@@ -20,6 +20,15 @@
 - Update docs when behavior changes.
 - If storage or backup behavior changes, flag it clearly.
 
+## Preferred workflow for agents
+- Inspect before editing.
+- Do not read `.env` unless the task requires debugging runtime config.
+- Prefer small, reversible changes.
+- Before changing auth, Docker, ports, volumes, or database storage, explain the impact first.
+- After frontend changes, run `npm run build` in `frontend`.
+- After backend changes, run the backend smoke/test command if available.
+- For schema changes, add a new migration; never edit an applied migration.
+
 ## Done when
 - Build passes
 - Existing features still work
