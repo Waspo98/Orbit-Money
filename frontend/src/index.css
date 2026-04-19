@@ -1230,6 +1230,12 @@ input, textarea, select {
   max-width: var(--app-max-width);
   margin: 0 auto;
   width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.app-main > * {
+  min-width: 0;
 }
 
 /* Tablet: 640–1079px. Adds side padding so content doesn't sprawl full-width
@@ -3125,6 +3131,7 @@ input, textarea, select {
 /* ================== Budgets (v14) ================== */
 
 .budgets-view {
+  width: 100%;
   max-width: 820px;
   margin: 0 auto;
   /* Keep the document at full height even while loading. A large
@@ -3133,6 +3140,13 @@ input, textarea, select {
      at a non-1.0 scale when combined with user-scalable=no. The 100dvh
      floor stops the collapse and anchors the viewport. */
   min-height: calc(100dvh - 140px);
+}
+
+@media (max-width: 639px) {
+  .budgets-view {
+    max-width: none;
+    margin-inline: 0;
+  }
 }
 
 /* ---------- Month navigation ---------- */
@@ -3149,6 +3163,7 @@ input, textarea, select {
   align-items: center;
   gap: 6px;
   margin: 8px 0 16px;
+  min-width: 0;
 }
 
 .month-nav-arrow {
@@ -3187,6 +3202,7 @@ input, textarea, select {
 .month-nav-label-wrap {
   position: relative;
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3344,7 +3360,7 @@ input, textarea, select {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: 4px 2px 10px;
+  padding: 4px 0 10px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 10px;
   gap: 10px;
@@ -3365,11 +3381,15 @@ input, textarea, select {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .budget-sort-select {
   font-family: inherit;
   font-size: 0.8rem;
+  min-width: 0;
+  max-width: 100%;
   padding: 4px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
