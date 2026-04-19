@@ -1,160 +1,270 @@
-# Budget Tracker
+# Budget Tracker — Technical Reference
 
-Self-hosted personal finance tracker for The Overbay HAL 9000. Node.js + Express backend, React + Vite frontend, SQLite storage. Designed to pair with SimpleFIN for bank sync and import history from Rocket Money.
+> **Operational summary lives in `Server_info.md`.** This document covers implementation details needed when modifying or debugging the app.
 
-This is the **Phase 1 scaffold** — infrastructure, schema, and auth only. No features yet. Running this gets you a working login + placeholder page that confirms the full stack (Docker → Express → SQLite → React → Cloudflare Tunnel) is wired up correctly.
+## Stack
+- **Frontend:** React 18 (Vite build, client-side routing via React Router v6)
+- **Backend:** Node.js 20 + Express
+- **Auth:** Session-based login (credentials in `.env`); `API_KEY` header for programmatic access
+- **Data:** SQLite (better-sqlite3) + Docker named volume
+- **Key dependencies:** `express`, `express-session`, `better-sqlite3`, `multer` (CSV upload), `papaparse` (CSV parsing), `@dnd-kit/core` + `@dnd-kit/sortable` (accounts reorder)
 
----
-
-## What's In This Scaffold
-
-- Multi-stage `Dockerfile` (`node:20-slim` build → `node:20-alpine` prod, matching Lawn Tracker's WSL2-safe pattern)
-- `docker-compose.yml` on `web_proxy` network with named `budget-data` volume
-- SQLite schema for all Phase 1 tables (accounts, transactions, categories, rules, budgets, goals, simplefin config)
-- Migration runner — applies SQL files in `backend/src/db/migrations/` in order, tracked in `_migrations` table
-- 32 default categories seeded from your Rocket Money CSV analysis, with icons, colors, transfer/income flags
-- Session-based auth (admin credentials from `.env`) + `X-API-Key` header support
-- Indefinite session cookies (10-year expiry)
-- Placeholder React app that shows DB counts after login
-
-## What's NOT In This Scaffold (Yet)
-
-- CSV import
-- SimpleFIN sync
-- Rules engine
-- Transactions UI
-- Accounts/Categories management UI
-- Real design system (minimal CSS for now; full theming in Phase 1 step 10)
-
----
-
-## Setup
-
-### 1. Copy to the server
-
-```powershell
-# From your dev machine or the server itself, place these files at:
-C:\Docker\Compose\Budget Tracker\
-```
-
-### 2. Create `.env` from the example
-
-```powershell
-cd "C:\Docker\Compose\Budget Tracker"
-copy .env.example .env
-```
-
-Edit `.env` and replace the placeholder values. Generate strong random strings with:
-
-```powershell
-# PowerShell one-liner for a 32-byte hex random string
--join ((1..64) | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) })
-```
-
-Do this for `SESSION_SECRET`, `API_KEY`, and `SIMPLEFIN_ENCRYPTION_KEY`.
-
-### 3. Free up `money.overbay.app` in Cloudflare Tunnel
-
-Since we're reclaiming this hostname from Actual Budget:
-
-1. Stop and remove the Actual Budget container + volume
-2. Edit your Cloudflare Tunnel config and change the `money.overbay.app` service from `http://actual_server:5006` to `http://budget-tracker:5008`
-3. Remove the Actual Budget backup step from `DailyBackup.ps1`
-
-### 4. Build and start
-
-```powershell
-docker compose up -d --build
-```
-
-First boot will:
-- Run migrations (creates all tables)
-- Seed 32 default categories
-- Start Express on port 5008
-
-### 5. Verify
-
-Visit `https://money.overbay.app` (or `http://192.168.86.200:5008` for direct LAN access). You should see a login page. Log in with the credentials from `.env`.
-
-Once logged in, the placeholder page will show:
-- Transactions: 0
-- Categories: 32
-- Accounts: 0
-
-If you see that, the scaffold is healthy and we're ready for CSV import.
-
----
-
-## Directory Layout
-
-```
-Budget Tracker/
-├── README.md                            # this file
-├── .env.example                         # template for .env
-├── .gitignore
-├── .dockerignore
-├── docker-compose.yml
-├── Dockerfile
-├── backend/
-│   ├── package.json
-│   └── src/
-│       ├── server.js                    # Express entry
-│       ├── config.js                    # env var loader
-│       ├── auth.js                      # session/API-key middleware
-│       ├── db/
-│       │   ├── index.js                 # SQLite connection
-│       │   ├── migrations.js            # migration runner
-│       │   └── migrations/
-│       │       ├── 001_initial_schema.sql
-│       │       └── 002_seed_categories.sql
-│       └── routes/
-│           ├── auth.js                  # /api/auth/*
-│           └── health.js                # /api/health
-└── frontend/
-    ├── package.json
-    ├── vite.config.js
-    ├── index.html
-    └── src/
-        ├── main.jsx
-        ├── App.jsx
-        ├── Login.jsx
-        ├── api.js
-        └── index.css
-```
+## Dockerfile
+Multi-stage build:
+- **Stage 1 (build):** `node:20-slim` — not Alpine, because Rollup/musl hangs on Docker Desktop + WSL2
+- **Stage 2 (prod):** `node:20-alpine` — requires `python3 make g++` for better-sqlite3 native compilation (removed after install)
+- Uses `--no-audit --no-fund` flags to prevent npm hangs
 
 ## Data Storage
-
-All persistent data lives in the `budget-data` named Docker volume, mounted at `/app/data`:
+All data lives in Docker named volume `budget-data` mounted at `/app/data`:
 
 | File | Purpose |
 |---|---|
-| `budget.db` | Main SQLite database (accounts, transactions, categories, rules, etc.) |
-| `sessions.db` | `connect-sqlite3` session store (separate file by design) |
+| `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
+| `sessions.db` | Session store (separate connection, managed by `connect-sqlite3`) |
 
-## Backup Integration
+### Database Schema (10 migrations)
 
-After the scaffold is verified, add this step to `C:\Scripts\DailyBackup.ps1`:
+| Migration | Purpose |
+|---|---|
+| `001_initial_schema.sql` | Core tables: accounts, transactions, categories, rules, simplefin_config, budgets, goals. 32 seeded Rocket Money categories. |
+| `002_seed_categories.sql` | Additional category seeds |
+| `003_account_uniqueness.sql` | Composite unique index on (institution, account_number_last4) |
+| `004_simplefin_sync_support.sql` | `sync_log` table, `cutover_date` on `simplefin_config` |
+| `005_add_mortgage_type.sql` | Adds `mortgage` to accounts.type CHECK constraint (full table rebuild) |
+| `006_account_sort_order.sql` | Adds `sort_order` column to accounts for drag-and-drop reorder |
+| `007_transactions_updated_at.sql` | Adds `updated_at` column to transactions (constant default + backfill from `imported_at`) |
+| `008_original_edited_split.sql` | Renames `transactions.merchant` → `original_merchant`, adds `edited_merchant`, `edited_category_id`, `edited_is_transfer`, `edited_is_ignored` and matching `_source` columns |
+| `009_budget_monthly.sql` | Per-month budgets: rebuilds `budgets` with composite unique `(category_id, month)` |
+| `010_budget_global_amount.sql` | Reverted to global per-category budgets: rebuilds `budgets` back to `category_id UNIQUE`, collapses any multi-month rows to the most recent via `ROW_NUMBER() OVER (PARTITION BY category_id ORDER BY month DESC)` |
 
-```powershell
-# Budget Tracker database
-docker cp budget-tracker:/app/data/budget.db "$BackupStaging\budget-tracker\budget.db"
-```
+### Key Data Model Notes
 
-(No need to back up `sessions.db` — it's transient.)
+**Sign convention:** expenses are negative, income is positive (flipped from Rocket Money's positive-expense format during CSV import).
 
-## Gotchas
+**Transaction sources:** `csv_import`, `simplefin`, `manual` — tracked in `source` column, deduplicated via `external_id`.
 
-- **Native module compilation:** `better-sqlite3` is a native module. The Dockerfile includes Alpine build tools (`python3`, `make`, `g++`) and removes them after install. If builds fail, you may need to bump the `better-sqlite3` version to one with prebuilt Alpine binaries.
-- **First run after schema change:** Add a new file like `003_whatever.sql` to `migrations/`. The runner picks up new files in sorted order on next restart. Never edit an already-applied migration — always create a new one.
-- **Indefinite sessions:** Cookies are set with a 10-year `maxAge`. Clearing your browser cookies logs you out; otherwise you'll stay logged in essentially forever.
+**Original / edited provenance (migration 008):** Rules and manual edits never mutate the raw imported values. Each editable field has an `original_*` column (populated at import, never touched afterward) and a nullable `edited_*` column with an `edited_*_source` tag (`'user'`, `'rule:{id}'`, or NULL). Display values are computed as `COALESCE(edited_X, original_X)` at the API layer so the UI sees one logical merchant/category/flag regardless of how it got there. User edits are sticky — rules never override `source='user'`.
 
-## What's Next
+**Rules:** JSON-serialized `conditions` (array of `{field, operator, value}`) and `actions` (array of `{type, value}`). Condition fields: `merchant`, `original_description`, `amount`, `account_id`, `category_id`. All condition evaluation runs against originals only, making match counts stable. Action types: `rename`, `categorize`, `mark_transfer`, `mark_ignored`. First rule (priority DESC, id ASC) to claim a given field wins; lower-priority rules skip it.
 
-Once this scaffold is running and verified, the next iteration adds:
+**Account types:** `checking`, `savings`, `credit`, `investment`, `loan`, `mortgage`, `cash`, `other`.
 
-1. Rocket Money CSV import (the 8,428-row file)
-2. Account type mapping UI (classify each imported account)
-3. Auto-generate rename rules from your Rocket Money Custom Names
-4. Basic transactions list view
+**Overlap strategy (SimpleFIN + Rocket Money):** cutover date approach — RM owns transactions before cutover, SimpleFIN owns after. Pre-cutover RM transactions are deleted during sync if SimpleFIN provides the same period.
 
-After that: accounts/categories management, the rules engine, and SimpleFIN sync.
+**Budgets:** One row per `category_id` (globally applied). The `budgets` table retains the `rollover` column from migration 001 for future Phase 2 work but it's not consumed by the current UI.
+
+## Features
+
+### Core Transactions
+- Rocket Money CSV import: auto-creates accounts, sign-flips amounts, and generates rename rules from Custom Name columns
+- SimpleFIN bank sync with AES-256-GCM encrypted access URL storage
+- Tap-to-expand transaction cards — grid-template-rows animated expand/contract (220ms), auto-scroll-into-view on expand (accounts for bottom tabs height)
+- Inline edit modal: merchant, category, notes (date/amount read-only — bank ground truth)
+- Transaction deletion and transfer/ignored toggles
+- Edit provenance UI: "edited manually" / "applied by rule" badges, per-field "reset to original" buttons, inline display of the original value alongside the edited one
+
+### Search, Filter, and Sort
+Transactions page toolbar has a debounced search input + filter sheet + sort dropdown. URL query params are the source of truth — back-button and link-sharing work. Active filters render as dismissible pills below the toolbar. Supported filters:
+
+- **q** — free-text search across display merchant, original merchant, original description, and notes
+- **accounts** — multi-select account IDs
+- **categories** — multi-select category IDs (supports `uncategorized` literal for NULL matches)
+- **date_from** / **date_to** — YYYY-MM-DD inclusive, with chip presets (This month, Last month, Last 30 / 90, YTD, All time)
+- **amount_min** / **amount_max** — absolute-value match so `50` catches both ±$50
+- **type** — all / income / expense / transfer
+- **include_ignored** — default true; can hide
+- **has_edits** — any / yes / no
+- **sort** — `date_desc | date_asc | amount_desc | amount_asc | abs_amount_desc | abs_amount_asc | merchant_asc`
+
+All comparisons use COALESCE(edited, original) so filtering matches what's on screen.
+
+### Rules Management
+- Full CRUD: create, read, update, delete individual rules
+- Bulk wipe with typed "DELETE" confirmation
+- Condition builder: field + operator + value rows, AND'd together
+- Action builder: rename, categorize, mark transfer, mark ignored
+- Live preview: debounced (400ms) match count against existing transactions before saving
+- Enable/disable toggle per rule with optimistic UI
+- Match count displayed per rule in the list view — stable because counting is condition-only (no actions involved)
+- "Create rule from transaction" flow: pre-fills condition with `merchant contains [original merchant]`, action with `rename to [current merchant]`. Synchronous reapply on save so the Transactions page reflects the change immediately on silent refresh
+- Rule deletion reverts every edit whose `source = 'rule:{id}'`, then re-runs remaining rules to re-populate any fields they should claim
+- Auto-apply: creating, updating, or toggling a rule triggers a synchronous reapply — by the time the response returns, all transactions reflect settled state
+
+### SimpleFIN Sync
+- Setup via base64 token exchange (SimpleFIN Bridge API)
+- Access URL encrypted at rest (AES-256-GCM, key from `.env`)
+- Auto-match accounts by (institution, last4)
+- Transfer auto-matcher: pairs opposite-sign same-day transactions in transfer-flagged categories
+- Scheduler: daily at 6 AM (configurable) + manual "Sync Now"
+- Sync log with status tracking (success / error / partial)
+- Partial sync detection: if SimpleFIN reports account connection issues, status shows as yellow "Partial sync" rather than red "Error"
+- Node `fetch` rejects inline URL credentials — implementation strips them and sends as Basic Auth header
+
+### Accounts
+- Full CRUD + merge (reassigns all transactions to target, deletes source) + archive/unarchive
+- **Reorder mode:** dedicated toggle that replaces normal rows with full-width drag handles; in-mode there are no competing tap targets, activation distance is 0 (any movement), and tapping "Done" exits. Outside reorder mode, no `@dnd-kit` listeners are mounted at all — eliminating the press-and-hold activation problems that dogged earlier versions.
+- Sort order persisted to `sort_order` column
+- "See transactions" button filters the Transactions page via `?accounts=X` query param
+- Three-dot dropdown menu per account (Edit, Merge, Archive, Delete)
+- Edit modal: name, type, institution only (balance and last-4 are intentionally not editable)
+
+### Budgets
+- **Monthly caps, global per category.** One amount per category that applies to every month. Editing `Groceries` updates the cap for every past and future month.
+- **Month navigation** via `‹ / ›` arrows plus a visible-but-transparent `<select>` overlaying a styled pill — opens the native month picker on tap. Chose `<select>` over a hidden `<input type="month">` because hidden month-type inputs caused unexpected mobile-browser zoom on page load.
+- **Summary card:** overall spent of budgeted, percentage, remaining/over, plus an unbudgeted-spending callout
+- **Income / Expenses / Net** three-column stat row at the top, scoped to the viewed month, excludes ignored + transfer transactions
+- **Three sections:** Budgeted (sorted most-over-budget first, per-row progress bars with over/remaining footnotes), Spent without a budget (quick-add CTAs), and No activity (collapsed toggle)
+- Progress bars transition green → yellow (≥85%) → red (>100%)
+- Endpoints: GET `/api/budgets?month=YYYY-MM`, GET `/api/budgets/months`, PUT `/api/budgets` (upsert), DELETE `/api/budgets/:id`
+
+### Dashboard
+Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on ≥900px with Recent Activity spanning full width. Data comes from parallel calls to existing endpoints — no dashboard-specific backend.
+
+- **Accounts card:** net worth (sum of active balances), breakdown by group (Cash = checking+savings+cash, Investments, Credit cards, Loans, Other). Rows with zero balance are hidden.
+- **This month card:** Day X of Y + compact Income / Expenses / Net trio
+- **Budget pulse card:** overall progress bar + up to 3 "attention" categories (over-budget first, then 85%+), or a success message when all are on track
+- **Top spending card:** up to 7 categories with horizontal bars scaled to the biggest spender; bars use each category's color
+- **Recent activity card:** last 10 transactions, tap-to-navigate to full Transactions page
+- Shimmer skeleton loading per card
+- Empty state routes new users to Import / SimpleFIN setup
+
+### Responsive Layout
+- **Phone (< 640px):** Single column, bottom tabs
+- **Tablet/Foldable (640–1079px):** Centered content (max-width 820px), bottom tabs
+- **Desktop (≥ 1080px):** Left sidebar (260px) + content area, bottom tabs hidden
+
+### Navigation
+- **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More
+- **Desktop sidebar:** Same 5 items as bottom tabs
+- **Hamburger menu (top-right):** Import, Settings, Theme toggle, Sign out
+- **More tab:** Opens bottom sheet (mobile) or centered modal (desktop) with cards for Rules, Settings, Import, and coming-soon placeholders (Mortgage Calculator, Net Worth, Goals, Credit Score)
+- **Settings page:** SimpleFIN configuration and sync log only. The Rules management card was removed after the Rules feature got its own dedicated page.
+- **React Router v6:** Client-side routing with browser back/forward support. All routes served via Express catch-all for deep-link support.
+
+### UI Details
+- `AnimatedModal` component: render-prop pattern (`{({ close }) => ...}`), 180ms slide-in/slide-out via `.closing` CSS class
+- Scroll lock: `document.body.style.overflow = 'hidden'` on all modals, hamburger menu, and More sheet
+- Three-way theme toggle (☀️ / 💻 / 🌙): localStorage persistence with pre-paint script in `index.html` to avoid flash
+- 40+ CSS custom properties for light/dark themes, emerald-600/500 accent
+- Inter Tight (Google Fonts) throughout — no serif fonts
+- Bottom tabs: 80px height (Material Design baseline), 5 columns
+- Dismissable sync-error banner keyed by error message text in localStorage
+- Mobile zoom suppression: `text-size-adjust: 100%` on `html` + 16px minimum font-size on editable form controls ≤767px (prevents both Android Chrome text boosting and iOS Safari focus zoom)
+
+### PWA
+- `manifest.webmanifest` with SVG icons (regular + maskable)
+- Service worker (`sw.js`): pass-through fetch, no offline caching (satisfies install criteria only)
+- Installable on Android Chrome, desktop Chrome/Edge
+- `theme-color` meta tags for light and dark schemes
+
+## API Endpoints
+
+### Auth
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/auth/login` | Session login |
+| POST | `/api/auth/logout` | Session logout |
+| GET | `/api/auth/me` | Check auth status |
+
+### Transactions
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/transactions?...` | Paginated list with full filter/search/sort. Returns display values (COALESCE'd) + originals + edit metadata + `has_edits` flag, plus `grandTotal` for "X of Y shown" UI |
+| GET | `/api/transactions/:id` | Single transaction detail |
+| PATCH | `/api/transactions/:id` | Partial update (merchant, category_id, notes, is_transfer, is_ignored). Writes to `edited_*` with source='user'. Setting a value equal to the original clears the edit and re-runs rules for that one row. |
+| POST | `/api/transactions/:id/reset` | Body `{ fields: [...] }`. Clears edits on listed fields and reapplies rules |
+| DELETE | `/api/transactions/:id` | Hard delete |
+
+### Accounts
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/accounts?includeArchived=` | List, ordered by sort_order |
+| PUT | `/api/accounts/:id` | Update (name, type, institution) |
+| POST | `/api/accounts/:id/archive` | Archive |
+| POST | `/api/accounts/:id/unarchive` | Unarchive |
+| POST | `/api/accounts/:id/merge` | Merge into target account |
+| DELETE | `/api/accounts/:id` | Delete (only if 0 transactions) |
+| POST | `/api/accounts/reorder` | Save drag-and-drop order |
+
+### Rules
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/rules?withCounts=1` | List all rules, optionally with match counts (condition-only counting) |
+| POST | `/api/rules` | Create rule. Synchronous full reapply before response returns. |
+| PUT | `/api/rules/:id` | Update rule. Synchronous full reapply. |
+| PATCH | `/api/rules/:id/enabled` | Toggle enabled. Synchronous full reapply. |
+| DELETE | `/api/rules/:id` | Delete single rule. Synchronously clears all `edited_*` with `source = 'rule:{id}'`, then reapplies remaining rules. |
+| DELETE | `/api/rules/all` | Wipe all rules. Clears all `rule:*` sourced edits. |
+| POST | `/api/rules/preview` | Preview match count for unsaved conditions |
+| POST | `/api/rules/reapply-all` | Manual full reapply |
+| GET | `/api/rules/:id/match-count` | Match count for one rule |
+
+### Categories
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/categories` | List all (32 seeded from Rocket Money) |
+
+### Budgets
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/budgets?month=YYYY-MM` | Monthly overview: `budgeted` / `unbudgeted` / `inactive` arrays + summary with `total_budgeted`, `total_spent_in_budgets`, `total_spent_unbudgeted`, `total_spent`, `total_income`, `total_expenses`, `total_net`. Month defaults to current month. |
+| GET | `/api/budgets/months` | Distinct months with transaction activity (for month picker) |
+| PUT | `/api/budgets` | Upsert `{ category_id, amount, rollover? }` — global per-category |
+| DELETE | `/api/budgets/:id` | Delete budget |
+
+### SimpleFIN
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/simplefin/status` | Connection status, last sync info |
+| POST | `/api/simplefin/setup` | Connect with setup token + cutover date |
+| POST | `/api/simplefin/sync` | Manual sync now |
+| POST | `/api/simplefin/disconnect` | Disconnect (keeps data) |
+| GET | `/api/simplefin/sync-log?limit=` | Recent sync history |
+
+### Import
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/import/rocket-money` | CSV upload (multipart/form-data). Inserts raw `original_merchant`, reapplies rules post-insert so Rocket Money Custom Names land as rule-owned `edited_merchant` values. |
+
+### Health
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/health` | Health check |
+
+## File Inventory
+
+### Backend (`backend/src/`)
+- `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
+- `db/index.js`, `db/migrations.js`
+- `db/migrations/001` through `010`
+- `routes/`: auth, health, import, transactions, accounts, categories, rules, simplefin, budgets
+- `services/`: csvImport, ruleMatcher (exports `loadRules`, `computeEdits`, `countMatches`, `reapplyRulesToAllTransactions`, `reapplyRulesToTransaction`, `revertEditsForRule`, `applyRulesToDraft`), simplefinClient, simplefinSync, transferMatcher
+
+### Frontend (`frontend/`)
+- `index.html` (Inter Tight font, PWA manifest link, pre-paint theme script, SW registration)
+- `public/`: manifest.webmanifest, icon.svg, icon-maskable.svg, sw.js
+- `src/main.jsx`, `src/App.jsx` (BrowserRouter, passes accounts + categories to Transactions and Dashboard), `src/Login.jsx`, `src/api.js` (get/post/put/patch/del), `src/index.css` (~3000 lines)
+- `src/hooks/useTheme.js`
+- `src/components/`: AnimatedModal, BottomTabs, DesktopSidebar, DropdownMenu, FilterSheet, HamburgerMenu, MoreSheet, SyncErrorBanner
+- `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, Import
+
+## Known Gotchas
+- **better-sqlite3 `.iterate()` + write transaction** = "database connection is busy" — always use `.all()` instead
+- **Node `fetch` rejects inline URL credentials** — strip from URL and send as Basic Auth header
+- **SQLite integer 0 renders as "0" in JSX** with `&&` pattern — must coerce with `!!` (e.g., `{!!account.is_archived && <Badge />}`)
+- **SQLite `ALTER TABLE ADD COLUMN`** cannot use function defaults like `datetime('now')` — must use constant default then backfill
+- **`touch-action: manipulation`** on draggable elements blocks `@dnd-kit` touch events — reorder mode removes competing touch targets entirely rather than fighting activation heuristics
+- **NavLink renders `<a>` elements** — need explicit `text-decoration: none; outline: none;` on all states to prevent flash-underline on tap
+- **SW needs a fetch listener** (even pass-through) to satisfy PWA install criteria in some browsers
+- **Rules with match counts** loads slowly with many rules — `withCounts=1` scans all transactions per rule. For 300+ rules × 8K+ transactions, expect 10–20 second initial load.
+- **Hidden `<input type="month">` triggers mobile-browser layout quirks** — use a `<select>` overlaying a styled pill instead when you want a native month picker
+- **Rule chaining no longer works** — since conditions match against originals only, a rule can't match on a value a higher-priority rule just renamed to. This was an intentional v12 change (match counts were broken because of the old chaining semantics). If a hand-built rule relied on chained renames, rewrite it to condition on `original_description` or the unmodified upstream value.
+
+## Planned
+- **Phase 2 Budgets:** rollover (column already exists), income targets with proper direction, category groupings, spending pace
+- **Phase 2 Dashboard:** month-over-month comparison on the This Month card, spending-over-time and net-worth charts
+- **Recurring bills / subscriptions detection**
+- **Goals tracking**
+- **Bulk merge suggestions:** Auto-pair SimpleFIN duplicates with RM accounts by institution + last-4
+- **Mortgage calculator, credit score** (placeholders in More sheet)
