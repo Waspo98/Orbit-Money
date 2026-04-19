@@ -360,10 +360,10 @@ function WipeRulesModal({ count, onClose, onWiped }) {
             <strong style={{ color: 'var(--text)' }}>
               {count.toLocaleString()}
             </strong>{' '}
-            rules. Transactions that were previously renamed or recategorized
-            by these rules are not affected — their current values stay.
-            Future transactions won't be auto-processed until you create new
-            rules.
+            rules. Rule-applied transaction edits will be cleared, so those
+            transactions fall back to their original bank/import values. Manual
+            edits stay in place. Future transactions won't be auto-processed
+            until you create new rules.
           </p>
 
           <div className="warning-banner">

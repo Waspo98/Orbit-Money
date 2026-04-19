@@ -168,21 +168,33 @@ export function computeEdits(transaction, rules) {
     edited_is_ignored_source: null
   };
 
-  if (transaction.edited_merchant_source === 'user') {
+  if (
+    transaction.edited_merchant_source === 'user' ||
+    transaction.edited_merchant_source?.startsWith('system:')
+  ) {
     edits.edited_merchant = transaction.edited_merchant;
-    edits.edited_merchant_source = 'user';
+    edits.edited_merchant_source = transaction.edited_merchant_source;
   }
-  if (transaction.edited_category_id_source === 'user') {
+  if (
+    transaction.edited_category_id_source === 'user' ||
+    transaction.edited_category_id_source?.startsWith('system:')
+  ) {
     edits.edited_category_id = transaction.edited_category_id;
-    edits.edited_category_id_source = 'user';
+    edits.edited_category_id_source = transaction.edited_category_id_source;
   }
-  if (transaction.edited_is_transfer_source === 'user') {
+  if (
+    transaction.edited_is_transfer_source === 'user' ||
+    transaction.edited_is_transfer_source?.startsWith('system:')
+  ) {
     edits.edited_is_transfer = transaction.edited_is_transfer;
-    edits.edited_is_transfer_source = 'user';
+    edits.edited_is_transfer_source = transaction.edited_is_transfer_source;
   }
-  if (transaction.edited_is_ignored_source === 'user') {
+  if (
+    transaction.edited_is_ignored_source === 'user' ||
+    transaction.edited_is_ignored_source?.startsWith('system:')
+  ) {
     edits.edited_is_ignored = transaction.edited_is_ignored;
-    edits.edited_is_ignored_source = 'user';
+    edits.edited_is_ignored_source = transaction.edited_is_ignored_source;
   }
 
   // Iterate rules in priority DESC, id ASC (order provided by loadRules).

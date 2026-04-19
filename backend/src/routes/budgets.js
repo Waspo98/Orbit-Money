@@ -56,14 +56,16 @@ router.get('/', requireAuth, (req, res) => {
     const spending = db
       .prepare(
         `SELECT
-           COALESCE(edited_category_id, category_id) AS cat_id,
-           -SUM(amount) AS spent,
+           COALESCE(t.edited_category_id, t.category_id) AS cat_id,
+           -SUM(t.amount) AS spent,
            COUNT(*) AS n
-         FROM transactions
-         WHERE date >= ? AND date <= ?
-           AND COALESCE(edited_is_ignored,  is_ignored)  = 0
-           AND COALESCE(edited_is_transfer, is_transfer) = 0
-           AND COALESCE(edited_category_id, category_id) IS NOT NULL
+         FROM transactions t
+         JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
+         WHERE t.date >= ? AND t.date <= ?
+           AND COALESCE(t.edited_is_ignored,  t.is_ignored)  = 0
+           AND COALESCE(t.edited_is_transfer, t.is_transfer) = 0
+           AND c.is_income = 0
+           AND c.is_transfer = 0
          GROUP BY cat_id`
       )
       .all(start, end);
@@ -91,13 +93,18 @@ router.get('/', requireAuth, (req, res) => {
       .prepare(
         `SELECT id, name, color, icon, is_income, is_transfer, sort_order
            FROM categories
-          WHERE is_transfer = 0
+          WHERE is_transfer = 0 AND is_income = 0
           ORDER BY sort_order, name`
       )
       .all();
 
     const budgets = db
-      .prepare('SELECT id, category_id, amount, rollover FROM budgets')
+      .prepare(
+        `SELECT b.id, b.category_id, b.amount, b.rollover
+           FROM budgets b
+           JOIN categories c ON c.id = b.category_id
+          WHERE c.is_transfer = 0 AND c.is_income = 0`
+      )
       .all();
     const budgetByCat = new Map(budgets.map((b) => [b.category_id, b]));
 
@@ -214,6 +221,18 @@ router.put('/', requireAuth, (req, res) => {
   }
 
   try {
+    const category = db
+      .prepare('SELECT is_income, is_transfer FROM categories WHERE id = ?')
+      .get(catId);
+    if (!category) {
+      return res.status(400).json({ error: 'category_id does not exist.' });
+    }
+    if (category.is_income || category.is_transfer) {
+      return res
+        .status(400)
+        .json({ error: 'Budgets can only be created for spending categories.' });
+    }
+
     const existing = db
       .prepare('SELECT id FROM budgets WHERE category_id = ?')
       .get(catId);

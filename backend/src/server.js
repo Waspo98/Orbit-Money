@@ -1,12 +1,14 @@
 import express from 'express';
 import session from 'express-session';
 import SQLiteStoreFactory from 'connect-sqlite3';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config.js';
-import { runMigrations } from './db/index.js';
+import { db, runMigrations } from './db/index.js';
 import { requireAuth } from './auth.js';
 import { startScheduler } from './scheduler.js';
+import { seedDemoData } from './services/demoSeed.js';
 import authRoutes from './routes/auth.js';
 import healthRoutes from './routes/health.js';
 import importRoutes from './routes/import.js';
@@ -23,6 +25,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 console.log('Budget Tracker starting...');
 console.log('Running migrations...');
 runMigrations();
+if (config.seedDemoData) {
+  seedDemoData(db);
+}
 
 // --- Express app ------------------------------------------------------------
 const app = express();
@@ -71,6 +76,13 @@ const publicDir = path.join(__dirname, '..', 'public');
 app.use(express.static(publicDir));
 
 app.get(/^\/(?!api).*/, (req, res) => {
+  if (!fs.existsSync(path.join(publicDir, 'index.html'))) {
+    return res
+      .status(404)
+      .send(
+        'Frontend dev server is separate in local development. Open http://localhost:5173 instead.'
+      );
+  }
   res.sendFile(path.join(publicDir, 'index.html'));
 });
 

@@ -8,7 +8,8 @@ export const config = {
   apiKey: process.env.API_KEY || null,
   simplefinEncryptionKey: process.env.SIMPLEFIN_ENCRYPTION_KEY,
   dataDir: process.env.DATA_DIR || '/app/data',
-  tz: process.env.TZ || 'America/Chicago'
+  tz: process.env.TZ || 'America/Chicago',
+  seedDemoData: process.env.SEED_DEMO_DATA === '1'
 };
 
 // Validate required env vars on startup — fail fast with a clear error.

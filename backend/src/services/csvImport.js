@@ -45,6 +45,10 @@ function accountKey(row) {
   return `${row['Institution Name'] || ''}|${row['Account Name'] || ''}|${row['Account Number'] || ''}`;
 }
 
+function canMatchExistingAccount(acct) {
+  return Boolean(acct.institution && acct.account_number_last4);
+}
+
 function computeContentHash({ date, amountCents, originalDescription, accountKey }) {
   const input = `${date}|${amountCents}|${originalDescription}|${accountKey}`;
   return crypto
@@ -140,7 +144,9 @@ export function importRocketMoneyCSV(db, csvBuffer) {
     const accountIdByKey = new Map();
 
     for (const [key, acct] of accountsMap) {
-      const existing = findAccount.get(acct.institution, acct.account_number_last4);
+      const existing = canMatchExistingAccount(acct)
+        ? findAccount.get(acct.institution, acct.account_number_last4)
+        : null;
       if (existing) {
         accountIdByKey.set(key, existing.id);
       } else {
@@ -161,7 +167,7 @@ export function importRocketMoneyCSV(db, csvBuffer) {
       insertRule.run(
         friendlyName,
         JSON.stringify([
-          { field: 'original_description', operator: 'contains', value: ruleName }
+          { field: 'merchant', operator: 'contains', value: ruleName }
         ]),
         JSON.stringify([{ type: 'rename', value: customName }])
       );
