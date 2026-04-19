@@ -30,6 +30,7 @@ changed only with care.
 |-- frontend/             # React/Vite PWA
 |   |-- public/           # manifest, icons, service worker
 |   `-- src/              # app shell, pages, components, hooks
+|-- Orbit Money Beta/     # Separate beta Docker deployment
 |-- docker-compose.yml    # Production-style Compose service
 |-- Dockerfile            # Multi-stage frontend build + backend runtime
 |-- Agents.md             # Instructions for coding agents
@@ -59,6 +60,8 @@ Optional or feature-specific values:
 - `SIMPLEFIN_ENCRYPTION_KEY` is required before SimpleFIN sync can be used.
 - `PORT` defaults to `5008`. Do not change this unless you also update the
   Docker, tunnel, and documentation assumptions.
+- `SESSION_NAME` defaults to `connect.sid`. Leave production on the default;
+  beta overrides this so localhost sessions do not collide.
 - `TZ` defaults to `America/Chicago`.
 
 For SimpleFIN encryption, `SIMPLEFIN_ENCRYPTION_KEY` must be a 64-character hex
@@ -100,6 +103,52 @@ The Compose service uses:
 
 Do not rename the service, port, network, or volume casually. Those names are
 part of the deployment setup.
+
+## Run The Beta Docker Deployment
+
+The beta deployment lives in `Orbit Money Beta/` and runs as a separate Docker
+container with its own data volume. Use it for branch testing before merging
+changes to the public production app.
+
+```powershell
+docker compose -f "Orbit Money Beta\docker-compose.yml" -p orbitmoney-beta up --build -d
+```
+
+Or from the beta folder:
+
+```bat
+deploy-beta.cmd
+```
+
+Open:
+
+```text
+http://localhost:5019
+```
+
+Check health:
+
+```powershell
+Invoke-RestMethod http://localhost:5019/api/health
+```
+
+The beta deployment uses:
+
+- Cloudflare hostname target: `orbitbeta.overbay.app`
+- Container name: `orbit-money-beta`
+- Host port: `5019`
+- Container port: `5008`
+- Docker network: external `web_proxy`
+- Docker volume: `orbitmoney-beta_orbit-money-beta-data`
+- Data mount: `/app/data`
+
+The beta container reads the parent `.env`, but overrides:
+
+- `SESSION_NAME=orbit_beta.sid`
+- `SEED_DEMO_DATA=1`
+
+That keeps beta browser sessions separate from production on localhost and seeds
+demo data into the beta-only volume when the beta database is empty.
 
 ## Local Development
 

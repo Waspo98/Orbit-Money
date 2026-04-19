@@ -1,0 +1,32 @@
+services:
+  orbit-money-beta:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: orbit-money-beta
+    restart: unless-stopped
+    ports:
+      - "5019:5008"
+    volumes:
+      - orbit-money-beta-data:/app/data
+    env_file:
+      - ../.env
+    environment:
+      PORT: 5008
+      SESSION_NAME: orbit_beta.sid
+      SEED_DEMO_DATA: "1"
+    networks:
+      - web_proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5008/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  web_proxy:
+    external: true
+
+volumes:
+  orbit-money-beta-data:

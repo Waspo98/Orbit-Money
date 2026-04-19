@@ -5,6 +5,7 @@ export const config = {
   adminUsername: process.env.ADMIN_USERNAME || 'admin',
   adminPassword: process.env.ADMIN_PASSWORD,
   sessionSecret: process.env.SESSION_SECRET,
+  sessionName: process.env.SESSION_NAME || 'connect.sid',
   apiKey: process.env.API_KEY || null,
   simplefinEncryptionKey: process.env.SIMPLEFIN_ENCRYPTION_KEY,
   dataDir: process.env.DATA_DIR || '/app/data',

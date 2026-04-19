@@ -37,6 +37,7 @@ app.use(express.json({ limit: '10mb' }));
 const SQLiteStore = SQLiteStoreFactory(session);
 app.use(
   session({
+    name: config.sessionName,
     store: new SQLiteStore({
       db: 'sessions.db',
       dir: config.dataDir,
