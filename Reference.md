@@ -44,7 +44,7 @@ All data lives in Docker named volume `budget-data` mounted at `/app/data`:
 
 **Transaction sources:** `csv_import`, `simplefin`, `manual` — tracked in `source` column, deduplicated via `external_id`.
 
-**Original / edited provenance (migration 008):** Rules and manual edits never mutate the raw imported values. Each editable field has an `original_*` column (populated at import, never touched afterward) and a nullable `edited_*` column with an `edited_*_source` tag (`'user'`, `'rule:{id}'`, or NULL). Display values are computed as `COALESCE(edited_X, original_X)` at the API layer so the UI sees one logical merchant/category/flag regardless of how it got there. User edits are sticky — rules never override `source='user'`.
+**Original / edited provenance (migration 008):** Rules and manual edits never mutate the raw imported values. Each editable field has an `original_*` column (populated at import, never touched afterward) and a nullable `edited_*` column with an `edited_*_source` tag (`'user'`, `'rule:{id}'`, `'system:*'`, or NULL). Display values are computed as `COALESCE(edited_X, original_X)` at the API layer so the UI sees one logical merchant/category/flag regardless of how it got there. User edits are sticky — rules never override `source='user'`. System edits are reserved for app-owned derivations like transfer matching and are preserved during rule reapply.
 
 **Rules:** JSON-serialized `conditions` (array of `{field, operator, value}`) and `actions` (array of `{type, value}`). Condition fields: `merchant`, `original_description`, `amount`, `account_id`, `category_id`. All condition evaluation runs against originals only, making match counts stable. Action types: `rename`, `categorize`, `mark_transfer`, `mark_ignored`. First rule (priority DESC, id ASC) to claim a given field wins; lower-priority rules skip it.
 
@@ -52,12 +52,12 @@ All data lives in Docker named volume `budget-data` mounted at `/app/data`:
 
 **Overlap strategy (SimpleFIN + Rocket Money):** cutover date approach — RM owns transactions before cutover, SimpleFIN owns after. Pre-cutover RM transactions are deleted during sync if SimpleFIN provides the same period.
 
-**Budgets:** One row per `category_id` (globally applied). The `budgets` table retains the `rollover` column from migration 001 for future Phase 2 work but it's not consumed by the current UI.
+**Budgets:** One row per spending `category_id` (globally applied). Transfer and income categories are excluded from budget rows and per-category spending lists; income is summarized separately in the monthly Income / Expenses / Net stat row. The `budgets` table retains the `rollover` column from migration 001 for future Phase 2 work but it's not consumed by the current UI.
 
 ## Features
 
 ### Core Transactions
-- Rocket Money CSV import: auto-creates accounts, sign-flips amounts, and generates rename rules from Custom Name columns
+- Rocket Money CSV import: auto-creates accounts, sign-flips amounts, and generates rename rules from Custom Name columns. Existing account matching only reuses an account when both institution and last4 are present; missing identifiers create a fresh account to avoid merging unrelated cash/manual accounts.
 - SimpleFIN bank sync with AES-256-GCM encrypted access URL storage
 - Tap-to-expand transaction cards — grid-template-rows animated expand/contract (220ms), auto-scroll-into-view on expand (accounts for bottom tabs height)
 - Inline edit modal: merchant, category, notes (date/amount read-only — bank ground truth)
@@ -95,7 +95,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Setup via base64 token exchange (SimpleFIN Bridge API)
 - Access URL encrypted at rest (AES-256-GCM, key from `.env`)
 - Auto-match accounts by (institution, last4)
-- Transfer auto-matcher: pairs opposite-sign same-day transactions in transfer-flagged categories
+- Transfer auto-matcher: pairs opposite-sign same-day transactions in displayed transfer-flagged categories. It respects edited category/ignored state and marks transfer status as a resettable `system:transfer_matcher` edit rather than mutating originals.
 - Scheduler: daily at 6 AM (configurable) + manual "Sync Now"
 - Sync log with status tracking (success / error / partial)
 - Partial sync detection: if SimpleFIN reports account connection issues, status shows as yellow "Partial sync" rather than red "Error"

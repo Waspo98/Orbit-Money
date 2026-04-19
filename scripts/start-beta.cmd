@@ -3,6 +3,7 @@ setlocal
 
 set "ROOT=%~dp0.."
 set "NODE_DIR=%ROOT%\.tools\node-v20.20.2-win-x64"
+set "NPM_CLI=%NODE_DIR%\node_modules\npm\bin\npm-cli.js"
 
 if not exist "%NODE_DIR%\node.exe" (
   echo Portable Node.js was not found at:
@@ -27,7 +28,7 @@ set "PATH=%NODE_DIR%;%PATH%"
 if not exist "%ROOT%\backend\node_modules" (
   echo Installing backend dependencies...
   cd /d "%ROOT%\backend"
-  call "%NODE_DIR%\npm.cmd" ci --cache "%ROOT%\.tools\npm-cache" --no-audit --no-fund
+  call "%NODE_DIR%\node.exe" "%NPM_CLI%" ci --cache "%ROOT%\.tools\npm-cache" --no-audit --no-fund
   if errorlevel 1 (
     echo Backend dependency install failed.
     pause
@@ -38,7 +39,7 @@ if not exist "%ROOT%\backend\node_modules" (
 if not exist "%ROOT%\frontend\node_modules" (
   echo Installing frontend dependencies...
   cd /d "%ROOT%\frontend"
-  call "%NODE_DIR%\npm.cmd" ci --cache "%ROOT%\.tools\npm-cache" --no-audit --no-fund
+  call "%NODE_DIR%\node.exe" "%NPM_CLI%" ci --cache "%ROOT%\.tools\npm-cache" --no-audit --no-fund
   if errorlevel 1 (
     echo Frontend dependency install failed.
     pause

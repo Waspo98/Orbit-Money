@@ -5,8 +5,8 @@
 // as two rows: e.g., -$500 from checking and +$500 to savings. We want those
 // collapsed into a single conceptual "Transfer" so budget math is correct.
 //
-// Strategy (safe heuristic): only consider transactions whose category has
-// is_transfer=1 (Credit Card Payment, Internal Transfers, Savings Transfer).
+// Strategy (safe heuristic): only consider transactions whose displayed category
+// has is_transfer=1 (Credit Card Payment, Internal Transfers, Savings Transfer).
 // This avoids false pairs like "paid $50 on card" + "got $50 from a friend".
 //
 // Pair criteria:
@@ -27,18 +27,18 @@
  */
 export function matchTransfers(db) {
   // Only consider transactions that:
-  //   - are in a transfer-flagged category
+  //   - display in a transfer-flagged category
   //   - aren't already paired
-  //   - aren't ignored
+  //   - don't display as ignored
   const rows = db
     .prepare(
       `
       SELECT t.id, t.account_id, t.date, t.amount
       FROM transactions t
-      JOIN categories c ON c.id = t.category_id
+      JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
       WHERE c.is_transfer = 1
         AND t.transfer_pair_id IS NULL
-        AND t.is_ignored = 0
+        AND COALESCE(t.edited_is_ignored, t.is_ignored) = 0
       ORDER BY t.date DESC, t.id ASC
     `
     )
@@ -53,7 +53,10 @@ export function matchTransfers(db) {
 
   const pairTxn = db.prepare(`
     UPDATE transactions
-    SET is_transfer = 1, transfer_pair_id = ?
+    SET edited_is_transfer = 1,
+        edited_is_transfer_source = 'system:transfer_matcher',
+        transfer_pair_id = ?,
+        updated_at = datetime('now')
     WHERE id = ?
   `);
 
