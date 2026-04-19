@@ -24,7 +24,7 @@ export default function Login({ onLogin }) {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={handleSubmit}>
-        <h1 className="login-title">Budget Tracker</h1>
+        <h1 className="login-title">Orbit Money</h1>
         <p className="login-subtitle">Welcome back.</p>
 
         <label className="field">

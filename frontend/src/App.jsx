@@ -126,7 +126,7 @@ function AppShell() {
           aria-label="Go to dashboard"
         >
           <div className="brand-mark">$</div>
-          <div className="brand-name">Budget Tracker</div>
+          <div className="brand-name">Orbit Money</div>
         </button>
 
         <button
