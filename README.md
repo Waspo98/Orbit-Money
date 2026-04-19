@@ -252,6 +252,40 @@ docker compose up --build -d
 Invoke-RestMethod http://localhost:5008/api/health
 ```
 
+## GitHub-Triggered Deploys
+
+The repo includes GitHub Actions workflows for remote deploys:
+
+- Pushes to `Beta` run `.github/workflows/deploy-beta.yml`
+- Pushes to `main` run `.github/workflows/deploy-live.yml`
+
+Both workflows expect a GitHub Actions self-hosted runner installed on the
+Windows server that hosts Docker. The runner must have these labels:
+
+```text
+self-hosted
+Windows
+X64
+```
+
+Install the runner from GitHub:
+
+```text
+GitHub repo -> Settings -> Actions -> Runners -> New self-hosted runner
+```
+
+Choose Windows and run the commands GitHub gives you on the server. After the
+runner is online, GitHub can deploy by calling the local scripts in this repo:
+
+```text
+Orbit Money Beta\deploy-beta.cmd
+scripts\deploy-live.cmd
+```
+
+The deploy scripts intentionally refuse to run if the server checkout has staged
+or unstaged changes. Commit or stash local edits before relying on automatic
+deploys.
+
 There is not currently a root-level `check` script or automated test suite. When
 changing behavior, manually smoke test the affected area and at minimum confirm:
 
