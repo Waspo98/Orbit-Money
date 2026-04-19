@@ -46,6 +46,13 @@ function formatCurrency(amount) {
   });
 }
 
+function parseOptionalCurrency(value) {
+  const cleaned = String(value || '').replace(/[$,]/g, '').trim();
+  if (!cleaned) return null;
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
 // ============================================================================
 // Main page
 // ============================================================================
@@ -327,6 +334,9 @@ function DraggableReorderRow({ account }) {
           {account.account_number_last4 && (
             <span>···{account.account_number_last4}</span>
           )}
+          {account.type === 'mortgage' && account.estimated_value != null && (
+            <span>Estimated value {formatCurrency(account.estimated_value)}</span>
+          )}
         </div>
       </div>
       <div className="account-balance">
@@ -404,6 +414,9 @@ function StaticAccountRow({
           {account.account_number_last4 && (
             <span>···{account.account_number_last4}</span>
           )}
+          {account.type === 'mortgage' && account.estimated_value != null && (
+            <span>Estimated value {formatCurrency(account.estimated_value)}</span>
+          )}
         </div>
       </div>
 
@@ -437,6 +450,9 @@ function EditAccountModal({ account, onClose, onSaved }) {
   const [name, setName] = useState(account.name);
   const [type, setType] = useState(account.type);
   const [institution, setInstitution] = useState(account.institution || '');
+  const [estimatedValue, setEstimatedValue] = useState(
+    account.estimated_value == null ? '' : String(account.estimated_value)
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -445,10 +461,20 @@ function EditAccountModal({ account, onClose, onSaved }) {
     setSaving(true);
     setError('');
 
+    const nextEstimatedValue =
+      type === 'mortgage' ? parseOptionalCurrency(estimatedValue) : null;
+
+    if (Number.isNaN(nextEstimatedValue)) {
+      setError('Estimated value must be a valid number.');
+      setSaving(false);
+      return;
+    }
+
     const patch = {
       name: name.trim(),
       type,
-      institution: institution.trim()
+      institution: institution.trim(),
+      estimated_value: nextEstimatedValue
     };
 
     try {
@@ -498,6 +524,19 @@ function EditAccountModal({ account, onClose, onSaved }) {
                 placeholder="e.g. Chase"
               />
             </label>
+
+            {type === 'mortgage' && (
+              <label className="field">
+                <span>Estimated Value</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={estimatedValue}
+                  onChange={(e) => setEstimatedValue(e.target.value)}
+                  placeholder="e.g. 300000"
+                />
+              </label>
+            )}
 
             {error && <div className="error">{error}</div>}
 

@@ -20,7 +20,8 @@ router.get('/', requireAuth, (req, res) => {
       .prepare(
         `
         SELECT a.id, a.name, a.type, a.institution, a.account_number_last4,
-               a.current_balance, a.is_manual, a.is_archived, a.sort_order,
+               a.current_balance, a.estimated_value,
+               a.is_manual, a.is_archived, a.sort_order,
                a.simplefin_account_id, a.created_at, a.updated_at,
                COUNT(t.id) AS transaction_count
           FROM accounts a
@@ -112,6 +113,7 @@ router.put('/:id', requireAuth, (req, res) => {
     ['institution', 'institution'],
     ['account_number_last4', 'account_number_last4'],
     ['current_balance', 'current_balance'],
+    ['estimated_value', 'estimated_value'],
     ['simplefin_account_id', 'simplefin_account_id']
   ];
 
@@ -122,6 +124,16 @@ router.put('/:id', requireAuth, (req, res) => {
       if (typeof v === 'string' && v.trim() === '' &&
           ['institution', 'account_number_last4', 'simplefin_account_id'].includes(col)) {
         v = null;
+      }
+      if (col === 'estimated_value') {
+        if (v === '' || v === null) {
+          v = null;
+        } else {
+          v = Number(v);
+          if (!Number.isFinite(v) || v < 0) {
+            return res.status(400).json({ error: 'estimated_value must be a positive number.' });
+          }
+        }
       }
       values.push(v);
     }
@@ -209,6 +221,13 @@ router.post('/:id/merge', requireAuth, (req, res) => {
       const moved = db
         .prepare('UPDATE transactions SET account_id = ? WHERE account_id = ?')
         .run(targetId, sourceId).changes;
+      if (source.estimated_value != null && target.estimated_value == null) {
+        db.prepare(
+          `UPDATE accounts
+              SET estimated_value = ?, updated_at = datetime('now')
+            WHERE id = ?`
+        ).run(source.estimated_value, targetId);
+      }
       db.prepare('DELETE FROM accounts WHERE id = ?').run(sourceId);
       return moved;
     });

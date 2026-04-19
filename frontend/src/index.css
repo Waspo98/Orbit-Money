@@ -2475,6 +2475,136 @@ input, textarea, select {
 .badge-archived  { background: var(--surface-3); color: var(--text-muted); }
 
 
+/* ================== 5. PAGES - Housing Calculator ================== */
+
+.housing-view {
+  min-height: calc(100dvh - 140px);
+}
+
+.housing-picker {
+  margin-bottom: 14px;
+}
+
+.housing-picker-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 360px) 1fr;
+  align-items: end;
+  gap: 16px;
+}
+
+.housing-picker-row .field,
+.housing-field {
+  margin-bottom: 0;
+}
+
+.housing-picker-note {
+  padding-bottom: 10px;
+}
+
+.housing-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 920px) {
+  .housing-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .housing-monthly {
+    grid-column: 1 / -1;
+  }
+}
+
+.housing-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.housing-form-grid-compact {
+  grid-template-columns: minmax(220px, 320px);
+}
+
+.housing-results {
+  margin: 16px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.housing-monthly .housing-results {
+  margin-top: -12px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.housing-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.housing-result-row:last-child {
+  border-bottom: 0;
+}
+
+.housing-result-row dt {
+  margin: 0;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.housing-result-row dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.housing-result-row.strong dt,
+.housing-result-row.strong dd {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.housing-result-row dt span {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.housing-result-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.button-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+@media (max-width: 640px) {
+  .housing-picker-row,
+  .housing-form-grid,
+  .housing-form-grid-compact {
+    grid-template-columns: 1fr;
+  }
+
+  .housing-picker-note {
+    padding-bottom: 0;
+  }
+}
+
+
 /* ================== 5. PAGES — Settings ================== */
 
 .settings-section {

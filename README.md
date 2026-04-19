@@ -296,6 +296,20 @@ changing behavior, manually smoke test the affected area and at minimum confirm:
 - Mobile layout still feels usable.
 - The PWA manifest and service worker still load.
 
+## Housing Calculator And Real Estate
+
+Mortgage accounts can store an optional `estimated_value` in the accounts table.
+When a mortgage has an estimated value, the Dashboard includes a `Real Estate`
+net worth category calculated as estimated home value minus the mortgage
+balance. Mortgage balances are excluded from the `Loans` category so they are
+not double-counted.
+
+The Housing Calculator is available from More -> Housing Calculator. Selecting
+a mortgage account prefills the estimated sale price from `estimated_value` and
+the remaining mortgage balance from the account balance. The calculator keeps
+the spreadsheet-style assumptions editable for selling fees, purchase details,
+cash to close, and monthly payment estimates.
+
 ## Data And Storage
 
 All production data lives in the Docker named volume `budget-data`, mounted at

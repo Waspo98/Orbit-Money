@@ -15,8 +15,9 @@ import { RuleEditor } from './Rules.jsx';
 // Account-type groupings (fed into the Accounts card):
 //   Assets     = checking + savings + cash + investment + other
 //   Credit     = credit   (shown as "owed" — abs value of sum)
-//   Loans      = loan + mortgage (shown as "owed")
-//   Net worth  = straight sum of every account balance as stored
+//   Loans      = loan (shown as "owed")
+//   Real Estate = estimated mortgage home value minus mortgage balance
+//   Net worth  = assets/debts plus real estate equity
 //
 // This assumes balances are stored with the conventional signs (debts
 // negative, assets positive) — SimpleFIN's norm. If a bank reports
@@ -116,29 +117,34 @@ function currentDayOfMonth() {
 const ASSET_TYPES = new Set(['checking', 'savings', 'cash']);
 const INVESTMENT_TYPES = new Set(['investment']);
 const CREDIT_TYPES = new Set(['credit']);
-const LOAN_TYPES = new Set(['loan', 'mortgage']);
+const LOAN_TYPES = new Set(['loan']);
 
 function groupAccountBalances(accounts) {
   let cash = 0;
   let investments = 0;
   let credit = 0;
   let loans = 0;
+  let realEstate = 0;
   let other = 0;
-  let net = 0;
 
   for (const a of accounts) {
     if (a.is_archived) continue;
     const b = Number(a.current_balance) || 0;
-    net += b;
 
     if (ASSET_TYPES.has(a.type)) cash += b;
     else if (INVESTMENT_TYPES.has(a.type)) investments += b;
     else if (CREDIT_TYPES.has(a.type)) credit += b;
     else if (LOAN_TYPES.has(a.type)) loans += b;
+    else if (a.type === 'mortgage') {
+      const estimatedValue = Number(a.estimated_value) || 0;
+      realEstate += estimatedValue - Math.abs(b);
+    }
     else other += b;
   }
 
-  return { cash, investments, credit, loans, other, net };
+  const net = cash + investments + credit + loans + realEstate + other;
+
+  return { cash, investments, credit, loans, realEstate, other, net };
 }
 
 // ============================================================================
@@ -350,6 +356,8 @@ function AccountsCard({ totals, activeCount, loading }) {
     rows.push({ label: 'Credit cards', value: totals.credit, isDebt: true });
   if (totals.loans !== 0)
     rows.push({ label: 'Loans', value: totals.loans, isDebt: true });
+  if (totals.realEstate !== 0)
+    rows.push({ label: 'Real Estate', value: totals.realEstate });
   if (totals.other !== 0) rows.push({ label: 'Other', value: totals.other });
 
   const netPositive = totals.net >= 0;

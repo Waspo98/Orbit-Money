@@ -16,6 +16,7 @@ import Accounts from './pages/Accounts.jsx';
 import Settings from './pages/Settings.jsx';
 import Import from './pages/Import.jsx';
 import Rules from './pages/Rules.jsx';
+import HousingCalculator from './pages/HousingCalculator.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
 import HamburgerMenu from './components/HamburgerMenu.jsx';
@@ -166,6 +167,10 @@ function AppShell() {
               element={<Accounts onChange={loadLookups} />}
             />
             <Route path="/rules" element={<Rules />} />
+            <Route
+              path="/housing-calculator"
+              element={<HousingCalculator accounts={accounts} />}
+            />
             <Route path="/settings" element={<Settings />} />
             <Route
               path="/import"
