@@ -124,35 +124,76 @@ Copy-Item ..\.env.example .env
 notepad .env
 ```
 
-Add this line to the local `backend/.env` file so SQLite
-data stays in the repo's ignored `data/` folder instead of `/app/data`:
+Add these lines to the local `backend/.env` file so SQLite data stays in the
+repo's ignored `data/` folder instead of `/app/data`, and so local development
+can run beside the Docker service without fighting over port `5008`:
 
 ```text
+PORT=5018
 DATA_DIR=../data
+```
+
+If you are using the workspace-local portable Node runtime, the helper scripts
+under `scripts/` set PATH for you.
+
+One-click local beta launcher:
+
+```powershell
+.\scripts\start-beta.cmd
+```
+
+This starts the local backend on `http://localhost:5018`, starts the Vite
+frontend on `http://localhost:5173`, and opens the frontend in your browser.
+
+Local dev also seeds a small demo dataset by default when the local database is
+empty:
+
+- 3 demo accounts
+- 50 demo transactions
+- sample monthly budgets
+
+The seed is controlled by `SEED_DEMO_DATA=1` in `backend/.env`; it is not enabled
+by the root Docker `.env.example`.
+
+Reset the local demo database and start fresh:
+
+```powershell
+.\scripts\reset-demo-data.cmd
 ```
 
 Start the backend:
 
 ```powershell
-npm run dev
+.\scripts\dev-backend.cmd
 ```
 
 In a second terminal, start the frontend:
 
 ```powershell
-Set-Location frontend
-npm run dev
+.\scripts\dev-frontend.cmd
 ```
 
-The Vite dev server proxies `/api` requests to `http://localhost:5008`.
+The Vite dev server opens on its printed URL, usually `http://localhost:5173`.
+The helper script points Vite's `/api` proxy at `http://localhost:5018`.
+
+Stop the local dev servers:
+
+```powershell
+.\scripts\stop-dev.cmd
+```
+
+If you run Vite manually, you can choose the backend proxy target with:
+
+```powershell
+$env:VITE_API_PROXY_TARGET = 'http://localhost:5018'
+```
 
 ## Build And Verification
 
 Frontend production build:
 
 ```powershell
-Set-Location frontend
-npm run build
+.\scripts\build-frontend.cmd
 ```
 
 Production-style Docker build and run:
