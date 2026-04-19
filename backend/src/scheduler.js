@@ -1,0 +1,72 @@
+// =============================================================================
+// scheduler.js — tiny hourly tick that triggers the 6 AM daily sync.
+// =============================================================================
+// Design goals:
+//   - No new npm dependency (no node-cron)
+//   - Survives container restarts — idempotence based on DB state
+//   - Doesn't run if SimpleFIN isn't configured
+//   - Only runs once per local day, regardless of how many times we tick
+//
+// The check runs every 60 minutes (plus once at startup after a 30s warmup).
+// Each tick:
+//   - if local time hour < 6, skip
+//   - if sync_enabled=0, skip
+//   - if last sync success was today, skip
+//   - otherwise, trigger a 'scheduled' sync
+// =============================================================================
+
+import { db } from './db/index.js';
+import { runSync } from './services/simplefinSync.js';
+
+const TICK_MS = 60 * 60 * 1000; // 60 minutes
+const STARTUP_WARMUP_MS = 30 * 1000;
+const SCHEDULED_HOUR = 6; // 6 AM local
+
+function localTodayIsoDate() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+async function tick() {
+  const now = new Date();
+  if (now.getHours() < SCHEDULED_HOUR) return;
+
+  const cfg = db.prepare('SELECT * FROM simplefin_config WHERE id = 1').get();
+  if (!cfg || !cfg.access_url_encrypted || !cfg.sync_enabled) return;
+
+  // Check the most recent successful sync's local date.
+  const lastSuccess = db
+    .prepare(
+      `SELECT finished_at FROM sync_log
+        WHERE status = 'success'
+        ORDER BY finished_at DESC
+        LIMIT 1`
+    )
+    .get();
+
+  if (lastSuccess?.finished_at) {
+    // sqlite `datetime('now')` returns UTC text. Convert to local date.
+    const lastLocalDate = new Date(lastSuccess.finished_at + 'Z')
+      .toLocaleDateString('en-CA'); // yyyy-mm-dd in local tz
+    if (lastLocalDate === localTodayIsoDate()) return; // already ran today
+  }
+
+  try {
+    console.log('[scheduler] Triggering daily sync...');
+    const result = await runSync({ trigger: 'scheduled' });
+    console.log('[scheduler] Sync done:', result);
+  } catch (err) {
+    console.error('[scheduler] Sync failed:', err.message || err);
+  }
+}
+
+export function startScheduler() {
+  setTimeout(() => {
+    tick();
+    setInterval(tick, TICK_MS);
+  }, STARTUP_WARMUP_MS);
+  console.log(`Scheduler started (checks hourly, runs daily at ${SCHEDULED_HOUR}:00 local).`);
+}

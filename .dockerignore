@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+.env
+*.env.local
+README.md
+.gitignore
+data
+*.db
+*.db-journal
+*.log
+.vscode
+.idea
+.DS_Store
+Thumbs.db

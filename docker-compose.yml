@@ -1,0 +1,26 @@
+services:
+  budget-tracker:
+    build: .
+    container_name: budget-tracker
+    restart: unless-stopped
+    ports:
+      - "5008:5008"
+    volumes:
+      - budget-data:/app/data
+    env_file:
+      - .env
+    networks:
+      - web_proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5008/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  web_proxy:
+    external: true
+
+volumes:
+  budget-data:
