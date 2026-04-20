@@ -304,6 +304,16 @@ net worth category calculated as estimated home value minus the mortgage
 balance. Mortgage balances are excluded from the `Loans` category so they are
 not double-counted.
 
+## Net Worth
+
+The Net Worth page is available from the More menu. It uses active accounts to
+show current assets, liabilities, allocation, account contributions, and a
+monthly net worth trend.
+
+The trend is derived from existing account balances and transaction history; it
+does not add new storage or change backup behavior. Mortgage accounts use the
+same `estimated_value - mortgage balance` equity calculation as the Dashboard.
+
 The Housing Calculator is available from More -> Housing Calculator. Selecting
 a mortgage account prefills the estimated sale price from `estimated_value` and
 the remaining mortgage balance from the account balance. The calculator keeps
