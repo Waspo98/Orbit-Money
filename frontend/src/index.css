@@ -1782,6 +1782,7 @@ input, textarea, select {
 
 .page-hero-main {
   min-width: 0;
+  position: relative;
 }
 
 .page-kicker {
@@ -1817,6 +1818,21 @@ input, textarea, select {
   will-change: transform;
 }
 
+.page-hero-collapsed-slot {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  width: min(calc(var(--hero-collapsed-width) - 34px), calc(100vw - 48px));
+  opacity: clamp(0, calc((var(--hero-progress) - 0.64) * 3.4), 1);
+  transform:
+    translateX(-50%)
+    translateY(calc((1 - var(--hero-progress)) * 18px))
+    scale(calc(0.94 + (var(--hero-progress) * 0.06)));
+  transform-origin: center top;
+  will-change: opacity, transform;
+  z-index: 4;
+}
+
 .page-hero p {
   margin: 10px 0 0;
   color: rgba(234, 245, 255, 0.78);
@@ -1826,14 +1842,16 @@ input, textarea, select {
 .page-kicker,
 .page-hero p,
 .page-hero-stats,
-.txn-toolbar-hero {
+.txn-toolbar-hero,
+.page-hero-budgets .month-nav {
   opacity: var(--hero-content-opacity);
   transform: translateY(calc(var(--hero-progress) * -18px));
   will-change: opacity, transform;
 }
 
 .page-hero-stats,
-.txn-toolbar-hero {
+.txn-toolbar-hero,
+.page-hero-budgets .month-nav {
   pointer-events: auto;
 }
 
@@ -3852,6 +3870,34 @@ input, textarea, select {
   color: #0d1b2f;
 }
 
+.page-hero-collapsed-slot .txn-search-wrap {
+  width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.page-hero-collapsed-slot .txn-search-input {
+  min-height: 38px;
+  padding: 8px 34px 8px 32px;
+  border-color: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #0d1b2f;
+  font-size: 0.88rem;
+  box-shadow:
+    0 10px 24px rgba(5, 20, 52, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.page-hero-collapsed-slot .txn-search-input::placeholder {
+  color: #607089;
+}
+
+.page-hero-collapsed-slot .txn-search-icon,
+.page-hero-collapsed-slot .txn-search-clear {
+  color: #607089;
+}
+
 .txn-search-input:focus {
   outline: none;
   border-color: var(--accent);
@@ -4315,6 +4361,15 @@ input, textarea, select {
   min-width: 0;
 }
 
+.page-hero-budgets .month-nav {
+  margin: 0;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
 .month-nav-arrow {
   width: 40px;
   height: 40px;
@@ -4344,6 +4399,18 @@ input, textarea, select {
 .month-nav-arrow:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.page-hero-budgets .month-nav-arrow {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.95);
+  color: #0d1b2f;
+  box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
+}
+
+.page-hero-budgets .month-nav-arrow:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: rgba(143, 240, 201, 0.8);
 }
 
 /* Wrap holds the visible pill styling PLUS an invisible <select> overlayed
@@ -4377,6 +4444,19 @@ input, textarea, select {
   border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
 }
 
+.page-hero-budgets .month-nav-label-wrap {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.95);
+  color: #0d1b2f;
+  box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
+}
+
+.page-hero-budgets .month-nav-label-wrap:hover,
+.page-hero-budgets .month-nav-label-wrap:focus-within {
+  background: #ffffff;
+  border-color: rgba(143, 240, 201, 0.8);
+}
+
 .month-nav-label-text {
   pointer-events: none;
 }
@@ -4385,6 +4465,10 @@ input, textarea, select {
   font-size: 0.75rem;
   color: var(--text-muted);
   pointer-events: none;
+}
+
+.page-hero-budgets .month-nav-caret {
+  color: #607089;
 }
 
 /* The real <select> is invisible but covers the entire pill — iOS and
@@ -4706,66 +4790,6 @@ input, textarea, select {
 
 .budget-row.inactive:hover {
   background: var(--surface-hover);
-}
-
-
-/* ================== Budget income/expense stats (v15) ================== */
-
-.budget-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 0 0 14px;
-}
-
-.budget-stat {
-  padding: 14px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md, 10px);
-  min-width: 0;
-}
-
-.budget-stat-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-}
-
-.budget-stat-value {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.budget-stat-value.income {
-  color: var(--income);
-}
-
-.budget-stat-value.expense {
-  color: var(--expense);
-}
-
-@media (max-width: 440px) {
-  .budget-stats {
-    gap: 6px;
-  }
-  .budget-stat {
-    padding: 10px 10px;
-  }
-  .budget-stat-value {
-    font-size: 0.95rem;
-  }
-  .budget-stat-label {
-    font-size: 0.68rem;
-  }
 }
 
 

@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 
-export function useMorphingPageHero(initialHeight = 420) {
+export function useMorphingPageHero(initialHeight = 420, options = {}) {
   const innerRef = useRef(null);
   const titleRef = useRef(null);
   const expandedRef = useRef(initialHeight);
+  const {
+    collapsedHeight = 64,
+    collapsedTitleTop = null
+  } = options;
   const [state, setState] = useState({
     progress: 0,
     height: initialHeight,
@@ -16,7 +20,7 @@ export function useMorphingPageHero(initialHeight = 420) {
   const frameRef = useRef(null);
 
   useEffect(() => {
-    const collapsed = 64;
+    const collapsed = collapsedHeight;
     const titleScale = 0.62;
 
     function measureTitleTarget() {
@@ -40,7 +44,10 @@ export function useMorphingPageHero(initialHeight = 420) {
         Math.max(preferredWidth, Math.ceil(titleRect.width * titleScale + 60))
       );
       const targetLeft = (collapsedWidth - titleRect.width * titleScale) / 2;
-      const targetTop = (collapsed - titleRect.height * titleScale) / 2;
+      const targetTop =
+        collapsedTitleTop == null
+          ? (collapsed - titleRect.height * titleScale) / 2
+          : collapsedTitleTop;
       const currentLeft = titleRect.left - heroRect.left;
       const currentTop = titleRect.top - heroRect.top;
 
@@ -112,7 +119,7 @@ export function useMorphingPageHero(initialHeight = 420) {
       window.removeEventListener('resize', update);
       if (frameRef.current) window.cancelAnimationFrame(frameRef.current);
     };
-  }, [initialHeight]);
+  }, [initialHeight, collapsedHeight, collapsedTitleTop]);
 
   return { ...state, innerRef, titleRef };
 }
@@ -125,16 +132,26 @@ export default function PageHero({
   subtitle,
   stats = [],
   initialHeight = 420,
+  collapsedHeight = 64,
+  collapsedTitleTop,
   hero: controlledHero,
   chrome,
   toolbar,
+  collapsedContent,
   onOpenMenu,
   statLabel
 }) {
-  const internalHero = useMorphingPageHero(initialHeight);
+  const internalHero = useMorphingPageHero(initialHeight, {
+    collapsedHeight,
+    collapsedTitleTop
+  });
   const hero = controlledHero || internalHero;
   const chromeContent = typeof chrome === 'function' ? chrome(hero) : chrome;
   const toolbarContent = typeof toolbar === 'function' ? toolbar(hero) : toolbar;
+  const collapsedSlot =
+    typeof collapsedContent === 'function'
+      ? collapsedContent(hero)
+      : collapsedContent;
 
   return (
     <>
@@ -172,6 +189,14 @@ export default function PageHero({
               <div className="page-hero-main">
                 <div className="page-kicker">{kicker}</div>
                 <h2 id={id} ref={hero.titleRef}>{title}</h2>
+                {collapsedSlot && (
+                  <div
+                    className="page-hero-collapsed-slot"
+                    style={{ pointerEvents: hero.progress > 0.82 ? 'auto' : 'none' }}
+                  >
+                    {collapsedSlot}
+                  </div>
+                )}
                 <p>{subtitle}</p>
               </div>
 

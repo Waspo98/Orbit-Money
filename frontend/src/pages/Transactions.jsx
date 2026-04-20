@@ -433,6 +433,8 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
           { label: 'Monthly transactions', value: monthlyTotal.toLocaleString() }
         ]}
         initialHeight={612}
+        collapsedHeight={104}
+        collapsedTitleTop={13}
         onOpenMenu={onOpenMenu}
         statLabel="Transaction summary"
         chrome={(hero) => (
@@ -459,26 +461,11 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
         )}
         toolbar={(
           <div className="txn-toolbar txn-toolbar-hero">
-            <div className="txn-search-wrap">
-              <span className="txn-search-icon" aria-hidden="true">{'\u2315'}</span>
-              <input
-                type="search"
-                className="txn-search-input"
-                placeholder="Search merchant, description, notes…"
-                value={searchLocal}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              {searchLocal && (
-                <button
-                  type="button"
-                  className="txn-search-clear"
-                  onClick={() => setSearch('')}
-                  aria-label="Clear search"
-                >
-                  ×
-                </button>
-              )}
-            </div>
+            <TransactionSearch
+              value={searchLocal}
+              onChange={setSearch}
+              placeholder="Search merchant, description, notes..."
+            />
             <div className="txn-toolbar-actions">
               <button
                 type="button"
@@ -515,6 +502,14 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
               </label>
             </div>
           </div>
+        )}
+        collapsedContent={(
+          <TransactionSearch
+            value={searchLocal}
+            onChange={setSearch}
+            placeholder="Search transactions"
+            compact
+          />
         )}
       />
       {/* ---------- Active filter pills ---------- */}
@@ -659,6 +654,31 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
       )}
 
       <Dialog />
+    </div>
+  );
+}
+
+function TransactionSearch({ value, onChange, placeholder, compact = false }) {
+  return (
+    <div className={`txn-search-wrap ${compact ? 'txn-search-compact' : ''}`}>
+      <span className="txn-search-icon" aria-hidden="true">{'\u2315'}</span>
+      <input
+        type="search"
+        className="txn-search-input"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {value && (
+        <button
+          type="button"
+          className="txn-search-clear"
+          onClick={() => onChange('')}
+          aria-label="Clear search"
+        >
+          ×
+        </button>
+      )}
     </div>
   );
 }
