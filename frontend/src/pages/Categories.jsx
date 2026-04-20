@@ -409,6 +409,17 @@ function CategoryEditor({
                           {emoji}
                         </button>
                       ))}
+                      <label className="category-emoji-custom">
+                        <span>Custom</span>
+                        <input
+                          type="text"
+                          value={icon}
+                          onChange={(e) => setIcon(e.target.value)}
+                          placeholder="Paste emoji"
+                          maxLength={24}
+                          aria-label="Custom category emoji"
+                        />
+                      </label>
                     </div>
                   )}
                 </div>
