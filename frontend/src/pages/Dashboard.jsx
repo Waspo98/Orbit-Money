@@ -542,6 +542,7 @@ function DashboardHero({ dateLabel, greeting, stats, hero, onOpenMenu }) {
           </div>
 
           <div className="page-hero-content">
+            <div className="page-hero-topline">
             <div className="page-hero-main">
               <div className="page-kicker">Financial Orbit</div>
               <h2 id="dashboard-title" ref={hero.titleRef}>Dashboard</h2>
@@ -555,6 +556,7 @@ function DashboardHero({ dateLabel, greeting, stats, hero, onOpenMenu }) {
                   <strong>{stat.value}</strong>
                 </div>
               ))}
+            </div>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import {
   BrowserRouter,
   Routes,
@@ -51,60 +51,21 @@ function AppShell() {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const scrollPositionsRef = useRef({});
-  const previousPathRef = useRef(location.pathname);
-  const restoringScrollRef = useRef(false);
   const hasPageHero =
     location.pathname === '/dashboard' || location.pathname === '/transactions';
 
   useLayoutEffect(() => {
-    if (previousPathRef.current !== location.pathname) {
-      const targetScroll = Object.prototype.hasOwnProperty.call(
-        scrollPositionsRef.current,
-        location.pathname
-      )
-        ? scrollPositionsRef.current[location.pathname]
-        : 0;
-
-      restoringScrollRef.current = true;
-      previousPathRef.current = location.pathname;
-      window.scrollTo({
-        top: targetScroll,
-        left: 0,
-        behavior: 'auto'
-      });
-      window.requestAnimationFrame(() => {
-        window.scrollTo({
-          top: targetScroll,
-          left: 0,
-          behavior: 'auto'
-        });
-        restoringScrollRef.current = false;
-      });
-    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
   }, [location.pathname]);
 
   useEffect(() => {
     const previousScrollRestoration = window.history.scrollRestoration;
     window.history.scrollRestoration = 'manual';
-
-    function saveCurrentScroll() {
-      scrollPositionsRef.current[previousPathRef.current] = window.scrollY;
-    }
-
-    function handleScroll() {
-      if (!restoringScrollRef.current) {
-        saveCurrentScroll();
-      }
-    }
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('pagehide', saveCurrentScroll);
     return () => {
-      saveCurrentScroll();
       window.history.scrollRestoration = previousScrollRestoration;
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('pagehide', saveCurrentScroll);
     };
   }, []);
 

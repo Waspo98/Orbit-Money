@@ -1840,6 +1840,8 @@ input, textarea, select {
   justify-self: stretch;
 }
 
+.page-hero-dashboard .page-hero-topline,
+.page-hero-dashboard .page-hero-main,
 .page-hero-transactions .page-hero-topline,
 .page-hero-transactions .page-hero-main {
   width: 100%;
