@@ -121,7 +121,8 @@ function useMorphingHero() {
         frameRef.current = null;
         const expanded = expandedHeight();
         const collapsed = 56;
-        const progress = Math.min(1, Math.max(0, window.scrollY / 220));
+        const collapseDistance = expanded - collapsed;
+        const progress = Math.min(1, Math.max(0, window.scrollY / collapseDistance));
         const height = Math.round(expanded - (expanded - collapsed) * progress);
 
         setState((prev) =>
