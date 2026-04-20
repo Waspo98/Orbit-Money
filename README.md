@@ -310,6 +310,13 @@ changing behavior, manually smoke test the affected area and at minimum confirm:
 - Mobile layout still feels usable.
 - The PWA manifest and service worker still load.
 
+## Versioning
+
+Orbit Money uses SemVer-compatible package versions and displays a shorter beta
+label in the app. For beta releases, keep the user-facing build label in
+`frontend/src/version.js` as `v<major>.<minor>b`; the current beta build is
+`v0.1b`.
+
 ## Housing Calculator And Real Estate
 
 Mortgage accounts can store an optional `estimated_value` in the accounts table.

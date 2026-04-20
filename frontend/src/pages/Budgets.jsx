@@ -199,25 +199,24 @@ export default function Budgets() {
   }`;
   const budgetHeroStats = [
     {
-      label: 'Budgeted',
-      value: summary ? formatMoney(summary.total_budgeted) : '—'
+      label: 'Income',
+      value: summary ? formatMoney(summary.total_income) : '—',
+      tone: 'good'
     },
     {
-      label: 'Spent',
-      value: summary ? formatMoney(summary.total_spent_in_budgets) : '—'
+      label: 'Expenses',
+      value: summary ? formatMoney(summary.total_expenses) : '—',
+      tone: 'caution'
     },
     {
-      label: remaining !== null && remaining < 0 ? 'Over' : 'Remaining',
-      value:
-        remaining !== null
-          ? formatMoney(Math.abs(remaining))
-          : '—',
+      label: 'Net',
+      value: summary ? formatMoney(summary.total_net) : '—',
+      tone: summary && summary.total_net < 0 ? 'caution' : 'good'
+    },
+    {
+      label: 'Remaining',
+      value: remaining !== null ? formatMoney(remaining) : '—',
       tone: remaining !== null && remaining < 0 ? 'caution' : 'good'
-    },
-    {
-      label: 'Progress',
-      value: overallPercent !== null ? `${Math.round(overallPercent)}%` : '—',
-      tone: overallPercent !== null && overallPercent > 100 ? 'caution' : ''
     }
   ];
 
@@ -275,6 +274,16 @@ export default function Budgets() {
         title="Budgets"
         subtitle={budgetSubtitle}
         stats={budgetHeroStats}
+        toolbar={(
+          <MonthNav
+            month={selectedMonth}
+            monthOptions={monthOptions}
+            canGoForward={canGoForward}
+            onPrev={() => goToMonth(addMonths(selectedMonth, -1))}
+            onNext={() => goToMonth(addMonths(selectedMonth, 1))}
+            onJump={(m) => goToMonth(m)}
+          />
+        )}
       />
 
       <div className="view-header" hidden>
@@ -294,16 +303,6 @@ export default function Budgets() {
         </div>
       </div>
 
-      {/* ---------- Month navigator ---------- */}
-      <MonthNav
-        month={selectedMonth}
-        monthOptions={monthOptions}
-        canGoForward={canGoForward}
-        onPrev={() => goToMonth(addMonths(selectedMonth, -1))}
-        onNext={() => goToMonth(addMonths(selectedMonth, 1))}
-        onJump={(m) => goToMonth(m)}
-      />
-
       {error && <div className="error">{error}</div>}
 
       {loading ? (
@@ -312,35 +311,6 @@ export default function Budgets() {
         </div>
       ) : (
         <div className={`budget-content ${refreshing ? 'is-refreshing' : ''}`}>
-          {/* ---------- Income / Expenses / Net stat row ---------- */}
-          {summary && (
-            <div className="budget-stats">
-              <div className="budget-stat">
-                <div className="budget-stat-label">Income</div>
-                <div className="budget-stat-value income">
-                  {formatMoney(summary.total_income)}
-                </div>
-              </div>
-              <div className="budget-stat">
-                <div className="budget-stat-label">Expenses</div>
-                <div className="budget-stat-value expense">
-                  {formatMoney(summary.total_expenses)}
-                </div>
-              </div>
-              <div className="budget-stat">
-                <div className="budget-stat-label">Net</div>
-                <div
-                  className={`budget-stat-value ${
-                    summary.total_net >= 0 ? 'income' : 'expense'
-                  }`}
-                >
-                  {summary.total_net >= 0 ? '+' : '−'}
-                  {formatMoney(Math.abs(summary.total_net))}
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* ---------- Budget progress summary card ---------- */}
           {hasAnyBudgets && summary && (
             <div className="budget-summary-card">
@@ -586,7 +556,9 @@ function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump })
         onClick={onPrev}
         aria-label="Previous month"
       >
-        ‹
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+          <path d="M14.5 6.5 9 12l5.5 5.5" />
+        </svg>
       </button>
 
       <div className="month-nav-label-wrap">
@@ -613,7 +585,9 @@ function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump })
         disabled={!canGoForward}
         aria-label="Next month"
       >
-        ›
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+          <path d="m9.5 6.5L15 12l-5.5 5.5" />
+        </svg>
       </button>
     </div>
   );

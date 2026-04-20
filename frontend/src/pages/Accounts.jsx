@@ -156,11 +156,15 @@ export default function Accounts({ onChange }) {
   }
 
   const activeAccounts = accounts.filter((account) => !account.is_archived);
-  const archivedAccounts = accounts.length - activeAccounts.length;
-  const totalBalance = activeAccounts.reduce(
-    (total, account) => total + (Number(account.current_balance) || 0),
-    0
-  );
+  const cashBalance = activeAccounts
+    .filter((account) => account.type === 'checking' || account.type === 'savings')
+    .reduce((total, account) => total + (Number(account.current_balance) || 0), 0);
+  const creditCardsDue = activeAccounts
+    .filter((account) => account.type === 'credit')
+    .reduce((total, account) => total + Math.abs(Number(account.current_balance) || 0), 0);
+  const investmentsBalance = activeAccounts
+    .filter((account) => account.type === 'investment')
+    .reduce((total, account) => total + (Number(account.current_balance) || 0), 0);
   const accountsSubtitle = `${accounts.length.toLocaleString()} account${
     accounts.length === 1 ? '' : 's'
   }${showArchived ? ' including archived' : ''}${
@@ -168,21 +172,23 @@ export default function Accounts({ onChange }) {
   }`;
   const accountHeroStats = [
     {
-      label: 'Active',
+      label: 'Cash',
+      value: loading ? '—' : formatCurrency(cashBalance),
+      tone: cashBalance >= 0 ? 'good' : 'caution'
+    },
+    {
+      label: 'Credit Cards',
+      value: loading ? '—' : formatCurrency(creditCardsDue),
+      tone: creditCardsDue > 0 ? 'caution' : 'good'
+    },
+    {
+      label: 'Investments',
+      value: loading ? '—' : formatCurrency(investmentsBalance),
+      tone: investmentsBalance >= 0 ? 'good' : 'caution'
+    },
+    {
+      label: 'Total Accounts',
       value: activeAccounts.length.toLocaleString()
-    },
-    {
-      label: 'Archived',
-      value: archivedAccounts.toLocaleString()
-    },
-    {
-      label: 'Shown',
-      value: accounts.length.toLocaleString()
-    },
-    {
-      label: 'Balance',
-      value: loading ? '—' : formatCurrency(totalBalance),
-      tone: totalBalance >= 0 ? 'good' : 'caution'
     }
   ];
 

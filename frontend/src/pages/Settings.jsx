@@ -1,6 +1,29 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import { APP_VERSION_LABEL } from '../version.js';
+
+const THEME_OPTIONS = [
+  {
+    value: 'light',
+    label: 'Day',
+    emoji: '☀️',
+    description: 'A bright interface for daylight use.'
+  },
+  {
+    value: 'dark',
+    label: 'Night',
+    emoji: '🌙',
+    description: 'A dimmer interface for low light.'
+  },
+  {
+    value: 'system',
+    label: 'System',
+    emoji: '💻',
+    description: 'Match this device automatically.'
+  }
+];
 
 function formatDateTime(iso) {
   if (!iso) return '—';
@@ -19,7 +42,7 @@ function todayIso() {
   return `${y}-${m}-${day}`;
 }
 
-export default function Settings() {
+export default function Settings({ themeMode = 'system', onThemeChange, onLogout }) {
   const { alert, confirm, Dialog } = useAppDialog();
   // SimpleFIN section
   const [status, setStatus] = useState(null);
@@ -34,6 +57,7 @@ export default function Settings() {
 
   const [syncLog, setSyncLog] = useState([]);
   const [showLog, setShowLog] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   async function loadStatus() {
     try {
@@ -114,6 +138,26 @@ export default function Settings() {
     setShowLog(!showLog);
   }
 
+  async function handleSignOut() {
+    const ok = await confirm(
+      'Sign out of Orbit Money on this device?',
+      {
+        title: 'Sign out',
+        confirmLabel: 'Sign out',
+        destructive: true
+      }
+    );
+    if (!ok || !onLogout) {
+      return;
+    }
+    setSigningOut(true);
+    try {
+      await onLogout();
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
   return (
     <div className="settings-view">
       <div className="view-header">
@@ -122,6 +166,32 @@ export default function Settings() {
           <p className="muted">Maintenance and configuration.</p>
         </div>
       </div>
+
+      <section className="settings-section settings-section-top">
+        <div className="settings-section-header">
+          <h3>Appearance</h3>
+          <p>Choose how Orbit Money looks on this device.</p>
+        </div>
+
+        <div className="settings-theme-toggle" role="radiogroup" aria-label="Theme">
+          {THEME_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`settings-theme-option ${themeMode === option.value ? 'active' : ''}`}
+              onClick={() => onThemeChange?.(option.value)}
+              role="radio"
+              aria-checked={themeMode === option.value}
+            >
+              <span className="settings-theme-emoji" aria-hidden>{option.emoji}</span>
+              <span className="settings-theme-text">
+                <span className="settings-theme-label">{option.label}</span>
+                <span className="settings-theme-copy">{option.description}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
 
       {/* ===== SimpleFIN ===== */}
       <section className="settings-section">
@@ -318,6 +388,70 @@ export default function Settings() {
             </button>
           </form>
         )}
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <h3>Import</h3>
+          <p>Bring in Rocket Money data when you need to reload history.</p>
+        </div>
+
+        <div className="settings-action">
+          <div className="settings-action-info">
+            <strong>Rocket Money import</strong>
+            <p>Upload an export file to add accounts and transactions.</p>
+          </div>
+          <Link to="/import" className="btn-secondary settings-action-link">
+            Open import
+          </Link>
+        </div>
+      </section>
+
+      <section className="settings-section settings-account-section">
+        <div className="settings-section-header">
+          <h3>Account</h3>
+          <p>Session controls and app build details.</p>
+        </div>
+
+        <div className="settings-action">
+          <div className="settings-action-info">
+            <strong>Sign out</strong>
+            <p>Ends this browser session and returns to the login screen.</p>
+          </div>
+          <button
+            type="button"
+            className="btn-danger"
+            onClick={handleSignOut}
+            disabled={signingOut}
+          >
+            {signingOut ? 'Signing out...' : 'Sign out'}
+          </button>
+        </div>
+      </section>
+
+      <section className="settings-section settings-about-section" aria-labelledby="settings-about-title">
+        <div className="settings-about-brand">
+          <img src="/icon.svg" alt="" className="settings-about-icon" />
+          <div>
+            <h3 id="settings-about-title">Orbit Money</h3>
+            <p>Personal finance PWA</p>
+          </div>
+        </div>
+
+        <dl className="settings-about-details">
+          <div>
+            <dt>Build</dt>
+            <dd>{APP_VERSION_LABEL}</dd>
+          </div>
+          <div>
+            <dt>Developer</dt>
+            <dd>Neal Overbay</dd>
+          </div>
+        </dl>
+
+        <div className="settings-about-footer">
+          <span>© 2026 Neal Overbay. All rights reserved.</span>
+        </div>
       </section>
       <Dialog />
     </div>
