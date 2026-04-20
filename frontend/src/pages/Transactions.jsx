@@ -485,6 +485,18 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
           height: `${hero.height}px`
         }}
       >
+        <div className="page-hero-pill-bar">
+          <span className="page-hero-pill-title" aria-hidden="true">Transactions</span>
+          <button
+            type="button"
+            className="btn-icon page-hero-pill-menu"
+            onClick={onOpenMenu}
+            aria-label="Open menu"
+            disabled={hero.progress < 0.72}
+          >
+            â˜°
+          </button>
+        </div>
         <div className="page-hero-inner" ref={hero.innerRef}>
         <div className="page-hero-chrome">
           <button
