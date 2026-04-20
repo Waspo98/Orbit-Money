@@ -106,12 +106,12 @@ function timeGreeting(d) {
 }
 
 function useMorphingHero() {
-  const [state, setState] = useState({ progress: 0, height: 493 });
+  const [state, setState] = useState({ progress: 0, height: 420 });
   const frameRef = useRef(null);
 
   useEffect(() => {
     function expandedHeight() {
-      return window.innerWidth <= 560 ? 493 : 360;
+      return window.innerWidth <= 560 ? 420 : 360;
     }
 
     function update() {

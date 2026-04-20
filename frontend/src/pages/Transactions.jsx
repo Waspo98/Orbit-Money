@@ -101,12 +101,12 @@ function describeEditSource(source) {
 }
 
 function useMorphingHero() {
-  const [state, setState] = useState({ progress: 0, height: 692 });
+  const [state, setState] = useState({ progress: 0, height: 612 });
   const frameRef = useRef(null);
 
   useEffect(() => {
     function expandedHeight() {
-      return window.innerWidth <= 560 ? 692 : 520;
+      return window.innerWidth <= 560 ? 612 : 520;
     }
 
     function update() {

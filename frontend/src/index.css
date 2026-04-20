@@ -1669,8 +1669,8 @@ input, textarea, select {
   margin-bottom: 28px;
 }
 
-.page-hero-dashboard-spacer { height: 493px; }
-.page-hero-transactions-spacer { height: 692px; }
+.page-hero-dashboard-spacer { height: 420px; }
+.page-hero-transactions-spacer { height: 612px; }
 
 @media (min-width: 561px) {
   .page-hero-dashboard-spacer { height: 360px; }
@@ -1729,6 +1729,8 @@ input, textarea, select {
 .hero-menu-button {
   color: rgba(255, 255, 255, 0.84);
   flex-shrink: 0;
+  transform: translateY(calc(var(--hero-progress) * -14px));
+  will-change: transform;
 }
 
 .hero-menu-button:hover {
