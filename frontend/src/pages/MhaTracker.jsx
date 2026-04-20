@@ -45,7 +45,7 @@ function formatYearLabel(year) {
   return String(year || currentYear());
 }
 
-export default function MhaTracker({ enabled = true, onEnabledChange, onOpenMenu }) {
+export default function MhaTracker({ onOpenMenu }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedYear = parseYearParam(searchParams.get('year'));
   const [data, setData] = useState(null);
@@ -56,7 +56,6 @@ export default function MhaTracker({ enabled = true, onEnabledChange, onOpenMenu
   const [savingCategoryId, setSavingCategoryId] = useState(null);
   const [accountsExpanded, setAccountsExpanded] = useState(false);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
-  const [settingsBusy, setSettingsBusy] = useState(false);
 
   async function load({ silent = false } = {}) {
     if (!silent && data == null) setLoading(true);
@@ -76,20 +75,6 @@ export default function MhaTracker({ enabled = true, onEnabledChange, onOpenMenu
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedYear]);
-
-  async function toggleEnabled() {
-    const next = !enabled;
-    setSettingsBusy(true);
-    setError('');
-    try {
-      const result = await api.put('/api/mha/settings', { enabled: next });
-      onEnabledChange?.(!!result.enabled);
-    } catch (err) {
-      setError(err.message || 'MHA Tracker setting update failed');
-    } finally {
-      setSettingsBusy(false);
-    }
-  }
 
   function goToYear(year) {
     const next = new URLSearchParams(searchParams);
@@ -174,11 +159,11 @@ export default function MhaTracker({ enabled = true, onEnabledChange, onOpenMenu
       <PageHero
         id="mha-title"
         variant="mha"
-        kicker="Housing allowance"
+        kicker="Ministerial Housing Allowance"
         title="MHA Tracker"
         subtitle={`${formatYearLabel(selectedYear)} ministerial housing allowance tracking`}
         stats={[
-          { label: 'MHA Transaction Total', value: formatMoney(summary.transactionTotal), tone: 'good' },
+          { label: 'MHA Eligible Total', value: formatMoney(summary.transactionTotal), tone: 'good' },
           { label: 'MHA Savings', value: formatMoney(summary.savings), tone: 'warn' }
         ]}
         toolbar={(
@@ -191,15 +176,6 @@ export default function MhaTracker({ enabled = true, onEnabledChange, onOpenMenu
               onNext={() => goToYear(selectedYear + 1)}
               onJump={goToYear}
             />
-            <button
-              type="button"
-              className={`btn-secondary mha-hero-toggle ${enabled ? 'btn-active' : ''}`}
-              onClick={toggleEnabled}
-              disabled={settingsBusy}
-              aria-pressed={enabled}
-            >
-              {settingsBusy ? 'Saving...' : enabled ? 'MHA On' : 'MHA Off'}
-            </button>
           </div>
         )}
         onOpenMenu={onOpenMenu}
@@ -368,7 +344,6 @@ function YearNav({ year, yearOptions, canGoForward, onPrev, onNext, onJump }) {
 
       <div className="month-nav-label-wrap">
         <span className="month-nav-label-text">{formatYearLabel(year)}</span>
-        <span className="month-nav-caret" aria-hidden="true">v</span>
         <select
           className="month-nav-select"
           value={year}

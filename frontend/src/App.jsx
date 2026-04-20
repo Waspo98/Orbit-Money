@@ -215,8 +215,6 @@ function AppShell() {
               element={
                 mhaTrackerEnabled ? (
                   <MhaTracker
-                    enabled={mhaTrackerEnabled}
-                    onEnabledChange={setMhaTrackerEnabled}
                     onOpenMenu={() => setMenuOpen(true)}
                   />
                 ) : (

@@ -2158,16 +2158,15 @@ input, textarea, select {
 }
 
 .page-hero-mha {
-  background:
-    radial-gradient(circle at 18% 18%, rgba(143, 240, 201, 0.24), transparent 34%),
-    linear-gradient(135deg, #173048 0%, #0d1b2f 52%, #103f3c 100%);
+  --hero-start: #052e24;
+  --hero-mid: #065f46;
+  --hero-end: #047857;
 }
 
 .mha-hero-toolbar {
-  display: grid;
-  grid-template-columns: minmax(240px, 420px) auto;
+  display: block;
+  max-width: 580px;
   align-items: center;
-  gap: 12px;
 }
 
 .page-hero-mha .month-nav {
@@ -2207,13 +2206,6 @@ input, textarea, select {
 
 .page-hero-mha .month-nav-caret {
   color: #607089;
-}
-
-.mha-hero-toggle {
-  min-height: 54px;
-  padding-inline: 18px;
-  border-color: rgba(255, 255, 255, 0.18);
-  white-space: nowrap;
 }
 
 .mha-content {
@@ -2311,10 +2303,6 @@ input, textarea, select {
 
 @media (max-width: 560px) {
   .mha-hero-toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .mha-hero-toggle {
     width: 100%;
   }
 
