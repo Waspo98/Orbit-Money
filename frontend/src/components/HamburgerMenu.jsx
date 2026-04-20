@@ -65,6 +65,14 @@ export default function HamburgerMenu({
     <>
       <div className={`menu-backdrop ${closing ? 'closing' : ''}`} onClick={close} />
       <div className={`menu-panel ${closing ? 'closing' : ''}`} role="menu">
+        <button
+          type="button"
+          className="menu-close-button"
+          onClick={close}
+          aria-label="Close menu"
+        >
+          ☰
+        </button>
         <button type="button" className="menu-item" onClick={() => go('/import')}>
           <span className="menu-item-icon">↑</span>
           <span>Import data</span>

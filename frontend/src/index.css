@@ -1477,6 +1477,25 @@ input, textarea, select {
   animation: menuIn var(--dur-base) var(--ease-out);
 }
 
+.menu-close-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.menu-close-button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
 @keyframes menuIn {
   from { opacity: 0; transform: translateY(-8px) scale(0.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -1722,6 +1741,7 @@ input, textarea, select {
 }
 
 .page-hero.collapsed {
+  min-height: 56px;
   padding-top: 8px;
   padding-bottom: 8px;
   box-shadow: 0 8px 28px rgba(5, 20, 52, 0.24);
@@ -1752,9 +1772,7 @@ input, textarea, select {
 }
 
 .page-hero-topline {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  display: grid;
   gap: 20px;
 }
 
@@ -1800,10 +1818,12 @@ input, textarea, select {
 .page-hero-transactions .page-hero-stats {
   width: 100%;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-self: stretch;
 }
 
 .page-hero-stat {
   min-width: 0;
+  width: 100%;
   padding: 13px 14px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-md);

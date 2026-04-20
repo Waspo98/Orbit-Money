@@ -107,10 +107,18 @@ function timeGreeting(d) {
 
 function useCollapsedHero() {
   const [collapsed, setCollapsed] = useState(false);
+  const collapsedRef = useRef(false);
 
   useEffect(() => {
     function update() {
-      setCollapsed(window.scrollY > 72);
+      const shouldCollapse = collapsedRef.current
+        ? window.scrollY > 28
+        : window.scrollY > 150;
+
+      if (shouldCollapse !== collapsedRef.current) {
+        collapsedRef.current = shouldCollapse;
+        setCollapsed(shouldCollapse);
+      }
     }
 
     update();
