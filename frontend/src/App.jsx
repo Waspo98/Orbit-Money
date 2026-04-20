@@ -208,7 +208,12 @@ function AppShell() {
             <Route path="/rules" element={<Rules />} />
             <Route
               path="/categories"
-              element={<Categories onChange={loadLookups} />}
+              element={
+                <Categories
+                  mhaTrackerEnabled={mhaTrackerEnabled}
+                  onChange={loadLookups}
+                />
+              }
             />
             <Route
               path="/housing-calculator"

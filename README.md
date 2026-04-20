@@ -346,6 +346,9 @@ cash to close, and monthly payment estimates.
 The Category Manager is available from the More menu. It lets categories be
 added, renamed, recolored, given a different emoji, or deleted.
 
+When MHA Tracker is enabled app-wide, the category editor also includes an
+`MHA Eligible` toggle for the category default.
+
 Deleting a category clears that category from original and manually edited
 transaction category fields, so affected transactions become uncategorized.
 Related budgets are removed by the existing budget foreign key behavior. A

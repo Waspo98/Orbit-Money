@@ -103,6 +103,10 @@ router.post('/', requireAuth, (req, res) => {
   const name = normalizeName(body.name);
   const color = normalizeColor(body.color || '#888888');
   const icon = normalizeIcon(body.icon);
+  const mhaDefaultEligible =
+    typeof body.mha_default_eligible === 'boolean'
+      ? (body.mha_default_eligible ? 1 : 0)
+      : 0;
 
   if (!name) {
     return res.status(400).json({ error: 'name cannot be empty.' });
@@ -121,11 +125,11 @@ router.post('/', requireAuth, (req, res) => {
     const result = db
       .prepare(
         `
-        INSERT INTO categories (name, color, icon, sort_order)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO categories (name, color, icon, sort_order, mha_default_eligible)
+        VALUES (?, ?, ?, ?, ?)
       `
       )
-      .run(name, color, icon, nextOrder);
+      .run(name, color, icon, nextOrder, mhaDefaultEligible);
     const row = db
       .prepare(
         `
@@ -182,6 +186,18 @@ router.put('/:id', requireAuth, (req, res) => {
     }
     sets.push('icon = ?');
     values.push(icon);
+  }
+
+  if (body.mha_default_eligible !== undefined) {
+    if (typeof body.mha_default_eligible !== 'boolean') {
+      return res.status(400).json({ error: 'mha_default_eligible must be a boolean.' });
+    }
+    const eligible = body.mha_default_eligible ? 1 : 0;
+    sets.push('mha_default_eligible = ?');
+    values.push(eligible);
+    if (eligible) {
+      sets.push('mha_default_ignored = 0');
+    }
   }
 
   if (sets.length === 0) {

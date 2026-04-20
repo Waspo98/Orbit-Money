@@ -25,14 +25,32 @@ function describeFlags(category) {
   const flags = [];
   if (category.is_income) flags.push('Income');
   if (category.is_transfer) flags.push('Transfer');
-  if (category.mha_default_eligible) flags.push('MHA include');
-  if (category.mha_default_ignored) flags.push('MHA ignore');
+  if (category.mha_default_eligible) flags.push('MHA eligible');
+  if (category.mha_default_ignored) flags.push('MHA ignored');
   return flags;
 }
 
-export default function Categories({ onChange }) {
+function deleteSummary(category) {
+  const transactionCount = Number(category.transaction_count || 0);
+  const budgetCount = Number(category.budget_count || 0);
+  return [
+    transactionCount > 0
+      ? `${transactionCount.toLocaleString()} transaction${
+          transactionCount === 1 ? '' : 's'
+        } will become uncategorized`
+      : null,
+    budgetCount > 0
+      ? `${budgetCount.toLocaleString()} budget${
+          budgetCount === 1 ? '' : 's'
+        } will be removed`
+      : null
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+export default function Categories({ mhaTrackerEnabled = false, onChange }) {
   const navigate = useNavigate();
-  const { alert, confirm, Dialog } = useAppDialog();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -64,58 +82,13 @@ export default function Categories({ onChange }) {
     );
   }, [categories, search]);
 
-  async function handleDelete(category) {
-    if (category.rule_count > 0) {
-      alert(
-        `"${category.name}" is used by ${category.rule_count.toLocaleString()} rule${
-          category.rule_count === 1 ? '' : 's'
-        }. Update or delete those rules before removing the category.`,
-        { title: 'Category used by rules' }
-      );
-      return;
-    }
-
-    const transactionCount = Number(category.transaction_count || 0);
-    const budgetCount = Number(category.budget_count || 0);
-    const detail = [
-      transactionCount > 0
-        ? `${transactionCount.toLocaleString()} transaction${
-            transactionCount === 1 ? '' : 's'
-          } will become uncategorized`
-        : null,
-      budgetCount > 0
-        ? `${budgetCount.toLocaleString()} budget${budgetCount === 1 ? '' : 's'} will be removed`
-        : null
-    ]
-      .filter(Boolean)
-      .join(', ');
-
-    const ok = await confirm(
-      `Delete "${category.name}"?${detail ? ` ${detail}.` : ''} This can't be undone.`,
-      {
-        title: 'Delete category',
-        confirmLabel: 'Delete',
-        destructive: true
-      }
-    );
-    if (!ok) return;
-
-    try {
-      await api.del(`/api/categories/${category.id}`);
-      await load();
-      onChange?.();
-    } catch (err) {
-      alert(err.message || 'Delete failed', { title: 'Delete failed' });
-    }
-  }
-
   function viewTransactions(category) {
     navigate(`/transactions?categories=${category.id}`);
   }
 
   return (
     <div className="categories-view">
-      <div className="view-header">
+      <div className="view-header categories-header">
         <div>
           <h2>Category Manager</h2>
           <p className="muted">
@@ -173,7 +146,6 @@ export default function Categories({ onChange }) {
               key={category.id}
               category={category}
               onEdit={() => setEditing(category)}
-              onDelete={() => handleDelete(category)}
               onViewTransactions={() => viewTransactions(category)}
             />
           ))}
@@ -183,6 +155,7 @@ export default function Categories({ onChange }) {
       {editing && (
         <CategoryEditor
           category={editing}
+          mhaTrackerEnabled={mhaTrackerEnabled}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -191,13 +164,11 @@ export default function Categories({ onChange }) {
           }}
         />
       )}
-
-      <Dialog />
     </div>
   );
 }
 
-function CategoryRow({ category, onEdit, onDelete, onViewTransactions }) {
+function CategoryRow({ category, onEdit, onViewTransactions }) {
   const flags = describeFlags(category);
   const transactionCount = Number(category.transaction_count || 0);
 
@@ -214,58 +185,106 @@ function CategoryRow({ category, onEdit, onDelete, onViewTransactions }) {
       </div>
 
       <div className="category-main">
-        <div className="category-name-row">
-          <span className="category-name">{category.name}</span>
-          {flags.map((flag) => (
-            <span key={flag} className="type-pill type-other">
-              {flag}
-            </span>
-          ))}
+        <div className="category-row-line category-row-line-title">
+          <div className="category-name-row">
+            <span className="category-name">{category.name}</span>
+            {flags.map((flag) => (
+              <span key={flag} className="type-pill type-other">
+                {flag}
+              </span>
+            ))}
+          </div>
+          <button type="button" className="btn-secondary btn-compact" onClick={onEdit}>
+            Edit
+          </button>
         </div>
-        <div className="category-meta">
-          <span>{transactionCount.toLocaleString()} transaction{transactionCount === 1 ? '' : 's'}</span>
-          {category.budget_count > 0 && (
-            <span>{category.budget_count.toLocaleString()} budget{category.budget_count === 1 ? '' : 's'}</span>
-          )}
-          {category.rule_count > 0 && (
-            <span>{category.rule_count.toLocaleString()} rule{category.rule_count === 1 ? '' : 's'}</span>
-          )}
-        </div>
-      </div>
 
-      <div className="category-actions">
-        <button
-          type="button"
-          className="btn-secondary btn-compact"
-          onClick={onViewTransactions}
-          disabled={transactionCount === 0}
-        >
-          See transactions
-        </button>
-        <button type="button" className="btn-secondary btn-compact" onClick={onEdit}>
-          Edit
-        </button>
-        <button
-          type="button"
-          className="btn-ghost"
-          onClick={onDelete}
-          aria-label={`Delete ${category.name}`}
-        >
-          {'\u2715'}
-        </button>
+        <div className="category-row-line category-row-line-meta">
+          <div className="category-meta">
+            <span>
+              {transactionCount.toLocaleString()} transaction
+              {transactionCount === 1 ? '' : 's'}
+            </span>
+            {category.budget_count > 0 && (
+              <span>
+                {category.budget_count.toLocaleString()} budget
+                {category.budget_count === 1 ? '' : 's'}
+              </span>
+            )}
+            {category.rule_count > 0 && (
+              <span>
+                {category.rule_count.toLocaleString()} rule
+                {category.rule_count === 1 ? '' : 's'}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="btn-secondary btn-compact"
+            onClick={onViewTransactions}
+            disabled={transactionCount === 0}
+          >
+            See transactions
+          </button>
+        </div>
       </div>
     </li>
   );
 }
 
-function CategoryEditor({ category, onClose, onSaved }) {
+function CategoryEditor({
+  category,
+  mhaTrackerEnabled = false,
+  onClose,
+  onSaved
+}) {
+  const { alert, confirm, Dialog } = useAppDialog();
   const isNew = !category.id;
   const [name, setName] = useState(category.name || '');
   const [icon, setIcon] = useState(category.icon || '');
   const [color, setColor] = useState(category.color || COLOR_PRESETS[0]);
+  const [mhaDefaultEligible, setMhaDefaultEligible] = useState(
+    !!category.mha_default_eligible
+  );
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const previewColor = HEX_COLOR_RE.test(color) ? color : '#888888';
+
+  async function handleDelete(close) {
+    if (isNew) return;
+    if (category.rule_count > 0) {
+      alert(
+        `"${category.name}" is used by ${category.rule_count.toLocaleString()} rule${
+          category.rule_count === 1 ? '' : 's'
+        }. Update or delete those rules before removing the category.`,
+        { title: 'Category used by rules' }
+      );
+      return;
+    }
+
+    const detail = deleteSummary(category);
+    const ok = await confirm(
+      `Delete "${category.name}"?${detail ? ` ${detail}.` : ''} This can't be undone.`,
+      {
+        title: 'Delete category',
+        confirmLabel: 'Delete',
+        destructive: true
+      }
+    );
+    if (!ok) return;
+
+    setDeleting(true);
+    setError('');
+    try {
+      await api.del(`/api/categories/${category.id}`);
+      close();
+      setTimeout(onSaved, 180);
+    } catch (err) {
+      setError(err.message || 'Delete failed');
+      setDeleting(false);
+    }
+  }
 
   async function handleSave(e, close) {
     e.preventDefault();
@@ -274,6 +293,10 @@ function CategoryEditor({ category, onClose, onSaved }) {
       icon: icon.trim(),
       color
     };
+
+    if (mhaTrackerEnabled) {
+      body.mha_default_eligible = mhaDefaultEligible;
+    }
 
     if (!body.name) {
       setError('Name cannot be empty.');
@@ -321,27 +344,30 @@ function CategoryEditor({ category, onClose, onSaved }) {
               </div>
             </div>
 
-            <label className="field">
-              <span>Name</span>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Groceries"
-                required
-              />
-            </label>
+            <div className="category-editor-name-row">
+              <label className="field category-emoji-field">
+                <span>Emoji</span>
+                <input
+                  type="text"
+                  value={icon}
+                  onChange={(e) => setIcon(e.target.value)}
+                  placeholder="#"
+                  maxLength={24}
+                  aria-label="Category emoji"
+                />
+              </label>
 
-            <label className="field">
-              <span>Emoji</span>
-              <input
-                type="text"
-                value={icon}
-                onChange={(e) => setIcon(e.target.value)}
-                placeholder="🍽"
-                maxLength={24}
-              />
-            </label>
+              <label className="field category-name-field">
+                <span>Name</span>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Groceries"
+                  required
+                />
+              </label>
+            </div>
 
             <label className="field">
               <span>Color</span>
@@ -376,24 +402,50 @@ function CategoryEditor({ category, onClose, onSaved }) {
               ))}
             </div>
 
+            {mhaTrackerEnabled && (
+              <label className="category-editor-toggle">
+                <span>
+                  <strong>MHA Eligible</strong>
+                  <small>Automatically include transactions in this category.</small>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={mhaDefaultEligible}
+                  onChange={(e) => setMhaDefaultEligible(e.target.checked)}
+                />
+              </label>
+            )}
+
             {!isNew && (category.is_income || category.is_transfer) && (
               <div className="warning-banner">
                 Income and transfer behavior stays unchanged here. This editor only
-                updates the name, emoji, and color.
+                updates the name, emoji, color, and MHA default.
               </div>
             )}
 
             {error && <div className="error">{error}</div>}
 
-            <div className="modal-actions">
+            <div className="modal-actions category-editor-actions">
+              {!isNew && (
+                <button
+                  type="button"
+                  className="btn-danger"
+                  onClick={() => handleDelete(close)}
+                  disabled={saving || deleting}
+                >
+                  {deleting ? 'Deleting...' : 'Delete category'}
+                </button>
+              )}
+              <span className="category-editor-action-spacer" />
               <button type="button" className="btn-secondary" onClick={close}>
                 Cancel
               </button>
-              <button type="submit" className="btn-primary" disabled={saving}>
+              <button type="submit" className="btn-primary" disabled={saving || deleting}>
                 {saving ? 'Saving...' : isNew ? 'Create category' : 'Save'}
               </button>
             </div>
           </form>
+          <Dialog />
         </>
       )}
     </AnimatedModal>
