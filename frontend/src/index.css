@@ -1397,7 +1397,7 @@ input, textarea, select {
   }
 
   .app-shell.has-sidebar.has-page-hero .page-hero {
-    left: var(--sidebar-width);
+    --hero-edge-left: var(--sidebar-width);
   }
 
   /* Brand already shown in sidebar; hide the header copy. */
@@ -1644,10 +1644,11 @@ input, textarea, select {
 .page-hero {
   --hero-progress: 0;
   --hero-content-opacity: 1;
+  --hero-edge-left: 0px;
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: calc(10px * var(--hero-progress));
+  left: calc(var(--hero-edge-left) + (14px * var(--hero-progress)));
+  right: calc(14px * var(--hero-progress));
   z-index: 45;
   overflow: hidden;
   display: grid;
@@ -1655,14 +1656,14 @@ input, textarea, select {
   margin: 0;
   padding: 30px 20px 32px;
   border: 0;
-  border-radius: 0;
+  border-radius: calc(32px * var(--hero-progress));
   color: #f7fbff;
   background:
     linear-gradient(135deg, var(--hero-start, #06112c) 0%, var(--hero-mid, #0c234f) 46%, var(--hero-end, #1d4680) 100%);
   box-shadow:
-    0 22px 52px rgba(5, 20, 52, 0.16),
+    0 calc(22px - (4px * var(--hero-progress))) calc(52px - (20px * var(--hero-progress))) rgba(5, 20, 52, calc(0.16 + (0.12 * var(--hero-progress)))),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  will-change: height;
+  will-change: height, top, left, right, border-radius;
 }
 
 .page-hero-spacer {
@@ -1725,7 +1726,7 @@ input, textarea, select {
 .hero-menu-button {
   color: rgba(255, 255, 255, 0.84);
   flex-shrink: 0;
-  transform: translateY(calc(var(--hero-progress) * -14px));
+  transform: translateY(calc(var(--hero-progress) * -18px));
   will-change: transform;
 }
 
@@ -1767,14 +1768,11 @@ input, textarea, select {
   line-height: 1;
   letter-spacing: 0;
   position: relative;
-  left: calc(var(--hero-progress) * 50%);
-  width: max-content;
   max-width: 100%;
   z-index: 3;
-  transform-origin: center top;
+  transform-origin: left top;
   transform:
-    translateX(calc(var(--hero-progress) * -50%))
-    translateY(calc(var(--hero-progress) * -84px))
+    translateY(calc(var(--hero-progress) * -89px))
     scale(calc(1 - (var(--hero-progress) * 0.46)));
   will-change: transform;
 }

@@ -120,9 +120,10 @@ function useMorphingHero() {
         return total + child.getBoundingClientRect().height + (index > 0 ? gap : 0);
       }, 0);
       const bottomCushion = window.innerWidth <= 560 ? 30 : 34;
+      const collapsed = 64;
       const measured = Math.ceil(paddingTop + contentHeight + bottomCushion);
 
-      expandedRef.current = Math.max(56, measured);
+      expandedRef.current = Math.max(collapsed, measured);
       return expandedRef.current;
     }
 
@@ -132,7 +133,7 @@ function useMorphingHero() {
       frameRef.current = window.requestAnimationFrame(() => {
         frameRef.current = null;
         const expanded = measureExpandedHeight();
-        const collapsed = 56;
+        const collapsed = 64;
         const collapseDistance = expanded - collapsed;
         const progress = Math.min(1, Math.max(0, window.scrollY / collapseDistance));
         const height = Math.round(expanded - (expanded - collapsed) * progress);
