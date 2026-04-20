@@ -1844,6 +1844,7 @@ input, textarea, select {
 }
 
 .page-hero-dashboard .page-hero-stats,
+.page-hero-transactions .page-hero-stats,
 .page-hero-budgets .page-hero-stats,
 .page-hero-accounts .page-hero-stats {
   grid-template-columns: repeat(4, minmax(112px, 1fr));
@@ -1851,7 +1852,6 @@ input, textarea, select {
 
 .page-hero-transactions .page-hero-stats {
   width: 100%;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-self: stretch;
   justify-self: stretch;
 }
@@ -4085,6 +4085,7 @@ input, textarea, select {
   }
   .page-hero-stats,
   .page-hero-dashboard .page-hero-stats,
+  .page-hero-transactions .page-hero-stats,
   .page-hero-budgets .page-hero-stats,
   .page-hero-accounts .page-hero-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
