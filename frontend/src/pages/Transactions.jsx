@@ -100,28 +100,44 @@ function describeEditSource(source) {
   return 'edited';
 }
 
-function useCollapsedHero() {
-  const [collapsed, setCollapsed] = useState(false);
-  const collapsedRef = useRef(false);
+function useMorphingHero() {
+  const [state, setState] = useState({ progress: 0, height: 692 });
+  const frameRef = useRef(null);
 
   useEffect(() => {
-    function update() {
-      const shouldCollapse = collapsedRef.current
-        ? window.scrollY > 28
-        : window.scrollY > 150;
+    function expandedHeight() {
+      return window.innerWidth <= 560 ? 692 : 520;
+    }
 
-      if (shouldCollapse !== collapsedRef.current) {
-        collapsedRef.current = shouldCollapse;
-        setCollapsed(shouldCollapse);
-      }
+    function update() {
+      if (frameRef.current) return;
+
+      frameRef.current = window.requestAnimationFrame(() => {
+        frameRef.current = null;
+        const expanded = expandedHeight();
+        const collapsed = 56;
+        const progress = Math.min(1, Math.max(0, window.scrollY / 260));
+        const height = Math.round(expanded - (expanded - collapsed) * progress);
+
+        setState((prev) =>
+          Math.abs(prev.progress - progress) > 0.01 || prev.height !== height
+            ? { progress, height }
+            : prev
+        );
+      });
     }
 
     update();
     window.addEventListener('scroll', update, { passive: true });
-    return () => window.removeEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+      if (frameRef.current) window.cancelAnimationFrame(frameRef.current);
+    };
   }, []);
 
-  return collapsed;
+  return state;
 }
 
 // ============================================================================
@@ -205,7 +221,7 @@ function countActiveFilters(f) {
 export default function Transactions({ accounts, categories, onOpenMenu }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const heroCollapsed = useCollapsedHero();
+  const hero = useMorphingHero();
 
   // URL-derived filter state (single source of truth for the data query).
   const filters = useMemo(
@@ -433,21 +449,15 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
 
   return (
     <div className="transactions-view">
-      <section className={`page-hero page-hero-transactions ${heroCollapsed ? 'collapsed' : ''}`} aria-labelledby="transactions-title">
-        <div className="page-hero-fixed" aria-hidden={!heroCollapsed}>
-          <div className="page-hero-fixed-inner">
-            <div className="page-hero-compact-title">Transactions</div>
-            <button
-              type="button"
-              className="btn-icon hero-menu-button"
-              onClick={onOpenMenu}
-              aria-label="Open menu"
-            >
-              ☰
-            </button>
-          </div>
-        </div>
-
+      <section
+        className="page-hero page-hero-transactions"
+        aria-labelledby="transactions-title"
+        style={{
+          '--hero-progress': hero.progress,
+          '--hero-content-opacity': Math.max(0, 1 - hero.progress * 1.35),
+          height: `${hero.height}px`
+        }}
+      >
         <div className="page-hero-inner">
         <div className="page-hero-chrome">
           <button
@@ -459,6 +469,7 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
             <span className="brand-mark">$</span>
             <span className="brand-name">Orbit Money</span>
           </button>
+          <div className="page-hero-compact-title">Transactions</div>
           <button
             type="button"
             className="btn-icon hero-menu-button"
@@ -561,6 +572,7 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
         </div>
         </div>
       </section>
+      <div className="page-hero-spacer page-hero-transactions-spacer" aria-hidden="true" />
 
       {/* ---------- Active filter pills ---------- */}
       {activeCount > 0 && (

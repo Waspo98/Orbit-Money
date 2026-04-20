@@ -105,28 +105,44 @@ function timeGreeting(d) {
   return 'Good evening';
 }
 
-function useCollapsedHero() {
-  const [collapsed, setCollapsed] = useState(false);
-  const collapsedRef = useRef(false);
+function useMorphingHero() {
+  const [state, setState] = useState({ progress: 0, height: 493 });
+  const frameRef = useRef(null);
 
   useEffect(() => {
-    function update() {
-      const shouldCollapse = collapsedRef.current
-        ? window.scrollY > 28
-        : window.scrollY > 150;
+    function expandedHeight() {
+      return window.innerWidth <= 560 ? 493 : 360;
+    }
 
-      if (shouldCollapse !== collapsedRef.current) {
-        collapsedRef.current = shouldCollapse;
-        setCollapsed(shouldCollapse);
-      }
+    function update() {
+      if (frameRef.current) return;
+
+      frameRef.current = window.requestAnimationFrame(() => {
+        frameRef.current = null;
+        const expanded = expandedHeight();
+        const collapsed = 56;
+        const progress = Math.min(1, Math.max(0, window.scrollY / 220));
+        const height = Math.round(expanded - (expanded - collapsed) * progress);
+
+        setState((prev) =>
+          Math.abs(prev.progress - progress) > 0.01 || prev.height !== height
+            ? { progress, height }
+            : prev
+        );
+      });
     }
 
     update();
     window.addEventListener('scroll', update, { passive: true });
-    return () => window.removeEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+      if (frameRef.current) window.cancelAnimationFrame(frameRef.current);
+    };
   }, []);
 
-  return collapsed;
+  return state;
 }
 
 function formatTransactionAmount(amount) {
@@ -192,7 +208,7 @@ function groupAccountBalances(accounts) {
 
 export default function Dashboard({ accounts = [], categories = [], onOpenMenu }) {
   const navigate = useNavigate();
-  const heroCollapsed = useCollapsedHero();
+  const hero = useMorphingHero();
 
   const [budgetData, setBudgetData] = useState(null);
   const [recent, setRecent] = useState([]);
@@ -296,7 +312,7 @@ export default function Dashboard({ accounts = [], categories = [], onOpenMenu }
         <DashboardHero
           dateLabel={formatLongDate(now)}
           greeting={timeGreeting(now)}
-          collapsed={heroCollapsed}
+          hero={hero}
           onOpenMenu={onOpenMenu}
           stats={[
             { label: 'Net worth', value: formatMoneyWhole(0) },
@@ -337,7 +353,7 @@ export default function Dashboard({ accounts = [], categories = [], onOpenMenu }
       <DashboardHero
         dateLabel={formatLongDate(now)}
         greeting={timeGreeting(now)}
-        collapsed={heroCollapsed}
+        hero={hero}
         onOpenMenu={onOpenMenu}
         stats={[
           { label: 'Net worth', value: formatMoneyWhole(totals.net), tone: totals.net >= 0 ? 'good' : 'caution' },
@@ -396,64 +412,62 @@ export default function Dashboard({ accounts = [], categories = [], onOpenMenu }
   );
 }
 
-function DashboardHero({ dateLabel, greeting, stats, collapsed, onOpenMenu }) {
+function DashboardHero({ dateLabel, greeting, stats, hero, onOpenMenu }) {
   const navigate = useNavigate();
 
   return (
-    <section className={`page-hero page-hero-dashboard ${collapsed ? 'collapsed' : ''}`} aria-labelledby="dashboard-title">
-      <div className="page-hero-fixed" aria-hidden={!collapsed}>
-        <div className="page-hero-fixed-inner">
-          <div className="page-hero-compact-title">Dashboard</div>
-          <button
-            type="button"
-            className="btn-icon hero-menu-button"
-            onClick={onOpenMenu}
-            aria-label="Open menu"
-          >
-            ☰
-          </button>
-        </div>
-      </div>
-
-      <div className="page-hero-inner">
-        <div className="page-hero-chrome">
-          <button
-            type="button"
-            className="hero-brand brand-home"
-            onClick={() => navigate('/dashboard')}
-            aria-label="Go to dashboard"
-          >
-            <span className="brand-mark">$</span>
-            <span className="brand-name">Orbit Money</span>
-          </button>
-          <button
-            type="button"
-            className="btn-icon hero-menu-button"
-            onClick={onOpenMenu}
-            aria-label="Open menu"
-          >
-            ☰
-          </button>
-        </div>
-
-        <div className="page-hero-content">
-          <div className="page-hero-main">
-            <div className="page-kicker">Financial Orbit</div>
-            <h2 id="dashboard-title">Dashboard</h2>
-            <p>{dateLabel} · {greeting}</p>
+    <>
+      <section
+        className="page-hero page-hero-dashboard"
+        aria-labelledby="dashboard-title"
+        style={{
+          '--hero-progress': hero.progress,
+          '--hero-content-opacity': Math.max(0, 1 - hero.progress * 1.35),
+          height: `${hero.height}px`
+        }}
+      >
+        <div className="page-hero-inner">
+          <div className="page-hero-chrome">
+            <button
+              type="button"
+              className="hero-brand brand-home"
+              onClick={() => navigate('/dashboard')}
+              aria-label="Go to dashboard"
+            >
+              <span className="brand-mark">$</span>
+              <span className="brand-name">Orbit Money</span>
+            </button>
+            <div className="page-hero-compact-title">Dashboard</div>
+            <button
+              type="button"
+              className="btn-icon hero-menu-button"
+              onClick={onOpenMenu}
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
           </div>
 
-          <div className="page-hero-stats" aria-label="Dashboard summary">
-            {stats.map((stat) => (
-              <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
-                <span>{stat.label}</span>
-                <strong>{stat.value}</strong>
-              </div>
-            ))}
+          <div className="page-hero-content">
+            <div className="page-hero-main">
+              <div className="page-kicker">Financial Orbit</div>
+              <h2 id="dashboard-title">Dashboard</h2>
+              <p>{dateLabel} · {greeting}</p>
+            </div>
+
+            <div className="page-hero-stats" aria-label="Dashboard summary">
+              {stats.map((stat) => (
+                <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
+                  <span>{stat.label}</span>
+                  <strong>{stat.value}</strong>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+      <div className="page-hero-spacer page-hero-dashboard-spacer" aria-hidden="true" />
+    </>
   );
 }
 
