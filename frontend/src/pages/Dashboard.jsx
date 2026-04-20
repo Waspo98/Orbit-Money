@@ -166,7 +166,10 @@ function useMorphingHero() {
       const paddingTop = parseFloat(styles.paddingTop) || 0;
       const innerStyles = window.getComputedStyle(inner);
       const gap = parseFloat(innerStyles.rowGap || innerStyles.gap) || 0;
-      const contentHeight = Array.from(inner.children).reduce((total, child, index) => {
+      const visibleChildren = Array.from(inner.children).filter((child) => {
+        return window.getComputedStyle(child).display !== 'none';
+      });
+      const contentHeight = visibleChildren.reduce((total, child, index) => {
         return total + child.getBoundingClientRect().height + (index > 0 ? gap : 0);
       }, 0);
       const bottomCushion = window.innerWidth <= 560 ? 30 : 34;
