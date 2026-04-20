@@ -8,7 +8,7 @@ const ITEMS = [
   { id: 'settings', label: 'Settings',           description: 'Maintenance and configuration',          icon: '⚙', path: '/settings' },
   { id: 'import',   label: 'Import',             description: 'Bring in data from Rocket Money',        icon: '↑', path: '/import' },
   { id: 'housing',  label: 'Housing Calculator',  description: 'Selling, buying, and payment estimates', icon: '⌂', path: '/housing-calculator' },
-  { id: 'networth', label: 'Net Worth',          description: 'Assets minus liabilities over time',     icon: '📈', comingSoon: true },
+  { id: 'networth', label: 'Net Worth',          description: 'Assets minus liabilities over time',     icon: '$', path: '/net-worth' },
   { id: 'goals',    label: 'Goals',              description: 'Track savings targets',                  icon: '◎',  comingSoon: true },
   { id: 'credit',   label: 'Credit Score',       description: 'Track your credit health',               icon: '⬡',  comingSoon: true }
 ];
