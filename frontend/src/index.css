@@ -3381,9 +3381,64 @@ input, textarea, select {
   box-shadow: var(--shadow-sm);
 }
 
+.settings-section-top { margin-top: 4px; }
+
 .settings-section-header { margin-bottom: 22px; }
 .settings-section-header h3 { margin: 0 0 4px; font-size: 1.2rem; font-weight: 600; }
 .settings-section-header p { margin: 0; color: var(--text-muted); font-size: 0.92rem; }
+
+.settings-theme-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.settings-theme-option {
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background-color var(--dur-fast),
+    border-color var(--dur-fast),
+    color var(--dur-fast),
+    box-shadow var(--dur-fast);
+}
+
+.settings-theme-option:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+.settings-theme-option.active {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-theme-label {
+  display: block;
+  margin-bottom: 6px;
+  color: inherit;
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+
+.settings-theme-copy {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
 
 .settings-action {
   display: flex;
@@ -3402,9 +3457,30 @@ input, textarea, select {
 .settings-action-info strong { display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.96rem; }
 .settings-action-info p { margin: 0; color: var(--text-muted); font-size: 0.88rem; }
 
+.settings-account-section { margin-bottom: 0; }
+
+.settings-build-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 4px 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.settings-build-row strong {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
 @media (max-width: 640px) {
   .settings-action { flex-direction: column; align-items: stretch; }
   .settings-action > button { width: 100%; }
+  .settings-theme-toggle { grid-template-columns: 1fr; }
+  .settings-theme-option { min-height: auto; }
 }
 
 .result-card {

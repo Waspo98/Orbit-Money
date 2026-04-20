@@ -203,7 +203,16 @@ function AppShell() {
               element={<HousingCalculator accounts={accounts} />}
             />
             <Route path="/net-worth" element={<NetWorth />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route
+              path="/settings"
+              element={
+                <Settings
+                  themeMode={themeMode}
+                  onThemeChange={setThemeMode}
+                  onLogout={handleLogout}
+                />
+              }
+            />
             <Route
               path="/import"
               element={<Import onComplete={handleImportComplete} />}
