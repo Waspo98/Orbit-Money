@@ -164,7 +164,7 @@ export default function MhaTracker({ onOpenMenu }) {
         subtitle={`${formatYearLabel(selectedYear)} ministerial housing allowance tracking`}
         stats={[
           { label: 'MHA Eligible Total', value: formatMoney(summary.transactionTotal), tone: 'good' },
-          { label: 'MHA Savings', value: formatMoney(summary.savings), tone: 'warn' }
+          { label: 'MHA Savings', value: formatMoney(summary.savings), tone: 'good' }
         ]}
         toolbar={(
           <div className="mha-hero-toolbar">
