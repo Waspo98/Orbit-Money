@@ -102,6 +102,8 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Partial sync detection: if SimpleFIN reports account connection issues, status shows as yellow "Partial sync" rather than red "Error"
 - Node `fetch` rejects inline URL credentials — implementation strips them and sends as Basic Auth header
 
+- Transactions with missing/zero SimpleFIN `posted` timestamps are skipped instead of being stored as `1970-01-01`; if a later sync returns a valid date for a previously affected transaction ID, the sync repairs that row's raw date/details.
+
 ### Accounts
 - Full CRUD + merge (reassigns all transactions to target, deletes source) + archive/unarchive
 - **Reorder mode:** dedicated toggle that replaces normal rows with full-width drag handles; in-mode there are no competing tap targets, activation distance is 0 (any movement), and tapping "Done" exits. Outside reorder mode, no `@dnd-kit` listeners are mounted at all — eliminating the press-and-hold activation problems that dogged earlier versions.

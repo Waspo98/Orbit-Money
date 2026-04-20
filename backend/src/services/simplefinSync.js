@@ -31,9 +31,24 @@ import { matchTransfers } from './transferMatcher.js';
 
 const STALE_RUN_MINUTES = 15;
 const LOOKBACK_BUFFER_DAYS = 7; // re-fetch the last N days on every sync
+const UNIX_EPOCH_ISO_DATE = '1970-01-01';
 
 function toIsoDate(d) {
   return d.toISOString().slice(0, 10);
+}
+
+function simpleFinPostedToIsoDate(posted) {
+  const seconds = Number(posted);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return null;
+  }
+
+  const date = new Date(seconds * 1000);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return toIsoDate(date);
 }
 
 /**
@@ -260,6 +275,17 @@ export async function runSync({ trigger = 'manual' } = {}) {
          source, external_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'simplefin', ?)
     `);
+    const repairEpochTxn = db.prepare(`
+      UPDATE transactions
+         SET account_id = ?,
+             date = ?,
+             amount = ?,
+             original_merchant = ?,
+             original_description = ?
+       WHERE source = 'simplefin'
+         AND external_id = ?
+         AND date = ?
+    `);
 
     let inserted = 0;
     let skipped = 0;
@@ -271,9 +297,12 @@ export async function runSync({ trigger = 'manual' } = {}) {
 
         const txns = Array.isArray(sf.transactions) ? sf.transactions : [];
         for (const tx of txns) {
-          // SimpleFIN posted date is Unix seconds.
-          const posted = new Date((tx.posted || 0) * 1000);
-          const isoDate = posted.toISOString().slice(0, 10);
+          const isoDate = simpleFinPostedToIsoDate(tx.posted);
+          if (!isoDate) {
+            skipped++;
+            continue;
+          }
+
           const amount = parseFloat(tx.amount);
           if (!Number.isFinite(amount)) {
             skipped++;
@@ -318,8 +347,20 @@ export async function runSync({ trigger = 'manual' } = {}) {
             hydrated.edited_is_ignored_source,
             tx.id  // SimpleFIN transaction id → external_id
           );
-          if (result.changes === 1) inserted++;
-          else skipped++; // duplicate (already synced previously)
+          if (result.changes === 1) {
+            inserted++;
+          } else {
+            repairEpochTxn.run(
+              accountId,
+              isoDate,
+              amount,
+              rawMerchant,
+              originalDesc,
+              tx.id,
+              UNIX_EPOCH_ISO_DATE
+            );
+            skipped++; // duplicate (already synced previously)
+          }
         }
       }
     });
