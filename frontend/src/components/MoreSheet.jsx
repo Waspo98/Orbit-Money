@@ -6,11 +6,11 @@ const ANIM_MS = 180;
 const ITEMS = [
   { id: 'settings', label: 'Settings', description: 'Maintenance and configuration', icon: '\u2699', path: '/settings' },
   { id: 'rules', label: 'Rules', description: 'Automate merchant names and categories', icon: '\u2299', path: '/rules' },
+  { id: 'categories', label: 'Category Manager', description: 'Organize spending categories', icon: '#', path: '/categories' },
+  { id: 'goals', label: 'Goals', description: 'Track savings targets', icon: '\u25ce', comingSoon: true },
   { id: 'housing', label: 'Housing Calculator', description: 'Selling, buying, and payment estimates', icon: '\u2302', path: '/housing-calculator' },
   { id: 'networth', label: 'Net Worth', description: 'Assets minus liabilities over time', icon: '$', path: '/net-worth' },
-  { id: 'mha', label: 'MHA Tracker', description: 'Track housing allowance transactions', icon: 'H', path: '/mha-tracker', feature: 'mha' },
-  { id: 'goals', label: 'Goals', description: 'Track savings targets', icon: '\u25ce', comingSoon: true },
-  { id: 'categories', label: 'Category Manager', description: 'Organize spending categories', icon: '#', path: '/categories' }
+  { id: 'mha', label: 'MHA Tracker', description: 'Track housing allowance transactions', icon: 'H', path: '/mha-tracker', feature: 'mha' }
 ];
 
 export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) {

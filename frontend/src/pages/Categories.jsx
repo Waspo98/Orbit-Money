@@ -102,7 +102,7 @@ export default function Categories({
       <PageHero
         id="categories-title"
         variant="transactions"
-        kicker="Money movement"
+        kicker="Spending Clusters"
         title="Category Manager"
         subtitle={`${categories.length.toLocaleString()} categor${
           categories.length === 1 ? 'y' : 'ies'
@@ -114,24 +114,12 @@ export default function Categories({
             value: categories
               .filter((category) => Number(category.transaction_count || 0) > 0)
               .length.toLocaleString()
-          },
-          {
-            label: 'MHA eligible',
-            value: categories
-              .filter((category) => category.mha_default_eligible)
-              .length.toLocaleString()
-          },
-          {
-            label: 'Rules',
-            value: categories
-              .reduce((total, category) => total + Number(category.rule_count || 0), 0)
-              .toLocaleString()
           }
         ]}
         initialHeight={420}
         onOpenMenu={onOpenMenu}
         statLabel="Category summary"
-        toolbar={(
+        statsExtra={(
           <div className="categories-hero-toolbar">
             <input
               type="search"

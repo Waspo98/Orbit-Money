@@ -203,7 +203,7 @@ export default function MhaTracker({ onOpenMenu }) {
         variant="mha"
         kicker="Ministerial Housing Allowance"
         title="MHA Tracker"
-        subtitle={`${formatYearLabel(selectedYear)} ministerial housing allowance tracking`}
+        subtitle="Calculate Projected MHA Tax Savings"
         stats={[
           { label: 'MHA Eligible Total', value: formatMoney(summary.transactionTotal), tone: 'good' },
           { label: 'MHA Savings', value: formatMoney(summary.savings), tone: 'good' }

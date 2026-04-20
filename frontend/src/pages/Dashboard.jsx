@@ -107,6 +107,13 @@ function timeGreeting(d) {
   return 'Good evening';
 }
 
+function greetingEmoji(d) {
+  const hour = d.getHours();
+  if (hour < 12) return '🌅';
+  if (hour < 17) return '☀️';
+  return '🌙';
+}
+
 function formatTransactionAmount(amount) {
   const abs = Math.abs(amount).toLocaleString(undefined, {
     style: 'currency',
@@ -380,7 +387,7 @@ function DashboardHero({ dateLabel, greeting, stats, onOpenMenu }) {
       variant="dashboard"
       kicker="Financial Orbit"
       title="Dashboard"
-      subtitle={`${dateLabel} · ${greeting}`}
+      subtitle={`${dateLabel} · ${greeting} ${greetingEmoji(new Date())}`}
       stats={stats}
       initialHeight={420}
       onOpenMenu={onOpenMenu}
