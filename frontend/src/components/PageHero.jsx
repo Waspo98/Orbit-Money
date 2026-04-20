@@ -131,6 +131,7 @@ export default function PageHero({
   title,
   subtitle,
   stats = [],
+  statsExtra,
   initialHeight = 420,
   collapsedHeight = 64,
   collapsedTitleTop,
@@ -220,6 +221,7 @@ export default function PageHero({
                     <strong>{stat.value}</strong>
                   </div>
                 ))}
+                {statsExtra}
               </div>
             </div>
             {toolbarContent}

@@ -349,19 +349,23 @@ hidden from the More menu and transaction cards do not show MHA controls.
 
 When enabled, expanded transaction cards include an `MHA-Eligible` action. The
 MHA Tracker page lists eligible transactions, lets active accounts and
-categories be marked for automatic inclusion by default, and shows year-specific
-totals:
+categories be marked for automatic inclusion by default, lets categories be
+marked for automatic exclusion, and shows year-specific totals:
 
-- `MHA Transaction Total`: the sum of absolute eligible transaction amounts.
-- `MHA Savings`: `MHA Transaction Total * 0.27`.
+- `MHA Eligible Total`: the sum of absolute eligible transaction amounts.
+- `MHA Savings`: `MHA Eligible Total * 0.27`.
 
 The page includes a year selector; the transaction list, transaction total, and
-savings estimate all follow the selected year.
+savings estimate all follow the selected year. Manual transaction-level
+`MHA-Eligible` edits take precedence over automatic category ignores; otherwise,
+ignored categories win over account/category auto-include defaults.
 
 Storage is additive: migration `012_mha_tracker.sql` adds an app setting,
 `accounts.mha_default_eligible`, and per-transaction MHA override columns.
 Migration `013_mha_category_defaults.sql` adds `categories.mha_default_eligible`.
-Neither change affects Docker volumes, ports, auth behavior, imports, or sync
+Migration `014_mha_category_ignore_defaults.sql` adds
+`categories.mha_default_ignored`.
+These changes do not affect Docker volumes, ports, auth behavior, imports, or sync
 storage.
 
 ## Data And Storage

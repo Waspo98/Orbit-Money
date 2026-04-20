@@ -100,7 +100,7 @@ router.get('/', requireAuth, (req, res) => {
     const categories = db
       .prepare(
         `SELECT id, name, color, icon, is_transfer, is_income, sort_order,
-                mha_default_eligible
+                mha_default_eligible, mha_default_ignored
            FROM categories
           ORDER BY sort_order ASC, name COLLATE NOCASE ASC`
       )
@@ -117,9 +117,13 @@ router.get('/', requireAuth, (req, res) => {
                 COALESCE(t.edited_is_ignored, t.is_ignored) AS is_ignored,
                 COALESCE(
                   t.edited_mha_eligible,
-                  CASE WHEN a.mha_default_eligible = 1
-                         OR COALESCE(c.mha_default_eligible, 0) = 1
-                       THEN 1 ELSE 0 END
+                  CASE
+                    WHEN COALESCE(c.mha_default_ignored, 0) = 1 THEN 0
+                    WHEN a.mha_default_eligible = 1
+                      OR COALESCE(c.mha_default_eligible, 0) = 1
+                    THEN 1
+                    ELSE 0
+                  END
                 ) AS mha_eligible,
                 t.edited_mha_eligible,
                 t.edited_mha_eligible_source,
@@ -133,9 +137,13 @@ router.get('/', requireAuth, (req, res) => {
            LEFT JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
           WHERE COALESCE(
                   t.edited_mha_eligible,
-                  CASE WHEN a.mha_default_eligible = 1
-                         OR COALESCE(c.mha_default_eligible, 0) = 1
-                       THEN 1 ELSE 0 END
+                  CASE
+                    WHEN COALESCE(c.mha_default_ignored, 0) = 1 THEN 0
+                    WHEN a.mha_default_eligible = 1
+                      OR COALESCE(c.mha_default_eligible, 0) = 1
+                    THEN 1
+                    ELSE 0
+                  END
                 ) = 1
             AND t.date >= ?
             AND t.date < ?
@@ -209,16 +217,47 @@ router.put('/categories/:id/default', requireAuth, (req, res) => {
     const existing = db.prepare('SELECT id FROM categories WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Category not found.' });
 
+    const include = boolFlag(req.body.mha_default_eligible);
     db.prepare(
       `UPDATE categories
-          SET mha_default_eligible = ?
+          SET mha_default_eligible = ?,
+              mha_default_ignored = CASE WHEN ? = 1 THEN 0 ELSE mha_default_ignored END
         WHERE id = ?`
-    ).run(boolFlag(req.body.mha_default_eligible), id);
+    ).run(include, include, id);
 
     const category = db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
     res.json({ success: true, category });
   } catch (err) {
     console.error('Update MHA category default failed:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/categories/:id/ignore-default', requireAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: 'Invalid category id.' });
+  }
+  if (typeof req.body?.mha_default_ignored !== 'boolean') {
+    return res.status(400).json({ error: 'mha_default_ignored must be a boolean.' });
+  }
+
+  try {
+    const existing = db.prepare('SELECT id FROM categories WHERE id = ?').get(id);
+    if (!existing) return res.status(404).json({ error: 'Category not found.' });
+
+    const ignored = boolFlag(req.body.mha_default_ignored);
+    db.prepare(
+      `UPDATE categories
+          SET mha_default_ignored = ?,
+              mha_default_eligible = CASE WHEN ? = 1 THEN 0 ELSE mha_default_eligible END
+        WHERE id = ?`
+    ).run(ignored, ignored, id);
+
+    const category = db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
+    res.json({ success: true, category });
+  } catch (err) {
+    console.error('Update MHA category ignore default failed:', err);
     res.status(500).json({ error: err.message });
   }
 });

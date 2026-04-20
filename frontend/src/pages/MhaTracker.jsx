@@ -54,8 +54,10 @@ export default function MhaTracker({ onOpenMenu }) {
   const [error, setError] = useState('');
   const [savingAccountId, setSavingAccountId] = useState(null);
   const [savingCategoryId, setSavingCategoryId] = useState(null);
+  const [savingIgnoredCategoryId, setSavingIgnoredCategoryId] = useState(null);
   const [accountsExpanded, setAccountsExpanded] = useState(false);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
+  const [ignoredCategoriesExpanded, setIgnoredCategoriesExpanded] = useState(false);
 
   async function load({ silent = false } = {}) {
     if (!silent && data == null) setLoading(true);
@@ -114,7 +116,13 @@ export default function MhaTracker({ onOpenMenu }) {
       setData((prev) => ({
         ...prev,
         categories: prev.categories.map((item) =>
-          item.id === category.id ? { ...item, mha_default_eligible: next ? 1 : 0 } : item
+          item.id === category.id
+            ? {
+                ...item,
+                mha_default_eligible: next ? 1 : 0,
+                mha_default_ignored: next ? 0 : item.mha_default_ignored
+              }
+            : item
         )
       }));
       await api.put(`/api/mha/categories/${category.id}/default`, {
@@ -126,6 +134,35 @@ export default function MhaTracker({ onOpenMenu }) {
       await load({ silent: true });
     } finally {
       setSavingCategoryId(null);
+    }
+  }
+
+  async function toggleIgnoredCategory(category) {
+    const next = !category.mha_default_ignored;
+    setSavingIgnoredCategoryId(category.id);
+    setError('');
+    try {
+      setData((prev) => ({
+        ...prev,
+        categories: prev.categories.map((item) =>
+          item.id === category.id
+            ? {
+                ...item,
+                mha_default_ignored: next ? 1 : 0,
+                mha_default_eligible: next ? 0 : item.mha_default_eligible
+              }
+            : item
+        )
+      }));
+      await api.put(`/api/mha/categories/${category.id}/ignore-default`, {
+        mha_default_ignored: next
+      });
+      await load({ silent: true });
+    } catch (err) {
+      setError(err.message || 'Could not update MHA category ignore default');
+      await load({ silent: true });
+    } finally {
+      setSavingIgnoredCategoryId(null);
     }
   }
 
@@ -143,9 +180,14 @@ export default function MhaTracker({ onOpenMenu }) {
     () => categories.filter((category) => category.mha_default_eligible),
     [categories]
   );
+  const ignoredCategories = useMemo(
+    () => categories.filter((category) => category.mha_default_ignored),
+    [categories]
+  );
 
   const visibleAccounts = accountsExpanded ? accounts : enabledAccounts;
   const visibleCategories = categoriesExpanded ? categories : enabledCategories;
+  const visibleIgnoredCategories = ignoredCategoriesExpanded ? categories : ignoredCategories;
   const yearOptions = useMemo(() => {
     const set = new Set(years);
     set.add(currentYear());
@@ -166,8 +208,9 @@ export default function MhaTracker({ onOpenMenu }) {
           { label: 'MHA Eligible Total', value: formatMoney(summary.transactionTotal), tone: 'good' },
           { label: 'MHA Savings', value: formatMoney(summary.savings), tone: 'good' }
         ]}
-        toolbar={(
-          <div className="mha-hero-toolbar">
+        statsExtra={(
+          <div className="page-hero-stat mha-year-stat">
+            <span>Year</span>
             <YearNav
               year={selectedYear}
               yearOptions={yearOptions}
@@ -277,6 +320,55 @@ export default function MhaTracker({ onOpenMenu }) {
                       </span>
                       <span className="mha-picker-state">
                         {category.mha_default_eligible ? 'Included' : 'Off'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="dashboard-card mha-picker-card">
+            <header className="dashboard-card-header">
+              <h3>Auto-ignore categories</h3>
+              <button
+                type="button"
+                className="dashboard-card-link button-link"
+                onClick={() => setIgnoredCategoriesExpanded((value) => !value)}
+              >
+                {ignoredCategoriesExpanded ? 'Show ignored' : 'Show all'} ({ignoredCategories.length})
+              </button>
+            </header>
+            <div className="dashboard-card-body">
+              {visibleIgnoredCategories.length === 0 ? (
+                <p className="muted" style={{ margin: 0 }}>
+                  No categories ignored.
+                </p>
+              ) : (
+                <div className="mha-picker-list">
+                  {visibleIgnoredCategories.map((category) => (
+                    <button
+                      key={category.id}
+                      type="button"
+                      className={`mha-picker-row ${category.mha_default_ignored ? 'ignored-active' : ''}`}
+                      onClick={() => toggleIgnoredCategory(category)}
+                      disabled={savingIgnoredCategoryId === category.id}
+                      aria-pressed={!!category.mha_default_ignored}
+                    >
+                      <span className="mha-picker-main">
+                        <strong>
+                          {category.icon && <span style={{ color: category.color }}>{category.icon} </span>}
+                          {category.name}
+                        </strong>
+                        <span>
+                          <span className="type-pill">
+                            {category.is_income ? 'Income' : category.is_transfer ? 'Transfer' : 'Spending'}
+                          </span>
+                          {category.is_transfer ? <em>Excluded from budgets</em> : null}
+                        </span>
+                      </span>
+                      <span className="mha-picker-state">
+                        {category.mha_default_ignored ? 'Ignored' : 'Allowed'}
                       </span>
                     </button>
                   ))}

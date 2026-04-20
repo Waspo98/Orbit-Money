@@ -64,6 +64,10 @@ const SELECT_COLS = `
   COALESCE(
     edited_mha_eligible,
     CASE
+      WHEN (SELECT mha_default_ignored
+              FROM categories c
+             WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)) = 1
+      THEN 0
       WHEN (SELECT mha_default_eligible FROM accounts a WHERE a.id = transactions.account_id) = 1
         OR (SELECT mha_default_eligible
               FROM categories c
@@ -368,6 +372,10 @@ router.patch('/:id', requireAuth, (req, res) => {
               is_transfer   AS original_is_transfer,
               is_ignored    AS original_is_ignored,
               CASE
+                WHEN (SELECT mha_default_ignored
+                        FROM categories c
+                       WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)) = 1
+                THEN 0
                 WHEN (SELECT mha_default_eligible FROM accounts a WHERE a.id = transactions.account_id) = 1
                   OR (SELECT mha_default_eligible
                         FROM categories c
