@@ -1641,6 +1641,10 @@ input, textarea, select {
 
 .view-header p { margin: 6px 0 0; color: var(--text-muted); }
 
+.view-header[hidden] {
+  display: none !important;
+}
+
 .page-hero {
   --hero-progress: 0;
   --hero-content-opacity: 1;
@@ -4072,7 +4076,9 @@ input, textarea, select {
     font-size: 0.92rem;
   }
   .page-hero-stats,
-  .page-hero-dashboard .page-hero-stats {
+  .page-hero-dashboard .page-hero-stats,
+  .page-hero-budgets .page-hero-stats,
+  .page-hero-accounts .page-hero-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
   }
@@ -4129,7 +4135,7 @@ input, textarea, select {
 @media (max-width: 639px) {
   .budgets-view {
     max-width: none;
-    margin-inline: 0;
+    margin-inline: auto;
   }
 }
 
