@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { APP_VERSION_LABEL } from '../version.js';
@@ -387,6 +388,23 @@ export default function Settings({ themeMode = 'system', onThemeChange, onLogout
             </button>
           </form>
         )}
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <h3>Import</h3>
+          <p>Bring in Rocket Money data when you need to reload history.</p>
+        </div>
+
+        <div className="settings-action">
+          <div className="settings-action-info">
+            <strong>Rocket Money import</strong>
+            <p>Upload an export file to add accounts and transactions.</p>
+          </div>
+          <Link to="/import" className="btn-secondary settings-action-link">
+            Open import
+          </Link>
+        </div>
       </section>
 
       <section className="settings-section settings-account-section">

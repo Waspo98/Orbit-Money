@@ -556,7 +556,7 @@ function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump })
         onClick={onPrev}
         aria-label="Previous month"
       >
-        ‹
+        <span aria-hidden="true">&larr;</span>
       </button>
 
       <div className="month-nav-label-wrap">
@@ -583,7 +583,7 @@ function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump })
         disabled={!canGoForward}
         aria-label="Next month"
       >
-        ›
+        <span aria-hidden="true">&rarr;</span>
       </button>
     </div>
   );

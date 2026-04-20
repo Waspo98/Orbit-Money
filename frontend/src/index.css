@@ -2134,10 +2134,8 @@ input, textarea, select {
 .networth-view > .empty-state,
 .networth-hero-panel,
 .networth-grid {
-  width: calc(100% - 40px);
-  max-width: 960px;
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
+  max-width: none;
 }
 
 .networth-hero-panel {
@@ -2781,7 +2779,7 @@ input, textarea, select {
 
 .txn-month-header {
   position: sticky;
-  top: var(--header-height);
+  top: 0;
   z-index: 10;
   display: flex;
   align-items: baseline;
@@ -3480,6 +3478,11 @@ input, textarea, select {
 .settings-action-info { flex: 1; min-width: 0; }
 .settings-action-info strong { display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.96rem; }
 .settings-action-info p { margin: 0; color: var(--text-muted); font-size: 0.88rem; }
+
+.settings-action-link {
+  text-decoration: none;
+  white-space: nowrap;
+}
 
 .settings-account-section { margin-bottom: 0; }
 
@@ -4395,6 +4398,8 @@ input, textarea, select {
   background: rgba(255, 255, 255, 0.95);
   color: #0d1b2f;
   box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
+  font-size: 1.1rem;
+  font-weight: 800;
 }
 
 .page-hero-budgets .month-nav-arrow:hover:not(:disabled) {
@@ -4435,6 +4440,7 @@ input, textarea, select {
 
 .page-hero-budgets .month-nav-label-wrap {
   border-color: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.95);
   color: #0d1b2f;
   box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
