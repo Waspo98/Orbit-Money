@@ -1699,49 +1699,6 @@ input, textarea, select {
   z-index: 1;
 }
 
-.page-hero-pill-bar {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 0 30px;
-  opacity: calc((var(--hero-progress) - 0.72) * 3.58);
-  pointer-events: none;
-  will-change: opacity;
-}
-
-.page-hero-pill-title {
-  min-width: 0;
-  overflow: hidden;
-  color: #ffffff;
-  font-size: 1.38rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.page-hero-pill-menu {
-  width: 40px;
-  height: 40px;
-  color: rgba(255, 255, 255, 0.84);
-  flex: 0 0 40px;
-  pointer-events: auto;
-}
-
-.page-hero-pill-menu:disabled {
-  pointer-events: none;
-}
-
-.page-hero-pill-menu:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-}
-
 .page-hero-inner {
   width: 100%;
   max-width: 960px;
@@ -1821,14 +1778,17 @@ input, textarea, select {
   line-height: 1;
   letter-spacing: 0;
   position: relative;
-  max-width: 100%;
-  opacity: calc(1 - (var(--hero-progress) * 1.45));
+  max-width: none;
+  white-space: nowrap;
   z-index: 3;
   transform-origin: left top;
   transform:
-    translateY(calc(var(--hero-progress) * -89px))
+    translate(
+      calc(var(--hero-progress) * var(--hero-title-x, 0px)),
+      calc(var(--hero-progress) * var(--hero-title-y, 0px))
+    )
     scale(calc(1 - (var(--hero-progress) * 0.46)));
-  will-change: opacity, transform;
+  will-change: transform;
 }
 
 .page-hero p {

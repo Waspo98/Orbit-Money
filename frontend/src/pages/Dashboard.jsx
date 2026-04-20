@@ -107,11 +107,56 @@ function timeGreeting(d) {
 
 function useMorphingHero() {
   const innerRef = useRef(null);
+  const titleRef = useRef(null);
   const expandedRef = useRef(420);
-  const [state, setState] = useState({ progress: 0, height: 420, expandedHeight: 420 });
+  const [state, setState] = useState({
+    progress: 0,
+    height: 420,
+    expandedHeight: 420,
+    titleX: 0,
+    titleY: 0,
+    titleScale: 0.54,
+    collapsedWidth: 232
+  });
   const frameRef = useRef(null);
 
   useEffect(() => {
+    const collapsed = 64;
+    const titleScale = 0.54;
+
+    function measureTitleTarget() {
+      const title = titleRef.current;
+      const hero = innerRef.current?.closest('.page-hero');
+      if (!title || !hero) {
+        return { titleX: 0, titleY: 0, titleScale, collapsedWidth: 232 };
+      }
+
+      const previousTransform = title.style.transform;
+      title.style.transform = 'none';
+      const heroRect = hero.getBoundingClientRect();
+      const titleRect = title.getBoundingClientRect();
+      title.style.transform = previousTransform;
+
+      const edgeLeft = window.innerWidth >= 1080 ? 260 : 0;
+      const availableWidth = window.innerWidth - edgeLeft;
+      const preferredWidth = Math.min(Math.max(availableWidth / 3, 232), 520);
+      const collapsedWidth = Math.min(
+        availableWidth - 28,
+        Math.max(preferredWidth, Math.ceil(titleRect.width * titleScale + 60))
+      );
+      const targetLeft = (collapsedWidth - titleRect.width * titleScale) / 2;
+      const targetTop = (collapsed - titleRect.height * titleScale) / 2;
+      const currentLeft = titleRect.left - heroRect.left;
+      const currentTop = titleRect.top - heroRect.top;
+
+      return {
+        titleX: targetLeft - currentLeft,
+        titleY: targetTop - currentTop,
+        titleScale,
+        collapsedWidth
+      };
+    }
+
     function measureExpandedHeight() {
       const inner = innerRef.current;
       const hero = inner?.closest('.page-hero');
@@ -125,7 +170,6 @@ function useMorphingHero() {
         return total + child.getBoundingClientRect().height + (index > 0 ? gap : 0);
       }, 0);
       const bottomCushion = window.innerWidth <= 560 ? 30 : 34;
-      const collapsed = 64;
       const measured = Math.ceil(paddingTop + contentHeight + bottomCushion);
 
       expandedRef.current = Math.max(collapsed, measured);
@@ -138,7 +182,7 @@ function useMorphingHero() {
       frameRef.current = window.requestAnimationFrame(() => {
         frameRef.current = null;
         const expanded = measureExpandedHeight();
-        const collapsed = 64;
+        const titleTarget = measureTitleTarget();
         const collapseDistance = expanded - collapsed;
         const progress = Math.min(1, Math.max(0, window.scrollY / collapseDistance));
         const height = Math.round(expanded - (expanded - collapsed) * progress);
@@ -146,8 +190,11 @@ function useMorphingHero() {
         setState((prev) =>
           Math.abs(prev.progress - progress) > 0.01 ||
           prev.height !== height ||
-          prev.expandedHeight !== expanded
-            ? { progress, height, expandedHeight: expanded }
+          prev.expandedHeight !== expanded ||
+          Math.abs(prev.titleX - titleTarget.titleX) > 0.5 ||
+          Math.abs(prev.titleY - titleTarget.titleY) > 0.5 ||
+          Math.abs(prev.collapsedWidth - titleTarget.collapsedWidth) > 0.5
+            ? { progress, height, expandedHeight: expanded, ...titleTarget }
             : prev
         );
       });
@@ -169,7 +216,7 @@ function useMorphingHero() {
     };
   }, []);
 
-  return { ...state, innerRef };
+  return { ...state, innerRef, titleRef };
 }
 
 function formatTransactionAmount(amount) {
@@ -450,10 +497,14 @@ function DashboardHero({ dateLabel, greeting, stats, hero, onOpenMenu }) {
         style={{
           '--hero-progress': hero.progress,
           '--hero-content-opacity': Math.max(0, 1 - hero.progress * 1.35),
+          '--hero-title-x': `${hero.titleX}px`,
+          '--hero-title-y': `${hero.titleY}px`,
+          '--hero-title-scale': hero.titleScale,
+          '--hero-collapsed-width': `${hero.collapsedWidth}px`,
           height: `${hero.height}px`
         }}
       >
-        <div className="page-hero-pill-bar">
+        <div className="page-hero-pill-bar" hidden>
           <span className="page-hero-pill-title" aria-hidden="true">Dashboard</span>
           <button
             type="button"
@@ -481,6 +532,7 @@ function DashboardHero({ dateLabel, greeting, stats, hero, onOpenMenu }) {
               className="btn-icon hero-menu-button"
               onClick={onOpenMenu}
               aria-label="Open menu"
+              disabled={hero.progress > 0.72}
             >
               ☰
             </button>
@@ -489,7 +541,7 @@ function DashboardHero({ dateLabel, greeting, stats, hero, onOpenMenu }) {
           <div className="page-hero-content">
             <div className="page-hero-main">
               <div className="page-kicker">Financial Orbit</div>
-              <h2 id="dashboard-title">Dashboard</h2>
+              <h2 id="dashboard-title" ref={hero.titleRef}>Dashboard</h2>
               <p>{dateLabel} · {greeting}</p>
             </div>
 
