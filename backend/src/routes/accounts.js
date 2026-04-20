@@ -21,7 +21,7 @@ router.get('/', requireAuth, (req, res) => {
         `
         SELECT a.id, a.name, a.type, a.institution, a.account_number_last4,
                a.current_balance, a.estimated_value,
-               a.is_manual, a.is_archived, a.sort_order,
+               a.is_manual, a.is_archived, a.sort_order, a.mha_default_eligible,
                a.simplefin_account_id, a.created_at, a.updated_at,
                COUNT(t.id) AS transaction_count
           FROM accounts a

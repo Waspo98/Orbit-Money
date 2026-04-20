@@ -180,7 +180,7 @@ function countActiveFilters(f) {
 // Main page
 // ============================================================================
 
-export default function Transactions({ accounts, categories, onOpenMenu }) {
+export default function Transactions({ accounts, categories, mhaTrackerEnabled = false, onOpenMenu }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { alert, confirm, Dialog } = useAppDialog();
@@ -657,8 +657,10 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
                     onCreateRule={() => setNewRuleFromTxn(t)}
                     onToggleTransfer={() => handleToggle(t, 'is_transfer')}
                     onToggleIgnored={() => handleToggle(t, 'is_ignored')}
+                    onToggleMhaEligible={() => handleToggle(t, 'mha_eligible')}
                     onDelete={() => handleDelete(t)}
                     onResetField={(field) => handleResetField(t, field)}
+                    mhaTrackerEnabled={mhaTrackerEnabled}
                   />
                 ))}
               </ul>
@@ -891,8 +893,10 @@ export function TransactionRow({
   onCreateRule,
   onToggleTransfer,
   onToggleIgnored,
+  onToggleMhaEligible,
   onDelete,
-  onResetField
+  onResetField,
+  mhaTrackerEnabled = false
 }) {
   const isIncome = txn.amount > 0 && !txn.is_transfer;
   const isTransfer = !!txn.is_transfer;
@@ -1007,8 +1011,10 @@ export function TransactionRow({
           onCreateRule={onCreateRule}
           onToggleTransfer={onToggleTransfer}
           onToggleIgnored={onToggleIgnored}
+          onToggleMhaEligible={onToggleMhaEligible}
           onDelete={onDelete}
           onResetField={onResetField}
+          mhaTrackerEnabled={mhaTrackerEnabled}
         />
       </div>
     </li>
@@ -1029,8 +1035,10 @@ function TransactionDetail({
   onCreateRule,
   onToggleTransfer,
   onToggleIgnored,
+  onToggleMhaEligible,
   onDelete,
-  onResetField
+  onResetField,
+  mhaTrackerEnabled = false
 }) {
   const merchantEdited = txn.edited_merchant_source !== null;
   const categoryEdited = txn.edited_category_id_source !== null;
@@ -1188,6 +1196,17 @@ function TransactionDetail({
         >
           {txn.is_ignored ? 'Unignore' : 'Ignore'}
         </button>
+        {mhaTrackerEnabled && (
+          <button
+            type="button"
+            className={`btn-secondary btn-compact ${txn.mha_eligible ? 'btn-active' : ''}`}
+            onClick={onToggleMhaEligible}
+            aria-pressed={!!txn.mha_eligible}
+            {...tabProps}
+          >
+            MHA-Eligible
+          </button>
+        )}
         <button
           type="button"
           className="btn-danger btn-compact"

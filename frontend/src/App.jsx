@@ -18,6 +18,7 @@ import Import from './pages/Import.jsx';
 import Rules from './pages/Rules.jsx';
 import HousingCalculator from './pages/HousingCalculator.jsx';
 import NetWorth from './pages/NetWorth.jsx';
+import MhaTracker from './pages/MhaTracker.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
 import HamburgerMenu from './components/HamburgerMenu.jsx';
@@ -46,6 +47,7 @@ function AppShell() {
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [lookupsReady, setLookupsReady] = useState(false);
+  const [mhaTrackerEnabled, setMhaTrackerEnabled] = useState(false);
 
   const { mode: themeMode, setMode: setThemeMode } = useTheme();
 
@@ -87,8 +89,10 @@ function AppShell() {
         api.get('/api/accounts'),
         api.get('/api/categories')
       ]);
+      const mha = await api.get('/api/mha/settings');
       setAccounts(a.items);
       setCategories(c.items);
+      setMhaTrackerEnabled(!!mha.enabled);
       setLookupsReady(true);
     } catch (err) {
       console.error('Failed to load lookups:', err);
@@ -115,6 +119,7 @@ function AppShell() {
     setAuthState('out');
     setAccounts([]);
     setCategories([]);
+    setMhaTrackerEnabled(false);
     setLookupsReady(false);
     navigate('/', { replace: true });
   }
@@ -188,6 +193,7 @@ function AppShell() {
                 <Transactions
                   accounts={accounts}
                   categories={categories}
+                  mhaTrackerEnabled={mhaTrackerEnabled}
                   onOpenMenu={() => setMenuOpen(true)}
                 />
               }
@@ -204,12 +210,24 @@ function AppShell() {
             />
             <Route path="/net-worth" element={<NetWorth />} />
             <Route
+              path="/mha-tracker"
+              element={
+                mhaTrackerEnabled ? (
+                  <MhaTracker />
+                ) : (
+                  <Navigate to="/settings" replace />
+                )
+              }
+            />
+            <Route
               path="/settings"
               element={
                 <Settings
                   themeMode={themeMode}
                   onThemeChange={setThemeMode}
                   onLogout={handleLogout}
+                  mhaTrackerEnabled={mhaTrackerEnabled}
+                  onMhaTrackerChange={setMhaTrackerEnabled}
                 />
               }
             />
@@ -232,7 +250,11 @@ function AppShell() {
         onLogout={handleLogout}
       />
 
-      <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
+      <MoreSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        mhaTrackerEnabled={mhaTrackerEnabled}
+      />
     </div>
   );
 }

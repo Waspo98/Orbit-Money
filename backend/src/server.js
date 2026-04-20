@@ -19,6 +19,7 @@ import rulesRoutes from './routes/rules.js';
 import simplefinRoutes from './routes/simplefin.js';
 import budgetsRoutes from './routes/budgets.js';
 import netWorthRoutes from './routes/netWorth.js';
+import mhaRoutes from './routes/mha.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -68,6 +69,7 @@ app.use('/api/rules', rulesRoutes);
 app.use('/api/simplefin', simplefinRoutes);
 app.use('/api/budgets', budgetsRoutes);
 app.use('/api/net-worth', netWorthRoutes);
+app.use('/api/mha', mhaRoutes);
 
 // Any other /api/* is a 404.
 app.use('/api', requireAuth, (req, res) => {

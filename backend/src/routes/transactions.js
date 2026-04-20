@@ -61,6 +61,13 @@ const SELECT_COLS = `
   edited_is_transfer_source,
   edited_is_ignored,
   edited_is_ignored_source,
+  COALESCE(
+    edited_mha_eligible,
+    (SELECT mha_default_eligible FROM accounts a WHERE a.id = transactions.account_id),
+    0
+  ) AS mha_eligible,
+  edited_mha_eligible,
+  edited_mha_eligible_source,
   notes,
   transfer_pair_id
 `;
@@ -71,7 +78,8 @@ function hydrate(row) {
     row.edited_merchant_source !== null ||
     row.edited_category_id_source !== null ||
     row.edited_is_transfer_source !== null ||
-    row.edited_is_ignored_source !== null;
+    row.edited_is_ignored_source !== null ||
+    row.edited_mha_eligible_source !== null;
   return row;
 }
 
@@ -242,14 +250,16 @@ function buildFilterWhere(q) {
       edited_merchant_source IS NOT NULL OR
       edited_category_id_source IS NOT NULL OR
       edited_is_transfer_source IS NOT NULL OR
-      edited_is_ignored_source IS NOT NULL
+      edited_is_ignored_source IS NOT NULL OR
+      edited_mha_eligible_source IS NOT NULL
     )`);
   } else if (hasEdits === 'no') {
     wheres.push(`(
       edited_merchant_source IS NULL AND
       edited_category_id_source IS NULL AND
       edited_is_transfer_source IS NULL AND
-      edited_is_ignored_source IS NULL
+      edited_is_ignored_source IS NULL AND
+      edited_mha_eligible_source IS NULL
     )`);
   }
 
@@ -350,7 +360,9 @@ router.patch('/:id', requireAuth, (req, res) => {
       `SELECT id, original_merchant,
               category_id   AS original_category_id,
               is_transfer   AS original_is_transfer,
-              is_ignored    AS original_is_ignored
+              is_ignored    AS original_is_ignored,
+              (SELECT mha_default_eligible FROM accounts a WHERE a.id = transactions.account_id)
+                AS account_mha_default_eligible
          FROM transactions WHERE id = ?`
     )
     .get(id);
@@ -414,6 +426,19 @@ router.patch('/:id', requireAuth, (req, res) => {
     }
   }
 
+  if (body.mha_eligible !== undefined) {
+    const flag = body.mha_eligible ? 1 : 0;
+    const accountDefault = existing.account_mha_default_eligible ? 1 : 0;
+    if (flag === accountDefault) {
+      sets.push('edited_mha_eligible = NULL');
+      sets.push('edited_mha_eligible_source = NULL');
+    } else {
+      sets.push('edited_mha_eligible = ?');
+      values.push(flag);
+      sets.push("edited_mha_eligible_source = 'user'");
+    }
+  }
+
   if (body.notes !== undefined) {
     sets.push('notes = ?');
     values.push(typeof body.notes === 'string' ? body.notes : '');
@@ -464,7 +489,7 @@ router.post('/:id/reset', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Invalid transaction id.' });
   }
 
-  const allowed = new Set(['merchant', 'category_id', 'is_transfer', 'is_ignored']);
+  const allowed = new Set(['merchant', 'category_id', 'is_transfer', 'is_ignored', 'mha_eligible']);
   const fields = Array.isArray(req.body?.fields)
     ? req.body.fields.filter((f) => allowed.has(f))
     : [];

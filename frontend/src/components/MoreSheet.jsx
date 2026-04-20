@@ -4,20 +4,21 @@ import { useNavigate } from 'react-router-dom';
 const ANIM_MS = 180;
 
 const ITEMS = [
-  { id: 'settings', label: 'Settings',           description: 'Maintenance and configuration',          icon: '⚙', path: '/settings' },
-  { id: 'rules',    label: 'Rules',              description: 'Automate merchant names and categories', icon: '⊙', path: '/rules' },
-  { id: 'housing',  label: 'Housing Calculator',  description: 'Selling, buying, and payment estimates', icon: '⌂', path: '/housing-calculator' },
-  { id: 'networth', label: 'Net Worth',          description: 'Assets minus liabilities over time',     icon: '$', path: '/net-worth' },
-  { id: 'goals',    label: 'Goals',              description: 'Track savings targets',                  icon: '◎',  comingSoon: true },
-  { id: 'categories', label: 'Category Manager', description: 'Organize spending categories',           icon: '#',  comingSoon: true }
+  { id: 'settings', label: 'Settings', description: 'Maintenance and configuration', icon: '\u2699', path: '/settings' },
+  { id: 'rules', label: 'Rules', description: 'Automate merchant names and categories', icon: '\u2299', path: '/rules' },
+  { id: 'housing', label: 'Housing Calculator', description: 'Selling, buying, and payment estimates', icon: '\u2302', path: '/housing-calculator' },
+  { id: 'networth', label: 'Net Worth', description: 'Assets minus liabilities over time', icon: '$', path: '/net-worth' },
+  { id: 'mha', label: 'MHA Tracker', description: 'Track housing allowance transactions', icon: 'H', path: '/mha-tracker', feature: 'mha' },
+  { id: 'goals', label: 'Goals', description: 'Track savings targets', icon: '\u25ce', comingSoon: true },
+  { id: 'categories', label: 'Category Manager', description: 'Organize spending categories', icon: '#', comingSoon: true }
 ];
 
-export default function MoreSheet({ open, onClose }) {
+export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) {
   const navigate = useNavigate();
   const [closing, setClosing] = useState(false);
   const timerRef = useRef(null);
+  const visibleItems = ITEMS.filter((item) => item.feature !== 'mha' || mhaTrackerEnabled);
 
-  // Reset closing state whenever the parent opens us anew.
   useEffect(() => {
     if (open) setClosing(false);
   }, [open]);
@@ -74,12 +75,12 @@ export default function MoreSheet({ open, onClose }) {
         <div className="more-sheet-header">
           <h3>More</h3>
           <button type="button" className="btn-ghost" onClick={close} aria-label="Close">
-            ✕
+            {'\u2715'}
           </button>
         </div>
 
         <div className="more-grid">
-          {ITEMS.map((item) => (
+          {visibleItems.map((item) => (
             <button
               key={item.id}
               type="button"

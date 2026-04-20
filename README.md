@@ -341,6 +341,23 @@ the remaining mortgage balance from the account balance. The calculator keeps
 the spreadsheet-style assumptions editable for selling fees, purchase details,
 cash to close, and monthly payment estimates.
 
+## MHA Tracker
+
+The MHA Tracker is an optional feature for Ministerial Housing Allowance
+tracking. Settings includes an MHA Tracker toggle; when off, the tracker page is
+hidden from the More menu and transaction cards do not show MHA controls.
+
+When enabled, expanded transaction cards include an `MHA-Eligible` action. The
+MHA Tracker page lists eligible transactions, lets active accounts be marked for
+automatic inclusion by default, and shows:
+
+- `MHA Transaction Total`: the sum of absolute eligible transaction amounts.
+- `MHA Savings`: `MHA Transaction Total * 0.27`.
+
+Storage is additive: migration `012_mha_tracker.sql` adds an app setting,
+`accounts.mha_default_eligible`, and per-transaction MHA override columns. It
+does not change Docker volumes, ports, auth behavior, imports, or sync storage.
+
 ## Data And Storage
 
 All production data lives in the Docker named volume `budget-data`, mounted at

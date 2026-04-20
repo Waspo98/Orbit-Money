@@ -42,7 +42,13 @@ function todayIso() {
   return `${y}-${m}-${day}`;
 }
 
-export default function Settings({ themeMode = 'system', onThemeChange, onLogout }) {
+export default function Settings({
+  themeMode = 'system',
+  onThemeChange,
+  onLogout,
+  mhaTrackerEnabled = false,
+  onMhaTrackerChange
+}) {
   const { alert, confirm, Dialog } = useAppDialog();
   // SimpleFIN section
   const [status, setStatus] = useState(null);
@@ -58,6 +64,8 @@ export default function Settings({ themeMode = 'system', onThemeChange, onLogout
   const [syncLog, setSyncLog] = useState([]);
   const [showLog, setShowLog] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [mhaBusy, setMhaBusy] = useState(false);
+  const [mhaError, setMhaError] = useState('');
 
   async function loadStatus() {
     try {
@@ -158,6 +166,20 @@ export default function Settings({ themeMode = 'system', onThemeChange, onLogout
     }
   }
 
+  async function handleMhaToggle() {
+    const next = !mhaTrackerEnabled;
+    setMhaBusy(true);
+    setMhaError('');
+    try {
+      const result = await api.put('/api/mha/settings', { enabled: next });
+      onMhaTrackerChange?.(!!result.enabled);
+    } catch (err) {
+      setMhaError(err.message || 'MHA Tracker update failed');
+    } finally {
+      setMhaBusy(false);
+    }
+  }
+
   return (
     <div className="settings-view">
       <div className="view-header">
@@ -191,6 +213,30 @@ export default function Settings({ themeMode = 'system', onThemeChange, onLogout
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <h3>MHA Tracker</h3>
+          <p>Show Ministerial Housing Allowance tools when you need them.</p>
+        </div>
+
+        <div className="settings-action">
+          <div className="settings-action-info">
+            <strong>MHA Tracker</strong>
+            <p>When off, the tracker page and transaction MHA controls are hidden.</p>
+          </div>
+          <button
+            type="button"
+            className={`btn-secondary ${mhaTrackerEnabled ? 'btn-active' : ''}`}
+            onClick={handleMhaToggle}
+            disabled={mhaBusy}
+            aria-pressed={mhaTrackerEnabled}
+          >
+            {mhaBusy ? 'Saving...' : mhaTrackerEnabled ? 'On' : 'Off'}
+          </button>
+        </div>
+        {mhaError && <div className="error" style={{ marginTop: 12 }}>{mhaError}</div>}
       </section>
 
       {/* ===== SimpleFIN ===== */}
