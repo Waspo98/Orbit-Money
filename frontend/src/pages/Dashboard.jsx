@@ -119,7 +119,11 @@ function useMorphingHero() {
 
       const styles = window.getComputedStyle(hero);
       const paddingTop = parseFloat(styles.paddingTop) || 0;
-      const contentHeight = inner.getBoundingClientRect().height;
+      const innerStyles = window.getComputedStyle(inner);
+      const gap = parseFloat(innerStyles.rowGap || innerStyles.gap) || 0;
+      const contentHeight = Array.from(inner.children).reduce((total, child, index) => {
+        return total + child.getBoundingClientRect().height + (index > 0 ? gap : 0);
+      }, 0);
       const bottomCushion = window.innerWidth <= 560 ? 30 : 34;
       const measured = Math.ceil(paddingTop + contentHeight + bottomCushion);
 

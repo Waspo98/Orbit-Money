@@ -1696,6 +1696,7 @@ input, textarea, select {
   display: grid;
   gap: 22px;
   align-content: start;
+  align-self: start;
 }
 
 .page-hero-chrome {
@@ -1766,9 +1767,13 @@ input, textarea, select {
   line-height: 1;
   letter-spacing: 0;
   position: relative;
+  left: calc(var(--hero-progress) * 50%);
+  width: max-content;
+  max-width: 100%;
   z-index: 3;
-  transform-origin: left top;
+  transform-origin: center top;
   transform:
+    translateX(calc(var(--hero-progress) * -50%))
     translateY(calc(var(--hero-progress) * -84px))
     scale(calc(1 - (var(--hero-progress) * 0.46)));
   will-change: transform;
