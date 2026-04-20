@@ -290,7 +290,10 @@ export default function HousingCalculator({ accounts = [] }) {
             <MoneyField label="Purchase Price" value={values.purchasePrice} placeholder="$375,000" onChange={(v) => update('purchasePrice', v)} />
             <MoneyField label="Downpayment" value={values.downPayment} onChange={(v) => update('downPayment', v)} />
             <PercentField label="Interest Rate (%)" value={values.interestRate} placeholder="6%" onChange={(v) => update('interestRate', v)} />
-            <NumberField label="Loan Term (Years)" value={values.loanTermYears} placeholder="30" onChange={(v) => update('loanTermYears', v)} />
+            <LoanTermField
+              value={values.loanTermYears}
+              onChange={(v) => update('loanTermYears', v)}
+            />
             <MoneyField label="Property Taxes (Annual)" value={values.annualPropertyTaxes} placeholder="$8,000" onChange={(v) => update('annualPropertyTaxes', v)} />
             <MoneyField label="Home Insurance (Annual)" value={values.annualHomeInsurance} placeholder="$1,500" onChange={(v) => update('annualHomeInsurance', v)} />
             <MoneyField label="HOA Fees (Monthly)" value={values.monthlyHoa} placeholder="$23" onChange={(v) => update('monthlyHoa', v)} />
@@ -358,6 +361,58 @@ function PercentField({ label, value, placeholder = '0%', onChange }) {
         placeholder={placeholder}
       />
     </label>
+  );
+}
+
+function LoanTermField({ value, onChange }) {
+  const [customOpen, setCustomOpen] = useState(false);
+  const isCustom = hasValue(value) && value !== '30' && value !== '15';
+  const showCustom = customOpen || isCustom;
+
+  function choosePreset(nextValue) {
+    setCustomOpen(false);
+    onChange(nextValue);
+  }
+
+  return (
+    <div className="field housing-field housing-loan-term">
+      <span>Loan Term (Years)</span>
+      <div className="housing-segmented" role="group" aria-label="Loan term">
+        <button
+          type="button"
+          className={value === '30' ? 'active' : ''}
+          onClick={() => choosePreset('30')}
+        >
+          30
+        </button>
+        <button
+          type="button"
+          className={value === '15' ? 'active' : ''}
+          onClick={() => choosePreset('15')}
+        >
+          15
+        </button>
+        <button
+          type="button"
+          className={showCustom ? 'active' : ''}
+          onClick={() => {
+            setCustomOpen(true);
+            if (value === '30' || value === '15') onChange('');
+          }}
+        >
+          Custom
+        </button>
+      </div>
+      <input
+        className={`housing-custom-term ${showCustom ? 'visible' : ''}`}
+        type="text"
+        inputMode="numeric"
+        value={showCustom && value !== '30' && value !== '15' ? value : ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Years"
+        aria-label="Custom loan term in years"
+      />
+    </div>
   );
 }
 

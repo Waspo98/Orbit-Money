@@ -2527,6 +2527,46 @@ input, textarea, select {
   grid-template-columns: minmax(220px, 320px);
 }
 
+.housing-segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.housing-segmented button {
+  min-height: 44px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--dur-fast), color var(--dur-fast);
+}
+
+.housing-segmented button:last-child {
+  border-right: 0;
+}
+
+.housing-segmented button:hover,
+.housing-segmented button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.housing-custom-term {
+  display: none;
+  margin-top: 8px;
+}
+
+.housing-custom-term.visible {
+  display: block;
+}
+
 .housing-results {
   margin: 16px 0 0;
   padding: 8px 0 0;
