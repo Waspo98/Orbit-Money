@@ -2231,12 +2231,12 @@ input, textarea, select {
   }
 
   .category-row-line {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 6px;
   }
 
   .category-row-line .btn-compact {
-    justify-self: start;
+    justify-self: end;
   }
 
   .category-editor-actions .btn-danger,
