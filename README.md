@@ -341,6 +341,21 @@ the remaining mortgage balance from the account balance. The calculator keeps
 the spreadsheet-style assumptions editable for selling fees, purchase details,
 cash to close, and monthly payment estimates.
 
+## Category Manager
+
+The Category Manager is available from the More menu. It lets categories be
+added, renamed, recolored, given a different emoji, or deleted.
+
+Deleting a category clears that category from original and manually edited
+transaction category fields, so affected transactions become uncategorized.
+Related budgets are removed by the existing budget foreign key behavior. A
+category cannot be deleted while any rule still references it as a condition or
+categorization action; update or delete the rule first to avoid silent
+automation changes.
+
+This feature does not add new tables or migrations and does not change Docker
+volumes, ports, auth behavior, imports, or sync storage.
+
 ## MHA Tracker
 
 The MHA Tracker is an optional feature for Ministerial Housing Allowance

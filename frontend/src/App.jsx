@@ -16,6 +16,7 @@ import Accounts from './pages/Accounts.jsx';
 import Settings from './pages/Settings.jsx';
 import Import from './pages/Import.jsx';
 import Rules from './pages/Rules.jsx';
+import Categories from './pages/Categories.jsx';
 import HousingCalculator from './pages/HousingCalculator.jsx';
 import NetWorth from './pages/NetWorth.jsx';
 import MhaTracker from './pages/MhaTracker.jsx';
@@ -205,6 +206,10 @@ function AppShell() {
               element={<Accounts onChange={loadLookups} />}
             />
             <Route path="/rules" element={<Rules />} />
+            <Route
+              path="/categories"
+              element={<Categories onChange={loadLookups} />}
+            />
             <Route
               path="/housing-calculator"
               element={<HousingCalculator accounts={accounts} />}

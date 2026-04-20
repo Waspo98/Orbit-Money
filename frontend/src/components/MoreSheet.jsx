@@ -10,7 +10,7 @@ const ITEMS = [
   { id: 'networth', label: 'Net Worth', description: 'Assets minus liabilities over time', icon: '$', path: '/net-worth' },
   { id: 'mha', label: 'MHA Tracker', description: 'Track housing allowance transactions', icon: 'H', path: '/mha-tracker', feature: 'mha' },
   { id: 'goals', label: 'Goals', description: 'Track savings targets', icon: '\u25ce', comingSoon: true },
-  { id: 'categories', label: 'Category Manager', description: 'Organize spending categories', icon: '#', comingSoon: true }
+  { id: 'categories', label: 'Category Manager', description: 'Organize spending categories', icon: '#', path: '/categories' }
 ];
 
 export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) {
