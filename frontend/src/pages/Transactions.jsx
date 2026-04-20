@@ -203,6 +203,8 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
   const [editingTxn, setEditingTxn] = useState(null);
   const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const groupRefs = useRef(new Map());
+  const [stickyMonth, setStickyMonth] = useState(null);
 
   // Local (debounced) search input - keeps typing snappy, writes to URL
   // after a short idle window so the server request doesn't fire per
@@ -397,6 +399,68 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
     .reduce((sum, t) => sum + Math.abs(Number(t.amount || 0)), 0);
   const visibleNet = visibleIncome - visibleOutflow;
 
+  useEffect(() => {
+    if (!groups.length) {
+      setStickyMonth(null);
+      return undefined;
+    }
+
+    function updateStickyMonth() {
+      const firstGroup = groupRefs.current.get(groups[0]?.key);
+      const firstHeader = firstGroup?.querySelector('.txn-month-header');
+      if (!firstGroup || !firstHeader) {
+        setStickyMonth(null);
+        return;
+      }
+
+      if (firstHeader.getBoundingClientRect().top > 0) {
+        setStickyMonth(null);
+        return;
+      }
+
+      let active = null;
+      for (const group of groups) {
+        const node = groupRefs.current.get(group.key);
+        if (!node) continue;
+        const rect = node.getBoundingClientRect();
+        if (rect.top <= 0 && rect.bottom > 0) {
+          active = { group, rect };
+          break;
+        }
+      }
+
+      if (!active) {
+        setStickyMonth(null);
+        return;
+      }
+
+      const nextStickyMonth = {
+        key: active.group.key,
+        label: active.group.label,
+        count: active.group.items.length,
+        left: active.rect.left,
+        width: active.rect.width
+      };
+
+      setStickyMonth((prev) =>
+        prev &&
+        prev.key === nextStickyMonth.key &&
+        Math.abs(prev.left - nextStickyMonth.left) < 0.5 &&
+        Math.abs(prev.width - nextStickyMonth.width) < 0.5
+          ? prev
+          : nextStickyMonth
+      );
+    }
+
+    updateStickyMonth();
+    window.addEventListener('scroll', updateStickyMonth, { passive: true });
+    window.addEventListener('resize', updateStickyMonth);
+    return () => {
+      window.removeEventListener('scroll', updateStickyMonth);
+      window.removeEventListener('resize', updateStickyMonth);
+    };
+  }, [groups]);
+
   // Onboarding empty state - only when no filters AND nothing exists at all.
   if (!loading && grandTotal === 0 && !isFiltered) {
     return (
@@ -515,6 +579,22 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
           </div>
         )}
       />
+      {stickyMonth && (
+        <header
+          className="txn-floating-month-header"
+          style={{
+            left: `${stickyMonth.left}px`,
+            width: `${stickyMonth.width}px`
+          }}
+          aria-hidden="true"
+        >
+          <span className="txn-month-label">{stickyMonth.label}</span>
+          <span className="txn-month-count">
+            {stickyMonth.count}{' '}
+            {stickyMonth.count === 1 ? 'transaction' : 'transactions'}
+          </span>
+        </header>
+      )}
       {/* ---------- Active filter pills ---------- */}
       {activeCount > 0 && (
         <ActiveFilterPills
@@ -544,7 +624,14 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
       ) : (
         <>
           {groups.map((group) => (
-            <section key={group.key} className="txn-month-group">
+            <section
+              key={group.key}
+              className="txn-month-group"
+              ref={(node) => {
+                if (node) groupRefs.current.set(group.key, node);
+                else groupRefs.current.delete(group.key);
+              }}
+            >
               <header className="txn-month-header">
                 <span className="txn-month-label">{group.label}</span>
                 <span className="txn-month-count">
