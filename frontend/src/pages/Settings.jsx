@@ -7,17 +7,20 @@ const THEME_OPTIONS = [
   {
     value: 'light',
     label: 'Day',
+    emoji: '☀️',
     description: 'A bright interface for daylight use.'
-  },
-  {
-    value: 'system',
-    label: 'System',
-    description: 'Match this device automatically.'
   },
   {
     value: 'dark',
     label: 'Night',
+    emoji: '🌙',
     description: 'A dimmer interface for low light.'
+  },
+  {
+    value: 'system',
+    label: 'System',
+    emoji: '💻',
+    description: 'Match this device automatically.'
   }
 ];
 
@@ -179,8 +182,11 @@ export default function Settings({ themeMode = 'system', onThemeChange, onLogout
               role="radio"
               aria-checked={themeMode === option.value}
             >
-              <span className="settings-theme-label">{option.label}</span>
-              <span className="settings-theme-copy">{option.description}</span>
+              <span className="settings-theme-emoji" aria-hidden>{option.emoji}</span>
+              <span className="settings-theme-text">
+                <span className="settings-theme-label">{option.label}</span>
+                <span className="settings-theme-copy">{option.description}</span>
+              </span>
             </button>
           ))}
         </div>
@@ -403,10 +409,30 @@ export default function Settings({ themeMode = 'system', onThemeChange, onLogout
             {signingOut ? 'Signing out...' : 'Sign out'}
           </button>
         </div>
+      </section>
 
-        <div className="settings-build-row" aria-label="App build">
-          <span>Build</span>
-          <strong>{APP_VERSION_LABEL}</strong>
+      <section className="settings-section settings-about-section" aria-labelledby="settings-about-title">
+        <div className="settings-about-brand">
+          <img src="/icon.svg" alt="" className="settings-about-icon" />
+          <div>
+            <h3 id="settings-about-title">Orbit Money</h3>
+            <p>Personal finance PWA</p>
+          </div>
+        </div>
+
+        <dl className="settings-about-details">
+          <div>
+            <dt>Build</dt>
+            <dd>{APP_VERSION_LABEL}</dd>
+          </div>
+          <div>
+            <dt>Developer</dt>
+            <dd>Neal Overbay</dd>
+          </div>
+        </dl>
+
+        <div className="settings-about-footer">
+          <span>© 2026 Neal Overbay. All rights reserved.</span>
         </div>
       </section>
       <Dialog />
