@@ -366,6 +366,13 @@ export default function Transactions({ accounts, categories }) {
   const activeCount = countActiveFilters(filters);
   const isFiltered = activeCount > 0;
   const groups = groupByMonth(items);
+  const visibleIncome = items
+    .filter((t) => t.amount > 0 && !t.is_transfer && !t.is_ignored)
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const visibleOutflow = items
+    .filter((t) => t.amount < 0 && !t.is_transfer && !t.is_ignored)
+    .reduce((sum, t) => sum + Math.abs(Number(t.amount || 0)), 0);
+  const visibleNet = visibleIncome - visibleOutflow;
 
   // Onboarding empty state — only when no filters AND nothing exists at all.
   if (!loading && grandTotal === 0 && !isFiltered) {
@@ -390,19 +397,40 @@ export default function Transactions({ accounts, categories }) {
 
   return (
     <div className="transactions-view">
-      <div className="view-header">
-        <div>
-          <h2>Transactions</h2>
-          <p className="muted">
-            {isFiltered
-              ? `${total.toLocaleString()} of ${grandTotal.toLocaleString()} shown`
-              : `${total.toLocaleString()} total`}
-          </p>
+      <section className="page-hero page-hero-transactions" aria-labelledby="transactions-title">
+        <div className="page-hero-topline">
+          <div className="page-hero-main">
+            <div className="page-kicker">Money movement</div>
+            <h2 id="transactions-title">Transactions</h2>
+            <p>
+              {isFiltered
+                ? `${total.toLocaleString()} of ${grandTotal.toLocaleString()} shown`
+                : `${total.toLocaleString()} total records`}
+            </p>
+          </div>
+
+          <div className="page-hero-stats" aria-label="Transaction summary">
+            <div className={`page-hero-stat ${visibleNet >= 0 ? 'good' : 'caution'}`}>
+              <span>Visible net</span>
+              <strong>{formatAmount(visibleNet)}</strong>
+            </div>
+            <div className="page-hero-stat good">
+              <span>Inflow</span>
+              <strong>{formatShortAmount(visibleIncome)}</strong>
+            </div>
+            <div className="page-hero-stat caution">
+              <span>Outflow</span>
+              <strong>{formatShortAmount(visibleOutflow)}</strong>
+            </div>
+            <div className="page-hero-stat">
+              <span>Filters</span>
+              <strong>{activeCount || 'None'}</strong>
+            </div>
+          </div>
         </div>
-      </div>
 
       {/* ---------- Search + toolbar ---------- */}
-      <div className="txn-toolbar">
+      <div className="txn-toolbar txn-toolbar-hero">
         <div className="txn-search-wrap">
           <span className="txn-search-icon" aria-hidden="true">⌕</span>
           <input
@@ -446,6 +474,7 @@ export default function Transactions({ accounts, categories }) {
           </label>
         </div>
       </div>
+      </section>
 
       {/* ---------- Active filter pills ---------- */}
       {activeCount > 0 && (
@@ -1149,4 +1178,3 @@ export function EditTransactionModal({ txn, categories, onClose, onSaved, onRese
     </AnimatedModal>
   );
 }
-

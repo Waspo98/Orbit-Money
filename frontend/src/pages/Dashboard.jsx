@@ -245,18 +245,27 @@ export default function Dashboard({ accounts = [], categories = [] }) {
 
   const dayOfMonth = currentDayOfMonth();
   const totalDays = daysInCurrentMonth();
+  const dashboardPulse =
+    summary
+      ? `${formatSignedCompact(summary.total_net)} net this month`
+      : `${activeAccountCount} active ${activeAccountCount === 1 ? 'account' : 'accounts'}`;
+  const budgetUsed =
+    overallPercent !== null ? `${Math.round(overallPercent)}%` : 'Not set';
 
   // --- First-time onboarding ------------------------------------------------
   const noActivity = !loading && recent.length === 0 && activeAccountCount === 0;
   if (noActivity) {
     return (
       <div className="dashboard-view">
-        <div className="view-header">
-          <div>
-            <h2>Dashboard</h2>
-            <p className="muted">{formatLongDate(now)}</p>
-          </div>
-        </div>
+        <DashboardHero
+          dateLabel={formatLongDate(now)}
+          pulse="Ready for your first import"
+          stats={[
+            { label: 'Net worth', value: formatMoneyCompact(0) },
+            { label: 'This month', value: formatMoneyCompact(0) },
+            { label: 'Accounts', value: '0' }
+          ]}
+        />
         <div className="empty-state">
           <div className="empty-state-icon">◯</div>
           <h2>Nothing to show yet</h2>
@@ -287,12 +296,16 @@ export default function Dashboard({ accounts = [], categories = [] }) {
 
   return (
     <div className="dashboard-view">
-      <div className="view-header">
-        <div>
-          <h2>Dashboard</h2>
-          <p className="muted">{formatLongDate(now)}</p>
-        </div>
-      </div>
+      <DashboardHero
+        dateLabel={formatLongDate(now)}
+        pulse={dashboardPulse}
+        stats={[
+          { label: 'Net worth', value: formatMoneyCompact(totals.net), tone: totals.net >= 0 ? 'good' : 'caution' },
+          { label: 'Month net', value: summary ? formatSignedCompact(summary.total_net) : 'Loading', tone: summary ? (summary.total_net >= 0 ? 'good' : 'caution') : '' },
+          { label: 'Budget used', value: budgetUsed, tone: overallPercent > 100 ? 'caution' : overallPercent >= 85 ? 'warn' : 'good' },
+          { label: 'Accounts', value: activeAccountCount.toLocaleString() }
+        ]}
+      />
 
       {error && <div className="error">{error}</div>}
 
@@ -340,6 +353,27 @@ export default function Dashboard({ accounts = [], categories = [] }) {
         />
       </div>
     </div>
+  );
+}
+
+function DashboardHero({ dateLabel, pulse, stats }) {
+  return (
+    <section className="page-hero page-hero-dashboard" aria-labelledby="dashboard-title">
+      <div className="page-hero-main">
+        <div className="page-kicker">Financial overview</div>
+        <h2 id="dashboard-title">Dashboard</h2>
+        <p>{dateLabel} · {pulse}</p>
+      </div>
+
+      <div className="page-hero-stats" aria-label="Dashboard summary">
+        {stats.map((stat) => (
+          <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
+            <span>{stat.label}</span>
+            <strong>{stat.value}</strong>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
