@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 
 const COLOR_PRESETS = [
@@ -16,6 +17,12 @@ const COLOR_PRESETS = [
   '#78909C'
 ];
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+const EMOJI_OPTIONS = [
+  '🚗', '👶', '💡', '💵', '💝', '💳', '🍽️', '🎓',
+  '🎬', '👨‍👩‍👧', '💸', '🎉', '🎁', '🛒', '💪', '🏠',
+  '💰', '🔄', '📈', '⚖️', '🏦', '🏥', '💆', '🐾',
+  '💹', '🛍️', '💻', '🧾', '✈️', '❓', '💱', '💼'
+];
 
 function displayIcon(category) {
   return category.icon || '#';
@@ -49,7 +56,11 @@ function deleteSummary(category) {
     .join(', ');
 }
 
-export default function Categories({ mhaTrackerEnabled = false, onChange }) {
+export default function Categories({
+  mhaTrackerEnabled = false,
+  onOpenMenu,
+  onChange
+}) {
   const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -88,48 +99,47 @@ export default function Categories({ mhaTrackerEnabled = false, onChange }) {
 
   return (
     <div className="categories-view">
-      <div className="view-header categories-header">
-        <div>
-          <h2>Category Manager</h2>
-          <p className="muted">
-            {categories.length.toLocaleString()} categor{categories.length === 1 ? 'y' : 'ies'}
-          </p>
-        </div>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => setEditing({})}
-        >
-          + New category
-        </button>
-      </div>
-
-      {error && <div className="error">{error}</div>}
-
-      <div className="categories-toolbar">
-        <input
-          type="search"
-          className="rules-search"
-          placeholder="Search categories..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
-      {loading ? (
-        <div className="center-loading">
-          <div className="spinner" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">#</div>
-          <h2>{search ? 'No matching categories' : 'No categories yet'}</h2>
-          <p>
-            {search
-              ? 'Try a different search term.'
-              : 'Add categories to organize transactions, budgets, and rules.'}
-          </p>
-          {!search && (
+      <PageHero
+        id="categories-title"
+        variant="transactions"
+        kicker="Money movement"
+        title="Category Manager"
+        subtitle={`${categories.length.toLocaleString()} categor${
+          categories.length === 1 ? 'y' : 'ies'
+        }`}
+        stats={[
+          { label: 'Categories', value: categories.length.toLocaleString() },
+          {
+            label: 'Used',
+            value: categories
+              .filter((category) => Number(category.transaction_count || 0) > 0)
+              .length.toLocaleString()
+          },
+          {
+            label: 'MHA eligible',
+            value: categories
+              .filter((category) => category.mha_default_eligible)
+              .length.toLocaleString()
+          },
+          {
+            label: 'Rules',
+            value: categories
+              .reduce((total, category) => total + Number(category.rule_count || 0), 0)
+              .toLocaleString()
+          }
+        ]}
+        initialHeight={420}
+        onOpenMenu={onOpenMenu}
+        statLabel="Category summary"
+        toolbar={(
+          <div className="categories-hero-toolbar">
+            <input
+              type="search"
+              className="rules-search categories-search"
+              placeholder="Search categories..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
             <button
               type="button"
               className="btn-primary"
@@ -137,20 +147,49 @@ export default function Categories({ mhaTrackerEnabled = false, onChange }) {
             >
               + New category
             </button>
-          )}
-        </div>
-      ) : (
-        <ul className="category-list">
-          {filtered.map((category) => (
-            <CategoryRow
-              key={category.id}
-              category={category}
-              onEdit={() => setEditing(category)}
-              onViewTransactions={() => viewTransactions(category)}
-            />
-          ))}
-        </ul>
-      )}
+          </div>
+        )}
+      />
+
+      <div className="categories-content">
+        {error && <div className="error">{error}</div>}
+
+        {loading ? (
+          <div className="center-loading">
+            <div className="spinner" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">#</div>
+            <h2>{search ? 'No matching categories' : 'No categories yet'}</h2>
+            <p>
+              {search
+                ? 'Try a different search term.'
+                : 'Add categories to organize transactions, budgets, and rules.'}
+            </p>
+            {!search && (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => setEditing({})}
+              >
+                + New category
+              </button>
+            )}
+          </div>
+        ) : (
+          <ul className="category-list">
+            {filtered.map((category) => (
+              <CategoryRow
+                key={category.id}
+                category={category}
+                onEdit={() => setEditing(category)}
+                onViewTransactions={() => viewTransactions(category)}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
 
       {editing && (
         <CategoryEditor
@@ -205,12 +244,6 @@ function CategoryRow({ category, onEdit, onViewTransactions }) {
               {transactionCount.toLocaleString()} transaction
               {transactionCount === 1 ? '' : 's'}
             </span>
-            {category.budget_count > 0 && (
-              <span>
-                {category.budget_count.toLocaleString()} budget
-                {category.budget_count === 1 ? '' : 's'}
-              </span>
-            )}
             {category.rule_count > 0 && (
               <span>
                 {category.rule_count.toLocaleString()} rule
@@ -246,6 +279,7 @@ function CategoryEditor({
   const [mhaDefaultEligible, setMhaDefaultEligible] = useState(
     !!category.mha_default_eligible
   );
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
@@ -347,14 +381,37 @@ function CategoryEditor({
             <div className="category-editor-name-row">
               <label className="field category-emoji-field">
                 <span>Emoji</span>
-                <input
-                  type="text"
-                  value={icon}
-                  onChange={(e) => setIcon(e.target.value)}
-                  placeholder="#"
-                  maxLength={24}
-                  aria-label="Category emoji"
-                />
+                <div className="category-emoji-picker-wrap">
+                  <button
+                    type="button"
+                    className="category-emoji-button"
+                    onClick={() => setEmojiPickerOpen((open) => !open)}
+                    aria-label="Choose category emoji"
+                    aria-expanded={emojiPickerOpen}
+                  >
+                    {icon || '#'}
+                  </button>
+                  {emojiPickerOpen && (
+                    <div className="category-emoji-popover" role="listbox">
+                      {EMOJI_OPTIONS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          className={`category-emoji-option ${
+                            icon === emoji ? 'active' : ''
+                          }`}
+                          onClick={() => {
+                            setIcon(emoji);
+                            setEmojiPickerOpen(false);
+                          }}
+                          aria-label={`Use ${emoji}`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </label>
 
               <label className="field category-name-field">

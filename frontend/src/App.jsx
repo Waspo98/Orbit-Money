@@ -57,6 +57,7 @@ function AppShell() {
   const hasPageHero =
     location.pathname === '/dashboard' ||
     location.pathname === '/transactions' ||
+    location.pathname === '/categories' ||
     location.pathname === '/budgets' ||
     location.pathname === '/accounts' ||
     location.pathname === '/mha-tracker';
@@ -211,6 +212,7 @@ function AppShell() {
               element={
                 <Categories
                   mhaTrackerEnabled={mhaTrackerEnabled}
+                  onOpenMenu={() => setMenuOpen(true)}
                   onChange={loadLookups}
                 />
               }
