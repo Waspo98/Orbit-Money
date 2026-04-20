@@ -1347,13 +1347,14 @@ input, textarea, select {
 }
 
 .bottom-tab-icon {
-  font-size: 1.5rem;
+  font-size: 1.32rem;
+  font-weight: 600;
   line-height: 1;
   transition: transform var(--dur-base) var(--ease-out);
 }
 
 .bottom-tab.active { color: var(--accent); }
-.bottom-tab.active .bottom-tab-icon { transform: scale(1.1); }
+.bottom-tab.active .bottom-tab-icon { transform: scale(1.05); }
 
 .bottom-tab.active::before {
   content: '';
@@ -1387,6 +1388,13 @@ input, textarea, select {
   .app-header         { grid-area: header; }
   .sync-error-banner  { grid-area: banner; }
   .app-main           { grid-area: main; }
+
+  .app-shell.has-sidebar.has-page-hero {
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "sidebar banner"
+      "sidebar main";
+  }
 
   /* Brand already shown in sidebar; hide the header copy. */
   .app-header .brand { visibility: hidden; }
@@ -1611,7 +1619,9 @@ input, textarea, select {
 .view-header p { margin: 6px 0 0; color: var(--text-muted); }
 
 .page-hero {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 45;
   overflow: hidden;
   display: grid;
   gap: 22px;
@@ -1625,6 +1635,9 @@ input, textarea, select {
   box-shadow:
     0 22px 52px rgba(5, 20, 52, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition:
+    padding var(--dur-slow) var(--ease-out),
+    box-shadow var(--dur-slow) var(--ease-out);
 }
 
 .page-hero::before {
@@ -1650,6 +1663,92 @@ input, textarea, select {
   margin: 0 auto;
   display: grid;
   gap: 22px;
+  transition: gap var(--dur-slow) var(--ease-out);
+}
+
+.page-hero-chrome {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.hero-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #ffffff;
+  min-width: 0;
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+.hero-brand .brand-name {
+  color: #ffffff;
+}
+
+.hero-menu-button {
+  color: rgba(255, 255, 255, 0.84);
+  flex-shrink: 0;
+}
+
+.hero-menu-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.page-hero-compact-title {
+  display: none;
+  min-width: 0;
+  flex: 1;
+  color: #ffffff;
+  font-size: 1.18rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.page-hero-content {
+  display: grid;
+  gap: 22px;
+  max-height: 520px;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    max-height var(--dur-slow) var(--ease-out),
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-slow) var(--ease-out);
+}
+
+.page-hero.collapsed {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  box-shadow: 0 8px 28px rgba(5, 20, 52, 0.24);
+}
+
+.page-hero.collapsed .page-hero-inner {
+  gap: 0;
+}
+
+.page-hero.collapsed .hero-brand {
+  opacity: 0;
+  transform: translateY(-8px);
+  width: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.page-hero.collapsed .page-hero-compact-title {
+  display: block;
+}
+
+.page-hero.collapsed .page-hero-content {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-10px);
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .page-hero-topline {
@@ -1700,6 +1799,7 @@ input, textarea, select {
 
 .page-hero-transactions .page-hero-stats {
   width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .page-hero-stat {
@@ -1978,7 +2078,7 @@ input, textarea, select {
 }
 
 .dash-month-stat-value.income { color: var(--income); }
-.dash-month-stat-value.expense { color: var(--expense); }
+.dash-month-stat-value.expense { color: var(--danger); }
 
 /* ---------- Budget pulse card ---------- */
 

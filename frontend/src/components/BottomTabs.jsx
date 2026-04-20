@@ -4,7 +4,7 @@ const PRIMARY_TABS = [
   { to: '/dashboard',    label: 'Dashboard',    icon: '●' },
   { to: '/transactions', label: 'Transactions', icon: '≡' },
   { to: '/budgets',      label: 'Budgets',      icon: '$' },
-  { to: '/accounts',     label: 'Accounts',     icon: '🏛' }
+  { to: '/accounts',     label: 'Accounts',     icon: '▥' }
 ];
 
 export default function BottomTabs({ onMoreClick }) {

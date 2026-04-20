@@ -100,6 +100,22 @@ function describeEditSource(source) {
   return 'edited';
 }
 
+function useCollapsedHero() {
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    function update() {
+      setCollapsed(window.scrollY > 72);
+    }
+
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
+
+  return collapsed;
+}
+
 // ============================================================================
 // URL <-> filter state
 // ============================================================================
@@ -178,9 +194,10 @@ function countActiveFilters(f) {
 // Main page
 // ============================================================================
 
-export default function Transactions({ accounts, categories }) {
+export default function Transactions({ accounts, categories, onOpenMenu }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const heroCollapsed = useCollapsedHero();
 
   // URL-derived filter state (single source of truth for the data query).
   const filters = useMemo(
@@ -376,6 +393,7 @@ export default function Transactions({ accounts, categories }) {
   const activeCount = countActiveFilters(filters);
   const isFiltered = activeCount > 0;
   const groups = groupByMonth(items);
+  const monthlyTransactionCount = groups[0]?.items.length || total;
   const visibleIncome = items
     .filter((t) => t.amount > 0 && !t.is_transfer && !t.is_ignored)
     .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -407,16 +425,37 @@ export default function Transactions({ accounts, categories }) {
 
   return (
     <div className="transactions-view">
-      <section className="page-hero page-hero-transactions" aria-labelledby="transactions-title">
+      <section className={`page-hero page-hero-transactions ${heroCollapsed ? 'collapsed' : ''}`} aria-labelledby="transactions-title">
         <div className="page-hero-inner">
+        <div className="page-hero-chrome">
+          <button
+            type="button"
+            className="hero-brand brand-home"
+            onClick={() => navigate('/dashboard')}
+            aria-label="Go to dashboard"
+          >
+            <span className="brand-mark">$</span>
+            <span className="brand-name">Orbit Money</span>
+          </button>
+          <div className="page-hero-compact-title">Transactions</div>
+          <button
+            type="button"
+            className="btn-icon hero-menu-button"
+            onClick={onOpenMenu}
+            aria-label="Open menu"
+          >
+            ☰
+          </button>
+        </div>
+        <div className="page-hero-content">
         <div className="page-hero-topline">
           <div className="page-hero-main">
             <div className="page-kicker">Money movement</div>
             <h2 id="transactions-title">Transactions</h2>
             <p>
               {isFiltered
-                ? `${total.toLocaleString()} of ${grandTotal.toLocaleString()} shown`
-                : `${total.toLocaleString()} total records`}
+                ? `${monthlyTransactionCount.toLocaleString()} monthly transactions`
+                : `${monthlyTransactionCount.toLocaleString()} monthly transactions`}
             </p>
           </div>
 
@@ -498,6 +537,7 @@ export default function Transactions({ accounts, categories }) {
           </label>
         </div>
       </div>
+        </div>
         </div>
       </section>
 

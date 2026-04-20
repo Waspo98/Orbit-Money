@@ -105,6 +105,22 @@ function timeGreeting(d) {
   return 'Good evening';
 }
 
+function useCollapsedHero() {
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    function update() {
+      setCollapsed(window.scrollY > 72);
+    }
+
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
+
+  return collapsed;
+}
+
 function formatTransactionAmount(amount) {
   const abs = Math.abs(amount).toLocaleString(undefined, {
     style: 'currency',
@@ -166,8 +182,9 @@ function groupAccountBalances(accounts) {
 // Main page
 // ============================================================================
 
-export default function Dashboard({ accounts = [], categories = [] }) {
+export default function Dashboard({ accounts = [], categories = [], onOpenMenu }) {
   const navigate = useNavigate();
+  const heroCollapsed = useCollapsedHero();
 
   const [budgetData, setBudgetData] = useState(null);
   const [recent, setRecent] = useState([]);
@@ -271,9 +288,11 @@ export default function Dashboard({ accounts = [], categories = [] }) {
         <DashboardHero
           dateLabel={formatLongDate(now)}
           greeting={timeGreeting(now)}
+          collapsed={heroCollapsed}
+          onOpenMenu={onOpenMenu}
           stats={[
             { label: 'Net worth', value: formatMoneyWhole(0) },
-            { label: 'This month', value: formatMoneyCompact(0) },
+            { label: 'Monthly net', value: formatMoneyCompact(0) },
             { label: 'Accounts', value: '0' }
           ]}
         />
@@ -310,9 +329,11 @@ export default function Dashboard({ accounts = [], categories = [] }) {
       <DashboardHero
         dateLabel={formatLongDate(now)}
         greeting={timeGreeting(now)}
+        collapsed={heroCollapsed}
+        onOpenMenu={onOpenMenu}
         stats={[
           { label: 'Net worth', value: formatMoneyWhole(totals.net), tone: totals.net >= 0 ? 'good' : 'caution' },
-          { label: 'Month net', value: summary ? formatSignedCompact(summary.total_net) : 'Loading', tone: summary ? (summary.total_net >= 0 ? 'good' : 'caution') : '' },
+          { label: 'Monthly net', value: summary ? formatSignedCompact(summary.total_net) : 'Loading', tone: summary ? (summary.total_net >= 0 ? 'good' : 'caution') : '' },
           { label: 'Budget used', value: budgetUsed, tone: overallPercent > 100 ? 'caution' : overallPercent >= 85 ? 'warn' : 'good' },
           { label: 'Accounts', value: activeAccountCount.toLocaleString() }
         ]}
@@ -367,23 +388,48 @@ export default function Dashboard({ accounts = [], categories = [] }) {
   );
 }
 
-function DashboardHero({ dateLabel, greeting, stats }) {
+function DashboardHero({ dateLabel, greeting, stats, collapsed, onOpenMenu }) {
+  const navigate = useNavigate();
+
   return (
-    <section className="page-hero page-hero-dashboard" aria-labelledby="dashboard-title">
+    <section className={`page-hero page-hero-dashboard ${collapsed ? 'collapsed' : ''}`} aria-labelledby="dashboard-title">
       <div className="page-hero-inner">
-        <div className="page-hero-main">
-          <div className="page-kicker">Financial Orbit</div>
-          <h2 id="dashboard-title">Dashboard</h2>
-          <p>{dateLabel} · {greeting}</p>
+        <div className="page-hero-chrome">
+          <button
+            type="button"
+            className="hero-brand brand-home"
+            onClick={() => navigate('/dashboard')}
+            aria-label="Go to dashboard"
+          >
+            <span className="brand-mark">$</span>
+            <span className="brand-name">Orbit Money</span>
+          </button>
+          <div className="page-hero-compact-title">Dashboard</div>
+          <button
+            type="button"
+            className="btn-icon hero-menu-button"
+            onClick={onOpenMenu}
+            aria-label="Open menu"
+          >
+            ☰
+          </button>
         </div>
 
-        <div className="page-hero-stats" aria-label="Dashboard summary">
-          {stats.map((stat) => (
-            <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
-              <span>{stat.label}</span>
-              <strong>{stat.value}</strong>
-            </div>
-          ))}
+        <div className="page-hero-content">
+          <div className="page-hero-main">
+            <div className="page-kicker">Financial Orbit</div>
+            <h2 id="dashboard-title">Dashboard</h2>
+            <p>{dateLabel} · {greeting}</p>
+          </div>
+
+          <div className="page-hero-stats" aria-label="Dashboard summary">
+            {stats.map((stat) => (
+              <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
+                <span>{stat.label}</span>
+                <strong>{stat.value}</strong>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -489,7 +535,7 @@ function MonthCard({ summary, dayOfMonth, totalDays, loading }) {
             <div className="dash-month-stat">
               <div className="dash-month-stat-label">Expenses</div>
               <div className="dash-month-stat-value expense">
-                {formatMoneyCompact(summary.total_expenses)}
+                {formatMoneyCompact(Math.abs(summary.total_expenses))}
               </div>
             </div>
             <div className="dash-month-stat">
@@ -499,7 +545,7 @@ function MonthCard({ summary, dayOfMonth, totalDays, loading }) {
                   summary.total_net >= 0 ? 'income' : 'expense'
                 }`}
               >
-                {formatSignedCompact(summary.total_net)}
+                {formatMoneyCompact(Math.abs(summary.total_net))}
               </div>
             </div>
           </div>

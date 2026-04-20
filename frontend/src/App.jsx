@@ -121,7 +121,7 @@ function AppShell() {
     <div className={`app-shell has-sidebar ${hasPageHero ? 'has-page-hero' : ''}`}>
       <DesktopSidebar onMoreClick={() => setMoreOpen(true)} />
 
-      <header className="app-header">
+      {!hasPageHero && <header className="app-header">
         <button
           type="button"
           className="brand brand-home"
@@ -141,7 +141,7 @@ function AppShell() {
         >
           ☰
         </button>
-      </header>
+      </header>}
 
       <SyncErrorBanner onOpenSettings={() => navigate('/settings')} />
 
@@ -155,12 +155,22 @@ function AppShell() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route
               path="/dashboard"
-              element={<Dashboard accounts={accounts} categories={categories} />}
+              element={
+                <Dashboard
+                  accounts={accounts}
+                  categories={categories}
+                  onOpenMenu={() => setMenuOpen(true)}
+                />
+              }
             />
             <Route
               path="/transactions"
               element={
-                <Transactions accounts={accounts} categories={categories} />
+                <Transactions
+                  accounts={accounts}
+                  categories={categories}
+                  onOpenMenu={() => setMenuOpen(true)}
+                />
               }
             />
             <Route path="/budgets" element={<Budgets />} />
