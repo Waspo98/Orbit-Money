@@ -1,7 +1,7 @@
 /* =============================================================================
  * Orbit Money — Design System
  * =============================================================================
- * Refined minimalism. Inter Tight throughout. Emerald accent. Navy-leaning
+ * Refined minimalism. DM Sans titles with Inter Tight throughout. Emerald accent. Navy-leaning
  * neutrals in dark mode for a calm, lamplit mood.
  *
  * Architecture:
@@ -14,6 +14,14 @@
 
 
 /* ================== 1. TOKENS ================== */
+
+@font-face {
+  font-family: 'DM Sans';
+  src: url('./assets/fonts/DMSans-VariableFont_opsz,wght.ttf') format('truetype');
+  font-weight: 100 1000;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   --bg:                #fafaf7;
@@ -67,6 +75,7 @@
 
   --font-sans:         'Inter Tight', -apple-system, BlinkMacSystemFont, 'Segoe UI',
                        Roboto, Helvetica, sans-serif;
+  --font-title:        'DM Sans', var(--font-sans);
   --font-mono:         ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
   --app-max-width:     1080px;
@@ -1150,9 +1159,10 @@ input, textarea, select {
 
 .login-title {
   margin: 0 0 4px;
+  font-family: var(--font-title);
   font-size: 1.8rem;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .login-subtitle { margin: 0 0 32px; color: var(--text-muted); font-size: 0.95rem; }
@@ -1268,7 +1278,12 @@ input, textarea, select {
   font-weight: 700;
 }
 
-.brand-name { font-size: 1.2rem; font-weight: 600; letter-spacing: -0.01em; }
+.brand-name {
+  font-family: var(--font-title);
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
 
 .app-main {
   padding: 28px 20px calc(var(--bottom-tab-height) + 32px);
@@ -1646,9 +1661,10 @@ input, textarea, select {
 
 .view-header h2 {
   margin: 0;
+  font-family: var(--font-title);
   font-size: 1.8rem;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .view-header p { margin: 6px 0 0; color: var(--text-muted); }
@@ -1795,6 +1811,7 @@ input, textarea, select {
 
 .page-hero h2 {
   margin: 0;
+  font-family: var(--font-title);
   color: #ffffff;
   display: inline-block;
   width: max-content;
