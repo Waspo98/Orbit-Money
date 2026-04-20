@@ -55,6 +55,25 @@ function parseOptionalCurrency(value) {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
+function pluralTypeLabel(type, count) {
+  const label = TYPE_LABELS[type] || type;
+  if (type === 'cash') return 'Cash';
+  if (type === 'checking') return 'Checking';
+  if (type === 'savings') return 'Savings';
+  if (type === 'credit') return count === 1 ? 'Credit Card' : 'Credit Cards';
+  return `${label}${count === 1 ? '' : 's'}`;
+}
+
+function accountTypeSummary(accounts) {
+  const counts = new Map();
+  accounts.forEach((account) => {
+    counts.set(account.type, (counts.get(account.type) || 0) + 1);
+  });
+  return Array.from(counts.entries())
+    .map(([type, count]) => `${count} ${pluralTypeLabel(type, count)}`)
+    .join(' | ');
+}
+
 // ============================================================================
 // Main page
 // ============================================================================
@@ -165,9 +184,9 @@ export default function Accounts({ onChange }) {
   const investmentsBalance = activeAccounts
     .filter((account) => account.type === 'investment')
     .reduce((total, account) => total + (Number(account.current_balance) || 0), 0);
-  const accountsSubtitle = `${accounts.length.toLocaleString()} account${
-    accounts.length === 1 ? '' : 's'
-  }${showArchived ? ' including archived' : ''}${
+  const accountsSubtitle = `${accountTypeSummary(accounts) || 'No accounts'}${
+    showArchived ? ' including archived' : ''
+  }${
     reorderMode ? ' · Drag a row to reorder' : ''
   }`;
   const accountHeroStats = [
@@ -219,7 +238,7 @@ export default function Accounts({ onChange }) {
       <PageHero
         id="accounts-title"
         variant="accounts"
-        kicker="Account orbit"
+        kicker="Your Money's Home Base"
         title="Accounts"
         subtitle={accountsSubtitle}
         stats={accountHeroStats}

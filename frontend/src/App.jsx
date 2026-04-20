@@ -16,6 +16,7 @@ import Accounts from './pages/Accounts.jsx';
 import Settings from './pages/Settings.jsx';
 import Import from './pages/Import.jsx';
 import Rules from './pages/Rules.jsx';
+import Categories from './pages/Categories.jsx';
 import HousingCalculator from './pages/HousingCalculator.jsx';
 import NetWorth from './pages/NetWorth.jsx';
 import MhaTracker from './pages/MhaTracker.jsx';
@@ -56,6 +57,7 @@ function AppShell() {
   const hasPageHero =
     location.pathname === '/dashboard' ||
     location.pathname === '/transactions' ||
+    location.pathname === '/categories' ||
     location.pathname === '/budgets' ||
     location.pathname === '/accounts' ||
     location.pathname === '/mha-tracker';
@@ -205,6 +207,16 @@ function AppShell() {
               element={<Accounts onChange={loadLookups} />}
             />
             <Route path="/rules" element={<Rules />} />
+            <Route
+              path="/categories"
+              element={
+                <Categories
+                  mhaTrackerEnabled={mhaTrackerEnabled}
+                  onOpenMenu={() => setMenuOpen(true)}
+                  onChange={loadLookups}
+                />
+              }
+            />
             <Route
               path="/housing-calculator"
               element={<HousingCalculator accounts={accounts} />}
