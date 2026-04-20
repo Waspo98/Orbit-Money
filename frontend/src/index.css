@@ -1717,8 +1717,8 @@ input, textarea, select {
   gap: 10px;
   color: #ffffff;
   min-width: 0;
-  opacity: calc(1 - var(--hero-progress));
-  transform: translateY(calc(var(--hero-progress) * -8px));
+  opacity: calc(1 - (var(--hero-progress) * 1.25));
+  transform: translateY(calc(var(--hero-progress) * -10px));
 }
 
 .hero-brand .brand-name {
@@ -1735,31 +1735,10 @@ input, textarea, select {
   color: #ffffff;
 }
 
-.page-hero-compact-title {
-  position: absolute;
-  left: 0;
-  right: 54px;
-  top: 50%;
-  transform: translateY(calc(-50% + ((1 - var(--hero-progress)) * 8px)));
-  min-width: 0;
-  color: #ffffff;
-  font-size: 1.18rem;
-  font-weight: 700;
-  line-height: 1;
-  opacity: var(--hero-progress);
-  pointer-events: none;
-}
-
 .page-hero-content {
   display: grid;
   gap: 22px;
-  opacity: var(--hero-content-opacity);
-  transform: translateY(calc(var(--hero-progress) * -24px));
   pointer-events: auto;
-}
-
-.page-hero-transactions .page-hero-content {
-  transform: translateY(calc(var(--hero-progress) * -34px));
 }
 
 .page-hero-topline {
@@ -1788,12 +1767,33 @@ input, textarea, select {
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0;
+  position: relative;
+  z-index: 3;
+  transform-origin: left top;
+  transform:
+    translateY(calc(var(--hero-progress) * -70px))
+    scale(calc(1 - (var(--hero-progress) * 0.46)));
+  will-change: transform;
 }
 
 .page-hero p {
   margin: 10px 0 0;
   color: rgba(234, 245, 255, 0.78);
   font-size: 0.98rem;
+}
+
+.page-kicker,
+.page-hero p,
+.page-hero-stats,
+.txn-toolbar-hero {
+  opacity: var(--hero-content-opacity);
+  transform: translateY(calc(var(--hero-progress) * -18px));
+  will-change: opacity, transform;
+}
+
+.page-hero-stats,
+.txn-toolbar-hero {
+  pointer-events: auto;
 }
 
 .page-hero-stats {
@@ -1811,6 +1811,11 @@ input, textarea, select {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-self: stretch;
   justify-self: stretch;
+}
+
+.page-hero-transactions .page-hero-topline,
+.page-hero-transactions .page-hero-main {
+  width: 100%;
 }
 
 .page-hero-stat {

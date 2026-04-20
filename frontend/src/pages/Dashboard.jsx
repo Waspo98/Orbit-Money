@@ -437,7 +437,6 @@ function DashboardHero({ dateLabel, greeting, stats, hero, onOpenMenu }) {
               <span className="brand-mark">$</span>
               <span className="brand-name">Orbit Money</span>
             </button>
-            <div className="page-hero-compact-title">Dashboard</div>
             <button
               type="button"
               className="btn-icon hero-menu-button"

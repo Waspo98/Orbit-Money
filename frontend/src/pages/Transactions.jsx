@@ -469,7 +469,6 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
             <span className="brand-mark">$</span>
             <span className="brand-name">Orbit Money</span>
           </button>
-          <div className="page-hero-compact-title">Transactions</div>
           <button
             type="button"
             className="btn-icon hero-menu-button"
