@@ -420,6 +420,19 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
 
   return (
     <div className="transactions-view">
+      {/*
+        Archived collapsed-pill transaction search:
+        collapsedHeight={104}
+        collapsedTitleTop={13}
+        collapsedContent={(
+          <TransactionSearch
+            value={searchLocal}
+            onChange={setSearch}
+            placeholder="Search transactions"
+            compact
+          />
+        )}
+      */}
       <PageHero
         id="transactions-title"
         variant="transactions"
@@ -433,8 +446,6 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
           { label: 'Monthly transactions', value: monthlyTotal.toLocaleString() }
         ]}
         initialHeight={612}
-        collapsedHeight={104}
-        collapsedTitleTop={13}
         onOpenMenu={onOpenMenu}
         statLabel="Transaction summary"
         chrome={(hero) => (
@@ -502,14 +513,6 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
               </label>
             </div>
           </div>
-        )}
-        collapsedContent={(
-          <TransactionSearch
-            value={searchLocal}
-            onChange={setSearch}
-            placeholder="Search transactions"
-            compact
-          />
         )}
       />
       {/* ---------- Active filter pills ---------- */}

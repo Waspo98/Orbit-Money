@@ -141,17 +141,28 @@ export default function PageHero({
   onOpenMenu,
   statLabel
 }) {
-  const internalHero = useMorphingPageHero(initialHeight, {
-    collapsedHeight,
-    collapsedTitleTop
-  });
-  const hero = controlledHero || internalHero;
+  const staticInnerRef = useRef(null);
+  const staticTitleRef = useRef(null);
+  const hero = controlledHero || {
+    progress: 0,
+    height: initialHeight,
+    expandedHeight: initialHeight,
+    titleX: 0,
+    titleY: 0,
+    titleScale: 1,
+    collapsedWidth: 0,
+    innerRef: staticInnerRef,
+    titleRef: staticTitleRef
+  };
   const chromeContent = typeof chrome === 'function' ? chrome(hero) : chrome;
   const toolbarContent = typeof toolbar === 'function' ? toolbar(hero) : toolbar;
-  const collapsedSlot =
-    typeof collapsedContent === 'function'
-      ? collapsedContent(hero)
-      : collapsedContent;
+  // Archived collapsed-pill support. This is intentionally not rendered while
+  // headers are normal scrolling cards, but kept nearby in case we bring the
+  // pill back later.
+  // const collapsedSlot =
+  //   typeof collapsedContent === 'function'
+  //     ? collapsedContent(hero)
+  //     : collapsedContent;
 
   return (
     <>
@@ -164,8 +175,7 @@ export default function PageHero({
           '--hero-title-x': `${hero.titleX}px`,
           '--hero-title-y': `${hero.titleY}px`,
           '--hero-title-scale': hero.titleScale,
-          '--hero-collapsed-width': `${hero.collapsedWidth}px`,
-          height: `${hero.height}px`
+          '--hero-collapsed-width': `${hero.collapsedWidth}px`
         }}
       >
         {onOpenMenu && (
@@ -189,14 +199,17 @@ export default function PageHero({
               <div className="page-hero-main">
                 <div className="page-kicker">{kicker}</div>
                 <h2 id={id} ref={hero.titleRef}>{title}</h2>
-                {collapsedSlot && (
-                  <div
-                    className="page-hero-collapsed-slot"
-                    style={{ pointerEvents: hero.progress > 0.82 ? 'auto' : 'none' }}
-                  >
-                    {collapsedSlot}
-                  </div>
-                )}
+                {/*
+                  Archived collapsed search/pill slot:
+                  {collapsedSlot && (
+                    <div
+                      className="page-hero-collapsed-slot"
+                      style={{ pointerEvents: hero.progress > 0.82 ? 'auto' : 'none' }}
+                    >
+                      {collapsedSlot}
+                    </div>
+                  )}
+                */}
                 <p>{subtitle}</p>
               </div>
 
@@ -213,11 +226,14 @@ export default function PageHero({
           </div>
         </div>
       </section>
-      <div
-        className={`page-hero-spacer page-hero-${variant}-spacer`}
-        style={{ height: `${hero.expandedHeight}px` }}
-        aria-hidden="true"
-      />
+      {/*
+        Archived fixed-hero spacer. Static headers live in normal document flow.
+        <div
+          className={`page-hero-spacer page-hero-${variant}-spacer`}
+          style={{ height: `${hero.expandedHeight}px` }}
+          aria-hidden="true"
+        />
+      */}
     </>
   );
 }
