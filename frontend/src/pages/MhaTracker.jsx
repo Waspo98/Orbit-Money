@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
+import PageHero from '../components/PageHero.jsx';
 
 const ACCOUNT_TYPE_LABELS = {
   checking: 'Checking',
@@ -31,30 +32,71 @@ function formatDate(iso) {
   });
 }
 
-export default function MhaTracker() {
+function currentYear() {
+  return new Date().getFullYear();
+}
+
+function parseYearParam(value) {
+  const year = parseInt(value, 10);
+  return Number.isFinite(year) ? year : currentYear();
+}
+
+function formatYearLabel(year) {
+  return String(year || currentYear());
+}
+
+export default function MhaTracker({ enabled = true, onEnabledChange, onOpenMenu }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedYear = parseYearParam(searchParams.get('year'));
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [savingAccountId, setSavingAccountId] = useState(null);
   const [savingCategoryId, setSavingCategoryId] = useState(null);
   const [accountsExpanded, setAccountsExpanded] = useState(false);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
+  const [settingsBusy, setSettingsBusy] = useState(false);
 
   async function load({ silent = false } = {}) {
-    if (!silent) setLoading(true);
+    if (!silent && data == null) setLoading(true);
+    else setRefreshing(true);
     setError('');
     try {
-      setData(await api.get('/api/mha'));
+      setData(await api.get(`/api/mha?year=${encodeURIComponent(selectedYear)}`));
     } catch (err) {
       setError(err.message || 'Failed to load MHA Tracker');
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
+      setRefreshing(false);
     }
   }
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear]);
+
+  async function toggleEnabled() {
+    const next = !enabled;
+    setSettingsBusy(true);
+    setError('');
+    try {
+      const result = await api.put('/api/mha/settings', { enabled: next });
+      onEnabledChange?.(!!result.enabled);
+    } catch (err) {
+      setError(err.message || 'MHA Tracker setting update failed');
+    } finally {
+      setSettingsBusy(false);
+    }
+  }
+
+  function goToYear(year) {
+    const next = new URLSearchParams(searchParams);
+    if (year === currentYear()) next.delete('year');
+    else next.set('year', String(year));
+    setSearchParams(next);
+  }
 
   async function toggleAccount(account) {
     const next = !account.mha_default_eligible;
@@ -103,6 +145,7 @@ export default function MhaTracker() {
   }
 
   const summary = data?.summary || {};
+  const years = data?.years || [selectedYear];
   const accounts = data?.accounts || [];
   const categories = data?.categories || [];
   const transactions = data?.transactions || [];
@@ -118,18 +161,50 @@ export default function MhaTracker() {
 
   const visibleAccounts = accountsExpanded ? accounts : enabledAccounts;
   const visibleCategories = categoriesExpanded ? categories : enabledCategories;
+  const yearOptions = useMemo(() => {
+    const set = new Set(years);
+    set.add(currentYear());
+    set.add(selectedYear);
+    return Array.from(set).sort((a, b) => b - a);
+  }, [selectedYear, years]);
+  const canGoForward = selectedYear < Math.max(currentYear() + 1, ...yearOptions);
 
   return (
     <div className="mha-view">
-      <div className="view-header">
-        <div>
-          <h2>MHA Tracker</h2>
-          <p className="muted">Ministerial Housing Allowance transaction tracking.</p>
-        </div>
-        <Link to="/settings" className="btn-secondary settings-action-link">
-          Settings
-        </Link>
-      </div>
+      <PageHero
+        id="mha-title"
+        variant="mha"
+        kicker="Housing allowance"
+        title="MHA Tracker"
+        subtitle={`${formatYearLabel(selectedYear)} ministerial housing allowance tracking`}
+        stats={[
+          { label: 'MHA Transaction Total', value: formatMoney(summary.transactionTotal), tone: 'good' },
+          { label: 'MHA Savings', value: formatMoney(summary.savings), tone: 'warn' }
+        ]}
+        toolbar={(
+          <div className="mha-hero-toolbar">
+            <YearNav
+              year={selectedYear}
+              yearOptions={yearOptions}
+              canGoForward={canGoForward}
+              onPrev={() => goToYear(selectedYear - 1)}
+              onNext={() => goToYear(selectedYear + 1)}
+              onJump={goToYear}
+            />
+            <button
+              type="button"
+              className={`btn-secondary mha-hero-toggle ${enabled ? 'btn-active' : ''}`}
+              onClick={toggleEnabled}
+              disabled={settingsBusy}
+              aria-pressed={enabled}
+            >
+              {settingsBusy ? 'Saving...' : enabled ? 'MHA On' : 'MHA Off'}
+            </button>
+          </div>
+        )}
+        onOpenMenu={onOpenMenu}
+        statLabel="MHA summary"
+      />
 
       {error && <div className="error">{error}</div>}
 
@@ -138,22 +213,7 @@ export default function MhaTracker() {
           <div className="spinner" />
         </div>
       ) : (
-        <>
-          <dl className="stat-grid mha-stat-grid">
-            <div>
-              <dt>MHA Transaction Total</dt>
-              <dd>{formatMoney(summary.transactionTotal)}</dd>
-            </div>
-            <div>
-              <dt>MHA Savings</dt>
-              <dd>{formatMoney(summary.savings)}</dd>
-            </div>
-            <div>
-              <dt>Eligible Transactions</dt>
-              <dd>{Number(summary.transactionCount || 0).toLocaleString()}</dd>
-            </div>
-          </dl>
-
+        <div className={`mha-content ${refreshing ? 'refreshing' : ''}`}>
           <section className="dashboard-card mha-picker-card">
             <header className="dashboard-card-header">
               <h3>Auto-include accounts</h3>
@@ -252,7 +312,9 @@ export default function MhaTracker() {
           <section className="dashboard-card mha-transactions-card">
             <header className="dashboard-card-header">
               <h3>MHA-eligible transactions</h3>
-              <Link to="/transactions" className="dashboard-card-link">Transactions</Link>
+              <span className="dashboard-card-link">
+                {Number(summary.transactionCount || 0).toLocaleString()} in {selectedYear}
+              </span>
             </header>
             <div className="dashboard-card-body">
               {transactions.length === 0 ? (
@@ -284,8 +346,54 @@ export default function MhaTracker() {
               )}
             </div>
           </section>
-        </>
+        </div>
       )}
+    </div>
+  );
+}
+
+function YearNav({ year, yearOptions, canGoForward, onPrev, onNext, onJump }) {
+  return (
+    <div className="month-nav year-nav">
+      <button
+        type="button"
+        className="btn-icon month-nav-arrow"
+        onClick={onPrev}
+        aria-label="Previous year"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+          <path d="M14.5 6.5 9 12l5.5 5.5" />
+        </svg>
+      </button>
+
+      <div className="month-nav-label-wrap">
+        <span className="month-nav-label-text">{formatYearLabel(year)}</span>
+        <span className="month-nav-caret" aria-hidden="true">v</span>
+        <select
+          className="month-nav-select"
+          value={year}
+          onChange={(e) => onJump(Number(e.target.value))}
+          aria-label="Jump to year"
+        >
+          {yearOptions.map((option) => (
+            <option key={option} value={option}>
+              {formatYearLabel(option)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <button
+        type="button"
+        className="btn-icon month-nav-arrow"
+        onClick={onNext}
+        disabled={!canGoForward}
+        aria-label="Next year"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+          <path d="m9.5 6.5L15 12l-5.5 5.5" />
+        </svg>
+      </button>
     </div>
   );
 }

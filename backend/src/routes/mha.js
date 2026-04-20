@@ -23,6 +23,34 @@ function formatTransaction(row) {
   };
 }
 
+function currentYear() {
+  return new Date().getFullYear();
+}
+
+function parseYear(value) {
+  const year = parseInt(value, 10);
+  if (!Number.isFinite(year) || year < 1900 || year > 2200) {
+    return currentYear();
+  }
+  return year;
+}
+
+function getYears() {
+  const years = db
+    .prepare(
+      `SELECT DISTINCT substr(date, 1, 4) AS year
+         FROM transactions
+        WHERE date IS NOT NULL
+        ORDER BY year DESC`
+    )
+    .all()
+    .map((row) => parseInt(row.year, 10))
+    .filter(Number.isFinite);
+  const set = new Set(years);
+  set.add(currentYear());
+  return Array.from(set).sort((a, b) => b - a);
+}
+
 router.get('/settings', requireAuth, (req, res) => {
   try {
     res.json({ enabled: getEnabled() });
@@ -55,6 +83,10 @@ router.put('/settings', requireAuth, (req, res) => {
 
 router.get('/', requireAuth, (req, res) => {
   try {
+    const year = parseYear(req.query.year);
+    const startDate = `${year}-01-01`;
+    const endDate = `${year + 1}-01-01`;
+
     const accounts = db
       .prepare(
         `SELECT id, name, type, institution, account_number_last4,
@@ -105,9 +137,11 @@ router.get('/', requireAuth, (req, res) => {
                          OR COALESCE(c.mha_default_eligible, 0) = 1
                        THEN 1 ELSE 0 END
                 ) = 1
+            AND t.date >= ?
+            AND t.date < ?
           ORDER BY t.date DESC, t.id DESC`
       )
-      .all()
+      .all(startDate, endDate)
       .map(formatTransaction);
 
     const transactionTotal = transactions.reduce(
@@ -118,6 +152,8 @@ router.get('/', requireAuth, (req, res) => {
     res.json({
       enabled: getEnabled(),
       savingsRate: SAVINGS_RATE,
+      year,
+      years: getYears(),
       accounts,
       categories,
       transactions,

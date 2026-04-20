@@ -57,7 +57,8 @@ function AppShell() {
     location.pathname === '/dashboard' ||
     location.pathname === '/transactions' ||
     location.pathname === '/budgets' ||
-    location.pathname === '/accounts';
+    location.pathname === '/accounts' ||
+    location.pathname === '/mha-tracker';
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -213,7 +214,11 @@ function AppShell() {
               path="/mha-tracker"
               element={
                 mhaTrackerEnabled ? (
-                  <MhaTracker />
+                  <MhaTracker
+                    enabled={mhaTrackerEnabled}
+                    onEnabledChange={setMhaTrackerEnabled}
+                    onOpenMenu={() => setMenuOpen(true)}
+                  />
                 ) : (
                   <Navigate to="/settings" replace />
                 )
