@@ -1782,12 +1782,14 @@ input, textarea, select {
   white-space: nowrap;
   z-index: 3;
   transform-origin: left top;
-  transform:
-    translate(
-      calc(var(--hero-progress) * var(--hero-title-x, 0px)),
-      calc(var(--hero-progress) * var(--hero-title-y, 0px))
-    )
-    scale(calc(1 - (var(--hero-progress) * 0.46)));
+  transform: matrix(
+    calc(1 - (var(--hero-progress) * (1 - var(--hero-title-scale, 0.54)))),
+    0,
+    0,
+    calc(1 - (var(--hero-progress) * (1 - var(--hero-title-scale, 0.54)))),
+    calc(var(--hero-progress) * var(--hero-title-x, 0px)),
+    calc(var(--hero-progress) * var(--hero-title-y, 0px))
+  );
   will-change: transform;
 }
 
