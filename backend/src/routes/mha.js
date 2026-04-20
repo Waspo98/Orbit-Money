@@ -65,6 +65,15 @@ router.get('/', requireAuth, (req, res) => {
       )
       .all();
 
+    const categories = db
+      .prepare(
+        `SELECT id, name, color, icon, is_transfer, is_income, sort_order,
+                mha_default_eligible
+           FROM categories
+          ORDER BY sort_order ASC, name COLLATE NOCASE ASC`
+      )
+      .all();
+
     const transactions = db
       .prepare(
         `SELECT t.id, t.account_id, t.date, t.amount,
@@ -74,7 +83,12 @@ router.get('/', requireAuth, (req, res) => {
                 COALESCE(t.edited_category_id, t.category_id) AS category_id,
                 COALESCE(t.edited_is_transfer, t.is_transfer) AS is_transfer,
                 COALESCE(t.edited_is_ignored, t.is_ignored) AS is_ignored,
-                COALESCE(t.edited_mha_eligible, a.mha_default_eligible, 0) AS mha_eligible,
+                COALESCE(
+                  t.edited_mha_eligible,
+                  CASE WHEN a.mha_default_eligible = 1
+                         OR COALESCE(c.mha_default_eligible, 0) = 1
+                       THEN 1 ELSE 0 END
+                ) AS mha_eligible,
                 t.edited_mha_eligible,
                 t.edited_mha_eligible_source,
                 a.name AS account_name,
@@ -85,7 +99,12 @@ router.get('/', requireAuth, (req, res) => {
            FROM transactions t
            JOIN accounts a ON a.id = t.account_id
            LEFT JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
-          WHERE COALESCE(t.edited_mha_eligible, a.mha_default_eligible, 0) = 1
+          WHERE COALESCE(
+                  t.edited_mha_eligible,
+                  CASE WHEN a.mha_default_eligible = 1
+                         OR COALESCE(c.mha_default_eligible, 0) = 1
+                       THEN 1 ELSE 0 END
+                ) = 1
           ORDER BY t.date DESC, t.id DESC`
       )
       .all()
@@ -100,6 +119,7 @@ router.get('/', requireAuth, (req, res) => {
       enabled: getEnabled(),
       savingsRate: SAVINGS_RATE,
       accounts,
+      categories,
       transactions,
       summary: {
         transactionCount: transactions.length,
@@ -136,6 +156,33 @@ router.put('/accounts/:id/default', requireAuth, (req, res) => {
     res.json({ success: true, account });
   } catch (err) {
     console.error('Update MHA account default failed:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/categories/:id/default', requireAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: 'Invalid category id.' });
+  }
+  if (typeof req.body?.mha_default_eligible !== 'boolean') {
+    return res.status(400).json({ error: 'mha_default_eligible must be a boolean.' });
+  }
+
+  try {
+    const existing = db.prepare('SELECT id FROM categories WHERE id = ?').get(id);
+    if (!existing) return res.status(404).json({ error: 'Category not found.' });
+
+    db.prepare(
+      `UPDATE categories
+          SET mha_default_eligible = ?
+        WHERE id = ?`
+    ).run(boolFlag(req.body.mha_default_eligible), id);
+
+    const category = db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
+    res.json({ success: true, category });
+  } catch (err) {
+    console.error('Update MHA category default failed:', err);
     res.status(500).json({ error: err.message });
   }
 });

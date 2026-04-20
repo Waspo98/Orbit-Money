@@ -63,8 +63,14 @@ const SELECT_COLS = `
   edited_is_ignored_source,
   COALESCE(
     edited_mha_eligible,
-    (SELECT mha_default_eligible FROM accounts a WHERE a.id = transactions.account_id),
-    0
+    CASE
+      WHEN (SELECT mha_default_eligible FROM accounts a WHERE a.id = transactions.account_id) = 1
+        OR (SELECT mha_default_eligible
+              FROM categories c
+             WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)) = 1
+      THEN 1
+      ELSE 0
+    END
   ) AS mha_eligible,
   edited_mha_eligible,
   edited_mha_eligible_source,
@@ -361,8 +367,14 @@ router.patch('/:id', requireAuth, (req, res) => {
               category_id   AS original_category_id,
               is_transfer   AS original_is_transfer,
               is_ignored    AS original_is_ignored,
-              (SELECT mha_default_eligible FROM accounts a WHERE a.id = transactions.account_id)
-                AS account_mha_default_eligible
+              CASE
+                WHEN (SELECT mha_default_eligible FROM accounts a WHERE a.id = transactions.account_id) = 1
+                  OR (SELECT mha_default_eligible
+                        FROM categories c
+                       WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)) = 1
+                THEN 1
+                ELSE 0
+              END AS default_mha_eligible
          FROM transactions WHERE id = ?`
     )
     .get(id);
@@ -428,8 +440,8 @@ router.patch('/:id', requireAuth, (req, res) => {
 
   if (body.mha_eligible !== undefined) {
     const flag = body.mha_eligible ? 1 : 0;
-    const accountDefault = existing.account_mha_default_eligible ? 1 : 0;
-    if (flag === accountDefault) {
+    const defaultMhaEligible = existing.default_mha_eligible ? 1 : 0;
+    if (flag === defaultMhaEligible) {
       sets.push('edited_mha_eligible = NULL');
       sets.push('edited_mha_eligible_source = NULL');
     } else {

@@ -36,6 +36,9 @@ export default function MhaTracker() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [savingAccountId, setSavingAccountId] = useState(null);
+  const [savingCategoryId, setSavingCategoryId] = useState(null);
+  const [accountsExpanded, setAccountsExpanded] = useState(false);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
   async function load({ silent = false } = {}) {
     if (!silent) setLoading(true);
@@ -76,14 +79,45 @@ export default function MhaTracker() {
     }
   }
 
+  async function toggleCategory(category) {
+    const next = !category.mha_default_eligible;
+    setSavingCategoryId(category.id);
+    setError('');
+    try {
+      setData((prev) => ({
+        ...prev,
+        categories: prev.categories.map((item) =>
+          item.id === category.id ? { ...item, mha_default_eligible: next ? 1 : 0 } : item
+        )
+      }));
+      await api.put(`/api/mha/categories/${category.id}/default`, {
+        mha_default_eligible: next
+      });
+      await load({ silent: true });
+    } catch (err) {
+      setError(err.message || 'Could not update MHA category default');
+      await load({ silent: true });
+    } finally {
+      setSavingCategoryId(null);
+    }
+  }
+
   const summary = data?.summary || {};
   const accounts = data?.accounts || [];
+  const categories = data?.categories || [];
   const transactions = data?.transactions || [];
 
   const enabledAccounts = useMemo(
     () => accounts.filter((account) => account.mha_default_eligible),
     [accounts]
   );
+  const enabledCategories = useMemo(
+    () => categories.filter((category) => category.mha_default_eligible),
+    [categories]
+  );
+
+  const visibleAccounts = accountsExpanded ? accounts : enabledAccounts;
+  const visibleCategories = categoriesExpanded ? categories : enabledCategories;
 
   return (
     <div className="mha-view">
@@ -120,39 +154,98 @@ export default function MhaTracker() {
             </div>
           </dl>
 
-          <section className="dashboard-card mha-account-card">
+          <section className="dashboard-card mha-picker-card">
             <header className="dashboard-card-header">
               <h3>Auto-include accounts</h3>
-              <span className="dashboard-card-link">
-                {enabledAccounts.length} selected
-              </span>
+              <button
+                type="button"
+                className="dashboard-card-link button-link"
+                onClick={() => setAccountsExpanded((value) => !value)}
+              >
+                {accountsExpanded ? 'Show selected' : 'Show all'} ({enabledAccounts.length})
+              </button>
             </header>
             <div className="dashboard-card-body">
-              <div className="mha-account-list">
-                {accounts.map((account) => (
-                  <button
-                    key={account.id}
-                    type="button"
-                    className={`mha-account-row ${account.mha_default_eligible ? 'active' : ''}`}
-                    onClick={() => toggleAccount(account)}
-                    disabled={savingAccountId === account.id}
-                    aria-pressed={!!account.mha_default_eligible}
-                  >
-                    <span className="mha-account-main">
-                      <strong>{account.name}</strong>
-                      <span>
-                        <span className={`type-pill type-${account.type}`}>
-                          {ACCOUNT_TYPE_LABELS[account.type] || account.type}
+              {visibleAccounts.length === 0 ? (
+                <p className="muted" style={{ margin: 0 }}>
+                  No accounts selected.
+                </p>
+              ) : (
+                <div className="mha-picker-list">
+                  {visibleAccounts.map((account) => (
+                    <button
+                      key={account.id}
+                      type="button"
+                      className={`mha-picker-row ${account.mha_default_eligible ? 'active' : ''}`}
+                      onClick={() => toggleAccount(account)}
+                      disabled={savingAccountId === account.id}
+                      aria-pressed={!!account.mha_default_eligible}
+                    >
+                      <span className="mha-picker-main">
+                        <strong>{account.name}</strong>
+                        <span>
+                          <span className={`type-pill type-${account.type}`}>
+                            {ACCOUNT_TYPE_LABELS[account.type] || account.type}
+                          </span>
+                          {account.institution && <em>{account.institution}</em>}
                         </span>
-                        {account.institution && <em>{account.institution}</em>}
                       </span>
-                    </span>
-                    <span className="mha-account-state">
-                      {account.mha_default_eligible ? 'Included' : 'Off'}
-                    </span>
-                  </button>
-                ))}
-              </div>
+                      <span className="mha-picker-state">
+                        {account.mha_default_eligible ? 'Included' : 'Off'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="dashboard-card mha-picker-card">
+            <header className="dashboard-card-header">
+              <h3>Auto-include categories</h3>
+              <button
+                type="button"
+                className="dashboard-card-link button-link"
+                onClick={() => setCategoriesExpanded((value) => !value)}
+              >
+                {categoriesExpanded ? 'Show selected' : 'Show all'} ({enabledCategories.length})
+              </button>
+            </header>
+            <div className="dashboard-card-body">
+              {visibleCategories.length === 0 ? (
+                <p className="muted" style={{ margin: 0 }}>
+                  No categories selected.
+                </p>
+              ) : (
+                <div className="mha-picker-list">
+                  {visibleCategories.map((category) => (
+                    <button
+                      key={category.id}
+                      type="button"
+                      className={`mha-picker-row ${category.mha_default_eligible ? 'active' : ''}`}
+                      onClick={() => toggleCategory(category)}
+                      disabled={savingCategoryId === category.id}
+                      aria-pressed={!!category.mha_default_eligible}
+                    >
+                      <span className="mha-picker-main">
+                        <strong>
+                          {category.icon && <span style={{ color: category.color }}>{category.icon} </span>}
+                          {category.name}
+                        </strong>
+                        <span>
+                          <span className="type-pill">
+                            {category.is_income ? 'Income' : category.is_transfer ? 'Transfer' : 'Spending'}
+                          </span>
+                          {category.is_transfer ? <em>Excluded from budgets</em> : null}
+                        </span>
+                      </span>
+                      <span className="mha-picker-state">
+                        {category.mha_default_eligible ? 'Included' : 'Off'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
 
