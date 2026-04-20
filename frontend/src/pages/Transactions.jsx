@@ -110,14 +110,14 @@ function useMorphingHero() {
     expandedHeight: 612,
     titleX: 0,
     titleY: 0,
-    titleScale: 0.54,
+    titleScale: 0.62,
     collapsedWidth: 232
   });
   const frameRef = useRef(null);
 
   useEffect(() => {
     const collapsed = 64;
-    const titleScale = 0.54;
+    const titleScale = 0.62;
 
     function measureTitleTarget() {
       const title = titleRef.current;

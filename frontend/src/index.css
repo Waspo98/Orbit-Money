@@ -1189,9 +1189,9 @@ input, textarea, select {
 }
 
 .app-shell.has-page-hero {
-  --hero-start: #06112c;
-  --hero-mid: #0c234f;
-  --hero-end: #1d4680;
+  --hero-start: #064e3b;
+  --hero-mid: var(--accent-hover);
+  --hero-end: var(--accent);
 }
 
 .app-shell.has-page-hero .app-header {

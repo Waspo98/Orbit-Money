@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   BrowserRouter,
   Routes,
@@ -51,8 +51,39 @@ function AppShell() {
 
   const location = useLocation();
   const navigate = useNavigate();
+  const scrollPositionsRef = useRef({});
+  const previousPathRef = useRef(location.pathname);
   const hasPageHero =
     location.pathname === '/dashboard' || location.pathname === '/transactions';
+
+  useLayoutEffect(() => {
+    const previousPath = previousPathRef.current;
+    if (previousPath !== location.pathname) {
+      scrollPositionsRef.current[previousPath] = window.scrollY;
+      previousPathRef.current = location.pathname;
+      window.scrollTo({
+        top: scrollPositionsRef.current[location.pathname] || 0,
+        left: 0,
+        behavior: 'auto'
+      });
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+
+    function saveCurrentScroll() {
+      scrollPositionsRef.current[previousPathRef.current] = window.scrollY;
+    }
+
+    window.addEventListener('pagehide', saveCurrentScroll);
+    return () => {
+      saveCurrentScroll();
+      window.history.scrollRestoration = previousScrollRestoration;
+      window.removeEventListener('pagehide', saveCurrentScroll);
+    };
+  }, []);
 
   async function checkAuth() {
     try {
