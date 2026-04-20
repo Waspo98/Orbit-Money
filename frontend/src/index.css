@@ -1644,11 +1644,20 @@ input, textarea, select {
 .page-hero {
   --hero-progress: 0;
   --hero-content-opacity: 1;
+  --hero-collapsed-width: clamp(232px, 33.333vw, 520px);
   --hero-edge-left: 0px;
+  --hero-expanded-width: calc(100vw - var(--hero-edge-left));
   position: fixed;
   top: calc(10px * var(--hero-progress));
-  left: calc(var(--hero-edge-left) + (14px * var(--hero-progress)));
-  right: calc(14px * var(--hero-progress));
+  left: calc(
+    var(--hero-edge-left) +
+    (((var(--hero-expanded-width) - var(--hero-collapsed-width)) / 2) * var(--hero-progress))
+  );
+  right: auto;
+  width: calc(
+    var(--hero-expanded-width) -
+    ((var(--hero-expanded-width) - var(--hero-collapsed-width)) * var(--hero-progress))
+  );
   z-index: 45;
   overflow: hidden;
   display: grid;
@@ -1663,7 +1672,7 @@ input, textarea, select {
   box-shadow:
     0 calc(22px - (4px * var(--hero-progress))) calc(52px - (20px * var(--hero-progress))) rgba(5, 20, 52, calc(0.16 + (0.12 * var(--hero-progress)))),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  will-change: height, top, left, right, border-radius;
+  will-change: height, top, left, width, border-radius;
 }
 
 .page-hero-spacer {
