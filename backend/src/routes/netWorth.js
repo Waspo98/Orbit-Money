@@ -163,7 +163,8 @@ router.get('/', requireAuth, (req, res) => {
       .get();
 
     const todayMonth = new Date().toISOString().slice(0, 7);
-    const latestMonth = monthKey(latestTransaction.latest) || todayMonth;
+    const latestDataMonth = monthKey(latestTransaction.latest) || todayMonth;
+    const latestMonth = latestDataMonth > todayMonth ? latestDataMonth : todayMonth;
     const floorMonth = addMonths(latestMonth, -(months - 1));
     const earliestMonth = monthKey(latestTransaction.earliest) || latestMonth;
     const firstMonth = earliestMonth > floorMonth ? earliestMonth : floorMonth;
