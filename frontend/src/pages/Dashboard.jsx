@@ -106,12 +106,25 @@ function timeGreeting(d) {
 }
 
 function useMorphingHero() {
-  const [state, setState] = useState({ progress: 0, height: 420 });
+  const innerRef = useRef(null);
+  const expandedRef = useRef(420);
+  const [state, setState] = useState({ progress: 0, height: 420, expandedHeight: 420 });
   const frameRef = useRef(null);
 
   useEffect(() => {
-    function expandedHeight() {
-      return window.innerWidth <= 560 ? 420 : 360;
+    function measureExpandedHeight() {
+      const inner = innerRef.current;
+      const hero = inner?.closest('.page-hero');
+      if (!inner || !hero) return expandedRef.current;
+
+      const styles = window.getComputedStyle(hero);
+      const paddingTop = parseFloat(styles.paddingTop) || 0;
+      const contentHeight = inner.getBoundingClientRect().height;
+      const bottomCushion = window.innerWidth <= 560 ? 30 : 34;
+      const measured = Math.ceil(paddingTop + contentHeight + bottomCushion);
+
+      expandedRef.current = Math.max(56, measured);
+      return expandedRef.current;
     }
 
     function update() {
@@ -119,31 +132,39 @@ function useMorphingHero() {
 
       frameRef.current = window.requestAnimationFrame(() => {
         frameRef.current = null;
-        const expanded = expandedHeight();
+        const expanded = measureExpandedHeight();
         const collapsed = 56;
         const collapseDistance = expanded - collapsed;
         const progress = Math.min(1, Math.max(0, window.scrollY / collapseDistance));
         const height = Math.round(expanded - (expanded - collapsed) * progress);
 
         setState((prev) =>
-          Math.abs(prev.progress - progress) > 0.01 || prev.height !== height
-            ? { progress, height }
+          Math.abs(prev.progress - progress) > 0.01 ||
+          prev.height !== height ||
+          prev.expandedHeight !== expanded
+            ? { progress, height, expandedHeight: expanded }
             : prev
         );
       });
     }
 
     update();
+    const observer =
+      'ResizeObserver' in window && innerRef.current
+        ? new ResizeObserver(update)
+        : null;
+    if (observer && innerRef.current) observer.observe(innerRef.current);
     window.addEventListener('scroll', update, { passive: true });
     window.addEventListener('resize', update);
     return () => {
+      if (observer) observer.disconnect();
       window.removeEventListener('scroll', update);
       window.removeEventListener('resize', update);
       if (frameRef.current) window.cancelAnimationFrame(frameRef.current);
     };
   }, []);
 
-  return state;
+  return { ...state, innerRef };
 }
 
 function formatTransactionAmount(amount) {
@@ -427,7 +448,7 @@ function DashboardHero({ dateLabel, greeting, stats, hero, onOpenMenu }) {
           height: `${hero.height}px`
         }}
       >
-        <div className="page-hero-inner">
+        <div className="page-hero-inner" ref={hero.innerRef}>
           <div className="page-hero-chrome">
             <button
               type="button"
@@ -466,7 +487,11 @@ function DashboardHero({ dateLabel, greeting, stats, hero, onOpenMenu }) {
           </div>
         </div>
       </section>
-      <div className="page-hero-spacer page-hero-dashboard-spacer" aria-hidden="true" />
+      <div
+        className="page-hero-spacer page-hero-dashboard-spacer"
+        style={{ height: `${hero.expandedHeight}px` }}
+        aria-hidden="true"
+      />
     </>
   );
 }

@@ -1672,11 +1672,6 @@ input, textarea, select {
 .page-hero-dashboard-spacer { height: 420px; }
 .page-hero-transactions-spacer { height: 612px; }
 
-@media (min-width: 561px) {
-  .page-hero-dashboard-spacer { height: 360px; }
-  .page-hero-transactions-spacer { height: 520px; }
-}
-
 .page-hero::before {
   content: '';
   position: absolute;
