@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
+import PageHero from '../components/PageHero.jsx';
 
 // ============================================================================
 // Budgets — v15
@@ -185,6 +186,38 @@ export default function Budgets() {
       : null;
 
   const daysLeft = daysLeftInMonth(selectedMonth);
+  const budgetSubtitle = `${isCurrentMonth ? 'This month' : formatMonthLabel(selectedMonth)}${
+    daysLeft !== null
+      ? ` · ${
+          daysLeft === 0
+            ? 'last day of the month'
+            : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`
+        }`
+      : ''
+  }`;
+  const budgetHeroStats = [
+    {
+      label: 'Budgeted',
+      value: summary ? formatMoney(summary.total_budgeted) : '—'
+    },
+    {
+      label: 'Spent',
+      value: summary ? formatMoney(summary.total_spent_in_budgets) : '—'
+    },
+    {
+      label: remaining !== null && remaining < 0 ? 'Over' : 'Remaining',
+      value:
+        remaining !== null
+          ? formatMoney(Math.abs(remaining))
+          : '—',
+      tone: remaining !== null && remaining < 0 ? 'caution' : 'good'
+    },
+    {
+      label: 'Progress',
+      value: overallPercent !== null ? `${Math.round(overallPercent)}%` : '—',
+      tone: overallPercent !== null && overallPercent > 100 ? 'caution' : ''
+    }
+  ];
 
   const hasAnyBudgets = (data?.budgeted?.length || 0) > 0;
   const hasAnyActivity =
@@ -228,7 +261,16 @@ export default function Budgets() {
 
   return (
     <div className="budgets-view">
-      <div className="view-header">
+      <PageHero
+        id="budgets-title"
+        variant="budgets"
+        kicker="Budget planning"
+        title="Budgets"
+        subtitle={budgetSubtitle}
+        stats={budgetHeroStats}
+      />
+
+      <div className="view-header" hidden>
         <div>
           <h2>Budgets</h2>
           <p className="muted">

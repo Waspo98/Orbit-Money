@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { api } from '../api.js';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import PageHero from '../components/PageHero.jsx';
 
 const TYPE_LABELS = {
   checking: 'Checking',
@@ -146,6 +147,37 @@ export default function Accounts({ onChange }) {
     navigate(`/transactions?account_id=${accountId}`);
   }
 
+  const activeAccounts = accounts.filter((account) => !account.is_archived);
+  const archivedAccounts = accounts.length - activeAccounts.length;
+  const totalBalance = activeAccounts.reduce(
+    (total, account) => total + (Number(account.current_balance) || 0),
+    0
+  );
+  const accountsSubtitle = `${accounts.length.toLocaleString()} account${
+    accounts.length === 1 ? '' : 's'
+  }${showArchived ? ' including archived' : ''}${
+    reorderMode ? ' · Drag a row to reorder' : ''
+  }`;
+  const accountHeroStats = [
+    {
+      label: 'Active',
+      value: activeAccounts.length.toLocaleString()
+    },
+    {
+      label: 'Archived',
+      value: archivedAccounts.toLocaleString()
+    },
+    {
+      label: 'Shown',
+      value: accounts.length.toLocaleString()
+    },
+    {
+      label: 'Balance',
+      value: loading ? '—' : formatCurrency(totalBalance),
+      tone: totalBalance >= 0 ? 'good' : 'caution'
+    }
+  ];
+
   async function handleDragEnd(event) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -170,7 +202,38 @@ export default function Accounts({ onChange }) {
 
   return (
     <div className={`accounts-view ${reorderMode ? 'reorder-mode' : ''}`}>
-      <div className="view-header">
+      <PageHero
+        id="accounts-title"
+        variant="accounts"
+        kicker="Account orbit"
+        title="Accounts"
+        subtitle={accountsSubtitle}
+        stats={accountHeroStats}
+      />
+
+      <div className="accounts-toolbar accounts-page-toolbar">
+        {!reorderMode && (
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+            />
+            <span>Show archived</span>
+          </label>
+        )}
+        {accounts.length > 1 && (
+          <button
+            type="button"
+            className={reorderMode ? 'btn-primary' : 'btn-secondary'}
+            onClick={toggleReorderMode}
+          >
+            {reorderMode ? 'Done' : 'Reorder'}
+          </button>
+        )}
+      </div>
+
+      <div className="view-header" hidden>
         <div>
           <h2>Accounts</h2>
           <p className="muted">

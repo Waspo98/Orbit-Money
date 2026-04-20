@@ -52,7 +52,10 @@ function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const hasPageHero =
-    location.pathname === '/dashboard' || location.pathname === '/transactions';
+    location.pathname === '/dashboard' ||
+    location.pathname === '/transactions' ||
+    location.pathname === '/budgets' ||
+    location.pathname === '/accounts';
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });

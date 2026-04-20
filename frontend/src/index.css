@@ -1691,6 +1691,8 @@ input, textarea, select {
 
 .page-hero-dashboard-spacer { height: 420px; }
 .page-hero-transactions-spacer { height: 612px; }
+.page-hero-budgets-spacer { height: 420px; }
+.page-hero-accounts-spacer { height: 420px; }
 
 .page-hero::before {
   content: '';
@@ -1829,7 +1831,9 @@ input, textarea, select {
   gap: 10px;
 }
 
-.page-hero-dashboard .page-hero-stats {
+.page-hero-dashboard .page-hero-stats,
+.page-hero-budgets .page-hero-stats,
+.page-hero-accounts .page-hero-stats {
   grid-template-columns: repeat(4, minmax(112px, 1fr));
 }
 
@@ -1843,8 +1847,16 @@ input, textarea, select {
 .page-hero-dashboard .page-hero-topline,
 .page-hero-dashboard .page-hero-main,
 .page-hero-transactions .page-hero-topline,
-.page-hero-transactions .page-hero-main {
+.page-hero-transactions .page-hero-main,
+.page-hero-budgets .page-hero-topline,
+.page-hero-budgets .page-hero-main,
+.page-hero-accounts .page-hero-topline,
+.page-hero-accounts .page-hero-main {
   width: 100%;
+}
+
+.page-hero-budgets {
+  --hero-expanded-width: min(820px, calc(var(--hero-available-width) - (var(--hero-card-margin) * 2)));
 }
 
 .page-hero-stat {
@@ -1945,7 +1957,15 @@ input, textarea, select {
 }
 
 .accounts-view {
+  width: calc(100% - 40px);
+  max-width: 960px;
+  margin: 0 auto;
   min-height: calc(100dvh - 140px);
+}
+
+.accounts-page-toolbar {
+  justify-content: flex-end;
+  margin: 0 0 16px;
 }
 
 /* Single column on mobile/tablet; a 2-column grid on wide screens. Cards
@@ -4095,7 +4115,7 @@ input, textarea, select {
 /* ================== Budgets (v14) ================== */
 
 .budgets-view {
-  width: 100%;
+  width: calc(100% - 40px);
   max-width: 820px;
   margin: 0 auto;
   /* Keep the document at full height even while loading. A large
