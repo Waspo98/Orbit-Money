@@ -1,5 +1,5 @@
 # ==============================================================================
-# Budget Tracker — Multi-stage Dockerfile
+# Orbit Money — Multi-stage Dockerfile
 # ==============================================================================
 # Build stage uses node:20-slim (Debian) because Rollup/musl hangs on Docker
 # Desktop + WSL2 with Alpine. Prod stage uses node:20-alpine for smaller image.

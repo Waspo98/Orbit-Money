@@ -1,7 +1,7 @@
 services:
-  budget-tracker:
+  orbit-money:
     build: .
-    container_name: budget-tracker
+    container_name: orbit-money
     restart: unless-stopped
     ports:
       - "5008:5008"
@@ -24,3 +24,4 @@ networks:
 
 volumes:
   budget-data:
+    name: orbit-money-data

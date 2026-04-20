@@ -1,4 +1,4 @@
-# Budget Tracker — Technical Reference
+# Orbit Money — Technical Reference
 
 > **Operational summary lives in `Server_info.md`.** This document covers implementation details needed when modifying or debugging the app.
 
@@ -16,7 +16,7 @@ Multi-stage build:
 - Uses `--no-audit --no-fund` flags to prevent npm hangs
 
 ## Data Storage
-All data lives in Docker named volume `budget-data` mounted at `/app/data`:
+All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 
 | File | Purpose |
 |---|---|

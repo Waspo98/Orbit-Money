@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 
-const DISMISS_KEY = 'budget-tracker-dismissed-sync-error';
+const DISMISS_KEY = 'orbit-money-dismissed-sync-error';
 
 function getDismissedMessage() {
   try {

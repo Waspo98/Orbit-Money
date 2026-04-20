@@ -1,7 +1,7 @@
 -- =============================================================================
 -- 001_initial_schema.sql
 -- =============================================================================
--- Creates all Phase 1 tables for Budget Tracker.
+-- Creates all Phase 1 tables for Orbit Money.
 --
 -- Sign convention: expenses are stored as NEGATIVE, income as POSITIVE.
 -- (Rocket Money CSV uses the inverse convention — flipped at import time.)

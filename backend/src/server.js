@@ -23,7 +23,7 @@ import netWorthRoutes from './routes/netWorth.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // --- Startup ----------------------------------------------------------------
-console.log('Budget Tracker starting...');
+console.log('Orbit Money starting...');
 console.log('Running migrations...');
 runMigrations();
 if (config.seedDemoData) {
@@ -91,7 +91,7 @@ app.get(/^\/(?!api).*/, (req, res) => {
 
 // --- Listen + start scheduler -----------------------------------------------
 app.listen(config.port, () => {
-  console.log(`Budget Tracker listening on port ${config.port}`);
+  console.log(`Orbit Money listening on port ${config.port}`);
   console.log(`Data directory: ${config.dataDir}`);
   startScheduler();
 });

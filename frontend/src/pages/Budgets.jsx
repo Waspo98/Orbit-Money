@@ -99,7 +99,7 @@ export default function Budgets() {
   // first = highest % spent first).
   const [budgetedSort, setBudgetedSort] = useState(() => {
     try {
-      return localStorage.getItem('budget-tracker-budgeted-sort') || 'pct_desc';
+      return localStorage.getItem('orbit-money-budgeted-sort') || 'pct_desc';
     } catch {
       return 'pct_desc';
     }
@@ -107,7 +107,7 @@ export default function Budgets() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('budget-tracker-budgeted-sort', budgetedSort);
+      localStorage.setItem('orbit-money-budgeted-sort', budgetedSort);
     } catch {
       /* ignore */
     }

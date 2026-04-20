@@ -1,5 +1,5 @@
 {
-  "name": "budget-tracker-backend",
+  "name": "orbit-money-backend",
   "version": "0.17.0",
   "private": true,
   "description": "Self-hosted personal finance tracker — Express + SQLite backend",

@@ -1,7 +1,7 @@
 # Orbit Money
 
-Orbit Money, currently named Budget Tracker in the app, is a self-hosted
-personal finance tracker built as an installable PWA. It imports Rocket Money
+Orbit Money is a self-hosted personal finance tracker built as an installable
+PWA. It imports Rocket Money
 CSV exports, syncs bank data through SimpleFIN, stores data in SQLite, and runs
 as a Docker Compose service on Windows.
 
@@ -95,14 +95,17 @@ docker compose down
 
 The Compose service uses:
 
-- Container name: `budget-tracker`
+- Container name: `orbit-money`
 - Host/container port: `5008`
 - Docker network: external `web_proxy`
-- Docker volume: `budget-data`
+- Docker volume: `orbit-money-data`
 - Data mount: `/app/data`
 
 Do not rename the service, port, network, or volume casually. Those names are
 part of the deployment setup.
+
+Storage rename note: the production SQLite volume was renamed from the old
+project-prefixed volume to `orbit-money-data` as part of the Orbit Money rename.
 
 ## Run The Beta Docker Deployment
 

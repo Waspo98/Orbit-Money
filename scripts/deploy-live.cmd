@@ -27,10 +27,10 @@ if errorlevel 1 exit /b 1
 git pull --ff-only origin main
 if errorlevel 1 exit /b 1
 
-docker compose -p budgettracker up --build -d
+docker compose -p orbitmoney up --build -d
 if errorlevel 1 exit /b 1
 
-docker ps --filter "name=budget-tracker" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+docker ps --filter "name=orbit-money" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 echo.
 echo Live should be available at http://localhost:5008

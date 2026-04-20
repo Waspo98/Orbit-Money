@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'budget-tracker-theme';
+const STORAGE_KEY = 'orbit-money-theme';
 
 /**
  * Three-way theme state: 'light' | 'dark' | 'system'.

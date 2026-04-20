@@ -95,7 +95,7 @@ Compose path for entire Arr stack: `C:\Docker\Compose\media\` (single compose fi
 ### Finance
 | Service | URL | Port | Container | Network | Notes |
 |---|---|---|---|---|---|
-| **Actual Budget** | — | 5006 | `actual_server` | `web_proxy` | **Deprecated.** Replaced by Budget Tracker. Container may still exist but is no longer the primary finance tool. |
+| **Actual Budget** | — | 5006 | `actual_server` | `web_proxy` | **Deprecated.** Replaced by Orbit Money. Container may still exist but is no longer the primary finance tool. |
 
 ### Networking Services
 | Service | Port | Image | Compose Path | Notes |
@@ -112,7 +112,7 @@ Compose path for entire Arr stack: `C:\Docker\Compose\media\` (single compose fi
 |---|---|---|---|---|---|---|---|
 | **Job Tracker** | `jobs.overbay.app` | 5055 | Python/Flask | `C:\Docker\Compose\Job Tracker\` | `web_proxy` | SQLite (`/data/jobs.db`, Docker volume) | Job alert scraper with Gmail SMTP alerts. See `job-tracker-reference.md` for full technical detail. |
 | **Lawn Tracker** | `lawncare.overbay.app` | 8085 | Node.js/Express + React | `C:\Docker\Compose\Lawn Tracker\` | `web_proxy` | JSON files + photos (Docker named volume `lawn-data` at `/app/data`) | Seasonal lawn care tracker for Kentucky Bluegrass (Zone 6a). Session auth + API key. Multi-stage Dockerfile (build: `node:20-slim`, prod: `node:20-alpine`). iCal feed at `/api/calendar.ics`. Weather/soil temp via Open-Meteo. See `lawn-tracker-reference.md` for full technical detail. |
-| **Budget Tracker** | `money.overbay.app` | 5008 | Node.js/Express + React | `C:\Docker\Compose\Budget Tracker\` | `web_proxy` | SQLite (`/app/data/budget.db`, Docker named volume `budget-data`) | Personal finance tracker replacing Rocket Money + Actual Budget. Full feature set: Rocket Money CSV import, SimpleFIN bank sync, rules engine with original/edited value provenance, transaction search/filter/sort, monthly budgets with progress tracking, and a multi-card dashboard. PWA installable. See `budget-tracker-reference.md` for full technical detail. |
+| **Orbit Money** | `money.overbay.app` | 5008 | Node.js/Express + React | `C:\Docker\Compose\Orbit Money\` | `web_proxy` | SQLite (`/app/data/budget.db`, Docker named volume `orbit-money-data`) | Personal finance tracker replacing Rocket Money + Actual Budget. Full feature set: Rocket Money CSV import, SimpleFIN bank sync, rules engine with original/edited value provenance, transaction search/filter/sort, monthly budgets with progress tracking, and a multi-card dashboard. PWA installable. See `Reference.md` for full technical detail. Storage was renamed from the old project-prefixed volume during the Orbit Money rename. |
 
 ## Backup
 
@@ -134,7 +134,7 @@ Compose path for entire Arr stack: `C:\Docker\Compose\media\` (single compose fi
 | Job Tracker SQLite | File copy from Docker volume |
 | Actual Budget data | File copy |
 | Lawn Tracker data (`state.json`, `custom-tasks.json`, `photos/`) | `docker cp lawn-tracker:/app/data ./lawn-backup` |
-| Budget Tracker SQLite | `docker cp budget-tracker:/app/data/budget.db ./budget-backup/` |
+| Orbit Money SQLite | `docker cp orbit-money:/app/data/budget.db ./budget-backup/` |
 
 **Reminder:** After adding any new container with a database (MariaDB, SQLite, Postgres, etc. in a Docker volume), update `DailyBackup.ps1` to include a dump/export step.
 
@@ -150,9 +150,9 @@ Quick-reference for recurring pitfalls — check here before troubleshooting.
 - **rclone + MariaDB:** The `root` user in Grimmory/BookLore MariaDB is restricted to socket auth. Dumps must use the application user credentials.
 - **New public-facing services:** Must join `web_proxy` network and be added to Cloudflare Tunnel config.
 - **WireGuard split tunneling:** Destination-based (`WG_ALLOWED_IPS=192.168.86.0/24`). No per-app config needed — new apps route correctly automatically.
-- **Budget Tracker: better-sqlite3 `.iterate()`:** Using `.iterate()` inside a write transaction causes "database connection is busy." Always use `.all()`.
-- **Budget Tracker: SQLite `ALTER TABLE ADD COLUMN`:** Cannot use function defaults like `datetime('now')`. Use a constant default then backfill.
-- **Budget Tracker: SQLite integer 0 in JSX:** `{value && <Component />}` renders literal "0" when value is integer 0. Coerce with `!!value`.
+- **Orbit Money: better-sqlite3 `.iterate()`:** Using `.iterate()` inside a write transaction causes "database connection is busy." Always use `.all()`.
+- **Orbit Money: SQLite `ALTER TABLE ADD COLUMN`:** Cannot use function defaults like `datetime('now')`. Use a constant default then backfill.
+- **Orbit Money: SQLite integer 0 in JSX:** `{value && <Component />}` renders literal "0" when value is integer 0. Coerce with `!!value`.
 
 ## Infrastructure Roadmap
 
