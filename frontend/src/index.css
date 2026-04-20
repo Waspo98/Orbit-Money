@@ -1420,10 +1420,13 @@ input, textarea, select {
     background: var(--surface);
     border-right: 1px solid var(--border);
     padding: 20px 14px;
+    width: var(--sidebar-width);
     height: 100vh;
     height: 100dvh;
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    z-index: 60;
   }
 
   .sidebar-brand {
@@ -1876,7 +1879,7 @@ input, textarea, select {
 }
 
 .page-hero-budgets {
-  --hero-expanded-width: min(820px, calc(var(--hero-available-width) - (var(--hero-card-margin) * 2)));
+  --hero-expanded-width: min(960px, calc(var(--hero-available-width) - (var(--hero-card-margin) * 2)));
 }
 
 .page-hero-stat {
@@ -4331,7 +4334,7 @@ input, textarea, select {
 
 .budgets-view {
   width: calc(100% - 40px);
-  max-width: 820px;
+  max-width: 960px;
   margin: 0 auto;
   /* Keep the document at full height even while loading. A large
      height-collapse (content → tiny spinner → content) was re-triggering
