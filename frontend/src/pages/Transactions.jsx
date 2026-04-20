@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import FilterSheet from '../components/FilterSheet.jsx';
+import PageHero from '../components/PageHero.jsx';
+import { useAppDialog } from '../components/AppDialog.jsx';
 import { RuleEditor } from './Rules.jsx';
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -24,7 +26,7 @@ const SORT_OPTIONS = [
   { value: 'abs_amount_asc',   label: 'Smallest first' },
   { value: 'amount_desc',      label: 'Most positive' },
   { value: 'amount_asc',       label: 'Most negative' },
-  { value: 'merchant_asc',     label: 'Merchant A–Z' }
+  { value: 'merchant_asc',     label: 'Merchant A-Z' }
 ];
 
 // ============================================================================
@@ -68,7 +70,7 @@ function formatAmount(amount) {
     style: 'currency',
     currency: 'USD'
   });
-  return amount < 0 ? `−${abs}` : `+${abs}`;
+  return amount < 0 ? `-${abs}` : `+${abs}`;
 }
 
 function formatShortAmount(amount) {
@@ -98,123 +100,6 @@ function describeEditSource(source) {
   if (source === 'user') return 'edited manually';
   if (source.startsWith('rule:')) return 'applied by rule';
   return 'edited';
-}
-
-function useMorphingHero() {
-  const innerRef = useRef(null);
-  const titleRef = useRef(null);
-  const expandedRef = useRef(612);
-  const [state, setState] = useState({
-    progress: 0,
-    height: 612,
-    expandedHeight: 612,
-    titleX: 0,
-    titleY: 0,
-    titleScale: 0.62,
-    collapsedWidth: 232
-  });
-  const frameRef = useRef(null);
-
-  useEffect(() => {
-    const collapsed = 64;
-    const titleScale = 0.62;
-
-    function measureTitleTarget() {
-      const title = titleRef.current;
-      const hero = innerRef.current?.closest('.page-hero');
-      if (!title || !hero) {
-        return { titleX: 0, titleY: 0, titleScale, collapsedWidth: 232 };
-      }
-
-      const previousTransform = title.style.transform;
-      title.style.transform = 'none';
-      const heroRect = hero.getBoundingClientRect();
-      const titleRect = title.getBoundingClientRect();
-      title.style.transform = previousTransform;
-
-      const edgeLeft = window.innerWidth >= 1080 ? 260 : 0;
-      const availableWidth = window.innerWidth - edgeLeft;
-      const preferredWidth = Math.min(Math.max(availableWidth / 3, 232), 520);
-      const collapsedWidth = Math.min(
-        availableWidth - 28,
-        Math.max(preferredWidth, Math.ceil(titleRect.width * titleScale + 60))
-      );
-      const targetLeft = (collapsedWidth - titleRect.width * titleScale) / 2;
-      const targetTop = (collapsed - titleRect.height * titleScale) / 2;
-      const currentLeft = titleRect.left - heroRect.left;
-      const currentTop = titleRect.top - heroRect.top;
-
-      return {
-        titleX: targetLeft - currentLeft,
-        titleY: targetTop - currentTop,
-        titleScale,
-        collapsedWidth
-      };
-    }
-
-    function measureExpandedHeight() {
-      const inner = innerRef.current;
-      const hero = inner?.closest('.page-hero');
-      if (!inner || !hero) return expandedRef.current;
-
-      const styles = window.getComputedStyle(hero);
-      const paddingTop = parseFloat(styles.paddingTop) || 0;
-      const innerStyles = window.getComputedStyle(inner);
-      const gap = parseFloat(innerStyles.rowGap || innerStyles.gap) || 0;
-      const visibleChildren = Array.from(inner.children).filter((child) => {
-        return window.getComputedStyle(child).display !== 'none';
-      });
-      const contentHeight = visibleChildren.reduce((total, child, index) => {
-        return total + child.getBoundingClientRect().height + (index > 0 ? gap : 0);
-      }, 0);
-      const bottomCushion = window.innerWidth <= 560 ? 30 : 34;
-      const measured = Math.ceil(paddingTop + contentHeight + bottomCushion);
-
-      expandedRef.current = Math.max(collapsed, measured);
-      return expandedRef.current;
-    }
-
-    function update() {
-      if (frameRef.current) return;
-
-      frameRef.current = window.requestAnimationFrame(() => {
-        frameRef.current = null;
-        const expanded = measureExpandedHeight();
-        const titleTarget = measureTitleTarget();
-        const collapseDistance = expanded - collapsed;
-        const progress = Math.min(1, Math.max(0, window.scrollY / collapseDistance));
-        const height = Math.round(expanded - (expanded - collapsed) * progress);
-
-        setState((prev) =>
-          Math.abs(prev.progress - progress) > 0.01 ||
-          prev.height !== height ||
-          prev.expandedHeight !== expanded ||
-          Math.abs(prev.titleX - titleTarget.titleX) > 0.5 ||
-          Math.abs(prev.titleY - titleTarget.titleY) > 0.5 ||
-          Math.abs(prev.collapsedWidth - titleTarget.collapsedWidth) > 0.5
-            ? { progress, height, expandedHeight: expanded, ...titleTarget }
-            : prev
-        );
-      });
-    }
-
-    update();
-    const observer =
-      'ResizeObserver' in window && innerRef.current
-        ? new ResizeObserver(update)
-        : null;
-    if (observer && innerRef.current) observer.observe(innerRef.current);
-    window.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
-    return () => {
-      if (observer) observer.disconnect();
-      window.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
-      if (frameRef.current) window.cancelAnimationFrame(frameRef.current);
-    };
-  }, []);
-
-  return { ...state, innerRef, titleRef };
 }
 
 // ============================================================================
@@ -298,7 +183,7 @@ function countActiveFilters(f) {
 export default function Transactions({ accounts, categories, onOpenMenu }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const hero = useMorphingHero();
+  const { alert, confirm, Dialog } = useAppDialog();
 
   // URL-derived filter state (single source of truth for the data query).
   const filters = useMemo(
@@ -309,6 +194,7 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [grandTotal, setGrandTotal] = useState(0);
+  const [monthlyTotal, setMonthlyTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -318,7 +204,7 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
   const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
-  // Local (debounced) search input — keeps typing snappy, writes to URL
+  // Local (debounced) search input - keeps typing snappy, writes to URL
   // after a short idle window so the server request doesn't fire per
   // keystroke.
   const [searchLocal, setSearchLocal] = useState(filters.q);
@@ -335,14 +221,14 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
   //
   // `silent: true` skips the loading-spinner swap. Useful when refreshing
   // after a mutation (e.g., rule created from a transaction) where we
-  // don't want the page to collapse to a spinner — the browser would
+  // don't want the page to collapse to a spinner - the browser would
   // clamp scrollY to the new document height, losing the user's scroll
   // position on long lists.
   async function load({ silent = false } = {}) {
     if (!silent) setLoading(true);
     setError('');
     try {
-      // Reuse the same URL params; just drop `page` handling — the server
+      // Reuse the same URL params; just drop `page` handling - the server
       // reads it from the query too but we'll send limit explicitly.
       const p = new URLSearchParams(searchParams);
       p.set('limit', String(filters.pageSize || DEFAULT_PAGE_SIZE));
@@ -352,6 +238,7 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
       setItems(data.items);
       setTotal(data.total);
       setGrandTotal(data.grandTotal ?? data.total);
+      setMonthlyTotal(data.monthlyTotal ?? 0);
       setTotalPages(data.totalPages);
     } catch (err) {
       setError(err.message || 'Failed to load transactions');
@@ -367,7 +254,7 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
 
   // ---------- URL writers ----------
   function commitFilters(next, opts = {}) {
-    // Always reset page to 1 when filters change — otherwise the user can
+    // Always reset page to 1 when filters change - otherwise the user can
     // land on an empty page 5 after narrowing results.
     const withPage = { ...next, page: opts.keepPage ? next.page : 1 };
     setSearchParams(filtersToSearchParams(withPage));
@@ -461,19 +348,27 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
       if (result?.transaction) replaceLocal(txn.id, result.transaction);
     } catch (err) {
       applyLocalPatch(txn.id, { [field]: txn[field] });
-      alert(err.message || 'Toggle failed');
+      alert(err.message || 'Toggle failed', { title: 'Could not update transaction' });
     }
   }
 
   async function handleDelete(txn) {
-    if (!confirm(`Delete this transaction? "${txn.merchant}" for ${formatAmount(txn.amount)}`)) {
+    const ok = await confirm(
+      `Delete this transaction? "${txn.merchant}" for ${formatAmount(txn.amount)}`,
+      {
+        title: 'Delete transaction',
+        confirmLabel: 'Delete',
+        destructive: true
+      }
+    );
+    if (!ok) {
       return;
     }
     try {
       await api.del(`/api/transactions/${txn.id}`);
       removeLocal(txn.id);
     } catch (err) {
-      alert(err.message || 'Delete failed');
+      alert(err.message || 'Delete failed', { title: 'Delete failed' });
     }
   }
 
@@ -484,7 +379,7 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
       });
       if (result?.transaction) replaceLocal(txn.id, result.transaction);
     } catch (err) {
-      alert(err.message || 'Reset failed');
+      alert(err.message || 'Reset failed', { title: 'Reset failed' });
     }
   }
 
@@ -494,7 +389,6 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
   const activeCount = countActiveFilters(filters);
   const isFiltered = activeCount > 0;
   const groups = groupByMonth(items);
-  const monthlyTransactionCount = groups[0]?.items.length || total;
   const visibleIncome = items
     .filter((t) => t.amount > 0 && !t.is_transfer && !t.is_ignored)
     .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -503,11 +397,11 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
     .reduce((sum, t) => sum + Math.abs(Number(t.amount || 0)), 0);
   const visibleNet = visibleIncome - visibleOutflow;
 
-  // Onboarding empty state — only when no filters AND nothing exists at all.
+  // Onboarding empty state - only when no filters AND nothing exists at all.
   if (!loading && grandTotal === 0 && !isFiltered) {
     return (
       <div className="empty-state">
-        <div className="empty-state-icon">§</div>
+        <div className="empty-state-icon">$</div>
         <h2>No transactions yet</h2>
         <p>
           Import your Rocket Money export to bring over your full history,
@@ -526,151 +420,103 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
 
   return (
     <div className="transactions-view">
-      <section
-        className="page-hero page-hero-transactions"
-        aria-labelledby="transactions-title"
-        style={{
-          '--hero-progress': hero.progress,
-          '--hero-content-opacity': Math.max(0, 1 - hero.progress * 1.35),
-          '--hero-title-x': `${hero.titleX}px`,
-          '--hero-title-y': `${hero.titleY}px`,
-          '--hero-title-scale': hero.titleScale,
-          '--hero-collapsed-width': `${hero.collapsedWidth}px`,
-          height: `${hero.height}px`
-        }}
-      >
-        <div className="page-hero-pill-bar" hidden>
-          <span className="page-hero-pill-title" aria-hidden="true">Transactions</span>
-          <button
-            type="button"
-            className="btn-icon page-hero-pill-menu"
-            onClick={onOpenMenu}
-            aria-label="Open menu"
-            disabled={hero.progress < 0.72}
-          >
-            â˜°
-          </button>
-        </div>
-        <div className="page-hero-inner" ref={hero.innerRef}>
-        <div className="page-hero-chrome">
-          <button
-            type="button"
-            className="hero-brand brand-home"
-            onClick={() => navigate('/dashboard')}
-            aria-label="Go to dashboard"
-          >
-            <span className="brand-mark">$</span>
-            <span className="brand-name">Orbit Money</span>
-          </button>
-          <button
-            type="button"
-            className="btn-icon hero-menu-button"
-            onClick={onOpenMenu}
-            aria-label="Open menu"
-            disabled={hero.progress > 0.72}
-          >
-            ☰
-          </button>
-        </div>
-        <div className="page-hero-content">
-        <div className="page-hero-topline">
-          <div className="page-hero-main">
-            <div className="page-kicker">Money movement</div>
-            <h2 id="transactions-title" ref={hero.titleRef}>Transactions</h2>
-            <p>
-              {isFiltered
-                ? `${monthlyTransactionCount.toLocaleString()} monthly transactions`
-                : `${monthlyTransactionCount.toLocaleString()} monthly transactions`}
-            </p>
-          </div>
-
-          <div className="page-hero-stats" aria-label="Transaction summary">
-            <div className="page-hero-stat good">
-              <span>Monthly income</span>
-              <strong>{formatShortAmount(visibleIncome)}</strong>
-            </div>
-            <div className="page-hero-stat caution">
-              <span>Monthly expenses</span>
-              <strong>{formatShortAmount(visibleOutflow)}</strong>
-            </div>
-            <div className={`page-hero-stat ${visibleNet >= 0 ? 'good' : 'caution'}`}>
-              <span>Monthly net</span>
-              <strong>{formatAmount(visibleNet)}</strong>
-            </div>
-            <div className="page-hero-stat">
-              <span>Filters</span>
-              <strong>{activeCount || 'None'}</strong>
-            </div>
-          </div>
-        </div>
-
-      {/* ---------- Search + toolbar ---------- */}
-      <div className="txn-toolbar txn-toolbar-hero">
-        <div className="txn-search-wrap">
-          <span className="txn-search-icon" aria-hidden="true">⌕</span>
-          <input
-            type="search"
-            className="txn-search-input"
-            placeholder="Search merchant, description, notes…"
-            value={searchLocal}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {searchLocal && (
+      <PageHero
+        id="transactions-title"
+        variant="transactions"
+        kicker="Money movement"
+        title="Transactions"
+        subtitle={`${monthlyTotal.toLocaleString()} ${monthlyTotal === 1 ? 'transaction' : 'transactions'} this month`}
+        stats={[
+          { label: 'Monthly income', value: formatShortAmount(visibleIncome), tone: 'good' },
+          { label: 'Monthly expenses', value: formatShortAmount(visibleOutflow), tone: 'caution' },
+          { label: 'Monthly net', value: formatAmount(visibleNet), tone: visibleNet >= 0 ? 'good' : 'caution' },
+          { label: 'Monthly transactions', value: monthlyTotal.toLocaleString() }
+        ]}
+        initialHeight={612}
+        onOpenMenu={onOpenMenu}
+        statLabel="Transaction summary"
+        chrome={(hero) => (
+          <div className="page-hero-chrome">
             <button
               type="button"
-              className="txn-search-clear"
-              onClick={() => setSearch('')}
-              aria-label="Clear search"
+              className="hero-brand brand-home"
+              onClick={() => navigate('/dashboard')}
+              aria-label="Go to dashboard"
             >
-              ✕
+              <span className="brand-mark">$</span>
+              <span className="brand-name">Orbit Money</span>
             </button>
-          )}
-        </div>
-        <div className="txn-toolbar-actions">
-          <button
-            type="button"
-            className={`btn-secondary ${activeCount > 0 ? 'btn-active' : ''}`}
-            onClick={() => setFilterSheetOpen(true)}
-          >
-            ⚙ Filter{activeCount > 0 ? ` (${activeCount})` : ''}
-          </button>
-          <label className="txn-sort">
-            <span className="visually-hidden">Sort</span>
-            <select
-              value={filters.sort}
-              onChange={(e) => setSort(e.target.value)}
+            <button
+              type="button"
+              className="btn-icon hero-menu-button"
+              onClick={onOpenMenu}
+              aria-label="Open menu"
+              disabled={hero.progress > 0.72}
             >
-              {SORT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="txn-page-size">
-            <span className="visually-hidden">Transactions per page</span>
-            <select
-              value={filters.pageSize}
-              onChange={(e) => setPageSize(e.target.value)}
-            >
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size}>
-                  {size} / page
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </div>
-        </div>
-        </div>
-      </section>
-      <div
-        className="page-hero-spacer page-hero-transactions-spacer"
-        style={{ height: `${hero.expandedHeight}px` }}
-        aria-hidden="true"
+              {'\u2630'}
+            </button>
+          </div>
+        )}
+        toolbar={(
+          <div className="txn-toolbar txn-toolbar-hero">
+            <div className="txn-search-wrap">
+              <span className="txn-search-icon" aria-hidden="true">{'\u2315'}</span>
+              <input
+                type="search"
+                className="txn-search-input"
+                placeholder="Search merchant, description, notes…"
+                value={searchLocal}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {searchLocal && (
+                <button
+                  type="button"
+                  className="txn-search-clear"
+                  onClick={() => setSearch('')}
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <div className="txn-toolbar-actions">
+              <button
+                type="button"
+                className={`btn-secondary ${activeCount > 0 ? 'btn-active' : ''}`}
+                onClick={() => setFilterSheetOpen(true)}
+              >
+                {'\u2699'} Filter{activeCount > 0 ? ` (${activeCount})` : ''}
+              </button>
+              <label className="txn-sort">
+                <span className="visually-hidden">Sort</span>
+                <select
+                  value={filters.sort}
+                  onChange={(e) => setSort(e.target.value)}
+                >
+                  {SORT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="txn-page-size">
+                <span className="visually-hidden">Transactions per page</span>
+                <select
+                  value={filters.pageSize}
+                  onChange={(e) => setPageSize(e.target.value)}
+                >
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size} / page
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+        )}
       />
-
       {/* ---------- Active filter pills ---------- */}
       {activeCount > 0 && (
         <ActiveFilterPills
@@ -690,7 +536,7 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
         </div>
       ) : total === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">§</div>
+          <div className="empty-state-icon">$</div>
           <h2>No transactions match your filters</h2>
           <p>Try widening the date range or removing some criteria.</p>
           <button type="button" className="btn-secondary" onClick={clearAllFilters}>
@@ -741,7 +587,7 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
               disabled={filters.page <= 1}
               onClick={() => goToPage(filters.page - 1)}
             >
-              ← Previous
+              Previous
             </button>
             <span className="page-info">
               Page {filters.page} of {totalPages}
@@ -752,7 +598,7 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
               disabled={filters.page >= totalPages}
               onClick={() => goToPage(filters.page + 1)}
             >
-              Next →
+              Next
             </button>
           </div>
         </>
@@ -776,7 +622,7 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
           rule={{
             // Seed the full rule editor with the obvious starting point
             // for a "make a rule like this transaction" flow. The user
-            // gets the full condition/action builder — multiple conditions,
+            // gets the full condition/action builder - multiple conditions,
             // amount filters, categorize, mark transfer, etc.
             conditions: [
               {
@@ -795,7 +641,7 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
           onClose={() => setNewRuleFromTxn(null)}
           onSaved={() => {
             setNewRuleFromTxn(null);
-            // Silent reload — avoids the spinner swap that would clamp
+            // Silent reload - avoids the spinner swap that would clamp
             // scrollY and jump the user to the top of the list.
             load({ silent: true });
           }}
@@ -811,12 +657,14 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
           onClose={() => setFilterSheetOpen(false)}
         />
       )}
+
+      <Dialog />
     </div>
   );
 }
 
 // ============================================================================
-// Active filter pills — one per active filter, dismissible
+// Active filter pills - one per active filter, dismissible
 // ============================================================================
 
 function ActiveFilterPills({
@@ -829,7 +677,7 @@ function ActiveFilterPills({
   const pills = [];
 
   if (filters.q) {
-    pills.push({ key: 'q', label: `“${filters.q}”` });
+    pills.push({ key: 'q', label: `"${filters.q}"` });
   }
 
   if (filters.accountIds.length) {
@@ -857,15 +705,15 @@ function ActiveFilterPills({
   }
 
   if (filters.dateFrom || filters.dateTo) {
-    const from = filters.dateFrom ? formatDayMonth(filters.dateFrom) : '—';
+    const from = filters.dateFrom ? formatDayMonth(filters.dateFrom) : '-';
     const to = filters.dateTo ? formatDayMonth(filters.dateTo) : 'today';
-    pills.push({ key: 'date', label: `${from} → ${to}` });
+    pills.push({ key: 'date', label: `${from} -> ${to}` });
   }
 
   if (filters.amountMin != null || filters.amountMax != null) {
     const lo = filters.amountMin != null ? formatShortAmount(filters.amountMin) : '0';
-    const hi = filters.amountMax != null ? formatShortAmount(filters.amountMax) : '∞';
-    pills.push({ key: 'amount', label: `${lo} – ${hi}` });
+    const hi = filters.amountMax != null ? formatShortAmount(filters.amountMax) : 'No max';
+    pills.push({ key: 'amount', label: `${lo} - ${hi}` });
   }
 
   if (filters.type !== 'all') {
@@ -900,7 +748,7 @@ function ActiveFilterPills({
           title={p.title || 'Remove filter'}
         >
           <span>{p.label}</span>
-          <span className="active-pill-x" aria-hidden="true">✕</span>
+          <span className="active-pill-x" aria-hidden="true">x</span>
         </button>
       ))}
       {pills.length > 1 && (
@@ -917,7 +765,7 @@ function ActiveFilterPills({
 }
 
 // ============================================================================
-// Transaction row — expand/contract animation via grid-template-rows,
+// Transaction row - expand/contract animation via grid-template-rows,
 // scroll-into-view accounts for bottom tabs
 // ============================================================================
 
@@ -944,7 +792,7 @@ export function TransactionRow({
 
   // Scroll-into-view after the expand animation settles. Uses a manual
   // scrollBy (rather than element.scrollIntoView) so we can account for the
-  // bottom-tabs bar overlapping the viewport — scrollIntoView treats the
+  // bottom-tabs bar overlapping the viewport - scrollIntoView treats the
   // whole window.innerHeight as usable area and leaves the bottom of the
   // expanded card hidden under the tabs.
   useEffect(() => {
@@ -976,7 +824,7 @@ export function TransactionRow({
       if (rect.bottom > effectiveBottom) {
         const overflow = Math.ceil(rect.bottom - effectiveBottom);
         // If the whole card is taller than the viewport, at least align
-        // the top just below the header — otherwise scroll just enough.
+        // the top just below the header - otherwise scroll just enough.
         const maxScroll = Math.max(0, rect.top - 16);
         const scrollBy = Math.min(overflow, Math.max(overflow, 0) + maxScroll);
         window.scrollBy({ top: scrollBy, behavior: 'smooth' });
@@ -988,7 +836,7 @@ export function TransactionRow({
 
   function handleRowClick(e) {
     // Ignore clicks on interactive elements (buttons, links, inputs).
-    // Also ignore clicks that happened inside the expanded detail area —
+    // Also ignore clicks that happened inside the expanded detail area -
     // otherwise tapping the expanded content would collapse the card.
     if (e.target.closest('button, a, input, select, textarea, [role=button]')) return;
     if (expanded && e.target.closest('.txn-detail-wrapper')) return;
@@ -1023,7 +871,7 @@ export function TransactionRow({
                 <span className="dot" />
                 <span>
                   {account.name}
-                  {account.account_number_last4 && ` ···${account.account_number_last4}`}
+                  {account.account_number_last4 && ` ...${account.account_number_last4}`}
                 </span>
               </>
             )}
@@ -1035,8 +883,8 @@ export function TransactionRow({
         </div>
       </div>
 
-      {/* Always-mounted detail wrapper — the expand/contract is animated
-          via grid-template-rows (0fr ↔ 1fr) on this container. Content
+      {/* Always-mounted detail wrapper - the expand/contract is animated
+          via grid-template-rows (0fr -> 1fr) on this container. Content
           inside is overflow: hidden so it clips during the animation. */}
       <div className="txn-detail-wrapper" aria-hidden={!expanded}>
         <TransactionDetail
@@ -1101,11 +949,11 @@ function TransactionDetail({
               <>
                 {account.name}
                 {account.institution && (
-                  <span className="subtle">  ·  {account.institution}</span>
+                  <span className="subtle">  .  {account.institution}</span>
                 )}
               </>
             ) : (
-              '—'
+              '-'
             )}
           </dd>
         </div>
@@ -1175,7 +1023,7 @@ function TransactionDetail({
         <div>
           <dt>Original description</dt>
           <dd className="txn-detail-mono">
-            {txn.original_description || <span className="subtle">—</span>}
+            {txn.original_description || <span className="subtle">-</span>}
           </dd>
         </div>
 
@@ -1197,14 +1045,14 @@ function TransactionDetail({
             >
               View budgets for {(txn.date || '').slice(0, 7) || 'this month'}
             </a>
-            {category && <> · {category.name}</>}
+            {category && <> . {category.name}</>}
           </dd>
         </div>
       </dl>
 
       <div className="txn-detail-actions">
         <button type="button" className="btn-secondary btn-compact" onClick={onEdit} {...tabProps}>
-          ✎ Edit
+          Edit
         </button>
         <button
           type="button"
@@ -1212,7 +1060,7 @@ function TransactionDetail({
           onClick={onCreateRule}
           {...tabProps}
         >
-          ⊙ Create rule
+          Create rule
         </button>
         <button
           type="button"
@@ -1220,7 +1068,7 @@ function TransactionDetail({
           onClick={onToggleTransfer}
           {...tabProps}
         >
-          ⇌ {txn.is_transfer ? 'Unmark transfer' : 'Mark transfer'}
+          {txn.is_transfer ? 'Unmark transfer' : 'Mark transfer'}
         </button>
         <button
           type="button"
@@ -1228,7 +1076,7 @@ function TransactionDetail({
           onClick={onToggleIgnored}
           {...tabProps}
         >
-          ⊘ {txn.is_ignored ? 'Unignore' : 'Ignore'}
+          {txn.is_ignored ? 'Unignore' : 'Ignore'}
         </button>
         <button
           type="button"
@@ -1236,7 +1084,7 @@ function TransactionDetail({
           onClick={onDelete}
           {...tabProps}
         >
-          ✕ Delete
+          Delete
         </button>
       </div>
     </div>
@@ -1354,7 +1202,7 @@ export function EditTransactionModal({ txn, categories, onClose, onSaved, onRese
 
             <p className="subtle" style={{ marginTop: -10, marginBottom: 12 }}>
               Date ({formatFullDate(txn.date)}) and amount ({formatAmount(txn.amount)})
-              are not editable — they're ground truth from the bank.
+              are not editable - they're ground truth from the bank.
             </p>
 
             {error && <div className="error">{error}</div>}
@@ -1364,7 +1212,7 @@ export function EditTransactionModal({ txn, categories, onClose, onSaved, onRese
                 Cancel
               </button>
               <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Saving…' : 'Save'}
+                {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </form>

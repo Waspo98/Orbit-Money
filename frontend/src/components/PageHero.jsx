@@ -81,7 +81,7 @@ export function useMorphingPageHero(initialHeight = 420) {
         frameRef.current = null;
         const expanded = measureExpandedHeight();
         const titleTarget = measureTitleTarget();
-        const collapseDistance = expanded - collapsed;
+        const collapseDistance = Math.max(1, expanded - collapsed);
         const progress = Math.min(1, Math.max(0, window.scrollY / collapseDistance));
         const height = Math.round(expanded - (expanded - collapsed) * progress);
 
@@ -123,10 +123,18 @@ export default function PageHero({
   kicker,
   title,
   subtitle,
-  stats,
-  initialHeight = 420
+  stats = [],
+  initialHeight = 420,
+  hero: controlledHero,
+  chrome,
+  toolbar,
+  onOpenMenu,
+  statLabel
 }) {
-  const hero = useMorphingPageHero(initialHeight);
+  const internalHero = useMorphingPageHero(initialHeight);
+  const hero = controlledHero || internalHero;
+  const chromeContent = typeof chrome === 'function' ? chrome(hero) : chrome;
+  const toolbarContent = typeof toolbar === 'function' ? toolbar(hero) : toolbar;
 
   return (
     <>
@@ -143,7 +151,22 @@ export default function PageHero({
           height: `${hero.height}px`
         }}
       >
+        {onOpenMenu && (
+          <div className="page-hero-pill-bar" hidden>
+            <span className="page-hero-pill-title" aria-hidden="true">{title}</span>
+            <button
+              type="button"
+              className="btn-icon page-hero-pill-menu"
+              onClick={onOpenMenu}
+              aria-label="Open menu"
+              disabled={hero.progress < 0.72}
+            >
+              {'\u2630'}
+            </button>
+          </div>
+        )}
         <div className="page-hero-inner" ref={hero.innerRef}>
+          {chromeContent}
           <div className="page-hero-content">
             <div className="page-hero-topline">
               <div className="page-hero-main">
@@ -152,7 +175,7 @@ export default function PageHero({
                 <p>{subtitle}</p>
               </div>
 
-              <div className="page-hero-stats" aria-label={`${title} summary`}>
+              <div className="page-hero-stats" aria-label={statLabel || `${title} summary`}>
                 {stats.map((stat) => (
                   <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
                     <span>{stat.label}</span>
@@ -161,6 +184,7 @@ export default function PageHero({
                 ))}
               </div>
             </div>
+            {toolbarContent}
           </div>
         </div>
       </section>

@@ -34,6 +34,13 @@ http://localhost:5019
 http://localhost:5019/api/health
 ```
 
+Before deploying a frontend change to beta, verify the production build from
+the parent project root:
+
+```bat
+cmd /c scripts\build-frontend.cmd
+```
+
 For Cloudflare Tunnel, point `orbitbeta.overbay.app` at:
 
 ```text

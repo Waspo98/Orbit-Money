@@ -9,12 +9,11 @@ const PRIMARY_TABS = [
 
 export default function BottomTabs({ onMoreClick }) {
   return (
-    <nav className="bottom-tabs" role="tablist">
+    <nav className="bottom-tabs" aria-label="Primary navigation">
       {PRIMARY_TABS.map((t) => (
         <NavLink
           key={t.to}
           to={t.to}
-          role="tab"
           className={({ isActive }) =>
             `bottom-tab ${isActive ? 'active' : ''}`
           }

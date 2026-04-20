@@ -104,6 +104,10 @@ router.put('/:id', requireAuth, (req, res) => {
       .json({ error: `type must be one of: ${VALID_TYPES.join(', ')}` });
   }
 
+  if (body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim())) {
+    return res.status(400).json({ error: 'name cannot be empty.' });
+  }
+
   const sets = [];
   const values = [];
 
@@ -125,13 +129,22 @@ router.put('/:id', requireAuth, (req, res) => {
           ['institution', 'account_number_last4', 'simplefin_account_id'].includes(col)) {
         v = null;
       }
+      if (col === 'name' && typeof v === 'string') {
+        v = v.trim();
+      }
+      if (col === 'current_balance') {
+        v = Number(v);
+        if (!Number.isFinite(v)) {
+          return res.status(400).json({ error: 'current_balance must be a valid number.' });
+        }
+      }
       if (col === 'estimated_value') {
         if (v === '' || v === null) {
           v = null;
         } else {
           v = Number(v);
           if (!Number.isFinite(v) || v < 0) {
-            return res.status(400).json({ error: 'estimated_value must be a positive number.' });
+            return res.status(400).json({ error: 'estimated_value must be a non-negative number.' });
           }
         }
       }

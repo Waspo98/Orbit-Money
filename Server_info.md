@@ -153,6 +153,8 @@ Quick-reference for recurring pitfalls — check here before troubleshooting.
 - **Orbit Money: better-sqlite3 `.iterate()`:** Using `.iterate()` inside a write transaction causes "database connection is busy." Always use `.all()`.
 - **Orbit Money: SQLite `ALTER TABLE ADD COLUMN`:** Cannot use function defaults like `datetime('now')`. Use a constant default then backfill.
 - **Orbit Money: SQLite integer 0 in JSX:** `{value && <Component />}` renders literal "0" when value is integer 0. Coerce with `!!value`.
+- **Orbit Money: frontend verification on Windows:** use `cmd /c scripts\build-frontend.cmd` from `C:\Docker\Compose\Orbit Money`; it wires the bundled Node runtime into PATH.
+- **Orbit Money: shared page hero:** reuse `frontend/src/components/PageHero.jsx` and `useMorphingPageHero` for sticky/morphing header behavior. Do not re-copy the scroll/resize measurement logic into new pages.
 
 ## Infrastructure Roadmap
 

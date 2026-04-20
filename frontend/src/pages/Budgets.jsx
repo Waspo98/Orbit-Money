@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import PageHero from '../components/PageHero.jsx';
+import { useAppDialog } from '../components/AppDialog.jsx';
 
 // ============================================================================
 // Budgets — v15
@@ -72,6 +73,7 @@ function formatMoney(n) {
 // ============================================================================
 
 export default function Budgets() {
+  const { alert, confirm, Dialog } = useAppDialog();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedMonth = searchParams.get('month') || currentMonth();
 
@@ -250,12 +252,17 @@ export default function Budgets() {
   }
 
   async function deleteBudget(budgetId) {
-    if (!confirm('Delete this budget? It will be removed for every month.')) return;
+    const ok = await confirm('Delete this budget? It will be removed for every month.', {
+      title: 'Delete budget',
+      confirmLabel: 'Delete',
+      destructive: true
+    });
+    if (!ok) return;
     try {
       await api.del(`/api/budgets/${budgetId}`);
       await load();
     } catch (err) {
-      alert(err.message || 'Delete failed');
+      alert(err.message || 'Delete failed', { title: 'Delete failed' });
     }
   }
 
@@ -555,6 +562,8 @@ export default function Budgets() {
           }
         />
       )}
+
+      <Dialog />
     </div>
   );
 }

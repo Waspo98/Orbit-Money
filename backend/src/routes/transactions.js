@@ -113,6 +113,16 @@ function isoDate(s) {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
 }
 
+function currentMonthBounds() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const start = `${year}-${String(month).padStart(2, '0')}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  return { start, end };
+}
+
 const SORT_MAP = {
   date_desc:        'date DESC, id DESC',
   date_asc:         'date ASC, id ASC',
@@ -270,6 +280,11 @@ router.get('/', requireAuth, (req, res) => {
       .prepare('SELECT COUNT(*) AS c FROM transactions')
       .get().c;
 
+    const { start: monthStart, end: monthEnd } = currentMonthBounds();
+    const monthlyTotal = db
+      .prepare('SELECT COUNT(*) AS c FROM transactions WHERE date >= ? AND date <= ?')
+      .get(monthStart, monthEnd).c;
+
     const items = db
       .prepare(
         `SELECT ${SELECT_COLS}
@@ -287,6 +302,7 @@ router.get('/', requireAuth, (req, res) => {
       limit,
       total,
       grandTotal,
+      monthlyTotal,
       totalPages: Math.max(1, Math.ceil(total / limit)),
       sort: sortKey in SORT_MAP ? sortKey : 'date_desc'
     });

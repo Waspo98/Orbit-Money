@@ -62,7 +62,7 @@ export default function AnimatedModal({ onClose, size = 'md', children }) {
       onClick={close}
     >
       <div
-        className={`modal ${size === 'lg' ? 'modal-lg' : ''} ${closing ? 'closing' : ''}`}
+        className={`modal ${size === 'lg' ? 'modal-lg' : ''} ${size === 'sm' ? 'modal-sm' : ''} ${closing ? 'closing' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         {typeof children === 'function' ? children({ close }) : children}

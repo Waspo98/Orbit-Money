@@ -23,7 +23,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
 | `sessions.db` | Session store (separate connection, managed by `connect-sqlite3`) |
 
-### Database Schema (10 migrations)
+### Database Schema (11 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -37,6 +37,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `008_original_edited_split.sql` | Renames `transactions.merchant` → `original_merchant`, adds `edited_merchant`, `edited_category_id`, `edited_is_transfer`, `edited_is_ignored` and matching `_source` columns |
 | `009_budget_monthly.sql` | Per-month budgets: rebuilds `budgets` with composite unique `(category_id, month)` |
 | `010_budget_global_amount.sql` | Reverted to global per-category budgets: rebuilds `budgets` back to `category_id UNIQUE`, collapses any multi-month rows to the most recent via `ROW_NUMBER() OVER (PARTITION BY category_id ORDER BY month DESC)` |
+| `011_account_estimated_value.sql` | Adds `estimated_value` to accounts for mortgage/home-equity net-worth calculations |
 
 ### Key Data Model Notes
 
@@ -107,7 +108,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Sort order persisted to `sort_order` column
 - "See transactions" button filters the Transactions page via `?accounts=X` query param
 - Three-dot dropdown menu per account (Edit, Merge, Archive, Delete)
-- Edit modal: name, type, institution only (balance and last-4 are intentionally not editable)
+- Edit modal: name, type, institution, plus estimated value for mortgage accounts. Balance and last-4 are intentionally not editable in the UI.
 
 ### Budgets
 - **Monthly caps, global per category.** One amount per category that applies to every month. Editing `Groceries` updates the cap for every past and future month.
@@ -121,7 +122,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 ### Dashboard
 Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on ≥900px with Recent Activity spanning full width. Data comes from parallel calls to existing endpoints — no dashboard-specific backend.
 
-- **Accounts card:** net worth (sum of active balances), breakdown by group (Cash = checking+savings+cash, Investments, Credit cards, Loans, Other). Rows with zero balance are hidden.
+- **Accounts card:** net worth (active balances plus mortgage estimated-value equity), breakdown by group (Cash = checking+savings+cash, Investments, Credit cards, Loans, Real Estate, Other). Rows with zero balance are hidden.
 - **This month card:** Day X of Y + compact Income / Expenses / Net trio
 - **Budget pulse card:** overall progress bar + up to 3 "attention" categories (over-budget first, then 85%+), or a success message when all are on track
 - **Top spending card:** up to 7 categories with horizontal bars scaled to the biggest spender; bars use each category's color
@@ -138,12 +139,15 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on �
 - **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More
 - **Desktop sidebar:** Same 5 items as bottom tabs
 - **Hamburger menu (top-right):** Import, Settings, Theme toggle, Sign out
-- **More tab:** Opens bottom sheet (mobile) or centered modal (desktop) with cards for Rules, Settings, Import, and coming-soon placeholders (Mortgage Calculator, Net Worth, Goals, Credit Score)
+- **More tab:** Opens bottom sheet (mobile) or centered modal (desktop) with cards for Rules, Settings, Import, Housing Calculator, Net Worth, and coming-soon placeholders (Goals, Credit Score)
 - **Settings page:** SimpleFIN configuration and sync log only. The Rules management card was removed after the Rules feature got its own dedicated page.
 - **React Router v6:** Client-side routing with browser back/forward support. All routes served via Express catch-all for deep-link support.
 
 ### UI Details
 - `AnimatedModal` component: render-prop pattern (`{({ close }) => ...}`), 180ms slide-in/slide-out via `.closing` CSS class
+- `PageHero` component and `useMorphingPageHero(initialHeight)` hook own the morphing sticky hero measurement logic. Reuse `PageHero` for page headers; pass `chrome` and `toolbar` slots when a page needs custom header controls.
+- `AppDialog.jsx` exposes `useAppDialog()` for modal alert/confirmation flows. Prefer it over native `alert()` / `confirm()` so mobile UX and destructive-action styling stay consistent.
+- `BottomTabs.jsx` owns the primary navigation item list; `DesktopSidebar.jsx` imports `PRIMARY_TABS` so desktop and mobile navigation labels/icons stay aligned.
 - Scroll lock: `document.body.style.overflow = 'hidden'` on all modals, hamburger menu, and More sheet
 - Three-way theme toggle (☀️ / 💻 / 🌙): localStorage persistence with pre-paint script in `index.html` to avoid flash
 - 40+ CSS custom properties for light/dark themes, emerald-600/500 accent
@@ -170,7 +174,7 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on �
 ### Transactions
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/transactions?...` | Paginated list with full filter/search/sort. Returns display values (COALESCE'd) + originals + edit metadata + `has_edits` flag, plus `grandTotal` for "X of Y shown" UI |
+| GET | `/api/transactions?...` | Paginated list with full filter/search/sort. Returns display values (COALESCE'd) + originals + edit metadata + `has_edits` flag, plus `grandTotal` for "X of Y shown" UI and `monthlyTotal` for the current-month transaction count |
 | GET | `/api/transactions/:id` | Single transaction detail |
 | PATCH | `/api/transactions/:id` | Partial update (merchant, category_id, notes, is_transfer, is_ignored). Writes to `edited_*` with source='user'. Setting a value equal to the original clears the edit and re-runs rules for that one row. |
 | POST | `/api/transactions/:id/reset` | Body `{ fields: [...] }`. Clears edits on listed fields and reapplies rules |
@@ -213,6 +217,11 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on �
 | PUT | `/api/budgets` | Upsert `{ category_id, amount, rollover? }` — global per-category |
 | DELETE | `/api/budgets/:id` | Delete budget |
 
+### Net Worth
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/net-worth?months=` | Current summary, monthly history, and account breakdown. Mortgage accounts contribute estimated value minus debt balance. |
+
 ### SimpleFIN
 | Method | Path | Description |
 |---|---|---|
@@ -237,8 +246,8 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on �
 ### Backend (`backend/src/`)
 - `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
 - `db/index.js`, `db/migrations.js`
-- `db/migrations/001` through `010`
-- `routes/`: auth, health, import, transactions, accounts, categories, rules, simplefin, budgets
+- `db/migrations/001` through `011`
+- `routes/`: auth, health, import, transactions, accounts, categories, rules, simplefin, budgets, netWorth
 - `services/`: csvImport, ruleMatcher (exports `loadRules`, `computeEdits`, `countMatches`, `reapplyRulesToAllTransactions`, `reapplyRulesToTransaction`, `revertEditsForRule`, `applyRulesToDraft`), simplefinClient, simplefinSync, transferMatcher
 
 ### Frontend (`frontend/`)
@@ -246,8 +255,8 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on �
 - `public/`: manifest.webmanifest, icon.svg, icon-maskable.svg, sw.js
 - `src/main.jsx`, `src/App.jsx` (BrowserRouter, passes accounts + categories to Transactions and Dashboard), `src/Login.jsx`, `src/api.js` (get/post/put/patch/del), `src/index.css` (~3000 lines)
 - `src/hooks/useTheme.js`
-- `src/components/`: AnimatedModal, BottomTabs, DesktopSidebar, DropdownMenu, FilterSheet, HamburgerMenu, MoreSheet, SyncErrorBanner
-- `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, Import
+- `src/components/`: AnimatedModal, AppDialog, BottomTabs, DesktopSidebar, DropdownMenu, FilterSheet, HamburgerMenu, MoreSheet, PageHero, SyncErrorBanner
+- `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, Import, HousingCalculator, NetWorth
 
 ## Known Gotchas
 - **better-sqlite3 `.iterate()` + write transaction** = "database connection is busy" — always use `.all()` instead
@@ -258,6 +267,9 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on �
 - **NavLink renders `<a>` elements** — need explicit `text-decoration: none; outline: none;` on all states to prevent flash-underline on tap
 - **SW needs a fetch listener** (even pass-through) to satisfy PWA install criteria in some browsers
 - **Rules with match counts** loads slowly with many rules — `withCounts=1` scans all transactions per rule. For 300+ rules × 8K+ transactions, expect 10–20 second initial load.
+- **Windows build tooling:** system `npm` may not be on PATH. Use `cmd /c scripts\build-frontend.cmd` from the repo root or the bundled runtime under `.tools\node-v20.20.2-win-x64\`.
+- **Repeated page hero UI:** before adding or changing a page header, check `PageHero.jsx` first. Shared morph behavior belongs in `useMorphingPageHero`; page-specific stat/chrome content belongs in the page.
+- **Native browser dialogs:** use `useAppDialog()` instead of `alert()` / `confirm()` so confirmations animate and share the app's button styling.
 - **Hidden `<input type="month">` triggers mobile-browser layout quirks** — use a `<select>` overlaying a styled pill instead when you want a native month picker
 - **Rule chaining no longer works** — since conditions match against originals only, a rule can't match on a value a higher-priority rule just renamed to. This was an intentional v12 change (match counts were broken because of the old chaining semantics). If a hand-built rule relied on chained renames, rewrite it to condition on `original_description` or the unmodified upstream value.
 

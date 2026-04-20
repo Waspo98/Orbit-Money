@@ -446,6 +446,10 @@ input, textarea, select {
   animation: modalIn var(--dur-base) var(--ease-out);
 }
 
+.modal-sm {
+  max-width: 420px;
+}
+
 .modal h3 {
   margin: 0 0 8px;
   font-size: 1.4rem;
@@ -453,6 +457,10 @@ input, textarea, select {
 }
 
 .modal p { margin: 0 0 20px; color: var(--text-muted); font-size: 0.92rem; }
+
+.modal-copy {
+  line-height: 1.45;
+}
 
 .modal-actions {
   display: flex;

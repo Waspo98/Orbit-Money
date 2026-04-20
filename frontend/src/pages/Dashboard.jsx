@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { TransactionRow, EditTransactionModal } from './Transactions.jsx';
 import { RuleEditor } from './Rules.jsx';
+import PageHero from '../components/PageHero.jsx';
+import { useAppDialog } from '../components/AppDialog.jsx';
 
 // ============================================================================
-// Dashboard — v16
+// Dashboard - v16
 //
 // "Where I stand right now" overview. Six cards, stacked on mobile and
 // flowing into a responsive grid on desktop. No new backend: reuses
@@ -14,13 +16,13 @@ import { RuleEditor } from './Rules.jsx';
 //
 // Account-type groupings (fed into the Accounts card):
 //   Assets     = checking + savings + cash + investment + other
-//   Credit     = credit   (shown as "owed" — abs value of sum)
+//   Credit     = credit   (shown as "owed" - abs value of sum)
 //   Loans      = loan (shown as "owed")
 //   Real Estate = estimated mortgage home value minus mortgage balance
 //   Net worth  = assets/debts plus real estate equity
 //
 // This assumes balances are stored with the conventional signs (debts
-// negative, assets positive) — SimpleFIN's norm. If a bank reports
+// negative, assets positive) - SimpleFIN's norm. If a bank reports
 // otherwise, the displayed groups may look off but net worth is still
 // the literal sum.
 // ============================================================================
@@ -46,10 +48,10 @@ function formatMoney(n) {
 function formatMoneyCompact(n) {
   const abs = Math.abs(n);
   if (abs >= 1_000_000) {
-    return `${n < 0 ? '−' : ''}$${(abs / 1_000_000).toFixed(1)}M`;
+    return `${n < 0 ? '-' : ''}$${(abs / 1_000_000).toFixed(1)}M`;
   }
   if (abs >= 10_000) {
-    return `${n < 0 ? '−' : ''}$${(abs / 1_000).toFixed(1)}k`;
+    return `${n < 0 ? '-' : ''}$${(abs / 1_000).toFixed(1)}k`;
   }
   return Number(n).toLocaleString(undefined, {
     style: 'currency',
@@ -73,13 +75,13 @@ function formatSignedMoney(n) {
     style: 'currency',
     currency: 'USD'
   });
-  return n < 0 ? `−${formatted}` : `+${formatted}`;
+  return n < 0 ? `-${formatted}` : `+${formatted}`;
 }
 
 function formatSignedCompact(n) {
   if (n === 0) return formatMoneyCompact(0);
   const compact = formatMoneyCompact(Math.abs(n));
-  return n < 0 ? `−${compact}` : `+${compact}`;
+  return n < 0 ? `-${compact}` : `+${compact}`;
 }
 
 function parseLocalDate(iso) {
@@ -105,129 +107,12 @@ function timeGreeting(d) {
   return 'Good evening';
 }
 
-function useMorphingHero() {
-  const innerRef = useRef(null);
-  const titleRef = useRef(null);
-  const expandedRef = useRef(420);
-  const [state, setState] = useState({
-    progress: 0,
-    height: 420,
-    expandedHeight: 420,
-    titleX: 0,
-    titleY: 0,
-    titleScale: 0.62,
-    collapsedWidth: 232
-  });
-  const frameRef = useRef(null);
-
-  useEffect(() => {
-    const collapsed = 64;
-    const titleScale = 0.62;
-
-    function measureTitleTarget() {
-      const title = titleRef.current;
-      const hero = innerRef.current?.closest('.page-hero');
-      if (!title || !hero) {
-        return { titleX: 0, titleY: 0, titleScale, collapsedWidth: 232 };
-      }
-
-      const previousTransform = title.style.transform;
-      title.style.transform = 'none';
-      const heroRect = hero.getBoundingClientRect();
-      const titleRect = title.getBoundingClientRect();
-      title.style.transform = previousTransform;
-
-      const edgeLeft = window.innerWidth >= 1080 ? 260 : 0;
-      const availableWidth = window.innerWidth - edgeLeft;
-      const preferredWidth = Math.min(Math.max(availableWidth / 3, 232), 520);
-      const collapsedWidth = Math.min(
-        availableWidth - 28,
-        Math.max(preferredWidth, Math.ceil(titleRect.width * titleScale + 60))
-      );
-      const targetLeft = (collapsedWidth - titleRect.width * titleScale) / 2;
-      const targetTop = (collapsed - titleRect.height * titleScale) / 2;
-      const currentLeft = titleRect.left - heroRect.left;
-      const currentTop = titleRect.top - heroRect.top;
-
-      return {
-        titleX: targetLeft - currentLeft,
-        titleY: targetTop - currentTop,
-        titleScale,
-        collapsedWidth
-      };
-    }
-
-    function measureExpandedHeight() {
-      const inner = innerRef.current;
-      const hero = inner?.closest('.page-hero');
-      if (!inner || !hero) return expandedRef.current;
-
-      const styles = window.getComputedStyle(hero);
-      const paddingTop = parseFloat(styles.paddingTop) || 0;
-      const innerStyles = window.getComputedStyle(inner);
-      const gap = parseFloat(innerStyles.rowGap || innerStyles.gap) || 0;
-      const visibleChildren = Array.from(inner.children).filter((child) => {
-        return window.getComputedStyle(child).display !== 'none';
-      });
-      const contentHeight = visibleChildren.reduce((total, child, index) => {
-        return total + child.getBoundingClientRect().height + (index > 0 ? gap : 0);
-      }, 0);
-      const bottomCushion = window.innerWidth <= 560 ? 30 : 34;
-      const measured = Math.ceil(paddingTop + contentHeight + bottomCushion);
-
-      expandedRef.current = Math.max(collapsed, measured);
-      return expandedRef.current;
-    }
-
-    function update() {
-      if (frameRef.current) return;
-
-      frameRef.current = window.requestAnimationFrame(() => {
-        frameRef.current = null;
-        const expanded = measureExpandedHeight();
-        const titleTarget = measureTitleTarget();
-        const collapseDistance = expanded - collapsed;
-        const progress = Math.min(1, Math.max(0, window.scrollY / collapseDistance));
-        const height = Math.round(expanded - (expanded - collapsed) * progress);
-
-        setState((prev) =>
-          Math.abs(prev.progress - progress) > 0.01 ||
-          prev.height !== height ||
-          prev.expandedHeight !== expanded ||
-          Math.abs(prev.titleX - titleTarget.titleX) > 0.5 ||
-          Math.abs(prev.titleY - titleTarget.titleY) > 0.5 ||
-          Math.abs(prev.collapsedWidth - titleTarget.collapsedWidth) > 0.5
-            ? { progress, height, expandedHeight: expanded, ...titleTarget }
-            : prev
-        );
-      });
-    }
-
-    update();
-    const observer =
-      'ResizeObserver' in window && innerRef.current
-        ? new ResizeObserver(update)
-        : null;
-    if (observer && innerRef.current) observer.observe(innerRef.current);
-    window.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
-    return () => {
-      if (observer) observer.disconnect();
-      window.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
-      if (frameRef.current) window.cancelAnimationFrame(frameRef.current);
-    };
-  }, []);
-
-  return { ...state, innerRef, titleRef };
-}
-
 function formatTransactionAmount(amount) {
   const abs = Math.abs(amount).toLocaleString(undefined, {
     style: 'currency',
     currency: 'USD'
   });
-  return amount < 0 ? `−${abs}` : `+${abs}`;
+  return amount < 0 ? `-${abs}` : `+${abs}`;
 }
 
 function currentMonthKey() {
@@ -244,7 +129,7 @@ function currentDayOfMonth() {
   return new Date().getDate();
 }
 
-// Account type classification — grouped so the dashboard can show a clean
+// Account type classification - grouped so the dashboard can show a clean
 // breakdown regardless of how many individual accounts Neal has.
 const ASSET_TYPES = new Set(['checking', 'savings', 'cash']);
 const INVESTMENT_TYPES = new Set(['investment']);
@@ -285,7 +170,6 @@ function groupAccountBalances(accounts) {
 
 export default function Dashboard({ accounts = [], categories = [], onOpenMenu }) {
   const navigate = useNavigate();
-  const hero = useMorphingHero();
 
   const [budgetData, setBudgetData] = useState(null);
   const [recent, setRecent] = useState([]);
@@ -389,7 +273,6 @@ export default function Dashboard({ accounts = [], categories = [], onOpenMenu }
         <DashboardHero
           dateLabel={formatLongDate(now)}
           greeting={timeGreeting(now)}
-          hero={hero}
           onOpenMenu={onOpenMenu}
           stats={[
             { label: 'Net worth', value: formatMoneyWhole(0) },
@@ -398,7 +281,7 @@ export default function Dashboard({ accounts = [], categories = [], onOpenMenu }
           ]}
         />
         <div className="empty-state">
-          <div className="empty-state-icon">◯</div>
+          <div className="empty-state-icon">$</div>
           <h2>Nothing to show yet</h2>
           <p>
             Import your Rocket Money history or connect SimpleFIN to start
@@ -430,7 +313,6 @@ export default function Dashboard({ accounts = [], categories = [], onOpenMenu }
       <DashboardHero
         dateLabel={formatLongDate(now)}
         greeting={timeGreeting(now)}
-        hero={hero}
         onOpenMenu={onOpenMenu}
         stats={[
           { label: 'Net worth', value: formatMoneyWhole(totals.net), tone: totals.net >= 0 ? 'good' : 'caution' },
@@ -489,87 +371,45 @@ export default function Dashboard({ accounts = [], categories = [], onOpenMenu }
   );
 }
 
-function DashboardHero({ dateLabel, greeting, stats, hero, onOpenMenu }) {
+function DashboardHero({ dateLabel, greeting, stats, onOpenMenu }) {
   const navigate = useNavigate();
 
   return (
-    <>
-      <section
-        className="page-hero page-hero-dashboard"
-        aria-labelledby="dashboard-title"
-        style={{
-          '--hero-progress': hero.progress,
-          '--hero-content-opacity': Math.max(0, 1 - hero.progress * 1.35),
-          '--hero-title-x': `${hero.titleX}px`,
-          '--hero-title-y': `${hero.titleY}px`,
-          '--hero-title-scale': hero.titleScale,
-          '--hero-collapsed-width': `${hero.collapsedWidth}px`,
-          height: `${hero.height}px`
-        }}
-      >
-        <div className="page-hero-pill-bar" hidden>
-          <span className="page-hero-pill-title" aria-hidden="true">Dashboard</span>
+    <PageHero
+      id="dashboard-title"
+      variant="dashboard"
+      kicker="Financial Orbit"
+      title="Dashboard"
+      subtitle={`${dateLabel} · ${greeting}`}
+      stats={stats}
+      initialHeight={420}
+      onOpenMenu={onOpenMenu}
+      statLabel="Dashboard summary"
+      chrome={(hero) => (
+        <div className="page-hero-chrome">
           <button
             type="button"
-            className="btn-icon page-hero-pill-menu"
+            className="hero-brand brand-home"
+            onClick={() => navigate('/dashboard')}
+            aria-label="Go to dashboard"
+          >
+            <span className="brand-mark">$</span>
+            <span className="brand-name">Orbit Money</span>
+          </button>
+          <button
+            type="button"
+            className="btn-icon hero-menu-button"
             onClick={onOpenMenu}
             aria-label="Open menu"
-            disabled={hero.progress < 0.72}
+            disabled={hero.progress > 0.72}
           >
-            â˜°
+            {'\u2630'}
           </button>
         </div>
-        <div className="page-hero-inner" ref={hero.innerRef}>
-          <div className="page-hero-chrome">
-            <button
-              type="button"
-              className="hero-brand brand-home"
-              onClick={() => navigate('/dashboard')}
-              aria-label="Go to dashboard"
-            >
-              <span className="brand-mark">$</span>
-              <span className="brand-name">Orbit Money</span>
-            </button>
-            <button
-              type="button"
-              className="btn-icon hero-menu-button"
-              onClick={onOpenMenu}
-              aria-label="Open menu"
-              disabled={hero.progress > 0.72}
-            >
-              ☰
-            </button>
-          </div>
-
-          <div className="page-hero-content">
-            <div className="page-hero-topline">
-            <div className="page-hero-main">
-              <div className="page-kicker">Financial Orbit</div>
-              <h2 id="dashboard-title" ref={hero.titleRef}>Dashboard</h2>
-              <p>{dateLabel} · {greeting}</p>
-            </div>
-
-            <div className="page-hero-stats" aria-label="Dashboard summary">
-              {stats.map((stat) => (
-                <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
-                  <span>{stat.label}</span>
-                  <strong>{stat.value}</strong>
-                </div>
-              ))}
-            </div>
-            </div>
-          </div>
-        </div>
-      </section>
-      <div
-        className="page-hero-spacer page-hero-dashboard-spacer"
-        style={{ height: `${hero.expandedHeight}px` }}
-        aria-hidden="true"
-      />
-    </>
+      )}
+    />
   );
 }
-
 // ============================================================================
 // Accounts card
 // ============================================================================
@@ -592,7 +432,7 @@ function AccountsCard({ totals, activeCount, loading }) {
   return (
     <DashboardCard
       title="Accounts"
-      action={<Link to="/accounts" className="dashboard-card-link">See all →</Link>}
+      action={<Link to="/accounts" className="dashboard-card-link">See all</Link>}
     >
       {loading ? (
         <CardSkeleton />
@@ -646,7 +486,7 @@ function MonthCard({ summary, dayOfMonth, totalDays, loading }) {
       title="This month"
       action={
         <Link to="/budgets" className="dashboard-card-link">
-          Details →
+          Details
         </Link>
       }
     >
@@ -701,7 +541,7 @@ function BudgetPulseCard({ summary, attention, overallPercent, totalBudgeted, lo
       title="Budget pulse"
       action={
         <Link to="/budgets" className="dashboard-card-link">
-          Manage →
+          Manage
         </Link>
       }
     >
@@ -757,7 +597,7 @@ function BudgetPulseCard({ summary, attention, overallPercent, totalBudgeted, lo
             </ul>
           ) : (
             <p className="subtle dash-no-attention">
-              ✓ All budgets comfortably on track.
+              OK All budgets comfortably on track.
             </p>
           )}
         </>
@@ -779,7 +619,7 @@ function TopSpendingCard({ topSpending, max, loading }) {
           to={`/transactions?date_from=${currentMonthKey()}-01&type=expense&sort=abs_amount_desc`}
           className="dashboard-card-link"
         >
-          Browse →
+          Browse
         </Link>
       }
     >
@@ -826,7 +666,7 @@ function TopSpendingCard({ topSpending, max, loading }) {
 //
 // Uses the same TransactionRow component as the Transactions page so the
 // expand/hover/edit UX is identical. Full edit, rule-from-transaction,
-// transfer/ignore toggle, and delete are all wired up — mutations refresh
+// transfer/ignore toggle, and delete are all wired up - mutations refresh
 // the local list so the dashboard stays current without a full reload.
 // ============================================================================
 
@@ -839,6 +679,7 @@ function RecentActivityCard({
   loading,
   onRefresh
 }) {
+  const { alert, confirm, Dialog } = useAppDialog();
   const [items, setItems] = useState(transactions);
   const [expandedId, setExpandedId] = useState(null);
   const [editingTxn, setEditingTxn] = useState(null);
@@ -875,12 +716,20 @@ function RecentActivityCard({
       if (onRefresh) onRefresh();
     } catch (err) {
       applyLocalPatch(txn.id, { [field]: txn[field] });
-      alert(err.message || 'Toggle failed');
+      alert(err.message || 'Toggle failed', { title: 'Could not update transaction' });
     }
   }
 
   async function handleDelete(txn) {
-    if (!confirm(`Delete this transaction? "${txn.merchant}" for ${formatTransactionAmount(txn.amount)}`)) {
+    const ok = await confirm(
+      `Delete this transaction? "${txn.merchant}" for ${formatTransactionAmount(txn.amount)}`,
+      {
+        title: 'Delete transaction',
+        confirmLabel: 'Delete',
+        destructive: true
+      }
+    );
+    if (!ok) {
       return;
     }
     try {
@@ -888,7 +737,7 @@ function RecentActivityCard({
       removeLocal(txn.id);
       if (onRefresh) onRefresh();
     } catch (err) {
-      alert(err.message || 'Delete failed');
+      alert(err.message || 'Delete failed', { title: 'Delete failed' });
     }
   }
 
@@ -900,7 +749,7 @@ function RecentActivityCard({
       if (result?.transaction) replaceLocal(txn.id, result.transaction);
       if (onRefresh) onRefresh();
     } catch (err) {
-      alert(err.message || 'Reset failed');
+      alert(err.message || 'Reset failed', { title: 'Reset failed' });
     }
   }
 
@@ -910,7 +759,7 @@ function RecentActivityCard({
         title="Recent Transactions"
         action={
           <Link to="/transactions" className="dashboard-card-link">
-            See all →
+            See all
           </Link>
         }
       >
@@ -982,6 +831,8 @@ function RecentActivityCard({
           }}
         />
       )}
+
+      <Dialog />
     </>
   );
 }

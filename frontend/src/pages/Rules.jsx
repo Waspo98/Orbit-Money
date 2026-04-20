@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import { useAppDialog } from '../components/AppDialog.jsx';
 
 // ============================================================================
 // Field / operator / action vocabularies (must stay in sync with ruleMatcher.js)
@@ -89,6 +90,7 @@ function summarizeAction(action, categories) {
 // ============================================================================
 
 export default function Rules() {
+  const { alert, confirm, Dialog } = useAppDialog();
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -135,17 +137,22 @@ export default function Rules() {
       setRules((prev) =>
         prev.map((r) => (r.id === rule.id ? { ...r, enabled: rule.enabled } : r))
       );
-      alert(err.message || 'Failed to toggle rule');
+      alert(err.message || 'Failed to toggle rule', { title: 'Could not update rule' });
     }
   }
 
   async function handleDelete(rule) {
-    if (!confirm(`Delete rule "${rule.name}"? This can't be undone.`)) return;
+    const ok = await confirm(`Delete rule "${rule.name}"? This can't be undone.`, {
+      title: 'Delete rule',
+      confirmLabel: 'Delete',
+      destructive: true
+    });
+    if (!ok) return;
     try {
       await api.del(`/api/rules/${rule.id}`);
       loadAll();
     } catch (err) {
-      alert(err.message || 'Delete failed');
+      alert(err.message || 'Delete failed', { title: 'Delete failed' });
     }
   }
 
@@ -321,6 +328,8 @@ export default function Rules() {
           }}
         />
       )}
+
+      <Dialog />
     </div>
   );
 }

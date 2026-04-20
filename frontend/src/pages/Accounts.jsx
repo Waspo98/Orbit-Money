@@ -22,6 +22,7 @@ import { api } from '../api.js';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import PageHero from '../components/PageHero.jsx';
+import { useAppDialog } from '../components/AppDialog.jsx';
 
 const TYPE_LABELS = {
   checking: 'Checking',
@@ -60,6 +61,7 @@ function parseOptionalCurrency(value) {
 
 export default function Accounts({ onChange }) {
   const navigate = useNavigate();
+  const { alert, confirm, Dialog } = useAppDialog();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -122,24 +124,30 @@ export default function Accounts({ onChange }) {
       await load();
       onChange?.();
     } catch (err) {
-      alert(err.message || 'Action failed');
+      alert(err.message || 'Action failed', { title: 'Account action failed' });
     }
   }
 
   async function handleDelete(account) {
     if (account.transaction_count > 0) {
       alert(
-        `This account has ${account.transaction_count.toLocaleString()} transactions. Merge it into another account first.`
+        `This account has ${account.transaction_count.toLocaleString()} transactions. Merge it into another account first.`,
+        { title: 'Cannot delete account' }
       );
       return;
     }
-    if (!confirm(`Delete "${account.name}"? This can't be undone.`)) return;
+    const ok = await confirm(`Delete "${account.name}"? This can't be undone.`, {
+      title: 'Delete account',
+      confirmLabel: 'Delete',
+      destructive: true
+    });
+    if (!ok) return;
     try {
       await api.del(`/api/accounts/${account.id}`);
       await load();
       onChange?.();
     } catch (err) {
-      alert(err.message || 'Delete failed');
+      alert(err.message || 'Delete failed', { title: 'Delete failed' });
     }
   }
 
@@ -343,6 +351,8 @@ export default function Accounts({ onChange }) {
           }}
         />
       )}
+
+      <Dialog />
     </div>
   );
 }

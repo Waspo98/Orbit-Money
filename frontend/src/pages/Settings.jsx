@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { useAppDialog } from '../components/AppDialog.jsx';
 
 function formatDateTime(iso) {
   if (!iso) return '—';
@@ -19,6 +20,7 @@ function todayIso() {
 }
 
 export default function Settings() {
+  const { alert, confirm, Dialog } = useAppDialog();
   // SimpleFIN section
   const [status, setStatus] = useState(null);
   const [setupToken, setSetupToken] = useState('');
@@ -86,7 +88,15 @@ export default function Settings() {
   }
 
   async function handleDisconnect() {
-    if (!confirm('Disconnect SimpleFIN? Your transactions stay, but sync stops until you reconnect.')) {
+    const ok = await confirm(
+      'Disconnect SimpleFIN? Your transactions stay, but sync stops until you reconnect.',
+      {
+        title: 'Disconnect SimpleFIN',
+        confirmLabel: 'Disconnect',
+        destructive: true
+      }
+    );
+    if (!ok) {
       return;
     }
     try {
@@ -95,7 +105,7 @@ export default function Settings() {
       setSyncError('');
       await loadStatus();
     } catch (err) {
-      alert(err.message || 'Disconnect failed');
+      alert(err.message || 'Disconnect failed', { title: 'Disconnect failed' });
     }
   }
 
@@ -309,6 +319,7 @@ export default function Settings() {
           </form>
         )}
       </section>
+      <Dialog />
     </div>
   );
 }

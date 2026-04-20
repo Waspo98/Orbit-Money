@@ -188,6 +188,17 @@ DATA_DIR=../data
 If you are using the workspace-local portable Node runtime, the helper scripts
 under `scripts/` set PATH for you.
 
+Agent-friendly verification commands from the repo root:
+
+```powershell
+cmd /c scripts\build-frontend.cmd
+.\.tools\node-v20.20.2-win-x64\node.exe --check backend\src\server.js
+```
+
+The first command builds the Vite PWA with the bundled Windows Node runtime.
+The second is the available backend syntax smoke check; there is not currently
+a dedicated backend test suite.
+
 One-click local beta launcher:
 
 ```powershell
