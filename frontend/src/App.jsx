@@ -53,18 +53,33 @@ function AppShell() {
   const navigate = useNavigate();
   const scrollPositionsRef = useRef({});
   const previousPathRef = useRef(location.pathname);
+  const restoringScrollRef = useRef(false);
   const hasPageHero =
     location.pathname === '/dashboard' || location.pathname === '/transactions';
 
   useLayoutEffect(() => {
-    const previousPath = previousPathRef.current;
-    if (previousPath !== location.pathname) {
-      scrollPositionsRef.current[previousPath] = window.scrollY;
+    if (previousPathRef.current !== location.pathname) {
+      const targetScroll = Object.prototype.hasOwnProperty.call(
+        scrollPositionsRef.current,
+        location.pathname
+      )
+        ? scrollPositionsRef.current[location.pathname]
+        : 0;
+
+      restoringScrollRef.current = true;
       previousPathRef.current = location.pathname;
       window.scrollTo({
-        top: scrollPositionsRef.current[location.pathname] || 0,
+        top: targetScroll,
         left: 0,
         behavior: 'auto'
+      });
+      window.requestAnimationFrame(() => {
+        window.scrollTo({
+          top: targetScroll,
+          left: 0,
+          behavior: 'auto'
+        });
+        restoringScrollRef.current = false;
       });
     }
   }, [location.pathname]);
@@ -77,10 +92,18 @@ function AppShell() {
       scrollPositionsRef.current[previousPathRef.current] = window.scrollY;
     }
 
+    function handleScroll() {
+      if (!restoringScrollRef.current) {
+        saveCurrentScroll();
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('pagehide', saveCurrentScroll);
     return () => {
       saveCurrentScroll();
       window.history.scrollRestoration = previousScrollRestoration;
+      window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('pagehide', saveCurrentScroll);
     };
   }, []);

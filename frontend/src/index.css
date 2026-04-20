@@ -1189,9 +1189,9 @@ input, textarea, select {
 }
 
 .app-shell.has-page-hero {
-  --hero-start: #064e3b;
-  --hero-mid: var(--accent-hover);
-  --hero-end: var(--accent);
+  --hero-start: #052e24;
+  --hero-mid: #065f46;
+  --hero-end: #047857;
 }
 
 .app-shell.has-page-hero .app-header {
@@ -1644,14 +1644,24 @@ input, textarea, select {
 .page-hero {
   --hero-progress: 0;
   --hero-content-opacity: 1;
+  --hero-available-width: calc(100vw - var(--hero-edge-left));
+  --hero-card-margin: 20px;
   --hero-collapsed-width: clamp(232px, 33.333vw, 520px);
   --hero-edge-left: 0px;
-  --hero-expanded-width: calc(100vw - var(--hero-edge-left));
-  position: fixed;
-  top: calc(10px * var(--hero-progress));
-  left: calc(
+  --hero-expanded-width: min(960px, calc(var(--hero-available-width) - (var(--hero-card-margin) * 2)));
+  --hero-expanded-left: calc(
     var(--hero-edge-left) +
-    (((var(--hero-expanded-width) - var(--hero-collapsed-width)) / 2) * var(--hero-progress))
+    ((var(--hero-available-width) - var(--hero-expanded-width)) / 2)
+  );
+  --hero-collapsed-left: calc(
+    var(--hero-edge-left) +
+    ((var(--hero-available-width) - var(--hero-collapsed-width)) / 2)
+  );
+  position: fixed;
+  top: calc(20px - (10px * var(--hero-progress)));
+  left: calc(
+    var(--hero-expanded-left) +
+    ((var(--hero-collapsed-left) - var(--hero-expanded-left)) * var(--hero-progress))
   );
   right: auto;
   width: calc(
@@ -1665,7 +1675,7 @@ input, textarea, select {
   margin: 0;
   padding: 30px 20px 32px;
   border: 0;
-  border-radius: calc(32px * var(--hero-progress));
+  border-radius: calc(var(--radius-lg, 14px) + ((32px - var(--radius-lg, 14px)) * var(--hero-progress)));
   color: #f7fbff;
   background:
     linear-gradient(135deg, var(--hero-start, #06112c) 0%, var(--hero-mid, #0c234f) 46%, var(--hero-end, #1d4680) 100%);
