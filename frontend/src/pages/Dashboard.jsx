@@ -401,6 +401,20 @@ function DashboardHero({ dateLabel, greeting, stats, collapsed, onOpenMenu }) {
 
   return (
     <section className={`page-hero page-hero-dashboard ${collapsed ? 'collapsed' : ''}`} aria-labelledby="dashboard-title">
+      <div className="page-hero-fixed" aria-hidden={!collapsed}>
+        <div className="page-hero-fixed-inner">
+          <div className="page-hero-compact-title">Dashboard</div>
+          <button
+            type="button"
+            className="btn-icon hero-menu-button"
+            onClick={onOpenMenu}
+            aria-label="Open menu"
+          >
+            ☰
+          </button>
+        </div>
+      </div>
+
       <div className="page-hero-inner">
         <div className="page-hero-chrome">
           <button
@@ -412,7 +426,6 @@ function DashboardHero({ dateLabel, greeting, stats, collapsed, onOpenMenu }) {
             <span className="brand-mark">$</span>
             <span className="brand-name">Orbit Money</span>
           </button>
-          <div className="page-hero-compact-title">Dashboard</div>
           <button
             type="button"
             className="btn-icon hero-menu-button"

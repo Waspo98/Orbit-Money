@@ -434,6 +434,20 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
   return (
     <div className="transactions-view">
       <section className={`page-hero page-hero-transactions ${heroCollapsed ? 'collapsed' : ''}`} aria-labelledby="transactions-title">
+        <div className="page-hero-fixed" aria-hidden={!heroCollapsed}>
+          <div className="page-hero-fixed-inner">
+            <div className="page-hero-compact-title">Transactions</div>
+            <button
+              type="button"
+              className="btn-icon hero-menu-button"
+              onClick={onOpenMenu}
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
+          </div>
+        </div>
+
         <div className="page-hero-inner">
         <div className="page-hero-chrome">
           <button
@@ -445,7 +459,6 @@ export default function Transactions({ accounts, categories, onOpenMenu }) {
             <span className="brand-mark">$</span>
             <span className="brand-name">Orbit Money</span>
           </button>
-          <div className="page-hero-compact-title">Transactions</div>
           <button
             type="button"
             className="btn-icon hero-menu-button"
