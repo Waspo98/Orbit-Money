@@ -50,6 +50,8 @@ function AppShell() {
 
   const location = useLocation();
   const navigate = useNavigate();
+  const hasPageHero =
+    location.pathname === '/dashboard' || location.pathname === '/transactions';
 
   async function checkAuth() {
     try {
@@ -116,7 +118,7 @@ function AppShell() {
   }
 
   return (
-    <div className="app-shell has-sidebar">
+    <div className={`app-shell has-sidebar ${hasPageHero ? 'has-page-hero' : ''}`}>
       <DesktopSidebar onMoreClick={() => setMoreOpen(true)} />
 
       <header className="app-header">

@@ -5,7 +5,8 @@ import AnimatedModal from '../components/AnimatedModal.jsx';
 import FilterSheet from '../components/FilterSheet.jsx';
 import { RuleEditor } from './Rules.jsx';
 
-const PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 50;
+const PAGE_SIZE_OPTIONS = [25, 50, 100];
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -135,6 +136,9 @@ function parseFiltersFromUrl(params) {
     includeIgnored: params.get('include_ignored') !== '0',
     hasEdits: params.get('has_edits') || 'any',
     sort: params.get('sort') || 'date_desc',
+    pageSize: PAGE_SIZE_OPTIONS.includes(parseInt(params.get('page_size'), 10))
+      ? parseInt(params.get('page_size'), 10)
+      : DEFAULT_PAGE_SIZE,
     page: Math.max(1, parseInt(params.get('page'), 10) || 1)
   };
 }
@@ -152,6 +156,7 @@ function filtersToSearchParams(f) {
   if (f.includeIgnored === false) p.set('include_ignored', '0');
   if (f.hasEdits && f.hasEdits !== 'any') p.set('has_edits', f.hasEdits);
   if (f.sort && f.sort !== 'date_desc') p.set('sort', f.sort);
+  if (f.pageSize && f.pageSize !== DEFAULT_PAGE_SIZE) p.set('page_size', String(f.pageSize));
   if (f.page && f.page !== 1) p.set('page', String(f.page));
   return p;
 }
@@ -222,7 +227,7 @@ export default function Transactions({ accounts, categories }) {
       // Reuse the same URL params; just drop `page` handling — the server
       // reads it from the query too but we'll send limit explicitly.
       const p = new URLSearchParams(searchParams);
-      p.set('limit', String(PAGE_SIZE));
+      p.set('limit', String(filters.pageSize || DEFAULT_PAGE_SIZE));
       if (!p.has('page')) p.set('page', '1');
 
       const data = await api.get(`/api/transactions?${p.toString()}`);
@@ -266,6 +271,10 @@ export default function Transactions({ accounts, categories }) {
     commitFilters({ ...filters, sort: value }, { scrollTop: false });
   }
 
+  function setPageSize(value) {
+    commitFilters({ ...filters, pageSize: Number(value) }, { scrollTop: false });
+  }
+
   function clearFilter(key) {
     const next = { ...filters };
     switch (key) {
@@ -295,6 +304,7 @@ export default function Transactions({ accounts, categories }) {
       type: 'all',
       includeIgnored: true,
       hasEdits: 'any',
+      pageSize: filters.pageSize,
       sort: filters.sort
     });
   }
@@ -398,6 +408,7 @@ export default function Transactions({ accounts, categories }) {
   return (
     <div className="transactions-view">
       <section className="page-hero page-hero-transactions" aria-labelledby="transactions-title">
+        <div className="page-hero-inner">
         <div className="page-hero-topline">
           <div className="page-hero-main">
             <div className="page-kicker">Money movement</div>
@@ -410,17 +421,17 @@ export default function Transactions({ accounts, categories }) {
           </div>
 
           <div className="page-hero-stats" aria-label="Transaction summary">
-            <div className={`page-hero-stat ${visibleNet >= 0 ? 'good' : 'caution'}`}>
-              <span>Visible net</span>
-              <strong>{formatAmount(visibleNet)}</strong>
-            </div>
             <div className="page-hero-stat good">
-              <span>Inflow</span>
+              <span>Monthly income</span>
               <strong>{formatShortAmount(visibleIncome)}</strong>
             </div>
             <div className="page-hero-stat caution">
-              <span>Outflow</span>
+              <span>Monthly expenses</span>
               <strong>{formatShortAmount(visibleOutflow)}</strong>
+            </div>
+            <div className={`page-hero-stat ${visibleNet >= 0 ? 'good' : 'caution'}`}>
+              <span>Monthly net</span>
+              <strong>{formatAmount(visibleNet)}</strong>
             </div>
             <div className="page-hero-stat">
               <span>Filters</span>
@@ -472,8 +483,22 @@ export default function Transactions({ accounts, categories }) {
               ))}
             </select>
           </label>
+          <label className="txn-page-size">
+            <span className="visually-hidden">Transactions per page</span>
+            <select
+              value={filters.pageSize}
+              onChange={(e) => setPageSize(e.target.value)}
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>
+                  {size} / page
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
+        </div>
       </section>
 
       {/* ---------- Active filter pills ---------- */}

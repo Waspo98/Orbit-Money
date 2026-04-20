@@ -1,10 +1,10 @@
 import { NavLink } from 'react-router-dom';
 
 const PRIMARY_TABS = [
-  { to: '/dashboard',    label: 'Dashboard',    icon: '◐' },
+  { to: '/dashboard',    label: 'Dashboard',    icon: '●' },
   { to: '/transactions', label: 'Transactions', icon: '≡' },
-  { to: '/budgets',      label: 'Budgets',      icon: '◉' },
-  { to: '/accounts',     label: 'Accounts',     icon: '⬢' }
+  { to: '/budgets',      label: 'Budgets',      icon: '$' },
+  { to: '/accounts',     label: 'Accounts',     icon: '🏛' }
 ];
 
 export default function BottomTabs({ onMoreClick }) {

@@ -1188,6 +1188,42 @@ input, textarea, select {
   z-index: 50;
 }
 
+.app-shell.has-page-hero {
+  --hero-start: #06112c;
+  --hero-mid: #0c234f;
+  --hero-end: #1d4680;
+}
+
+.app-shell.has-page-hero .app-header {
+  background:
+    linear-gradient(135deg, var(--hero-start) 0%, var(--hero-mid) 48%, var(--hero-end) 100%);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.app-shell.has-page-hero .brand-mark {
+  background: rgba(143, 240, 201, 0.16);
+  border: 1px solid rgba(143, 240, 201, 0.45);
+  color: #8ff0c9;
+}
+
+.app-shell.has-page-hero .btn-icon {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.app-shell.has-page-hero .btn-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.app-shell.has-page-hero .app-main {
+  max-width: none;
+  padding-top: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .brand { display: flex; align-items: center; gap: 10px; }
 
 /* Clickable brand (anchored to home). Resets button defaults so it reads
@@ -1579,15 +1615,15 @@ input, textarea, select {
   overflow: hidden;
   display: grid;
   gap: 22px;
-  margin: 0 0 24px;
-  padding: 24px;
-  border: 1px solid rgba(170, 205, 255, 0.22);
-  border-radius: var(--radius-lg);
+  margin: 0 0 28px;
+  padding: 30px 20px 32px;
+  border: 0;
+  border-radius: 0;
   color: #f7fbff;
   background:
-    linear-gradient(135deg, rgba(6, 17, 44, 0.98) 0%, rgba(12, 35, 79, 0.96) 46%, rgba(29, 70, 128, 0.94) 100%);
+    linear-gradient(135deg, var(--hero-start, #06112c) 0%, var(--hero-mid, #0c234f) 46%, var(--hero-end, #1d4680) 100%);
   box-shadow:
-    0 22px 52px rgba(5, 20, 52, 0.18),
+    0 22px 52px rgba(5, 20, 52, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
@@ -1606,6 +1642,14 @@ input, textarea, select {
 .page-hero > * {
   position: relative;
   z-index: 1;
+}
+
+.page-hero-inner {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  gap: 22px;
 }
 
 .page-hero-topline {
@@ -1654,6 +1698,10 @@ input, textarea, select {
   grid-template-columns: repeat(4, minmax(112px, 1fr));
 }
 
+.page-hero-transactions .page-hero-stats {
+  width: 100%;
+}
+
 .page-hero-stat {
   min-width: 0;
   padding: 13px 14px;
@@ -1690,6 +1738,10 @@ input, textarea, select {
   letter-spacing: 0;
 }
 
+.page-hero-stat strong {
+  overflow-wrap: normal;
+}
+
 .page-hero-stat.good strong { color: #8ff0c9; }
 .page-hero-stat.warn strong { color: #ffe28a; }
 .page-hero-stat.caution strong { color: #ffb3a8; }
@@ -1711,7 +1763,7 @@ input, textarea, select {
 /* ================== 5. PAGES — Dashboard (v16) ================== */
 
 .dashboard-view {
-  max-width: 960px;
+  max-width: none;
   margin: 0 auto;
   /* Hold document height during loading/skeleton swap — see
      .budgets-view for the full rationale. Eliminates the height
@@ -1719,10 +1771,31 @@ input, textarea, select {
   min-height: calc(100dvh - 140px);
 }
 
+.dashboard-grid,
+.dashboard-view > .empty-state,
+.dashboard-view > .error {
+  width: calc(100% - 40px);
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .transactions-view {
   /* Same min-height trick as the other top-level views — keeps the
      document from collapsing while the list is loading/filtering. */
   min-height: calc(100dvh - 140px);
+}
+
+.transactions-view > .active-pills-row,
+.transactions-view > .error,
+.transactions-view > .center-loading,
+.transactions-view > .empty-state,
+.transactions-view > .txn-month-group,
+.transactions-view > .pagination {
+  width: calc(100% - 40px);
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .accounts-view {
@@ -3133,10 +3206,11 @@ input, textarea, select {
   flex-wrap: wrap;
 }
 
-.txn-sort select {
+.txn-sort select,
+.txn-page-size select {
   padding: 9px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text);
   font-size: 0.9rem;
@@ -3145,15 +3219,18 @@ input, textarea, select {
 }
 
 .txn-toolbar-hero .btn-secondary,
-.txn-toolbar-hero .txn-sort select {
+.txn-toolbar-hero .txn-sort select,
+.txn-toolbar-hero .txn-page-size select {
   border-color: rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.95);
   color: #0d1b2f;
   box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
 }
 
 .txn-toolbar-hero .btn-secondary:hover,
-.txn-toolbar-hero .txn-sort select:hover {
+.txn-toolbar-hero .txn-sort select:hover,
+.txn-toolbar-hero .txn-page-size select:hover {
   background: #ffffff;
   border-color: rgba(143, 240, 201, 0.8);
 }
@@ -3164,7 +3241,8 @@ input, textarea, select {
   color: #06112c;
 }
 
-.txn-sort select:focus {
+.txn-sort select:focus,
+.txn-page-size select:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
@@ -3457,8 +3535,11 @@ input, textarea, select {
 @media (max-width: 560px) {
   .page-hero {
     gap: 16px;
-    margin-bottom: 18px;
-    padding: 18px;
+    margin-bottom: 22px;
+    padding: 22px 20px 28px;
+  }
+  .page-hero-inner {
+    gap: 18px;
   }
   .page-hero-topline {
     display: grid;
@@ -3473,6 +3554,7 @@ input, textarea, select {
   .page-hero-stats,
   .page-hero-dashboard .page-hero-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
   }
   .page-hero-stat {
     padding: 11px 12px;
@@ -3483,12 +3565,26 @@ input, textarea, select {
   .txn-toolbar-hero {
     padding: 12px;
   }
+  .txn-toolbar-hero .txn-search-input {
+    font-size: 0.9rem;
+  }
   .txn-search-wrap {
     flex: 1 1 100%;
   }
   .txn-toolbar-actions {
     width: 100%;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .txn-toolbar-hero .btn-secondary,
+  .txn-toolbar-hero .txn-sort select,
+  .txn-toolbar-hero .txn-page-size select {
+    width: 100%;
+    min-width: 0;
+    padding-left: 8px;
+    padding-right: 8px;
+    font-size: 0.86rem;
   }
   .filter-checkbox-grid {
     grid-template-columns: 1fr;
