@@ -3483,6 +3483,35 @@ input, textarea, select {
   font-variant-numeric: tabular-nums;
 }
 
+.selectable-list-item.goal-list-row {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  min-height: 64px;
+}
+
+.goal-list-row .selectable-list-side {
+  justify-items: end;
+  text-align: right;
+}
+
+.goal-list-row-reorder {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  cursor: default;
+}
+
+.goal-list-row-reorder:hover,
+.goal-list-row-reorder:focus {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+.goal-reorder-controls {
+  grid-column: 2 / -1;
+  justify-self: end;
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
 .goal-list-icon,
 .goal-picker-check {
   width: 34px;
@@ -3931,12 +3960,10 @@ input, textarea, select {
     grid-template-columns: 1fr;
   }
 
-  .selectable-list-item.goal-list-row,
   .goal-account-picker button {
     grid-template-columns: 34px minmax(0, 1fr);
   }
 
-  .selectable-list-item.goal-list-row .selectable-list-side,
   .goal-picker-side {
     grid-column: 2;
     justify-items: start;
@@ -6207,15 +6234,23 @@ input, textarea, select {
 .budget-pie-slice {
   cursor: pointer;
   transition:
-    opacity var(--dur-fast) var(--ease-out),
-    stroke-width var(--dur-fast) var(--ease-out),
-    filter var(--dur-fast) var(--ease-out);
+    opacity 260ms var(--ease-out),
+    stroke-width 260ms var(--ease-out),
+    filter 260ms var(--ease-out);
 }
 
 .budget-pie-slice-glow {
-  opacity: 0.28;
-  filter: blur(2px) drop-shadow(0 0 16px currentColor);
+  opacity: 0;
+  filter: blur(1.5px) drop-shadow(0 0 8px currentColor);
   pointer-events: none;
+  transition:
+    opacity 260ms var(--ease-out),
+    stroke-width 260ms var(--ease-out),
+    filter 260ms var(--ease-out);
+}
+
+.budget-pie-slice-glow.active {
+  opacity: 0.14;
 }
 
 .budget-pie-slice:not(.active) {
@@ -6227,8 +6262,8 @@ input, textarea, select {
   opacity: 1;
   stroke-width: 21px;
   filter:
-    drop-shadow(0 0 10px currentColor)
-    drop-shadow(0 10px 18px rgba(0, 0, 0, 0.24));
+    drop-shadow(0 0 5px currentColor)
+    drop-shadow(0 8px 14px rgba(0, 0, 0, 0.18));
   outline: none;
 }
 

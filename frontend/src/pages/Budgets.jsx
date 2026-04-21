@@ -782,22 +782,20 @@ function SpendingPieChart({ items, total, selectedKey, onSelect }) {
             strokeWidth={strokeWidth}
           />
           {segments.map((item) => (
-            item.active ? (
-              <circle
-                key={`${item.key}-glow`}
-                className="budget-pie-slice-glow"
-                cx="60"
-                cy="60"
-                r={radius}
-                fill="none"
-                stroke={item.color}
-                strokeWidth={strokeWidth + 9}
-                strokeDasharray={`${item.length} ${circumference - item.length}`}
-                strokeDashoffset={item.dashOffset}
-                transform="rotate(-90 60 60)"
-                aria-hidden="true"
-              />
-            ) : null
+            <circle
+              key={`${item.key}-glow`}
+              className={`budget-pie-slice-glow ${item.active ? 'active' : ''}`}
+              cx="60"
+              cy="60"
+              r={radius}
+              fill="none"
+              stroke={item.color}
+              strokeWidth={strokeWidth + 7}
+              strokeDasharray={`${item.length} ${circumference - item.length}`}
+              strokeDashoffset={item.dashOffset}
+              transform="rotate(-90 60 60)"
+              aria-hidden="true"
+            />
           ))}
           {segments.map((item) => {
             return (

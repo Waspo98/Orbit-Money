@@ -216,6 +216,7 @@ export default function Goals() {
   const [wizardGoal, setWizardGoal] = useState(null);
   const [imagineMonthly, setImagineMonthly] = useState(50);
   const [focusCollapsed, setFocusCollapsed] = useState(true);
+  const [reorderMode, setReorderMode] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -263,6 +264,28 @@ export default function Goals() {
 
   function openEditGoal(goal) {
     setWizardGoal(goal);
+  }
+
+  async function moveGoal(goalId, direction) {
+    const index = goals.findIndex((goal) => goal.id === goalId);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= goals.length) return;
+
+    const nextGoals = [...goals];
+    const [moved] = nextGoals.splice(index, 1);
+    nextGoals.splice(nextIndex, 0, moved);
+    const optimisticData = { ...data, goals: nextGoals };
+    setData(optimisticData);
+
+    try {
+      const result = await api.put('/api/goals/reorder', {
+        ids: nextGoals.map((goal) => goal.id)
+      });
+      setData(result);
+    } catch (err) {
+      setData(data);
+      alert(err.message || 'Reorder failed', { title: 'Reorder failed' });
+    }
   }
 
   function toggleFocusCard(e) {
@@ -368,22 +391,75 @@ export default function Goals() {
           <section className="dashboard-card goals-list-card">
             <header className="dashboard-card-header">
               <h3>Goals</h3>
+              {goals.length > 1 && (
+                <button
+                  type="button"
+                  className="dashboard-card-link button-link"
+                  onClick={() => setReorderMode((value) => !value)}
+                >
+                  {reorderMode ? 'Done' : 'Reorder'}
+                </button>
+              )}
             </header>
             <div className="goal-list">
-              {goals.map((goal) => (
-                <SelectableListItem
-                  key={goal.id}
-                  className="goal-list-row"
-                  active={selectedGoal?.id === goal.id}
-                  onClick={() => setSelectedId(goal.id)}
-                  leading={<span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>}
-                  title={goal.name}
-                  subtitle={`${formatMoney(goal.current_amount)} of ${formatMoney(goal.target_amount)}`}
-                  sidePrimary={`${Math.round(goal.progress_percent || 0)}%`}
-                  sideSecondary={formatEta(goal.eta)}
-                  ariaLabel={`Select ${goal.name}`}
-                />
-              ))}
+              {goals.map((goal, index) => {
+                const leading = <span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>;
+                const subtitle = `${formatMoney(goal.current_amount)} of ${formatMoney(goal.target_amount)}`;
+                const progress = `${Math.round(goal.progress_percent || 0)}%`;
+                const eta = formatEta(goal.eta);
+
+                if (reorderMode) {
+                  return (
+                    <div
+                      key={goal.id}
+                      className="selectable-list-item goal-list-row goal-list-row-reorder"
+                    >
+                      <span className="selectable-list-leading">{leading}</span>
+                      <span className="selectable-list-main">
+                        <strong>{goal.name}</strong>
+                        <em>{subtitle}</em>
+                      </span>
+                      <span className="selectable-list-side">
+                        <strong>{progress}</strong>
+                        <em>{eta}</em>
+                      </span>
+                      <span className="goal-reorder-controls" aria-label={`Reorder ${goal.name}`}>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-compact"
+                          onClick={() => moveGoal(goal.id, -1)}
+                          disabled={index === 0}
+                        >
+                          Up
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-compact"
+                          onClick={() => moveGoal(goal.id, 1)}
+                          disabled={index === goals.length - 1}
+                        >
+                          Down
+                        </button>
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <SelectableListItem
+                    key={goal.id}
+                    className="goal-list-row"
+                    active={selectedGoal?.id === goal.id}
+                    onClick={() => setSelectedId(goal.id)}
+                    leading={leading}
+                    title={goal.name}
+                    subtitle={subtitle}
+                    sidePrimary={progress}
+                    sideSecondary={eta}
+                    ariaLabel={`Select ${goal.name}`}
+                  />
+                );
+              })}
             </div>
           </section>
 

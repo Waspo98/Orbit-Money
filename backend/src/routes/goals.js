@@ -89,9 +89,9 @@ function fetchGoals() {
   return db
     .prepare(
       `SELECT id, name, target_amount, current_amount, target_date,
-              linked_account_id, kind, icon, notes, created_at, updated_at
+              linked_account_id, kind, icon, notes, sort_order, created_at, updated_at
          FROM goals
-        ORDER BY updated_at DESC, id DESC`
+        ORDER BY sort_order ASC, id ASC`
     )
     .all();
 }
@@ -473,10 +473,11 @@ function saveGoal(existingId, body) {
       );
       db.prepare('DELETE FROM goal_account_allocations WHERE goal_id = ?').run(goalId);
     } else {
+      const nextOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM goals').get().next_order;
       const result = db
         .prepare(
-          `INSERT INTO goals (name, target_amount, current_amount, target_date, kind, icon, notes)
-           VALUES (?, ?, 0, ?, ?, ?, ?)`
+          `INSERT INTO goals (name, target_amount, current_amount, target_date, kind, icon, notes, sort_order)
+           VALUES (?, ?, 0, ?, ?, ?, ?, ?)`
         )
         .run(
           normalized.name,
@@ -484,7 +485,8 @@ function saveGoal(existingId, body) {
           normalized.target_date,
           normalized.kind,
           normalized.icon,
-          normalized.notes
+          normalized.notes,
+          nextOrder
         );
       goalId = result.lastInsertRowid;
     }
@@ -533,6 +535,35 @@ router.post('/', requireAuth, (req, res) => {
   } catch (err) {
     console.error('Create goal failed:', err);
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.put('/reorder', requireAuth, (req, res) => {
+  const ids = Array.isArray(req.body?.ids)
+    ? req.body.ids.map((id) => parseInt(id, 10)).filter(Number.isFinite)
+    : [];
+
+  if (ids.length === 0 || new Set(ids).size !== ids.length) {
+    return res.status(400).json({ error: 'ids must be a non-empty list of unique goal ids.' });
+  }
+
+  try {
+    const existing = db.prepare('SELECT id FROM goals').all().map((row) => row.id);
+    const existingSet = new Set(existing);
+    if (ids.length !== existing.length || ids.some((id) => !existingSet.has(id))) {
+      return res.status(400).json({ error: 'ids must include every goal exactly once.' });
+    }
+
+    const update = db.prepare('UPDATE goals SET sort_order = ? WHERE id = ?');
+    const run = db.transaction(() => {
+      ids.forEach((id, index) => update.run(index, id));
+    });
+    run();
+
+    res.json({ success: true, ...buildGoalsPayload(24) });
+  } catch (err) {
+    console.error('Reorder goals failed:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
