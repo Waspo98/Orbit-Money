@@ -175,7 +175,7 @@ function groupAccountBalances(accounts) {
 // Main page
 // ============================================================================
 
-export default function Dashboard({ accounts = [], categories = [], onOpenMenu }) {
+export default function Dashboard({ accounts = [], categories = [], mhaTrackerEnabled = false }) {
   const navigate = useNavigate();
 
   const [budgetData, setBudgetData] = useState(null);
@@ -280,7 +280,6 @@ export default function Dashboard({ accounts = [], categories = [], onOpenMenu }
         <DashboardHero
           dateLabel={formatLongDate(now)}
           greeting={timeGreeting(now)}
-          onOpenMenu={onOpenMenu}
           stats={[
             { label: 'Net worth', value: formatMoneyWhole(0) },
             { label: 'Monthly net', value: formatMoneyCompact(0) },
@@ -320,7 +319,6 @@ export default function Dashboard({ accounts = [], categories = [], onOpenMenu }
       <DashboardHero
         dateLabel={formatLongDate(now)}
         greeting={timeGreeting(now)}
-        onOpenMenu={onOpenMenu}
         stats={[
           { label: 'Net worth', value: formatMoneyWhole(totals.net), tone: totals.net >= 0 ? 'good' : 'caution' },
           { label: 'Monthly net', value: summary ? formatSignedCompact(summary.total_net) : 'Loading', tone: summary ? (summary.total_net >= 0 ? 'good' : 'caution') : '' },
@@ -370,6 +368,7 @@ export default function Dashboard({ accounts = [], categories = [], onOpenMenu }
           categoryById={categoryById}
           accounts={accounts}
           categories={categories}
+          mhaTrackerEnabled={mhaTrackerEnabled}
           loading={loading && recent.length === 0}
           onRefresh={loadDashboard}
         />
@@ -378,7 +377,7 @@ export default function Dashboard({ accounts = [], categories = [], onOpenMenu }
   );
 }
 
-function DashboardHero({ dateLabel, greeting, stats, onOpenMenu }) {
+function DashboardHero({ dateLabel, greeting, stats }) {
   const navigate = useNavigate();
 
   return (
@@ -390,7 +389,6 @@ function DashboardHero({ dateLabel, greeting, stats, onOpenMenu }) {
       subtitle={`${dateLabel} · ${greeting} ${greetingEmoji(new Date())}`}
       stats={stats}
       initialHeight={420}
-      onOpenMenu={onOpenMenu}
       statLabel="Dashboard summary"
       chrome={(hero) => (
         <div className="page-hero-chrome">
@@ -402,15 +400,6 @@ function DashboardHero({ dateLabel, greeting, stats, onOpenMenu }) {
           >
             <span className="brand-mark">$</span>
             <span className="brand-name">Orbit Money</span>
-          </button>
-          <button
-            type="button"
-            className="btn-icon hero-menu-button"
-            onClick={onOpenMenu}
-            aria-label="Open menu"
-            disabled={hero.progress > 0.72}
-          >
-            {'\u2630'}
           </button>
         </div>
       )}
@@ -683,6 +672,7 @@ function RecentActivityCard({
   categoryById,
   accounts,
   categories,
+  mhaTrackerEnabled = false,
   loading,
   onRefresh
 }) {
@@ -792,8 +782,10 @@ function RecentActivityCard({
                 onCreateRule={() => setNewRuleFromTxn(t)}
                 onToggleTransfer={() => handleToggle(t, 'is_transfer')}
                 onToggleIgnored={() => handleToggle(t, 'is_ignored')}
+                onToggleMhaEligible={() => handleToggle(t, 'mha_eligible')}
                 onDelete={() => handleDelete(t)}
                 onResetField={(field) => handleResetField(t, field)}
+                mhaTrackerEnabled={mhaTrackerEnabled}
               />
             ))}
           </ul>

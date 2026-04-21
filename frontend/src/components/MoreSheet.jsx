@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-const ANIM_MS = 180;
+import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
 
 const MORE_ITEMS = [
   { id: 'rules', label: 'Rules', description: 'Automate merchant names and categories', icon: '\u2299', path: '/rules' },
@@ -23,10 +22,14 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
     if (open) setClosing(false);
   }, [open]);
 
-  function close() {
+  function close(options = {}) {
     if (closing) return;
+    if (!options.animate) {
+      onClose();
+      return;
+    }
     setClosing(true);
-    timerRef.current = setTimeout(onClose, ANIM_MS);
+    timerRef.current = setTimeout(onClose, OVERLAY_ANIM_MS);
   }
 
   useEffect(() => {
@@ -39,12 +42,7 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, [open]);
+  useBodyScrollLock(open);
 
   useEffect(() => {
     return () => {
@@ -56,8 +54,8 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
 
   function handleItemClick(item) {
     if (item.comingSoon) return;
-    close();
-    setTimeout(() => navigate(item.path), ANIM_MS);
+    close({ animate: true });
+    setTimeout(() => navigate(item.path), OVERLAY_ANIM_MS);
   }
 
   return (

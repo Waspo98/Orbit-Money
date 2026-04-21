@@ -356,7 +356,7 @@ function WipeRulesModal({ count, onClose, onWiped }) {
     setError('');
     try {
       await api.del('/api/rules/all');
-      close();
+      close({ animate: true });
       setTimeout(onWiped, 180);
     } catch (err) {
       setError(err.message || 'Wipe failed');
@@ -531,7 +531,7 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
       } else {
         await api.put(`/api/rules/${rule.id}`, body);
       }
-      close();
+      close({ animate: true });
       setTimeout(onSaved, 180);
     } catch (err) {
       setError(err.message || 'Save failed');

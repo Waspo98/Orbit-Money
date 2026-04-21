@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
 
 /**
  * AnimatedModal — plays a slide-out animation before calling the parent's
@@ -21,8 +22,6 @@ import { useEffect, useState, useRef } from 'react';
  * After ANIM_MS the parent's onClose fires and the modal unmounts.
  */
 
-const ANIM_MS = 180;
-
 export default function AnimatedModal({ onClose, size = 'md', animation = 'default', children }) {
   const [closing, setClosing] = useState(false);
   const [closingAnimation, setClosingAnimation] = useState('default');
@@ -30,38 +29,16 @@ export default function AnimatedModal({ onClose, size = 'md', animation = 'defau
 
   function close(options = {}) {
     if (closing) return;
+    if (!options.animate && !options.animation) {
+      onClose();
+      return;
+    }
     setClosingAnimation(options.animation || 'default');
     setClosing(true);
-    timerRef.current = setTimeout(onClose, ANIM_MS);
+    timerRef.current = setTimeout(onClose, OVERLAY_ANIM_MS);
   }
 
-  // Lock body scroll while modal is open.
-  useEffect(() => {
-    const scrollY = window.scrollY;
-    const prev = {
-      overflow: document.body.style.overflow,
-      position: document.body.style.position,
-      top: document.body.style.top,
-      left: document.body.style.left,
-      right: document.body.style.right,
-      width: document.body.style.width
-    };
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.left = '0';
-    document.body.style.right = '0';
-    document.body.style.width = '100%';
-    return () => {
-      document.body.style.overflow = prev.overflow;
-      document.body.style.position = prev.position;
-      document.body.style.top = prev.top;
-      document.body.style.left = prev.left;
-      document.body.style.right = prev.right;
-      document.body.style.width = prev.width;
-      window.scrollTo(0, scrollY);
-    };
-  }, []);
+  useBodyScrollLock(true);
 
   // Escape closes.
   useEffect(() => {

@@ -577,7 +577,7 @@ function EditAccountModal({ account, onClose, onSaved }) {
 
     try {
       await api.put(`/api/accounts/${account.id}`, patch);
-      close();
+      close({ animate: true });
       setTimeout(onSaved, 180);
     } catch (err) {
       setError(err.message || 'Save failed');
@@ -672,7 +672,7 @@ function MergeAccountModal({ source, candidates, onClose, onMerged }) {
       await api.post(`/api/accounts/${source.id}/merge`, {
         targetId: Number(targetId)
       });
-      close();
+      close({ animate: true });
       setTimeout(onMerged, 180);
     } catch (err) {
       setError(err.message || 'Merge failed');

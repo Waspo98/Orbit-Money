@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
 
 /**
  * Reusable dropdown menu anchored to a trigger button.
@@ -21,18 +22,36 @@ import { useEffect, useRef, useState } from 'react';
  */
 export default function DropdownMenu({ items, ariaLabel = 'More actions' }) {
   const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
   const wrapRef = useRef(null);
+  const timerRef = useRef(null);
+
+  useBodyScrollLock(open);
+
+  function close(options = {}) {
+    if (!open || closing) return;
+    if (!options.animate) {
+      setOpen(false);
+      return;
+    }
+    setClosing(true);
+    timerRef.current = setTimeout(() => {
+      setOpen(false);
+      setClosing(false);
+      options.afterClose?.();
+    }, OVERLAY_ANIM_MS);
+  }
 
   useEffect(() => {
     if (!open) return;
 
     function onClick(e) {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) {
-        setOpen(false);
+        close();
       }
     }
     function onKey(e) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') close();
     }
 
     document.addEventListener('mousedown', onClick);
@@ -41,7 +60,13 @@ export default function DropdownMenu({ items, ariaLabel = 'More actions' }) {
       document.removeEventListener('mousedown', onClick);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, closing]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const visibleItems = items.filter((it) => !it.hidden);
 
@@ -58,7 +83,7 @@ export default function DropdownMenu({ items, ariaLabel = 'More actions' }) {
       </button>
 
       {open && (
-        <div className="dropdown-menu" role="menu">
+        <div className={`dropdown-menu ${closing ? 'closing' : ''}`} role="menu">
           {visibleItems.map((item, i) =>
             item.divider ? (
               <div key={`d-${i}`} className="dropdown-divider" />
@@ -68,9 +93,13 @@ export default function DropdownMenu({ items, ariaLabel = 'More actions' }) {
                 type="button"
                 className={`dropdown-item ${item.destructive ? 'destructive' : ''}`}
                 role="menuitem"
+                disabled={item.disabled}
                 onClick={() => {
-                  setOpen(false);
-                  item.onClick?.();
+                  if (item.disabled) return;
+                  close({
+                    animate: true,
+                    afterClose: () => item.onClick?.()
+                  });
                 }}
               >
                 {item.icon && <span>{item.icon}</span>}

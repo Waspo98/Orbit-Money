@@ -52,7 +52,7 @@ export default function Login({ onLogin }) {
 
         {error && <div className="error">{error}</div>}
 
-        <button type="submit" disabled={loading}>
+        <button type="submit" className="btn-primary" disabled={loading}>
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
       </form>

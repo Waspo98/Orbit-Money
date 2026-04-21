@@ -22,7 +22,6 @@ import MhaTracker from './pages/MhaTracker.jsx';
 import Goals from './pages/Goals.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
-import HamburgerMenu from './components/HamburgerMenu.jsx';
 import SyncErrorBanner from './components/SyncErrorBanner.jsx';
 import MoreSheet from './components/MoreSheet.jsx';
 import { useTheme } from './hooks/useTheme.js';
@@ -42,7 +41,6 @@ export default function App() {
 
 function AppShell() {
   const [authState, setAuthState] = useState('loading');
-  const [menuOpen, setMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
   const [accounts, setAccounts] = useState([]);
@@ -164,15 +162,6 @@ function AppShell() {
           <div className="brand-name">Orbit Money</div>
         </button>
 
-        <button
-          type="button"
-          className="btn-icon"
-          onClick={() => setMenuOpen(true)}
-          aria-label="Open menu"
-          aria-expanded={menuOpen}
-        >
-          ☰
-        </button>
       </header>}
 
       <SyncErrorBanner onOpenSettings={() => navigate('/settings')} />
@@ -191,7 +180,7 @@ function AppShell() {
                 <Dashboard
                   accounts={accounts}
                   categories={categories}
-                  onOpenMenu={() => setMenuOpen(true)}
+                  mhaTrackerEnabled={mhaTrackerEnabled}
                 />
               }
             />
@@ -202,7 +191,6 @@ function AppShell() {
                   accounts={accounts}
                   categories={categories}
                   mhaTrackerEnabled={mhaTrackerEnabled}
-                  onOpenMenu={() => setMenuOpen(true)}
                 />
               }
             />
@@ -217,7 +205,6 @@ function AppShell() {
               element={
                 <Categories
                   mhaTrackerEnabled={mhaTrackerEnabled}
-                  onOpenMenu={() => setMenuOpen(true)}
                   onChange={loadLookups}
                 />
               }
@@ -232,9 +219,7 @@ function AppShell() {
               path="/mha-tracker"
               element={
                 mhaTrackerEnabled ? (
-                  <MhaTracker
-                    onOpenMenu={() => setMenuOpen(true)}
-                  />
+                  <MhaTracker />
                 ) : (
                   <Navigate to="/settings" replace />
                 )
@@ -260,14 +245,6 @@ function AppShell() {
       </main>
 
       <BottomTabs onMoreClick={() => setMoreOpen(true)} />
-
-      <HamburgerMenu
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        themeMode={themeMode}
-        onThemeChange={setThemeMode}
-        onLogout={handleLogout}
-      />
 
       <MoreSheet
         open={moreOpen}

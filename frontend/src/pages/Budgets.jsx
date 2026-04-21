@@ -745,7 +745,7 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
     setSaving(true);
     try {
       await onSaved({ category_id: cid, amount: amt });
-      close();
+      close({ animate: true });
     } catch (err) {
       setError(err.message || 'Save failed');
       setSaving(false);
@@ -846,7 +846,7 @@ function EditBudgetModal({ item, onClose, onSaved, onDelete }) {
     setSaving(true);
     try {
       await onSaved({ category_id: item.category.id, amount: amt });
-      close();
+      close({ animate: true });
     } catch (err) {
       setError(err.message || 'Save failed');
       setSaving(false);

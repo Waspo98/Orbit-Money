@@ -555,6 +555,10 @@ input, textarea, select {
   animation: menuIn var(--dur-base) var(--ease-out);
 }
 
+.dropdown-menu.closing {
+  animation: menuOut var(--dur-base) var(--ease-in-out) forwards;
+}
+
 .dropdown-item {
   display: flex;
   align-items: center;
@@ -572,9 +576,24 @@ input, textarea, select {
 }
 
 .dropdown-item:hover { background: var(--surface-hover); }
+.dropdown-item:disabled {
+  color: var(--text-subtle);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.dropdown-item:disabled:hover { background: transparent; }
 .dropdown-item.destructive { color: var(--danger); }
 
 .dropdown-divider { height: 1px; background: var(--border); margin: 4px 4px; }
+
+.inline-popover {
+  animation: modalZoomIn var(--dur-base) var(--ease-out);
+  transform-origin: top left;
+}
+
+.inline-popover.closing {
+  animation: modalZoomOut var(--dur-base) var(--ease-in-out) forwards;
+}
 
 
 /* ================== 3. PRIMITIVES — Spinners ================== */
@@ -1202,21 +1221,10 @@ input, textarea, select {
 
 .login-subtitle { margin: 0 0 32px; color: var(--text-muted); font-size: 0.95rem; }
 
-.login-card button[type="submit"] {
+.login-card .btn-primary {
   width: 100%;
-  padding: 12px 20px;
-  background: var(--accent);
-  color: var(--accent-text);
-  border: none;
-  border-radius: var(--radius-pill);
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
   margin-top: 8px;
-  transition: background-color var(--dur-fast);
 }
-.login-card button[type="submit"]:hover:not(:disabled) { background: var(--accent-hover); }
-.login-card button[type="submit"]:disabled { opacity: 0.5; cursor: not-allowed; }
 
 
 /* ================== 4. LAYOUT — App shell ================== */
@@ -1522,47 +1530,6 @@ input, textarea, select {
 
 
 /* ================== 4. LAYOUT — Hamburger menu ================== */
-
-.menu-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 20, 16, 0.4);
-  z-index: 100;
-  animation: backdropIn var(--dur-base) var(--ease-out);
-}
-
-.menu-panel {
-  position: fixed;
-  top: 8px;
-  right: 8px;
-  min-width: 240px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
-  padding: 8px;
-  z-index: 110;
-  animation: menuIn var(--dur-base) var(--ease-out);
-}
-
-.menu-close-button {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 1.2rem;
-  cursor: pointer;
-}
-
-.menu-close-button:hover {
-  background: var(--surface-hover);
-  color: var(--text);
-}
 
 @keyframes menuIn {
   from { opacity: 0; transform: translateY(-8px) scale(0.96); }
@@ -2403,10 +2370,6 @@ input, textarea, select {
   flex-wrap: wrap;
 }
 
-.category-editor-action-spacer {
-  flex: 1 1 auto;
-}
-
 @media (max-width: 760px) {
   .categories-content {
     width: calc(100% - 40px);
@@ -2436,14 +2399,13 @@ input, textarea, select {
     justify-self: end;
   }
 
-  .category-editor-actions .btn-danger,
-  .category-editor-actions .btn-secondary,
-  .category-editor-actions .btn-primary {
+  .category-editor-actions .btn-danger {
     flex: 1 1 100%;
   }
 
-  .category-editor-action-spacer {
-    display: none;
+  .category-editor-actions .btn-secondary,
+  .category-editor-actions .btn-primary {
+    flex: 1 1 0;
   }
 }
 
@@ -4321,10 +4283,14 @@ input, textarea, select {
 
 .txn-row-summary {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 16px;
   cursor: pointer;
+}
+
+.txn-row-menu {
+  cursor: default;
 }
 
 .txn-row:hover:not(.expanded) {

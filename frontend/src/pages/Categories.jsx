@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import DropdownMenu from '../components/DropdownMenu.jsx';
+import InlinePopover from '../components/InlinePopover.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 
@@ -67,10 +69,10 @@ function sortCategoriesByName(items) {
 
 export default function Categories({
   mhaTrackerEnabled = false,
-  onOpenMenu,
   onChange
 }) {
   const navigate = useNavigate();
+  const { alert, confirm, Dialog } = useAppDialog();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -107,6 +109,37 @@ export default function Categories({
     navigate(`/transactions?categories=${category.id}`);
   }
 
+  async function deleteCategory(category) {
+    if (category.rule_count > 0) {
+      alert(
+        `"${category.name}" is used by ${category.rule_count.toLocaleString()} rule${
+          category.rule_count === 1 ? '' : 's'
+        }. Update or delete those rules before removing the category.`,
+        { title: 'Category used by rules' }
+      );
+      return;
+    }
+
+    const detail = deleteSummary(category);
+    const ok = await confirm(
+      `Delete "${category.name}"?${detail ? ` ${detail}.` : ''} This can't be undone.`,
+      {
+        title: 'Delete category',
+        confirmLabel: 'Delete',
+        destructive: true
+      }
+    );
+    if (!ok) return;
+
+    try {
+      await api.del(`/api/categories/${category.id}`);
+      await load();
+      onChange?.();
+    } catch (err) {
+      alert(err.message || 'Delete failed', { title: 'Delete failed' });
+    }
+  }
+
   return (
     <div className="categories-view">
       <PageHero
@@ -118,7 +151,6 @@ export default function Categories({
           categories.length === 1 ? 'y' : 'ies'
         }`}
         initialHeight={420}
-        onOpenMenu={onOpenMenu}
         toolbar={(
           <div className="categories-hero-toolbar">
             <input
@@ -173,6 +205,7 @@ export default function Categories({
                 category={category}
                 onEdit={() => setEditing(category)}
                 onViewTransactions={() => viewTransactions(category)}
+                onDelete={() => deleteCategory(category)}
               />
             ))}
           </ul>
@@ -191,13 +224,24 @@ export default function Categories({
           }}
         />
       )}
+      <Dialog />
     </div>
   );
 }
 
-function CategoryRow({ category, onEdit, onViewTransactions }) {
+function CategoryRow({ category, onEdit, onViewTransactions, onDelete }) {
   const flags = describeFlags(category);
   const transactionCount = Number(category.transaction_count || 0);
+  const actionItems = [
+    { label: 'Edit', onClick: onEdit },
+    {
+      label: 'See transactions',
+      onClick: onViewTransactions,
+      disabled: transactionCount === 0
+    },
+    { divider: true },
+    { label: 'Delete', onClick: onDelete, destructive: true }
+  ];
 
   return (
     <li className="category-row">
@@ -221,9 +265,7 @@ function CategoryRow({ category, onEdit, onViewTransactions }) {
               </span>
             ))}
           </div>
-          <button type="button" className="btn-secondary btn-compact" onClick={onEdit}>
-            Edit
-          </button>
+          <DropdownMenu items={actionItems} ariaLabel={`Actions for ${category.name}`} />
         </div>
 
         <div className="category-row-line category-row-line-meta">
@@ -239,14 +281,6 @@ function CategoryRow({ category, onEdit, onViewTransactions }) {
               </span>
             )}
           </div>
-          <button
-            type="button"
-            className="btn-secondary btn-compact"
-            onClick={onViewTransactions}
-            disabled={transactionCount === 0}
-          >
-            See transactions
-          </button>
         </div>
       </div>
     </li>
@@ -300,7 +334,7 @@ function CategoryEditor({
     setError('');
     try {
       await api.del(`/api/categories/${category.id}`);
-      close();
+      close({ animate: true });
       setTimeout(onSaved, 180);
     } catch (err) {
       setError(err.message || 'Delete failed');
@@ -337,7 +371,7 @@ function CategoryEditor({
       } else {
         await api.put(`/api/categories/${category.id}`, body);
       }
-      close();
+      close({ animate: true });
       setTimeout(onSaved, 180);
     } catch (err) {
       setError(err.message || 'Save failed');
@@ -379,8 +413,7 @@ function CategoryEditor({
                   >
                     {icon || '#'}
                   </button>
-                  {emojiPickerOpen && (
-                    <div className="category-emoji-popover" role="listbox">
+                  <InlinePopover open={emojiPickerOpen} className="category-emoji-popover" role="listbox">
                       {EMOJI_OPTIONS.map((emoji) => (
                         <button
                           key={emoji}
@@ -408,8 +441,7 @@ function CategoryEditor({
                           aria-label="Custom category emoji"
                         />
                       </label>
-                    </div>
-                  )}
+                  </InlinePopover>
                 </div>
               </label>
 
@@ -492,7 +524,6 @@ function CategoryEditor({
                   {deleting ? 'Deleting...' : 'Delete category'}
                 </button>
               )}
-              <span className="category-editor-action-spacer" />
               <button type="button" className="btn-secondary" onClick={close}>
                 Cancel
               </button>

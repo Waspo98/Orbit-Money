@@ -45,7 +45,7 @@ function formatYearLabel(year) {
   return String(year || currentYear());
 }
 
-export default function MhaTracker({ onOpenMenu }) {
+export default function MhaTracker() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedYear = parseYearParam(searchParams.get('year'));
   const [data, setData] = useState(null);
@@ -221,7 +221,6 @@ export default function MhaTracker({ onOpenMenu }) {
             />
           </div>
         )}
-        onOpenMenu={onOpenMenu}
         statLabel="MHA summary"
       />
 

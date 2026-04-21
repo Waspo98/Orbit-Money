@@ -139,7 +139,6 @@ export default function PageHero({
   chrome,
   toolbar,
   collapsedContent,
-  onOpenMenu,
   statLabel
 }) {
   const hasHeroStats = stats.length > 0 || !!statsExtra;
@@ -180,20 +179,6 @@ export default function PageHero({
           '--hero-collapsed-width': `${hero.collapsedWidth}px`
         }}
       >
-        {onOpenMenu && (
-          <div className="page-hero-pill-bar" hidden>
-            <span className="page-hero-pill-title" aria-hidden="true">{title}</span>
-            <button
-              type="button"
-              className="btn-icon page-hero-pill-menu"
-              onClick={onOpenMenu}
-              aria-label="Open menu"
-              disabled={hero.progress < 0.72}
-            >
-              {'\u2630'}
-            </button>
-          </div>
-        )}
         <div className="page-hero-inner" ref={hero.innerRef}>
           {chromeContent}
           <div className="page-hero-content">

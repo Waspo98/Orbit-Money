@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import AnimatedModal from './AnimatedModal.jsx';
 
 export function useAppDialog() {
@@ -38,14 +38,15 @@ export function useAppDialog() {
   }, []);
 
   function Dialog() {
+    const resultRef = useRef(false);
     if (!dialog) return null;
 
     return (
-      <AnimatedModal onClose={() => close(false)} size="sm">
+      <AnimatedModal onClose={() => close(resultRef.current)} size="sm">
         {({ close: closeModal }) => {
-          function finish(result) {
-            close(result);
-            closeModal();
+          function finish(result, options = {}) {
+            resultRef.current = result;
+            closeModal(options.animate ? { animate: true } : {});
           }
 
           return (
@@ -65,7 +66,7 @@ export function useAppDialog() {
                 <button
                   type="button"
                   className={dialog.destructive ? 'btn-danger' : 'btn-primary'}
-                  onClick={() => finish(true)}
+                  onClick={() => finish(true, { animate: true })}
                   autoFocus
                 >
                   {dialog.confirmLabel}

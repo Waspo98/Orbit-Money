@@ -2,6 +2,7 @@
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import DropdownMenu from '../components/DropdownMenu.jsx';
 import FilterSheet from '../components/FilterSheet.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
@@ -180,7 +181,7 @@ function countActiveFilters(f) {
 // Main page
 // ============================================================================
 
-export default function Transactions({ accounts, categories, mhaTrackerEnabled = false, onOpenMenu }) {
+export default function Transactions({ accounts, categories, mhaTrackerEnabled = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { alert, confirm, Dialog } = useAppDialog();
@@ -510,7 +511,6 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           { label: 'Monthly transactions', value: monthlyTotal.toLocaleString() }
         ]}
         initialHeight={612}
-        onOpenMenu={onOpenMenu}
         statLabel="Transaction summary"
         chrome={(hero) => (
           <div className="page-hero-chrome">
@@ -522,15 +522,6 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             >
               <span className="brand-mark">$</span>
               <span className="brand-name">Orbit Money</span>
-            </button>
-            <button
-              type="button"
-              className="btn-icon hero-menu-button"
-              onClick={onOpenMenu}
-              aria-label="Open menu"
-              disabled={hero.progress > 0.72}
-            >
-              {'\u2630'}
             </button>
           </div>
         )}
@@ -900,6 +891,25 @@ export function TransactionRow({
 }) {
   const isIncome = txn.amount > 0 && !txn.is_transfer;
   const isTransfer = !!txn.is_transfer;
+  const actionItems = [
+    { label: 'Edit', onClick: onEdit },
+    { label: 'Create rule', onClick: onCreateRule },
+    {
+      label: txn.is_transfer ? 'Unmark as transfer' : 'Mark as transfer',
+      onClick: onToggleTransfer
+    },
+    {
+      label: txn.mha_eligible ? 'MHA ineligible' : 'MHA eligible',
+      onClick: onToggleMhaEligible,
+      hidden: !mhaTrackerEnabled
+    },
+    {
+      label: txn.is_ignored ? 'Unignore' : 'Ignore',
+      onClick: onToggleIgnored
+    },
+    { divider: true },
+    { label: 'Delete', onClick: onDelete, destructive: true }
+  ];
 
   const rowRef = useRef(null);
   const prevExpandedRef = useRef(expanded);
@@ -992,6 +1002,11 @@ export function TransactionRow({
         <div className={`txn-amount ${isIncome ? 'income' : ''}`}>
           {formatAmount(txn.amount)}
         </div>
+        {!expanded && (
+          <div className="txn-row-menu">
+            <DropdownMenu items={actionItems} ariaLabel={`Actions for ${txn.merchant}`} />
+          </div>
+        )}
       </div>
 
       {/* Always-mounted detail wrapper - the expand/contract is animated
@@ -1244,7 +1259,7 @@ export function EditTransactionModal({ txn, categories, onClose, onSaved, onRese
 
     try {
       const result = await api.patch(`/api/transactions/${txn.id}`, patch);
-      close();
+      close({ animate: true });
       setTimeout(() => onSaved(result?.transaction), 180);
     } catch (err) {
       setError(err.message || 'Save failed');
@@ -1268,7 +1283,7 @@ export function EditTransactionModal({ txn, categories, onClose, onSaved, onRese
                     className="linkish"
                     onClick={() => {
                       onReset('merchant');
-                      close();
+                      close({ animate: true });
                     }}
                     title="Clear the edit and let any matching rule re-apply"
                   >
@@ -1293,7 +1308,7 @@ export function EditTransactionModal({ txn, categories, onClose, onSaved, onRese
                     className="linkish"
                     onClick={() => {
                       onReset('category_id');
-                      close();
+                      close({ animate: true });
                     }}
                     title="Clear the edit and let any matching rule re-apply"
                   >
