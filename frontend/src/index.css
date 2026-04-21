@@ -3171,6 +3171,20 @@ input, textarea, select {
   gap: 16px;
 }
 
+.goals-focus-card {
+  cursor: pointer;
+  transition:
+    box-shadow 220ms var(--ease-out, ease),
+    border-color var(--dur-fast) var(--ease-out, ease),
+    transform var(--dur-fast) var(--ease-out, ease);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.goals-focus-card:hover,
+.goals-focus-card:focus-visible {
+  box-shadow: var(--shadow-md);
+}
+
 .goals-card-actions {
   display: inline-flex;
   align-items: center;
@@ -3184,12 +3198,14 @@ input, textarea, select {
   grid-template-columns: minmax(0, 1fr) 132px minmax(220px, 0.72fr);
   gap: 18px;
   align-items: center;
+  transition: gap 220ms var(--ease-out, ease);
 }
 
 .goal-progress-main {
   min-width: 0;
   display: grid;
   gap: 4px;
+  transition: gap 220ms var(--ease-out, ease);
 }
 
 .goal-progress-main span,
@@ -3208,6 +3224,7 @@ input, textarea, select {
   line-height: 1;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+  transition: font-size 220ms var(--ease-out, ease), line-height 220ms var(--ease-out, ease);
 }
 
 .goal-progress-ring {
@@ -3220,6 +3237,7 @@ input, textarea, select {
     radial-gradient(circle at center, var(--surface) 58%, transparent 59%),
     conic-gradient(var(--accent) var(--goal-progress), var(--surface-2) 0);
   box-shadow: inset 0 0 0 1px var(--border);
+  transition: width 220ms var(--ease-out, ease);
 }
 
 .goal-progress-ring span {
@@ -3232,6 +3250,93 @@ input, textarea, select {
 .goal-progress-meta {
   display: grid;
   gap: 0;
+}
+
+.goal-progress-meta .networth-signal-row {
+  transition: padding 220ms var(--ease-out, ease), opacity 160ms var(--ease-out, ease);
+}
+
+.goals-focus-detail {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 220ms var(--ease-out, ease);
+  pointer-events: none;
+}
+
+.goals-focus-card:not(.collapsed) .goals-focus-detail {
+  grid-template-rows: 1fr;
+  pointer-events: auto;
+}
+
+.goals-focus-detail-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  gap: 16px;
+  opacity: 0;
+  transition: opacity 160ms var(--ease-out, ease) 60ms;
+}
+
+.goals-focus-card:not(.collapsed) .goals-focus-detail-inner {
+  opacity: 1;
+}
+
+.goals-focus-card.collapsed .dashboard-card-body {
+  gap: 8px;
+}
+
+.goals-focus-card.collapsed .goal-progress-panel {
+  grid-template-columns: minmax(0, 1fr) 74px minmax(112px, 0.92fr);
+  gap: 10px;
+}
+
+.goals-focus-card.collapsed .goal-progress-main {
+  gap: 2px;
+}
+
+.goals-focus-card.collapsed .goal-progress-main span,
+.goals-focus-card.collapsed .goal-progress-main em {
+  font-size: 0.78rem;
+}
+
+.goals-focus-card.collapsed .goal-progress-main strong {
+  font-size: 1.65rem;
+}
+
+.goals-focus-card.collapsed .goal-progress-ring {
+  width: 74px;
+}
+
+.goals-focus-card.collapsed .goal-progress-ring span {
+  font-size: 0.92rem;
+}
+
+.goals-focus-card.collapsed .goal-monthly-row {
+  display: none;
+}
+
+.goals-focus-card.collapsed .goal-progress-meta .networth-signal-row {
+  align-items: start;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.goals-focus-card.collapsed .goal-progress-meta .networth-signal-row:first-child {
+  padding-top: 0;
+}
+
+.goals-focus-card.collapsed .goal-progress-meta span {
+  font-size: 0.68rem;
+}
+
+.goals-focus-card.collapsed .goal-progress-meta strong {
+  font-size: 0.9rem;
+}
+
+.goals-focus-card.collapsed .goal-progress-meta em {
+  font-size: 0.78rem;
+  text-align: right;
+  white-space: normal;
 }
 
 .goal-chart-wrap {
@@ -3743,15 +3848,27 @@ input, textarea, select {
 }
 
 @media (max-width: 720px) {
-  .goal-progress-panel,
   .goal-imagine-panel,
   .goal-form-grid,
   .goal-allocation-header {
     grid-template-columns: 1fr;
   }
 
+  .goal-progress-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .goals-focus-card.collapsed .goal-progress-panel {
+    grid-template-columns: minmax(0, 1fr) 68px minmax(100px, 0.92fr);
+    align-items: center;
+  }
+
   .goal-progress-ring {
     width: 116px;
+  }
+
+  .goals-focus-card.collapsed .goal-progress-ring {
+    width: 68px;
   }
 
   .goal-progress-meta {

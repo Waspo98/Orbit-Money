@@ -234,6 +234,28 @@ export default function Goals() {
     setWizardGoal(goal);
   }
 
+  function toggleFocusCard(e) {
+    if (
+      e.target.closest('button, a, input, select, textarea') ||
+      e.target.closest('.goals-focus-detail')
+    ) {
+      return;
+    }
+    setFocusCollapsed((value) => !value);
+  }
+
+  function handleFocusCardKeyDown(e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (
+      e.target.closest('button, a, input, select, textarea') ||
+      e.target.closest('.goals-focus-detail')
+    ) {
+      return;
+    }
+    e.preventDefault();
+    setFocusCollapsed((value) => !value);
+  }
+
   return (
     <div className="goals-view">
       <PageHero
@@ -276,13 +298,16 @@ export default function Goals() {
         </div>
       ) : (
         <div className="goals-grid">
-          <section className={`dashboard-card goals-focus-card ${focusCollapsed ? 'collapsed' : ''}`}>
+          <section
+            className={`dashboard-card goals-focus-card ${focusCollapsed ? 'collapsed' : ''}`}
+            onClick={toggleFocusCard}
+            onKeyDown={handleFocusCardKeyDown}
+            tabIndex={0}
+            aria-expanded={!focusCollapsed}
+          >
             <header className="dashboard-card-header">
               <h3>{selectedGoal?.name || 'Goal'}</h3>
               <div className="goals-card-actions">
-                <button type="button" className="dashboard-card-link button-link" onClick={() => setFocusCollapsed((value) => !value)}>
-                  {focusCollapsed ? 'Expand' : 'Collapse'}
-                </button>
                 <button type="button" className="dashboard-card-link button-link" onClick={() => openEditGoal(selectedGoal)}>
                   Edit
                 </button>
@@ -290,8 +315,8 @@ export default function Goals() {
             </header>
             <div className="dashboard-card-body">
               <GoalProgress goal={selectedGoal} />
-              {!focusCollapsed && (
-                <>
+              <div className="goals-focus-detail" aria-hidden={focusCollapsed}>
+                <div className="goals-focus-detail-inner">
                   <GoalChart goal={selectedGoal} />
                   <ImaginePanel
                     goal={selectedGoal}
@@ -307,15 +332,14 @@ export default function Goals() {
                       Delete
                     </button>
                   </div>
-                </>
-              )}
+                </div>
+              </div>
             </div>
           </section>
 
           <section className="dashboard-card goals-list-card">
             <header className="dashboard-card-header">
               <h3>Targets</h3>
-              <span className="dashboard-card-link">{goals.length} active</span>
             </header>
             <div className="goal-list">
               {goals.map((goal) => (
@@ -342,7 +366,7 @@ export default function Goals() {
           <section className="dashboard-card goals-account-card">
             <header className="dashboard-card-header">
               <h3>Account allocation</h3>
-              <Link to="/accounts" className="dashboard-card-link">Accounts</Link>
+              <Link to="/accounts" className="dashboard-card-link">View Accounts</Link>
             </header>
             <div className="dashboard-card-body">
               <div className="goal-account-list">
@@ -404,9 +428,9 @@ function GoalProgress({ goal }) {
         <span>{Math.round(progress)}%</span>
       </div>
       <div className="goal-progress-meta">
-        <SignalRow label="Desired ETA" value={desiredEta(goal)} detail={extraNeeded === null ? 'Set a date to calculate' : `${formatMoney(extraNeeded)}/mo more needed`} />
-        <SignalRow label="Projected ETA" value={formatEta(goal?.eta)} detail={goal?.eta?.months ? `${goal.eta.months} months` : goal?.eta?.status === 'complete' ? 'Complete' : 'No trend yet'} />
-        <SignalRow label="Monthly pace" value={formatSignedMoney(goal?.monthly_pace)} detail="Based on history" />
+        <SignalRow className="goal-eta-row goal-desired-row" label="Desired ETA" value={desiredEta(goal)} detail={extraNeeded === null ? 'Set a date to calculate' : `${formatMoney(extraNeeded)}/mo more needed`} />
+        <SignalRow className="goal-eta-row goal-projected-row" label="Projected ETA" value={formatEta(goal?.eta)} detail={goal?.eta?.months ? `${goal.eta.months} months` : goal?.eta?.status === 'complete' ? 'Complete' : 'No trend yet'} />
+        <SignalRow className="goal-monthly-row" label="Monthly pace" value={formatSignedMoney(goal?.monthly_pace)} detail="Based on history" />
       </div>
     </div>
   );
@@ -497,9 +521,9 @@ function ImaginePanel({ goal, imagineMonthly, imaginedEta, onChange }) {
   );
 }
 
-function SignalRow({ label, value, detail }) {
+function SignalRow({ label, value, detail, className = '' }) {
   return (
-    <div className="networth-signal-row">
+    <div className={`networth-signal-row ${className}`}>
       <div>
         <span>{label}</span>
         <strong>{value}</strong>
