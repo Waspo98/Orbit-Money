@@ -428,7 +428,7 @@ function GoalProgress({ goal }) {
         <span>{Math.round(progress)}%</span>
       </div>
       <div className="goal-progress-meta">
-        <SignalRow className="goal-eta-row goal-desired-row" label="Desired ETA" value={desiredEta(goal)} detail={extraNeeded === null ? 'Set a date to calculate' : `${formatMoney(extraNeeded)}/mo more needed`} />
+        <SignalRow className="goal-eta-row goal-desired-row" label="Desired ETA" value={desiredEta(goal)} detail={extraNeeded === null ? 'Set a date to calculate' : `${formatMoney(extraNeeded)}/mo more needed`} compactDetail="" />
         <SignalRow className="goal-eta-row goal-projected-row" label="Projected ETA" value={formatEta(goal?.eta)} detail={goal?.eta?.months ? `${goal.eta.months} months` : goal?.eta?.status === 'complete' ? 'Complete' : 'No trend yet'} />
         <SignalRow className="goal-monthly-row" label="Monthly pace" value={formatSignedMoney(goal?.monthly_pace)} detail="Based on history" />
       </div>
@@ -521,14 +521,14 @@ function ImaginePanel({ goal, imagineMonthly, imaginedEta, onChange }) {
   );
 }
 
-function SignalRow({ label, value, detail, className = '' }) {
+function SignalRow({ label, value, detail, compactDetail = null, className = '' }) {
   return (
     <div className={`networth-signal-row ${className}`}>
       <div>
         <span>{label}</span>
         <strong>{value}</strong>
       </div>
-      <em>{detail}</em>
+      <em data-compact-detail={compactDetail ?? detail}>{detail}</em>
     </div>
   );
 }

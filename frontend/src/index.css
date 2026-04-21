@@ -3316,8 +3316,7 @@ input, textarea, select {
 }
 
 .goals-focus-card.collapsed .goal-progress-meta .networth-signal-row {
-  align-items: start;
-  gap: 8px;
+  display: block;
   padding: 6px 0;
 }
 
@@ -3326,17 +3325,25 @@ input, textarea, select {
 }
 
 .goals-focus-card.collapsed .goal-progress-meta span {
+  display: block;
   font-size: 0.68rem;
+  white-space: nowrap;
 }
 
 .goals-focus-card.collapsed .goal-progress-meta strong {
+  display: block;
   font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .goals-focus-card.collapsed .goal-progress-meta em {
-  font-size: 0.78rem;
-  text-align: right;
-  white-space: normal;
+  display: none;
+}
+
+.goals-focus-card.collapsed .goal-progress-meta em::before {
+  content: attr(data-compact-detail);
 }
 
 .goal-chart-wrap {
