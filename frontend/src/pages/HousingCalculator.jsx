@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import PageHero from '../components/PageHero.jsx';
 
 function formatMoney(amount) {
   if (amount === null || amount === undefined) return null;
@@ -210,17 +211,20 @@ export default function HousingCalculator({ accounts = [] }) {
 
   return (
     <div className="housing-view">
-      <div className="view-header">
-        <div>
-          <h2>Housing Calculator</h2>
-          <p className="muted">
-            Estimate selling proceeds, cash to close, and projected monthly payment.
-          </p>
-        </div>
-        <button type="button" className="btn-secondary" onClick={resetCalculator}>
-          Reset
-        </button>
-      </div>
+      <PageHero
+        id="housing-title"
+        variant="housing"
+        kicker="Home Planning"
+        title="Housing Calculator"
+        subtitle="Estimate selling proceeds, cash to close, and projected monthly payment."
+        toolbar={(
+          <div className="page-hero-action-row">
+            <button type="button" className="btn-secondary" onClick={resetCalculator}>
+              Reset
+            </button>
+          </div>
+        )}
+      />
 
       <section className="dashboard-card housing-picker">
         <header className="dashboard-card-header">

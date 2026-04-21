@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 
 // ============================================================================
@@ -169,32 +170,33 @@ export default function Rules() {
 
   return (
     <div className="rules-view">
-      <div className="view-header">
-        <div>
-          <h2>Rules</h2>
-          <p className="muted">
-            {rules.length.toLocaleString()} rule{rules.length === 1 ? '' : 's'}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {rules.length > 0 && (
+      <PageHero
+        id="rules-title"
+        variant="rules"
+        kicker="Automation"
+        title="Rules"
+        subtitle={`${rules.length.toLocaleString()} rule${rules.length === 1 ? '' : 's'}`}
+        toolbar={(
+          <div className="page-hero-action-row">
+            {rules.length > 0 && (
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={() => setWipeOpen(true)}
+              >
+                Wipe all
+              </button>
+            )}
             <button
               type="button"
-              className="btn-danger"
-              onClick={() => setWipeOpen(true)}
+              className="btn-primary"
+              onClick={() => setEditing({})}
             >
-              Wipe all
+              + New rule
             </button>
-          )}
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => setEditing({})}
-          >
-            + New rule
-          </button>
-        </div>
-      </div>
+          </div>
+        )}
+      />
 
       {error && <div className="error">{error}</div>}
 

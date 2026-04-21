@@ -142,6 +142,7 @@ export default function PageHero({
   onOpenMenu,
   statLabel
 }) {
+  const hasHeroStats = stats.length > 0 || !!statsExtra;
   const staticInnerRef = useRef(null);
   const staticTitleRef = useRef(null);
   const hero = controlledHero || {
@@ -168,7 +169,7 @@ export default function PageHero({
   return (
     <>
       <section
-        className={`page-hero page-hero-${variant}`}
+        className={`page-hero page-hero-${variant} ${hasHeroStats ? '' : 'page-hero-plain'}`}
         aria-labelledby={id}
         style={{
           '--hero-progress': hero.progress,
@@ -214,15 +215,17 @@ export default function PageHero({
                 <p>{subtitle}</p>
               </div>
 
-              <div className="page-hero-stats" aria-label={statLabel || `${title} summary`}>
-                {stats.map((stat) => (
-                  <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
-                    <span>{stat.label}</span>
-                    <strong>{stat.value}</strong>
-                  </div>
-                ))}
-                {statsExtra}
-              </div>
+              {hasHeroStats && (
+                <div className="page-hero-stats" aria-label={statLabel || `${title} summary`}>
+                  {stats.map((stat) => (
+                    <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
+                      <span>{stat.label}</span>
+                      <strong>{stat.value}</strong>
+                    </div>
+                  ))}
+                  {statsExtra}
+                </div>
+              )}
             </div>
             {toolbarContent}
           </div>

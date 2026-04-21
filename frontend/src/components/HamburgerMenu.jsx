@@ -73,11 +73,11 @@ export default function HamburgerMenu({
         >
           ☰
         </button>
-        <button type="button" className="menu-item" onClick={() => go('/import')}>
-          <span className="menu-item-icon">↑</span>
-          <span>Import data</span>
-        </button>
         <button type="button" className="menu-item" onClick={() => go('/settings')}>
+          <span className="menu-item-icon">↑</span>
+          <span>Settings</span>
+        </button>
+        <button type="button" className="menu-item" onClick={() => go('/settings')} hidden>
           <span className="menu-item-icon">⚙</span>
           <span>Settings</span>
         </button>

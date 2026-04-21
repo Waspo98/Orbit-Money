@@ -14,7 +14,6 @@ import Transactions from './pages/Transactions.jsx';
 import Budgets from './pages/Budgets.jsx';
 import Accounts from './pages/Accounts.jsx';
 import Settings from './pages/Settings.jsx';
-import Import from './pages/Import.jsx';
 import Rules from './pages/Rules.jsx';
 import Categories from './pages/Categories.jsx';
 import HousingCalculator from './pages/HousingCalculator.jsx';
@@ -28,7 +27,7 @@ import MoreSheet from './components/MoreSheet.jsx';
 import { useTheme } from './hooks/useTheme.js';
 import { api } from './api.js';
 
-// Bottom tabs always visible. (Previously we hid them on Settings/Import to
+// Bottom tabs always visible. (Previously we hid them on Settings/import to
 // keep the UI focused, but with the More tab the sheet can be opened from any
 // page so keeping tabs visible is fine and more consistent.)
 
@@ -60,6 +59,10 @@ function AppShell() {
     location.pathname === '/categories' ||
     location.pathname === '/budgets' ||
     location.pathname === '/accounts' ||
+    location.pathname === '/rules' ||
+    location.pathname === '/housing-calculator' ||
+    location.pathname === '/net-worth' ||
+    location.pathname === '/settings' ||
     location.pathname === '/mha-tracker';
 
   useLayoutEffect(() => {
@@ -127,7 +130,7 @@ function AppShell() {
     navigate('/', { replace: true });
   }
 
-  async function handleImportComplete() {
+  async function handleSettingsImportComplete() {
     await loadLookups();
     navigate('/transactions');
   }
@@ -243,13 +246,11 @@ function AppShell() {
                   onLogout={handleLogout}
                   mhaTrackerEnabled={mhaTrackerEnabled}
                   onMhaTrackerChange={setMhaTrackerEnabled}
+                  onImportComplete={handleSettingsImportComplete}
                 />
               }
             />
-            <Route
-              path="/import"
-              element={<Import onComplete={handleImportComplete} />}
-            />
+            <Route path="/import" element={<Navigate to="/settings" replace />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         )}
