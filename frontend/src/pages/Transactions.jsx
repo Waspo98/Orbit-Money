@@ -1340,11 +1340,6 @@ export function EditTransactionModal({ txn, categories, onClose, onSaved, onRese
               />
             </label>
 
-            <p className="subtle" style={{ marginTop: -10, marginBottom: 12 }}>
-              Date ({formatFullDate(txn.date)}) and amount ({formatAmount(txn.amount)})
-              are not editable - they're ground truth from the bank.
-            </p>
-
             {error && <div className="error">{error}</div>}
 
             <div className="modal-actions">

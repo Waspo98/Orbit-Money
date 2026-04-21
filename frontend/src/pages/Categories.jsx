@@ -165,7 +165,7 @@ export default function Categories({
               className="btn-primary"
               onClick={() => setEditing({})}
             >
-              + New category
+              + New Category
             </button>
           </div>
         )}
@@ -193,7 +193,7 @@ export default function Categories({
                 className="btn-primary"
                 onClick={() => setEditing({})}
               >
-                + New category
+                + New Category
               </button>
             )}
           </div>
@@ -235,7 +235,7 @@ function CategoryRow({ category, onEdit, onViewTransactions, onDelete }) {
   const actionItems = [
     { label: 'Edit', onClick: onEdit },
     {
-      label: 'See transactions',
+      label: 'See Transactions',
       onClick: onViewTransactions,
       disabled: transactionCount === 0
     },
@@ -521,14 +521,14 @@ function CategoryEditor({
                   onClick={() => handleDelete(close)}
                   disabled={saving || deleting}
                 >
-                  {deleting ? 'Deleting...' : 'Delete category'}
+                  {deleting ? 'Deleting...' : 'Delete Category'}
                 </button>
               )}
               <button type="button" className="btn-secondary" onClick={close}>
                 Cancel
               </button>
               <button type="submit" className="btn-primary" disabled={saving || deleting}>
-                {saving ? 'Saving...' : isNew ? 'Create category' : 'Save'}
+                {saving ? 'Saving...' : isNew ? 'Create Category' : 'Save'}
               </button>
             </div>
           </form>

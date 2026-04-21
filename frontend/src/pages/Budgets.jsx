@@ -94,6 +94,7 @@ export default function Budgets() {
   const [addingBudget, setAddingBudget] = useState(false);
   const [editingBudget, setEditingBudget] = useState(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [selectedSpendingKey, setSelectedSpendingKey] = useState(null);
 
   // Sort order for the Budgeted section. Persisted in localStorage so a
   // user's choice sticks across navigations without needing a URL param.
@@ -178,13 +179,14 @@ export default function Budgets() {
 
   // --- Summary derived ---
   const summary = data?.summary;
+  const totalMonthlySpending = summary ? Number(summary.total_expenses || 0) : 0;
   const overallPercent =
     summary && summary.total_budgeted > 0
-      ? (summary.total_spent_in_budgets / summary.total_budgeted) * 100
+      ? (totalMonthlySpending / summary.total_budgeted) * 100
       : null;
   const remaining =
     summary && summary.total_budgeted > 0
-      ? summary.total_budgeted - summary.total_spent_in_budgets
+      ? summary.total_budgeted - totalMonthlySpending
       : null;
 
   const daysLeft = daysLeftInMonth(selectedMonth);
@@ -242,6 +244,25 @@ export default function Budgets() {
     }
     return list;
   }, [data, budgetedSort]);
+
+  const spendingByCategory = useMemo(() => {
+    const rows = [
+      ...(data?.budgeted || []),
+      ...(data?.unbudgeted || [])
+    ]
+      .filter((item) => Number(item.spent) > 0)
+      .map((item) => ({
+        key: String(item.category.id),
+        name: item.category.name,
+        icon: item.category.icon,
+        color: item.category.color || 'var(--accent)',
+        amount: Number(item.spent)
+      }))
+      .sort((a, b) => b.amount - a.amount);
+
+    const total = rows.reduce((sum, item) => sum + item.amount, 0);
+    return { items: rows, total };
+  }, [data]);
 
   // --- Mutations ---
   async function upsertBudget({ category_id, amount }) {
@@ -318,7 +339,7 @@ export default function Budgets() {
                 <div>
                   <div className="budget-summary-amounts">
                     <span className="budget-summary-spent">
-                      {formatMoney(summary.total_spent_in_budgets)}
+                      {formatMoney(totalMonthlySpending)}
                     </span>
                     <span className="subtle">
                       {' '}of {formatMoney(summary.total_budgeted)} budgeted
@@ -350,6 +371,15 @@ export default function Budgets() {
             </div>
           )}
 
+          {spendingByCategory.total > 0 && (
+            <SpendingPieChart
+              items={spendingByCategory.items}
+              total={spendingByCategory.total}
+              selectedKey={selectedSpendingKey}
+              onSelect={setSelectedSpendingKey}
+            />
+          )}
+
           {/* ---------- Action row ---------- */}
           <div className="budget-actions-row">
             <button
@@ -357,7 +387,7 @@ export default function Budgets() {
               className="btn-primary"
               onClick={() => setAddingBudget(true)}
             >
-              + Add budget
+              + Add Budget
             </button>
           </div>
 
@@ -439,7 +469,7 @@ export default function Budgets() {
                 className="btn-primary"
                 onClick={() => setAddingBudget(true)}
               >
-                + Add budget
+                + Add Budget
               </button>
             </div>
           )}
@@ -482,7 +512,7 @@ export default function Budgets() {
                           })
                         }
                       >
-                        Add budget
+                        Add Budget
                       </button>
                     </li>
                   ))}
@@ -618,6 +648,127 @@ function ProgressBar({ percent, overBudget = false, compact = false }) {
 }
 
 // ============================================================================
+// Spending by category pie chart
+// ============================================================================
+
+function SpendingPieChart({ items, total, selectedKey, onSelect }) {
+  const radius = 44;
+  const strokeWidth = 18;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
+  const selected =
+    items.find((item) => item.key === selectedKey) ||
+    items[0] ||
+    null;
+
+  return (
+    <section className="budget-pie-card" aria-labelledby="budget-pie-title">
+      <div className="budget-pie-header">
+        <div>
+          <h3 id="budget-pie-title">Spending by Category</h3>
+          <p className="subtle">{formatMoney(total)} spent this month</p>
+        </div>
+        {selected && (
+          <div className="budget-pie-selected">
+            <span>{selected.icon}</span>
+            <strong>{formatMoney(selected.amount)}</strong>
+            <em>{selected.name}</em>
+          </div>
+        )}
+      </div>
+
+      <div className="budget-pie-body">
+        <svg
+          className="budget-pie-chart"
+          viewBox="0 0 120 120"
+          role="img"
+          aria-label="Spending by category pie chart"
+        >
+          <circle
+            className="budget-pie-track"
+            cx="60"
+            cy="60"
+            r={radius}
+            fill="none"
+            strokeWidth={strokeWidth}
+          />
+          {items.map((item) => {
+            const length = (item.amount / total) * circumference;
+            const dashOffset = -offset;
+            offset += length;
+            const active = selected?.key === item.key;
+            return (
+              <circle
+                key={item.key}
+                className={`budget-pie-slice ${active ? 'active' : ''}`}
+                cx="60"
+                cy="60"
+                r={radius}
+                fill="none"
+                stroke={item.color}
+                strokeWidth={strokeWidth}
+                strokeDasharray={`${length} ${circumference - length}`}
+                strokeDashoffset={dashOffset}
+                transform="rotate(-90 60 60)"
+                tabIndex={0}
+                role="button"
+                aria-label={`${item.name}: ${formatMoney(item.amount)}`}
+                onClick={() => onSelect(item.key)}
+                onFocus={() => onSelect(item.key)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelect(item.key);
+                  }
+                }}
+                onMouseEnter={() => onSelect(item.key)}
+              />
+            );
+          })}
+          <text className="budget-pie-total-label" x="60" y="56" textAnchor="middle">
+            Total
+          </text>
+          <text className="budget-pie-total-value" x="60" y="74" textAnchor="middle">
+            {formatMoney(total)}
+          </text>
+        </svg>
+
+        <div className="budget-pie-list" role="list">
+          {items.map((item) => {
+            const active = selected?.key === item.key;
+            const percent = total > 0 ? Math.round((item.amount / total) * 100) : 0;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                className={`budget-pie-item ${active ? 'active' : ''}`}
+                onClick={() => onSelect(item.key)}
+                aria-pressed={active}
+              >
+                <span
+                  className="budget-pie-dot"
+                  style={{ backgroundColor: item.color }}
+                  aria-hidden="true"
+                />
+                <span className="budget-pie-item-name">
+                  <span>{item.icon}</span>
+                  <span>{item.name}</span>
+                </span>
+                <span className="budget-pie-item-amount">
+                  {formatMoney(item.amount)}
+                  <em>{percent}%</em>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================================
 // Budget row (has a budget)
 // ============================================================================
 
@@ -628,7 +779,7 @@ function BudgetedRow({ item, onEdit, onDelete }) {
   const remaining = amount - spent;
 
   const menuItems = [
-    { label: 'Edit amount', icon: '✎', onClick: onEdit },
+    { label: 'Edit Amount', icon: '✎', onClick: onEdit },
     { divider: true },
     { label: 'Delete', icon: '✕', destructive: true, onClick: onDelete }
   ];
@@ -811,7 +962,7 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? 'Saving…' : 'Add budget'}
+                  {saving ? 'Saving…' : 'Add Budget'}
                 </button>
               </div>
             </form>
@@ -905,7 +1056,7 @@ function EditBudgetModal({ item, onClose, onSaved, onDelete }) {
                 Cancel
               </button>
               <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Saving…' : isNew ? 'Add budget' : 'Save'}
+                {saving ? 'Saving…' : isNew ? 'Add Budget' : 'Save'}
               </button>
             </div>
           </form>
