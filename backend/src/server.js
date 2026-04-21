@@ -21,6 +21,7 @@ import budgetsRoutes from './routes/budgets.js';
 import netWorthRoutes from './routes/netWorth.js';
 import mhaRoutes from './routes/mha.js';
 import goalsRoutes from './routes/goals.js';
+import merchantLogosRoutes from './routes/merchantLogos.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -72,6 +73,7 @@ app.use('/api/budgets', budgetsRoutes);
 app.use('/api/net-worth', netWorthRoutes);
 app.use('/api/mha', mhaRoutes);
 app.use('/api/goals', goalsRoutes);
+app.use('/api/merchant-logos', merchantLogosRoutes);
 
 // Any other /api/* is a 404.
 app.use('/api', requireAuth, (req, res) => {

@@ -4317,9 +4317,9 @@ input, textarea, select {
 
 .txn-row-summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: 36px minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   cursor: pointer;
 }
 
@@ -4351,6 +4351,35 @@ input, textarea, select {
 
 .txn-row.ignored { opacity: 0.55; }
 .txn-row.transfer .txn-amount { color: var(--neutral); }
+
+.txn-merchant-mark {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.txn-merchant-mark img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  padding: 4px;
+  background: #ffffff;
+}
+
+.txn-merchant-mark-fallback {
+  font-size: 1rem;
+  font-weight: 650;
+  background: color-mix(in srgb, currentColor 10%, var(--surface-2));
+  border-color: color-mix(in srgb, currentColor 28%, var(--border));
+}
 
 .txn-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 

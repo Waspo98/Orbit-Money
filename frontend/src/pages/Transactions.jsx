@@ -30,6 +30,8 @@ const SORT_OPTIONS = [
   { value: 'merchant_asc',     label: 'Merchant A-Z' }
 ];
 
+const reportedLogoStatuses = new Set();
+
 // ============================================================================
 // Formatting helpers
 // ============================================================================
@@ -971,6 +973,7 @@ export function TransactionRow({
       onClick={handleRowClick}
     >
       <div className="txn-row-summary">
+        <TransactionMerchantMark txn={txn} category={category} />
         <div className="txn-main">
           <div className="txn-merchant">{txn.merchant}</div>
           <div className="txn-meta">
@@ -1030,6 +1033,61 @@ export function TransactionRow({
         />
       </div>
     </li>
+  );
+}
+
+function TransactionMerchantMark({ txn, category }) {
+  const logo = txn.merchant_logo;
+  const [showLogo, setShowLogo] = useState(Boolean(logo?.url));
+
+  useEffect(() => {
+    setShowLogo(Boolean(logo?.url));
+  }, [logo?.url]);
+
+  function report(status) {
+    if (!logo?.merchant_key) return;
+    const reportKey = `${logo.merchant_key}:${status}`;
+    if (reportedLogoStatuses.has(reportKey)) return;
+    reportedLogoStatuses.add(reportKey);
+
+    api.post('/api/merchant-logos/report', {
+      merchant_key: logo.merchant_key,
+      status
+    }).catch(() => {
+      reportedLogoStatuses.delete(reportKey);
+    });
+  }
+
+  if (showLogo && logo?.url) {
+    return (
+      <span className="txn-merchant-mark" title={`${txn.merchant} logo`}>
+        <img
+          src={logo.url}
+          alt=""
+          loading="lazy"
+          width="32"
+          height="32"
+          onLoad={() => {
+            if (logo.status === 'candidate') report('loaded');
+          }}
+          onError={() => {
+            setShowLogo(false);
+            report('failed');
+          }}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="txn-merchant-mark txn-merchant-mark-fallback"
+      style={category?.color ? { color: category.color } : undefined}
+      title={category ? category.name : 'Category'}
+      aria-hidden="true"
+    >
+      {category?.icon || '$'}
+    </span>
   );
 }
 

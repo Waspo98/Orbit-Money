@@ -58,6 +58,8 @@ Optional or feature-specific values:
 
 - `API_KEY` enables programmatic API access through the `X-API-Key` header.
 - `SIMPLEFIN_ENCRYPTION_KEY` is required before SimpleFIN sync can be used.
+- `LOGO_DEV_PUBLISHABLE_KEY` enables merchant logo enrichment in transaction
+  lists. When it is not set, transactions continue to use category icons.
 - `PORT` defaults to `5008`. Do not change this unless you also update the
   Docker, tunnel, and documentation assumptions.
 - `SESSION_NAME` defaults to `connect.sid`. Leave production on the default;
@@ -66,6 +68,11 @@ Optional or feature-specific values:
 
 For SimpleFIN encryption, `SIMPLEFIN_ENCRYPTION_KEY` must be a 64-character hex
 string.
+
+Merchant logos are resolved through Logo.dev by unique merchant name and cached
+in SQLite as display enrichment. Logo image bytes are not stored by Orbit Money;
+the browser/provider cache handles the image files, and failed logo loads fall
+back to the transaction category icon.
 
 ## Run With Docker Compose
 

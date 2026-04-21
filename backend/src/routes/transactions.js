@@ -31,6 +31,7 @@ import express from 'express';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
 import { reapplyRulesToTransaction } from '../services/ruleMatcher.js';
+import { attachMerchantLogos } from '../services/merchantLogos.js';
 
 const router = express.Router();
 
@@ -305,7 +306,7 @@ router.get('/', requireAuth, (req, res) => {
       .prepare('SELECT COUNT(*) AS c FROM transactions WHERE date >= ? AND date <= ?')
       .get(monthStart, monthEnd).c;
 
-    const items = db
+    const rows = db
       .prepare(
         `SELECT ${SELECT_COLS}
            FROM transactions
@@ -315,6 +316,7 @@ router.get('/', requireAuth, (req, res) => {
       )
       .all(...args, limit, offset)
       .map(hydrate);
+    const items = attachMerchantLogos(db, rows);
 
     res.json({
       items,
@@ -346,7 +348,7 @@ router.get('/:id', requireAuth, (req, res) => {
                   FROM transactions WHERE id = ?`)
       .get(id);
     if (!row) return res.status(404).json({ error: 'Transaction not found.' });
-    res.json(hydrate(row));
+    res.json(attachMerchantLogos(db, [hydrate(row)])[0]);
   } catch (err) {
     console.error('Get transaction failed:', err);
     res.status(500).json({ error: err.message });
@@ -491,7 +493,10 @@ router.patch('/:id', requireAuth, (req, res) => {
     const updated = db
       .prepare(`SELECT ${SELECT_COLS} FROM transactions WHERE id = ?`)
       .get(id);
-    res.json({ success: true, transaction: hydrate(updated) });
+    res.json({
+      success: true,
+      transaction: attachMerchantLogos(db, [hydrate(updated)])[0]
+    });
   } catch (err) {
     console.error('Update transaction failed:', err);
     res.status(500).json({ error: err.message });
@@ -535,7 +540,10 @@ router.post('/:id/reset', requireAuth, (req, res) => {
       .prepare(`SELECT ${SELECT_COLS} FROM transactions WHERE id = ?`)
       .get(id);
     if (!updated) return res.status(404).json({ error: 'Transaction not found.' });
-    res.json({ success: true, transaction: hydrate(updated) });
+    res.json({
+      success: true,
+      transaction: attachMerchantLogos(db, [hydrate(updated)])[0]
+    });
   } catch (err) {
     console.error('Reset transaction failed:', err);
     res.status(500).json({ error: err.message });
