@@ -178,15 +178,6 @@ export default function Rules() {
         subtitle={`${rules.length.toLocaleString()} rule${rules.length === 1 ? '' : 's'}`}
         toolbar={(
           <div className="page-hero-action-row">
-            {rules.length > 0 && (
-              <button
-                type="button"
-                className="btn-danger"
-                onClick={() => setWipeOpen(true)}
-              >
-                Wipe all
-              </button>
-            )}
             <button
               type="button"
               className="btn-primary"
@@ -305,6 +296,18 @@ export default function Rules() {
             </li>
           ))}
         </ul>
+      )}
+
+      {rules.length > 0 && (
+        <div className="rules-danger-zone">
+          <button
+            type="button"
+            className="btn-danger"
+            onClick={() => setWipeOpen(true)}
+          >
+            Wipe all
+          </button>
+        </div>
       )}
 
       {editing && (
@@ -509,8 +512,10 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
     // Auto-generate a name if empty.
     let finalName = name.trim();
     if (!finalName) {
-      const firstCond = summarizeCondition(conditions[0], accounts, categories);
-      finalName = `Rule: ${firstCond}`.slice(0, 80);
+      const renameAction = actions.find((action) => action.type === 'rename');
+      finalName = String(
+        renameAction?.value || summarizeCondition(conditions[0], accounts, categories)
+      ).trim().slice(0, 80);
     }
 
     const body = {

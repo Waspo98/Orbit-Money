@@ -511,7 +511,7 @@ function GoalChart({ goal }) {
 function ImaginePanel({ goal, imagineMonthly, imaginedEta, onChange }) {
   const lastTickRef = useRef(null);
   const imaginedText = imaginedEta?.date
-    ? `Goal will be reached in ${formatFullMonthDate(imaginedEta.date)} with extra ${formatMoney(imagineMonthly)}/m`
+    ? `Goal will be reaching in ${formatFullMonthDate(imaginedEta.date)}`
     : 'Goal needs more monthly savings history to project a date';
 
   function tick(value) {

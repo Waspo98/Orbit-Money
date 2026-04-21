@@ -151,7 +151,7 @@ function AppShell() {
 
   return (
     <div className={`app-shell has-sidebar ${hasPageHero ? 'has-page-hero' : ''}`}>
-      <DesktopSidebar onMoreClick={() => setMoreOpen(true)} />
+      <DesktopSidebar mhaTrackerEnabled={mhaTrackerEnabled} />
 
       {!hasPageHero && <header className="app-header">
         <button

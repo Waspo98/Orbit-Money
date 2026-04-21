@@ -950,10 +950,7 @@ export function TransactionRow({
 
   function handleRowClick(e) {
     // Ignore clicks on interactive elements (buttons, links, inputs).
-    // Also ignore clicks that happened inside the expanded detail area -
-    // otherwise tapping the expanded content would collapse the card.
     if (e.target.closest('button, a, input, select, textarea, [role=button]')) return;
-    if (expanded && e.target.closest('.txn-detail-wrapper')) return;
     onExpand();
   }
 
@@ -1186,15 +1183,7 @@ function TransactionDetail({
           onClick={onToggleTransfer}
           {...tabProps}
         >
-          {txn.is_transfer ? 'Unmark transfer' : 'Mark transfer'}
-        </button>
-        <button
-          type="button"
-          className={`btn-secondary btn-compact ${txn.is_ignored ? 'btn-active' : ''} ${ignoredEdited ? 'edited' : ''}`}
-          onClick={onToggleIgnored}
-          {...tabProps}
-        >
-          {txn.is_ignored ? 'Unignore' : 'Ignore'}
+          {txn.is_transfer ? 'Unmark as transfer' : 'Mark as transfer'}
         </button>
         {mhaTrackerEnabled && (
           <button
@@ -1204,9 +1193,17 @@ function TransactionDetail({
             aria-pressed={!!txn.mha_eligible}
             {...tabProps}
           >
-            MHA-Eligible
+            MHA Eligible
           </button>
         )}
+        <button
+          type="button"
+          className={`btn-secondary btn-compact ${txn.is_ignored ? 'btn-active' : ''} ${ignoredEdited ? 'edited' : ''}`}
+          onClick={onToggleIgnored}
+          {...tabProps}
+        >
+          {txn.is_ignored ? 'Unignore' : 'Ignore'}
+        </button>
         <button
           type="button"
           className="btn-danger btn-compact"
@@ -1284,7 +1281,6 @@ export function EditTransactionModal({ txn, categories, onClose, onSaved, onRese
                 value={merchant}
                 onChange={(e) => setMerchant(e.target.value)}
                 required
-                autoFocus
               />
             </label>
 

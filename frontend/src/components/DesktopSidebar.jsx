@@ -1,8 +1,16 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { PRIMARY_TABS } from './BottomTabs.jsx';
+import { MORE_ITEMS } from './MoreSheet.jsx';
 
-export default function DesktopSidebar({ onMoreClick }) {
+export default function DesktopSidebar({ mhaTrackerEnabled = false }) {
   const navigate = useNavigate();
+  const links = [
+    ...PRIMARY_TABS.map((item) => ({
+      ...item,
+      path: item.to
+    })),
+    ...MORE_ITEMS.filter((item) => item.feature !== 'mha' || mhaTrackerEnabled)
+  ];
 
   return (
     <aside className="desktop-sidebar">
@@ -16,10 +24,10 @@ export default function DesktopSidebar({ onMoreClick }) {
         <div className="brand-name">Orbit Money</div>
       </button>
       <nav className="sidebar-nav">
-        {PRIMARY_TABS.map((t) => (
+        {links.map((t) => (
           <NavLink
-            key={t.to}
-            to={t.to}
+            key={t.path}
+            to={t.path}
             className={({ isActive }) =>
               `sidebar-link ${isActive ? 'active' : ''}`
             }
@@ -28,14 +36,6 @@ export default function DesktopSidebar({ onMoreClick }) {
             <span>{t.label}</span>
           </NavLink>
         ))}
-        <button
-          type="button"
-          className="sidebar-link"
-          onClick={onMoreClick}
-        >
-          <span className="sidebar-icon" aria-hidden>⋯</span>
-          <span>More</span>
-        </button>
       </nav>
     </aside>
   );

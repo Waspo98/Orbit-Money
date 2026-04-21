@@ -172,13 +172,6 @@ export default function NetWorth() {
         title="Net Worth"
         subtitle={`Assets minus liabilities${latest ? `, updated through ${formatMonth(latest.month)}` : ''}`}
         stats={netWorthStats}
-        toolbar={(
-          <div className="page-hero-action-row">
-            <button type="button" className="btn-secondary" onClick={reload} disabled={loading}>
-              Refresh
-            </button>
-          </div>
-        )}
       />
 
       {error && <div className="error">{error}</div>}

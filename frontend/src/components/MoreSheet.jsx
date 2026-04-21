@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 const ANIM_MS = 180;
 
-const ITEMS = [
+const MORE_ITEMS = [
   { id: 'settings', label: 'Settings', description: 'Maintenance and configuration', icon: '\u2699', path: '/settings' },
   { id: 'rules', label: 'Rules', description: 'Automate merchant names and categories', icon: '\u2299', path: '/rules' },
   { id: 'categories', label: 'Category Manager', description: 'Organize spending categories', icon: '#', path: '/categories' },
@@ -17,7 +17,7 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
   const navigate = useNavigate();
   const [closing, setClosing] = useState(false);
   const timerRef = useRef(null);
-  const visibleItems = ITEMS.filter((item) => item.feature !== 'mha' || mhaTrackerEnabled);
+  const visibleItems = MORE_ITEMS.filter((item) => item.feature !== 'mha' || mhaTrackerEnabled);
 
   useEffect(() => {
     if (open) setClosing(false);
@@ -99,3 +99,5 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
     </div>
   );
 }
+
+export { MORE_ITEMS };

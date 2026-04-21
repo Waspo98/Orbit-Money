@@ -24,6 +24,8 @@
 }
 
 :root {
+  color-scheme: light;
+
   --bg:                #fafaf7;
   --surface:           #ffffff;
   --surface-2:         #f5f4ee;
@@ -85,6 +87,8 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
+
   --bg:                #0a1410;
   --surface:           #111a15;
   --surface-2:         #172220;
@@ -125,6 +129,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
     --bg:                #0a1410;
     --surface:           #111a15;
     --surface-2:         #172220;
@@ -644,6 +650,13 @@ input, textarea, select {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.rules-danger-zone {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 22px;
+  padding-bottom: 18px;
 }
 
 .rule-row {
@@ -1465,6 +1478,7 @@ input, textarea, select {
     top: 0;
     left: 0;
     z-index: 60;
+    overflow-y: auto;
   }
 
   .sidebar-brand {
@@ -5349,24 +5363,24 @@ input, textarea, select {
 }
 
 .txn-toolbar-hero .txn-search-input {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.96);
-  color: #0d1b2f;
+  border-color: color-mix(in srgb, var(--border) 70%, rgba(255, 255, 255, 0.18));
+  background: var(--surface);
+  color: var(--text);
   box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
 }
 
 .txn-toolbar-hero .txn-search-input::placeholder {
-  color: #607089;
+  color: var(--text-muted);
 }
 
 .txn-toolbar-hero .txn-search-icon,
 .txn-toolbar-hero .txn-search-clear {
-  color: #607089;
+  color: var(--text-muted);
 }
 
 .txn-toolbar-hero .txn-search-clear:hover {
-  background: rgba(8, 25, 60, 0.08);
-  color: #0d1b2f;
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
 .page-hero-collapsed-slot .txn-search-wrap {
@@ -5448,18 +5462,18 @@ input, textarea, select {
 .txn-toolbar-hero .btn-secondary,
 .txn-toolbar-hero .txn-sort select,
 .txn-toolbar-hero .txn-page-size select {
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: color-mix(in srgb, var(--border) 70%, rgba(255, 255, 255, 0.18));
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.95);
-  color: #0d1b2f;
+  background: var(--surface);
+  color: var(--text);
   box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
 }
 
 .txn-toolbar-hero .btn-secondary:hover,
 .txn-toolbar-hero .txn-sort select:hover,
 .txn-toolbar-hero .txn-page-size select:hover {
-  background: #ffffff;
-  border-color: rgba(143, 240, 201, 0.8);
+  background: var(--surface-hover);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 
 .txn-toolbar-hero .btn-secondary.btn-active {
@@ -5913,18 +5927,18 @@ input, textarea, select {
 }
 
 .app-shell.has-page-hero .page-hero-budgets .month-nav-arrow {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.95);
-  color: #0d1b2f;
+  border-color: color-mix(in srgb, var(--border) 70%, rgba(255, 255, 255, 0.18));
+  background: var(--surface);
+  color: var(--text);
   box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
   font-size: 1.1rem;
   font-weight: 800;
 }
 
 .app-shell.has-page-hero .page-hero-budgets .month-nav-arrow:hover:not(:disabled) {
-  background: #ffffff;
-  color: #0d1b2f;
-  border-color: rgba(143, 240, 201, 0.8);
+  background: var(--surface-hover);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 
 /* Wrap holds the visible pill styling PLUS an invisible <select> overlayed
@@ -5959,17 +5973,17 @@ input, textarea, select {
 }
 
 .page-hero-budgets .month-nav-label-wrap {
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: color-mix(in srgb, var(--border) 70%, rgba(255, 255, 255, 0.18));
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.95);
-  color: #0d1b2f;
+  background: var(--surface);
+  color: var(--text);
   box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
 }
 
 .page-hero-budgets .month-nav-label-wrap:hover,
 .page-hero-budgets .month-nav-label-wrap:focus-within {
-  background: #ffffff;
-  border-color: rgba(143, 240, 201, 0.8);
+  background: var(--surface-hover);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 
 .month-nav-label-text {
@@ -5983,7 +5997,7 @@ input, textarea, select {
 }
 
 .page-hero-budgets .month-nav-caret {
-  color: #607089;
+  color: var(--text-muted);
 }
 
 /* The real <select> is invisible but covers the entire pill — iOS and

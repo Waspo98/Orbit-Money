@@ -56,6 +56,15 @@ function deleteSummary(category) {
     .join(', ');
 }
 
+function sortCategoriesByName(items) {
+  return [...items].sort((a, b) =>
+    String(a.name || '').localeCompare(String(b.name || ''), undefined, {
+      sensitivity: 'base',
+      numeric: true
+    })
+  );
+}
+
 export default function Categories({
   mhaTrackerEnabled = false,
   onOpenMenu,
@@ -73,7 +82,7 @@ export default function Categories({
     setError('');
     try {
       const data = await api.get('/api/categories');
-      setCategories(data.items);
+      setCategories(sortCategoriesByName(data.items || []));
     } catch (err) {
       setError(err.message || 'Failed to load categories');
     } finally {
@@ -87,8 +96,9 @@ export default function Categories({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return categories;
-    return categories.filter((category) =>
+    const sorted = sortCategoriesByName(categories);
+    if (!q) return sorted;
+    return sorted.filter((category) =>
       `${category.name} ${category.icon || ''}`.toLowerCase().includes(q)
     );
   }, [categories, search]);
