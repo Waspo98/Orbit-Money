@@ -123,7 +123,6 @@ export default function NetWorth() {
   const history = data?.history || [];
   const breakdown = data?.breakdown || [];
   const latest = history[history.length - 1];
-  const first = history[0];
   const topAccounts = breakdown.slice(0, 8);
   const positiveAccounts = breakdown.filter((a) => a.contribution > 0);
   const debtAccounts = breakdown.filter((a) => a.contribution < 0);
@@ -139,7 +138,7 @@ export default function NetWorth() {
   const largestDebt = debtAccounts[0];
   const debtShare = percent(summary.liabilities, summary.assets);
   const monthTone = Number(summary.monthOverMonth || 0) >= 0 ? 'income' : 'expense';
-  const periodTone = Number(summary.periodChange || 0) >= 0 ? 'income' : 'expense';
+  const yearTone = Number(summary.yearToDateChange || 0) >= 0 ? 'income' : 'expense';
   const netWorthStats = [
     {
       label: 'Current',
@@ -152,9 +151,9 @@ export default function NetWorth() {
       tone: monthTone === 'income' ? 'good' : 'caution'
     },
     {
-      label: first ? `Since ${formatMonth(first.month)}` : 'Since Start',
-      value: loading ? 'Loading' : formatSignedMoney(summary.periodChange),
-      tone: periodTone === 'income' ? 'good' : 'caution'
+      label: 'This Year',
+      value: loading ? 'Loading' : formatSignedMoney(summary.yearToDateChange),
+      tone: yearTone === 'income' ? 'good' : 'caution'
     },
     {
       label: 'Debt Share',

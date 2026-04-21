@@ -117,19 +117,9 @@ export default function Categories({
         subtitle={`${categories.length.toLocaleString()} categor${
           categories.length === 1 ? 'y' : 'ies'
         }`}
-        stats={[
-          { label: 'Categories', value: categories.length.toLocaleString() },
-          {
-            label: 'Used',
-            value: categories
-              .filter((category) => Number(category.transaction_count || 0) > 0)
-              .length.toLocaleString()
-          }
-        ]}
         initialHeight={420}
         onOpenMenu={onOpenMenu}
-        statLabel="Category summary"
-        statsExtra={(
+        toolbar={(
           <div className="categories-hero-toolbar">
             <input
               type="search"

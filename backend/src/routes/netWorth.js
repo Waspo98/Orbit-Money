@@ -142,6 +142,15 @@ function buildHistory(accounts, monthlyDeltas, firstMonth, latestMonth) {
   return rows.reverse();
 }
 
+function sumNetWorthChange(accounts, deltas) {
+  const accountById = new Map(accounts.map((account) => [account.id, account]));
+  return deltas.reduce((total, delta) => {
+    const account = accountById.get(delta.account_id);
+    if (!account) return total;
+    return total + contributionForAccount(account, delta.amount);
+  }, 0);
+}
+
 router.get('/', requireAuth, (req, res) => {
   try {
     const requestedMonths = parseInt(req.query.months, 10);
@@ -185,13 +194,25 @@ router.get('/', requireAuth, (req, res) => {
     const history = buildHistory(accounts, monthlyDeltas, firstMonth, latestMonth);
     const previous = history.length > 1 ? history[history.length - 2] : null;
     const first = history[0] || null;
+    const yearStart = `${latestMonth.slice(0, 4)}-01-01`;
+    const yearToDateDeltas = db
+      .prepare(
+        `
+        SELECT account_id, SUM(amount) AS amount
+          FROM transactions
+         WHERE date >= ?
+         GROUP BY account_id
+      `
+      )
+      .all(yearStart);
 
     res.json({
       summary: {
         ...current.totals,
         accountCount: accounts.length,
         monthOverMonth: previous ? current.totals.netWorth - previous.netWorth : 0,
-        periodChange: first ? current.totals.netWorth - first.netWorth : 0
+        periodChange: first ? current.totals.netWorth - first.netWorth : 0,
+        yearToDateChange: sumNetWorthChange(accounts, yearToDateDeltas)
       },
       history,
       breakdown: current.breakdown
