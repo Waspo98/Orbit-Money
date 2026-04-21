@@ -74,6 +74,12 @@ in SQLite as display enrichment. Logo image bytes are not stored by Orbit Money;
 the browser/provider cache handles the image files, and failed logo loads fall
 back to the transaction category icon.
 
+Logo matching is intentionally conservative. Domain-like transaction text can
+use Logo.dev's domain lookup, but name-only lookup is limited to clean merchant
+names or names already normalized by a user/rule edit. Ambiguous processor,
+payment, transfer, terminal, or numbered bank strings fall back to category
+icons instead of guessing.
+
 ## Run With Docker Compose
 
 This is the primary way the app is intended to run.

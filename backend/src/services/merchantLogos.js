@@ -1,6 +1,7 @@
 import { config } from '../config.js';
 
 const PROVIDER = 'logo_dev';
+const DOMAIN_RE = /\b(?:https?:\/\/)?(?:www\.)?([a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+\.[a-z]{2,})\b/i;
 const GENERIC_MERCHANTS = new Set([
   'unknown',
   'transfer',
@@ -14,15 +15,38 @@ const GENERIC_MERCHANTS = new Set([
   'interest',
   'dividend'
 ]);
+const AMBIGUOUS_MERCHANT_WORDS = [
+  'ach',
+  'autopay',
+  'bill pay',
+  'card',
+  'checkcard',
+  'credit',
+  'debit',
+  'direct debit',
+  'external transfer',
+  'mobile payment',
+  'online transfer',
+  'payment',
+  'pos',
+  'purchase',
+  'recurring',
+  'transfer',
+  'withdrawal'
+];
+const PAYMENT_PREFIX_RE = /^(sq|tst|sp|paypal|pp|stripe|sumup|toast|clover)[\s*.-]+/i;
+const SAFE_SHORT_NAMES = new Set(['aldi', 'amex', 'apple', 'at&t', 'aws', 'cvs', 'etsy', 'hulu', 'ikea', 'lyft', 'uber', 'ups', 'usps']);
 
 function cleanMerchantName(value) {
   return String(value || '')
     .trim()
     .replace(/\s+/g, ' ')
-    .replace(/^(sq|tst|sp|paypal|pp|zelle|venmo|cash app|stripe)[\s*.-]+/i, '')
+    .replace(PAYMENT_PREFIX_RE, '')
     .replace(/\s+#?\d{3,}\b.*$/i, '')
+    .replace(/\b(store|location|terminal|auth|pending)\s*#?\d*\b/gi, ' ')
     .replace(/\b\d{2}\/\d{2}(\/\d{2,4})?\b/g, ' ')
     .replace(/\b\d{4,}\b/g, ' ')
+    .replace(/\s+(inc|llc|ltd|co|corp|corporation)\.?$/i, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -36,7 +60,46 @@ export function merchantLogoKey(value) {
     .replace(/\s+/g, '-');
 }
 
-function logoDevUrl(query, includeToken = false) {
+function extractDomain(value) {
+  const match = DOMAIN_RE.exec(String(value || '').toLowerCase());
+  if (!match) return null;
+  const domain = match[1].replace(/^www\./, '');
+  if (domain.endsWith('.local') || domain.endsWith('.invalid')) return null;
+  return domain;
+}
+
+function isStrictNameCandidate(query, rawText) {
+  const lowerQuery = query.toLowerCase();
+  const lowerRaw = String(rawText || '').toLowerCase();
+  if (GENERIC_MERCHANTS.has(lowerQuery)) return false;
+  if (AMBIGUOUS_MERCHANT_WORDS.some((word) => lowerQuery.includes(word))) return false;
+  if (PAYMENT_PREFIX_RE.test(String(rawText || ''))) return false;
+  if (/[#*_/@\\]/.test(query)) return false;
+  if (/\d/.test(query)) return false;
+  if (/\b\d{3,}\b/.test(lowerRaw)) return false;
+
+  const words = lowerQuery.split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 3) return false;
+  if (query.length < 3 || query.length > 32) return false;
+  if (words.length === 1 && words[0].length < 4 && !SAFE_SHORT_NAMES.has(words[0])) return false;
+  if (words.some((word) => word.length < 3 && !['&', 'and'].includes(word))) return false;
+
+  return true;
+}
+
+function isCuratedMerchantName(row, query) {
+  if (row?.edited_merchant_source) return true;
+
+  const original = cleanMerchantName(row?.original_merchant || row?.merchant);
+  const displayed = cleanMerchantName(row?.merchant);
+  return (
+    merchantLogoKey(original) === merchantLogoKey(query) &&
+    merchantLogoKey(displayed) === merchantLogoKey(query) &&
+    String(row?.original_merchant || row?.merchant || '').trim() === query
+  );
+}
+
+function logoDevUrl(query, includeToken = false, lookup = 'name') {
   const params = new URLSearchParams({
     size: '96',
     retina: 'true',
@@ -46,23 +109,32 @@ function logoDevUrl(query, includeToken = false) {
   if (includeToken) {
     params.set('token', config.logoDevPublishableKey);
   }
-  return `https://img.logo.dev/name/${encodeURIComponent(query)}?${params.toString()}`;
+  const path = lookup === 'domain' ? encodeURIComponent(query) : `name/${encodeURIComponent(query)}`;
+  return `https://img.logo.dev/${path}?${params.toString()}`;
 }
 
-function candidateForMerchant(merchant) {
+function candidateForTransaction(row) {
   if (!config.logoDevPublishableKey) return null;
 
-  const providerQuery = cleanMerchantName(merchant);
-  const key = merchantLogoKey(providerQuery);
+  const rawText = [
+    row?.merchant,
+    row?.original_merchant,
+    row?.original_description
+  ].filter(Boolean).join(' ');
+  const domain = extractDomain(rawText);
+  const providerQuery = domain || cleanMerchantName(row?.merchant);
+  const lookup = domain ? 'domain' : 'name';
+  const key = domain ? `domain-${domain}` : merchantLogoKey(providerQuery);
   if (!providerQuery || providerQuery.length < 2 || !key) return null;
-  if (GENERIC_MERCHANTS.has(providerQuery.toLowerCase())) return null;
+  if (!domain && !isStrictNameCandidate(providerQuery, rawText)) return null;
+  if (!domain && !isCuratedMerchantName(row, providerQuery)) return null;
 
   return {
     merchant_key: key,
     merchant_name: providerQuery,
     provider: PROVIDER,
     provider_query: providerQuery,
-    logo_url: logoDevUrl(providerQuery)
+    logo_url: logoDevUrl(providerQuery, false, lookup)
   };
 }
 
@@ -98,7 +170,7 @@ export function attachMerchantLogos(db, rows) {
   const rowKeys = new Map();
 
   for (const row of rows) {
-    const candidate = candidateForMerchant(row?.merchant);
+    const candidate = candidateForTransaction(row);
     if (!candidate) {
       rowKeys.set(row?.id, null);
       continue;
@@ -144,7 +216,11 @@ export function attachMerchantLogos(db, rows) {
             url:
               cached.status === 'manual'
                 ? cached.logo_url
-                : logoDevUrl(cached.provider_query, true),
+                : logoDevUrl(
+                    cached.provider_query,
+                    true,
+                    extractDomain(cached.provider_query) ? 'domain' : 'name'
+                  ),
             status: cached.status
           }
         : null
