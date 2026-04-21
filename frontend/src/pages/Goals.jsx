@@ -1,5 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+  arrayMove
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import PageHero from '../components/PageHero.jsx';
@@ -217,6 +234,17 @@ export default function Goals() {
   const [imagineMonthly, setImagineMonthly] = useState(50);
   const [focusCollapsed, setFocusCollapsed] = useState(true);
   const [reorderMode, setReorderMode] = useState(false);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 0 }
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { distance: 0 }
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates
+    })
+  );
 
   async function load() {
     setLoading(true);
@@ -266,14 +294,15 @@ export default function Goals() {
     setWizardGoal(goal);
   }
 
-  async function moveGoal(goalId, direction) {
-    const index = goals.findIndex((goal) => goal.id === goalId);
-    const nextIndex = index + direction;
-    if (index < 0 || nextIndex < 0 || nextIndex >= goals.length) return;
+  async function handleGoalDragEnd(event) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-    const nextGoals = [...goals];
-    const [moved] = nextGoals.splice(index, 1);
-    nextGoals.splice(nextIndex, 0, moved);
+    const oldIndex = goals.findIndex((goal) => goal.id === active.id);
+    const newIndex = goals.findIndex((goal) => goal.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const nextGoals = arrayMove(goals, oldIndex, newIndex);
     const optimisticData = { ...data, goals: nextGoals };
     setData(optimisticData);
 
@@ -402,48 +431,28 @@ export default function Goals() {
               )}
             </header>
             <div className="goal-list">
-              {goals.map((goal, index) => {
+              {reorderMode ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleGoalDragEnd}
+                >
+                  <SortableContext
+                    items={goals.map((goal) => goal.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="goal-list reorder-active">
+                      {goals.map((goal) => (
+                        <DraggableGoalRow key={goal.id} goal={goal} />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              ) : goals.map((goal) => {
                 const leading = <span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>;
                 const subtitle = `${formatMoney(goal.current_amount)} of ${formatMoney(goal.target_amount)}`;
                 const progress = `${Math.round(goal.progress_percent || 0)}%`;
                 const eta = formatEta(goal.eta);
-
-                if (reorderMode) {
-                  return (
-                    <div
-                      key={goal.id}
-                      className="selectable-list-item goal-list-row goal-list-row-reorder"
-                    >
-                      <span className="selectable-list-leading">{leading}</span>
-                      <span className="selectable-list-main">
-                        <strong>{goal.name}</strong>
-                        <em>{subtitle}</em>
-                      </span>
-                      <span className="selectable-list-side">
-                        <strong>{progress}</strong>
-                        <em>{eta}</em>
-                      </span>
-                      <span className="goal-reorder-controls" aria-label={`Reorder ${goal.name}`}>
-                        <button
-                          type="button"
-                          className="btn-secondary btn-compact"
-                          onClick={() => moveGoal(goal.id, -1)}
-                          disabled={index === 0}
-                        >
-                          Up
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary btn-compact"
-                          onClick={() => moveGoal(goal.id, 1)}
-                          disabled={index === goals.length - 1}
-                        >
-                          Down
-                        </button>
-                      </span>
-                    </div>
-                  );
-                }
 
                 return (
                   <SelectableListItem
@@ -500,6 +509,45 @@ export default function Goals() {
 
 function presetFor(kind) {
   return GOAL_PRESETS.find((preset) => preset.kind === kind) || GOAL_PRESETS[GOAL_PRESETS.length - 1];
+}
+
+function DraggableGoalRow({ goal }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: goal.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`selectable-list-item goal-list-row goal-list-row-reorder draggable ${isDragging ? 'dragging' : ''}`}
+      {...attributes}
+      {...listeners}
+    >
+      <span className="drag-grip" aria-hidden="true">⋮⋮</span>
+      <span className="selectable-list-leading">
+        <span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>
+      </span>
+      <span className="selectable-list-main">
+        <strong>{goal.name}</strong>
+        <em>{formatMoney(goal.current_amount)} of {formatMoney(goal.target_amount)}</em>
+      </span>
+      <span className="selectable-list-side">
+        <strong>{Math.round(goal.progress_percent || 0)}%</strong>
+        <em>{formatEta(goal.eta)}</em>
+      </span>
+    </div>
+  );
 }
 
 function GoalProgress({ goal }) {

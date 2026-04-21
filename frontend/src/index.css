@@ -1145,6 +1145,16 @@ input, textarea, select {
   border: 1px dashed var(--border-strong, var(--border));
   touch-action: none;
 }
+
+.account-list.reorder-active .account-main {
+  flex: 1 1 auto;
+}
+
+.account-list.reorder-active .account-balance {
+  min-width: 132px;
+  margin-left: auto;
+  text-align: right;
+}
 .account-list.reorder-active .account-row.draggable:active {
   cursor: grabbing;
 }
@@ -3213,11 +3223,15 @@ input, textarea, select {
 
 .goal-progress-main strong {
   color: var(--text);
-  font-size: clamp(2rem, 7vw, 3.6rem);
+  font-size: clamp(1.5rem, 5.8vw, 3.6rem);
   font-weight: 750;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: clip;
+  white-space: nowrap;
   transition: font-size 220ms var(--ease-out, ease), line-height 220ms var(--ease-out, ease);
 }
 
@@ -3413,6 +3427,10 @@ input, textarea, select {
   gap: 8px;
 }
 
+.goal-list.reorder-active {
+  touch-action: none;
+}
+
 .selectable-list-item {
   width: 100%;
   min-width: 0;
@@ -3494,8 +3512,10 @@ input, textarea, select {
 }
 
 .goal-list-row-reorder {
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  cursor: default;
+  grid-template-columns: 28px 34px minmax(0, 1fr) auto;
+  cursor: grab;
+  border-style: dashed;
+  touch-action: none;
 }
 
 .goal-list-row-reorder:hover,
@@ -3504,12 +3524,15 @@ input, textarea, select {
   background: var(--surface-2);
 }
 
-.goal-reorder-controls {
-  grid-column: 2 / -1;
-  justify-self: end;
-  display: inline-flex;
-  gap: 8px;
-  margin-top: 2px;
+.goal-list-row-reorder:active {
+  cursor: grabbing;
+}
+
+.goal-list-row-reorder.dragging {
+  opacity: 0.9;
+  box-shadow: var(--shadow-xl);
+  z-index: 100;
+  border-style: solid;
 }
 
 .goal-list-icon,
@@ -4386,10 +4409,10 @@ input, textarea, select {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
 }
 
 .txn-merchant-mark img {
@@ -4397,15 +4420,20 @@ input, textarea, select {
   height: 100%;
   display: block;
   object-fit: contain;
-  padding: 4px;
-  background: #ffffff;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 4px 10px rgba(0, 0, 0, 0.18);
 }
 
 .txn-merchant-mark-fallback {
+  border: 1px solid color-mix(in srgb, currentColor 28%, var(--border));
   font-size: 1rem;
   font-weight: 650;
   background: color-mix(in srgb, currentColor 10%, var(--surface-2));
-  border-color: color-mix(in srgb, currentColor 28%, var(--border));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.36);
 }
 
 .txn-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
