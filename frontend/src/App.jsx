@@ -19,6 +19,7 @@ import Categories from './pages/Categories.jsx';
 import HousingCalculator from './pages/HousingCalculator.jsx';
 import NetWorth from './pages/NetWorth.jsx';
 import MhaTracker from './pages/MhaTracker.jsx';
+import Goals from './pages/Goals.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
 import HamburgerMenu from './components/HamburgerMenu.jsx';
@@ -62,6 +63,7 @@ function AppShell() {
     location.pathname === '/rules' ||
     location.pathname === '/housing-calculator' ||
     location.pathname === '/net-worth' ||
+    location.pathname === '/goals' ||
     location.pathname === '/settings' ||
     location.pathname === '/mha-tracker';
 
@@ -225,6 +227,7 @@ function AppShell() {
               element={<HousingCalculator accounts={accounts} />}
             />
             <Route path="/net-worth" element={<NetWorth />} />
+            <Route path="/goals" element={<Goals />} />
             <Route
               path="/mha-tracker"
               element={

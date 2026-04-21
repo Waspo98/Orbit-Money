@@ -23,7 +23,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `budget.db` | SQLite database â€” accounts, transactions, categories, rules, budgets, sync config, sync log |
 | `sessions.db` | Session store (separate connection, managed by `connect-sqlite3`) |
 
-### Database Schema (11 migrations)
+### Database Schema (15 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -38,6 +38,10 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `009_budget_monthly.sql` | Per-month budgets: rebuilds `budgets` with composite unique `(category_id, month)` |
 | `010_budget_global_amount.sql` | Reverted to global per-category budgets: rebuilds `budgets` back to `category_id UNIQUE`, collapses any multi-month rows to the most recent via `ROW_NUMBER() OVER (PARTITION BY category_id ORDER BY month DESC)` |
 | `011_account_estimated_value.sql` | Adds `estimated_value` to accounts for mortgage/home-equity net-worth calculations |
+| `012_mha_tracker.sql` | Adds MHA app setting, default account eligibility, and transaction-level MHA overrides |
+| `013_mha_category_defaults.sql` | Adds category-level MHA default eligibility |
+| `014_mha_category_ignore_defaults.sql` | Adds category-level MHA default ignore behavior |
+| `015_goal_allocations.sql` | Extends goals metadata and adds multi-account goal allocations |
 
 ### Key Data Model Notes
 
@@ -54,6 +58,8 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 **Overlap strategy (SimpleFIN + Rocket Money):** cutover date approach â€” RM owns transactions before cutover, SimpleFIN owns after. Pre-cutover RM transactions are deleted during sync if SimpleFIN provides the same period.
 
 **Budgets:** One row per spending `category_id` (globally applied). Transfer and income categories are excluded from budget rows and per-category spending lists; income is summarized separately in the monthly Income / Expenses / Net stat row. The `budgets` table retains the `rollover` column from migration 001 for future Phase 2 work but it's not consumed by the current UI.
+
+**Goals:** Goal progress is computed from `goal_account_allocations` and active asset account balances. Allocations can be fixed dollar amounts or percentages of the post-reserve balance. The old `goals.current_amount` column is retained for compatibility, but the Goals API derives live progress at read time.
 
 ## Features
 
@@ -121,6 +127,16 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Progress bars transition green â†’ yellow (â‰¥85%) â†’ red (>100%)
 - Endpoints: GET `/api/budgets?month=YYYY-MM`, GET `/api/budgets/months`, PUT `/api/budgets` (upsert), DELETE `/api/budgets/:id`
 
+### Goals
+- Create and edit saving targets from the More menu with a three-step wizard: purpose, accounts, allocation
+- Supported goal kinds: retirement, college, car, home, emergency, travel, custom
+- Allocations can connect multiple active asset accounts to a goal: checking, savings, cash, investment, or other
+- Each account allocation can reserve cash first, then apply either a percent of the remaining balance or a fixed dollar amount
+- Wizard shows each account's existing goal allocations and can steal allocation from other goals when explicitly enabled
+- Goal charts derive monthly history from existing transaction deltas and current account balances; ETA uses recent monthly progress
+- "Imagine" slider projects a hypothetical ETA with extra monthly savings
+- Endpoints: GET `/api/goals?months=`, POST `/api/goals`, PUT `/api/goals/:id`, DELETE `/api/goals/:id`
+
 ### Dashboard
 Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on â‰¥900px with Recent Activity spanning full width. Data comes from parallel calls to existing endpoints â€” no dashboard-specific backend.
 
@@ -141,7 +157,7 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on â‰
 - **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More
 - **Desktop sidebar:** Same 5 items as bottom tabs
 - **Hamburger menu (top-right):** Settings/import, Theme toggle, Sign out
-- **More tab:** Opens bottom sheet (mobile) or centered modal (desktop) with cards for Rules, Settings, Category Manager, Housing Calculator, Net Worth, MHA Tracker when enabled, and coming-soon placeholders (Goals)
+- **More tab:** Opens bottom sheet (mobile) or centered modal (desktop) with cards for Rules, Settings, Category Manager, Goals, Housing Calculator, Net Worth, and MHA Tracker when enabled
 - **Settings page:** Appearance, MHA visibility, Rocket Money CSV import, SimpleFIN configuration/sync log, account controls, and app build details.
 - **React Router v6:** Client-side routing with browser back/forward support. All routes served via Express catch-all for deep-link support.
 
@@ -224,6 +240,14 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on â‰
 |---|---|---|
 | GET | `/api/net-worth?months=` | Current summary, monthly history, and account breakdown. Mortgage accounts contribute estimated value minus debt balance. |
 
+### Goals
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/goals?months=` | Goals, account allocation availability, history, progress, and ETA projections. |
+| POST | `/api/goals` | Create a goal with `{ name, target_amount, target_date?, kind?, allocations, stealFromOthers? }`. |
+| PUT | `/api/goals/:id` | Replace goal metadata and allocations. Can rebalance other goals when stealing is enabled. |
+| DELETE | `/api/goals/:id` | Delete a goal and its allocation rows. |
+
 ### SimpleFIN
 | Method | Path | Description |
 |---|---|---|
@@ -248,8 +272,8 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on â‰
 ### Backend (`backend/src/`)
 - `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
 - `db/index.js`, `db/migrations.js`
-- `db/migrations/001` through `011`
-- `routes/`: auth, health, import, transactions, accounts, categories, rules, simplefin, budgets, netWorth
+- `db/migrations/001` through `015`
+- `routes/`: auth, health, import, transactions, accounts, categories, rules, simplefin, budgets, netWorth, mha, goals
 - `services/`: csvImport, ruleMatcher (exports `loadRules`, `computeEdits`, `countMatches`, `reapplyRulesToAllTransactions`, `reapplyRulesToTransaction`, `revertEditsForRule`, `applyRulesToDraft`), simplefinClient, simplefinSync, transferMatcher
 
 ### Frontend (`frontend/`)
@@ -258,7 +282,7 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on â‰
 - `src/main.jsx`, `src/App.jsx` (BrowserRouter, passes accounts + categories to Transactions and Dashboard), `src/Login.jsx`, `src/api.js` (get/post/put/patch/del), `src/index.css` (~3000 lines)
 - `src/hooks/useTheme.js`
 - `src/components/`: AnimatedModal, AppDialog, BottomTabs, DesktopSidebar, DropdownMenu, FilterSheet, HamburgerMenu, MoreSheet, PageHero, SyncErrorBanner
-- `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, HousingCalculator, NetWorth, MhaTracker
+- `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, HousingCalculator, NetWorth, MhaTracker, Goals
 
 ## Known Gotchas
 - **better-sqlite3 `.iterate()` + write transaction** = "database connection is busy" â€” always use `.all()` instead
@@ -279,6 +303,5 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on â‰
 - **Phase 2 Budgets:** rollover (column already exists), income targets with proper direction, category groupings, spending pace
 - **Phase 2 Dashboard:** month-over-month comparison on the This Month card, spending-over-time and net-worth charts
 - **Recurring bills / subscriptions detection**
-- **Goals tracking**
 - **Bulk merge suggestions:** Auto-pair SimpleFIN duplicates with RM accounts by institution + last-4
 - **Mortgage calculator, credit score** (placeholders in More sheet)

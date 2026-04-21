@@ -1,0 +1,928 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { api } from '../api.js';
+import AnimatedModal from '../components/AnimatedModal.jsx';
+import PageHero from '../components/PageHero.jsx';
+import { useAppDialog } from '../components/AppDialog.jsx';
+
+const GOAL_PRESETS = [
+  { kind: 'retirement', label: 'Retirement', icon: 'R' },
+  { kind: 'college', label: 'Kids college', icon: 'C' },
+  { kind: 'car', label: 'New car', icon: 'A' },
+  { kind: 'home', label: 'Home', icon: 'H' },
+  { kind: 'emergency', label: 'Emergency fund', icon: 'E' },
+  { kind: 'travel', label: 'Travel', icon: 'T' },
+  { kind: 'custom', label: 'Something else', icon: 'G' }
+];
+
+const ACCOUNT_TYPE_LABELS = {
+  checking: 'Checking',
+  savings: 'Savings',
+  investment: 'Investment',
+  cash: 'Cash',
+  other: 'Other'
+};
+
+function formatMoney(amount, digits = 0) {
+  return Number(amount || 0).toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: digits
+  });
+}
+
+function formatSignedMoney(amount) {
+  const value = Number(amount || 0);
+  if (value === 0) return formatMoney(0);
+  return `${value > 0 ? '+' : '-'}${formatMoney(Math.abs(value))}`;
+}
+
+function parseMoney(value) {
+  const cleaned = String(value || '').replace(/[$,\s]/g, '');
+  if (!cleaned) return 0;
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatCurrencyInput(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const cleaned = String(value).replace(/[^0-9.]/g, '');
+  if (!cleaned) return '';
+  const [whole, decimal = ''] = cleaned.split('.');
+  const dollars = Number(whole || 0).toLocaleString();
+  const cents = decimal.slice(0, 2);
+  return `$${dollars}${cleaned.includes('.') ? `.${cents}` : ''}`;
+}
+
+function formatMonth(key) {
+  if (!key) return '';
+  const [year, month] = key.split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString(undefined, {
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
+function formatDate(date) {
+  if (!date) return 'No ETA yet';
+  return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
+function formatEta(eta) {
+  if (!eta) return 'No ETA yet';
+  if (eta.status === 'complete') return 'Reached';
+  if (!eta.date) return 'Needs history';
+  return formatDate(eta.date);
+}
+
+function addMonthsToDate(date, amount) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + amount);
+  return next.toISOString().slice(0, 10);
+}
+
+function estimateEta(goal, extraMonthly) {
+  const current = Number(goal?.current_amount) || 0;
+  const target = Number(goal?.target_amount) || 0;
+  if (current >= target) return { date: null, months: 0, status: 'complete' };
+  const monthly = (Number(goal?.monthly_pace) || 0) + Number(extraMonthly || 0);
+  if (monthly <= 0) return { date: null, months: null, status: 'stalled' };
+  const months = Math.ceil((target - current) / monthly);
+  return { date: addMonthsToDate(new Date(), months), months, status: 'projected' };
+}
+
+function chartRange(history) {
+  if (!history?.length) return { min: 0, max: 1 };
+  const values = history.map((point) => Number(point.amount) || 0);
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  if (min === max) {
+    min -= Math.max(100, Math.abs(min) * 0.1);
+    max += Math.max(100, Math.abs(max) * 0.1);
+  }
+  const pad = (max - min) * 0.16;
+  return { min: min - pad, max: max + pad };
+}
+
+function chartPath(history, width, height) {
+  if (!history?.length) return '';
+  const { min, max } = chartRange(history);
+  return history
+    .map((point, index) => {
+      const x = history.length === 1 ? width / 2 : (index / (history.length - 1)) * width;
+      const y = height - (((Number(point.amount) || 0) - min) / (max - min)) * height;
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(' ');
+}
+
+function areaPath(history, width, height) {
+  const line = chartPath(history, width, height);
+  if (!line) return '';
+  return `${line} L ${width} ${height} L 0 ${height} Z`;
+}
+
+function allocationBasis(account, reserveAmount) {
+  return Math.max(0, (Number(account?.current_balance) || 0) - Number(reserveAmount || 0));
+}
+
+function allocationAmount(allocation, account, reserveAmount) {
+  const basis = allocationBasis(account, reserveAmount);
+  if (allocation.allocation_type === 'percent') {
+    return basis * (Number(allocation.allocation_value || 0) / 100);
+  }
+  return Math.min(Number(allocation.allocation_value || 0), basis);
+}
+
+export default function Goals() {
+  const { alert, confirm, Dialog } = useAppDialog();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
+  const [wizardGoal, setWizardGoal] = useState(null);
+  const [imagineMonthly, setImagineMonthly] = useState(50);
+
+  async function load() {
+    setLoading(true);
+    setError('');
+    try {
+      const next = await api.get('/api/goals?months=24');
+      setData(next);
+      setSelectedId((current) => {
+        if (current && next.goals.some((goal) => goal.id === current)) return current;
+        return next.goals[0]?.id || null;
+      });
+    } catch (err) {
+      setError(err.message || 'Failed to load goals');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const goals = data?.goals || [];
+  const accounts = data?.accounts || [];
+  const selectedGoal = goals.find((goal) => goal.id === selectedId) || goals[0] || null;
+  const imaginedEta = selectedGoal ? estimateEta(selectedGoal, imagineMonthly) : null;
+  const bestPaceGoal = goals.reduce((best, goal) => {
+    if (!best || Number(goal.monthly_pace || 0) > Number(best.monthly_pace || 0)) return goal;
+    return best;
+  }, null);
+  const nextEtaGoal = goals
+    .filter((goal) => goal.eta?.date)
+    .sort((a, b) => a.eta.date.localeCompare(b.eta.date))[0];
+
+  async function handleDelete(goal) {
+    const ok = await confirm(`Delete "${goal.name}"? Its account allocations will be removed.`, {
+      title: 'Delete goal',
+      confirmLabel: 'Delete',
+      destructive: true
+    });
+    if (!ok) return;
+    try {
+      await api.del(`/api/goals/${goal.id}`);
+      await load();
+    } catch (err) {
+      alert(err.message || 'Delete failed', { title: 'Delete failed' });
+    }
+  }
+
+  function openNewGoal() {
+    setWizardGoal({ mode: 'new' });
+  }
+
+  function openEditGoal(goal) {
+    setWizardGoal(goal);
+  }
+
+  return (
+    <div className="goals-view">
+      <PageHero
+        id="goals-title"
+        variant="goals"
+        kicker="Saving Targets"
+        title="Goals"
+        subtitle="Connect asset accounts, reserve emergency cash, and project when each target lands."
+        toolbar={(
+          <div className="page-hero-action-row">
+            <button type="button" className="btn-secondary" onClick={load} disabled={loading}>
+              Refresh
+            </button>
+            <button type="button" className="btn-primary" onClick={openNewGoal}>
+              Add goal
+            </button>
+          </div>
+        )}
+      />
+
+      {error && <div className="error">{error}</div>}
+
+      {loading ? (
+        <div className="center-loading">
+          <div className="spinner" />
+        </div>
+      ) : accounts.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">$</div>
+          <h2>No asset accounts yet</h2>
+          <p>Add a checking, savings, investment, cash, or other asset account before creating goals.</p>
+          <Link to="/accounts" className="btn-primary">Manage accounts</Link>
+        </div>
+      ) : goals.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">G</div>
+          <h2>No goals yet</h2>
+          <p>Create a saving target and connect the accounts that should count toward it.</p>
+          <button type="button" className="btn-primary" onClick={openNewGoal}>Add goal</button>
+        </div>
+      ) : (
+        <div className="goals-grid">
+          <section className="dashboard-card goals-focus-card">
+            <header className="dashboard-card-header">
+              <h3>{selectedGoal?.name || 'Goal'}</h3>
+              <button type="button" className="dashboard-card-link button-link" onClick={() => openEditGoal(selectedGoal)}>
+                Edit
+              </button>
+            </header>
+            <div className="dashboard-card-body">
+              <GoalProgress goal={selectedGoal} />
+              <GoalChart goal={selectedGoal} />
+              <ImaginePanel
+                goal={selectedGoal}
+                imagineMonthly={imagineMonthly}
+                imaginedEta={imaginedEta}
+                onChange={setImagineMonthly}
+              />
+              <div className="goals-focus-actions">
+                <button type="button" className="btn-secondary" onClick={() => openEditGoal(selectedGoal)}>
+                  Edit goal
+                </button>
+                <button type="button" className="btn-danger" onClick={() => handleDelete(selectedGoal)}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="dashboard-card goals-list-card">
+            <header className="dashboard-card-header">
+              <h3>Targets</h3>
+              <span className="dashboard-card-link">{goals.length} active</span>
+            </header>
+            <div className="goal-list">
+              {goals.map((goal) => (
+                <button
+                  type="button"
+                  key={goal.id}
+                  className={`goal-list-row ${selectedGoal?.id === goal.id ? 'active' : ''}`}
+                  onClick={() => setSelectedId(goal.id)}
+                >
+                  <span className="goal-list-icon">{presetFor(goal.kind).icon}</span>
+                  <span className="goal-list-main">
+                    <strong>{goal.name}</strong>
+                    <em>{formatMoney(goal.current_amount)} of {formatMoney(goal.target_amount)}</em>
+                  </span>
+                  <span className="goal-list-side">
+                    <strong>{Math.round(goal.progress_percent || 0)}%</strong>
+                    <em>{formatEta(goal.eta)}</em>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="dashboard-card goals-signal-card">
+            <header className="dashboard-card-header">
+              <h3>Signals</h3>
+            </header>
+            <div className="dashboard-card-body">
+              <SignalRow label="Total saved" value={formatMoney(data.summary.total_saved)} detail={`${Math.round(data.summary.progress_percent || 0)}% funded`} />
+              <SignalRow label="Fastest pace" value={bestPaceGoal?.name || 'None yet'} detail={bestPaceGoal ? formatSignedMoney(bestPaceGoal.monthly_pace) + '/mo' : formatMoney(0)} />
+              <SignalRow label="Next ETA" value={nextEtaGoal?.name || 'Needs history'} detail={nextEtaGoal ? formatEta(nextEtaGoal.eta) : 'Add history'} />
+            </div>
+          </section>
+
+          <section className="dashboard-card goals-account-card">
+            <header className="dashboard-card-header">
+              <h3>Account allocation</h3>
+              <Link to="/accounts" className="dashboard-card-link">Accounts</Link>
+            </header>
+            <div className="dashboard-card-body">
+              <div className="goal-account-list">
+                {accounts.map((account) => (
+                  <AccountAllocationRow key={account.id} account={account} />
+                ))}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {wizardGoal && (
+        <GoalWizard
+          goal={wizardGoal.mode === 'new' ? null : wizardGoal}
+          accounts={accounts}
+          onClose={() => setWizardGoal(null)}
+          onSaved={async (savedId) => {
+            setWizardGoal(null);
+            await load();
+            setSelectedId(savedId);
+          }}
+        />
+      )}
+
+      <Dialog />
+    </div>
+  );
+}
+
+function presetFor(kind) {
+  return GOAL_PRESETS.find((preset) => preset.kind === kind) || GOAL_PRESETS[GOAL_PRESETS.length - 1];
+}
+
+function GoalProgress({ goal }) {
+  const progress = Math.max(0, Math.min(100, Number(goal?.progress_percent) || 0));
+  const remaining = Math.max(0, Number(goal?.target_amount || 0) - Number(goal?.current_amount || 0));
+
+  return (
+    <div className="goal-progress-panel">
+      <div className="goal-progress-main">
+        <span>{formatMoney(goal?.current_amount)} saved</span>
+        <strong>{formatMoney(goal?.target_amount)}</strong>
+        <em>{formatMoney(remaining)} remaining</em>
+      </div>
+      <div className="goal-progress-ring" style={{ '--goal-progress': `${progress}%` }}>
+        <span>{Math.round(progress)}%</span>
+      </div>
+      <div className="goal-progress-meta">
+        <SignalRow label="Projected ETA" value={formatEta(goal?.eta)} detail={goal?.eta?.months ? `${goal.eta.months} months` : goal?.eta?.status === 'complete' ? 'Complete' : 'No trend yet'} />
+        <SignalRow label="Monthly pace" value={formatSignedMoney(goal?.monthly_pace)} detail="Based on history" />
+      </div>
+    </div>
+  );
+}
+
+function GoalChart({ goal }) {
+  const width = 640;
+  const height = 180;
+  const history = goal?.history || [];
+  const line = chartPath(history, width, height);
+  const area = areaPath(history, width, height);
+  const first = history[0];
+  const latest = history[history.length - 1];
+
+  return (
+    <div className="goal-chart-wrap">
+      {history.length ? (
+        <>
+          <svg className="goal-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${goal.name} savings trend`}>
+            <defs>
+              <linearGradient id={`goalArea${goal.id}`} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.24" />
+                <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.02" />
+              </linearGradient>
+            </defs>
+            <path d={area} fill={`url(#goalArea${goal.id})`} />
+            <path d={line} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <div className="networth-chart-labels">
+            <span>{formatMonth(first?.month)}</span>
+            <strong>{formatMoney(latest?.amount)}</strong>
+            <span>{formatMonth(latest?.month)}</span>
+          </div>
+        </>
+      ) : (
+        <p className="subtle">No trend to chart yet.</p>
+      )}
+    </div>
+  );
+}
+
+function ImaginePanel({ goal, imagineMonthly, imaginedEta, onChange }) {
+  return (
+    <div className="goal-imagine-panel">
+      <div className="goal-imagine-copy">
+        <span>Imagine extra savings</span>
+        <strong>{formatMoney(imagineMonthly)}/mo</strong>
+        <em>{formatEta(imaginedEta)} with the extra amount</em>
+      </div>
+      <div className="goal-imagine-controls">
+        <input
+          type="range"
+          min="0"
+          max="1000"
+          step="25"
+          value={imagineMonthly}
+          onChange={(e) => onChange(Number(e.target.value))}
+          aria-label={`Extra monthly savings for ${goal.name}`}
+        />
+        <input
+          type="text"
+          inputMode="numeric"
+          value={formatMoney(imagineMonthly)}
+          onChange={(e) => onChange(parseMoney(e.target.value))}
+          aria-label="Extra monthly savings amount"
+        />
+      </div>
+    </div>
+  );
+}
+
+function SignalRow({ label, value, detail }) {
+  return (
+    <div className="networth-signal-row">
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
+      <em>{detail}</em>
+    </div>
+  );
+}
+
+function AccountAllocationRow({ account }) {
+  return (
+    <div className="goal-account-row">
+      <div className="goal-account-row-top">
+        <div>
+          <strong>{account.name}</strong>
+          <span>
+            <span className={`type-pill type-${account.type}`}>{ACCOUNT_TYPE_LABELS[account.type] || account.type}</span>
+            {account.institution && <em>{account.institution}</em>}
+          </span>
+        </div>
+        <div className="goal-account-values">
+          <strong>{formatMoney(account.allocated_amount)}</strong>
+          <span>{formatMoney(account.remaining_amount)} open</span>
+        </div>
+      </div>
+      <div className="goal-account-meter" aria-label={`${account.name} allocation`}>
+        <span style={{ width: `${Math.min(100, Math.max(0, account.allocated_percent || 0))}%` }} />
+      </div>
+      <div className="goal-account-row-bottom">
+        <span>Balance {formatMoney(account.current_balance)}</span>
+        <span>Reserve {formatMoney(account.reserve_amount)}</span>
+        <span>Allocatable {formatMoney(account.allocatable_amount)}</span>
+      </div>
+      {account.allocations.length > 0 && (
+        <div className="goal-account-chips">
+          {account.allocations.map((allocation) => (
+            <span key={allocation.id}>
+              {allocation.goal_name}: {formatMoney(allocation.current_amount)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GoalWizard({ goal, accounts, onClose, onSaved }) {
+  const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [draft, setDraft] = useState(() => ({
+    name: goal?.name || '',
+    kind: goal?.kind || 'custom',
+    icon: goal?.icon || presetFor(goal?.kind || 'custom').icon,
+    target_amount: goal ? formatCurrencyInput(goal.target_amount) : '',
+    target_date: goal?.target_date || '',
+    stealFromOthers: false,
+    allocations: (goal?.allocations || []).map((allocation) => ({
+      account_id: allocation.account_id,
+      allocation_type: allocation.allocation_type,
+      allocation_value:
+        allocation.allocation_type === 'fixed'
+          ? formatCurrencyInput(allocation.allocation_value)
+          : String(Math.round(Number(allocation.allocation_value) || 0)),
+      reserve_amount: allocation.reserve_amount ? formatCurrencyInput(allocation.reserve_amount) : ''
+    }))
+  }));
+
+  const selectedIds = new Set(draft.allocations.map((allocation) => allocation.account_id));
+  const selectedAccounts = accounts.filter((account) => selectedIds.has(account.id));
+  const conflicts = selectedAccounts.filter((account) => allocationConflict(account, draft, goal?.id));
+  const title = goal ? 'Edit goal' : 'Create goal';
+
+  function update(key, value) {
+    setDraft((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function chooseKind(kind) {
+    const preset = presetFor(kind);
+    setDraft((prev) => ({
+      ...prev,
+      kind,
+      icon: preset.icon,
+      name: prev.name || preset.label
+    }));
+  }
+
+  function toggleAccount(accountId) {
+    setDraft((prev) => {
+      const exists = prev.allocations.some((allocation) => allocation.account_id === accountId);
+      return {
+        ...prev,
+        allocations: exists
+          ? prev.allocations.filter((allocation) => allocation.account_id !== accountId)
+          : [
+              ...prev.allocations,
+              {
+                account_id: accountId,
+                allocation_type: 'percent',
+                allocation_value: '25',
+                reserve_amount: ''
+              }
+            ]
+      };
+    });
+  }
+
+  function updateAllocation(accountId, key, value) {
+    setDraft((prev) => ({
+      ...prev,
+      allocations: prev.allocations.map((allocation) =>
+        allocation.account_id === accountId ? { ...allocation, [key]: value } : allocation
+      )
+    }));
+  }
+
+  function validateStep(nextStep = step) {
+    if (nextStep === 0) {
+      if (!draft.name.trim()) return 'Goal name is required.';
+      if (parseMoney(draft.target_amount) <= 0) return 'Target amount is required.';
+    }
+    if (nextStep === 1 && draft.allocations.length === 0) {
+      return 'Connect at least one account.';
+    }
+    if (nextStep === 2) {
+      if (draft.allocations.some((allocation) => allocationValueNumber(allocation) <= 0)) {
+        return 'Each selected account needs an allocation greater than zero.';
+      }
+      if (conflicts.length > 0 && !draft.stealFromOthers) {
+        return 'Some accounts are fully allocated. Enable stealing or lower the new allocation.';
+      }
+    }
+    return '';
+  }
+
+  function goNext() {
+    const message = validateStep(step);
+    if (message) {
+      setError(message);
+      return;
+    }
+    setError('');
+    setStep((value) => Math.min(2, value + 1));
+  }
+
+  async function save(close) {
+    const message = validateStep(2);
+    if (message) {
+      setError(message);
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    const payload = {
+      name: draft.name.trim(),
+      kind: draft.kind,
+      icon: draft.icon,
+      target_amount: parseMoney(draft.target_amount),
+      target_date: draft.target_date || null,
+      stealFromOthers: draft.stealFromOthers,
+      allocations: draft.allocations.map((allocation) => ({
+        account_id: allocation.account_id,
+        allocation_type: allocation.allocation_type,
+        allocation_value: allocationValueNumber(allocation),
+        reserve_amount: parseMoney(allocation.reserve_amount)
+      }))
+    };
+
+    try {
+      const result = goal
+        ? await api.put(`/api/goals/${goal.id}`, payload)
+        : await api.post('/api/goals', payload);
+      close();
+      setTimeout(() => onSaved(result.id), 180);
+    } catch (err) {
+      setError(err.message || 'Save failed');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AnimatedModal onClose={onClose} size="lg">
+      {({ close }) => (
+        <div className="goal-wizard">
+          <h3>{title}</h3>
+          <div className="goal-wizard-steps" aria-label="Goal setup progress">
+            {['Purpose', 'Accounts', 'Allocation'].map((label, index) => (
+              <button
+                type="button"
+                key={label}
+                className={step === index ? 'active' : ''}
+                onClick={() => {
+                  if (index < step || !validateStep(step)) {
+                    setError('');
+                    setStep(index);
+                  }
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {step === 0 && (
+            <div className="goal-wizard-panel">
+              <div className="goal-preset-grid">
+                {GOAL_PRESETS.map((preset) => (
+                  <button
+                    type="button"
+                    key={preset.kind}
+                    className={draft.kind === preset.kind ? 'active' : ''}
+                    onClick={() => chooseKind(preset.kind)}
+                  >
+                    <span>{preset.icon}</span>
+                    <strong>{preset.label}</strong>
+                  </button>
+                ))}
+              </div>
+              <label className="field">
+                <span>Saving for</span>
+                <input value={draft.name} onChange={(e) => update('name', e.target.value)} placeholder="New car" />
+              </label>
+              <div className="goal-form-grid">
+                <label className="field">
+                  <span>Target amount</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={draft.target_amount}
+                    onChange={(e) => update('target_amount', formatCurrencyInput(e.target.value))}
+                    placeholder="$25,000"
+                  />
+                </label>
+                <label className="field">
+                  <span>Target date</span>
+                  <input type="date" value={draft.target_date} onChange={(e) => update('target_date', e.target.value)} />
+                </label>
+              </div>
+            </div>
+          )}
+
+          {step === 1 && (
+            <div className="goal-wizard-panel">
+              <div className="goal-account-picker">
+                {accounts.map((account) => {
+                  const otherAllocated = account.allocations
+                    .filter((allocation) => allocation.goal_id !== goal?.id)
+                    .reduce((sum, allocation) => sum + Number(allocation.current_amount || 0), 0);
+                  return (
+                    <button
+                      type="button"
+                      key={account.id}
+                      className={selectedIds.has(account.id) ? 'active' : ''}
+                      aria-pressed={selectedIds.has(account.id)}
+                      onClick={() => toggleAccount(account.id)}
+                    >
+                      <span className="goal-picker-check" aria-hidden />
+                      <span className="goal-picker-main">
+                        <strong>{account.name}</strong>
+                        <em>{ACCOUNT_TYPE_LABELS[account.type] || account.type} | {formatMoney(account.current_balance)}</em>
+                      </span>
+                      <span className="goal-picker-side">
+                        <strong>{formatMoney(account.remaining_amount)} open</strong>
+                        <em>{formatMoney(otherAllocated)} allocated</em>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="goal-wizard-panel">
+              <div className="goal-steal-row">
+                <label className="toggle-row">
+                  <input
+                    type="checkbox"
+                    checked={draft.stealFromOthers}
+                    onChange={(e) => update('stealFromOthers', e.target.checked)}
+                  />
+                  <span>Steal allocation from other goals when needed</span>
+                </label>
+                {conflicts.length > 0 && (
+                  <span className="pill warning">{conflicts.length} conflict{conflicts.length === 1 ? '' : 's'}</span>
+                )}
+              </div>
+              <div className="goal-allocation-editor">
+                {selectedAccounts.map((account) => {
+                  const allocation = draft.allocations.find((row) => row.account_id === account.id);
+                  return (
+                    <AllocationEditor
+                      key={account.id}
+                      account={account}
+                      allocation={allocation}
+                      goalId={goal?.id}
+                      onChange={(key, value) => updateAllocation(account.id, key, value)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {error && <div className="error">{error}</div>}
+
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={step === 0 ? close : () => setStep((value) => value - 1)}>
+              {step === 0 ? 'Cancel' : 'Back'}
+            </button>
+            {step < 2 ? (
+              <button type="button" className="btn-primary" onClick={goNext}>
+                Next
+              </button>
+            ) : (
+              <button type="button" className="btn-primary" onClick={() => save(close)} disabled={saving}>
+                {saving ? 'Saving...' : goal ? 'Save goal' : 'Create goal'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </AnimatedModal>
+  );
+}
+
+function allocationValueNumber(allocation) {
+  if (allocation.allocation_type === 'fixed') return parseMoney(allocation.allocation_value);
+  const parsed = Number(String(allocation.allocation_value || '').replace(/[^0-9.]/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function allocationConflict(account, draft, goalId) {
+  const allocation = draft.allocations.find((row) => row.account_id === account.id);
+  if (!allocation) return false;
+  const reserveAmount = parseMoney(allocation.reserve_amount);
+  const basis = allocationBasis(account, reserveAmount);
+  const currentAmount = allocationAmount(
+    {
+      allocation_type: allocation.allocation_type,
+      allocation_value: allocationValueNumber(allocation)
+    },
+    account,
+    reserveAmount
+  );
+  const otherAmount = account.allocations
+    .filter((row) => row.goal_id !== goalId)
+    .reduce((sum, row) => sum + Number(row.current_amount || 0), 0);
+  return currentAmount + otherAmount > basis + 0.01;
+}
+
+function AllocationEditor({ account, allocation, goalId, onChange }) {
+  const reserveAmount = parseMoney(allocation.reserve_amount);
+  const basis = allocationBasis(account, reserveAmount);
+  const otherAllocations = account.allocations.filter((row) => row.goal_id !== goalId);
+  const otherAmount = otherAllocations.reduce((sum, row) => sum + Number(row.current_amount || 0), 0);
+  const currentAmount = allocationAmount(
+    {
+      allocation_type: allocation.allocation_type,
+      allocation_value: allocationValueNumber(allocation)
+    },
+    account,
+    reserveAmount
+  );
+  const conflict = currentAmount + otherAmount > basis + 0.01;
+
+  return (
+    <div className={`goal-allocation-row ${conflict ? 'conflict' : ''}`}>
+      <div className="goal-allocation-header">
+        <div>
+          <strong>{account.name}</strong>
+          <span>{formatMoney(account.current_balance)} balance | {formatMoney(otherAmount)} already allocated</span>
+        </div>
+        <select
+          value={allocation.allocation_type}
+          onChange={(e) => {
+            onChange('allocation_type', e.target.value);
+            onChange('allocation_value', e.target.value === 'fixed' ? formatCurrencyInput(currentAmount) : '25');
+          }}
+        >
+          <option value="percent">Percent</option>
+          <option value="fixed">Fixed amount</option>
+        </select>
+      </div>
+
+      <div className="goal-form-grid">
+        <label className="field">
+          <span>Reserve first</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={allocation.reserve_amount}
+            onChange={(e) => onChange('reserve_amount', formatCurrencyInput(e.target.value))}
+            placeholder="$0"
+          />
+        </label>
+        <label className="field">
+          <span>{allocation.allocation_type === 'fixed' ? 'Goal amount' : 'Goal percent'}</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={allocation.allocation_value}
+            onChange={(e) => {
+              const value = allocation.allocation_type === 'fixed'
+                ? formatCurrencyInput(e.target.value)
+                : String(Math.min(100, Math.max(0, Number(e.target.value.replace(/[^0-9.]/g, '')) || 0)));
+              onChange('allocation_value', value);
+            }}
+            placeholder={allocation.allocation_type === 'fixed' ? '$500' : '25'}
+          />
+        </label>
+      </div>
+
+      <AllocationMeter
+        account={account}
+        allocation={allocation}
+        reserveAmount={reserveAmount}
+        basis={basis}
+        currentAmount={currentAmount}
+        otherAmount={otherAmount}
+        onChange={onChange}
+      />
+
+      {otherAllocations.length > 0 && (
+        <div className="goal-existing-allocations">
+          {otherAllocations.map((row) => (
+            <span key={row.id}>
+              {row.goal_name}: {formatMoney(row.current_amount)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AllocationMeter({ allocation, basis, currentAmount, otherAmount, onChange }) {
+  const lastTickRef = useRef(null);
+  const otherPercent = basis > 0 ? Math.min(100, (otherAmount / basis) * 100) : 0;
+  const currentPercent = basis > 0 ? Math.min(100, (currentAmount / basis) * 100) : 0;
+  const totalPercent = Math.min(100, otherPercent + currentPercent);
+  const rangeValue =
+    allocation.allocation_type === 'fixed'
+      ? Math.min(basis, allocationValueNumber(allocation))
+      : allocationValueNumber(allocation);
+
+  function tick(value) {
+    const tickValue = Math.round(Number(value) / (allocation.allocation_type === 'fixed' ? 100 : 5));
+    if (lastTickRef.current !== tickValue) {
+      lastTickRef.current = tickValue;
+      if (navigator.vibrate) navigator.vibrate(8);
+    }
+  }
+
+  function handleRange(value) {
+    tick(value);
+    if (allocation.allocation_type === 'fixed') {
+      onChange('allocation_value', formatCurrencyInput(value));
+    } else {
+      onChange('allocation_value', String(value));
+    }
+  }
+
+  return (
+    <div className="goal-meter-wrap">
+      <div className="goal-meter-track">
+        <span className="goal-meter-other" style={{ width: `${otherPercent}%` }} />
+        <span className="goal-meter-current" style={{ left: `${otherPercent}%`, width: `${Math.max(0, totalPercent - otherPercent)}%` }} />
+      </div>
+      <input
+        type="range"
+        min="0"
+        max={allocation.allocation_type === 'fixed' ? Math.max(0, Math.round(basis)) : 100}
+        step={allocation.allocation_type === 'fixed' ? 50 : 1}
+        value={rangeValue}
+        onPointerDown={() => tick(rangeValue)}
+        onChange={(e) => handleRange(Number(e.target.value))}
+        aria-label="Goal allocation meter"
+      />
+      <div className="goal-meter-labels">
+        <span>Other {formatMoney(otherAmount)}</span>
+        <span>This goal {formatMoney(currentAmount)}</span>
+        <span>Pool {formatMoney(basis)}</span>
+      </div>
+    </div>
+  );
+}

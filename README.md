@@ -341,6 +341,30 @@ the remaining mortgage balance from the account balance. The calculator keeps
 the spreadsheet-style assumptions editable for selling fees, purchase details,
 cash to close, and monthly payment estimates.
 
+## Goals
+
+The Goals page is available from the More menu. It lets savings targets be
+created for retirement, college, a car, a home, an emergency fund, travel, or a
+custom purpose.
+
+Each goal can connect to multiple active asset accounts: checking, savings,
+cash, investment, or other. For each connected account, the allocation can be a
+percentage of the post-reserve balance or a fixed dollar amount. A reserve can
+be set per account, such as keeping the first `$5,000` of savings outside goal
+allocations. When a new or edited goal would over-allocate an account, the
+wizard shows existing allocations and can steal allocation from other goals if
+the user enables that option.
+
+Goal progress is computed from current account balances and saved allocations.
+The trend graph is derived from existing transaction history by walking account
+balances backward over time, similar to the Net Worth page. ETA is projected
+from recent monthly goal history, and the "imagine" control estimates a new ETA
+with extra monthly savings added on top.
+
+Storage is additive: migration `015_goal_allocations.sql` extends the existing
+`goals` table with metadata and adds `goal_account_allocations`. It does not
+change Docker volumes, ports, auth behavior, imports, or sync storage.
+
 ## Category Manager
 
 The Category Manager is available from the More menu. It lets categories be
