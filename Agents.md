@@ -35,6 +35,10 @@
 - For schema changes, add a new migration; never edit an applied migration.
 
 ## Frontend conventions
+- Before creating new UI, first look for an existing component or CSS primitive
+  that matches the interaction: page hero, modal/dialog, dropdown, selectable
+  list item, sheet, button, card, pill, chart, or form field. Extend the shared
+  primitive when a pattern appears in more than one place.
 - Reuse `frontend/src/components/PageHero.jsx` and its exported
   `useMorphingPageHero` hook for morphing page headers; do not copy the
   scroll/resize measurement code into pages.
@@ -42,8 +46,15 @@
   imports it so mobile and desktop stay in sync.
 - Use `AnimatedModal`, `DropdownMenu`, `FilterSheet`, `MoreSheet`, and
   `SyncErrorBanner` rather than recreating equivalent overlays or menus.
+- Use `SelectableListItem` for two-line selectable rows such as goal/category
+  pickers; selected rows should use the shared green active treatment.
 - Use `useAppDialog` from `frontend/src/components/AppDialog.jsx` for alert
   and confirmation flows; avoid native `alert()` / `confirm()` in page code.
+- Use Title Case for visible button labels, for example `+ New Category`,
+  `Add Budget`, and `Save`.
+- Overlay behavior is intentional: modals/dialogs/sheets blur the app backdrop
+  and lock body scroll; dropdown menus stay anchored to their trigger, do not
+  blur the page, and do not lock scroll.
 - Keep route-level pages focused on data loading and composition. Move shared
   display primitives into `frontend/src/components` once a pattern appears in
   two places.

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import PageHero from '../components/PageHero.jsx';
+import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 
 const GOAL_PRESETS = [
@@ -214,7 +215,7 @@ export default function Goals() {
   const [selectedId, setSelectedId] = useState(null);
   const [wizardGoal, setWizardGoal] = useState(null);
   const [imagineMonthly, setImagineMonthly] = useState(50);
-  const [focusCollapsed, setFocusCollapsed] = useState(false);
+  const [focusCollapsed, setFocusCollapsed] = useState(true);
 
   async function load() {
     setLoading(true);
@@ -366,26 +367,22 @@ export default function Goals() {
 
           <section className="dashboard-card goals-list-card">
             <header className="dashboard-card-header">
-              <h3>Targets</h3>
+              <h3>Goals</h3>
             </header>
             <div className="goal-list">
               {goals.map((goal) => (
-                <button
-                  type="button"
+                <SelectableListItem
                   key={goal.id}
-                  className={`goal-list-row ${selectedGoal?.id === goal.id ? 'active' : ''}`}
+                  className="goal-list-row"
+                  active={selectedGoal?.id === goal.id}
                   onClick={() => setSelectedId(goal.id)}
-                >
-                  <span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>
-                  <span className="goal-list-main">
-                    <strong>{goal.name}</strong>
-                    <em>{formatMoney(goal.current_amount)} of {formatMoney(goal.target_amount)}</em>
-                  </span>
-                  <span className="goal-list-side">
-                    <strong>{Math.round(goal.progress_percent || 0)}%</strong>
-                    <em>{formatEta(goal.eta)}</em>
-                  </span>
-                </button>
+                  leading={<span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>}
+                  title={goal.name}
+                  subtitle={`${formatMoney(goal.current_amount)} of ${formatMoney(goal.target_amount)}`}
+                  sidePrimary={`${Math.round(goal.progress_percent || 0)}%`}
+                  sideSecondary={formatEta(goal.eta)}
+                  ariaLabel={`Select ${goal.name}`}
+                />
               ))}
             </div>
           </section>

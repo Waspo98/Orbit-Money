@@ -121,9 +121,10 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 ### Budgets
 - **Monthly caps, global per category.** One amount per category that applies to every month. Editing `Groceries` updates the cap for every past and future month.
 - **Month navigation** via `‹ / ›` arrows plus a visible-but-transparent `<select>` overlaying a styled pill — opens the native month picker on tap. Chose `<select>` over a hidden `<input type="month">` because hidden month-type inputs caused unexpected mobile-browser zoom on page load.
-- **Summary card:** overall spent of budgeted, percentage, remaining/over, plus an unbudgeted-spending callout
+- **Summary card:** total monthly expenses, percentage of budgeted amount, remaining/over, plus an unbudgeted-spending callout. The headline and progress math intentionally include unbudgeted expenses.
+- **Spending by Category chart:** interactive donut chart for monthly category spend. The list uses `SelectableListItem`, sorts biggest-to-smallest with Uncategorized forced last, and selected rows use the shared green active treatment.
 - **Income / Expenses / Net** three-column stat row at the top, scoped to the viewed month, excludes ignored + transfer transactions
-- **Three sections:** Budgeted (sorted most-over-budget first, per-row progress bars with over/remaining footnotes), Spent without a budget (quick-add CTAs), and No activity (collapsed toggle)
+- **Three sections:** Budgeted (sorted most-over-budget first, expandable per-row progress cards with transaction details), Spent without a budget (quick-add CTAs), and No activity (collapsed toggle)
 - Progress bars transition green → yellow (≥85%) → red (>100%)
 - Endpoints: GET `/api/budgets?month=YYYY-MM`, GET `/api/budgets/months`, PUT `/api/budgets` (upsert), DELETE `/api/budgets/:id`
 
@@ -155,18 +156,19 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on �
 
 ### Navigation
 - **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More
-- **Desktop sidebar:** Same 5 items as bottom tabs
-- **Hamburger menu (top-right):** Settings/import, Theme toggle, Sign out
-- **More tab:** Opens bottom sheet (mobile) or centered modal (desktop) with cards for Rules, Settings, Category Manager, Goals, Housing Calculator, Net Worth, and MHA Tracker when enabled
+- **Desktop sidebar:** Lists every page directly, in the same order as the mobile More menu, with Settings last. Bottom tabs are hidden on desktop.
+- **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Goals, Housing Calculator, Net Worth, MHA Tracker when enabled, and Settings last.
+- **Deprecated hamburger:** the old hamburger menu was removed; do not reintroduce it.
 - **Settings page:** Appearance, MHA visibility, Rocket Money CSV import, SimpleFIN configuration/sync log, account controls, and app build details.
 - **React Router v6:** Client-side routing with browser back/forward support. All routes served via Express catch-all for deep-link support.
 
 ### UI Details
-- `AnimatedModal` component: render-prop pattern (`{({ close }) => ...}`), 180ms slide-in/slide-out via `.closing` CSS class
+- `AnimatedModal` component: render-prop pattern (`{({ close }) => ...}`), 180ms slide/zoom animations via `.closing` CSS classes. Saved closes animate; canceled closes should feel immediate unless a specific flow says otherwise.
 - `PageHero` component and `useMorphingPageHero(initialHeight)` hook own the morphing sticky hero measurement logic. Reuse `PageHero` for page headers; pass `chrome` and `toolbar` slots when a page needs custom header controls.
 - `AppDialog.jsx` exposes `useAppDialog()` for modal alert/confirmation flows. Prefer it over native `alert()` / `confirm()` so mobile UX and destructive-action styling stay consistent.
 - `BottomTabs.jsx` owns the primary navigation item list; `DesktopSidebar.jsx` imports `PRIMARY_TABS` so desktop and mobile navigation labels/icons stay aligned.
-- Scroll lock: `document.body.style.overflow = 'hidden'` on all modals, hamburger menu, and More sheet
+- `SelectableListItem.jsx` is the shared two-line selectable card/row primitive. Use it for lists where one item is selected, such as goal/category pickers; selected rows use the shared green active treatment.
+- Overlay behavior: modals, app dialogs, sheets, and full-screen popovers blur the app backdrop and lock body scroll. `DropdownMenu` stays anchored to its trigger, does not blur the page, and does not lock scroll.
 - Three-way theme toggle (☀️ / 💻 / 🌙): localStorage persistence with pre-paint script in `index.html` to avoid flash
 - 40+ CSS custom properties for light/dark themes, emerald-600/500 accent
 - Inter Tight (Google Fonts) throughout — no serif fonts
@@ -281,7 +283,7 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on �
 - `public/`: manifest.webmanifest, icon.svg, icon-maskable.svg, sw.js
 - `src/main.jsx`, `src/App.jsx` (BrowserRouter, passes accounts + categories to Transactions and Dashboard), `src/Login.jsx`, `src/api.js` (get/post/put/patch/del), `src/index.css` (~3000 lines)
 - `src/hooks/useTheme.js`
-- `src/components/`: AnimatedModal, AppDialog, BottomTabs, DesktopSidebar, DropdownMenu, FilterSheet, HamburgerMenu, MoreSheet, PageHero, SyncErrorBanner
+- `src/components/`: AnimatedModal, AppDialog, BottomTabs, DesktopSidebar, DropdownMenu, FilterSheet, InlinePopover, MoreSheet, PageHero, SelectableListItem, SyncErrorBanner
 - `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, HousingCalculator, NetWorth, MhaTracker, Goals
 
 ## Known Gotchas
@@ -297,6 +299,8 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on �
 - **Repeated page hero UI:** before adding or changing a page header, check `PageHero.jsx` first. Shared morph behavior belongs in `useMorphingPageHero`; page-specific stat/chrome content belongs in the page.
 - **Native browser dialogs:** use `useAppDialog()` instead of `alert()` / `confirm()` so confirmations animate and share the app's button styling.
 - **Button copy:** visible button labels should use Title Case for words, e.g. `+ New Category`, `Add Budget`, `Save`.
+- **Selectable rows:** use `SelectableListItem` before creating a new selectable card/list row. Keep selected states green and compact two-line rows unless there is a strong page-specific reason.
+- **Dropdown menus:** do not lock body scroll or blur the page. Keep them positionally anchored to the trigger.
 - **Hidden `<input type="month">` triggers mobile-browser layout quirks** — use a `<select>` overlaying a styled pill instead when you want a native month picker
 - **Rule chaining no longer works** — since conditions match against originals only, a rule can't match on a value a higher-priority rule just renamed to. This was an intentional v12 change (match counts were broken because of the old chaining semantics). If a hand-built rule relied on chained renames, rewrite it to condition on `original_description` or the unmodified upstream value.
 

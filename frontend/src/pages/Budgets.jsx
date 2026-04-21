@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import PageHero from '../components/PageHero.jsx';
+import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 
 // ============================================================================
@@ -45,6 +46,16 @@ function addMonths(m, delta) {
   return monthFromDate(d);
 }
 
+function monthBounds(m) {
+  const d = parseMonthStr(m) || new Date();
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  const start = `${year}-${String(month).padStart(2, '0')}-01`;
+  const endDate = new Date(year, month, 0).getDate();
+  const end = `${year}-${String(month).padStart(2, '0')}-${String(endDate).padStart(2, '0')}`;
+  return { start, end };
+}
+
 function formatMonthLabel(m) {
   const d = parseMonthStr(m);
   if (!d) return m;
@@ -65,6 +76,14 @@ function formatMoney(n) {
   return Number(n).toLocaleString(undefined, {
     style: 'currency',
     currency: 'USD'
+  });
+}
+
+function formatTransactionDate(date) {
+  if (!date) return '';
+  return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric'
   });
 }
 
@@ -95,6 +114,8 @@ export default function Budgets() {
   const [editingBudget, setEditingBudget] = useState(null);
   const [showInactive, setShowInactive] = useState(false);
   const [selectedSpendingKey, setSelectedSpendingKey] = useState(null);
+  const [expandedBudgetKey, setExpandedBudgetKey] = useState(null);
+  const [budgetTransactions, setBudgetTransactions] = useState({});
 
   // Sort order for the Budgeted section. Persisted in localStorage so a
   // user's choice sticks across navigations without needing a URL param.
@@ -154,6 +175,11 @@ export default function Budgets() {
   useEffect(() => {
     loadMonths();
   }, []);
+
+  useEffect(() => {
+    setExpandedBudgetKey(null);
+    setBudgetTransactions({});
+  }, [selectedMonth]);
 
   function goToMonth(m) {
     const next = new URLSearchParams(searchParams);
@@ -258,7 +284,12 @@ export default function Budgets() {
         color: item.category.color || 'var(--accent)',
         amount: Number(item.spent)
       }))
-      .sort((a, b) => b.amount - a.amount);
+      .sort((a, b) => {
+        const aUncategorized = a.name.toLowerCase() === 'uncategorized';
+        const bUncategorized = b.name.toLowerCase() === 'uncategorized';
+        if (aUncategorized !== bUncategorized) return aUncategorized ? 1 : -1;
+        return b.amount - a.amount;
+      });
 
     const total = rows.reduce((sum, item) => sum + item.amount, 0);
     return { items: rows, total };
@@ -284,6 +315,49 @@ export default function Budgets() {
     } catch (err) {
       alert(err.message || 'Delete failed', { title: 'Delete failed' });
     }
+  }
+
+  async function loadBudgetTransactions(item) {
+    const key = String(item.category.id);
+    if (budgetTransactions[key]?.items || budgetTransactions[key]?.loading) return;
+    setBudgetTransactions((current) => ({
+      ...current,
+      [key]: { loading: true, items: [], error: '' }
+    }));
+    try {
+      const { start, end } = monthBounds(selectedMonth);
+      const categoryToken = item.category.id || 'uncategorized';
+      const qs = new URLSearchParams({
+        categories: String(categoryToken),
+        date_from: start,
+        date_to: end,
+        type: 'expense',
+        include_ignored: '0',
+        include_transfers: '0',
+        sort: 'date_desc',
+        limit: '100'
+      });
+      const result = await api.get(`/api/transactions?${qs.toString()}`);
+      setBudgetTransactions((current) => ({
+        ...current,
+        [key]: { loading: false, items: result.items || [], error: '' }
+      }));
+    } catch (err) {
+      setBudgetTransactions((current) => ({
+        ...current,
+        [key]: {
+          loading: false,
+          items: [],
+          error: err.message || 'Failed to load transactions'
+        }
+      }));
+    }
+  }
+
+  function toggleBudgetRow(item) {
+    const key = String(item.category.id);
+    setExpandedBudgetKey((current) => (current === key ? null : key));
+    loadBudgetTransactions(item);
   }
 
   return (
@@ -419,6 +493,9 @@ export default function Budgets() {
                   <BudgetedRow
                     key={item.category.id}
                     item={item}
+                    expanded={expandedBudgetKey === String(item.category.id)}
+                    transactionsState={budgetTransactions[String(item.category.id)]}
+                    onToggle={() => toggleBudgetRow(item)}
                     onEdit={() => setEditingBudget(item)}
                     onDelete={() => deleteBudget(item.budget_id)}
                   />
@@ -661,6 +738,17 @@ function SpendingPieChart({ items, total, selectedKey, onSelect }) {
     items.find((item) => item.key === selectedKey) ||
     items[0] ||
     null;
+  const segments = items.map((item) => {
+    const length = (item.amount / total) * circumference;
+    const segment = {
+      ...item,
+      length,
+      dashOffset: -offset,
+      active: selected?.key === item.key
+    };
+    offset += length;
+    return segment;
+  });
 
   return (
     <section className="budget-pie-card" aria-labelledby="budget-pie-title">
@@ -693,23 +781,37 @@ function SpendingPieChart({ items, total, selectedKey, onSelect }) {
             fill="none"
             strokeWidth={strokeWidth}
           />
-          {items.map((item) => {
-            const length = (item.amount / total) * circumference;
-            const dashOffset = -offset;
-            offset += length;
-            const active = selected?.key === item.key;
+          {segments.map((item) => (
+            item.active ? (
+              <circle
+                key={`${item.key}-glow`}
+                className="budget-pie-slice-glow"
+                cx="60"
+                cy="60"
+                r={radius}
+                fill="none"
+                stroke={item.color}
+                strokeWidth={strokeWidth + 9}
+                strokeDasharray={`${item.length} ${circumference - item.length}`}
+                strokeDashoffset={item.dashOffset}
+                transform="rotate(-90 60 60)"
+                aria-hidden="true"
+              />
+            ) : null
+          ))}
+          {segments.map((item) => {
             return (
               <circle
                 key={item.key}
-                className={`budget-pie-slice ${active ? 'active' : ''}`}
+                className={`budget-pie-slice ${item.active ? 'active' : ''}`}
                 cx="60"
                 cy="60"
                 r={radius}
                 fill="none"
                 stroke={item.color}
                 strokeWidth={strokeWidth}
-                strokeDasharray={`${length} ${circumference - length}`}
-                strokeDashoffset={dashOffset}
+                strokeDasharray={`${item.length} ${circumference - item.length}`}
+                strokeDashoffset={item.dashOffset}
                 transform="rotate(-90 60 60)"
                 tabIndex={0}
                 role="button"
@@ -739,27 +841,26 @@ function SpendingPieChart({ items, total, selectedKey, onSelect }) {
             const active = selected?.key === item.key;
             const percent = total > 0 ? Math.round((item.amount / total) * 100) : 0;
             return (
-              <button
+              <SelectableListItem
                 key={item.key}
-                type="button"
-                className={`budget-pie-item ${active ? 'active' : ''}`}
+                className="budget-pie-item"
+                active={active}
                 onClick={() => onSelect(item.key)}
-                aria-pressed={active}
-              >
-                <span
-                  className="budget-pie-dot"
-                  style={{ backgroundColor: item.color }}
-                  aria-hidden="true"
-                />
-                <span className="budget-pie-item-name">
-                  <span>{item.icon}</span>
-                  <span>{item.name}</span>
-                </span>
-                <span className="budget-pie-item-amount">
-                  {formatMoney(item.amount)}
-                  <em>{percent}%</em>
-                </span>
-              </button>
+                leading={(
+                  <>
+                    <span
+                      className="budget-pie-dot"
+                      style={{ backgroundColor: item.color }}
+                      aria-hidden="true"
+                    />
+                    <span aria-hidden="true">{item.icon}</span>
+                  </>
+                )}
+                title={item.name}
+                sidePrimary={formatMoney(item.amount)}
+                sideSecondary={`${percent}%`}
+                ariaLabel={`Select ${item.name}: ${formatMoney(item.amount)}`}
+              />
             );
           })}
         </div>
@@ -772,7 +873,7 @@ function SpendingPieChart({ items, total, selectedKey, onSelect }) {
 // Budget row (has a budget)
 // ============================================================================
 
-function BudgetedRow({ item, onEdit, onDelete }) {
+function BudgetedRow({ item, expanded, transactionsState, onToggle, onEdit, onDelete }) {
   const { category, amount, spent } = item;
   const percent = amount > 0 ? (spent / amount) * 100 : 0;
   const overBudget = spent > amount;
@@ -784,15 +885,28 @@ function BudgetedRow({ item, onEdit, onDelete }) {
     { label: 'Delete', icon: '✕', destructive: true, onClick: onDelete }
   ];
 
+  function handleClick(e) {
+    if (e.target.closest('button, a, input, select, textarea, [role="button"]')) return;
+    onToggle();
+  }
+
+  function handleKeyDown(e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (e.target.closest('button, a, input, select, textarea, [role="button"]')) return;
+    e.preventDefault();
+    onToggle();
+  }
+
   return (
-    <li className={`budget-row ${overBudget ? 'over-budget' : ''}`}>
+    <li
+      className={`budget-row ${overBudget ? 'over-budget' : ''} ${expanded ? 'expanded' : ''}`}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      aria-expanded={expanded}
+    >
       <div className="budget-row-head">
-        <button
-          type="button"
-          className="budget-row-main"
-          onClick={onEdit}
-          aria-label={`Edit budget for ${category.name}`}
-        >
+        <div className="budget-row-main">
           <span className="budget-row-icon" style={{ color: category.color }}>
             {category.icon}
           </span>
@@ -801,7 +915,7 @@ function BudgetedRow({ item, onEdit, onDelete }) {
             <span className="budget-row-spent">{formatMoney(spent)}</span>
             <span className="subtle"> / {formatMoney(amount)}</span>
           </span>
-        </button>
+        </div>
         <DropdownMenu
           items={menuItems}
           ariaLabel={`Actions for ${category.name} budget`}
@@ -823,6 +937,30 @@ function BudgetedRow({ item, onEdit, onDelete }) {
             {item.transaction_count}{' '}
             {item.transaction_count === 1 ? 'transaction' : 'transactions'}
           </span>
+        </div>
+      </div>
+      <div className="budget-row-detail" aria-hidden={!expanded}>
+        <div className="budget-row-detail-inner">
+          <h4>Transactions</h4>
+          {transactionsState?.loading ? (
+            <p className="subtle">Loading transactions...</p>
+          ) : transactionsState?.error ? (
+            <p className="error">{transactionsState.error}</p>
+          ) : transactionsState?.items?.length ? (
+            <ul className="budget-transaction-list">
+              {transactionsState.items.map((txn) => (
+                <li key={txn.id}>
+                  <span>
+                    <strong>{txn.merchant}</strong>
+                    <em>{formatTransactionDate(txn.date)}</em>
+                  </span>
+                  <strong>{formatMoney(Math.abs(Number(txn.amount || 0)))}</strong>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="subtle">No matching transactions this month.</p>
+          )}
         </div>
       </div>
     </li>
