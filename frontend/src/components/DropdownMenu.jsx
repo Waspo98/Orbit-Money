@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
+import { OVERLAY_ANIM_MS } from './overlayBehavior.js';
 
 /**
  * Reusable dropdown menu anchored to a trigger button.
@@ -25,8 +25,6 @@ export default function DropdownMenu({ items, ariaLabel = 'More actions' }) {
   const [closing, setClosing] = useState(false);
   const wrapRef = useRef(null);
   const timerRef = useRef(null);
-
-  useBodyScrollLock(open);
 
   function close(options = {}) {
     if (!open || closing) return;

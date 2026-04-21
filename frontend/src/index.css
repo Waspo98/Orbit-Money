@@ -2377,12 +2377,12 @@ input, textarea, select {
   }
 
   .categories-hero-toolbar {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
     padding: 12px;
   }
 
   .categories-hero-toolbar .btn-primary {
-    width: 100%;
+    min-width: max-content;
   }
 
   .category-row {
