@@ -207,25 +207,53 @@ export function attachMerchantLogos(db, rows) {
 
     return {
       ...row,
-      merchant_logo: hasLogo
+      merchant_logo: cached
         ? {
             merchant_key: cached.merchant_key,
             merchant_name: cached.merchant_name,
             provider: cached.provider,
             provider_query: cached.provider_query,
-            url:
-              cached.status === 'manual'
-                ? cached.logo_url
-                : logoDevUrl(
-                    cached.provider_query,
-                    true,
-                    extractDomain(cached.provider_query) ? 'domain' : 'name'
-                  ),
+            url: hasLogo
+              ? cached.status === 'manual'
+                  ? cached.logo_url
+                  : logoDevUrl(
+                      cached.provider_query,
+                      true,
+                      extractDomain(cached.provider_query) ? 'domain' : 'name'
+                    )
+              : null,
             status: cached.status
           }
         : null
     };
   });
+}
+
+export function overrideMerchantLogo(db, { merchantKey, logoUrl = null, hide = false }) {
+  if (!merchantKey) return { updated: false };
+
+  const existing = db
+    .prepare('SELECT merchant_key FROM merchant_logo_cache WHERE merchant_key = ?')
+    .get(merchantKey);
+  if (!existing) return { updated: false };
+
+  const status = hide ? 'hidden' : 'manual';
+  const nextUrl = hide ? null : logoUrl;
+  if (status === 'manual' && !nextUrl) return { updated: false };
+
+  const result = db
+    .prepare(`
+      UPDATE merchant_logo_cache
+         SET logo_url = ?,
+             status = ?,
+             failure_count = 0,
+             last_checked_at = datetime('now'),
+             updated_at = datetime('now')
+       WHERE merchant_key = ?
+    `)
+    .run(nextUrl, status, merchantKey);
+
+  return { updated: result.changes > 0 };
 }
 
 export function reportMerchantLogoStatus(db, { merchantKey, status }) {

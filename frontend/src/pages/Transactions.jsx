@@ -653,6 +653,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                     onToggleMhaEligible={() => handleToggle(t, 'mha_eligible')}
                     onDelete={() => handleDelete(t)}
                     onResetField={(field) => handleResetField(t, field)}
+                    onLogoChanged={(updated) => replaceLocal(t.id, updated)}
                     mhaTrackerEnabled={mhaTrackerEnabled}
                   />
                 ))}
@@ -889,6 +890,8 @@ export function TransactionRow({
   onToggleMhaEligible,
   onDelete,
   onResetField,
+  onLogoChanged,
+  hideMerchantLogo = false,
   mhaTrackerEnabled = false
 }) {
   const isIncome = txn.amount > 0 && !txn.is_transfer;
@@ -969,11 +972,17 @@ export function TransactionRow({
   return (
     <li
       ref={rowRef}
-      className={`txn-row ${txn.is_ignored ? 'ignored' : ''} ${isTransfer ? 'transfer' : ''} ${expanded ? 'expanded' : ''} ${txn.has_edits ? 'has-edits' : ''}`}
+      className={`txn-row ${hideMerchantLogo ? 'no-logo' : ''} ${txn.is_ignored ? 'ignored' : ''} ${isTransfer ? 'transfer' : ''} ${expanded ? 'expanded' : ''} ${txn.has_edits ? 'has-edits' : ''}`}
       onClick={handleRowClick}
     >
       <div className="txn-row-summary">
-        <TransactionMerchantMark txn={txn} category={category} />
+        {!hideMerchantLogo && (
+          <TransactionMerchantMark
+            txn={txn}
+            category={category}
+            onLogoChanged={onLogoChanged}
+          />
+        )}
         <div className="txn-main">
           <div className="txn-merchant">{txn.merchant}</div>
           <div className="txn-meta">
@@ -992,7 +1001,6 @@ export function TransactionRow({
             )}
             {account && !hideAccountInMeta && (
               <>
-                <span className="dot" />
                 <span>
                   {account.name}
                   {account.account_number_last4 && ` ...${account.account_number_last4}`}
@@ -1036,9 +1044,11 @@ export function TransactionRow({
   );
 }
 
-function TransactionMerchantMark({ txn, category }) {
+function TransactionMerchantMark({ txn, category, onLogoChanged }) {
   const logo = txn.merchant_logo;
   const [showLogo, setShowLogo] = useState(Boolean(logo?.url));
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [overrideOpen, setOverrideOpen] = useState(false);
 
   useEffect(() => {
     setShowLogo(Boolean(logo?.url));
@@ -1058,9 +1068,28 @@ function TransactionMerchantMark({ txn, category }) {
     });
   }
 
-  if (showLogo && logo?.url) {
-    return (
-      <span className="txn-merchant-mark" title={`${txn.merchant} logo`}>
+  function openLogoSearch() {
+    const query = encodeURIComponent(`${txn.merchant || logo?.merchant_name || 'merchant'} logo`);
+    window.open(`https://www.google.com/search?tbm=isch&q=${query}`, '_blank', 'noopener,noreferrer');
+  }
+
+  async function refreshTransaction() {
+    const refreshed = await api.get(`/api/transactions/${txn.id}`);
+    onLogoChanged?.(refreshed);
+  }
+
+  async function useCategoryIcon() {
+    if (!logo?.merchant_key) return;
+    await api.post('/api/merchant-logos/override', {
+      merchant_key: logo.merchant_key,
+      use_category_icon: true
+    });
+    await refreshTransaction();
+  }
+
+  function markContent() {
+    if (showLogo && logo?.url) {
+      return (
         <img
           src={logo.url}
           alt=""
@@ -1075,19 +1104,124 @@ function TransactionMerchantMark({ txn, category }) {
             report('failed');
           }}
         />
+      );
+    }
+
+    return (
+      <span
+        className="txn-merchant-mark-fallback"
+        style={category?.color ? { color: category.color } : undefined}
+        aria-hidden="true"
+      >
+        {category?.icon || '$'}
       </span>
     );
   }
 
   return (
-    <span
-      className="txn-merchant-mark txn-merchant-mark-fallback"
-      style={category?.color ? { color: category.color } : undefined}
-      title={category ? category.name : 'Category'}
-      aria-hidden="true"
-    >
-      {category?.icon || '$'}
+    <span className="txn-logo-menu-wrap">
+      <button
+        type="button"
+        className="txn-merchant-mark"
+        title={`${txn.merchant} logo options`}
+        aria-label={`Logo options for ${txn.merchant}`}
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((value) => !value)}
+      >
+        {markContent()}
+      </button>
+      {menuOpen && (
+        <div className="dropdown-menu txn-logo-menu" role="menu">
+          <button type="button" className="dropdown-item" role="menuitem" onClick={openLogoSearch}>
+            <span>Search for Logo</span>
+          </button>
+          <button type="button" className="dropdown-item" role="menuitem" onClick={() => setOverrideOpen(true)}>
+            <span>Use Image URL</span>
+          </button>
+          <button
+            type="button"
+            className="dropdown-item"
+            role="menuitem"
+            disabled={!logo?.merchant_key}
+            onClick={useCategoryIcon}
+          >
+            <span>Use Category Icon</span>
+          </button>
+        </div>
+      )}
+      {overrideOpen && (
+        <LogoOverrideModal
+          txn={txn}
+          logo={logo}
+          onClose={() => setOverrideOpen(false)}
+          onSaved={async () => {
+            setOverrideOpen(false);
+            await refreshTransaction();
+          }}
+        />
+      )}
     </span>
+  );
+}
+
+function LogoOverrideModal({ txn, logo, onClose, onSaved }) {
+  const [logoUrl, setLogoUrl] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e, close) {
+    e.preventDefault();
+    if (!logo?.merchant_key) {
+      setError('This merchant does not have a logo entry to override yet.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await api.post('/api/merchant-logos/override', {
+        merchant_key: logo.merchant_key,
+        logo_url: logoUrl.trim()
+      });
+      close({ animate: true });
+      setTimeout(onSaved, 180);
+    } catch (err) {
+      setError(err.message || 'Logo override failed');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AnimatedModal onClose={onClose} size="sm">
+      {({ close }) => (
+        <>
+          <h3>Use Image URL</h3>
+          <p className="modal-copy">
+            Paste a direct image URL for {txn.merchant}. Search results pages will not work.
+          </p>
+          <form onSubmit={(e) => handleSubmit(e, close)}>
+            <label className="field">
+              <span>Logo Image URL</span>
+              <input
+                type="url"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                placeholder="https://example.com/logo.png"
+                required
+              />
+            </label>
+            {error && <div className="error">{error}</div>}
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={close}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </>
+      )}
+    </AnimatedModal>
   );
 }
 

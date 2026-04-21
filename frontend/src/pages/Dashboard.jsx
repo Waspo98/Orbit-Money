@@ -785,6 +785,8 @@ function RecentActivityCard({
                 onToggleMhaEligible={() => handleToggle(t, 'mha_eligible')}
                 onDelete={() => handleDelete(t)}
                 onResetField={(field) => handleResetField(t, field)}
+                onLogoChanged={(updated) => replaceLocal(t.id, updated)}
+                hideMerchantLogo
                 mhaTrackerEnabled={mhaTrackerEnabled}
               />
             ))}
