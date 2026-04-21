@@ -217,13 +217,6 @@ export default function HousingCalculator({ accounts = [] }) {
         kicker="Home Planning"
         title="Housing Calculator"
         subtitle="Estimate selling proceeds, cash to close, and projected monthly payment."
-        toolbar={(
-          <div className="page-hero-action-row">
-            <button type="button" className="btn-secondary" onClick={resetCalculator}>
-              Reset
-            </button>
-          </div>
-        )}
       />
 
       <section className="dashboard-card housing-picker">
@@ -333,6 +326,12 @@ export default function HousingCalculator({ accounts = [] }) {
             ]}
           />
         </section>
+      </div>
+
+      <div className="housing-danger-zone">
+        <button type="button" className="btn-danger" onClick={resetCalculator}>
+          Reset
+        </button>
       </div>
     </div>
   );

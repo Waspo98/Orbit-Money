@@ -274,30 +274,6 @@ export default function Settings({
         </div>
       </section>
 
-      <section className="settings-section">
-        <div className="settings-section-header">
-          <h3>MHA Tracker</h3>
-          <p>Show Ministerial Housing Allowance tools when you need them.</p>
-        </div>
-
-        <div className="settings-action">
-          <div className="settings-action-info">
-            <strong>MHA Tracker</strong>
-            <p>When off, the tracker page and transaction MHA controls are hidden.</p>
-          </div>
-          <button
-            type="button"
-            className={`btn-secondary ${mhaTrackerEnabled ? 'btn-active' : ''}`}
-            onClick={handleMhaToggle}
-            disabled={mhaBusy}
-            aria-pressed={mhaTrackerEnabled}
-          >
-            {mhaBusy ? 'Saving...' : mhaTrackerEnabled ? 'On' : 'Off'}
-          </button>
-        </div>
-        {mhaError && <div className="error" style={{ marginTop: 12 }}>{mhaError}</div>}
-      </section>
-
       {/* ===== SimpleFIN ===== */}
       <section className="settings-section">
         <div className="settings-section-header">
@@ -586,6 +562,30 @@ export default function Settings({
             </button>
           </>
         )}
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <h3>MHA Tracker</h3>
+          <p>Show Ministerial Housing Allowance tools when you need them.</p>
+        </div>
+
+        <div className="settings-action">
+          <div className="settings-action-info">
+            <strong>MHA Tracker</strong>
+            <p>When off, the tracker page and transaction MHA controls are hidden.</p>
+          </div>
+          <button
+            type="button"
+            className={`btn-secondary ${mhaTrackerEnabled ? 'btn-active' : ''}`}
+            onClick={handleMhaToggle}
+            disabled={mhaBusy}
+            aria-pressed={mhaTrackerEnabled}
+          >
+            {mhaBusy ? 'Saving...' : mhaTrackerEnabled ? 'On' : 'Off'}
+          </button>
+        </div>
+        {mhaError && <div className="error" style={{ marginTop: 12 }}>{mhaError}</div>}
       </section>
 
       <section className="settings-section settings-account-section">

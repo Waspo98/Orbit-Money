@@ -241,14 +241,6 @@ export default function Goals() {
   const accounts = data?.accounts || [];
   const selectedGoal = goals.find((goal) => goal.id === selectedId) || goals[0] || null;
   const imaginedEta = selectedGoal ? estimateEta(selectedGoal, imagineMonthly) : null;
-  const bestPaceGoal = goals.reduce((best, goal) => {
-    if (!best || Number(goal.monthly_pace || 0) > Number(best.monthly_pace || 0)) return goal;
-    return best;
-  }, null);
-  const nextEtaGoal = goals
-    .filter((goal) => goal.eta?.date)
-    .sort((a, b) => a.eta.date.localeCompare(b.eta.date))[0];
-
   async function handleDelete(goal) {
     const ok = await confirm(`Delete "${goal.name}"? Its account allocations will be removed.`, {
       title: 'Delete goal',
@@ -305,7 +297,7 @@ export default function Goals() {
         toolbar={(
           <div className="page-hero-action-row">
             <button type="button" className="btn-primary" onClick={openNewGoal}>
-              Add goal
+              + New Goal
             </button>
           </div>
         )}
@@ -329,7 +321,7 @@ export default function Goals() {
           <div className="empty-state-icon">G</div>
           <h2>No goals yet</h2>
           <p>Create a saving target and connect the accounts that should count toward it.</p>
-          <button type="button" className="btn-primary" onClick={openNewGoal}>Add goal</button>
+          <button type="button" className="btn-primary" onClick={openNewGoal}>+ New Goal</button>
         </div>
       ) : (
         <div className="goals-grid">
@@ -409,17 +401,6 @@ export default function Goals() {
                   <AccountAllocationRow key={account.id} account={account} />
                 ))}
               </div>
-            </div>
-          </section>
-
-          <section className="dashboard-card goals-signal-card">
-            <header className="dashboard-card-header">
-              <h3>Signals</h3>
-            </header>
-            <div className="dashboard-card-body">
-              <SignalRow label="Total saved" value={formatMoney(data.summary.total_saved)} detail={`${Math.round(data.summary.progress_percent || 0)}% funded`} />
-              <SignalRow label="Fastest pace" value={bestPaceGoal?.name || 'None yet'} detail={bestPaceGoal ? formatSignedMoney(bestPaceGoal.monthly_pace) + '/mo' : formatMoney(0)} />
-              <SignalRow label="Next ETA" value={nextEtaGoal?.name || 'Needs history'} detail={nextEtaGoal ? formatEta(nextEtaGoal.eta) : 'Add history'} />
             </div>
           </section>
         </div>
@@ -511,7 +492,7 @@ function GoalChart({ goal }) {
 function ImaginePanel({ goal, imagineMonthly, imaginedEta, onChange }) {
   const lastTickRef = useRef(null);
   const imaginedText = imaginedEta?.date
-    ? `Goal will be reaching in ${formatFullMonthDate(imaginedEta.date)}`
+    ? `Goal will be reached in ${formatFullMonthDate(imaginedEta.date)}`
     : 'Goal needs more monthly savings history to project a date';
 
   function tick(value) {
