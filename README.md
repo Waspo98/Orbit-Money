@@ -349,11 +349,9 @@ custom purpose.
 
 Each goal can connect to multiple active asset accounts: checking, savings,
 cash, investment, or other. For each connected account, the allocation can be a
-percentage of the post-reserve balance or a fixed dollar amount. A reserve can
-be set per account, such as keeping the first `$5,000` of savings outside goal
-allocations. When a new or edited goal would over-allocate an account, the
-wizard shows existing allocations and can steal allocation from other goals if
-the user enables that option.
+percentage of the account balance or a fixed dollar amount. When a new or edited
+goal would over-allocate an account, the wizard shows existing allocations and
+can steal allocation from other goals if the user enables that option.
 
 Goal progress is computed from current account balances and saved allocations.
 The trend graph is derived from existing transaction history by walking account

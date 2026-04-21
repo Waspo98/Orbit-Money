@@ -59,7 +59,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 
 **Budgets:** One row per spending `category_id` (globally applied). Transfer and income categories are excluded from budget rows and per-category spending lists; income is summarized separately in the monthly Income / Expenses / Net stat row. The `budgets` table retains the `rollover` column from migration 001 for future Phase 2 work but it's not consumed by the current UI.
 
-**Goals:** Goal progress is computed from `goal_account_allocations` and active asset account balances. Allocations can be fixed dollar amounts or percentages of the post-reserve balance. The old `goals.current_amount` column is retained for compatibility, but the Goals API derives live progress at read time.
+**Goals:** Goal progress is computed from `goal_account_allocations` and active asset account balances. Allocations can be fixed dollar amounts or percentages of the account balance. The old `goals.current_amount` column is retained for compatibility, but the Goals API derives live progress at read time.
 
 ## Features
 
@@ -131,7 +131,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Create and edit saving targets from the More menu with a three-step wizard: purpose, accounts, allocation
 - Supported goal kinds: retirement, college, car, home, emergency, travel, custom
 - Allocations can connect multiple active asset accounts to a goal: checking, savings, cash, investment, or other
-- Each account allocation can reserve cash first, then apply either a percent of the remaining balance or a fixed dollar amount
+- Each account allocation can apply either a percent of the account balance or a fixed dollar amount
 - Wizard shows each account's existing goal allocations and can steal allocation from other goals when explicitly enabled
 - Goal charts derive monthly history from existing transaction deltas and current account balances; ETA uses recent monthly progress
 - "Imagine" slider projects a hypothetical ETA with extra monthly savings

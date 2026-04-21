@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
@@ -6,13 +6,13 @@ import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 
 const GOAL_PRESETS = [
-  { kind: 'retirement', label: 'Retirement', icon: 'R' },
-  { kind: 'college', label: 'Kids college', icon: 'C' },
-  { kind: 'car', label: 'New car', icon: 'A' },
-  { kind: 'home', label: 'Home', icon: 'H' },
-  { kind: 'emergency', label: 'Emergency fund', icon: 'E' },
-  { kind: 'travel', label: 'Travel', icon: 'T' },
-  { kind: 'custom', label: 'Something else', icon: 'G' }
+  { kind: 'retirement', label: 'Retirement', icon: '🏖️' },
+  { kind: 'college', label: 'Kids College', icon: '🎓' },
+  { kind: 'car', label: 'New Car', icon: '🚗' },
+  { kind: 'home', label: 'Home', icon: '🏠' },
+  { kind: 'emergency', label: 'Emergency Fund', icon: '🛟' },
+  { kind: 'travel', label: 'Travel', icon: '✈️' },
+  { kind: 'custom', label: 'Something Else', icon: '✨' }
 ];
 
 const ACCOUNT_TYPE_LABELS = {
@@ -71,11 +71,42 @@ function formatDate(date) {
   });
 }
 
+function formatFullMonthDate(date) {
+  if (!date) return 'No ETA yet';
+  return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
 function formatEta(eta) {
   if (!eta) return 'No ETA yet';
   if (eta.status === 'complete') return 'Reached';
   if (!eta.date) return 'Needs history';
   return formatDate(eta.date);
+}
+
+function monthsUntil(date) {
+  if (!date) return null;
+  const target = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  const now = new Date();
+  const months = (target.getFullYear() - now.getFullYear()) * 12 + (target.getMonth() - now.getMonth());
+  return Math.max(1, months);
+}
+
+function desiredEta(goal) {
+  return goal?.target_date ? formatFullMonthDate(goal.target_date) : 'ASAP';
+}
+
+function neededExtraForDesiredEta(goal) {
+  if (!goal?.target_date) return null;
+  const remaining = Math.max(0, Number(goal.target_amount || 0) - Number(goal.current_amount || 0));
+  if (remaining <= 0) return 0;
+  const months = monthsUntil(goal.target_date);
+  if (!months) return null;
+  const requiredMonthly = remaining / months;
+  return Math.max(0, requiredMonthly - (Number(goal.monthly_pace) || 0));
 }
 
 function addMonthsToDate(date, amount) {
@@ -145,6 +176,7 @@ export default function Goals() {
   const [selectedId, setSelectedId] = useState(null);
   const [wizardGoal, setWizardGoal] = useState(null);
   const [imagineMonthly, setImagineMonthly] = useState(50);
+  const [focusCollapsed, setFocusCollapsed] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -209,7 +241,7 @@ export default function Goals() {
         variant="goals"
         kicker="Saving Targets"
         title="Goals"
-        subtitle="Connect asset accounts, reserve emergency cash, and project when each target lands."
+        subtitle="Connect asset accounts, allocate savings, and project when each target lands."
         toolbar={(
           <div className="page-hero-action-row">
             <button type="button" className="btn-secondary" onClick={load} disabled={loading}>
@@ -244,30 +276,39 @@ export default function Goals() {
         </div>
       ) : (
         <div className="goals-grid">
-          <section className="dashboard-card goals-focus-card">
+          <section className={`dashboard-card goals-focus-card ${focusCollapsed ? 'collapsed' : ''}`}>
             <header className="dashboard-card-header">
               <h3>{selectedGoal?.name || 'Goal'}</h3>
-              <button type="button" className="dashboard-card-link button-link" onClick={() => openEditGoal(selectedGoal)}>
-                Edit
-              </button>
+              <div className="goals-card-actions">
+                <button type="button" className="dashboard-card-link button-link" onClick={() => setFocusCollapsed((value) => !value)}>
+                  {focusCollapsed ? 'Expand' : 'Collapse'}
+                </button>
+                <button type="button" className="dashboard-card-link button-link" onClick={() => openEditGoal(selectedGoal)}>
+                  Edit
+                </button>
+              </div>
             </header>
             <div className="dashboard-card-body">
               <GoalProgress goal={selectedGoal} />
-              <GoalChart goal={selectedGoal} />
-              <ImaginePanel
-                goal={selectedGoal}
-                imagineMonthly={imagineMonthly}
-                imaginedEta={imaginedEta}
-                onChange={setImagineMonthly}
-              />
-              <div className="goals-focus-actions">
-                <button type="button" className="btn-secondary" onClick={() => openEditGoal(selectedGoal)}>
-                  Edit goal
-                </button>
-                <button type="button" className="btn-danger" onClick={() => handleDelete(selectedGoal)}>
-                  Delete
-                </button>
-              </div>
+              {!focusCollapsed && (
+                <>
+                  <GoalChart goal={selectedGoal} />
+                  <ImaginePanel
+                    goal={selectedGoal}
+                    imagineMonthly={imagineMonthly}
+                    imaginedEta={imaginedEta}
+                    onChange={setImagineMonthly}
+                  />
+                  <div className="goals-focus-actions">
+                    <button type="button" className="btn-secondary" onClick={() => openEditGoal(selectedGoal)}>
+                      Edit goal
+                    </button>
+                    <button type="button" className="btn-danger" onClick={() => handleDelete(selectedGoal)}>
+                      Delete
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </section>
 
@@ -298,17 +339,6 @@ export default function Goals() {
             </div>
           </section>
 
-          <section className="dashboard-card goals-signal-card">
-            <header className="dashboard-card-header">
-              <h3>Signals</h3>
-            </header>
-            <div className="dashboard-card-body">
-              <SignalRow label="Total saved" value={formatMoney(data.summary.total_saved)} detail={`${Math.round(data.summary.progress_percent || 0)}% funded`} />
-              <SignalRow label="Fastest pace" value={bestPaceGoal?.name || 'None yet'} detail={bestPaceGoal ? formatSignedMoney(bestPaceGoal.monthly_pace) + '/mo' : formatMoney(0)} />
-              <SignalRow label="Next ETA" value={nextEtaGoal?.name || 'Needs history'} detail={nextEtaGoal ? formatEta(nextEtaGoal.eta) : 'Add history'} />
-            </div>
-          </section>
-
           <section className="dashboard-card goals-account-card">
             <header className="dashboard-card-header">
               <h3>Account allocation</h3>
@@ -320,6 +350,17 @@ export default function Goals() {
                   <AccountAllocationRow key={account.id} account={account} />
                 ))}
               </div>
+            </div>
+          </section>
+
+          <section className="dashboard-card goals-signal-card">
+            <header className="dashboard-card-header">
+              <h3>Signals</h3>
+            </header>
+            <div className="dashboard-card-body">
+              <SignalRow label="Total saved" value={formatMoney(data.summary.total_saved)} detail={`${Math.round(data.summary.progress_percent || 0)}% funded`} />
+              <SignalRow label="Fastest pace" value={bestPaceGoal?.name || 'None yet'} detail={bestPaceGoal ? formatSignedMoney(bestPaceGoal.monthly_pace) + '/mo' : formatMoney(0)} />
+              <SignalRow label="Next ETA" value={nextEtaGoal?.name || 'Needs history'} detail={nextEtaGoal ? formatEta(nextEtaGoal.eta) : 'Add history'} />
             </div>
           </section>
         </div>
@@ -350,6 +391,7 @@ function presetFor(kind) {
 function GoalProgress({ goal }) {
   const progress = Math.max(0, Math.min(100, Number(goal?.progress_percent) || 0));
   const remaining = Math.max(0, Number(goal?.target_amount || 0) - Number(goal?.current_amount || 0));
+  const extraNeeded = neededExtraForDesiredEta(goal);
 
   return (
     <div className="goal-progress-panel">
@@ -362,6 +404,7 @@ function GoalProgress({ goal }) {
         <span>{Math.round(progress)}%</span>
       </div>
       <div className="goal-progress-meta">
+        <SignalRow label="Desired ETA" value={desiredEta(goal)} detail={extraNeeded === null ? 'Set a date to calculate' : `${formatMoney(extraNeeded)}/mo more needed`} />
         <SignalRow label="Projected ETA" value={formatEta(goal?.eta)} detail={goal?.eta?.months ? `${goal.eta.months} months` : goal?.eta?.status === 'complete' ? 'Complete' : 'No trend yet'} />
         <SignalRow label="Monthly pace" value={formatSignedMoney(goal?.monthly_pace)} detail="Based on history" />
       </div>
@@ -406,12 +449,30 @@ function GoalChart({ goal }) {
 }
 
 function ImaginePanel({ goal, imagineMonthly, imaginedEta, onChange }) {
+  const lastTickRef = useRef(null);
+  const imaginedText = imaginedEta?.date
+    ? `Goal will be reached in ${formatFullMonthDate(imaginedEta.date)} with extra ${formatMoney(imagineMonthly)}/m`
+    : 'Goal needs more monthly savings history to project a date';
+
+  function tick(value) {
+    const tickValue = Math.round(Number(value) / 25);
+    if (lastTickRef.current !== tickValue) {
+      lastTickRef.current = tickValue;
+      if (navigator.vibrate) navigator.vibrate(8);
+    }
+  }
+
+  function handleSlider(value) {
+    tick(value);
+    onChange(value);
+  }
+
   return (
     <div className="goal-imagine-panel">
       <div className="goal-imagine-copy">
-        <span>Imagine extra savings</span>
+        <span>Want to reach your goal faster?</span>
         <strong>{formatMoney(imagineMonthly)}/mo</strong>
-        <em>{formatEta(imaginedEta)} with the extra amount</em>
+        <em>{imaginedText}</em>
       </div>
       <div className="goal-imagine-controls">
         <input
@@ -420,7 +481,8 @@ function ImaginePanel({ goal, imagineMonthly, imaginedEta, onChange }) {
           max="1000"
           step="25"
           value={imagineMonthly}
-          onChange={(e) => onChange(Number(e.target.value))}
+          onPointerDown={() => tick(imagineMonthly)}
+          onChange={(e) => handleSlider(Number(e.target.value))}
           aria-label={`Extra monthly savings for ${goal.name}`}
         />
         <input
@@ -468,7 +530,6 @@ function AccountAllocationRow({ account }) {
       </div>
       <div className="goal-account-row-bottom">
         <span>Balance {formatMoney(account.current_balance)}</span>
-        <span>Reserve {formatMoney(account.reserve_amount)}</span>
         <span>Allocatable {formatMoney(account.allocatable_amount)}</span>
       </div>
       {account.allocations.length > 0 && (
@@ -488,6 +549,7 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [targetDateMode, setTargetDateMode] = useState(goal?.target_date ? 'date' : 'asap');
   const [draft, setDraft] = useState(() => ({
     name: goal?.name || '',
     kind: goal?.kind || 'custom',
@@ -502,7 +564,7 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
         allocation.allocation_type === 'fixed'
           ? formatCurrencyInput(allocation.allocation_value)
           : String(Math.round(Number(allocation.allocation_value) || 0)),
-      reserve_amount: allocation.reserve_amount ? formatCurrencyInput(allocation.reserve_amount) : ''
+      reserve_amount: ''
     }))
   }));
 
@@ -513,6 +575,11 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
 
   function update(key, value) {
     setDraft((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function chooseTargetDateMode(mode) {
+    setTargetDateMode(mode);
+    if (mode === 'asap') update('target_date', '');
   }
 
   function chooseKind(kind) {
@@ -603,7 +670,7 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
         account_id: allocation.account_id,
         allocation_type: allocation.allocation_type,
         allocation_value: allocationValueNumber(allocation),
-        reserve_amount: parseMoney(allocation.reserve_amount)
+        reserve_amount: 0
       }))
     };
 
@@ -674,7 +741,25 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
                 </label>
                 <label className="field">
                   <span>Target date</span>
-                  <input type="date" value={draft.target_date} onChange={(e) => update('target_date', e.target.value)} />
+                  <div className="goal-date-choice" role="group" aria-label="Target date choice">
+                    <button
+                      type="button"
+                      className={targetDateMode === 'asap' ? 'active' : ''}
+                      onClick={() => chooseTargetDateMode('asap')}
+                    >
+                      ASAP
+                    </button>
+                    <button
+                      type="button"
+                      className={targetDateMode === 'date' ? 'active' : ''}
+                      onClick={() => chooseTargetDateMode('date')}
+                    >
+                      Date
+                    </button>
+                  </div>
+                  {targetDateMode === 'date' && (
+                    <input type="date" value={draft.target_date} onChange={(e) => update('target_date', e.target.value)} />
+                  )}
                 </label>
               </div>
             </div>
@@ -824,19 +909,9 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
         </select>
       </div>
 
-      <div className="goal-form-grid">
+      <div className="goal-form-grid goal-form-grid-single">
         <label className="field">
-          <span>Reserve first</span>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={allocation.reserve_amount}
-            onChange={(e) => onChange('reserve_amount', formatCurrencyInput(e.target.value))}
-            placeholder="$0"
-          />
-        </label>
-        <label className="field">
-          <span>{allocation.allocation_type === 'fixed' ? 'Goal amount' : 'Goal percent'}</span>
+          <span>{allocation.allocation_type === 'fixed' ? 'Amount Allocated Towards Goal' : 'Percent of Account Allocated Towards Goal'}</span>
           <input
             type="text"
             inputMode="decimal"
@@ -877,9 +952,6 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
 
 function AllocationMeter({ allocation, basis, currentAmount, otherAmount, onChange }) {
   const lastTickRef = useRef(null);
-  const otherPercent = basis > 0 ? Math.min(100, (otherAmount / basis) * 100) : 0;
-  const currentPercent = basis > 0 ? Math.min(100, (currentAmount / basis) * 100) : 0;
-  const totalPercent = Math.min(100, otherPercent + currentPercent);
   const rangeValue =
     allocation.allocation_type === 'fixed'
       ? Math.min(basis, allocationValueNumber(allocation))
@@ -904,10 +976,6 @@ function AllocationMeter({ allocation, basis, currentAmount, otherAmount, onChan
 
   return (
     <div className="goal-meter-wrap">
-      <div className="goal-meter-track">
-        <span className="goal-meter-other" style={{ width: `${otherPercent}%` }} />
-        <span className="goal-meter-current" style={{ left: `${otherPercent}%`, width: `${Math.max(0, totalPercent - otherPercent)}%` }} />
-      </div>
       <input
         type="range"
         min="0"

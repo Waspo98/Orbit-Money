@@ -3161,13 +3161,22 @@ input, textarea, select {
   }
 
   .goals-focus-card,
-  .goals-account-card {
+  .goals-account-card,
+  .goals-signal-card {
     grid-column: 1 / -1;
   }
 }
 
 .goals-focus-card .dashboard-card-body {
   gap: 16px;
+}
+
+.goals-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .goal-progress-panel {
@@ -3479,6 +3488,7 @@ input, textarea, select {
   border-radius: var(--radius-pill);
   background: var(--surface-2);
   color: var(--text-muted);
+  font-size: 0.9rem;
   font-weight: 650;
 }
 
@@ -3525,14 +3535,15 @@ input, textarea, select {
 
 .goal-preset-grid span {
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   background: var(--surface);
   color: var(--accent);
+  font-size: 1.05rem;
   font-weight: 800;
 }
 
@@ -3547,6 +3558,33 @@ input, textarea, select {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.goal-form-grid-single {
+  grid-template-columns: 1fr;
+}
+
+.goal-date-choice {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.goal-date-choice button {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-weight: 650;
+}
+
+.goal-date-choice button.active {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .goal-account-picker {
@@ -3741,9 +3779,17 @@ input, textarea, select {
 }
 
 @media (max-width: 480px) {
-  .goal-wizard-steps,
   .goal-preset-grid {
     grid-template-columns: 1fr;
+  }
+
+  .goal-wizard-steps {
+    gap: 6px;
+  }
+
+  .goal-wizard-steps button {
+    padding: 8px 6px;
+    font-size: 0.82rem;
   }
 }
 
