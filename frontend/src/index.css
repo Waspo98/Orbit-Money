@@ -3676,6 +3676,12 @@ input, textarea, select {
   grid-template-columns: 1fr;
 }
 
+.goal-emoji-field input {
+  max-width: 180px;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
 .goal-date-choice {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3739,18 +3745,6 @@ input, textarea, select {
   justify-items: end;
 }
 
-.goal-steal-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-}
-
 .goal-allocation-editor {
   display: grid;
   gap: 12px;
@@ -3795,13 +3789,26 @@ input, textarea, select {
   font-size: 0.82rem;
 }
 
-.goal-allocation-header select {
-  width: 100%;
-  padding: 9px 10px;
+.goal-allocation-mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.goal-allocation-mode button {
+  min-width: 0;
+  padding: 9px 8px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text);
+  font-weight: 650;
+}
+
+.goal-allocation-mode button.active {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .goal-meter-wrap {

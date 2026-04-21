@@ -160,12 +160,47 @@ function allocationBasis(account, reserveAmount) {
   return Math.max(0, (Number(account?.current_balance) || 0) - Number(reserveAmount || 0));
 }
 
-function allocationAmount(allocation, account, reserveAmount) {
-  const basis = allocationBasis(account, reserveAmount);
+function accountOpenAmount(account, goalId) {
+  const ownAmount = (account?.allocations || [])
+    .filter((row) => row.goal_id === goalId)
+    .reduce((sum, row) => sum + Number(row.current_amount || 0), 0);
+  return Math.max(0, (Number(account?.remaining_amount) || 0) + ownAmount);
+}
+
+function openSpaceAllocationAmount(allocation, openAmount) {
+  const value = allocationValueNumber(allocation);
   if (allocation.allocation_type === 'percent') {
-    return basis * (Number(allocation.allocation_value || 0) / 100);
+    return openAmount * (Math.min(100, Math.max(0, value)) / 100);
   }
-  return Math.min(Number(allocation.allocation_value || 0), basis);
+  return Math.min(Math.max(0, value), openAmount);
+}
+
+function draftAllocationValue(allocation, accounts, goalId) {
+  if (allocation.allocation_type === 'fixed') {
+    return formatCurrencyInput(allocation.current_amount || allocation.allocation_value);
+  }
+  const account = accounts.find((row) => row.id === allocation.account_id);
+  const openAmount = accountOpenAmount(account, goalId);
+  if (openAmount <= 0) return '0';
+  const percentOfOpen = (Number(allocation.current_amount || 0) / openAmount) * 100;
+  return String(Math.round(Math.min(100, Math.max(0, percentOfOpen))));
+}
+
+function toSavedAllocation(allocation, account, goalId) {
+  const basis = allocationBasis(account, 0);
+  const openAmount = accountOpenAmount(account, goalId);
+  const currentAmount = openSpaceAllocationAmount(allocation, openAmount);
+  return {
+    account_id: allocation.account_id,
+    allocation_type: allocation.allocation_type,
+    allocation_value:
+      allocation.allocation_type === 'percent'
+        ? basis > 0
+          ? Math.min(100, (currentAmount / basis) * 100)
+          : 0
+        : currentAmount,
+    reserve_amount: 0
+  };
 }
 
 export default function Goals() {
@@ -349,7 +384,7 @@ export default function Goals() {
                   className={`goal-list-row ${selectedGoal?.id === goal.id ? 'active' : ''}`}
                   onClick={() => setSelectedId(goal.id)}
                 >
-                  <span className="goal-list-icon">{presetFor(goal.kind).icon}</span>
+                  <span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>
                   <span className="goal-list-main">
                     <strong>{goal.name}</strong>
                     <em>{formatMoney(goal.current_amount)} of {formatMoney(goal.target_amount)}</em>
@@ -580,21 +615,16 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
     icon: goal?.icon || presetFor(goal?.kind || 'custom').icon,
     target_amount: goal ? formatCurrencyInput(goal.target_amount) : '',
     target_date: goal?.target_date || '',
-    stealFromOthers: false,
     allocations: (goal?.allocations || []).map((allocation) => ({
       account_id: allocation.account_id,
       allocation_type: allocation.allocation_type,
-      allocation_value:
-        allocation.allocation_type === 'fixed'
-          ? formatCurrencyInput(allocation.allocation_value)
-          : String(Math.round(Number(allocation.allocation_value) || 0)),
+      allocation_value: draftAllocationValue(allocation, accounts, goal?.id),
       reserve_amount: ''
     }))
   }));
 
   const selectedIds = new Set(draft.allocations.map((allocation) => allocation.account_id));
   const selectedAccounts = accounts.filter((account) => selectedIds.has(account.id));
-  const conflicts = selectedAccounts.filter((account) => allocationConflict(account, draft, goal?.id));
   const title = goal ? 'Edit goal' : 'Create goal';
 
   function update(key, value) {
@@ -611,7 +641,7 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
     setDraft((prev) => ({
       ...prev,
       kind,
-      icon: preset.icon,
+      icon: kind === 'custom' ? prev.icon || preset.icon : preset.icon,
       name: prev.name || preset.label
     }));
   }
@@ -657,8 +687,14 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
       if (draft.allocations.some((allocation) => allocationValueNumber(allocation) <= 0)) {
         return 'Each selected account needs an allocation greater than zero.';
       }
-      if (conflicts.length > 0 && !draft.stealFromOthers) {
-        return 'Some accounts are fully allocated. Enable stealing or lower the new allocation.';
+      const overOpenSpace = draft.allocations.some((allocation) => {
+        const account = accounts.find((row) => row.id === allocation.account_id);
+        if (!account) return true;
+        const openAmount = accountOpenAmount(account, goal?.id);
+        return openAmount <= 0 || openSpaceAllocationAmount(allocation, openAmount) > openAmount + 0.01;
+      });
+      if (overOpenSpace) {
+        return 'Allocation cannot exceed open account space.';
       }
     }
     return '';
@@ -689,13 +725,13 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
       icon: draft.icon,
       target_amount: parseMoney(draft.target_amount),
       target_date: draft.target_date || null,
-      stealFromOthers: draft.stealFromOthers,
-      allocations: draft.allocations.map((allocation) => ({
-        account_id: allocation.account_id,
-        allocation_type: allocation.allocation_type,
-        allocation_value: allocationValueNumber(allocation),
-        reserve_amount: 0
-      }))
+      allocations: draft.allocations.map((allocation) =>
+        toSavedAllocation(
+          allocation,
+          accounts.find((account) => account.id === allocation.account_id),
+          goal?.id
+        )
+      )
     };
 
     try {
@@ -748,6 +784,17 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
                   </button>
                 ))}
               </div>
+              {draft.kind === 'custom' && (
+                <label className="field goal-emoji-field">
+                  <span>Goal emoji</span>
+                  <input
+                    value={draft.icon}
+                    onChange={(e) => update('icon', e.target.value.slice(0, 16))}
+                    placeholder="Choose an emoji"
+                    aria-label="Goal emoji"
+                  />
+                </label>
+              )}
               <label className="field">
                 <span>Saving for</span>
                 <input value={draft.name} onChange={(e) => update('name', e.target.value)} placeholder="New car" />
@@ -822,19 +869,6 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
 
           {step === 2 && (
             <div className="goal-wizard-panel">
-              <div className="goal-steal-row">
-                <label className="toggle-row">
-                  <input
-                    type="checkbox"
-                    checked={draft.stealFromOthers}
-                    onChange={(e) => update('stealFromOthers', e.target.checked)}
-                  />
-                  <span>Steal allocation from other goals when needed</span>
-                </label>
-                {conflicts.length > 0 && (
-                  <span className="pill warning">{conflicts.length} conflict{conflicts.length === 1 ? '' : 's'}</span>
-                )}
-              </div>
               <div className="goal-allocation-editor">
                 {selectedAccounts.map((account) => {
                   const allocation = draft.allocations.find((row) => row.account_id === account.id);
@@ -880,57 +914,54 @@ function allocationValueNumber(allocation) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function allocationConflict(account, draft, goalId) {
-  const allocation = draft.allocations.find((row) => row.account_id === account.id);
-  if (!allocation) return false;
-  const reserveAmount = parseMoney(allocation.reserve_amount);
-  const basis = allocationBasis(account, reserveAmount);
-  const currentAmount = allocationAmount(
-    {
-      allocation_type: allocation.allocation_type,
-      allocation_value: allocationValueNumber(allocation)
-    },
-    account,
-    reserveAmount
-  );
-  const otherAmount = account.allocations
-    .filter((row) => row.goal_id !== goalId)
-    .reduce((sum, row) => sum + Number(row.current_amount || 0), 0);
-  return currentAmount + otherAmount > basis + 0.01;
-}
-
 function AllocationEditor({ account, allocation, goalId, onChange }) {
-  const reserveAmount = parseMoney(allocation.reserve_amount);
-  const basis = allocationBasis(account, reserveAmount);
   const otherAllocations = account.allocations.filter((row) => row.goal_id !== goalId);
   const otherAmount = otherAllocations.reduce((sum, row) => sum + Number(row.current_amount || 0), 0);
-  const currentAmount = allocationAmount(
-    {
-      allocation_type: allocation.allocation_type,
-      allocation_value: allocationValueNumber(allocation)
-    },
-    account,
-    reserveAmount
-  );
-  const conflict = currentAmount + otherAmount > basis + 0.01;
+  const openAmount = accountOpenAmount(account, goalId);
+  const currentAmount = openSpaceAllocationAmount(allocation, openAmount);
+
+  function changeType(type) {
+    const nextValue = type === 'fixed'
+      ? formatCurrencyInput(currentAmount)
+      : openAmount > 0
+        ? String(Math.round((currentAmount / openAmount) * 100))
+        : '0';
+    onChange('allocation_type', type);
+    onChange('allocation_value', nextValue);
+  }
+
+  function changeValue(value) {
+    if (allocation.allocation_type === 'fixed') {
+      onChange('allocation_value', formatCurrencyInput(Math.min(openAmount, parseMoney(value))));
+      return;
+    }
+    const parsed = Number(String(value).replace(/[^0-9.]/g, '')) || 0;
+    onChange('allocation_value', String(Math.min(100, Math.max(0, parsed))));
+  }
 
   return (
-    <div className={`goal-allocation-row ${conflict ? 'conflict' : ''}`}>
+    <div className="goal-allocation-row">
       <div className="goal-allocation-header">
         <div>
           <strong>{account.name}</strong>
-          <span>{formatMoney(account.current_balance)} balance | {formatMoney(otherAmount)} already allocated</span>
+          <span>{formatMoney(account.current_balance)} balance | {formatMoney(otherAmount)} allocated | {formatMoney(openAmount)} open</span>
         </div>
-        <select
-          value={allocation.allocation_type}
-          onChange={(e) => {
-            onChange('allocation_type', e.target.value);
-            onChange('allocation_value', e.target.value === 'fixed' ? formatCurrencyInput(currentAmount) : '25');
-          }}
-        >
-          <option value="percent">Percent</option>
-          <option value="fixed">Fixed amount</option>
-        </select>
+        <div className="goal-allocation-mode" role="group" aria-label="Allocation type">
+          <button
+            type="button"
+            className={allocation.allocation_type === 'percent' ? 'active' : ''}
+            onClick={() => changeType('percent')}
+          >
+            Percent
+          </button>
+          <button
+            type="button"
+            className={allocation.allocation_type === 'fixed' ? 'active' : ''}
+            onClick={() => changeType('fixed')}
+          >
+            Fixed
+          </button>
+        </div>
       </div>
 
       <div className="goal-form-grid goal-form-grid-single">
@@ -940,22 +971,15 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
             type="text"
             inputMode="decimal"
             value={allocation.allocation_value}
-            onChange={(e) => {
-              const value = allocation.allocation_type === 'fixed'
-                ? formatCurrencyInput(e.target.value)
-                : String(Math.min(100, Math.max(0, Number(e.target.value.replace(/[^0-9.]/g, '')) || 0)));
-              onChange('allocation_value', value);
-            }}
+            onChange={(e) => changeValue(e.target.value)}
             placeholder={allocation.allocation_type === 'fixed' ? '$500' : '25'}
           />
         </label>
       </div>
 
       <AllocationMeter
-        account={account}
         allocation={allocation}
-        reserveAmount={reserveAmount}
-        basis={basis}
+        openAmount={openAmount}
         currentAmount={currentAmount}
         otherAmount={otherAmount}
         onChange={onChange}
@@ -974,11 +998,11 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
   );
 }
 
-function AllocationMeter({ allocation, basis, currentAmount, otherAmount, onChange }) {
+function AllocationMeter({ allocation, openAmount, currentAmount, otherAmount, onChange }) {
   const lastTickRef = useRef(null);
   const rangeValue =
     allocation.allocation_type === 'fixed'
-      ? Math.min(basis, allocationValueNumber(allocation))
+      ? Math.min(openAmount, allocationValueNumber(allocation))
       : allocationValueNumber(allocation);
 
   function tick(value) {
@@ -1003,7 +1027,7 @@ function AllocationMeter({ allocation, basis, currentAmount, otherAmount, onChan
       <input
         type="range"
         min="0"
-        max={allocation.allocation_type === 'fixed' ? Math.max(0, Math.round(basis)) : 100}
+        max={allocation.allocation_type === 'fixed' ? Math.max(0, Math.round(openAmount)) : 100}
         step={allocation.allocation_type === 'fixed' ? 50 : 1}
         value={rangeValue}
         onPointerDown={() => tick(rangeValue)}
@@ -1011,9 +1035,9 @@ function AllocationMeter({ allocation, basis, currentAmount, otherAmount, onChan
         aria-label="Goal allocation meter"
       />
       <div className="goal-meter-labels">
-        <span>Other {formatMoney(otherAmount)}</span>
+        <span>Already allocated {formatMoney(otherAmount)}</span>
         <span>This goal {formatMoney(currentAmount)}</span>
-        <span>Pool {formatMoney(basis)}</span>
+        <span>Open {formatMoney(openAmount)}</span>
       </div>
     </div>
   );

@@ -340,7 +340,7 @@ function normalizeGoalBody(body) {
     icon,
     notes,
     allocations,
-    stealFromOthers: !!body?.stealFromOthers
+    stealFromOthers: false
   };
 }
 
@@ -431,7 +431,7 @@ function rebalanceAccounts(accountIds, protectedGoalId, stealFromOthers) {
 
     if (total <= basis + 0.01) continue;
     if (!stealFromOthers) {
-      throw goalError('This account is already fully allocated. Enable stealing to move allocation from another goal.');
+      throw goalError('This account does not have enough open balance for that allocation.');
     }
     if (basis <= 0) {
       throw goalError('This account has no allocatable balance after reserve.');
