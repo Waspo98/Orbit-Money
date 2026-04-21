@@ -1054,6 +1054,26 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
     setShowLogo(Boolean(logo?.url));
   }, [logo?.url]);
 
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+
+    function closeOnPointerDown(e) {
+      if (!e.target.closest('.txn-logo-menu-wrap')) {
+        setMenuOpen(false);
+      }
+    }
+    function closeOnEscape(e) {
+      if (e.key === 'Escape') setMenuOpen(false);
+    }
+
+    document.addEventListener('mousedown', closeOnPointerDown);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnPointerDown);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [menuOpen]);
+
   function report(status) {
     if (!logo?.merchant_key) return;
     const reportKey = `${logo.merchant_key}:${status}`;
@@ -1080,11 +1100,17 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
 
   async function useCategoryIcon() {
     if (!logo?.merchant_key) return;
-    await api.post('/api/merchant-logos/override', {
-      merchant_key: logo.merchant_key,
-      use_category_icon: true
-    });
-    await refreshTransaction();
+    setMenuOpen(false);
+    setShowLogo(false);
+    try {
+      await api.post('/api/merchant-logos/override', {
+        merchant_key: logo.merchant_key,
+        use_category_icon: true
+      });
+      await refreshTransaction();
+    } catch (err) {
+      setShowLogo(Boolean(logo?.url));
+    }
   }
 
   function markContent() {
@@ -1119,23 +1145,44 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
   }
 
   return (
-    <span className="txn-logo-menu-wrap">
+    <span className="txn-logo-menu-wrap" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         className="txn-merchant-mark"
         title={`${txn.merchant} logo options`}
         aria-label={`Logo options for ${txn.merchant}`}
         aria-expanded={menuOpen}
-        onClick={() => setMenuOpen((value) => !value)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setMenuOpen((value) => !value);
+        }}
       >
         {markContent()}
       </button>
       {menuOpen && (
         <div className="dropdown-menu txn-logo-menu" role="menu">
-          <button type="button" className="dropdown-item" role="menuitem" onClick={openLogoSearch}>
+          <button
+            type="button"
+            className="dropdown-item"
+            role="menuitem"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen(false);
+              openLogoSearch();
+            }}
+          >
             <span>Search for Logo</span>
           </button>
-          <button type="button" className="dropdown-item" role="menuitem" onClick={() => setOverrideOpen(true)}>
+          <button
+            type="button"
+            className="dropdown-item"
+            role="menuitem"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen(false);
+              setOverrideOpen(true);
+            }}
+          >
             <span>Use Image URL</span>
           </button>
           <button
@@ -1143,7 +1190,10 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
             className="dropdown-item"
             role="menuitem"
             disabled={!logo?.merchant_key}
-            onClick={useCategoryIcon}
+            onClick={(e) => {
+              e.stopPropagation();
+              useCategoryIcon();
+            }}
           >
             <span>Use Category Icon</span>
           </button>

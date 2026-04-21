@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
 
 /**
@@ -56,7 +57,7 @@ export default function AnimatedModal({ onClose, size = 'md', animation = 'defau
     };
   }, []);
 
-  return (
+  const modal = (
     <div
       className={`modal-backdrop ${closing ? 'closing' : ''}`}
       onClick={close}
@@ -69,4 +70,6 @@ export default function AnimatedModal({ onClose, size = 'md', animation = 'defau
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }

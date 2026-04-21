@@ -4347,6 +4347,7 @@ input, textarea, select {
 .txn-list { list-style: none; margin: 0; padding: 0; }
 
 .txn-row {
+  position: relative;
   padding: 14px 4px;
   border-bottom: 1px solid var(--border);
   /* The transition list covers both hover (fast) and expand (slower) state
@@ -4363,6 +4364,10 @@ input, textarea, select {
     border-color var(--dur-fast) var(--ease-out, ease),
     border-radius 220ms var(--ease-out, ease);
   -webkit-tap-highlight-color: transparent;
+}
+
+.txn-row:has(.txn-logo-menu) {
+  z-index: 160;
 }
 
 .txn-row-summary {
@@ -4409,6 +4414,7 @@ input, textarea, select {
 .txn-logo-menu-wrap {
   position: relative;
   display: inline-flex;
+  z-index: 1;
 }
 
 .txn-merchant-mark {
@@ -4458,6 +4464,7 @@ input, textarea, select {
   right: auto;
   top: calc(100% + 8px);
   min-width: 178px;
+  z-index: 180;
 }
 
 .txn-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
