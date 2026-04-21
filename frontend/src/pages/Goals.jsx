@@ -189,7 +189,10 @@ function draftAllocationValue(allocation, accounts, goalId) {
 function toSavedAllocation(allocation, account, goalId) {
   const basis = allocationBasis(account, 0);
   const openAmount = accountOpenAmount(account, goalId);
-  const currentAmount = openSpaceAllocationAmount(allocation, openAmount);
+  const fixedCanSteal = allocation.allocation_type === 'fixed' && allocation.stealFromOthers;
+  const currentAmount = fixedCanSteal
+    ? Math.min(Math.max(0, allocationValueNumber(allocation)), basis)
+    : openSpaceAllocationAmount(allocation, openAmount);
   return {
     account_id: allocation.account_id,
     allocation_type: allocation.allocation_type,
@@ -301,9 +304,6 @@ export default function Goals() {
         subtitle="Connect asset accounts, allocate savings, and project when each target lands."
         toolbar={(
           <div className="page-hero-action-row">
-            <button type="button" className="btn-secondary" onClick={load} disabled={loading}>
-              Refresh
-            </button>
             <button type="button" className="btn-primary" onClick={openNewGoal}>
               Add goal
             </button>
@@ -429,6 +429,7 @@ export default function Goals() {
         <GoalWizard
           goal={wizardGoal.mode === 'new' ? null : wizardGoal}
           accounts={accounts}
+          confirm={confirm}
           onClose={() => setWizardGoal(null)}
           onSaved={async (savedId) => {
             setWizardGoal(null);
@@ -604,7 +605,7 @@ function AccountAllocationRow({ account }) {
   );
 }
 
-function GoalWizard({ goal, accounts, onClose, onSaved }) {
+function GoalWizard({ goal, accounts, confirm, onClose, onSaved }) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -619,7 +620,8 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
       account_id: allocation.account_id,
       allocation_type: allocation.allocation_type,
       allocation_value: draftAllocationValue(allocation, accounts, goal?.id),
-      reserve_amount: ''
+      reserve_amount: '',
+      stealFromOthers: false
     }))
   }));
 
@@ -642,7 +644,7 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
       ...prev,
       kind,
       icon: kind === 'custom' ? prev.icon || preset.icon : preset.icon,
-      name: prev.name || preset.label
+      name: preset.label
     }));
   }
 
@@ -659,7 +661,8 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
                 account_id: accountId,
                 allocation_type: 'percent',
                 allocation_value: '25',
-                reserve_amount: ''
+                reserve_amount: '',
+                stealFromOthers: false
               }
             ]
       };
@@ -691,6 +694,9 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
         const account = accounts.find((row) => row.id === allocation.account_id);
         if (!account) return true;
         const openAmount = accountOpenAmount(account, goal?.id);
+        if (allocation.allocation_type === 'fixed' && allocation.stealFromOthers) {
+          return allocationValueNumber(allocation) > allocationBasis(account, 0) + 0.01;
+        }
         return openAmount <= 0 || openSpaceAllocationAmount(allocation, openAmount) > openAmount + 0.01;
       });
       if (overOpenSpace) {
@@ -719,12 +725,37 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
 
     setSaving(true);
     setError('');
+    const stealRequests = draft.allocations
+      .map((allocation) => {
+        const account = accounts.find((row) => row.id === allocation.account_id);
+        if (!account || allocation.allocation_type !== 'fixed' || !allocation.stealFromOthers) return null;
+        const requested = allocationValueNumber(allocation);
+        const openAmount = accountOpenAmount(account, goal?.id);
+        if (requested <= openAmount + 0.01) return null;
+        return { account, requested, openAmount };
+      })
+      .filter(Boolean);
+    if (stealRequests.length > 0) {
+      const ok = await confirm(
+        `This fixed allocation will take space from existing goal percentages on ${stealRequests.map((row) => row.account.name).join(', ')}. Continue?`,
+        {
+          title: 'Steal allocation?',
+          confirmLabel: 'Steal allocation'
+        }
+      );
+      if (!ok) {
+        setSaving(false);
+        return;
+      }
+    }
+
     const payload = {
       name: draft.name.trim(),
       kind: draft.kind,
       icon: draft.icon,
       target_amount: parseMoney(draft.target_amount),
       target_date: draft.target_date || null,
+      stealFromOthers: stealRequests.length > 0,
       allocations: draft.allocations.map((allocation) =>
         toSavedAllocation(
           allocation,
@@ -738,7 +769,7 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
       const result = goal
         ? await api.put(`/api/goals/${goal.id}`, payload)
         : await api.post('/api/goals', payload);
-      close();
+      close({ animation: 'zoom' });
       setTimeout(() => onSaved(result.id), 180);
     } catch (err) {
       setError(err.message || 'Save failed');
@@ -747,7 +778,7 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
   }
 
   return (
-    <AnimatedModal onClose={onClose} size="lg">
+    <AnimatedModal onClose={onClose} size="lg" animation="zoom">
       {({ close }) => (
         <div className="goal-wizard">
           <h3>{title}</h3>
@@ -796,7 +827,7 @@ function GoalWizard({ goal, accounts, onClose, onSaved }) {
                 </label>
               )}
               <label className="field">
-                <span>Saving for</span>
+                <span>What are you saving for?</span>
                 <input value={draft.name} onChange={(e) => update('name', e.target.value)} placeholder="New car" />
               </label>
               <div className="goal-form-grid">
@@ -918,7 +949,12 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
   const otherAllocations = account.allocations.filter((row) => row.goal_id !== goalId);
   const otherAmount = otherAllocations.reduce((sum, row) => sum + Number(row.current_amount || 0), 0);
   const openAmount = accountOpenAmount(account, goalId);
-  const currentAmount = openSpaceAllocationAmount(allocation, openAmount);
+  const basis = allocationBasis(account, 0);
+  const fixedCanSteal = allocation.allocation_type === 'fixed' && allocation.stealFromOthers;
+  const maxAmount = fixedCanSteal ? basis : openAmount;
+  const currentAmount = fixedCanSteal
+    ? Math.min(Math.max(0, allocationValueNumber(allocation)), basis)
+    : openSpaceAllocationAmount(allocation, openAmount);
 
   function changeType(type) {
     const nextValue = type === 'fixed'
@@ -928,11 +964,12 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
         : '0';
     onChange('allocation_type', type);
     onChange('allocation_value', nextValue);
+    if (type === 'percent') onChange('stealFromOthers', false);
   }
 
   function changeValue(value) {
     if (allocation.allocation_type === 'fixed') {
-      onChange('allocation_value', formatCurrencyInput(Math.min(openAmount, parseMoney(value))));
+      onChange('allocation_value', formatCurrencyInput(Math.min(maxAmount, parseMoney(value))));
       return;
     }
     const parsed = Number(String(value).replace(/[^0-9.]/g, '')) || 0;
@@ -979,11 +1016,28 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
 
       <AllocationMeter
         allocation={allocation}
-        openAmount={openAmount}
+        maxAmount={maxAmount}
         currentAmount={currentAmount}
         otherAmount={otherAmount}
+        fixedCanSteal={fixedCanSteal}
         onChange={onChange}
       />
+
+      {allocation.allocation_type === 'fixed' && openAmount < basis - 0.01 && (
+        <label className="goal-fixed-steal-row">
+          <input
+            type="checkbox"
+            checked={!!allocation.stealFromOthers}
+            onChange={(e) => {
+              onChange('stealFromOthers', e.target.checked);
+              if (!e.target.checked) {
+                onChange('allocation_value', formatCurrencyInput(Math.min(openAmount, allocationValueNumber(allocation))));
+              }
+            }}
+          />
+          <span>Allow this fixed amount to reduce other goal percentages</span>
+        </label>
+      )}
 
       {otherAllocations.length > 0 && (
         <div className="goal-existing-allocations">
@@ -998,11 +1052,11 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
   );
 }
 
-function AllocationMeter({ allocation, openAmount, currentAmount, otherAmount, onChange }) {
+function AllocationMeter({ allocation, maxAmount, currentAmount, otherAmount, fixedCanSteal, onChange }) {
   const lastTickRef = useRef(null);
   const rangeValue =
     allocation.allocation_type === 'fixed'
-      ? Math.min(openAmount, allocationValueNumber(allocation))
+      ? Math.min(maxAmount, allocationValueNumber(allocation))
       : allocationValueNumber(allocation);
 
   function tick(value) {
@@ -1027,7 +1081,7 @@ function AllocationMeter({ allocation, openAmount, currentAmount, otherAmount, o
       <input
         type="range"
         min="0"
-        max={allocation.allocation_type === 'fixed' ? Math.max(0, Math.round(openAmount)) : 100}
+        max={allocation.allocation_type === 'fixed' ? Math.max(0, Math.round(maxAmount)) : 100}
         step={allocation.allocation_type === 'fixed' ? 50 : 1}
         value={rangeValue}
         onPointerDown={() => tick(rangeValue)}
@@ -1037,7 +1091,7 @@ function AllocationMeter({ allocation, openAmount, currentAmount, otherAmount, o
       <div className="goal-meter-labels">
         <span>Already allocated {formatMoney(otherAmount)}</span>
         <span>This goal {formatMoney(currentAmount)}</span>
-        <span>Open {formatMoney(openAmount)}</span>
+        <span>{fixedCanSteal ? 'Pie' : 'Open'} {formatMoney(maxAmount)}</span>
       </div>
     </div>
   );

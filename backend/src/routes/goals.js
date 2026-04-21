@@ -340,7 +340,7 @@ function normalizeGoalBody(body) {
     icon,
     notes,
     allocations,
-    stealFromOthers: false
+    stealFromOthers: !!body?.stealFromOthers && allocations.some((row) => row.allocation_type === 'fixed')
   };
 }
 

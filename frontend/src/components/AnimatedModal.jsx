@@ -23,12 +23,14 @@ import { useEffect, useState, useRef } from 'react';
 
 const ANIM_MS = 180;
 
-export default function AnimatedModal({ onClose, size = 'md', children }) {
+export default function AnimatedModal({ onClose, size = 'md', animation = 'default', children }) {
   const [closing, setClosing] = useState(false);
+  const [closingAnimation, setClosingAnimation] = useState('default');
   const timerRef = useRef(null);
 
-  function close() {
+  function close(options = {}) {
     if (closing) return;
+    setClosingAnimation(options.animation || 'default');
     setClosing(true);
     timerRef.current = setTimeout(onClose, ANIM_MS);
   }
@@ -83,7 +85,7 @@ export default function AnimatedModal({ onClose, size = 'md', children }) {
       onClick={close}
     >
       <div
-        className={`modal ${size === 'lg' ? 'modal-lg' : ''} ${size === 'sm' ? 'modal-sm' : ''} ${closing ? 'closing' : ''}`}
+        className={`modal ${size === 'lg' ? 'modal-lg' : ''} ${size === 'sm' ? 'modal-sm' : ''} ${animation === 'zoom' ? 'modal-zoom' : ''} ${closing ? `closing closing-${closingAnimation}` : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         {typeof children === 'function' ? children({ close }) : children}

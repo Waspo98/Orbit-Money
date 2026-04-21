@@ -455,6 +455,10 @@ input, textarea, select {
   animation: modalIn var(--dur-base) var(--ease-out);
 }
 
+.modal.modal-zoom {
+  animation: modalZoomIn var(--dur-base) var(--ease-out);
+}
+
 .modal-sm {
   max-width: 420px;
 }
@@ -488,12 +492,23 @@ input, textarea, select {
   from { opacity: 1; transform: translateY(0) scale(1); }
   to   { opacity: 0; transform: translateY(12px) scale(0.98); }
 }
+@keyframes modalZoomIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes modalZoomOut {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.94); }
+}
 
 .modal-backdrop.closing {
   animation: backdropOut var(--dur-base) var(--ease-in-out) forwards;
 }
 .modal.closing {
   animation: modalOut var(--dur-base) var(--ease-in-out) forwards;
+}
+.modal.closing-zoom {
+  animation: modalZoomOut var(--dur-base) var(--ease-in-out) forwards;
 }
 
 
@@ -3849,6 +3864,23 @@ input, textarea, select {
   gap: 8px;
   color: var(--text-muted);
   font-size: 0.78rem;
+}
+
+.goal-fixed-steal-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.goal-fixed-steal-row input {
+  margin-top: 2px;
 }
 
 .goal-existing-allocations {
