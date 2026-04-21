@@ -593,6 +593,13 @@ input, textarea, select {
 
 /* ================== 5. PAGES — Rules ================== */
 
+.rules-view {
+  width: calc(100% - 40px);
+  max-width: 960px;
+  margin: 0 auto;
+  min-height: calc(100dvh - 140px);
+}
+
 .rules-toolbar {
   margin-bottom: 20px;
 }
@@ -1757,6 +1764,10 @@ input, textarea, select {
   align-self: start;
 }
 
+.page-hero-plain .page-hero-topline {
+  gap: 14px;
+}
+
 .page-hero-chrome {
   display: none;
   min-height: 40px;
@@ -1797,6 +1808,20 @@ input, textarea, select {
   display: grid;
   gap: 22px;
   pointer-events: auto;
+}
+
+.page-hero-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.page-hero-action-row .btn-primary,
+.page-hero-action-row .btn-secondary,
+.page-hero-action-row .btn-danger {
+  box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
 }
 
 .page-hero-topline {
@@ -1909,6 +1934,10 @@ input, textarea, select {
 
 .page-hero-budgets {
   --hero-expanded-width: min(960px, calc(var(--hero-available-width) - (var(--hero-card-margin) * 2)));
+}
+
+.page-hero-networth .page-hero-stats {
+  grid-template-columns: repeat(4, minmax(112px, 1fr));
 }
 
 .page-hero-stat {
@@ -2538,14 +2567,14 @@ input, textarea, select {
   min-height: calc(100dvh - 140px);
 }
 
-.networth-view > .view-header,
 .networth-view > .error,
 .networth-view > .center-loading,
 .networth-view > .empty-state,
-.networth-hero-panel,
 .networth-grid {
-  width: 100%;
-  max-width: none;
+  width: calc(100% - 40px);
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ---------- MHA Tracker ---------- */
@@ -3843,6 +3872,9 @@ input, textarea, select {
 /* ================== 5. PAGES - Housing Calculator ================== */
 
 .housing-view {
+  width: calc(100% - 40px);
+  max-width: 960px;
+  margin: 0 auto;
   min-height: calc(100dvh - 140px);
 }
 
@@ -4012,6 +4044,13 @@ input, textarea, select {
 
 /* ================== 5. PAGES — Settings ================== */
 
+.settings-view {
+  width: calc(100% - 40px);
+  max-width: 960px;
+  margin: 0 auto;
+  min-height: calc(100dvh - 140px);
+}
+
 .settings-section {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -4117,6 +4156,10 @@ input, textarea, select {
 .settings-action-link {
   text-decoration: none;
   white-space: nowrap;
+}
+
+.settings-import-button {
+  width: 100%;
 }
 
 .settings-account-section { margin-bottom: 0; }
@@ -4910,7 +4953,8 @@ input, textarea, select {
   .page-hero-dashboard .page-hero-stats,
   .page-hero-transactions .page-hero-stats,
   .page-hero-budgets .page-hero-stats,
-  .page-hero-accounts .page-hero-stats {
+  .page-hero-accounts .page-hero-stats,
+  .page-hero-networth .page-hero-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
   }

@@ -128,7 +128,7 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on â‰
 - **Top spending card:** up to 7 categories with horizontal bars scaled to the biggest spender; bars use each category's color
 - **Recent activity card:** last 10 transactions, tap-to-navigate to full Transactions page
 - Shimmer skeleton loading per card
-- Empty state routes new users to Import / SimpleFIN setup
+- Empty state routes new users to Settings, where Rocket Money import and SimpleFIN setup live
 
 ### Responsive Layout
 - **Phone (< 640px):** Single column, bottom tabs
@@ -138,9 +138,9 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on â‰
 ### Navigation
 - **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More
 - **Desktop sidebar:** Same 5 items as bottom tabs
-- **Hamburger menu (top-right):** Import, Settings, Theme toggle, Sign out
-- **More tab:** Opens bottom sheet (mobile) or centered modal (desktop) with cards for Rules, Settings, Import, Housing Calculator, Net Worth, and coming-soon placeholders (Goals, Credit Score)
-- **Settings page:** SimpleFIN configuration and sync log only. The Rules management card was removed after the Rules feature got its own dedicated page.
+- **Hamburger menu (top-right):** Settings/import, Theme toggle, Sign out
+- **More tab:** Opens bottom sheet (mobile) or centered modal (desktop) with cards for Rules, Settings, Category Manager, Housing Calculator, Net Worth, MHA Tracker when enabled, and coming-soon placeholders (Goals)
+- **Settings page:** Appearance, MHA visibility, Rocket Money CSV import, SimpleFIN configuration/sync log, account controls, and app build details.
 - **React Router v6:** Client-side routing with browser back/forward support. All routes served via Express catch-all for deep-link support.
 
 ### UI Details
@@ -256,7 +256,7 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on â‰
 - `src/main.jsx`, `src/App.jsx` (BrowserRouter, passes accounts + categories to Transactions and Dashboard), `src/Login.jsx`, `src/api.js` (get/post/put/patch/del), `src/index.css` (~3000 lines)
 - `src/hooks/useTheme.js`
 - `src/components/`: AnimatedModal, AppDialog, BottomTabs, DesktopSidebar, DropdownMenu, FilterSheet, HamburgerMenu, MoreSheet, PageHero, SyncErrorBanner
-- `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, Import, HousingCalculator, NetWorth
+- `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, HousingCalculator, NetWorth, MhaTracker
 
 ## Known Gotchas
 - **better-sqlite3 `.iterate()` + write transaction** = "database connection is busy" â€” always use `.all()` instead

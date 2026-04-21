@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
+import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { APP_VERSION_LABEL } from '../version.js';
 
@@ -47,7 +47,8 @@ export default function Settings({
   onThemeChange,
   onLogout,
   mhaTrackerEnabled = false,
-  onMhaTrackerChange
+  onMhaTrackerChange,
+  onImportComplete
 }) {
   const { alert, confirm, Dialog } = useAppDialog();
   // SimpleFIN section
@@ -66,6 +67,12 @@ export default function Settings({
   const [signingOut, setSigningOut] = useState(false);
   const [mhaBusy, setMhaBusy] = useState(false);
   const [mhaError, setMhaError] = useState('');
+  const [file, setFile] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [importError, setImportError] = useState('');
+  const fileInputRef = useRef(null);
 
   async function loadStatus() {
     try {
@@ -180,14 +187,66 @@ export default function Settings({
     }
   }
 
+  function handleFile(f) {
+    if (!f) return;
+    if (!f.name.toLowerCase().endsWith('.csv')) {
+      setImportError('Please choose a .csv file.');
+      return;
+    }
+    if (f.size > 20 * 1024 * 1024) {
+      setImportError('File is larger than 20 MB.');
+      return;
+    }
+    setImportError('');
+    setImportResult(null);
+    setFile(f);
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    setDragging(false);
+    handleFile(e.dataTransfer.files?.[0]);
+  }
+
+  async function handleImport() {
+    if (!file) return;
+    setImporting(true);
+    setImportError('');
+    setImportResult(null);
+
+    try {
+      const form = new FormData();
+      form.append('file', file);
+
+      const res = await fetch('/api/import/rocket-money', {
+        method: 'POST',
+        credentials: 'same-origin',
+        body: form
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Import failed: ${res.status}`);
+      }
+
+      setImportResult(data);
+      setFile(null);
+    } catch (err) {
+      setImportError(err.message || 'Import failed');
+    } finally {
+      setImporting(false);
+    }
+  }
+
   return (
     <div className="settings-view">
-      <div className="view-header">
-        <div>
-          <h2>Settings</h2>
-          <p className="muted">Maintenance and configuration.</p>
-        </div>
-      </div>
+      <PageHero
+        id="settings-title"
+        variant="settings"
+        kicker="Control Center"
+        title="Settings"
+        subtitle="Maintenance and configuration."
+      />
 
       <section className="settings-section settings-section-top">
         <div className="settings-section-header">
@@ -442,15 +501,91 @@ export default function Settings({
           <p>Bring in Rocket Money data when you need to reload history.</p>
         </div>
 
-        <div className="settings-action">
-          <div className="settings-action-info">
-            <strong>Rocket Money import</strong>
-            <p>Upload an export file to add accounts and transactions.</p>
+        {importResult ? (
+          <div className="result-card">
+            <dl className="stat-grid">
+              <div><dt>Imported</dt><dd>{importResult.inserted.toLocaleString()}</dd></div>
+              <div><dt>Skipped</dt><dd>{importResult.skipped.toLocaleString()}</dd></div>
+              <div><dt>Accounts</dt><dd>{importResult.accountsCreated.toLocaleString()}</dd></div>
+              <div><dt>Rules</dt><dd>{importResult.rulesCreated.toLocaleString()}</dd></div>
+            </dl>
+
+            {importResult.parseWarnings > 0 && (
+              <p className="muted" style={{ marginTop: 0 }}>
+                Parser reported {importResult.parseWarnings} minor warnings - usually fine.
+              </p>
+            )}
+
+            <div className="settings-action">
+              <div className="settings-action-info">
+                <strong>Import complete</strong>
+                <p>Refresh account lookups and review the imported transactions.</p>
+              </div>
+              <button type="button" className="btn-primary" onClick={onImportComplete}>
+                View transactions
+              </button>
+            </div>
           </div>
-          <Link to="/import" className="btn-secondary settings-action-link">
-            Open import
-          </Link>
-        </div>
+        ) : (
+          <>
+            <p style={{ marginBottom: 20 }}>
+              Export your transactions from Rocket Money as CSV, then drop the file below.
+              Accounts will be created, Custom Names preserved, and rename rules generated
+              automatically.
+            </p>
+
+            <div
+              className={`drop-zone ${dragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              role="button"
+              tabIndex={0}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => handleFile(e.target.files?.[0])}
+                style={{ display: 'none' }}
+              />
+              {file ? (
+                <>
+                  <div className="drop-zone-icon">OK</div>
+                  <div className="drop-zone-filename">{file.name}</div>
+                  <div className="subtle">{(file.size / 1024).toFixed(0)} KB - click to pick a different file</div>
+                </>
+              ) : (
+                <>
+                  <div className="drop-zone-icon">CSV</div>
+                  <div className="drop-zone-primary">Drop your CSV here</div>
+                  <div className="subtle">or click to browse</div>
+                </>
+              )}
+            </div>
+
+            {importError && <div className="error">{importError}</div>}
+
+            <button
+              type="button"
+              className="btn-primary settings-import-button"
+              disabled={!file || importing}
+              onClick={handleImport}
+            >
+              {importing ? (
+                <>
+                  <span className="spinner-inline" /> Importing...
+                </>
+              ) : (
+                'Import'
+              )}
+            </button>
+          </>
+        )}
       </section>
 
       <section className="settings-section settings-account-section">

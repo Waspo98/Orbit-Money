@@ -471,12 +471,12 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           Import your Rocket Money export to bring over your full history,
           preserve your custom merchant names, and generate rename rules.
         </p>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => navigate('/import')}
-        >
-          Import from Rocket Money
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => navigate('/settings')}
+          >
+            Import from Rocket Money
         </button>
       </div>
     );

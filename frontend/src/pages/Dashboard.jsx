@@ -298,7 +298,7 @@ export default function Dashboard({ accounts = [], categories = [], onOpenMenu }
             <button
               type="button"
               className="btn-primary"
-              onClick={() => navigate('/import')}
+              onClick={() => navigate('/settings')}
             >
               Import from Rocket Money
             </button>

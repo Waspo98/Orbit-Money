@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
+import PageHero from '../components/PageHero.jsx';
 
 const BUCKET_LABELS = {
   cash: 'Cash',
@@ -139,21 +140,46 @@ export default function NetWorth() {
   const debtShare = percent(summary.liabilities, summary.assets);
   const monthTone = Number(summary.monthOverMonth || 0) >= 0 ? 'income' : 'expense';
   const periodTone = Number(summary.periodChange || 0) >= 0 ? 'income' : 'expense';
+  const netWorthStats = [
+    {
+      label: 'Current',
+      value: loading ? 'Loading' : formatMoney(summary.netWorth),
+      tone: Number(summary.netWorth || 0) >= 0 ? 'good' : 'caution'
+    },
+    {
+      label: 'This Month',
+      value: loading ? 'Loading' : formatSignedMoney(summary.monthOverMonth),
+      tone: monthTone === 'income' ? 'good' : 'caution'
+    },
+    {
+      label: first ? `Since ${formatMonth(first.month)}` : 'Since Start',
+      value: loading ? 'Loading' : formatSignedMoney(summary.periodChange),
+      tone: periodTone === 'income' ? 'good' : 'caution'
+    },
+    {
+      label: 'Debt Share',
+      value: loading ? 'Loading' : `${Math.round(debtShare)}%`,
+      tone: debtShare > 65 ? 'caution' : debtShare > 35 ? 'warn' : 'good'
+    }
+  ];
 
   return (
     <div className="networth-view">
-      <div className="view-header">
-        <div>
-          <h2>Net Worth</h2>
-          <p>
-            Assets minus liabilities
-            {latest ? `, updated through ${formatMonth(latest.month)}` : ''}
-          </p>
-        </div>
-        <button type="button" className="btn-secondary" onClick={reload} disabled={loading}>
-          Refresh
-        </button>
-      </div>
+      <PageHero
+        id="networth-title"
+        variant="networth"
+        kicker="Balance Sheet"
+        title="Net Worth"
+        subtitle={`Assets minus liabilities${latest ? `, updated through ${formatMonth(latest.month)}` : ''}`}
+        stats={netWorthStats}
+        toolbar={(
+          <div className="page-hero-action-row">
+            <button type="button" className="btn-secondary" onClick={reload} disabled={loading}>
+              Refresh
+            </button>
+          </div>
+        )}
+      />
 
       {error && <div className="error">{error}</div>}
 
@@ -170,36 +196,6 @@ export default function NetWorth() {
         </div>
       ) : (
         <>
-          <section className="networth-hero-panel">
-            <div className="networth-hero-main">
-              <div className="networth-kicker">Current net worth</div>
-              <div className={`networth-total ${summary.netWorth >= 0 ? 'income' : 'expense'}`}>
-                {formatMoney(summary.netWorth)}
-              </div>
-              <div className="networth-hero-sub">
-                {formatMoney(summary.assets)} assets minus {formatMoney(summary.liabilities)} liabilities
-              </div>
-            </div>
-
-            <div className="networth-hero-metrics">
-              <MetricCard
-                label="This month"
-                value={formatSignedMoney(summary.monthOverMonth)}
-                tone={monthTone}
-              />
-              <MetricCard
-                label={first ? `Since ${formatMonth(first.month)}` : 'Since start'}
-                value={formatSignedMoney(summary.periodChange)}
-                tone={periodTone}
-              />
-              <MetricCard
-                label="Debt share"
-                value={`${Math.round(debtShare)}%`}
-                tone={debtShare > 65 ? 'expense' : debtShare > 35 ? 'warn' : 'income'}
-              />
-            </div>
-          </section>
-
           <div className="networth-grid">
             <section className="dashboard-card networth-trend-card">
               <header className="dashboard-card-header">
@@ -272,15 +268,6 @@ export default function NetWorth() {
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-function MetricCard({ label, value, tone }) {
-  return (
-    <div className={`networth-metric ${tone || ''}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
     </div>
   );
 }
