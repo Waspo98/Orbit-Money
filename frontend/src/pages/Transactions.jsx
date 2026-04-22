@@ -1343,14 +1343,13 @@ function LogoFinderModal({ txn, logo, onClose, onSaved }) {
                 required
               />
             </label>
-            {logoUrl && (
-              <div className="logo-finder-preview" aria-label="Selected logo preview">
-                <img src={logoUrl} alt="" />
-              </div>
-            )}
-            {error && <div className="error">{error}</div>}
-            <div className="modal-actions logo-finder-actions">
-              <div className="logo-finder-action-row">
+            <div className={`logo-finder-bottom-tools ${logoUrl ? 'has-preview' : ''}`}>
+              {logoUrl && (
+                <div className="logo-finder-preview" aria-label="Selected logo preview">
+                  <img src={logoUrl} alt="" />
+                </div>
+              )}
+              <div className="logo-finder-secondary-actions">
                 <button type="button" className="btn-secondary" onClick={openDuckDuckGo}>
                   DuckDuckGo Images
                 </button>
@@ -1358,14 +1357,15 @@ function LogoFinderModal({ txn, logo, onClose, onSaved }) {
                   Use Category Icon
                 </button>
               </div>
-              <div className="logo-finder-action-row logo-finder-action-row-primary">
-                <button type="button" className="btn-secondary" onClick={close}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? 'Saving...' : 'Save'}
-                </button>
-              </div>
+            </div>
+            {error && <div className="error">{error}</div>}
+            <div className="modal-actions logo-finder-actions">
+              <button type="button" className="btn-secondary" onClick={close}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? 'Saving...' : 'Save'}
+              </button>
             </div>
           </form>
         </>
