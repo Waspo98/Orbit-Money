@@ -174,6 +174,7 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on �
 - `AppDialog.jsx` exposes `useAppDialog()` for modal alert/confirmation flows. Prefer it over native `alert()` / `confirm()` so mobile UX and destructive-action styling stay consistent.
 - `BottomTabs.jsx` owns the primary navigation item list; `DesktopSidebar.jsx` imports `PRIMARY_TABS` so desktop and mobile navigation labels/icons stay aligned.
 - `SelectableListItem.jsx` is the shared two-line selectable card/row primitive. Use it for lists where one item is selected, such as goal/category pickers; selected rows use the shared green active treatment.
+- `CurrencyInput.jsx` is the shared primitive for editable dollar amounts. Use it for money text fields so values format with `$` and comma grouping while typing; pair saved values with `parseCurrencyInput`.
 - Overlay behavior: modals, app dialogs, sheets, and full-screen popovers blur the app backdrop and lock body scroll. `DropdownMenu` stays anchored to its trigger, does not blur the page, and does not lock scroll.
 - Three-way theme toggle (☀️ / 💻 / 🌙): localStorage persistence with pre-paint script in `index.html` to avoid flash
 - 40+ CSS custom properties for light/dark themes, emerald-600/500 accent

@@ -6,6 +6,10 @@ import DropdownMenu from '../components/DropdownMenu.jsx';
 import PageHero from '../components/PageHero.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import CurrencyInput, {
+  formatCurrencyInput,
+  parseCurrencyInput
+} from '../components/CurrencyInput.jsx';
 
 // ============================================================================
 // Budgets — v15
@@ -1023,7 +1027,7 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
       setError('Pick a category.');
       return;
     }
-    const amt = Number(amount);
+    const amt = parseCurrencyInput(amount, NaN);
     if (!Number.isFinite(amt) || amt < 0) {
       setError('Enter a valid non-negative amount.');
       return;
@@ -1079,14 +1083,10 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
 
               <label className="field">
                 <span>Monthly limit</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  inputMode="decimal"
-                  placeholder="0.00"
+                <CurrencyInput
+                  placeholder="$0"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={setAmount}
                   required
                 />
               </label>
@@ -1115,7 +1115,7 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
 
 function EditBudgetModal({ item, onClose, onSaved, onDelete }) {
   const [amount, setAmount] = useState(
-    item.amount != null ? String(item.amount) : ''
+    item.amount != null ? formatCurrencyInput(item.amount) : ''
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -1124,7 +1124,7 @@ function EditBudgetModal({ item, onClose, onSaved, onDelete }) {
     e.preventDefault();
     setError('');
 
-    const amt = Number(amount);
+    const amt = parseCurrencyInput(amount, NaN);
     if (!Number.isFinite(amt) || amt < 0) {
       setError('Enter a valid non-negative amount.');
       return;
@@ -1162,14 +1162,10 @@ function EditBudgetModal({ item, onClose, onSaved, onDelete }) {
           <form onSubmit={(e) => handleSave(e, close)}>
             <label className="field">
               <span>Monthly limit</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                inputMode="decimal"
-                placeholder="0.00"
+              <CurrencyInput
+                placeholder="$0"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={setAmount}
                 required
                 autoFocus
               />

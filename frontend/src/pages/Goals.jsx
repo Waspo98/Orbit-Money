@@ -22,6 +22,10 @@ import AnimatedModal from '../components/AnimatedModal.jsx';
 import PageHero from '../components/PageHero.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import CurrencyInput, {
+  formatCurrencyInput,
+  parseCurrencyInput
+} from '../components/CurrencyInput.jsx';
 
 const GOAL_PRESETS = [
   { kind: 'retirement', label: 'Retirement', icon: '🏖️' },
@@ -55,22 +59,7 @@ function formatSignedMoney(amount) {
   return `${value > 0 ? '+' : '-'}${formatMoney(Math.abs(value))}`;
 }
 
-function parseMoney(value) {
-  const cleaned = String(value || '').replace(/[$,\s]/g, '');
-  if (!cleaned) return 0;
-  const parsed = Number(cleaned);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function formatCurrencyInput(value) {
-  if (value === null || value === undefined || value === '') return '';
-  const cleaned = String(value).replace(/[^0-9.]/g, '');
-  if (!cleaned) return '';
-  const [whole, decimal = ''] = cleaned.split('.');
-  const dollars = Number(whole || 0).toLocaleString();
-  const cents = decimal.slice(0, 2);
-  return `$${dollars}${cleaned.includes('.') ? `.${cents}` : ''}`;
-}
+const parseMoney = parseCurrencyInput;
 
 function formatMonth(key) {
   if (!key) return '';
@@ -935,11 +924,9 @@ function GoalWizard({ goal, accounts, confirm, onClose, onSaved }) {
               <div className="goal-form-grid">
                 <label className="field">
                   <span>Target amount</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
+                  <CurrencyInput
                     value={draft.target_amount}
-                    onChange={(e) => update('target_amount', formatCurrencyInput(e.target.value))}
+                    onChange={(value) => update('target_amount', value)}
                     placeholder="$25,000"
                   />
                 </label>
@@ -1106,13 +1093,21 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
       <div className="goal-form-grid goal-form-grid-single">
         <label className="field">
           <span>{allocation.allocation_type === 'fixed' ? 'Amount Allocated Towards Goal' : 'Percent of Account Allocated Towards Goal'}</span>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={allocation.allocation_value}
-            onChange={(e) => changeValue(e.target.value)}
-            placeholder={allocation.allocation_type === 'fixed' ? '$500' : '25'}
-          />
+          {allocation.allocation_type === 'fixed' ? (
+            <CurrencyInput
+              value={allocation.allocation_value}
+              onChange={changeValue}
+              placeholder="$500"
+            />
+          ) : (
+            <input
+              type="text"
+              inputMode="decimal"
+              value={allocation.allocation_value}
+              onChange={(e) => changeValue(e.target.value)}
+              placeholder="25"
+            />
+          )}
         </label>
       </div>
 

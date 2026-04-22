@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import PageHero from '../components/PageHero.jsx';
+import CurrencyInput, { formatCurrencyInput } from '../components/CurrencyInput.jsx';
 
 function formatMoney(amount) {
   if (amount === null || amount === undefined) return null;
@@ -20,15 +21,6 @@ function parseNumber(value, fallback = 0) {
 
 function hasValue(value) {
   return String(value ?? '').replace(/[$,%\s,]/g, '').trim() !== '';
-}
-
-function formatCurrencyInput(value) {
-  const cleaned = String(value || '').replace(/[^0-9.]/g, '');
-  if (!cleaned) return '';
-  const [whole, decimal = ''] = cleaned.split('.');
-  const dollars = Number(whole || 0).toLocaleString();
-  const cents = decimal.slice(0, 2);
-  return `$${dollars}${cleaned.includes('.') ? `.${cents}` : ''}`;
 }
 
 function formatPercentInput(value) {
@@ -341,11 +333,9 @@ function MoneyField({ label, value, placeholder = '$0', onChange }) {
   return (
     <label className="field housing-field">
       <span>{label}</span>
-      <input
-        type="text"
-        inputMode="decimal"
+      <CurrencyInput
         value={value}
-        onChange={(e) => onChange(formatCurrencyInput(e.target.value))}
+        onChange={onChange}
         placeholder={placeholder}
       />
     </label>

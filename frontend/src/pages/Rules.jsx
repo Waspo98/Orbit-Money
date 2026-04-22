@@ -3,6 +3,10 @@ import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import CurrencyInput, {
+  formatCurrencyInput,
+  parseCurrencyInput
+} from '../components/CurrencyInput.jsx';
 
 // ============================================================================
 // Field / operator / action vocabularies (must stay in sync with ruleMatcher.js)
@@ -688,37 +692,34 @@ function ConditionRow({ index, condition, accounts, categories, onFieldChange, o
           </select>
         ) : condition.operator === 'between' ? (
           <div className="rule-between">
-            <input
-              type="number"
-              step="0.01"
-              value={Array.isArray(condition.value) ? condition.value[0] ?? '' : ''}
-              onChange={(e) => {
+            <CurrencyInput
+              allowNegative
+              value={Array.isArray(condition.value) ? formatCurrencyInput(condition.value[0] ?? '', { allowNegative: true }) : ''}
+              onChange={(value) => {
                 const arr = Array.isArray(condition.value) ? [...condition.value] : ['', ''];
-                arr[0] = parseFloat(e.target.value);
+                arr[0] = value ? parseCurrencyInput(value, 0) : '';
                 onUpdate({ value: arr });
               }}
               placeholder="Low"
             />
             <span>and</span>
-            <input
-              type="number"
-              step="0.01"
-              value={Array.isArray(condition.value) ? condition.value[1] ?? '' : ''}
-              onChange={(e) => {
+            <CurrencyInput
+              allowNegative
+              value={Array.isArray(condition.value) ? formatCurrencyInput(condition.value[1] ?? '', { allowNegative: true }) : ''}
+              onChange={(value) => {
                 const arr = Array.isArray(condition.value) ? [...condition.value] : ['', ''];
-                arr[1] = parseFloat(e.target.value);
+                arr[1] = value ? parseCurrencyInput(value, 0) : '';
                 onUpdate({ value: arr });
               }}
               placeholder="High"
             />
           </div>
         ) : type === 'number' ? (
-          <input
-            type="number"
-            step="0.01"
-            value={condition.value ?? ''}
-            onChange={(e) => onUpdate({ value: parseFloat(e.target.value) })}
-            placeholder="0.00"
+          <CurrencyInput
+            allowNegative
+            value={formatCurrencyInput(condition.value ?? '', { allowNegative: true })}
+            onChange={(value) => onUpdate({ value: value ? parseCurrencyInput(value, 0) : '' })}
+            placeholder="$0"
           />
         ) : (
           <input

@@ -13,6 +13,12 @@ function isValidDateOnly(value) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+function previousMonthEnd(value) {
+  const [year, month] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, 0));
+  return date.toISOString().slice(0, 10);
+}
+
 /**
  * GET /api/accounts?includeArchived=1
  *
@@ -235,6 +241,11 @@ router.post('/:id/records', requireAuth, (req, res) => {
   if (!Number.isFinite(balance)) {
     return res.status(400).json({ error: 'balance must be a valid number.' });
   }
+  const previousBalance =
+    req.body?.previousBalance === undefined ? null : Number(req.body.previousBalance);
+  if (previousBalance !== null && !Number.isFinite(previousBalance)) {
+    return res.status(400).json({ error: 'previousBalance must be a valid number.' });
+  }
 
   const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
   if (!account) {
@@ -243,7 +254,7 @@ router.post('/:id/records', requireAuth, (req, res) => {
 
   try {
     const run = db.transaction(() => {
-      db.prepare(
+      const insertRecord = db.prepare(
         `
         INSERT INTO account_balance_records (account_id, record_date, balance)
         VALUES (?, ?, ?)
@@ -251,7 +262,29 @@ router.post('/:id/records', requireAuth, (req, res) => {
           balance = excluded.balance,
           updated_at = datetime('now')
       `
-      ).run(id, recordDate, balance);
+      );
+
+      const priorRecords = db
+        .prepare(
+          `
+          SELECT COUNT(*) AS count
+            FROM account_balance_records
+           WHERE account_id = ? AND record_date < ?
+        `
+        )
+        .get(id, recordDate).count;
+
+      if (priorRecords === 0 && previousBalance !== null && previousBalance !== balance) {
+        const baselineDate = previousMonthEnd(recordDate);
+        db.prepare(
+          `
+          INSERT OR IGNORE INTO account_balance_records (account_id, record_date, balance)
+          VALUES (?, ?, ?)
+        `
+        ).run(id, baselineDate, previousBalance);
+      }
+
+      insertRecord.run(id, recordDate, balance);
 
       const latestRecord = db
         .prepare(

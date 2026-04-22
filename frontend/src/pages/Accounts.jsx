@@ -23,6 +23,7 @@ import DropdownMenu from '../components/DropdownMenu.jsx';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import CurrencyInput, { parseCurrencyInput } from '../components/CurrencyInput.jsx';
 
 const TYPE_LABELS = {
   checking: 'Checking',
@@ -49,9 +50,8 @@ function formatCurrency(amount) {
 }
 
 function parseOptionalCurrency(value) {
-  const cleaned = String(value || '').replace(/[$,]/g, '').trim();
-  if (!cleaned) return null;
-  const parsed = Number(cleaned);
+  if (String(value ?? '').replace(/[$,\s]/g, '').trim() === '') return null;
+  const parsed = parseCurrencyInput(value, NaN);
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
@@ -608,7 +608,8 @@ function AccountRecordModal({ account, confirm, onClose, onSaved }) {
     try {
       await api.post(`/api/accounts/${account.id}/records`, {
         date,
-        balance: nextBalance
+        balance: nextBalance,
+        previousBalance
       });
       close({ animate: true });
       setTimeout(onSaved, 180);
@@ -642,12 +643,10 @@ function AccountRecordModal({ account, confirm, onClose, onSaved }) {
 
             <label className="field">
               <span>Account Total</span>
-              <input
-                type="text"
-                inputMode="decimal"
+              <CurrencyInput
                 value={balance}
-                onChange={(e) => setBalance(e.target.value)}
-                placeholder="e.g. 125000"
+                onChange={setBalance}
+                placeholder="$125,000"
                 required
               />
             </label>
@@ -759,12 +758,10 @@ function EditAccountModal({ account, onClose, onSaved }) {
             {type === 'mortgage' && (
               <label className="field">
                 <span>Estimated Value</span>
-                <input
-                  type="text"
-                  inputMode="decimal"
+                <CurrencyInput
                   value={estimatedValue}
-                  onChange={(e) => setEstimatedValue(e.target.value)}
-                  placeholder="e.g. 300000"
+                  onChange={setEstimatedValue}
+                  placeholder="$300,000"
                 />
               </label>
             )}

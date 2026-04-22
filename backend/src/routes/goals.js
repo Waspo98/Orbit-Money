@@ -126,12 +126,25 @@ function buildHistories(accounts, goals, allocations, months) {
   const latestTransaction = db
     .prepare('SELECT MAX(date) AS latest, MIN(date) AS earliest FROM transactions')
     .get();
+  const latestRecord = db
+    .prepare(
+      `SELECT MAX(record_date) AS latest, MIN(record_date) AS earliest
+         FROM account_balance_records`
+    )
+    .get();
 
   const todayMonth = currentMonth();
-  const latestDataMonth = monthKey(latestTransaction.latest) || todayMonth;
+  const latestDataMonth = [
+    monthKey(latestTransaction.latest),
+    monthKey(latestRecord.latest),
+    todayMonth
+  ].filter(Boolean).sort().at(-1);
   const latestMonth = latestDataMonth > todayMonth ? latestDataMonth : todayMonth;
   const floorMonth = addMonths(latestMonth, -(months - 1));
-  const earliestMonth = monthKey(latestTransaction.earliest) || latestMonth;
+  const earliestMonth = [
+    monthKey(latestTransaction.earliest),
+    monthKey(latestRecord.earliest)
+  ].filter(Boolean).sort()[0] || latestMonth;
   const firstMonth = earliestMonth > floorMonth ? earliestMonth : floorMonth;
 
   const monthlyDeltas = db
@@ -143,6 +156,14 @@ function buildHistories(accounts, goals, allocations, months) {
         ORDER BY month ASC`
     )
     .all(`${firstMonth}-01`);
+  const balanceRecords = db
+    .prepare(
+      `SELECT account_id, record_date, balance
+         FROM account_balance_records
+        WHERE record_date <= ?
+        ORDER BY account_id ASC, record_date DESC`
+    )
+    .all(`${latestMonth}-31`);
 
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const balancesByAccount = new Map(accounts.map((account) => [account.id, Number(account.current_balance) || 0]));
@@ -160,15 +181,41 @@ function buildHistories(accounts, goals, allocations, months) {
     deltasByMonth.get(row.month).push(row);
   }
 
+  const recordsByAccount = new Map();
+  for (const record of balanceRecords) {
+    if (!recordsByAccount.has(record.account_id)) recordsByAccount.set(record.account_id, []);
+    recordsByAccount.get(record.account_id).push({
+      month: monthKey(record.record_date),
+      date: record.record_date,
+      balance: Number(record.balance) || 0
+    });
+  }
+  for (const records of recordsByAccount.values()) {
+    records.sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  function snapshotBalanceForMonth(accountId, month) {
+    const records = recordsByAccount.get(accountId);
+    if (!records) return null;
+    const record = records.find((item) => item.month <= month);
+    return record ? record.balance : null;
+  }
+
   const histories = new Map(goals.map((goal) => [goal.id, []]));
   let cursor = latestMonth;
 
   while (cursor >= firstMonth) {
+    const monthBalances = new Map();
+    for (const account of accounts) {
+      const snapshotBalance = snapshotBalanceForMonth(account.id, cursor);
+      monthBalances.set(account.id, snapshotBalance ?? (balancesByAccount.get(account.id) || 0));
+    }
+
     for (const goal of goals) {
       const total = (allocationsByGoal.get(goal.id) || []).reduce((sum, allocation) => {
         const account = accountById.get(allocation.account_id);
         if (!account) return sum;
-        return sum + allocationDollars(allocation, account, reserves, balancesByAccount);
+        return sum + allocationDollars(allocation, account, reserves, monthBalances);
       }, 0);
       histories.get(goal.id).push({ month: cursor, amount: total });
     }

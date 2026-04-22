@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import AnimatedModal from './AnimatedModal.jsx';
+import CurrencyInput, {
+  formatCurrencyInput,
+  parseCurrencyInput
+} from './CurrencyInput.jsx';
 
 // ============================================================================
 // FilterSheet — comprehensive filter UI for the Transactions page.
@@ -100,10 +104,10 @@ export default function FilterSheet({
   const [dateFrom, setDateFrom] = useState(initial.dateFrom || '');
   const [dateTo, setDateTo] = useState(initial.dateTo || '');
   const [amountMin, setAmountMin] = useState(
-    initial.amountMin != null ? String(initial.amountMin) : ''
+    initial.amountMin != null ? formatCurrencyInput(initial.amountMin) : ''
   );
   const [amountMax, setAmountMax] = useState(
-    initial.amountMax != null ? String(initial.amountMax) : ''
+    initial.amountMax != null ? formatCurrencyInput(initial.amountMax) : ''
   );
   const [type, setType] = useState(initial.type || 'all');
   const [includeIgnored, setIncludeIgnored] = useState(
@@ -145,8 +149,8 @@ export default function FilterSheet({
   }
 
   function handleApply(close) {
-    const min = amountMin.trim() ? Number(amountMin) : null;
-    const max = amountMax.trim() ? Number(amountMax) : null;
+    const min = amountMin.trim() ? parseCurrencyInput(amountMin, NaN) : null;
+    const max = amountMax.trim() ? parseCurrencyInput(amountMax, NaN) : null;
 
     onApply({
       accountIds,
@@ -241,26 +245,18 @@ export default function FilterSheet({
               <div className="filter-row">
                 <label className="filter-field">
                   <span>Min</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    inputMode="decimal"
-                    placeholder="0"
+                  <CurrencyInput
+                    placeholder="$0"
                     value={amountMin}
-                    onChange={(e) => setAmountMin(e.target.value)}
+                    onChange={setAmountMin}
                   />
                 </label>
                 <label className="filter-field">
                   <span>Max</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    inputMode="decimal"
-                    placeholder="∞"
+                  <CurrencyInput
+                    placeholder="No max"
                     value={amountMax}
-                    onChange={(e) => setAmountMax(e.target.value)}
+                    onChange={setAmountMax}
                   />
                 </label>
               </div>
