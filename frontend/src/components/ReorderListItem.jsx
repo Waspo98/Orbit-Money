@@ -1,6 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+// Shared reorder row primitive for sortable lists. Keep drag activation on the
+// handle so row content remains visually stable and does not become a drag slab.
 export default function ReorderListItem({
   id,
   as: Element = 'div',
@@ -31,7 +33,7 @@ export default function ReorderListItem({
     <Element
       ref={setNodeRef}
       style={style}
-      className={`selectable-list-item reorder-list-row draggable ${className} ${isDragging ? 'dragging' : ''}`}
+      className={`selectable-list-item reorder-list-row draggable ${leading ? 'has-leading' : 'no-leading'} ${className} ${isDragging ? 'dragging' : ''}`}
     >
       <button
         type="button"
@@ -43,9 +45,11 @@ export default function ReorderListItem({
       >
         <span aria-hidden="true">⋮⋮</span>
       </button>
-      <span className="selectable-list-leading">
-        {leading}
-      </span>
+      {leading && (
+        <span className="selectable-list-leading">
+          {leading}
+        </span>
+      )}
       <span className="selectable-list-main">
         <strong>{title}</strong>
         {subtitle && <em>{subtitle}</em>}

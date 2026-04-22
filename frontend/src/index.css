@@ -3667,6 +3667,10 @@ input, textarea, select {
   border: 1px dashed var(--border-strong, var(--border));
 }
 
+.selectable-list-item.reorder-list-row.no-leading {
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+}
+
 .reorder-list-row:hover,
 .reorder-list-row:focus {
   border-color: var(--border);
@@ -3702,28 +3706,6 @@ input, textarea, select {
 
 .account-list.reorder-active .reorder-list-row {
   min-height: 64px;
-}
-
-.account-list.reorder-active .selectable-list-leading {
-  justify-content: flex-start;
-}
-
-.account-list.reorder-active .selectable-list-leading .type-pill {
-  max-width: 100%;
-}
-
-.account-reorder-icon {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--accent);
-  border: 1px solid var(--border);
-  font-weight: 700;
-  font-size: 0.9rem;
 }
 
 .goal-list-icon,

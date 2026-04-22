@@ -610,11 +610,6 @@ function DraggableReorderRow({ account }) {
       as="li"
       className={`account-row ${account.is_archived ? 'archived' : ''}`}
       handleLabel={`Reorder ${account.name}`}
-      leading={(
-        <span className="account-reorder-icon">
-          {(TYPE_LABELS[account.type] || account.type || '?').slice(0, 1)}
-        </span>
-      )}
       title={account.name}
       subtitle={metaParts.join(' | ')}
       sidePrimary={formatCurrency(account.current_balance)}
