@@ -3303,8 +3303,7 @@ input, textarea, select {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .goals-focus-card,
-  .goals-account-card {
+  .goals-focus-card {
     grid-column: 1 / -1;
   }
 }
@@ -4125,20 +4124,46 @@ input, textarea, select {
   }
 
   .goal-progress-panel {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(132px, 0.58fr);
+    grid-template-areas:
+      "main meta"
+      "ring meta";
+    align-items: center;
+    gap: 14px 18px;
   }
 
-  .goals-focus-card.collapsed .goal-progress-panel {
-    grid-template-columns: minmax(0, 1fr) 68px minmax(110px, 0.82fr);
-    align-items: center;
+  .goal-progress-main {
+    grid-area: main;
   }
 
   .goal-progress-ring {
-    width: 116px;
+    grid-area: ring;
+    justify-self: start;
+    width: 104px;
+  }
+
+  .goal-progress-meta {
+    grid-area: meta;
+  }
+
+  .goal-progress-main strong {
+    font-size: clamp(1.9rem, 7vw, 2.55rem);
+  }
+
+  .goals-focus-card.collapsed .goal-progress-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(132px, 0.58fr);
+    grid-template-areas:
+      "main meta"
+      "ring meta";
+    gap: 12px 16px;
+  }
+
+  .goals-focus-card.collapsed .goal-progress-main strong {
+    font-size: clamp(1.9rem, 7vw, 2.55rem);
   }
 
   .goals-focus-card.collapsed .goal-progress-ring {
-    width: 68px;
+    width: 96px;
   }
 
   .goal-progress-meta {
@@ -4164,6 +4189,20 @@ input, textarea, select {
 }
 
 @media (max-width: 480px) {
+  .goal-progress-panel,
+  .goals-focus-card.collapsed .goal-progress-panel {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "main"
+      "ring"
+      "meta";
+  }
+
+  .goal-progress-ring,
+  .goals-focus-card.collapsed .goal-progress-ring {
+    width: 102px;
+  }
+
   .goal-preset-grid {
     grid-template-columns: 1fr;
   }
