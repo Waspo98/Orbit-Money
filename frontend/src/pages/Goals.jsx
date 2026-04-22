@@ -45,6 +45,17 @@ const ACCOUNT_TYPE_LABELS = {
   other: 'Other'
 };
 
+const GOAL_COLORS = [
+  '#10b981',
+  '#38bdf8',
+  '#a78bfa',
+  '#f59e0b',
+  '#f472b6',
+  '#22c55e',
+  '#fb7185',
+  '#60a5fa'
+];
+
 function formatMoney(amount, digits = 0) {
   return Number(amount || 0).toLocaleString(undefined, {
     style: 'currency',
@@ -60,6 +71,15 @@ function formatSignedMoney(amount) {
 }
 
 const parseMoney = parseCurrencyInput;
+
+function colorForGoal(goalKey) {
+  const text = String(goalKey || 'goal');
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) % 9973;
+  }
+  return GOAL_COLORS[hash % GOAL_COLORS.length];
+}
 
 function formatMonth(key) {
   if (!key) return '';
@@ -661,6 +681,9 @@ function SignalRow({ label, value, detail, compactDetail = null, className = '' 
 }
 
 function AccountAllocationRow({ account }) {
+  const allocatable = Math.max(0, Number(account.allocatable_amount || account.current_balance || 0));
+  const basis = allocatable > 0 ? allocatable : 1;
+
   return (
     <div className="goal-account-row">
       <div className="goal-account-row-top">
@@ -676,8 +699,22 @@ function AccountAllocationRow({ account }) {
           <span>{formatMoney(account.remaining_amount)} open</span>
         </div>
       </div>
-      <div className="goal-account-meter" aria-label={`${account.name} allocation`}>
-        <span style={{ width: `${Math.min(100, Math.max(0, account.allocated_percent || 0))}%` }} />
+      <div className="goal-account-meter goal-account-meter-chunked" aria-label={`${account.name} allocation`}>
+        {(account.allocations || []).map((allocation) => {
+          const amount = Math.max(0, Number(allocation.current_amount || 0));
+          const width = Math.min(100, Math.max(0, (amount / basis) * 100));
+          if (width <= 0) return null;
+          return (
+            <span
+              key={allocation.id}
+              style={{
+                width: `${width}%`,
+                '--goal-color': colorForGoal(allocation.goal_id || allocation.goal_name)
+              }}
+              title={`${allocation.goal_name}: ${formatMoney(amount)}`}
+            />
+          );
+        })}
       </div>
       <div className="goal-account-row-bottom">
         <span>Balance {formatMoney(account.current_balance)}</span>
@@ -686,7 +723,10 @@ function AccountAllocationRow({ account }) {
       {account.allocations.length > 0 && (
         <div className="goal-account-chips">
           {account.allocations.map((allocation) => (
-            <span key={allocation.id}>
+            <span
+              key={allocation.id}
+              style={{ '--goal-color': colorForGoal(allocation.goal_id || allocation.goal_name) }}
+            >
               {allocation.goal_name}: {formatMoney(allocation.current_amount)}
             </span>
           ))}

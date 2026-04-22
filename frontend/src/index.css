@@ -2796,6 +2796,10 @@ input, textarea, select {
     margin-bottom: 0;
   }
 
+  .mha-content > .mha-picker-card:first-child {
+    grid-column: 1 / -1;
+  }
+
   .mha-transactions-card {
     grid-column: 1 / -1;
   }
@@ -3299,6 +3303,7 @@ input, textarea, select {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .goals-focus-card,
   .goals-account-card {
     grid-column: 1 / -1;
   }
@@ -3332,8 +3337,8 @@ input, textarea, select {
 
 .goal-progress-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 132px minmax(220px, 0.72fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 124px minmax(220px, 0.78fr);
+  gap: 20px;
   align-items: center;
   transition: gap 220ms var(--ease-out, ease);
 }
@@ -3356,9 +3361,9 @@ input, textarea, select {
 
 .goal-progress-main strong {
   color: var(--text);
-  font-size: clamp(1.5rem, 5.8vw, 3.6rem);
+  font-size: clamp(1.7rem, 4vw, 3rem);
   font-weight: 750;
-  line-height: 1;
+  line-height: 1.04;
   font-variant-numeric: tabular-nums;
   max-width: 100%;
   overflow: hidden;
@@ -3369,7 +3374,7 @@ input, textarea, select {
 }
 
 .goal-progress-ring {
-  width: 132px;
+  width: 124px;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -3420,6 +3425,7 @@ input, textarea, select {
 
 .goals-focus-card:not(.collapsed) .goals-focus-detail-inner {
   opacity: 1;
+  padding-top: 4px;
 }
 
 .goals-focus-card.collapsed .dashboard-card-body {
@@ -3427,8 +3433,8 @@ input, textarea, select {
 }
 
 .goals-focus-card.collapsed .goal-progress-panel {
-  grid-template-columns: minmax(0, 1fr) 74px minmax(112px, 0.92fr);
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 82px minmax(150px, 0.7fr);
+  gap: 16px;
 }
 
 .goals-focus-card.collapsed .goal-progress-main {
@@ -3441,11 +3447,11 @@ input, textarea, select {
 }
 
 .goals-focus-card.collapsed .goal-progress-main strong {
-  font-size: 1.65rem;
+  font-size: clamp(1.4rem, 3vw, 2.15rem);
 }
 
 .goals-focus-card.collapsed .goal-progress-ring {
-  width: 74px;
+  width: 82px;
 }
 
 .goals-focus-card.collapsed .goal-progress-ring span {
@@ -3490,20 +3496,25 @@ input, textarea, select {
 .goal-chart-wrap {
   display: grid;
   gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
 }
 
 .goal-chart {
   width: 100%;
   height: auto;
-  min-height: 160px;
+  min-height: 150px;
   overflow: visible;
 }
 
 .goal-imagine-panel {
   display: grid;
-  grid-template-columns: minmax(0, 0.75fr) minmax(260px, 1fr);
-  gap: 18px;
-  align-items: center;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: stretch;
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -3518,7 +3529,7 @@ input, textarea, select {
 
 .goal-imagine-copy strong {
   color: var(--text);
-  font-size: 1.6rem;
+  font-size: 1.8rem;
   line-height: 1;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
@@ -3527,7 +3538,7 @@ input, textarea, select {
 .goal-imagine-controls {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px;
+  grid-template-columns: minmax(0, 1fr) 120px;
   gap: 12px;
   align-items: center;
 }
@@ -3553,6 +3564,17 @@ input, textarea, select {
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+@media (min-width: 760px) {
+  .goals-focus-card:not(.collapsed) .goals-focus-detail-inner {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.62fr);
+    align-items: stretch;
+  }
+
+  .goals-focus-actions {
+    grid-column: 1 / -1;
+  }
 }
 
 .goal-list {
@@ -3761,7 +3783,7 @@ input, textarea, select {
 }
 
 .goal-account-meter {
-  height: 10px;
+  height: 12px;
   overflow: hidden;
   border-radius: var(--radius-pill);
   background: var(--surface-2);
@@ -3770,8 +3792,18 @@ input, textarea, select {
 .goal-account-meter span {
   display: block;
   height: 100%;
-  border-radius: inherit;
-  background: var(--accent);
+  background: var(--goal-color, var(--accent));
+}
+
+.goal-account-meter-chunked {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+}
+
+.goal-account-meter-chunked span {
+  min-width: 4px;
+  border-radius: var(--radius-pill);
 }
 
 .goal-account-row-bottom,
@@ -3784,8 +3816,9 @@ input, textarea, select {
 .goal-account-chips span {
   padding: 4px 9px;
   border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--text-muted);
+  background: color-mix(in srgb, var(--goal-color, var(--accent)) 14%, var(--surface-2));
+  color: color-mix(in srgb, var(--goal-color, var(--accent)) 82%, var(--text));
+  border: 1px solid color-mix(in srgb, var(--goal-color, var(--accent)) 26%, transparent);
 }
 
 .goal-wizard h3 {
@@ -4096,7 +4129,7 @@ input, textarea, select {
   }
 
   .goals-focus-card.collapsed .goal-progress-panel {
-    grid-template-columns: minmax(0, 1fr) 68px minmax(100px, 0.92fr);
+    grid-template-columns: minmax(0, 1fr) 68px minmax(110px, 0.82fr);
     align-items: center;
   }
 
@@ -6882,13 +6915,15 @@ input, textarea, select {
 
   .budget-content > .budget-summary-card,
   .budget-content > .budget-pie-card,
-  .budget-content > .budget-section {
-    margin-bottom: 0;
-  }
-
   .budget-content > .budget-actions-row,
   .budget-content > .empty-state {
     grid-column: 1 / -1;
+  }
+
+  .budget-content > .budget-summary-card,
+  .budget-content > .budget-pie-card,
+  .budget-content > .budget-section {
+    margin-bottom: 0;
   }
 }
 

@@ -141,6 +141,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Each account allocation can apply either a percent of the account balance or a fixed dollar amount
 - Wizard shows each account's existing goal allocations and can steal allocation from other goals when explicitly enabled
 - Goal charts derive monthly history from existing transaction deltas and current account balances; ETA uses recent monthly progress
+- Account allocation meters are split into consistent per-goal color chunks so the same goal is visually traceable across accounts.
 - "Imagine" slider projects a hypothetical ETA with extra monthly savings
 - Endpoints: GET `/api/goals?months=`, POST `/api/goals`, PUT `/api/goals/:id`, DELETE `/api/goals/:id`
 
