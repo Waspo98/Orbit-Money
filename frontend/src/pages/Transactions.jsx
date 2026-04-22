@@ -1090,26 +1090,34 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
 
   function openLogoSearch() {
     const query = encodeURIComponent(`${txn.merchant || logo?.merchant_name || 'merchant'} logo`);
-    window.open(`https://www.google.com/search?tbm=isch&q=${query}`, '_blank', 'noopener,noreferrer');
+    window.open(`https://duckduckgo.com/?q=${query}&iar=images&iax=images&ia=images`, '_blank', 'noopener,noreferrer');
   }
 
-  async function refreshTransaction() {
-    const refreshed = await api.get(`/api/transactions/${txn.id}`);
-    onLogoChanged?.(refreshed);
+  function applyLogoState(nextLogo) {
+    setShowLogo(Boolean(nextLogo?.url));
+    onLogoChanged?.({
+      ...txn,
+      merchant_logo: nextLogo || null
+    });
   }
 
   async function useCategoryIcon() {
     if (!logo?.merchant_key) return;
     setMenuOpen(false);
-    setShowLogo(false);
+    applyLogoState({
+      ...logo,
+      url: null,
+      status: 'hidden'
+    });
     try {
-      await api.post('/api/merchant-logos/override', {
+      const result = await api.post('/api/merchant-logos/override', {
         merchant_key: logo.merchant_key,
         use_category_icon: true
       });
-      await refreshTransaction();
+      applyLogoState(result.merchant_logo);
     } catch (err) {
       setShowLogo(Boolean(logo?.url));
+      onLogoChanged?.(txn);
     }
   }
 
@@ -1204,9 +1212,9 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
           txn={txn}
           logo={logo}
           onClose={() => setOverrideOpen(false)}
-          onSaved={async () => {
+          onSaved={(nextLogo) => {
             setOverrideOpen(false);
-            await refreshTransaction();
+            applyLogoState(nextLogo);
           }}
         />
       )}
@@ -1228,12 +1236,12 @@ function LogoOverrideModal({ txn, logo, onClose, onSaved }) {
     setSaving(true);
     setError('');
     try {
-      await api.post('/api/merchant-logos/override', {
+      const result = await api.post('/api/merchant-logos/override', {
         merchant_key: logo.merchant_key,
         logo_url: logoUrl.trim()
       });
       close({ animate: true });
-      setTimeout(onSaved, 180);
+      setTimeout(() => onSaved(result.merchant_logo), 180);
     } catch (err) {
       setError(err.message || 'Logo override failed');
       setSaving(false);

@@ -233,7 +233,7 @@ export function overrideMerchantLogo(db, { merchantKey, logoUrl = null, hide = f
   if (!merchantKey) return { updated: false };
 
   const existing = db
-    .prepare('SELECT merchant_key FROM merchant_logo_cache WHERE merchant_key = ?')
+    .prepare('SELECT merchant_key, merchant_name, provider, provider_query FROM merchant_logo_cache WHERE merchant_key = ?')
     .get(merchantKey);
   if (!existing) return { updated: false };
 
@@ -253,7 +253,17 @@ export function overrideMerchantLogo(db, { merchantKey, logoUrl = null, hide = f
     `)
     .run(nextUrl, status, merchantKey);
 
-  return { updated: result.changes > 0 };
+  return {
+    updated: result.changes > 0,
+    merchant_logo: {
+      merchant_key: existing.merchant_key,
+      merchant_name: existing.merchant_name,
+      provider: existing.provider,
+      provider_query: existing.provider_query,
+      url: status === 'manual' ? nextUrl : null,
+      status
+    }
+  };
 }
 
 export function reportMerchantLogoStatus(db, { merchantKey, status }) {
