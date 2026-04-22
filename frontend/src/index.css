@@ -1153,27 +1153,7 @@ input, textarea, select {
   font-weight: 500;
 }
 
-/* Rows in reorder mode: full-width drag handle, no competing targets */
-.account-list.reorder-active .account-row.draggable {
-  cursor: grab;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-left: 8px;
-  background: var(--surface);
-  border: 1px dashed var(--border-strong, var(--border));
-  touch-action: none;
-}
-
-.account-list.reorder-active .account-main {
-  flex: 1 1 auto;
-}
-
-.account-list.reorder-active .account-balance {
-  min-width: 132px;
-  margin-left: auto;
-  text-align: right;
-}
+/* Rows in reorder mode share the same handle + content + side-value primitive. */
 .account-list.reorder-active .account-row.draggable:active {
   cursor: grabbing;
 }
@@ -3654,6 +3634,8 @@ input, textarea, select {
   color: var(--text-muted);
   font-size: 0.82rem;
   font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -3675,33 +3657,34 @@ input, textarea, select {
   text-align: right;
 }
 
-.selectable-list-item.goal-list-row.goal-list-row-reorder {
+.selectable-list-item.reorder-list-row {
   grid-template-columns: 22px 34px minmax(0, 1fr) auto;
   gap: 8px;
   padding-left: 10px;
   cursor: grab;
   border-style: dashed;
   touch-action: none;
+  border: 1px dashed var(--border-strong, var(--border));
 }
 
-.goal-list-row-reorder:hover,
-.goal-list-row-reorder:focus {
+.reorder-list-row:hover,
+.reorder-list-row:focus {
   border-color: var(--border);
   background: var(--surface-2);
 }
 
-.goal-list-row-reorder:active {
+.reorder-list-row:active {
   cursor: grabbing;
 }
 
-.goal-list-row-reorder.dragging {
+.reorder-list-row.dragging {
   opacity: 0.9;
   box-shadow: var(--shadow-xl);
   z-index: 100;
   border-style: solid;
 }
 
-.goal-drag-handle {
+.reorder-drag-handle {
   appearance: none;
   border: 0;
   background: transparent;
@@ -3713,8 +3696,34 @@ input, textarea, select {
   letter-spacing: 0;
 }
 
-.goal-drag-handle:active {
+.reorder-drag-handle:active {
   cursor: grabbing;
+}
+
+.account-list.reorder-active .reorder-list-row {
+  min-height: 64px;
+}
+
+.account-list.reorder-active .selectable-list-leading {
+  justify-content: flex-start;
+}
+
+.account-list.reorder-active .selectable-list-leading .type-pill {
+  max-width: 100%;
+}
+
+.account-reorder-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  font-weight: 700;
+  font-size: 0.9rem;
 }
 
 .goal-list-icon,
@@ -5198,6 +5207,14 @@ input, textarea, select {
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.account-group-total.positive {
+  color: var(--success);
+}
+
+.account-group-total.negative {
+  color: var(--danger);
 }
 
 .account-group-header-side {

@@ -22,6 +22,7 @@ import { api } from '../api.js';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import PageHero from '../components/PageHero.jsx';
+import ReorderListItem from '../components/ReorderListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import CurrencyInput, { parseCurrencyInput } from '../components/CurrencyInput.jsx';
 
@@ -528,6 +529,8 @@ export default function Accounts({ onChange }) {
 // ============================================================================
 
 function AccountGroup({ group, children, collapsed, onToggle }) {
+  const totalTone = group.total < 0 ? 'negative' : 'positive';
+
   return (
     <section className={`dashboard-card account-group-card ${collapsed ? 'collapsed' : ''}`}>
       <button
@@ -543,7 +546,7 @@ function AccountGroup({ group, children, collapsed, onToggle }) {
           </span>
         </div>
         <span className="account-group-header-side">
-          <strong className="account-group-total">{formatCurrency(group.total)}</strong>
+          <strong className={`account-group-total ${totalTone}`}>{formatCurrency(group.total)}</strong>
           <span className="month-nav-caret account-group-caret" aria-hidden="true">▾</span>
         </span>
       </button>
@@ -570,6 +573,7 @@ function DraggableAccountGroup({ group, children }) {
     transform: CSS.Transform.toString(transform),
     transition
   };
+  const totalTone = group.total < 0 ? 'negative' : 'positive';
 
   return (
     <section
@@ -585,7 +589,7 @@ function DraggableAccountGroup({ group, children }) {
             {group.items.length.toLocaleString()} {group.items.length === 1 ? 'account' : 'accounts'}
           </span>
         </div>
-        <strong className="account-group-total">{formatCurrency(group.total)}</strong>
+        <strong className={`account-group-total ${totalTone}`}>{formatCurrency(group.total)}</strong>
       </header>
       {children}
     </section>
@@ -593,60 +597,28 @@ function DraggableAccountGroup({ group, children }) {
 }
 
 function DraggableReorderRow({ account }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({ id: accountSortableId(account.id) });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition
-  };
-
-  const badges = [];
-  badges.push(
-    <span key="type" className={`type-pill type-${account.type}`}>
-      {TYPE_LABELS[account.type] || account.type}
-    </span>
-  );
-  if (account.is_archived) {
-    badges.push(
-      <span key="arch" className="badge-archived">
-        Archived
-      </span>
-    );
-  }
+  const metaParts = [
+    TYPE_LABELS[account.type] || account.type,
+    account.institution,
+    account.account_number_last4 ? `...${account.account_number_last4}` : '',
+    account.is_archived ? 'Archived' : ''
+  ].filter(Boolean);
 
   return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      className={`account-row draggable ${account.is_archived ? 'archived' : ''} ${isDragging ? 'dragging' : ''}`}
-      {...attributes}
-      {...listeners}
-    >
-      <span className="drag-grip" aria-hidden="true">⋮⋮</span>
-      <div className="account-main">
-        <div className="account-name">{account.name}</div>
-        <div className="account-badges">{badges}</div>
-        <div className="account-meta">
-          {account.institution && <span>{account.institution}</span>}
-          {account.account_number_last4 && (
-            <span>···{account.account_number_last4}</span>
-          )}
-          {account.type === 'mortgage' && account.estimated_value != null && (
-            <span>Estimated value {formatCurrency(account.estimated_value)}</span>
-          )}
-        </div>
-      </div>
-      <div className="account-balance">
-        {formatCurrency(account.current_balance)}
-      </div>
-    </li>
+    <ReorderListItem
+      id={accountSortableId(account.id)}
+      as="li"
+      className={`account-row ${account.is_archived ? 'archived' : ''}`}
+      handleLabel={`Reorder ${account.name}`}
+      leading={(
+        <span className="account-reorder-icon">
+          {(TYPE_LABELS[account.type] || account.type || '?').slice(0, 1)}
+        </span>
+      )}
+      title={account.name}
+      subtitle={metaParts.join(' | ')}
+      sidePrimary={formatCurrency(account.current_balance)}
+    />
   );
 }
 

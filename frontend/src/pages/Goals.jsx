@@ -13,13 +13,12 @@ import {
   SortableContext,
   verticalListSortingStrategy,
   sortableKeyboardCoordinates,
-  useSortable,
   arrayMove
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import PageHero from '../components/PageHero.jsx';
+import ReorderListItem from '../components/ReorderListItem.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import CurrencyInput, {
@@ -521,49 +520,17 @@ function presetFor(kind) {
 }
 
 function DraggableGoalRow({ goal }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({ id: goal.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition
-  };
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`selectable-list-item goal-list-row goal-list-row-reorder draggable ${isDragging ? 'dragging' : ''}`}
-    >
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        className="drag-grip goal-drag-handle"
-        aria-label={`Reorder ${goal.name}`}
-        {...attributes}
-        {...listeners}
-      >
-        <span aria-hidden="true">⋮⋮</span>
-      </button>
-      <span className="selectable-list-leading">
-        <span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>
-      </span>
-      <span className="selectable-list-main">
-        <strong>{goal.name}</strong>
-        <em>{formatMoney(goal.current_amount)} of {formatMoney(goal.target_amount)}</em>
-      </span>
-      <span className="selectable-list-side">
-        <strong>{Math.round(goal.progress_percent || 0)}%</strong>
-        <em>{formatEta(goal.eta)}</em>
-      </span>
-    </div>
+    <ReorderListItem
+      id={goal.id}
+      className="goal-list-row"
+      handleLabel={`Reorder ${goal.name}`}
+      leading={<span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>}
+      title={goal.name}
+      subtitle={`${formatMoney(goal.current_amount)} of ${formatMoney(goal.target_amount)}`}
+      sidePrimary={`${Math.round(goal.progress_percent || 0)}%`}
+      sideSecondary={formatEta(goal.eta)}
+    />
   );
 }
 
