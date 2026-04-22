@@ -4589,6 +4589,28 @@ input, textarea, select {
   object-fit: contain;
 }
 
+.logo-finder-actions {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.logo-finder-action-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.logo-finder-action-row .btn-secondary,
+.logo-finder-action-row .btn-primary {
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.logo-finder-action-row-primary {
+  justify-content: end;
+}
+
 @media (max-width: 560px) {
   .logo-finder-search {
     grid-template-columns: 1fr;
@@ -4601,6 +4623,10 @@ input, textarea, select {
 
   .logo-finder-search .btn-secondary {
     width: 100%;
+  }
+
+  .logo-finder-action-row {
+    grid-template-columns: 1fr 1fr;
   }
 }
 

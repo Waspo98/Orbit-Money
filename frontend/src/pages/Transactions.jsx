@@ -1392,19 +1392,23 @@ function LogoFinderModal({ txn, logo, onClose, onSaved }) {
               </div>
             )}
             {error && <div className="error">{error}</div>}
-            <div className="modal-actions">
-              <button type="button" className="btn-secondary" onClick={openDuckDuckGo}>
-                DuckDuckGo Images
-              </button>
-              <button type="button" className="btn-secondary" onClick={() => useCategoryIcon(close)} disabled={saving}>
-                Use Category Icon
-              </button>
-              <button type="button" className="btn-secondary" onClick={close}>
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Saving...' : 'Save'}
-              </button>
+            <div className="modal-actions logo-finder-actions">
+              <div className="logo-finder-action-row">
+                <button type="button" className="btn-secondary" onClick={openDuckDuckGo}>
+                  DuckDuckGo Images
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => useCategoryIcon(close)} disabled={saving}>
+                  Use Category Icon
+                </button>
+              </div>
+              <div className="logo-finder-action-row logo-finder-action-row-primary">
+                <button type="button" className="btn-secondary" onClick={close}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={saving}>
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
             </div>
           </form>
         </>
