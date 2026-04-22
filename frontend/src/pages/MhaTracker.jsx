@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import PageHero from '../components/PageHero.jsx';
+import { useAppDialog } from '../components/AppDialog.jsx';
+import { TransactionRow, EditTransactionModal } from './Transactions.jsx';
+import { RuleEditor } from './Rules.jsx';
 
 const ACCOUNT_TYPE_LABELS = {
   checking: 'Checking',
@@ -22,16 +25,6 @@ function formatMoney(amount, digits = 2) {
   });
 }
 
-function formatDate(iso) {
-  if (!iso) return '';
-  const [year, month, day] = iso.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  });
-}
-
 function currentYear() {
   return new Date().getFullYear();
 }
@@ -45,9 +38,31 @@ function formatYearLabel(year) {
   return String(year || currentYear());
 }
 
+function normalizeMhaTransaction(txn) {
+  return {
+    ...txn,
+    original_merchant: txn.original_merchant || txn.merchant,
+    original_category_id: txn.original_category_id ?? txn.category_id ?? null,
+    edited_merchant_source: txn.edited_merchant_source ?? null,
+    edited_category_id_source: txn.edited_category_id_source ?? null,
+    edited_is_transfer_source: txn.edited_is_transfer_source ?? null,
+    edited_is_ignored_source: txn.edited_is_ignored_source ?? null,
+    edited_mha_eligible_source: txn.edited_mha_eligible_source ?? null,
+    has_edits: Boolean(
+      txn.has_edits ||
+      txn.edited_merchant_source ||
+      txn.edited_category_id_source ||
+      txn.edited_is_transfer_source ||
+      txn.edited_is_ignored_source ||
+      txn.edited_mha_eligible_source
+    )
+  };
+}
+
 export default function MhaTracker() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedYear = parseYearParam(searchParams.get('year'));
+  const { alert, confirm, Dialog } = useAppDialog();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,6 +73,9 @@ export default function MhaTracker() {
   const [accountsExpanded, setAccountsExpanded] = useState(false);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
   const [ignoredCategoriesExpanded, setIgnoredCategoriesExpanded] = useState(false);
+  const [expandedTxnId, setExpandedTxnId] = useState(null);
+  const [editingTxn, setEditingTxn] = useState(null);
+  const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
 
   async function load({ silent = false } = {}) {
     if (!silent && data == null) setLoading(true);
@@ -166,11 +184,84 @@ export default function MhaTracker() {
     }
   }
 
+  function patchLocalTransaction(id, patch) {
+    setData((prev) => prev ? {
+      ...prev,
+      transactions: prev.transactions.map((txn) =>
+        txn.id === id ? normalizeMhaTransaction({ ...txn, ...patch }) : txn
+      )
+    } : prev);
+  }
+
+  function replaceLocalTransaction(id, nextTxn) {
+    setData((prev) => prev ? {
+      ...prev,
+      transactions: prev.transactions.map((txn) =>
+        txn.id === id ? normalizeMhaTransaction(nextTxn) : txn
+      )
+    } : prev);
+  }
+
+  function removeLocalTransaction(id) {
+    setExpandedTxnId(null);
+    setData((prev) => prev ? {
+      ...prev,
+      transactions: prev.transactions.filter((txn) => txn.id !== id)
+    } : prev);
+  }
+
+  async function handleTransactionToggle(txn, field) {
+    const nextValue = !txn[field];
+    patchLocalTransaction(txn.id, { [field]: nextValue ? 1 : 0 });
+    try {
+      await api.patch(`/api/transactions/${txn.id}`, {
+        [field]: nextValue
+      });
+      await load({ silent: true });
+    } catch (err) {
+      patchLocalTransaction(txn.id, { [field]: txn[field] });
+      alert(err.message || 'Toggle failed', { title: 'Could not update transaction' });
+    }
+  }
+
+  async function handleDeleteTransaction(txn) {
+    const ok = await confirm(
+      `Delete this transaction? "${txn.merchant}" for ${formatMoney(txn.amount)}`,
+      {
+        title: 'Delete transaction',
+        confirmLabel: 'Delete',
+        destructive: true
+      }
+    );
+    if (!ok) return;
+    try {
+      await api.del(`/api/transactions/${txn.id}`);
+      removeLocalTransaction(txn.id);
+      await load({ silent: true });
+    } catch (err) {
+      alert(err.message || 'Delete failed', { title: 'Delete failed' });
+    }
+  }
+
+  async function handleResetTransactionField(txn, field) {
+    try {
+      await api.post(`/api/transactions/${txn.id}/reset`, {
+        fields: [field]
+      });
+      await load({ silent: true });
+    } catch (err) {
+      alert(err.message || 'Reset failed', { title: 'Reset failed' });
+    }
+  }
+
   const summary = data?.summary || {};
   const years = data?.years || [selectedYear];
   const accounts = data?.accounts || [];
   const categories = data?.categories || [];
-  const transactions = data?.transactions || [];
+  const transactions = useMemo(
+    () => (data?.transactions || []).map(normalizeMhaTransaction),
+    [data?.transactions]
+  );
 
   const enabledAccounts = useMemo(
     () => accounts.filter((account) => account.mha_default_eligible),
@@ -188,6 +279,8 @@ export default function MhaTracker() {
   const visibleAccounts = accountsExpanded ? accounts : enabledAccounts;
   const visibleCategories = categoriesExpanded ? categories : enabledCategories;
   const visibleIgnoredCategories = ignoredCategoriesExpanded ? categories : ignoredCategories;
+  const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
+  const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
   const yearOptions = useMemo(() => {
     const set = new Set(years);
     set.add(currentYear());
@@ -389,30 +482,74 @@ export default function MhaTracker() {
                   No MHA-eligible transactions yet.
                 </p>
               ) : (
-                <ul className="networth-account-list mha-transaction-list">
+                <ul className="txn-list dash-recent-txn-list mha-transaction-list">
                   {transactions.map((txn) => (
-                    <li key={txn.id} className="networth-account-row mha-transaction-row">
-                      <div className="networth-account-main">
-                        <div className="networth-account-name">{txn.merchant}</div>
-                        <div className="networth-account-meta">
-                          <span>{formatDate(txn.date)}</span>
-                          <span>{txn.account_name}</span>
-                          {txn.category_name && (
-                            <span style={{ color: txn.category_color }}>
-                              {txn.category_icon} {txn.category_name}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="networth-account-side">
-                        <strong>{formatMoney(txn.amount_abs)}</strong>
-                      </div>
-                    </li>
+                    <TransactionRow
+                      key={txn.id}
+                      txn={txn}
+                      expanded={expandedTxnId === txn.id}
+                      onExpand={() => setExpandedTxnId(expandedTxnId === txn.id ? null : txn.id)}
+                      account={accountById.get(txn.account_id)}
+                      category={categoryById.get(txn.category_id)}
+                      originalCategory={categoryById.get(txn.original_category_id)}
+                      hideAccountInMeta={false}
+                      onEdit={() => setEditingTxn(txn)}
+                      onCreateRule={() => setNewRuleFromTxn(txn)}
+                      onToggleTransfer={() => handleTransactionToggle(txn, 'is_transfer')}
+                      onToggleIgnored={() => handleTransactionToggle(txn, 'is_ignored')}
+                      onToggleMhaEligible={() => handleTransactionToggle(txn, 'mha_eligible')}
+                      onDelete={() => handleDeleteTransaction(txn)}
+                      onResetField={(field) => handleResetTransactionField(txn, field)}
+                      onLogoChanged={(updated) => replaceLocalTransaction(txn.id, updated)}
+                      hideMerchantLogo
+                      mhaTrackerEnabled
+                    />
                   ))}
                 </ul>
               )}
             </div>
           </section>
+
+          {editingTxn && (
+            <EditTransactionModal
+              txn={editingTxn}
+              categories={categories}
+              onClose={() => setEditingTxn(null)}
+              onSaved={(updated) => {
+                if (updated) replaceLocalTransaction(editingTxn.id, updated);
+                setEditingTxn(null);
+                load({ silent: true });
+              }}
+              onReset={(field) => handleResetTransactionField(editingTxn, field)}
+            />
+          )}
+
+          {newRuleFromTxn && (
+            <RuleEditor
+              rule={{
+                conditions: [
+                  {
+                    field: 'merchant',
+                    operator: 'contains',
+                    value: (newRuleFromTxn.original_merchant || newRuleFromTxn.merchant || '').trim()
+                  }
+                ],
+                actions: [
+                  { type: 'rename', value: newRuleFromTxn.merchant || '' }
+                ],
+                enabled: true
+              }}
+              accounts={accounts}
+              categories={categories}
+              onClose={() => setNewRuleFromTxn(null)}
+              onSaved={() => {
+                setNewRuleFromTxn(null);
+                load({ silent: true });
+              }}
+            />
+          )}
+
+          <Dialog />
         </div>
       )}
     </div>
