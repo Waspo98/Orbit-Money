@@ -525,6 +525,7 @@ function DraggableGoalRow({ goal }) {
     attributes,
     listeners,
     setNodeRef,
+    setActivatorNodeRef,
     transform,
     transition,
     isDragging
@@ -540,10 +541,17 @@ function DraggableGoalRow({ goal }) {
       ref={setNodeRef}
       style={style}
       className={`selectable-list-item goal-list-row goal-list-row-reorder draggable ${isDragging ? 'dragging' : ''}`}
-      {...attributes}
-      {...listeners}
     >
-      <span className="drag-grip" aria-hidden="true">⋮⋮</span>
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        className="drag-grip goal-drag-handle"
+        aria-label={`Reorder ${goal.name}`}
+        {...attributes}
+        {...listeners}
+      >
+        <span aria-hidden="true">⋮⋮</span>
+      </button>
       <span className="selectable-list-leading">
         <span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>
       </span>

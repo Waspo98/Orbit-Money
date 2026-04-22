@@ -3675,8 +3675,10 @@ input, textarea, select {
   text-align: right;
 }
 
-.goal-list-row-reorder {
-  grid-template-columns: 28px 34px minmax(0, 1fr) auto;
+.selectable-list-item.goal-list-row.goal-list-row-reorder {
+  grid-template-columns: 22px 34px minmax(0, 1fr) auto;
+  gap: 8px;
+  padding-left: 10px;
   cursor: grab;
   border-style: dashed;
   touch-action: none;
@@ -3697,6 +3699,22 @@ input, textarea, select {
   box-shadow: var(--shadow-xl);
   z-index: 100;
   border-style: solid;
+}
+
+.goal-drag-handle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 22px;
+  min-width: 22px;
+  height: 34px;
+  padding: 0;
+  cursor: grab;
+  letter-spacing: 0;
+}
+
+.goal-drag-handle:active {
+  cursor: grabbing;
 }
 
 .goal-list-icon,
