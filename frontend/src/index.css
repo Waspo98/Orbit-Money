@@ -546,6 +546,7 @@ input, textarea, select {
   top: calc(100% + 6px);
   right: 0;
   min-width: 160px;
+  width: max-content;
   max-height: calc(100dvh - 16px);
   overflow-y: auto;
   background: var(--surface);

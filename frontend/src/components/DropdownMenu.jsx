@@ -13,7 +13,8 @@ export default function DropdownMenu({
   ariaLabel = 'More actions',
   triggerClassName = 'dropdown-trigger',
   menuClassName = '',
-  renderTrigger
+  renderTrigger,
+  align = 'end'
 }) {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -81,7 +82,7 @@ export default function DropdownMenu({
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
 
-      let left = triggerRect.right - menuWidth;
+      let left = align === 'start' ? triggerRect.left : triggerRect.right - menuWidth;
       left = Math.max(margin, Math.min(left, viewportWidth - menuWidth - margin));
 
       let top = triggerRect.bottom + gap;
@@ -97,7 +98,10 @@ export default function DropdownMenu({
         position: 'fixed',
         top: `${Math.max(margin, top)}px`,
         left: `${left}px`,
-        '--dropdown-origin': `${originY} right`
+        right: 'auto',
+        width: 'max-content',
+        maxWidth: `calc(100dvw - ${margin * 2}px)`,
+        '--dropdown-origin': `${originY} ${align === 'start' ? 'left' : 'right'}`
       });
     }
 
@@ -108,7 +112,7 @@ export default function DropdownMenu({
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [open, visibleItems.length]);
+  }, [open, visibleItems.length, align]);
 
   useEffect(() => {
     return () => {

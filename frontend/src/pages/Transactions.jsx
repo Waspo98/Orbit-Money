@@ -1152,6 +1152,7 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
         aria-label={`Logo options for ${txn.merchant}`}
         triggerClassName="txn-merchant-mark"
         menuClassName="txn-logo-menu"
+        align="start"
         renderTrigger={() => markContent()}
       />
       {finderOpen && (
