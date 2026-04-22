@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import PageHero from '../components/PageHero.jsx';
+import DropdownMenu from '../components/DropdownMenu.jsx';
 
 const BUCKET_LABELS = {
   cash: 'Cash',
@@ -31,6 +32,15 @@ const TYPE_LABELS = {
   cash: 'Cash',
   other: 'Other'
 };
+
+const RANGE_OPTIONS = [
+  { key: '12', label: '1 year', months: 12 },
+  { key: '24', label: '2 years', months: 24 },
+  { key: '36', label: '3 years', months: 36 },
+  { key: '60', label: '5 years', months: 60 },
+  { key: '120', label: '10 years', months: 120 },
+  { key: 'all', label: 'All time', months: 'all' }
+];
 
 function formatMoney(amount, digits = 0) {
   return Number(amount || 0).toLocaleString(undefined, {
@@ -92,7 +102,7 @@ function buildAreaPath(history, width, height) {
   return `${line} L ${width} ${height} L 0 ${height} Z`;
 }
 
-function useNetWorth() {
+function useNetWorth(range) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -101,7 +111,7 @@ function useNetWorth() {
     setLoading(true);
     setError('');
     try {
-      setData(await api.get('/api/net-worth?months=24'));
+      setData(await api.get(`/api/net-worth?months=${encodeURIComponent(range.months)}`));
     } catch (err) {
       setError(err.message || 'Failed to load net worth');
     } finally {
@@ -111,13 +121,16 @@ function useNetWorth() {
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range.key]);
 
   return { data, loading, error, reload: load };
 }
 
 export default function NetWorth() {
-  const { data, loading, error, reload } = useNetWorth();
+  const [rangeKey, setRangeKey] = useState('24');
+  const range = RANGE_OPTIONS.find((option) => option.key === rangeKey) || RANGE_OPTIONS[1];
+  const { data, loading, error } = useNetWorth(range);
 
   const summary = data?.summary || {};
   const history = data?.history || [];
@@ -192,7 +205,16 @@ export default function NetWorth() {
             <section className="dashboard-card networth-trend-card">
               <header className="dashboard-card-header">
                 <h3>Net worth over time</h3>
-                <span className="dashboard-card-link">{history.length} months</span>
+                <DropdownMenu
+                  ariaLabel="Choose net worth range"
+                  triggerClassName="dashboard-card-link button-link networth-range-trigger"
+                  renderTrigger={() => range.label}
+                  items={RANGE_OPTIONS.map((option) => ({
+                    label: option.label,
+                    icon: option.key === range.key ? '✓' : '',
+                    onClick: () => setRangeKey(option.key)
+                  }))}
+                />
               </header>
               <NetWorthChart history={history} />
             </section>

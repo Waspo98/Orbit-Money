@@ -117,7 +117,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 
 ### Accounts
 - Full CRUD + merge (reassigns all transactions to target, deletes source) + archive/unarchive
-- **Reorder mode:** dedicated toggle that replaces normal rows with full-width drag handles; in-mode there are no competing tap targets, activation distance is 0 (any movement), and tapping "Done" exits. Outside reorder mode, no `@dnd-kit` listeners are mounted at all — eliminating the press-and-hold activation problems that dogged earlier versions.
+- **Reorder mode:** dedicated toggle that replaces normal grouped account cards with drag handles; account rows can be reordered within their account-type group, and group headers can be dragged to reorder whole groups. In-mode there are no competing tap targets, activation distance is 0 (any movement), and tapping "Done" exits. Outside reorder mode, no `@dnd-kit` listeners are mounted at all — eliminating the press-and-hold activation problems that dogged earlier versions.
 - Sort order persisted to `sort_order` column
 - "See transactions" button filters the Transactions page via `?accounts=X` query param
 - Three-dot dropdown menu per account (Add Record, Edit, Merge, Archive, Delete)
@@ -145,7 +145,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Endpoints: GET `/api/goals?months=`, POST `/api/goals`, PUT `/api/goals/:id`, DELETE `/api/goals/:id`
 
 ### Dashboard
-Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on ≥900px with Recent Activity spanning full width. Data comes from parallel calls to existing endpoints — no dashboard-specific backend.
+Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column grid on foldable/tablet widths (≥640px) with Recent Activity spanning full width. Data comes from parallel calls to existing endpoints — no dashboard-specific backend.
 
 - **Accounts card:** net worth (active balances plus mortgage estimated-value equity), breakdown by group (Cash = checking+savings+cash, Investments, Credit cards, Loans, Real Estate, Other). Rows with zero balance are hidden.
 - **This month card:** Day X of Y + compact Income / Expenses / Net trio
@@ -157,7 +157,7 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on �
 
 ### Responsive Layout
 - **Phone (< 640px):** Single column, bottom tabs
-- **Tablet/Foldable (640–1079px):** Centered content (max-width 820px), bottom tabs
+- **Tablet/Foldable (640–1079px):** Centered content with foldable-aware 2-column card grids on Dashboard, Budgets, Accounts, Category Manager, Goals, Net Worth, and MHA Tracker where the page content benefits from it; bottom tabs remain active
 - **Desktop (≥ 1080px):** Left sidebar (260px) + content area, bottom tabs hidden
 
 ### Navigation
@@ -247,7 +247,7 @@ Multi-card overview page at `/dashboard`. Stacked on mobile, 2-column grid on �
 ### Net Worth
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/net-worth?months=` | Current summary, monthly history, and account breakdown. Mortgage accounts contribute estimated value minus debt balance. |
+| GET | `/api/net-worth?months=` | Current summary, monthly history, and account breakdown. `months` accepts numeric ranges up to 240 or `all`. Mortgage accounts contribute estimated value minus debt balance. |
 
 ### Goals
 | Method | Path | Description |

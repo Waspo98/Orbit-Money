@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
@@ -86,6 +86,55 @@ function accountTypeSummary(accounts) {
   return Array.from(counts.entries())
     .map(([type, count]) => `${count} ${pluralTypeLabel(type, count)}`)
     .join(' | ');
+}
+
+function buildAccountGroups(accounts) {
+  const groupsByType = new Map();
+  const orderedTypes = [];
+
+  for (const account of accounts) {
+    const type = account.type || 'other';
+    if (!groupsByType.has(type)) {
+      groupsByType.set(type, []);
+      orderedTypes.push(type);
+    }
+    groupsByType.get(type).push(account);
+  }
+
+  return orderedTypes.map((type) => {
+    const items = groupsByType.get(type) || [];
+    const total = items.reduce(
+      (sum, account) => sum + (Number(account.current_balance) || 0),
+      0
+    );
+    return { type, items, total };
+  });
+}
+
+function flattenGroups(groups) {
+  return groups.flatMap((group) => group.items);
+}
+
+function accountSortableId(accountId) {
+  return `account-${accountId}`;
+}
+
+function groupSortableId(type) {
+  return `group-${type}`;
+}
+
+function accountIdFromSortable(id) {
+  const text = String(id || '');
+  return text.startsWith('account-') ? Number(text.slice('account-'.length)) : null;
+}
+
+function groupTypeFromSortable(id) {
+  const text = String(id || '');
+  return text.startsWith('group-') ? text.slice('group-'.length) : null;
+}
+
+function findAccountGroup(groups, accountId) {
+  return groups.find((group) => group.items.some((account) => account.id === accountId));
 }
 
 // ============================================================================
@@ -190,6 +239,7 @@ export default function Accounts({ onChange }) {
   }
 
   const activeAccounts = accounts.filter((account) => !account.is_archived);
+  const accountGroups = useMemo(() => buildAccountGroups(accounts), [accounts]);
   const cashBalance = activeAccounts
     .filter((account) => account.type === 'checking' || account.type === 'savings')
     .reduce((total, account) => total + (Number(account.current_balance) || 0), 0);
@@ -230,11 +280,37 @@ export default function Accounts({ onChange }) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = accounts.findIndex((a) => a.id === active.id);
-    const newIndex = accounts.findIndex((a) => a.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
+    const activeGroupType = groupTypeFromSortable(active.id);
+    const overGroupType = groupTypeFromSortable(over.id);
+    const activeAccountId = accountIdFromSortable(active.id);
+    const overAccountId = accountIdFromSortable(over.id);
 
-    const reordered = arrayMove(accounts, oldIndex, newIndex);
+    let reordered = null;
+
+    if (activeGroupType && overGroupType) {
+      const oldIndex = accountGroups.findIndex((group) => group.type === activeGroupType);
+      const newIndex = accountGroups.findIndex((group) => group.type === overGroupType);
+      if (oldIndex === -1 || newIndex === -1) return;
+      reordered = flattenGroups(arrayMove(accountGroups, oldIndex, newIndex));
+    } else if (activeAccountId && overAccountId) {
+      const sourceGroup = findAccountGroup(accountGroups, activeAccountId);
+      const targetGroup = findAccountGroup(accountGroups, overAccountId);
+      if (!sourceGroup || !targetGroup || sourceGroup.type !== targetGroup.type) return;
+
+      const oldIndex = sourceGroup.items.findIndex((account) => account.id === activeAccountId);
+      const newIndex = sourceGroup.items.findIndex((account) => account.id === overAccountId);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const nextGroups = accountGroups.map((group) =>
+        group.type === sourceGroup.type
+          ? { ...group, items: arrayMove(group.items, oldIndex, newIndex) }
+          : group
+      );
+      reordered = flattenGroups(nextGroups);
+    }
+
+    if (!reordered) return;
+
     setAccounts(reordered);
 
     try {
@@ -330,40 +406,58 @@ export default function Accounts({ onChange }) {
           <p>Import from Rocket Money or connect SimpleFIN to add accounts.</p>
         </div>
       ) : reorderMode ? (
-        // Reorder mode: wrapped in DndContext, all rows draggable, no actions
+        // Reorder mode: account rows reorder inside their group; group headers
+        // drag the whole account type group.
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
           <SortableContext
-            items={accounts.map((a) => a.id)}
+            items={accountGroups.map((group) => groupSortableId(group.type))}
             strategy={verticalListSortingStrategy}
           >
-            <ul className="account-list reorder-active">
-              {accounts.map((a) => (
-                <DraggableReorderRow key={a.id} account={a} />
+            <div className="account-group-grid reorder-active">
+              {accountGroups.map((group) => (
+                <DraggableAccountGroup key={group.type} group={group}>
+                  <SortableContext
+                    items={group.items.map((account) => accountSortableId(account.id))}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <ul className="account-list reorder-active">
+                      {group.items.map((a) => (
+                        <DraggableReorderRow key={a.id} account={a} />
+                      ))}
+                    </ul>
+                  </SortableContext>
+                </DraggableAccountGroup>
               ))}
-            </ul>
+            </div>
           </SortableContext>
         </DndContext>
       ) : (
-        // Normal mode: no drag, all actions available
-        <ul className="account-list">
-          {accounts.map((a) => (
-            <StaticAccountRow
-              key={a.id}
-              account={a}
-              allCount={accounts.length}
-              onAddRecord={() => setRecording(a)}
-              onEdit={() => setEditing(a)}
-              onMerge={() => setMerging(a)}
-              onArchive={() => handleArchive(a.id, !!a.is_archived)}
-              onDelete={() => handleDelete(a)}
-              onViewTransactions={() => viewTransactions(a.id)}
-            />
+        // Normal mode: grouped cards with all account actions available.
+        <div className="account-group-grid">
+          {accountGroups.map((group) => (
+            <AccountGroup key={group.type} group={group}>
+              <ul className="account-list account-group-list">
+                {group.items.map((a) => (
+                  <StaticAccountRow
+                    key={a.id}
+                    account={a}
+                    allCount={accounts.length}
+                    onAddRecord={() => setRecording(a)}
+                    onEdit={() => setEditing(a)}
+                    onMerge={() => setMerging(a)}
+                    onArchive={() => handleArchive(a.id, !!a.is_archived)}
+                    onDelete={() => handleDelete(a)}
+                    onViewTransactions={() => viewTransactions(a.id)}
+                  />
+                ))}
+              </ul>
+            </AccountGroup>
           ))}
-        </ul>
+        </div>
       )}
 
       {editing && (
@@ -415,6 +509,59 @@ export default function Accounts({ onChange }) {
 // Row used in reorder mode — entire row is a drag handle, no buttons
 // ============================================================================
 
+function AccountGroup({ group, children }) {
+  return (
+    <section className="dashboard-card account-group-card">
+      <header className="dashboard-card-header account-group-header">
+        <div>
+          <h3>{pluralTypeLabel(group.type, group.items.length)}</h3>
+          <span className="muted">
+            {group.items.length.toLocaleString()} {group.items.length === 1 ? 'account' : 'accounts'}
+          </span>
+        </div>
+        <strong className="account-group-total">{formatCurrency(group.total)}</strong>
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function DraggableAccountGroup({ group, children }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: groupSortableId(group.type) });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition
+  };
+
+  return (
+    <section
+      ref={setNodeRef}
+      style={style}
+      className={`dashboard-card account-group-card draggable ${isDragging ? 'dragging' : ''}`}
+    >
+      <header className="dashboard-card-header account-group-header account-group-drag-handle" {...attributes} {...listeners}>
+        <span className="drag-grip" aria-hidden="true">⋮⋮</span>
+        <div>
+          <h3>{pluralTypeLabel(group.type, group.items.length)}</h3>
+          <span className="muted">
+            {group.items.length.toLocaleString()} {group.items.length === 1 ? 'account' : 'accounts'}
+          </span>
+        </div>
+        <strong className="account-group-total">{formatCurrency(group.total)}</strong>
+      </header>
+      {children}
+    </section>
+  );
+}
+
 function DraggableReorderRow({ account }) {
   const {
     attributes,
@@ -423,7 +570,7 @@ function DraggableReorderRow({ account }) {
     transform,
     transition,
     isDragging
-  } = useSortable({ id: account.id });
+  } = useSortable({ id: accountSortableId(account.id) });
 
   const style = {
     transform: CSS.Transform.toString(transform),

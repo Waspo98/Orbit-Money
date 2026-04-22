@@ -353,7 +353,8 @@ not double-counted.
 
 The Net Worth page is available from the More menu. It uses active accounts to
 show current assets, liabilities, allocation, account contributions, and a
-monthly net worth trend.
+monthly net worth trend. The trend range can be changed between 1 year, 2 years,
+3 years, 5 years, 10 years, and all available history.
 
 The trend is derived from existing account balances and transaction history; it
 does not add new storage or change backup behavior. Mortgage accounts use the

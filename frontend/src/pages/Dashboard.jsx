@@ -337,6 +337,13 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
           loading={loading && accounts.length === 0}
         />
 
+        {/* ============ Top spending ============ */}
+        <TopSpendingCard
+          topSpending={topSpending}
+          max={topSpendingMax}
+          loading={loading && !budgetData}
+        />
+
         {/* ============ This month ============ */}
         <MonthCard
           summary={summary}
@@ -351,13 +358,6 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
           attention={budgetAttention}
           overallPercent={overallPercent}
           totalBudgeted={summary?.total_budgeted || 0}
-          loading={loading && !budgetData}
-        />
-
-        {/* ============ Top spending ============ */}
-        <TopSpendingCard
-          topSpending={topSpending}
-          max={topSpendingMax}
           loading={loading && !budgetData}
         />
 

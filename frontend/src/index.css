@@ -2191,9 +2191,16 @@ input, textarea, select {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .category-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
 }
 
 .category-row {
@@ -2538,7 +2545,7 @@ input, textarea, select {
   gap: 14px;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 640px) {
   .dashboard-grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -2777,6 +2784,23 @@ input, textarea, select {
   margin-bottom: 14px;
 }
 
+@media (min-width: 640px) {
+  .mha-content {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+  }
+
+  .mha-picker-card {
+    margin-bottom: 0;
+  }
+
+  .mha-transactions-card {
+    grid-column: 1 / -1;
+  }
+}
+
 .mha-picker-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -2993,15 +3017,27 @@ input, textarea, select {
   gap: 14px;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 640px) {
   .networth-grid {
-    grid-template-columns: 1.15fr 0.85fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .networth-trend-card,
-  .networth-account-card {
+  .networth-trend-card {
     grid-column: 1 / -1;
   }
+}
+
+.networth-range-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+}
+
+.networth-range-trigger::after {
+  content: '▾';
+  color: var(--text-muted);
+  font-size: 0.7rem;
 }
 
 .networth-chart-wrap {
@@ -3258,12 +3294,11 @@ input, textarea, select {
   gap: 14px;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 640px) {
   .goals-grid {
-    grid-template-columns: minmax(0, 1.12fr) minmax(300px, 0.88fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .goals-focus-card,
   .goals-account-card {
     grid-column: 1 / -1;
   }
@@ -4987,6 +5022,101 @@ input, textarea, select {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.account-group-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (min-width: 640px) {
+  .account-group-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.account-group-card {
+  min-height: 100%;
+}
+
+.account-group-header {
+  align-items: center;
+}
+
+.account-group-header > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.account-group-header .muted {
+  font-size: 0.78rem;
+}
+
+.account-group-total {
+  color: var(--text);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.account-group-list .account-row,
+.account-list.reorder-active .account-row {
+  padding: 13px 14px;
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+.account-group-list .account-row {
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "main balance"
+    "actions actions";
+  gap: 10px 12px;
+}
+
+.account-group-list .account-main { grid-area: main; }
+.account-group-list .account-balance { grid-area: balance; }
+.account-group-list .account-row-actions {
+  grid-area: actions;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.account-group-list .account-name {
+  font-size: 0.98rem;
+  margin-bottom: 5px;
+}
+
+.account-group-list .account-balance {
+  font-size: 1rem;
+}
+
+.account-group-list .btn-compact {
+  padding-inline: 10px;
+}
+
+.account-group-card.draggable,
+.account-list.reorder-active .account-row.draggable {
+  touch-action: none;
+}
+
+.account-group-card.dragging {
+  opacity: 0.92;
+  box-shadow: var(--shadow-xl);
+  z-index: 100;
+}
+
+.account-group-drag-handle {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.account-group-drag-handle:active {
+  cursor: grabbing;
 }
 
 .account-row {
@@ -6740,6 +6870,26 @@ input, textarea, select {
 .budget-content.is-refreshing {
   opacity: 0.55;
   pointer-events: none;
+}
+
+@media (min-width: 640px) {
+  .budget-content {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+  }
+
+  .budget-content > .budget-summary-card,
+  .budget-content > .budget-pie-card,
+  .budget-content > .budget-section {
+    margin-bottom: 0;
+  }
+
+  .budget-content > .budget-actions-row,
+  .budget-content > .empty-state {
+    grid-column: 1 / -1;
+  }
 }
 
 .budget-list {

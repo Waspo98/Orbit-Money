@@ -175,8 +175,9 @@ function sumNetWorthChange(accounts, deltas) {
 
 router.get('/', requireAuth, (req, res) => {
   try {
+    const allTime = String(req.query.months || '').toLowerCase() === 'all';
     const requestedMonths = parseInt(req.query.months, 10);
-    const months = Math.min(60, Math.max(3, Number.isFinite(requestedMonths) ? requestedMonths : 24));
+    const months = Math.min(240, Math.max(3, Number.isFinite(requestedMonths) ? requestedMonths : 24));
 
     const accounts = db
       .prepare(
@@ -219,13 +220,17 @@ router.get('/', requireAuth, (req, res) => {
       .sort()
       .at(-1);
     const latestMonth = latestDataMonth > todayMonth ? latestDataMonth : todayMonth;
-    const floorMonth = addMonths(latestMonth, -(months - 1));
     const earliestTransactionMonth = monthKey(latestTransaction.earliest);
     const earliestRecordMonth = monthKey(latestRecord.earliest);
     const earliestMonth = [earliestTransactionMonth, earliestRecordMonth]
       .filter(Boolean)
       .sort()[0] || latestMonth;
-    const firstMonth = earliestMonth > floorMonth ? earliestMonth : floorMonth;
+    const floorMonth = addMonths(latestMonth, -(months - 1));
+    const firstMonth = allTime
+      ? earliestMonth
+      : earliestMonth > floorMonth
+        ? earliestMonth
+        : floorMonth;
 
     const monthlyDeltas = db
       .prepare(
