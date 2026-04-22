@@ -5156,12 +5156,31 @@ input, textarea, select {
   }
 }
 
-.account-group-card {
+.account-group-card:not(.collapsed) {
   min-height: 100%;
 }
 
 .account-group-header {
   align-items: center;
+}
+
+.account-group-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-group-toggle:hover h3,
+.account-group-toggle:focus-visible h3 {
+  color: var(--text);
+}
+
+.account-group-toggle:focus-visible {
+  outline: none;
 }
 
 .account-group-header > div {
@@ -5179,6 +5198,36 @@ input, textarea, select {
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.account-group-header-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.account-group-caret {
+  transition: transform 180ms var(--ease-out, ease);
+}
+
+.account-group-card.collapsed .account-group-caret {
+  transform: rotate(-90deg);
+}
+
+.account-group-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 220ms var(--ease-out, ease);
+}
+
+.account-group-card.collapsed .account-group-body {
+  grid-template-rows: 0fr;
+}
+
+.account-group-body-inner {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .account-group-list .account-row,

@@ -151,6 +151,7 @@ export default function Accounts({ onChange }) {
   const [editing, setEditing] = useState(null);
   const [merging, setMerging] = useState(null);
   const [recording, setRecording] = useState(null);
+  const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
 
   // Reorder mode: when true, rows become drag handles and ALL other
   // interactions (expand, action buttons, dropdown, See transactions) are
@@ -198,6 +199,18 @@ export default function Accounts({ onChange }) {
   // reorder mode, we want to make sure we're synced.
   function toggleReorderMode() {
     setReorderMode((v) => !v);
+  }
+
+  function toggleAccountGroup(type) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
   }
 
   async function handleArchive(id, currentlyArchived) {
@@ -439,7 +452,12 @@ export default function Accounts({ onChange }) {
         // Normal mode: grouped cards with all account actions available.
         <div className="account-group-grid">
           {accountGroups.map((group) => (
-            <AccountGroup key={group.type} group={group}>
+            <AccountGroup
+              key={group.type}
+              group={group}
+              collapsed={collapsedGroups.has(group.type)}
+              onToggle={() => toggleAccountGroup(group.type)}
+            >
               <ul className="account-list account-group-list">
                 {group.items.map((a) => (
                   <StaticAccountRow
@@ -509,19 +527,31 @@ export default function Accounts({ onChange }) {
 // Row used in reorder mode — entire row is a drag handle, no buttons
 // ============================================================================
 
-function AccountGroup({ group, children }) {
+function AccountGroup({ group, children, collapsed, onToggle }) {
   return (
-    <section className="dashboard-card account-group-card">
-      <header className="dashboard-card-header account-group-header">
+    <section className={`dashboard-card account-group-card ${collapsed ? 'collapsed' : ''}`}>
+      <button
+        type="button"
+        className="dashboard-card-header account-group-header account-group-toggle"
+        aria-expanded={!collapsed}
+        onClick={onToggle}
+      >
         <div>
           <h3>{pluralTypeLabel(group.type, group.items.length)}</h3>
           <span className="muted">
             {group.items.length.toLocaleString()} {group.items.length === 1 ? 'account' : 'accounts'}
           </span>
         </div>
-        <strong className="account-group-total">{formatCurrency(group.total)}</strong>
-      </header>
-      {children}
+        <span className="account-group-header-side">
+          <strong className="account-group-total">{formatCurrency(group.total)}</strong>
+          <span className="month-nav-caret account-group-caret" aria-hidden="true">▾</span>
+        </span>
+      </button>
+      <div className="account-group-body" aria-hidden={collapsed}>
+        <div className="account-group-body-inner">
+          {children}
+        </div>
+      </div>
     </section>
   );
 }
