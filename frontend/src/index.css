@@ -1384,7 +1384,7 @@ input, textarea, select {
 
 .mobile-route-deck {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   width: 100%;
   min-width: 0;
   transition: transform 230ms var(--ease-out);
@@ -1402,7 +1402,14 @@ input, textarea, select {
 }
 
 .mobile-route-pane[aria-hidden="true"] {
+  height: 0;
+  overflow: hidden;
   pointer-events: none;
+}
+
+.mobile-route-deck-viewport.is-dragging .mobile-route-pane[aria-hidden="true"] {
+  height: auto;
+  overflow: visible;
 }
 
 .mobile-route-deck-viewport.from-more-enter .mobile-route-pane.is-current {
