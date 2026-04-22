@@ -5,6 +5,13 @@ import { db } from '../db/index.js';
 const router = express.Router();
 
 const VALID_TYPES = ['checking', 'savings', 'credit', 'investment', 'loan', 'mortgage', 'cash', 'other'];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidDateOnly(value) {
+  if (typeof value !== 'string' || !DATE_RE.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
 
 /**
  * GET /api/accounts?includeArchived=1
@@ -209,6 +216,80 @@ router.post('/:id/unarchive', requireAuth, (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Unarchive failed:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/records', requireAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: 'Invalid account id.' });
+  }
+
+  const recordDate = String(req.body?.date || '').trim();
+  if (!isValidDateOnly(recordDate)) {
+    return res.status(400).json({ error: 'date must be a valid YYYY-MM-DD date.' });
+  }
+
+  const balance = Number(req.body?.balance);
+  if (!Number.isFinite(balance)) {
+    return res.status(400).json({ error: 'balance must be a valid number.' });
+  }
+
+  const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
+  if (!account) {
+    return res.status(404).json({ error: 'Account not found.' });
+  }
+
+  try {
+    const run = db.transaction(() => {
+      db.prepare(
+        `
+        INSERT INTO account_balance_records (account_id, record_date, balance)
+        VALUES (?, ?, ?)
+        ON CONFLICT(account_id, record_date) DO UPDATE SET
+          balance = excluded.balance,
+          updated_at = datetime('now')
+      `
+      ).run(id, recordDate, balance);
+
+      const latestRecord = db
+        .prepare(
+          `
+          SELECT record_date, balance
+            FROM account_balance_records
+           WHERE account_id = ?
+           ORDER BY record_date DESC, id DESC
+           LIMIT 1
+        `
+        )
+        .get(id);
+
+      if (latestRecord?.record_date === recordDate) {
+        db.prepare(
+          `
+          UPDATE accounts
+             SET current_balance = ?, is_manual = 1, updated_at = datetime('now')
+           WHERE id = ?
+        `
+        ).run(balance, id);
+      }
+
+      return db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
+    });
+
+    const updated = run();
+    res.json({
+      success: true,
+      account: updated,
+      record: {
+        account_id: id,
+        date: recordDate,
+        balance
+      }
+    });
+  } catch (err) {
+    console.error('Add account record failed:', err);
     res.status(500).json({ error: err.message });
   }
 });

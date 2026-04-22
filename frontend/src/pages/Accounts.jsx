@@ -55,6 +55,20 @@ function parseOptionalCurrency(value) {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
+function todayLocalDate() {
+  const now = new Date();
+  const offsetDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().slice(0, 10);
+}
+
+function formatPercentChange(next, previous) {
+  if (!Number.isFinite(previous) || previous === 0) return null;
+  const change = ((next - previous) / Math.abs(previous)) * 100;
+  return `${Math.abs(change).toLocaleString(undefined, {
+    maximumFractionDigits: 1
+  })}% ${change >= 0 ? 'more' : 'less'}`;
+}
+
 function pluralTypeLabel(type, count) {
   const label = TYPE_LABELS[type] || type;
   if (type === 'cash') return 'Cash';
@@ -87,6 +101,7 @@ export default function Accounts({ onChange }) {
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState(null);
   const [merging, setMerging] = useState(null);
+  const [recording, setRecording] = useState(null);
 
   // Reorder mode: when true, rows become drag handles and ALL other
   // interactions (expand, action buttons, dropdown, See transactions) are
@@ -340,6 +355,7 @@ export default function Accounts({ onChange }) {
               key={a.id}
               account={a}
               allCount={accounts.length}
+              onAddRecord={() => setRecording(a)}
               onEdit={() => setEditing(a)}
               onMerge={() => setMerging(a)}
               onArchive={() => handleArchive(a.id, !!a.is_archived)}
@@ -371,6 +387,19 @@ export default function Accounts({ onChange }) {
           onClose={() => setMerging(null)}
           onMerged={() => {
             setMerging(null);
+            load();
+            onChange?.();
+          }}
+        />
+      )}
+
+      {recording && (
+        <AccountRecordModal
+          account={recording}
+          confirm={confirm}
+          onClose={() => setRecording(null)}
+          onSaved={() => {
+            setRecording(null);
             load();
             onChange?.();
           }}
@@ -451,6 +480,7 @@ function DraggableReorderRow({ account }) {
 function StaticAccountRow({
   account,
   allCount,
+  onAddRecord,
   onEdit,
   onMerge,
   onArchive,
@@ -459,6 +489,7 @@ function StaticAccountRow({
 }) {
   const canDelete = account.transaction_count === 0;
   const menuItems = [
+    { label: 'Add Record', icon: '+', onClick: onAddRecord },
     { label: 'Edit', icon: '✎', onClick: onEdit },
     {
       label: 'Merge',
@@ -537,6 +568,108 @@ function StaticAccountRow({
         />
       </div>
     </li>
+  );
+}
+
+// ============================================================================
+// Add account balance record modal
+// ============================================================================
+
+function AccountRecordModal({ account, confirm, onClose, onSaved }) {
+  const [date, setDate] = useState(todayLocalDate());
+  const [balance, setBalance] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const previousBalance = Number(account.current_balance) || 0;
+
+  async function handleSave(e, close) {
+    e.preventDefault();
+    setError('');
+
+    const nextBalance = parseOptionalCurrency(balance);
+    if (Number.isNaN(nextBalance) || nextBalance === null) {
+      setError('Account total must be a valid number.');
+      return;
+    }
+
+    const changeText = formatPercentChange(nextBalance, previousBalance);
+    const confirmMessage = changeText
+      ? `${formatCurrency(nextBalance)} is ${changeText} than the previous amount of ${formatCurrency(previousBalance)}. Does that sound right?`
+      : `${formatCurrency(nextBalance)} will replace the previous amount of ${formatCurrency(previousBalance)}. Does that sound right?`;
+
+    const ok = await confirm(confirmMessage, {
+      title: 'Confirm Account Record',
+      confirmLabel: 'Add Record'
+    });
+    if (!ok) return;
+
+    setSaving(true);
+    try {
+      await api.post(`/api/accounts/${account.id}/records`, {
+        date,
+        balance: nextBalance
+      });
+      close({ animate: true });
+      setTimeout(onSaved, 180);
+    } catch (err) {
+      setError(err.message || 'Add record failed');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AnimatedModal onClose={onClose}>
+      {({ close }) => (
+        <>
+          <h3>Add Record</h3>
+
+          <p className="modal-copy">
+            Add a dated balance snapshot for{' '}
+            <strong style={{ color: 'var(--text)' }}>{account.name}</strong>.
+          </p>
+
+          <form onSubmit={(e) => handleSave(e, close)}>
+            <label className="field">
+              <span>Date</span>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Account Total</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={balance}
+                onChange={(e) => setBalance(e.target.value)}
+                placeholder="e.g. 125000"
+                required
+              />
+            </label>
+
+            <div className="warning-banner">
+              Previous amount: <strong>{formatCurrency(previousBalance)}</strong>
+            </div>
+
+            {error && <div className="error">{error}</div>}
+
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={close}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? 'Adding...' : 'Add Record'}
+              </button>
+            </div>
+          </form>
+        </>
+      )}
+    </AnimatedModal>
   );
 }
 

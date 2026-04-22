@@ -23,7 +23,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
 | `sessions.db` | Session store (separate connection, managed by `connect-sqlite3`) |
 
-### Database Schema (15 migrations)
+### Database Schema (18 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -42,6 +42,9 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `013_mha_category_defaults.sql` | Adds category-level MHA default eligibility |
 | `014_mha_category_ignore_defaults.sql` | Adds category-level MHA default ignore behavior |
 | `015_goal_allocations.sql` | Extends goals metadata and adds multi-account goal allocations |
+| `016_merchant_logo_cache.sql` | Adds cached merchant logo metadata for transaction display |
+| `017_goal_sort_order.sql` | Adds custom goal ordering |
+| `018_account_balance_records.sql` | Adds dated account balance snapshots for manual/disconnected account history |
 
 ### Key Data Model Notes
 
@@ -54,6 +57,8 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 **Rules:** JSON-serialized `conditions` (array of `{field, operator, value}`) and `actions` (array of `{type, value}`). Condition fields: `merchant`, `original_description`, `amount`, `account_id`, `category_id`. All condition evaluation runs against originals only, making match counts stable. Action types: `rename`, `categorize`, `mark_transfer`, `mark_ignored`. First rule (priority DESC, id ASC) to claim a given field wins; lower-priority rules skip it.
 
 **Account types:** `checking`, `savings`, `credit`, `investment`, `loan`, `mortgage`, `cash`, `other`.
+
+**Account balance records:** `account_balance_records` stores dated balance snapshots for accounts that need manual history outside SimpleFIN. Adding a record upserts by `(account_id, record_date)` and updates `accounts.current_balance` when that record is the newest snapshot for the account. Net Worth history uses the latest snapshot on or before each month when one exists, then falls back to transaction-derived balances.
 
 **Overlap strategy (SimpleFIN + Rocket Money):** cutover date approach — RM owns transactions before cutover, SimpleFIN owns after. Pre-cutover RM transactions are deleted during sync if SimpleFIN provides the same period.
 
@@ -115,7 +120,8 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - **Reorder mode:** dedicated toggle that replaces normal rows with full-width drag handles; in-mode there are no competing tap targets, activation distance is 0 (any movement), and tapping "Done" exits. Outside reorder mode, no `@dnd-kit` listeners are mounted at all — eliminating the press-and-hold activation problems that dogged earlier versions.
 - Sort order persisted to `sort_order` column
 - "See transactions" button filters the Transactions page via `?accounts=X` query param
-- Three-dot dropdown menu per account (Edit, Merge, Archive, Delete)
+- Three-dot dropdown menu per account (Add Record, Edit, Merge, Archive, Delete)
+- Add Record modal stores a dated account total snapshot with an app-dialog confirmation that summarizes the percentage change from the previous balance.
 - Edit modal: name, type, institution, plus estimated value for mortgage accounts. Balance and last-4 are intentionally not editable in the UI.
 
 ### Budgets

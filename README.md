@@ -126,6 +126,11 @@ part of the deployment setup.
 Storage rename note: the production SQLite volume was renamed from the old
 project-prefixed volume to `orbit-money-data` as part of the Orbit Money rename.
 
+Account balance records are stored in SQLite as dated snapshots. They let manual
+or disconnected accounts contribute to account and net-worth history even when
+SimpleFIN is unavailable; adding the newest record also updates that account's
+current balance.
+
 ## Run The Beta Docker Deployment
 
 The beta deployment lives in `Orbit Money Beta/` and runs as a separate Docker

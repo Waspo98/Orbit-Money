@@ -89,7 +89,7 @@ function buildCurrentSummary(accounts) {
   return { totals, breakdown };
 }
 
-function buildHistory(accounts, monthlyDeltas, firstMonth, latestMonth) {
+function buildHistory(accounts, monthlyDeltas, balanceRecords, firstMonth, latestMonth) {
   if (!latestMonth) return [];
 
   const accountById = new Map(accounts.map((a) => [a.id, a]));
@@ -103,6 +103,27 @@ function buildHistory(accounts, monthlyDeltas, firstMonth, latestMonth) {
     byMonth.get(row.month).push(row);
   }
 
+  const recordsByAccount = new Map();
+  for (const record of balanceRecords) {
+    const accountId = Number(record.account_id);
+    if (!recordsByAccount.has(accountId)) recordsByAccount.set(accountId, []);
+    recordsByAccount.get(accountId).push({
+      month: monthKey(record.record_date),
+      date: record.record_date,
+      balance: Number(record.balance) || 0
+    });
+  }
+  for (const records of recordsByAccount.values()) {
+    records.sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  function snapshotBalanceForMonth(accountId, month) {
+    const records = recordsByAccount.get(accountId);
+    if (!records) return null;
+    const record = records.find((item) => item.month <= month);
+    return record ? record.balance : null;
+  }
+
   const rows = [];
   let cursor = latestMonth;
 
@@ -110,7 +131,8 @@ function buildHistory(accounts, monthlyDeltas, firstMonth, latestMonth) {
     const totals = emptyTotals();
 
     for (const account of accounts) {
-      const balance = balancesByAccount.get(account.id) || 0;
+      const snapshotBalance = snapshotBalanceForMonth(account.id, cursor);
+      const balance = snapshotBalance ?? (balancesByAccount.get(account.id) || 0);
       addContribution(totals, account, contributionForAccount(account, balance));
     }
 
@@ -168,14 +190,41 @@ router.get('/', requireAuth, (req, res) => {
       .all();
 
     const latestTransaction = db
-      .prepare('SELECT MAX(date) AS latest, MIN(date) AS earliest FROM transactions')
+      .prepare(
+        `
+        SELECT
+          MAX(date) AS latest,
+          MIN(date) AS earliest
+          FROM transactions
+      `
+      )
+      .get();
+
+    const latestRecord = db
+      .prepare(
+        `
+        SELECT
+          MAX(record_date) AS latest,
+          MIN(record_date) AS earliest
+          FROM account_balance_records
+      `
+      )
       .get();
 
     const todayMonth = new Date().toISOString().slice(0, 7);
-    const latestDataMonth = monthKey(latestTransaction.latest) || todayMonth;
+    const latestTransactionMonth = monthKey(latestTransaction.latest);
+    const latestRecordMonth = monthKey(latestRecord.latest);
+    const latestDataMonth = [latestTransactionMonth, latestRecordMonth, todayMonth]
+      .filter(Boolean)
+      .sort()
+      .at(-1);
     const latestMonth = latestDataMonth > todayMonth ? latestDataMonth : todayMonth;
     const floorMonth = addMonths(latestMonth, -(months - 1));
-    const earliestMonth = monthKey(latestTransaction.earliest) || latestMonth;
+    const earliestTransactionMonth = monthKey(latestTransaction.earliest);
+    const earliestRecordMonth = monthKey(latestRecord.earliest);
+    const earliestMonth = [earliestTransactionMonth, earliestRecordMonth]
+      .filter(Boolean)
+      .sort()[0] || latestMonth;
     const firstMonth = earliestMonth > floorMonth ? earliestMonth : floorMonth;
 
     const monthlyDeltas = db
@@ -190,8 +239,25 @@ router.get('/', requireAuth, (req, res) => {
       )
       .all(`${firstMonth}-01`);
 
+    const balanceRecords = db
+      .prepare(
+        `
+        SELECT account_id, record_date, balance
+          FROM account_balance_records
+         WHERE record_date <= ?
+         ORDER BY account_id ASC, record_date DESC
+      `
+      )
+      .all(`${latestMonth}-31`);
+
     const current = buildCurrentSummary(accounts);
-    const history = buildHistory(accounts, monthlyDeltas, firstMonth, latestMonth);
+    const history = buildHistory(
+      accounts,
+      monthlyDeltas,
+      balanceRecords,
+      firstMonth,
+      latestMonth
+    );
     const previous = history.length > 1 ? history[history.length - 2] : null;
     const first = history[0] || null;
     const yearStart = `${latestMonth.slice(0, 4)}-01-01`;
