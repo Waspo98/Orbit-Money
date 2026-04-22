@@ -473,7 +473,9 @@ function MobileRouteDeck({ currentPath, routeTransition, routes, renderRoute, na
     });
   }
 
-  const transform = `translate3d(calc(${-activePaneIndex * 100}% + ${dragX}px), 0, 0)`;
+  const suppressingSwipeEnter = suppressNextEnterRef.current;
+  const effectiveDragX = suppressingSwipeEnter ? 0 : dragX;
+  const transform = `translate3d(calc(${-activePaneIndex * 100}% + ${effectiveDragX}px), 0, 0)`;
 
   return (
     <div
@@ -487,7 +489,7 @@ function MobileRouteDeck({ currentPath, routeTransition, routes, renderRoute, na
         className="mobile-route-deck"
         style={{
           transform,
-          transition: dragging ? 'none' : undefined
+          transition: dragging || suppressingSwipeEnter ? 'none' : undefined
         }}
       >
         {panePaths.map((path) => (

@@ -1108,8 +1108,8 @@ input, textarea, select {
 }
 
 .more-card-icon.app-icon {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
 }
 
 .more-card-label {
@@ -1539,8 +1539,8 @@ input, textarea, select {
 }
 
 .bottom-tab-icon.app-icon {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 
 .bottom-tab.active { color: var(--accent); }
@@ -1655,8 +1655,8 @@ input, textarea, select {
   }
 
   .sidebar-icon.app-icon {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
   }
 }
 
@@ -3274,9 +3274,9 @@ input, textarea, select {
 }
 
 .page-hero-goals {
-  --hero-start: #082018;
-  --hero-mid: #0f3c33;
-  --hero-end: #195f73;
+  --hero-start: #052e24;
+  --hero-mid: #065f46;
+  --hero-end: #047857;
 }
 
 .goals-view > .error,
