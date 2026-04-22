@@ -21,6 +21,7 @@ import HousingCalculator from './pages/HousingCalculator.jsx';
 import NetWorth from './pages/NetWorth.jsx';
 import MhaTracker from './pages/MhaTracker.jsx';
 import Goals from './pages/Goals.jsx';
+import Household from './pages/Household.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
 import SyncErrorBanner from './components/SyncErrorBanner.jsx';
@@ -39,6 +40,7 @@ const MORE_NAV_ROUTES = [
   '/goals',
   '/housing-calculator',
   '/net-worth',
+  '/household',
   '/mha-tracker',
   '/settings'
 ];
@@ -83,6 +85,7 @@ function AppShell() {
     location.pathname === '/rules' ||
     location.pathname === '/housing-calculator' ||
     location.pathname === '/net-worth' ||
+    location.pathname === '/household' ||
     location.pathname === '/goals' ||
     location.pathname === '/settings' ||
     location.pathname === '/mha-tracker';
@@ -209,6 +212,8 @@ function AppShell() {
         return <HousingCalculator accounts={accounts} />;
       case '/net-worth':
         return <NetWorth />;
+      case '/household':
+        return <Household />;
       case '/goals':
         return <Goals />;
       case '/mha-tracker':
@@ -283,6 +288,7 @@ function AppShell() {
               <Route path="/categories" element={renderRoute('/categories')} />
               <Route path="/housing-calculator" element={renderRoute('/housing-calculator')} />
               <Route path="/net-worth" element={renderRoute('/net-worth')} />
+              <Route path="/household" element={renderRoute('/household')} />
               <Route path="/goals" element={renderRoute('/goals')} />
               <Route path="/mha-tracker" element={renderRoute('/mha-tracker')} />
               <Route path="/settings" element={renderRoute('/settings')} />

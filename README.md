@@ -366,6 +366,20 @@ the remaining mortgage balance from the account balance. The calculator keeps
 the spreadsheet-style assumptions editable for selling fees, purchase details,
 cash to close, and monthly payment estimates.
 
+## Household
+
+The Household page is available from the More menu after Net Worth. It tracks
+household members, employment status, employer details, gross income,
+annualized net pay, retirement account type, employee retirement contributions,
+employer match assumptions, and benefit values such as HSA, dependent care FSA,
+health premiums, and other annual benefits.
+
+Saving a member also writes a dated income snapshot so historical compensation
+is preserved for future reporting and retirement projection work. Storage is
+additive: migration `019_household_income.sql` adds `household_members` and
+`household_income_records`. It does not change Docker volumes, ports, auth
+behavior, imports, or sync storage.
+
 ## Goals
 
 The Goals page is available from the More menu. It lets savings targets be

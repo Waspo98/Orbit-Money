@@ -45,6 +45,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `016_merchant_logo_cache.sql` | Adds cached merchant logo metadata for transaction display |
 | `017_goal_sort_order.sql` | Adds custom goal ordering |
 | `018_account_balance_records.sql` | Adds dated account balance snapshots for manual/disconnected account history |
+| `019_household_income.sql` | Adds household member profiles and dated income/benefit history snapshots |
 
 ### Key Data Model Notes
 
@@ -65,6 +66,8 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 **Budgets:** One row per spending `category_id` (globally applied). Transfer and income categories are excluded from budget rows and per-category spending lists; income is summarized separately in the monthly Income / Expenses / Net stat row. The `budgets` table retains the `rollover` column from migration 001 for future Phase 2 work but it's not consumed by the current UI.
 
 **Goals:** Goal progress is computed from `goal_account_allocations` and active asset account balances. Allocations can be fixed dollar amounts or percentages of the account balance. The old `goals.current_amount` column is retained for compatibility, but the Goals API derives live progress at read time.
+
+**Household:** `household_members` stores the current profile, income, retirement, and benefit assumptions for each person. `household_income_records` stores dated snapshots so future projections can use compensation history without mutating old records.
 
 ## Features
 
@@ -145,6 +148,13 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - "Imagine" slider projects a hypothetical ETA with extra monthly savings
 - Endpoints: GET `/api/goals?months=`, POST `/api/goals`, PUT `/api/goals/:id`, DELETE `/api/goals/:id`
 
+### Household
+- Create and edit household members from the More menu after Net Worth
+- Tracks age source date, employment status, employer/title, gross income, pay cadence, annualized net pay, retirement account type, employee contribution, employer match assumptions, and benefit values
+- Saving a profile writes a dated income snapshot for future historical income reporting
+- Summary cards show annualized take-home pay, gross income, employer retirement match, benefits value, and earners
+- Endpoints: GET `/api/household`, POST `/api/household/members`, PUT `/api/household/members/:id`, POST `/api/household/members/:id/income-records`, DELETE `/api/household/members/:id`
+
 ### Dashboard
 Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column grid on foldable/tablet widths (≥640px) with Recent Activity spanning full width. Data comes from parallel calls to existing endpoints — no dashboard-specific backend.
 
@@ -158,13 +168,13 @@ Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column gri
 
 ### Responsive Layout
 - **Phone (< 640px):** Single column, bottom tabs
-- **Tablet/Foldable (640–1079px):** Centered content with foldable-aware 2-column card grids on Dashboard, Budgets, Accounts, Category Manager, Goals, Net Worth, and MHA Tracker where the page content benefits from it; bottom tabs remain active
+- **Tablet/Foldable (640–1079px):** Centered content with foldable-aware 2-column card grids on Dashboard, Budgets, Accounts, Category Manager, Goals, Net Worth, Household, and MHA Tracker where the page content benefits from it; bottom tabs remain active
 - **Desktop (≥ 1080px):** Left sidebar (260px) + content area, bottom tabs hidden
 
 ### Navigation
 - **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More
 - **Desktop sidebar:** Lists every page directly, in the same order as the mobile More menu, with Settings last. Bottom tabs are hidden on desktop.
-- **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Goals, Housing Calculator, Net Worth, MHA Tracker when enabled, and Settings last.
+- **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Goals, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings last.
 - **Deprecated hamburger:** the old hamburger menu was removed; do not reintroduce it.
 - **Settings page:** Appearance, MHA visibility, Rocket Money CSV import, SimpleFIN configuration/sync log, account controls, and app build details.
 - **React Router v6:** Client-side routing with browser back/forward support. All routes served via Express catch-all for deep-link support.
@@ -258,6 +268,15 @@ Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column gri
 | PUT | `/api/goals/:id` | Replace goal metadata and allocations. Can rebalance other goals when stealing is enabled. |
 | DELETE | `/api/goals/:id` | Delete a goal and its allocation rows. |
 
+### Household
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/household` | Household summary, member profiles, and recent income history snapshots. |
+| POST | `/api/household/members` | Create a household member and write the first dated income snapshot. |
+| PUT | `/api/household/members/:id` | Update a household member and upsert a dated income snapshot. |
+| POST | `/api/household/members/:id/income-records` | Upsert a manual income/benefit snapshot for a member. |
+| DELETE | `/api/household/members/:id` | Delete a member and their income history. |
+
 ### SimpleFIN
 | Method | Path | Description |
 |---|---|---|
@@ -283,7 +302,7 @@ Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column gri
 - `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
 - `db/index.js`, `db/migrations.js`
 - `db/migrations/001` through `015`
-- `routes/`: auth, health, import, transactions, accounts, categories, rules, simplefin, budgets, netWorth, mha, goals
+- `routes/`: auth, health, import, transactions, accounts, categories, rules, simplefin, budgets, netWorth, mha, goals, household
 - `services/`: csvImport, ruleMatcher (exports `loadRules`, `computeEdits`, `countMatches`, `reapplyRulesToAllTransactions`, `reapplyRulesToTransaction`, `revertEditsForRule`, `applyRulesToDraft`), simplefinClient, simplefinSync, transferMatcher
 
 ### Frontend (`frontend/`)
@@ -292,7 +311,7 @@ Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column gri
 - `src/main.jsx`, `src/App.jsx` (BrowserRouter, passes accounts + categories to Transactions and Dashboard), `src/Login.jsx`, `src/api.js` (get/post/put/patch/del), `src/index.css` (~3000 lines)
 - `src/hooks/useTheme.js`
 - `src/components/`: AnimatedModal, AppDialog, BottomTabs, DesktopSidebar, DropdownMenu, FilterSheet, InlinePopover, MoreSheet, PageHero, SelectableListItem, SyncErrorBanner
-- `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, HousingCalculator, NetWorth, MhaTracker, Goals
+- `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, HousingCalculator, NetWorth, Household, MhaTracker, Goals
 
 ## Known Gotchas
 - **better-sqlite3 `.iterate()` + write transaction** = "database connection is busy" — always use `.all()` instead

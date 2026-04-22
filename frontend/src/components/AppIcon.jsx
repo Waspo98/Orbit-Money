@@ -4,6 +4,7 @@ const ICON_PATHS = {
   categories: new URL('../assets/icons/categorymanager.svg', import.meta.url).href,
   dashboard: new URL('../assets/icons/dashboard.svg', import.meta.url).href,
   goals: new URL('../assets/icons/goals.svg', import.meta.url).href,
+  household: new URL('../assets/icons/household.svg', import.meta.url).href,
   housing: new URL('../assets/icons/housingcalculator.svg', import.meta.url).href,
   mha: new URL('../assets/icons/mhatracker.svg', import.meta.url).href,
   networth: new URL('../assets/icons/networth.svg', import.meta.url).href,

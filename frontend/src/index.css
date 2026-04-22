@@ -2688,6 +2688,12 @@ input, textarea, select {
   --hero-end: #047857;
 }
 
+.page-hero-household {
+  --hero-start: #173831;
+  --hero-mid: #22304a;
+  --hero-end: #312b46;
+}
+
 .page-hero-mha .page-hero-stats {
   grid-template-columns: repeat(3, minmax(168px, 1fr));
 }
@@ -3205,6 +3211,207 @@ input, textarea, select {
   display: block;
   height: 100%;
   border-radius: inherit;
+}
+
+/* ---------- Household ---------- */
+
+.household-view {
+  min-height: 100%;
+}
+
+.household-view > .error,
+.household-view > .center-loading,
+.household-view > .empty-state,
+.household-grid {
+  width: min(1120px, calc(100% - 32px));
+  margin: 18px auto 110px;
+}
+
+.household-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 760px) {
+  .household-grid {
+    grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.4fr);
+  }
+
+  .household-history-card {
+    grid-column: 1 / -1;
+  }
+}
+
+.household-member-list,
+.household-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.household-member-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.household-member-top,
+.household-history-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.household-member-top h4 {
+  margin: 0 0 3px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.household-member-top p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.household-member-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.household-member-actions .expense {
+  color: var(--expense);
+}
+
+.household-member-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.household-metric {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.household-metric span,
+.household-history-row span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.household-metric strong,
+.household-history-row strong {
+  color: var(--text);
+  font-size: 0.94rem;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.household-member-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.household-member-meta span {
+  padding: 5px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.household-history-row {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.household-history-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.household-history-row > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.household-history-row > div:not(:first-child) {
+  text-align: right;
+}
+
+.household-modal h3 {
+  margin-bottom: 14px;
+}
+
+.household-form-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.household-form-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.household-form-section h4 {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 720px) {
+  .household-view > .error,
+  .household-view > .center-loading,
+  .household-view > .empty-state,
+  .household-grid {
+    width: min(100% - 24px, 680px);
+    margin-top: 14px;
+  }
+
+  .household-member-top,
+  .household-history-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .household-member-actions {
+    justify-content: flex-start;
+  }
+
+  .household-history-row > div:not(:first-child) {
+    text-align: left;
+  }
+}
+
+@media (max-width: 480px) {
+  .household-member-metrics {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {

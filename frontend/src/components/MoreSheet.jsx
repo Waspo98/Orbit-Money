@@ -9,6 +9,7 @@ const MORE_ITEMS = [
   { id: 'goals', label: 'Goals', description: 'Track savings targets', icon: 'goals', path: '/goals' },
   { id: 'housing', label: 'Housing Calculator', description: 'Selling, buying, and payment estimates', icon: 'housing', path: '/housing-calculator' },
   { id: 'networth', label: 'Net Worth', description: 'Assets minus liabilities over time', icon: 'networth', path: '/net-worth' },
+  { id: 'household', label: 'Household', description: 'Net pay, benefits, and income history', icon: 'household', path: '/household' },
   { id: 'mha', label: 'MHA Tracker', description: 'Track housing allowance transactions', icon: 'mha', path: '/mha-tracker', feature: 'mha' },
   { id: 'settings', label: 'Settings', description: 'Maintenance and configuration', icon: 'settings', path: '/settings' }
 ];
