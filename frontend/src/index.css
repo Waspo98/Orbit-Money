@@ -3446,7 +3446,7 @@ input, textarea, select {
 }
 
 .goals-focus-card.collapsed .goal-progress-main strong {
-  font-size: clamp(1.4rem, 3vw, 2.15rem);
+  font-size: clamp(2.3rem, 5vw, 3.25rem);
 }
 
 .goals-focus-card.collapsed .goal-progress-ring {
