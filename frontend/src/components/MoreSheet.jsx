@@ -22,9 +22,10 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
     if (open) setClosing(false);
   }, [open]);
 
-  function close(options = {}) {
+  function close(options = { animate: true }) {
     if (closing) return;
-    if (!options.animate) {
+    const shouldAnimate = options?.animate !== false;
+    if (!shouldAnimate) {
       onClose();
       return;
     }
@@ -35,7 +36,7 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
   useEffect(() => {
     if (!open) return;
     function onKey(e) {
-      if (e.key === 'Escape') close();
+      if (e.key === 'Escape') close({ animate: true });
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -61,7 +62,7 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
   return (
     <div
       className={`more-sheet-backdrop ${closing ? 'closing' : ''}`}
-      onClick={close}
+      onClick={() => close({ animate: true })}
       role="dialog"
       aria-modal="true"
     >
@@ -72,7 +73,7 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
         <div className="more-sheet-handle" aria-hidden />
         <div className="more-sheet-header">
           <h3>More</h3>
-          <button type="button" className="btn-ghost" onClick={close} aria-label="Close">
+          <button type="button" className="btn-ghost" onClick={() => close({ animate: true })} aria-label="Close">
             {'\u2715'}
           </button>
         </div>
