@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DndContext,
@@ -568,7 +568,7 @@ function GoalProgress({ goal }) {
     <div className="goal-progress-panel">
       <div className="goal-progress-main">
         <span>{formatMoney(goal?.current_amount)} saved</span>
-        <strong>{formatMoney(goal?.target_amount)}</strong>
+        <FitGoalAmount value={formatMoney(goal?.target_amount)} />
         <em>{formatMoney(remaining)} remaining</em>
       </div>
       <div className="goal-progress-ring" style={{ '--goal-progress': `${progress}%` }}>
@@ -580,6 +580,54 @@ function GoalProgress({ goal }) {
         <SignalRow className="goal-monthly-row" label="Monthly pace" value={formatSignedMoney(goal?.monthly_pace)} detail="Based on history" />
       </div>
     </div>
+  );
+}
+
+function FitGoalAmount({ value }) {
+  const wrapRef = useRef(null);
+  const textRef = useRef(null);
+  const [fontSize, setFontSize] = useState(null);
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    const text = textRef.current;
+    if (!wrap || !text) return undefined;
+
+    let raf = 0;
+
+    function fit() {
+      window.cancelAnimationFrame(raf);
+      raf = window.requestAnimationFrame(() => {
+        const styles = window.getComputedStyle(wrap);
+        const max = parseFloat(styles.getPropertyValue('--goal-amount-max')) || 48;
+        const min = parseFloat(styles.getPropertyValue('--goal-amount-min')) || 24;
+        const available = wrap.clientWidth;
+        if (!available) return;
+
+        text.style.fontSize = `${max}px`;
+        const needed = text.scrollWidth;
+        const next = needed > available
+          ? Math.max(min, Math.floor((max * available) / needed))
+          : max;
+        setFontSize(next);
+      });
+    }
+
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(wrap);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+  }, [value]);
+
+  return (
+    <strong ref={wrapRef} className="goal-progress-amount">
+      <span ref={textRef} style={fontSize ? { fontSize: `${fontSize}px` } : undefined}>
+        {value}
+      </span>
+    </strong>
   );
 }
 
