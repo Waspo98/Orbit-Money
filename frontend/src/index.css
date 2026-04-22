@@ -3807,6 +3807,7 @@ input, textarea, select {
 
 .goal-account-values {
   justify-items: end;
+  text-align: right;
 }
 
 .goal-account-meter {
@@ -4212,7 +4213,8 @@ input, textarea, select {
   }
 
   .goal-account-values {
-    justify-items: start;
+    justify-items: end;
+    text-align: right;
   }
 }
 
