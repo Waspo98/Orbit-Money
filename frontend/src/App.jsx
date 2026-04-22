@@ -332,9 +332,12 @@ function MobileRouteDeck({ currentPath, routeTransition, routes, renderRoute, na
   const [dragging, setDragging] = useState(false);
   const [settling, setSettling] = useState(false);
   const [bottomEntering, setBottomEntering] = useState(false);
+  const [disableTransition, setDisableTransition] = useState(false);
+  const [deckRevision, setDeckRevision] = useState(0);
   const startRef = useRef(null);
   const timerRef = useRef(null);
   const suppressNextEnterRef = useRef(false);
+  const swipeArrivalPanesRef = useRef(null);
 
   useLayoutEffect(() => {
     setDragging(false);
@@ -342,12 +345,25 @@ function MobileRouteDeck({ currentPath, routeTransition, routes, renderRoute, na
     if (timerRef.current) clearTimeout(timerRef.current);
 
     if (suppressNextEnterRef.current) {
-      suppressNextEnterRef.current = false;
       setBottomEntering(false);
       setDragX(0);
       setSettling(false);
+      setDisableTransition(true);
+
+      window.requestAnimationFrame(() => {
+        suppressNextEnterRef.current = false;
+        swipeArrivalPanesRef.current = null;
+        setDeckRevision((value) => value + 1);
+
+        window.requestAnimationFrame(() => {
+          setDisableTransition(false);
+        });
+      });
       return;
     }
+
+    swipeArrivalPanesRef.current = null;
+    setDisableTransition(false);
 
     if (routeTransition === 'forward' || routeTransition === 'back') {
       setBottomEntering(false);
@@ -373,6 +389,7 @@ function MobileRouteDeck({ currentPath, routeTransition, routes, renderRoute, na
     setBottomEntering(false);
     setDragX(0);
     setSettling(false);
+    setDeckRevision((value) => value + 1);
   }, [currentPath]);
 
   useEffect(() => () => {
@@ -466,6 +483,7 @@ function MobileRouteDeck({ currentPath, routeTransition, routes, renderRoute, na
 
     setDragX(wantsNext ? -window.innerWidth : window.innerWidth);
     finishSettle(() => {
+      swipeArrivalPanesRef.current = panePaths;
       suppressNextEnterRef.current = true;
       navigate(targetPath, {
         state: { transition: wantsNext ? 'forward' : 'back' }
@@ -474,8 +492,16 @@ function MobileRouteDeck({ currentPath, routeTransition, routes, renderRoute, na
   }
 
   const suppressingSwipeEnter = suppressNextEnterRef.current;
+  const arrivalPanePaths =
+    suppressingSwipeEnter && swipeArrivalPanesRef.current?.includes(currentPath)
+      ? swipeArrivalPanesRef.current
+      : null;
+  const displayPanePaths = arrivalPanePaths || panePaths;
+  const displayActivePaneIndex = arrivalPanePaths
+    ? displayPanePaths.indexOf(currentPath)
+    : activePaneIndex;
   const effectiveDragX = suppressingSwipeEnter ? 0 : dragX;
-  const transform = `translate3d(calc(${-activePaneIndex * 100}% + ${effectiveDragX}px), 0, 0)`;
+  const transform = `translate3d(calc(${-displayActivePaneIndex * 100}% + ${effectiveDragX}px), 0, 0)`;
 
   return (
     <div
@@ -487,12 +513,13 @@ function MobileRouteDeck({ currentPath, routeTransition, routes, renderRoute, na
     >
       <div
         className="mobile-route-deck"
+        data-revision={deckRevision}
         style={{
           transform,
-          transition: dragging || suppressingSwipeEnter ? 'none' : undefined
+          transition: dragging || suppressingSwipeEnter || disableTransition ? 'none' : undefined
         }}
       >
-        {panePaths.map((path) => (
+        {displayPanePaths.map((path) => (
           <section
             key={path}
             className={`mobile-route-pane ${path === currentPath ? 'is-current' : ''}`}
