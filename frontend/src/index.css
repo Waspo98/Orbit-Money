@@ -314,6 +314,16 @@ input, textarea, select {
 .btn-icon:hover { background: var(--surface-hover); color: var(--text); }
 .btn-icon.active { background: var(--accent-soft); color: var(--accent); }
 
+.app-icon {
+  display: inline-block;
+  width: 1.25em;
+  height: 1.25em;
+  flex: 0 0 auto;
+  background: currentColor;
+  mask: var(--icon-url) center / contain no-repeat;
+  -webkit-mask: var(--icon-url) center / contain no-repeat;
+}
+
 
 /* ================== 3. PRIMITIVES — Fields ================== */
 
@@ -1097,6 +1107,11 @@ input, textarea, select {
   color: var(--accent);
 }
 
+.more-card-icon.app-icon {
+  width: 28px;
+  height: 28px;
+}
+
 .more-card-label {
   font-size: 0.95rem;
   font-weight: 600;
@@ -1435,6 +1450,11 @@ input, textarea, select {
   transition: transform var(--dur-base) var(--ease-out);
 }
 
+.bottom-tab-icon.app-icon {
+  width: 24px;
+  height: 24px;
+}
+
 .bottom-tab.active { color: var(--accent); }
 .bottom-tab.active .bottom-tab-icon { transform: scale(1.05); }
 
@@ -1539,7 +1559,17 @@ input, textarea, select {
   .sidebar-link:hover { background: var(--surface-hover); color: var(--text); }
   .sidebar-link.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 
-  .sidebar-icon { width: 20px; text-align: center; font-size: 1.05rem; }
+  .sidebar-icon {
+    width: 20px;
+    height: 20px;
+    text-align: center;
+    font-size: 1.05rem;
+  }
+
+  .sidebar-icon.app-icon {
+    width: 20px;
+    height: 20px;
+  }
 }
 
 

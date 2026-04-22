@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
+import AppIcon from './AppIcon.jsx';
 
 const PRIMARY_TABS = [
-  { to: '/dashboard',    label: 'Dashboard',    icon: '●' },
-  { to: '/transactions', label: 'Transactions', icon: '≡' },
-  { to: '/budgets',      label: 'Budgets',      icon: '$' },
-  { to: '/accounts',     label: 'Accounts',     icon: '▥' }
+  { to: '/dashboard',    label: 'Dashboard',    icon: 'dashboard' },
+  { to: '/transactions', label: 'Transactions', icon: 'transactions' },
+  { to: '/budgets',      label: 'Budgets',      icon: 'budgets' },
+  { to: '/accounts',     label: 'Accounts',     icon: 'accounts' }
 ];
 
 export default function BottomTabs({ onMoreClick }) {
@@ -18,7 +19,7 @@ export default function BottomTabs({ onMoreClick }) {
             `bottom-tab ${isActive ? 'active' : ''}`
           }
         >
-          <span className="bottom-tab-icon" aria-hidden>{t.icon}</span>
+          <AppIcon name={t.icon} className="bottom-tab-icon" />
           <span>{t.label}</span>
         </NavLink>
       ))}

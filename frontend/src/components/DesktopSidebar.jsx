@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import AppIcon from './AppIcon.jsx';
 import { PRIMARY_TABS } from './BottomTabs.jsx';
 import { MORE_ITEMS } from './MoreSheet.jsx';
 
@@ -32,7 +33,7 @@ export default function DesktopSidebar({ mhaTrackerEnabled = false }) {
               `sidebar-link ${isActive ? 'active' : ''}`
             }
           >
-            <span className="sidebar-icon" aria-hidden>{t.icon}</span>
+            <AppIcon name={t.icon} className="sidebar-icon" />
             <span>{t.label}</span>
           </NavLink>
         ))}

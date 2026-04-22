@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AppIcon from './AppIcon.jsx';
 import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
 
 const MORE_ITEMS = [
-  { id: 'rules', label: 'Rules', description: 'Automate merchant names and categories', icon: '\u2299', path: '/rules' },
-  { id: 'categories', label: 'Category Manager', description: 'Organize spending categories', icon: '#', path: '/categories' },
-  { id: 'goals', label: 'Goals', description: 'Track savings targets', icon: '\u25ce', path: '/goals' },
-  { id: 'housing', label: 'Housing Calculator', description: 'Selling, buying, and payment estimates', icon: '\u2302', path: '/housing-calculator' },
-  { id: 'networth', label: 'Net Worth', description: 'Assets minus liabilities over time', icon: '$', path: '/net-worth' },
-  { id: 'mha', label: 'MHA Tracker', description: 'Track housing allowance transactions', icon: 'H', path: '/mha-tracker', feature: 'mha' },
-  { id: 'settings', label: 'Settings', description: 'Maintenance and configuration', icon: '\u2699', path: '/settings' }
+  { id: 'rules', label: 'Rules', description: 'Automate merchant names and categories', icon: 'rules', path: '/rules' },
+  { id: 'categories', label: 'Category Manager', description: 'Organize spending categories', icon: 'categories', path: '/categories' },
+  { id: 'goals', label: 'Goals', description: 'Track savings targets', icon: 'goals', path: '/goals' },
+  { id: 'housing', label: 'Housing Calculator', description: 'Selling, buying, and payment estimates', icon: 'housing', path: '/housing-calculator' },
+  { id: 'networth', label: 'Net Worth', description: 'Assets minus liabilities over time', icon: 'networth', path: '/net-worth' },
+  { id: 'mha', label: 'MHA Tracker', description: 'Track housing allowance transactions', icon: 'mha', path: '/mha-tracker', feature: 'mha' },
+  { id: 'settings', label: 'Settings', description: 'Maintenance and configuration', icon: 'settings', path: '/settings' }
 ];
 
 export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) {
@@ -87,7 +88,7 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
               onClick={() => handleItemClick(item)}
               disabled={item.comingSoon}
             >
-              <div className="more-card-icon">{item.icon}</div>
+              <AppIcon name={item.icon} className="more-card-icon" />
               <div className="more-card-label">{item.label}</div>
               <div className="more-card-description">{item.description}</div>
               {item.comingSoon && <span className="more-card-badge">Soon</span>}
