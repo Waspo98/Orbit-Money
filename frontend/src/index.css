@@ -3346,6 +3346,7 @@ input, textarea, select {
   min-width: 0;
   display: grid;
   gap: 4px;
+  container-type: inline-size;
   transition: gap 220ms var(--ease-out, ease);
 }
 
@@ -3359,15 +3360,13 @@ input, textarea, select {
 }
 
 .goal-progress-main strong {
-  --goal-amount-max: 48;
-  --goal-amount-min: 24;
   color: var(--text);
-  font-size: clamp(1.7rem, 4vw, 3rem);
+  font-size: clamp(1.7rem, 18cqw, 3rem);
   font-weight: 750;
   line-height: 1.04;
   font-variant-numeric: tabular-nums;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
   overflow-wrap: normal;
   text-overflow: clip;
   white-space: nowrap;
@@ -3433,18 +3432,9 @@ input, textarea, select {
   display: block;
   width: 100%;
   min-width: 0;
-  color: var(--text);
+  color: var(--text) !important;
+  -webkit-text-fill-color: var(--text);
   overflow: visible;
-}
-
-.goal-progress-amount-text {
-  display: inline-block;
-  max-width: none;
-  font: inherit;
-  color: var(--text);
-  font-weight: 750;
-  line-height: inherit;
-  white-space: nowrap;
 }
 
 .goals-focus-card.collapsed .dashboard-card-body {
@@ -3466,9 +3456,7 @@ input, textarea, select {
 }
 
 .goals-focus-card.collapsed .goal-progress-main strong {
-  --goal-amount-max: 52;
-  --goal-amount-min: 24;
-  font-size: clamp(2.3rem, 5vw, 3.25rem);
+  font-size: clamp(2.05rem, 18cqw, 3.25rem);
 }
 
 .goals-focus-card.collapsed .goal-progress-ring {
@@ -4169,9 +4157,7 @@ input, textarea, select {
   }
 
   .goal-progress-main strong {
-    --goal-amount-max: 41;
-    --goal-amount-min: 24;
-    font-size: clamp(1.85rem, 8vw, 2.55rem);
+    font-size: clamp(1.25rem, 18cqw, 2.55rem);
   }
 
   .goals-focus-card.collapsed .goal-progress-panel {
@@ -4183,9 +4169,7 @@ input, textarea, select {
   }
 
   .goals-focus-card.collapsed .goal-progress-main strong {
-    --goal-amount-max: 41;
-    --goal-amount-min: 24;
-    font-size: clamp(1.85rem, 8vw, 2.55rem);
+    font-size: clamp(1.25rem, 18cqw, 2.55rem);
   }
 
   .goals-focus-card.collapsed .goal-progress-ring {
@@ -4232,9 +4216,7 @@ input, textarea, select {
 
   .goal-progress-main strong,
   .goals-focus-card.collapsed .goal-progress-main strong {
-    --goal-amount-max: 40;
-    --goal-amount-min: 20;
-    font-size: clamp(1.7rem, 9vw, 2.5rem);
+    font-size: clamp(1rem, 18cqw, 2.5rem);
   }
 
   .goal-preset-grid {
