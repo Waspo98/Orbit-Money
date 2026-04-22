@@ -546,12 +546,15 @@ input, textarea, select {
   top: calc(100% + 6px);
   right: 0;
   min-width: 160px;
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   padding: 6px;
-  z-index: 90;
+  z-index: 600;
+  transform-origin: var(--dropdown-origin, top right);
   animation: menuIn var(--dur-base) var(--ease-out);
 }
 
@@ -1542,12 +1545,12 @@ input, textarea, select {
 /* ================== 4. LAYOUT — Hamburger menu ================== */
 
 @keyframes menuIn {
-  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
 }
 @keyframes menuOut {
-  from { opacity: 1; transform: translateY(0) scale(1); }
-  to   { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.96); }
 }
 
 .menu-backdrop.closing {
@@ -4460,11 +4463,7 @@ input, textarea, select {
 }
 
 .txn-logo-menu {
-  left: 0;
-  right: auto;
-  top: calc(100% + 8px);
   min-width: 178px;
-  z-index: 180;
 }
 
 .logo-finder-search {

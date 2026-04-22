@@ -1,55 +1,59 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { OVERLAY_ANIM_MS } from './overlayBehavior.js';
 
 /**
  * Reusable dropdown menu anchored to a trigger button.
  *
- * Usage:
- *   <DropdownMenu
- *     items={[
- *       { label: 'Edit', onClick: () => {} },
- *       { label: 'Delete', onClick: () => {}, destructive: true }
- *     ]}
- *   />
- *
- * Each item can also include a `hidden: boolean` to conditionally suppress it.
- * Items support a `divider: true` flag to render a horizontal rule.
- *
- * Closes on:
- *   - outside click
- *   - Escape key
- *   - item click (item's onClick fires, then menu closes)
+ * The menu is portaled and viewport-clamped so page/card overflow rules cannot
+ * clip it, and every close path uses the same zoom-out animation.
  */
-export default function DropdownMenu({ items, ariaLabel = 'More actions' }) {
+export default function DropdownMenu({
+  items,
+  ariaLabel = 'More actions',
+  triggerClassName = 'dropdown-trigger',
+  menuClassName = '',
+  renderTrigger
+}) {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [menuStyle, setMenuStyle] = useState(null);
   const wrapRef = useRef(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
   const timerRef = useRef(null);
+
+  const visibleItems = items.filter((it) => !it.hidden);
 
   function close(options = {}) {
     if (!open || closing) return;
     if (!options.animate) {
       setOpen(false);
+      setMenuStyle(null);
       return;
     }
     setClosing(true);
     timerRef.current = setTimeout(() => {
       setOpen(false);
       setClosing(false);
+      setMenuStyle(null);
       options.afterClose?.();
     }, OVERLAY_ANIM_MS);
   }
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
 
     function onClick(e) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
-        close();
+      const insideTrigger = wrapRef.current && wrapRef.current.contains(e.target);
+      const insideMenu = menuRef.current && menuRef.current.contains(e.target);
+      if (!insideTrigger && !insideMenu) {
+        close({ animate: true });
       }
     }
+
     function onKey(e) {
-      if (e.key === 'Escape') close();
+      if (e.key === 'Escape') close({ animate: true });
     }
 
     document.addEventListener('mousedown', onClick);
@@ -60,28 +64,86 @@ export default function DropdownMenu({ items, ariaLabel = 'More actions' }) {
     };
   }, [open, closing]);
 
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+
+    function updatePosition() {
+      const trigger = triggerRef.current;
+      const menu = menuRef.current;
+      if (!trigger || !menu) return;
+
+      const gap = 6;
+      const margin = 8;
+      const triggerRect = trigger.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+      const menuWidth = menuRect.width || 160;
+      const menuHeight = menuRect.height || 40;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      let left = triggerRect.right - menuWidth;
+      left = Math.max(margin, Math.min(left, viewportWidth - menuWidth - margin));
+
+      let top = triggerRect.bottom + gap;
+      let originY = 'top';
+      if (top + menuHeight > viewportHeight - margin && triggerRect.top - gap - menuHeight >= margin) {
+        top = triggerRect.top - gap - menuHeight;
+        originY = 'bottom';
+      } else {
+        top = Math.min(top, viewportHeight - menuHeight - margin);
+      }
+
+      setMenuStyle({
+        position: 'fixed',
+        top: `${Math.max(margin, top)}px`,
+        left: `${left}px`,
+        '--dropdown-origin': `${originY} right`
+      });
+    }
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open, visibleItems.length]);
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
 
-  const visibleItems = items.filter((it) => !it.hidden);
-
   return (
     <div className="dropdown-wrap" ref={wrapRef}>
       <button
+        ref={triggerRef}
         type="button"
-        className={`dropdown-trigger ${open ? 'open' : ''}`}
+        className={`${triggerClassName} ${open ? 'open' : ''}`}
         aria-label={ariaLabel}
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (open) {
+            close({ animate: true });
+          } else {
+            setOpen(true);
+          }
+        }}
       >
-        ⋯
+        {renderTrigger ? renderTrigger({ open }) : '⋯'}
       </button>
 
-      {open && (
-        <div className={`dropdown-menu ${closing ? 'closing' : ''}`} role="menu">
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          className={`dropdown-menu ${menuClassName} ${closing ? 'closing' : ''}`}
+          role="menu"
+          style={menuStyle || undefined}
+          onClick={(e) => e.stopPropagation()}
+        >
           {visibleItems.map((item, i) =>
             item.divider ? (
               <div key={`d-${i}`} className="dropdown-divider" />
@@ -105,7 +167,8 @@ export default function DropdownMenu({ items, ariaLabel = 'More actions' }) {
               </button>
             )
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
