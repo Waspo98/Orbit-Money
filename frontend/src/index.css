@@ -4147,7 +4147,7 @@ input, textarea, select {
   }
 
   .goal-progress-main strong {
-    font-size: clamp(1.9rem, 7vw, 2.55rem);
+    font-size: clamp(1.85rem, 8vw, 2.55rem);
   }
 
   .goals-focus-card.collapsed .goal-progress-panel {
@@ -4159,7 +4159,7 @@ input, textarea, select {
   }
 
   .goals-focus-card.collapsed .goal-progress-main strong {
-    font-size: clamp(1.9rem, 7vw, 2.55rem);
+    font-size: clamp(1.85rem, 8vw, 2.55rem);
   }
 
   .goals-focus-card.collapsed .goal-progress-ring {
@@ -4191,16 +4191,22 @@ input, textarea, select {
 @media (max-width: 480px) {
   .goal-progress-panel,
   .goals-focus-card.collapsed .goal-progress-panel {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(122px, 0.58fr);
     grid-template-areas:
-      "main"
-      "ring"
-      "meta";
+      "main meta"
+      "ring meta";
+    align-items: center;
+    gap: 12px 14px;
   }
 
   .goal-progress-ring,
   .goals-focus-card.collapsed .goal-progress-ring {
-    width: 102px;
+    width: 94px;
+  }
+
+  .goal-progress-main strong,
+  .goals-focus-card.collapsed .goal-progress-main strong {
+    font-size: clamp(1.7rem, 9vw, 2.5rem);
   }
 
   .goal-preset-grid {
@@ -4214,6 +4220,17 @@ input, textarea, select {
   .goal-wizard-steps button {
     padding: 8px 6px;
     font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .goal-progress-panel,
+  .goals-focus-card.collapsed .goal-progress-panel {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "main"
+      "ring"
+      "meta";
   }
 }
 
