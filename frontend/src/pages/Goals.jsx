@@ -601,11 +601,13 @@ function FitGoalAmount({ value }) {
         const styles = window.getComputedStyle(wrap);
         const max = parseFloat(styles.getPropertyValue('--goal-amount-max')) || 48;
         const min = parseFloat(styles.getPropertyValue('--goal-amount-min')) || 24;
-        const available = wrap.clientWidth;
+        const main = wrap.closest('.goal-progress-main');
+        const available = Math.floor((main?.getBoundingClientRect().width || wrap.getBoundingClientRect().width) - 1);
         if (!available) return;
 
+        text.style.removeProperty('font-size');
         text.style.fontSize = `${max}px`;
-        const needed = text.scrollWidth;
+        const needed = text.getBoundingClientRect().width;
         const next = needed > available
           ? Math.max(min, Math.floor((max * available) / needed))
           : max;
@@ -616,6 +618,7 @@ function FitGoalAmount({ value }) {
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(wrap);
+    if (wrap.parentElement) observer.observe(wrap.parentElement);
     return () => {
       window.cancelAnimationFrame(raf);
       observer.disconnect();
@@ -624,7 +627,11 @@ function FitGoalAmount({ value }) {
 
   return (
     <strong ref={wrapRef} className="goal-progress-amount">
-      <span ref={textRef} style={fontSize ? { fontSize: `${fontSize}px` } : undefined}>
+      <span
+        ref={textRef}
+        className="goal-progress-amount-text"
+        style={fontSize ? { fontSize: `${fontSize}px` } : undefined}
+      >
         {value}
       </span>
     </strong>
