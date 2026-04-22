@@ -152,14 +152,7 @@ export default function Categories({
         }`}
         initialHeight={420}
         toolbar={(
-          <div className="categories-hero-toolbar">
-            <input
-              type="search"
-              className="rules-search categories-search"
-              placeholder="Search categories..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="page-hero-action-row">
             <button
               type="button"
               className="btn-primary"
@@ -170,6 +163,16 @@ export default function Categories({
           </div>
         )}
       />
+
+      <div className="rules-toolbar categories-toolbar">
+        <input
+          type="search"
+          className="rules-search categories-search"
+          placeholder="Search categories..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
 
       <div className="categories-content">
         {error && <div className="error">{error}</div>}

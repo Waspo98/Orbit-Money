@@ -1375,6 +1375,40 @@ input, textarea, select {
   min-width: 0;
 }
 
+.mobile-route-deck-viewport {
+  width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+  touch-action: pan-y;
+}
+
+.mobile-route-deck {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+  transition: transform 230ms var(--ease-out);
+  will-change: transform;
+}
+
+.mobile-route-deck-viewport.is-dragging .mobile-route-deck {
+  cursor: grabbing;
+}
+
+.mobile-route-pane {
+  flex: 0 0 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mobile-route-pane[aria-hidden="true"] {
+  pointer-events: none;
+}
+
+.mobile-route-deck-viewport.from-more-enter .mobile-route-pane.is-current {
+  animation: routeSlideInFromBottom 280ms var(--ease-out) both;
+}
+
 @media (max-width: 1079px) {
   .app-shell.has-page-hero .app-main {
     overflow-x: clip;
@@ -1401,8 +1435,11 @@ input, textarea, select {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .route-transition {
+  .route-transition,
+  .mobile-route-deck,
+  .mobile-route-deck-viewport.from-more-enter .mobile-route-pane.is-current {
     animation: none !important;
+    transition: none !important;
     will-change: auto;
   }
 }
@@ -1828,6 +1865,12 @@ input, textarea, select {
 .page-hero-budgets-spacer { height: 420px; }
 .page-hero-accounts-spacer { height: 420px; }
 
+.page-hero-rules {
+  --hero-start: #052e24;
+  --hero-mid: #065f46;
+  --hero-end: #047857;
+}
+
 .page-hero::before {
   content: '';
   position: absolute;
@@ -2145,7 +2188,14 @@ input, textarea, select {
 .categories-content {
   width: calc(100% - 40px);
   max-width: 960px;
-  margin: 20px auto 0;
+  margin: 0 auto;
+}
+
+.categories-toolbar {
+  width: calc(100% - 40px);
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .categories-hero-toolbar {
