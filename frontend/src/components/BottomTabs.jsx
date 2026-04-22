@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import AppIcon from './AppIcon.jsx';
 
 const PRIMARY_TABS = [
@@ -9,12 +9,20 @@ const PRIMARY_TABS = [
 ];
 
 export default function BottomTabs({ onMoreClick }) {
+  const location = useLocation();
+  const currentIndex = PRIMARY_TABS.findIndex((tab) => tab.to === location.pathname);
+
   return (
     <nav className="bottom-tabs" aria-label="Primary navigation">
-      {PRIMARY_TABS.map((t) => (
+      {PRIMARY_TABS.map((t, index) => (
         <NavLink
           key={t.to}
           to={t.to}
+          state={
+            currentIndex >= 0 && index !== currentIndex
+              ? { transition: index > currentIndex ? 'forward' : 'back' }
+              : undefined
+          }
           className={({ isActive }) =>
             `bottom-tab ${isActive ? 'active' : ''}`
           }

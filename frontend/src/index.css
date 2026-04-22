@@ -1371,6 +1371,57 @@ input, textarea, select {
   min-width: 0;
 }
 
+.route-transition {
+  min-width: 0;
+}
+
+@media (max-width: 1079px) {
+  .app-shell.has-page-hero .app-main {
+    overflow-x: clip;
+  }
+
+  .route-transition {
+    animation-duration: 280ms;
+    animation-timing-function: var(--ease-out);
+    animation-fill-mode: both;
+    will-change: transform, opacity;
+  }
+
+  .route-transition-forward {
+    animation-name: routeSlideInFromRight;
+  }
+
+  .route-transition-back {
+    animation-name: routeSlideInFromLeft;
+  }
+
+  .route-transition-from-more {
+    animation-name: routeSlideInFromBottom;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-transition {
+    animation: none !important;
+    will-change: auto;
+  }
+}
+
+@keyframes routeSlideInFromRight {
+  from { opacity: 0.88; transform: translateX(36px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes routeSlideInFromLeft {
+  from { opacity: 0.88; transform: translateX(-36px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes routeSlideInFromBottom {
+  from { opacity: 0.92; transform: translateY(42px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Tablet: 640–1079px. Adds side padding so content doesn't sprawl full-width
    on a folded/unfolded foldable phone or small tablet. */
 @media (min-width: 640px) and (max-width: 1079px) {

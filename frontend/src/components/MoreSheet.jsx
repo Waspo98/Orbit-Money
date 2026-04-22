@@ -57,7 +57,9 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
   function handleItemClick(item) {
     if (item.comingSoon) return;
     close({ animate: true });
-    setTimeout(() => navigate(item.path), OVERLAY_ANIM_MS);
+    setTimeout(() => {
+      navigate(item.path, { state: { transition: 'from-more' } });
+    }, OVERLAY_ANIM_MS);
   }
 
   return (
