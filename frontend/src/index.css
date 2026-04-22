@@ -1375,47 +1375,6 @@ input, textarea, select {
   min-width: 0;
 }
 
-.mobile-route-deck-viewport {
-  width: 100%;
-  min-width: 0;
-  overflow-x: clip;
-  touch-action: pan-y;
-}
-
-.mobile-route-deck {
-  display: flex;
-  align-items: stretch;
-  width: 100%;
-  min-width: 0;
-  transition: transform 230ms var(--ease-out);
-  will-change: transform;
-}
-
-.mobile-route-deck-viewport.is-dragging .mobile-route-deck {
-  cursor: grabbing;
-}
-
-.mobile-route-pane {
-  flex: 0 0 100%;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.mobile-route-pane[aria-hidden="true"] {
-  height: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.mobile-route-deck-viewport.is-dragging .mobile-route-pane[aria-hidden="true"] {
-  height: auto;
-  overflow: visible;
-}
-
-.mobile-route-deck-viewport.from-more-enter .mobile-route-pane.is-current {
-  animation: routeSlideInFromBottom 280ms var(--ease-out) both;
-}
-
 @media (max-width: 1079px) {
   .app-shell.has-page-hero .app-main {
     overflow-x: clip;
@@ -1442,11 +1401,8 @@ input, textarea, select {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .route-transition,
-  .mobile-route-deck,
-  .mobile-route-deck-viewport.from-more-enter .mobile-route-pane.is-current {
+  .route-transition {
     animation: none !important;
-    transition: none !important;
     will-change: auto;
   }
 }
