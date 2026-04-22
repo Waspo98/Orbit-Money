@@ -60,6 +60,8 @@ Optional or feature-specific values:
 - `SIMPLEFIN_ENCRYPTION_KEY` is required before SimpleFIN sync can be used.
 - `LOGO_DEV_PUBLISHABLE_KEY` enables merchant logo enrichment in transaction
   lists. When it is not set, transactions continue to use category icons.
+- `LOGO_DEV_SECRET_KEY` enables the server-side merchant logo picker. Keep this
+  key out of frontend code and version control.
 - `PORT` defaults to `5008`. Do not change this unless you also update the
   Docker, tunnel, and documentation assumptions.
 - `SESSION_NAME` defaults to `connect.sid`. Leave production on the default;
@@ -79,6 +81,10 @@ use Logo.dev's domain lookup, but name-only lookup is limited to clean merchant
 names or names already normalized by a user/rule edit. Ambiguous processor,
 payment, transfer, terminal, or numbered bank strings fall back to category
 icons instead of guessing.
+
+Manual logo overrides use Logo.dev Brand Search from the backend and store the
+chosen image URL in SQLite. Orbit Money does not store imported logo image
+bytes; broken override images fall back visually to the category icon.
 
 ## Run With Docker Compose
 

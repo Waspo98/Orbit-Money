@@ -9,6 +9,7 @@ export const config = {
   apiKey: process.env.API_KEY || null,
   simplefinEncryptionKey: process.env.SIMPLEFIN_ENCRYPTION_KEY,
   logoDevPublishableKey: process.env.LOGO_DEV_PUBLISHABLE_KEY || null,
+  logoDevSecretKey: process.env.LOGO_DEV_SECRET_KEY || null,
   dataDir: process.env.DATA_DIR || '/app/data',
   tz: process.env.TZ || 'America/Chicago',
   seedDemoData: process.env.SEED_DEMO_DATA === '1'

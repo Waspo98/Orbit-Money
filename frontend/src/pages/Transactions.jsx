@@ -1048,7 +1048,7 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
   const logo = txn.merchant_logo;
   const [showLogo, setShowLogo] = useState(Boolean(logo?.url));
   const [menuOpen, setMenuOpen] = useState(false);
-  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [finderOpen, setFinderOpen] = useState(false);
 
   useEffect(() => {
     setShowLogo(Boolean(logo?.url));
@@ -1088,11 +1088,6 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
     });
   }
 
-  function openLogoSearch() {
-    const query = encodeURIComponent(`${txn.merchant || logo?.merchant_name || 'merchant'} logo`);
-    window.open(`https://duckduckgo.com/?q=${query}&iar=images&iax=images&ia=images`, '_blank', 'noopener,noreferrer');
-  }
-
   function applyLogoState(nextLogo) {
     setShowLogo(Boolean(nextLogo?.url));
     onLogoChanged?.({
@@ -1101,17 +1096,26 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
     });
   }
 
-  async function useCategoryIcon() {
-    if (!logo?.merchant_key) return;
-    setMenuOpen(false);
-    applyLogoState({
-      ...logo,
-      url: null,
-      status: 'hidden'
+  async function ensureLogoEntry() {
+    if (logo?.merchant_key) return logo;
+    const result = await api.post('/api/merchant-logos/ensure', {
+      transaction_id: txn.id
     });
+    return result.merchant_logo;
+  }
+
+  async function useCategoryIcon() {
+    setMenuOpen(false);
     try {
+      const ensuredLogo = await ensureLogoEntry();
+      if (!ensuredLogo?.merchant_key) return;
+      applyLogoState({
+        ...ensuredLogo,
+        url: null,
+        status: 'hidden'
+      });
       const result = await api.post('/api/merchant-logos/override', {
-        merchant_key: logo.merchant_key,
+        merchant_key: ensuredLogo.merchant_key,
         use_category_icon: true
       });
       applyLogoState(result.merchant_logo);
@@ -1176,28 +1180,15 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
             onClick={(e) => {
               e.stopPropagation();
               setMenuOpen(false);
-              openLogoSearch();
+              setFinderOpen(true);
             }}
           >
-            <span>Search for Logo</span>
+            <span>Find Logo</span>
           </button>
           <button
             type="button"
             className="dropdown-item"
             role="menuitem"
-            onClick={(e) => {
-              e.stopPropagation();
-              setMenuOpen(false);
-              setOverrideOpen(true);
-            }}
-          >
-            <span>Use Image URL</span>
-          </button>
-          <button
-            type="button"
-            className="dropdown-item"
-            role="menuitem"
-            disabled={!logo?.merchant_key}
             onClick={(e) => {
               e.stopPropagation();
               useCategoryIcon();
@@ -1207,13 +1198,13 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
           </button>
         </div>
       )}
-      {overrideOpen && (
-        <LogoOverrideModal
+      {finderOpen && (
+        <LogoFinderModal
           txn={txn}
           logo={logo}
-          onClose={() => setOverrideOpen(false)}
+          onClose={() => setFinderOpen(false)}
           onSaved={(nextLogo) => {
-            setOverrideOpen(false);
+            setFinderOpen(false);
             applyLogoState(nextLogo);
           }}
         />
@@ -1222,22 +1213,85 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
   );
 }
 
-function LogoOverrideModal({ txn, logo, onClose, onSaved }) {
-  const [logoUrl, setLogoUrl] = useState('');
+function LogoFinderModal({ txn, logo, onClose, onSaved }) {
+  const [merchantLogo, setMerchantLogo] = useState(logo || null);
+  const [query, setQuery] = useState(txn.merchant || logo?.merchant_name || '');
+  const [logoUrl, setLogoUrl] = useState(logo?.url || '');
+  const [candidates, setCandidates] = useState([]);
+  const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    searchBrands(query, { initial: true, activeRef: () => active });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function ensureLogoEntry() {
+    if (merchantLogo?.merchant_key) return merchantLogo;
+    const result = await api.post('/api/merchant-logos/ensure', {
+      transaction_id: txn.id
+    });
+    setMerchantLogo(result.merchant_logo);
+    return result.merchant_logo;
+  }
+
+  async function searchBrands(nextQuery = query, options = {}) {
+    const trimmed = nextQuery.trim();
+    if (!trimmed) return;
+    const isActive = options.activeRef || (() => true);
+    setSearching(true);
+    setError('');
+    try {
+      const result = await api.post('/api/merchant-logos/search', {
+        transaction_id: txn.id,
+        query: trimmed
+      });
+      if (!isActive()) return;
+      setMerchantLogo(result.merchant_logo);
+      setCandidates(result.candidates || []);
+      setHasSearched(true);
+      if (result.configured === false) {
+        setError('Logo search is not configured on this server yet. Paste a direct image URL below.');
+      }
+    } catch (err) {
+      if (!isActive()) return;
+      setError(err.message || 'Logo search failed');
+      setHasSearched(true);
+    } finally {
+      if (isActive()) setSearching(false);
+    }
+  }
+
+  function openDuckDuckGo() {
+    const searchQuery = encodeURIComponent(`${query || txn.merchant || 'merchant'} logo`);
+    window.open(`https://duckduckgo.com/?q=${searchQuery}&iar=images&iax=images&ia=images`, '_blank', 'noopener,noreferrer');
+  }
+
+  function selectCandidate(candidate) {
+    setLogoUrl(candidate.logo_url || '');
+  }
 
   async function handleSubmit(e, close) {
     e.preventDefault();
-    if (!logo?.merchant_key) {
-      setError('This merchant does not have a logo entry to override yet.');
+    const ensuredLogo = await ensureLogoEntry();
+    if (!ensuredLogo?.merchant_key) {
+      setError('This merchant does not have a logo entry to update yet.');
+      return;
+    }
+    if (!logoUrl.trim()) {
+      setError('Choose a result or paste a direct image URL.');
       return;
     }
     setSaving(true);
     setError('');
     try {
       const result = await api.post('/api/merchant-logos/override', {
-        merchant_key: logo.merchant_key,
+        merchant_key: ensuredLogo.merchant_key,
         logo_url: logoUrl.trim()
       });
       close({ animate: true });
@@ -1248,14 +1302,79 @@ function LogoOverrideModal({ txn, logo, onClose, onSaved }) {
     }
   }
 
+  async function useCategoryIcon(close) {
+    setSaving(true);
+    setError('');
+    try {
+      const ensuredLogo = await ensureLogoEntry();
+      if (!ensuredLogo?.merchant_key) {
+        setError('This merchant does not have a logo entry to update yet.');
+        setSaving(false);
+        return;
+      }
+      const result = await api.post('/api/merchant-logos/override', {
+        merchant_key: ensuredLogo.merchant_key,
+        use_category_icon: true
+      });
+      close({ animate: true });
+      setTimeout(() => onSaved(result.merchant_logo), 180);
+    } catch (err) {
+      setError(err.message || 'Logo override failed');
+      setSaving(false);
+    }
+  }
+
   return (
-    <AnimatedModal onClose={onClose} size="sm">
+    <AnimatedModal onClose={onClose} size="lg">
       {({ close }) => (
         <>
-          <h3>Use Image URL</h3>
+          <h3>Find Logo</h3>
           <p className="modal-copy">
-            Paste a direct image URL for {txn.merchant}. Search results pages will not work.
+            Search Logo.dev results for {txn.merchant}, or paste a direct image URL.
           </p>
+          <form className="logo-finder-search" onSubmit={(e) => {
+            e.preventDefault();
+            searchBrands(query);
+          }}>
+            <label className="field">
+              <span>Merchant Search</span>
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Merchant name"
+                required
+              />
+            </label>
+            <button type="submit" className="btn-secondary" disabled={searching}>
+              {searching ? 'Searching...' : 'Search'}
+            </button>
+          </form>
+
+          <div className="logo-finder-results">
+            {candidates.map((candidate) => (
+              <button
+                key={candidate.domain}
+                type="button"
+                className={`logo-candidate ${logoUrl === candidate.logo_url ? 'selected' : ''}`}
+                onClick={() => selectCandidate(candidate)}
+              >
+                <span className="logo-candidate-image">
+                  <img src={candidate.logo_url} alt="" loading="lazy" />
+                </span>
+                <span className="logo-candidate-text">
+                  <strong>{candidate.name}</strong>
+                  <span>{candidate.domain}</span>
+                </span>
+              </button>
+            ))}
+            {!searching && hasSearched && candidates.length === 0 && (
+              <div className="logo-finder-empty">
+                No Logo.dev matches found. Try a simpler merchant name or paste a direct image URL.
+              </div>
+            )}
+          </div>
+
           <form onSubmit={(e) => handleSubmit(e, close)}>
             <label className="field">
               <span>Logo Image URL</span>
@@ -1267,8 +1386,19 @@ function LogoOverrideModal({ txn, logo, onClose, onSaved }) {
                 required
               />
             </label>
+            {logoUrl && (
+              <div className="logo-finder-preview" aria-label="Selected logo preview">
+                <img src={logoUrl} alt="" />
+              </div>
+            )}
             {error && <div className="error">{error}</div>}
             <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={openDuckDuckGo}>
+                DuckDuckGo Images
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => useCategoryIcon(close)} disabled={saving}>
+                Use Category Icon
+              </button>
               <button type="button" className="btn-secondary" onClick={close}>
                 Cancel
               </button>

@@ -113,6 +113,11 @@ function logoDevUrl(query, includeToken = false, lookup = 'name') {
   return `https://img.logo.dev/${path}?${params.toString()}`;
 }
 
+function publicLogoDevUrl(query, lookup = 'name') {
+  if (!config.logoDevPublishableKey) return null;
+  return logoDevUrl(query, true, lookup);
+}
+
 function candidateForTransaction(row) {
   if (!config.logoDevPublishableKey) return null;
 
@@ -135,6 +140,43 @@ function candidateForTransaction(row) {
     provider: PROVIDER,
     provider_query: providerQuery,
     logo_url: logoDevUrl(providerQuery, false, lookup)
+  };
+}
+
+function merchantIdentityForRow(row) {
+  const providerQuery = cleanMerchantName(row?.merchant || row?.original_merchant);
+  const key = merchantLogoKey(providerQuery);
+  if (!providerQuery || providerQuery.length < 2 || !key) return null;
+
+  return {
+    merchant_key: key,
+    merchant_name: providerQuery,
+    provider: PROVIDER,
+    provider_query: providerQuery
+  };
+}
+
+function formatCachedLogo(cached) {
+  if (!cached) return null;
+  const hasLogo =
+    cached.logo_url &&
+    cached.status !== 'failed' &&
+    cached.status !== 'hidden';
+
+  return {
+    merchant_key: cached.merchant_key,
+    merchant_name: cached.merchant_name,
+    provider: cached.provider,
+    provider_query: cached.provider_query,
+    url: hasLogo
+      ? cached.status === 'manual'
+          ? cached.logo_url
+          : publicLogoDevUrl(
+              cached.provider_query,
+              extractDomain(cached.provider_query) ? 'domain' : 'name'
+            )
+      : null,
+    status: cached.status
   };
 }
 
@@ -172,7 +214,8 @@ export function attachMerchantLogos(db, rows) {
   for (const row of rows) {
     const candidate = candidateForTransaction(row);
     if (!candidate) {
-      rowKeys.set(row?.id, null);
+      const identity = merchantIdentityForRow(row);
+      rowKeys.set(row?.id, identity?.merchant_key || null);
       continue;
     }
     candidateByKey.set(candidate.merchant_key, candidate);
@@ -182,11 +225,10 @@ export function attachMerchantLogos(db, rows) {
   const candidates = [...candidateByKey.values()];
   ensureCandidates(db, candidates);
 
-  if (candidateByKey.size === 0) {
+  const keys = [...new Set([...rowKeys.values()].filter(Boolean))];
+  if (keys.length === 0) {
     return rows.map((row) => ({ ...row, merchant_logo: null }));
   }
-
-  const keys = [...candidateByKey.keys()];
   const cachedRows = db
     .prepare(`
       SELECT merchant_key, merchant_name, provider, provider_query, logo_url, status
@@ -199,34 +241,112 @@ export function attachMerchantLogos(db, rows) {
   return rows.map((row) => {
     const key = rowKeys.get(row.id);
     const cached = key ? cacheByKey.get(key) : null;
-    const hasLogo =
-      cached &&
-      cached.logo_url &&
-      cached.status !== 'failed' &&
-      cached.status !== 'hidden';
 
     return {
       ...row,
-      merchant_logo: cached
-        ? {
-            merchant_key: cached.merchant_key,
-            merchant_name: cached.merchant_name,
-            provider: cached.provider,
-            provider_query: cached.provider_query,
-            url: hasLogo
-              ? cached.status === 'manual'
-                  ? cached.logo_url
-                  : logoDevUrl(
-                      cached.provider_query,
-                      true,
-                      extractDomain(cached.provider_query) ? 'domain' : 'name'
-                    )
-              : null,
-            status: cached.status
-          }
-        : null
+      merchant_logo: formatCachedLogo(cached)
     };
   });
+}
+
+export function ensureMerchantLogoEntryForTransaction(db, transactionId) {
+  const row = db
+    .prepare(`
+      SELECT id,
+             COALESCE(edited_merchant, original_merchant) AS merchant,
+             original_merchant,
+             original_description,
+             edited_merchant_source
+        FROM transactions
+       WHERE id = ?
+    `)
+    .get(transactionId);
+
+  if (!row) return { found: false };
+
+  const candidate = candidateForTransaction(row);
+  const identity = candidate || merchantIdentityForRow(row);
+  if (!identity) return { found: true, merchant_logo: null };
+
+  db.prepare(`
+    INSERT INTO merchant_logo_cache
+      (merchant_key, merchant_name, provider, provider_query, logo_url, status)
+    VALUES
+      (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(merchant_key) DO NOTHING
+  `).run(
+    identity.merchant_key,
+    identity.merchant_name,
+    identity.provider,
+    identity.provider_query,
+    candidate?.logo_url || null,
+    candidate ? 'candidate' : 'hidden'
+  );
+
+  const cached = db
+    .prepare(`
+      SELECT merchant_key, merchant_name, provider, provider_query, logo_url, status
+        FROM merchant_logo_cache
+       WHERE merchant_key = ?
+    `)
+    .get(identity.merchant_key);
+
+  return { found: true, merchant_logo: formatCachedLogo(cached) };
+}
+
+export async function searchMerchantLogoBrands(db, { transactionId, query }) {
+  const ensured = ensureMerchantLogoEntryForTransaction(db, transactionId);
+  if (!ensured.found) return { found: false };
+
+  const cleanedQuery = cleanMerchantName(query).slice(0, 80);
+  if (!cleanedQuery || cleanedQuery.length < 2) {
+    return {
+      found: true,
+      configured: Boolean(config.logoDevSecretKey && config.logoDevPublishableKey),
+      merchant_logo: ensured.merchant_logo,
+      candidates: []
+    };
+  }
+
+  if (!config.logoDevSecretKey || !config.logoDevPublishableKey) {
+    return {
+      found: true,
+      configured: false,
+      merchant_logo: ensured.merchant_logo,
+      candidates: []
+    };
+  }
+
+  const params = new URLSearchParams({ q: cleanedQuery, strategy: 'match' });
+  const response = await fetch(`https://api.logo.dev/search?${params.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${config.logoDevSecretKey}`,
+      Accept: 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Logo search failed with ${response.status}`);
+  }
+
+  const results = await response.json();
+  const candidates = Array.isArray(results)
+    ? results
+        .filter((item) => item?.domain)
+        .slice(0, 10)
+        .map((item) => ({
+          name: String(item.name || item.domain).trim(),
+          domain: String(item.domain).trim().toLowerCase(),
+          logo_url: publicLogoDevUrl(String(item.domain).trim().toLowerCase(), 'domain')
+        }))
+    : [];
+
+  return {
+    found: true,
+    configured: true,
+    merchant_logo: ensured.merchant_logo,
+    candidates
+  };
 }
 
 export function overrideMerchantLogo(db, { merchantKey, logoUrl = null, hide = false }) {

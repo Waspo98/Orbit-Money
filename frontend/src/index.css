@@ -4467,6 +4467,143 @@ input, textarea, select {
   z-index: 180;
 }
 
+.logo-finder-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+
+.logo-finder-search .field {
+  margin: 0;
+}
+
+.logo-finder-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 2px 2px 12px;
+  margin-bottom: 12px;
+}
+
+.logo-candidate {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.logo-candidate:hover,
+.logo-candidate.selected {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+}
+
+.logo-candidate:active {
+  transform: scale(0.99);
+}
+
+.logo-candidate-image {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+}
+
+.logo-candidate-image img {
+  width: 34px;
+  height: 34px;
+  display: block;
+  object-fit: contain;
+}
+
+.logo-candidate-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.logo-candidate-text strong,
+.logo-candidate-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logo-candidate-text strong {
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.logo-candidate-text span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.logo-finder-empty {
+  grid-column: 1 / -1;
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.logo-finder-preview {
+  width: 58px;
+  height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+}
+
+.logo-finder-preview img {
+  width: 48px;
+  height: 48px;
+  display: block;
+  object-fit: contain;
+}
+
+@media (max-width: 560px) {
+  .logo-finder-search {
+    grid-template-columns: 1fr;
+  }
+
+  .logo-finder-results {
+    grid-template-columns: 1fr;
+    max-height: 260px;
+  }
+
+  .logo-finder-search .btn-secondary {
+    width: 100%;
+  }
+}
+
 .txn-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 
 .txn-merchant {
