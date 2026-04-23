@@ -146,6 +146,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Goal charts derive monthly history from existing transaction deltas and current account balances; ETA uses recent monthly progress
 - Account allocation meters are split into consistent per-goal color chunks so the same goal is visually traceable across accounts.
 - "Imagine" slider projects a hypothetical ETA with extra monthly savings
+- Selecting a goal named `Retirement` shows a Household-powered retirement calculator with editable age, return, inflation, income replacement, and withdrawal assumptions
 - Endpoints: GET `/api/goals?months=`, POST `/api/goals`, PUT `/api/goals/:id`, DELETE `/api/goals/:id`
 
 ### Household

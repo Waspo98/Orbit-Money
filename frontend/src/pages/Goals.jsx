@@ -105,6 +105,25 @@ function formatFullMonthDate(date) {
   });
 }
 
+function formatPercent(value, digits = 1) {
+  return `${Number(value || 0).toLocaleString(undefined, {
+    maximumFractionDigits: digits
+  })}%`;
+}
+
+function ageFromBirthDate(date) {
+  if (!date) return null;
+  const birth = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(birth.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const hadBirthday =
+    now.getMonth() > birth.getMonth() ||
+    (now.getMonth() === birth.getMonth() && now.getDate() >= birth.getDate());
+  if (!hadBirthday) age -= 1;
+  return age >= 0 ? age : null;
+}
+
 function formatEta(eta) {
   if (!eta) return 'No ETA yet';
   if (eta.status === 'complete') return 'Reached';
@@ -149,6 +168,27 @@ function estimateEta(goal, extraMonthly) {
   if (monthly <= 0) return { date: null, months: null, status: 'stalled' };
   const months = Math.ceil((target - current) / monthly);
   return { date: addMonthsToDate(new Date(), months), months, status: 'projected' };
+}
+
+function isRetirementGoal(goal) {
+  return String(goal?.name || '').trim().toLowerCase() === 'retirement';
+}
+
+function futureValueSeries(current, monthly, monthlyReturn, months) {
+  const principal = Number(current) || 0;
+  const contribution = Number(monthly) || 0;
+  if (months <= 0) return principal;
+  if (monthlyReturn <= 0) return principal + contribution * months;
+  return principal * ((1 + monthlyReturn) ** months) +
+    contribution * ((((1 + monthlyReturn) ** months) - 1) / monthlyReturn);
+}
+
+function monthlyNeededForTarget(current, target, monthlyReturn, months) {
+  if (months <= 0) return Math.max(0, target - current);
+  if (monthlyReturn <= 0) return Math.max(0, (target - current) / months);
+  const futurePrincipal = current * ((1 + monthlyReturn) ** months);
+  const factor = (((1 + monthlyReturn) ** months) - 1) / monthlyReturn;
+  return Math.max(0, (target - futurePrincipal) / factor);
 }
 
 function chartRange(history) {
@@ -239,6 +279,7 @@ export default function Goals() {
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [wizardGoal, setWizardGoal] = useState(null);
+  const [household, setHousehold] = useState(null);
   const [imagineMonthly, setImagineMonthly] = useState(50);
   const [focusCollapsed, setFocusCollapsed] = useState(true);
   const [reorderMode, setReorderMode] = useState(false);
@@ -258,8 +299,12 @@ export default function Goals() {
     setLoading(true);
     setError('');
     try {
-      const next = await api.get('/api/goals?months=24');
+      const [next, householdNext] = await Promise.all([
+        api.get('/api/goals?months=24'),
+        api.get('/api/household').catch(() => null)
+      ]);
       setData(next);
+      setHousehold(householdNext);
       setSelectedId((current) => {
         if (current && next.goals.some((goal) => goal.id === current)) return current;
         return next.goals[0]?.id || null;
@@ -480,6 +525,10 @@ export default function Goals() {
             </div>
           </section>
 
+          {isRetirementGoal(selectedGoal) && (
+            <RetirementPlanner goal={selectedGoal} household={household} />
+          )}
+
           <section className="dashboard-card goals-account-card">
             <header className="dashboard-card-header">
               <h3>Account allocation</h3>
@@ -550,10 +599,138 @@ function GoalProgress({ goal }) {
         <span>{Math.round(progress)}%</span>
       </div>
       <div className="goal-progress-meta">
-        <SignalRow className="goal-eta-row goal-desired-row" label="Desired ETA" value={desiredEta(goal)} detail={extraNeeded === null ? 'Set a date to calculate' : `${formatMoney(extraNeeded)}/mo more needed`} compactDetail="" />
-        <SignalRow className="goal-eta-row goal-projected-row" label="Projected ETA" value={formatEta(goal?.eta)} detail={goal?.eta?.months ? `${goal.eta.months} months` : goal?.eta?.status === 'complete' ? 'Complete' : 'No trend yet'} />
-        <SignalRow className="goal-monthly-row" label="Monthly pace" value={formatSignedMoney(goal?.monthly_pace)} detail="Based on history" />
+        <SignalRow className="goal-eta-row goal-desired-row" label="Desired ETA" value={desiredEta(goal)} />
+        <SignalRow className="goal-eta-row goal-projected-row" label="Projected ETA" value={formatEta(goal?.eta)} />
+        <SignalRow className="goal-monthly-row" label="Monthly pace" value={formatSignedMoney(goal?.monthly_pace)} />
       </div>
+    </div>
+  );
+}
+
+function RetirementPlanner({ goal, household }) {
+  const [assumptions, setAssumptions] = useState({
+    currentAge: '',
+    retirementAge: 67,
+    annualReturn: 7,
+    inflation: 2.5,
+    replacementRate: 80,
+    withdrawalRate: 4
+  });
+
+  const members = household?.members || [];
+  const summary = household?.summary || {};
+  const inferredAge =
+    members
+      .map((member) => ageFromBirthDate(member.birth_date))
+      .find((age) => age !== null) ?? 35;
+  const currentAge = Number(assumptions.currentAge) || inferredAge;
+  const retirementAge = Math.max(currentAge, Number(assumptions.retirementAge) || 67);
+  const years = Math.max(0, retirementAge - currentAge);
+  const months = Math.round(years * 12);
+  const annualReturn = (Number(assumptions.annualReturn) || 0) / 100;
+  const inflation = (Number(assumptions.inflation) || 0) / 100;
+  const realReturn = ((1 + annualReturn) / (1 + inflation)) - 1;
+  const monthlyReturn = annualReturn / 12;
+  const currentBalance = Number(goal?.current_amount) || 0;
+  const employeeAnnual = Number(summary.employee_retirement_annual) || 0;
+  const employerAnnual = Number(summary.employer_retirement_annual) || 0;
+  const annualSavings = employeeAnnual + employerAnnual;
+  const plannedMonthly = annualSavings / 12;
+  const annualIncome = Number(summary.net_pay_annual || summary.gross_income_annual) || 0;
+  const annualNeed = annualIncome * ((Number(assumptions.replacementRate) || 0) / 100);
+  const withdrawalRate = Math.max(0.1, Number(assumptions.withdrawalRate) || 4) / 100;
+  const targetNestEgg = annualNeed / withdrawalRate;
+  const projectedBalance = futureValueSeries(currentBalance, plannedMonthly, monthlyReturn, months);
+  const gap = projectedBalance - targetNestEgg;
+  const requiredMonthly = monthlyNeededForTarget(currentBalance, targetNestEgg, monthlyReturn, months);
+  const savingsRate = Number(summary.gross_income_annual) > 0
+    ? (annualSavings / Number(summary.gross_income_annual)) * 100
+    : 0;
+
+  function update(key, value) {
+    setAssumptions((prev) => ({ ...prev, [key]: value }));
+  }
+
+  return (
+    <section className="dashboard-card retirement-planner-card">
+      <header className="dashboard-card-header">
+        <h3>Retirement Calculator</h3>
+        <Link to="/household" className="dashboard-card-link">Household</Link>
+      </header>
+      <div className="dashboard-card-body">
+        <div className="retirement-planner-hero">
+          <div>
+            <span>Projected at {Math.round(retirementAge)}</span>
+            <strong>{formatMoney(projectedBalance)}</strong>
+            <em className={gap >= 0 ? 'income' : 'expense'}>
+              {gap >= 0 ? `${formatMoney(gap)} surplus` : `${formatMoney(Math.abs(gap))} short`}
+            </em>
+          </div>
+          <div className="retirement-readiness-ring" style={{ '--retirement-progress': `${Math.min(100, targetNestEgg > 0 ? (projectedBalance / targetNestEgg) * 100 : 0)}%` }}>
+            <span>{Math.round(Math.min(100, targetNestEgg > 0 ? (projectedBalance / targetNestEgg) * 100 : 0))}%</span>
+          </div>
+        </div>
+
+        <div className="retirement-metric-grid">
+          <RetirementMetric label="Target Nest Egg" value={formatMoney(targetNestEgg)} detail={`${formatMoney(annualNeed)}/yr need`} />
+          <RetirementMetric label="Monthly Needed" value={formatMoney(requiredMonthly)} detail={`${formatMoney(Math.max(0, requiredMonthly - plannedMonthly))}/mo gap`} />
+          <RetirementMetric label="Household Savings" value={`${formatMoney(plannedMonthly)}/mo`} detail={`${formatMoney(employerAnnual)} employer/yr`} />
+          <RetirementMetric label="Savings Rate" value={formatPercent(savingsRate)} detail={`${formatMoney(employeeAnnual)} employee/yr`} />
+          <RetirementMetric label="Real Return" value={formatPercent(realReturn * 100)} detail={`${formatPercent(annualReturn * 100)} market - ${formatPercent(inflation * 100)} inflation`} />
+          <RetirementMetric label="Runway" value={`${Math.round(years)} years`} detail={`${Math.round(months).toLocaleString()} months`} />
+        </div>
+
+        <div className="retirement-assumption-grid">
+          <label className="field">
+            <span>Current Age</span>
+            <input type="number" min="0" value={assumptions.currentAge} onChange={(e) => update('currentAge', e.target.value)} placeholder={String(inferredAge)} />
+          </label>
+          <label className="field">
+            <span>Retirement Age</span>
+            <input type="number" min="1" value={assumptions.retirementAge} onChange={(e) => update('retirementAge', e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Market Return</span>
+            <input type="number" min="0" step="0.1" value={assumptions.annualReturn} onChange={(e) => update('annualReturn', e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Inflation</span>
+            <input type="number" min="0" step="0.1" value={assumptions.inflation} onChange={(e) => update('inflation', e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Income Replacement</span>
+            <input type="number" min="0" step="1" value={assumptions.replacementRate} onChange={(e) => update('replacementRate', e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Withdrawal Rate</span>
+            <input type="number" min="0.1" step="0.1" value={assumptions.withdrawalRate} onChange={(e) => update('withdrawalRate', e.target.value)} />
+          </label>
+        </div>
+
+        <div className="retirement-member-list">
+          {members.length === 0 ? (
+            <p className="subtle">Add household income and match details to unlock employer contribution projections.</p>
+          ) : members.map((member) => (
+            <div key={member.id} className="retirement-member-row">
+              <div>
+                <strong>{member.name}</strong>
+                <span>{member.retirement_account_type || 'Retirement'} | {formatPercent(member.employee_contribution_percent)} employee | {formatPercent(member.employer_match_percent)} match</span>
+              </div>
+              <em>{formatMoney((Number(member.employee_retirement_annual) || 0) + (Number(member.employer_retirement_annual) || 0))}/yr</em>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RetirementMetric({ label, value, detail }) {
+  return (
+    <div className="retirement-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <em>{detail}</em>
     </div>
   );
 }
@@ -650,7 +827,7 @@ function SignalRow({ label, value, detail, compactDetail = null, className = '' 
         <span>{label}</span>
         <strong>{value}</strong>
       </div>
-      <em data-compact-detail={compactDetail ?? detail}>{detail}</em>
+      {detail && <em data-compact-detail={compactDetail ?? detail}>{detail}</em>}
     </div>
   );
 }

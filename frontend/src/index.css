@@ -3749,6 +3749,155 @@ input, textarea, select {
   accent-color: var(--accent);
 }
 
+.retirement-planner-card {
+  grid-column: 1 / -1;
+}
+
+.retirement-planner-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 118px;
+  align-items: center;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 40%, transparent), transparent 58%),
+    var(--surface-2);
+}
+
+.retirement-planner-hero > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.retirement-planner-hero span,
+.retirement-metric span,
+.retirement-member-row span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.retirement-planner-hero strong {
+  color: var(--text);
+  font-size: clamp(2rem, 10vw, 3.4rem);
+  line-height: 1;
+  font-weight: 780;
+  font-variant-numeric: tabular-nums;
+}
+
+.retirement-planner-hero em {
+  font-style: normal;
+  font-weight: 700;
+}
+
+.retirement-planner-hero em.income {
+  color: var(--income);
+}
+
+.retirement-planner-hero em.expense {
+  color: var(--danger);
+}
+
+.retirement-readiness-ring {
+  width: 118px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, var(--surface) 57%, transparent 58%),
+    conic-gradient(var(--accent) var(--retirement-progress), var(--surface-3) 0);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.retirement-readiness-ring span {
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.retirement-metric-grid,
+.retirement-assumption-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.retirement-metric {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.retirement-metric strong {
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.retirement-metric em {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.retirement-assumption-grid .field {
+  margin: 0;
+}
+
+.retirement-member-list {
+  display: grid;
+  gap: 8px;
+}
+
+.retirement-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.retirement-member-row > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.retirement-member-row strong {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.retirement-member-row em {
+  flex: 0 0 auto;
+  color: var(--text);
+  font-style: normal;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .goals-focus-actions {
   display: flex;
   justify-content: flex-end;
@@ -4393,6 +4542,26 @@ input, textarea, select {
 
   .goal-imagine-controls {
     grid-template-columns: 1fr;
+  }
+
+  .retirement-planner-hero,
+  .retirement-metric-grid,
+  .retirement-assumption-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .retirement-readiness-ring {
+    justify-self: start;
+    width: 96px;
+  }
+
+  .retirement-member-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .retirement-member-row em {
+    white-space: normal;
   }
 
   .goal-account-picker button {
