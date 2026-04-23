@@ -3882,6 +3882,32 @@ input, textarea, select {
   grid-template-columns: minmax(0, 1fr) 140px;
 }
 
+.retirement-chart-axis-title,
+.retirement-chart-x-label,
+.retirement-projection-input-label {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.retirement-chart-axis-title {
+  margin-bottom: -2px;
+}
+
+.retirement-chart-x-label,
+.retirement-projection-input-label {
+  text-align: center;
+}
+
+.retirement-chart-labels {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.retirement-chart-labels span,
+.retirement-chart-labels strong {
+  white-space: nowrap;
+}
+
 .retirement-chart-gridline {
   stroke: color-mix(in srgb, var(--border) 82%, transparent);
   stroke-width: 1;
@@ -4738,6 +4764,10 @@ input, textarea, select {
     grid-template-columns: 1fr;
   }
 
+  .retirement-projection-controls {
+    grid-template-columns: 1fr;
+  }
+
   .retirement-planner-hero,
   .retirement-metric-grid,
   .retirement-assumption-grid,
@@ -4759,6 +4789,14 @@ input, textarea, select {
 
   .retirement-member-row em {
     white-space: normal;
+  }
+
+  .retirement-chart-labels {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .retirement-chart-labels span:last-child {
+    text-align: right;
   }
 
   .goal-account-picker button {

@@ -668,7 +668,7 @@ function GoalProgress({ goal }) {
 function RetirementPlanner({ goal, household }) {
   const [editingAssumptions, setEditingAssumptions] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [scenarioAnnualSavings, setScenarioAnnualSavings] = useState('');
+  const [scenarioMonthlySavings, setScenarioMonthlySavings] = useState('');
   const [assumptions, setAssumptions] = useState({
     currentAge: '',
     retirementAge: '67',
@@ -760,15 +760,19 @@ function RetirementPlanner({ goal, household }) {
   const sourceSummary = usesLinkedAccounts
     ? `${linkedAccounts.length} household ${linkedAccounts.length === 1 ? 'account' : 'accounts'} linked`
     : 'Using retirement goal allocations';
-  const scenarioAnnualValue = String(scenarioAnnualSavings).trim() === ''
-    ? annualSavings
-    : parseMoney(scenarioAnnualSavings);
+  const defaultMonthlySavings = annualSavings / 12;
+  const scenarioMonthlyValue = String(scenarioMonthlySavings).trim() === ''
+    ? defaultMonthlySavings
+    : parseMoney(scenarioMonthlySavings);
+  const scenarioAnnualValue = scenarioMonthlyValue * 12;
+  const scenarioRangeMaxMonthly = Math.max(1000, Math.ceil((Math.max(defaultMonthlySavings, targetNestEgg / Math.max(1, months)) * 1.75) / 250) * 250);
+  const maxRangeAnnualValue = scenarioRangeMaxMonthly * 12;
   const defaultPoints = projectRetirementByYear(currentBalance, annualSavings, annualReturn, Math.max(1, Math.round(years)));
   const scenarioPoints = projectRetirementByYear(currentBalance, scenarioAnnualValue, annualReturn, Math.max(1, Math.round(years)));
+  const maxRangePoints = projectRetirementByYear(currentBalance, maxRangeAnnualValue, annualReturn, Math.max(1, Math.round(years)));
   const defaultProjection = defaultPoints[defaultPoints.length - 1]?.amount || currentBalance;
   const scenarioProjection = scenarioPoints[scenarioPoints.length - 1]?.amount || currentBalance;
   const scenarioGap = scenarioProjection - targetNestEgg;
-  const scenarioRangeMax = Math.max(25000, Math.ceil(Math.max(annualSavings, targetNestEgg / Math.max(1, years)) / 5000) * 10000);
 
   function update(key, value) {
     setAssumptions((prev) => ({ ...prev, [key]: value }));
@@ -859,14 +863,15 @@ function RetirementPlanner({ goal, household }) {
               retirementAge={retirementAge}
               targetNestEgg={targetNestEgg}
               defaultProjection={defaultProjection}
-              annualSavings={scenarioAnnualValue}
-              annualSavingsDefault={annualSavings}
+              monthlySavings={scenarioMonthlyValue}
+              monthlySavingsDefault={defaultMonthlySavings}
               scenarioProjection={scenarioProjection}
               scenarioGap={scenarioGap}
               defaultPoints={defaultPoints}
               points={scenarioPoints}
-              rangeMax={scenarioRangeMax}
-              onAnnualSavingsChange={setScenarioAnnualSavings}
+              maxRangePoints={maxRangePoints}
+              rangeMax={scenarioRangeMaxMonthly}
+              onMonthlySavingsChange={setScenarioMonthlySavings}
             />
 
             <div className="retirement-member-list">
@@ -972,17 +977,18 @@ function RetirementProjectionPanel({
   retirementAge,
   targetNestEgg,
   defaultProjection,
-  annualSavings,
-  annualSavingsDefault,
+  monthlySavings,
+  monthlySavingsDefault,
   scenarioProjection,
   scenarioGap,
   defaultPoints,
   points,
+  maxRangePoints,
   rangeMax,
-  onAnnualSavingsChange
+  onMonthlySavingsChange
 }) {
   const width = 640;
-  const height = 180;
+  const height = 220;
   const baselineChartPoints = defaultPoints.map((point) => ({
     month: String(point.yearOffset),
     amount: point.amount
@@ -994,9 +1000,8 @@ function RetirementProjectionPanel({
   const yMax = Math.max(
     targetNestEgg,
     defaultProjection,
-    scenarioProjection,
+    ...maxRangePoints.map((point) => point.amount),
     ...defaultPoints.map((point) => point.amount),
-    ...points.map((point) => point.amount),
     1
   ) * 1.08;
   const yMin = 0;
@@ -1010,7 +1015,7 @@ function RetirementProjectionPanel({
   }));
 
   function handleSlider(value) {
-    onAnnualSavingsChange(formatCurrencyInput(value));
+    onMonthlySavingsChange(formatCurrencyInput(value));
   }
 
   return (
@@ -1025,6 +1030,7 @@ function RetirementProjectionPanel({
         </em>
       </div>
       <div className="goal-chart-wrap">
+        <div className="retirement-chart-axis-title">Projected Balance</div>
         <svg className="goal-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Retirement projection">
           <defs>
             <linearGradient id="retirementProjectionArea" x1="0" x2="0" y1="0" y2="1">
@@ -1048,11 +1054,12 @@ function RetirementProjectionPanel({
           <path d={baselineLine} fill="none" stroke="color-mix(in srgb, var(--text-muted) 65%, transparent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="10 8" />
           <path d={line} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <div className="networth-chart-labels">
+        <div className="networth-chart-labels retirement-chart-labels">
           <span>Age {Math.round(currentAge)}</span>
           <strong>{formatMoney(scenarioProjection)}</strong>
           <span>Age {Math.round(retirementAge)}</span>
         </div>
+        <div className="retirement-chart-x-label">Age</div>
       </div>
       <div className="retirement-projection-legend">
         <span><i className="retirement-legend-line retirement-legend-line-scenario" /> Scenario</span>
@@ -1063,19 +1070,21 @@ function RetirementProjectionPanel({
           type="range"
           min="0"
           max={rangeMax}
-          step="500"
-          value={Math.min(rangeMax, Math.max(0, annualSavings))}
+          step="25"
+          value={Math.min(rangeMax, Math.max(0, monthlySavings))}
           onChange={(e) => handleSlider(e.target.value)}
+          aria-label="Retirement savings per month"
         />
         <input
           type="text"
-          value={formatCurrencyInput(annualSavings)}
-          onChange={(e) => onAnnualSavingsChange(formatCurrencyInput(e.target.value))}
-          placeholder={formatCurrencyInput(annualSavingsDefault)}
+          value={formatCurrencyInput(monthlySavings)}
+          onChange={(e) => onMonthlySavingsChange(formatCurrencyInput(e.target.value))}
+          placeholder={formatCurrencyInput(monthlySavingsDefault)}
           inputMode="numeric"
-          aria-label="Annual savings scenario"
+          aria-label="Retirement savings per month"
         />
       </div>
+      <div className="retirement-projection-input-label">Retirement Savings Per Month</div>
     </div>
   );
 }
