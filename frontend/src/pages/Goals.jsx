@@ -829,15 +829,26 @@ function RetirementPlanner({ goal, household }) {
                 <input
                   type="number"
                   min="1"
+                  max="99"
                   value={assumptions.retirementAge}
                   onChange={(e) => update('retirementAge', e.target.value)}
                 />
-                <div className="retirement-age-buttons">
-                  <button type="button" aria-label="Increase retirement age" onClick={() => update('retirementAge', String(retirementAge + 1))}>
-                    ▲
+                <div className="retirement-age-actions">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    aria-label="Decrease retirement age"
+                    onClick={() => update('retirementAge', String(Math.max(currentAge, retirementAge - 1)))}
+                  >
+                    Down
                   </button>
-                  <button type="button" aria-label="Decrease retirement age" onClick={() => update('retirementAge', String(Math.max(currentAge, retirementAge - 1)))}>
-                    ▼
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    aria-label="Increase retirement age"
+                    onClick={() => update('retirementAge', String(Math.min(99, retirementAge + 1)))}
+                  >
+                    Up
                   </button>
                 </div>
               </div>
@@ -997,13 +1008,14 @@ function RetirementProjectionPanel({
     month: String(point.yearOffset),
     amount: point.amount
   }));
-  const yMax = Math.max(
+  const computedYMax = Math.max(
     targetNestEgg,
     defaultProjection,
     ...maxRangePoints.map((point) => point.amount),
     ...defaultPoints.map((point) => point.amount),
     1
   ) * 1.08;
+  const yMax = Math.max(targetNestEgg, Math.min(10000000, computedYMax));
   const yMin = 0;
   const baselineLine = chartPathWithRange(baselineChartPoints, width, height, yMin, yMax);
   const line = chartPathWithRange(chartPoints, width, height, yMin, yMax);
