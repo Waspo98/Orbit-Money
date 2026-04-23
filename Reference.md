@@ -147,13 +147,14 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Goal charts derive monthly history from existing transaction deltas and current account balances; ETA uses recent monthly progress
 - Account allocation meters are split into consistent per-goal color chunks so the same goal is visually traceable across accounts.
 - "Imagine" slider projects a hypothetical ETA with extra monthly savings
-- Selecting a goal named `Retirement` shows a Household-powered retirement calculator with editable age, return, inflation, income replacement, withdrawal, and HSA bridge assumptions. Linked household retirement accounts are used as the current-balance source when available, including HSA balances for the pre-65 bridge check.
+- Selecting a goal named `Retirement` shows a Household-powered retirement calculator with a compact summary card plus an assumptions modal for age, return, inflation, income replacement, withdrawal, and HSA contribution overrides. Linked household retirement accounts are used as the current-balance source when available, including HSA balances for the pre-65 bridge check.
 - Endpoints: GET `/api/goals?months=`, POST `/api/goals`, PUT `/api/goals/:id`, DELETE `/api/goals/:id`
 
 ### Household
 - Create and edit household members from the More menu after Net Worth
 - Tracks age source date, employment status, employer/title, gross income, pay cadence, annualized net pay, retirement account type, employee contribution, employer match assumptions, and benefit values
-- Links active accounts to household members as 401(k), 403(b), Roth IRA, HSA, pension, or other retirement assets so current balances feed the retirement calculator
+- Links active investment accounts to household members as 401(k), 403(b), Roth IRA, HSA, pension, or other retirement assets so current balances feed the retirement calculator
+- Paycheck deduction fields are entered per paycheck in the UI and annualized from the selected pay frequency for projection math
 - Saving a profile writes a dated income snapshot for future historical income reporting
 - Summary cards show annualized take-home pay, gross income, employer retirement match, benefits value, and earners
 - Endpoints: GET `/api/household`, POST `/api/household/members`, PUT `/api/household/members/:id`, POST `/api/household/members/:id/income-records`, DELETE `/api/household/members/:id`

@@ -685,17 +685,6 @@ function RetirementPlanner({ goal, household }) {
       owner: null,
       kind: classifyRetirementAccount(allocation.account_name).toLowerCase()
     }));
-  const accountMix = accountSources.reduce((items, source) => {
-    const label = source.label || 'Other';
-    const existing = items.find((item) => item.label === label);
-    if (existing) {
-      existing.amount += source.amount;
-      existing.count += 1;
-    } else {
-      items.push({ label, amount: source.amount, count: 1 });
-    }
-    return items;
-  }, []);
   const linkedCurrentBalance = accountSources.reduce((sum, source) => sum + source.amount, 0);
   const inferredHsaCurrent = accountSources
     .filter((source) => source.kind === 'hsa' || source.label === 'HSA')
@@ -744,7 +733,6 @@ function RetirementPlanner({ goal, household }) {
   const bridgeNeed = retirementAge < hsaAccessAge ? annualNeed * lockedHsaYears : 0;
   const bridgeSurplus = projectedNonHsa - bridgeNeed;
   const gap = projectedBalance - targetNestEgg;
-  const requiredMonthly = monthlyNeededForTarget(currentBalance, targetNestEgg, monthlyReturn, months);
   const savingsRate = Number(summary.gross_income_annual) > 0
     ? (annualSavings / Number(summary.gross_income_annual)) * 100
     : 0;
@@ -790,9 +778,24 @@ function RetirementPlanner({ goal, household }) {
 
         <div className="retirement-metric-grid">
           <RetirementMetric label="Target Nest Egg" value={formatMoney(targetNestEgg)} detail={`${formatMoney(annualNeed)}/yr need`} />
-          <RetirementMetric label="Monthly Needed" value={formatMoney(requiredMonthly)} detail={`${formatMoney(Math.max(0, requiredMonthly - plannedMonthly))}/mo gap`} />
           <RetirementMetric label="Household Savings" value={`${formatMoney(plannedMonthly)}/mo`} detail={`${formatMoney(employerAnnual)} employer/yr`} />
           <RetirementMetric label="Savings Rate" value={formatPercent(savingsRate)} detail={`${formatMoney(employeeAnnual)} employee/yr`} />
+          <RetirementMetric label="Real Return" value={formatPercent(realReturn * 100)} detail={`${formatPercent(annualReturn * 100)} market minus ${formatPercent(inflation * 100)} inflation`} />
+          <RetirementMetric label="Time to Retirement" value={`${Math.round(years)} years`} detail={`${Math.round(months).toLocaleString()} months`} />
+        </div>
+
+        <div className="retirement-member-list">
+          {members.length === 0 ? (
+            <p className="subtle">Add household income and match details to unlock employer contribution projections.</p>
+          ) : members.map((member) => (
+            <div key={member.id} className="retirement-member-row">
+              <div>
+                <strong>{member.name}</strong>
+                <span>{member.retirement_accounts?.length || 0} linked | {formatPercent(member.employee_contribution_percent)} employee | {formatPercent(member.employer_match_percent)} match</span>
+              </div>
+              <em>{formatMoney((Number(member.employee_retirement_annual) || 0) + (Number(member.employer_retirement_annual) || 0))}/yr</em>
+            </div>
+          ))}
         </div>
 
         <div className="retirement-hsa-panel">
@@ -811,33 +814,6 @@ function RetirementPlanner({ goal, household }) {
             <RetirementMetric label="HSA at Retirement" value={formatMoney(projectedHsaAtRetirement)} detail={`${formatMoney(hsaAnnual)}/yr contributions`} />
             <RetirementMetric label={`HSA at ${Math.round(hsaAccessAge)}`} value={formatMoney(projectedHsaAtAccess)} detail={`${Math.round(lockedHsaYears)} locked years after retirement`} />
           </div>
-        </div>
-
-        {accountMix.length > 0 && (
-          <div className="retirement-account-mix">
-            {accountMix.map((item) => (
-              <RetirementMetric
-                key={item.label}
-                label={item.label}
-                value={formatMoney(item.amount)}
-                detail={`${Math.round(currentBalance > 0 ? (item.amount / currentBalance) * 100 : 0)}% of current balance`}
-              />
-            ))}
-          </div>
-        )}
-
-        <div className="retirement-member-list">
-          {members.length === 0 ? (
-            <p className="subtle">Add household income and match details to unlock employer contribution projections.</p>
-          ) : members.map((member) => (
-            <div key={member.id} className="retirement-member-row">
-              <div>
-                <strong>{member.name}</strong>
-                <span>{member.retirement_accounts?.length || 0} linked | {formatPercent(member.employee_contribution_percent)} employee | {formatPercent(member.employer_match_percent)} match</span>
-              </div>
-              <em>{formatMoney((Number(member.employee_retirement_annual) || 0) + (Number(member.employer_retirement_annual) || 0))}/yr</em>
-            </div>
-          ))}
         </div>
       </div>
 
@@ -875,22 +851,9 @@ function RetirementPlanner({ goal, household }) {
                   <PercentInput value={assumptions.withdrawalRate} onChange={(value) => update('withdrawalRate', value)} placeholder="4%" />
                 </label>
                 <label className="field">
-                  <span>HSA Balance Override</span>
-                  <CurrencyInput value={assumptions.hsaCurrentBalance} onChange={(value) => update('hsaCurrentBalance', value)} placeholder={formatMoney(inferredHsaCurrent)} />
-                </label>
-                <label className="field">
                   <span>HSA Contribution Override</span>
                   <CurrencyInput value={assumptions.hsaAnnualContribution} onChange={(value) => update('hsaAnnualContribution', value)} placeholder={formatMoney(householdHsaAnnual)} />
                 </label>
-                <label className="field">
-                  <span>HSA Access Age</span>
-                  <input type="number" min="0" value={assumptions.hsaAccessAge} onChange={(e) => update('hsaAccessAge', e.target.value)} />
-                </label>
-              </div>
-              <div className="retirement-assumption-summary">
-                <RetirementMetric label="Real Return" value={formatPercent(realReturn * 100)} detail={`${formatPercent(annualReturn * 100)} market minus ${formatPercent(inflation * 100)} inflation`} />
-                <RetirementMetric label="Runway" value={`${Math.round(years)} years`} detail={`${Math.round(months).toLocaleString()} months`} />
-                <RetirementMetric label="Current Balance" value={formatMoney(currentBalance)} detail={sourceSummary} />
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn-primary" onClick={close}>Done</button>

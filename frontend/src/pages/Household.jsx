@@ -82,6 +82,18 @@ function formatPercentInput(value) {
   return `${cleaned}%`;
 }
 
+function safePayPeriods(payFrequency) {
+  return Math.max(1, PAY_PERIODS[payFrequency] || 0);
+}
+
+function annualToPerPaycheck(value, payFrequency) {
+  return formatCurrencyInput((Number(value) || 0) / safePayPeriods(payFrequency));
+}
+
+function perPaycheckToAnnual(value, payFrequency) {
+  return parseCurrencyInput(value) * safePayPeriods(payFrequency);
+}
+
 function labelFor(options, value) {
   return options.find(([key]) => key === value)?.[1] || value || 'Not set';
 }
@@ -131,10 +143,10 @@ function toDraft(member) {
     ...member,
     gross_income_annual: formatCurrencyInput(member.gross_income_annual),
     net_pay_per_period: formatCurrencyInput(member.net_pay_per_period),
-    health_premium_per_month: formatCurrencyInput(member.health_premium_per_month),
-    hsa_contribution_annual: formatCurrencyInput(member.hsa_contribution_annual),
-    dependent_care_fsa_annual: formatCurrencyInput(member.dependent_care_fsa_annual),
-    other_benefits_annual: formatCurrencyInput(member.other_benefits_annual),
+    health_premium_per_month: annualToPerPaycheck(member.health_premium_per_month, member.pay_frequency),
+    hsa_contribution_annual: annualToPerPaycheck(member.hsa_contribution_annual, member.pay_frequency),
+    dependent_care_fsa_annual: annualToPerPaycheck(member.dependent_care_fsa_annual, member.pay_frequency),
+    other_benefits_annual: annualToPerPaycheck(member.other_benefits_annual, member.pay_frequency),
     employee_contribution_percent: formatPercentInput(member.employee_contribution_percent),
     employer_match_percent: formatPercentInput(member.employer_match_percent),
     employer_match_limit_percent: formatPercentInput(member.employer_match_limit_percent),
@@ -165,10 +177,10 @@ function toPayload(draft) {
     employer_match_percent: parsePercentInput(draft.employer_match_percent),
     employer_match_limit_percent: parsePercentInput(draft.employer_match_limit_percent),
     employer_match_annual_cap: 0,
-    health_premium_per_month: parseCurrencyInput(draft.health_premium_per_month),
-    hsa_contribution_annual: parseCurrencyInput(draft.hsa_contribution_annual),
-    dependent_care_fsa_annual: parseCurrencyInput(draft.dependent_care_fsa_annual),
-    other_benefits_annual: parseCurrencyInput(draft.other_benefits_annual),
+    health_premium_per_month: perPaycheckToAnnual(draft.health_premium_per_month, draft.pay_frequency),
+    hsa_contribution_annual: perPaycheckToAnnual(draft.hsa_contribution_annual, draft.pay_frequency),
+    dependent_care_fsa_annual: perPaycheckToAnnual(draft.dependent_care_fsa_annual, draft.pay_frequency),
+    other_benefits_annual: perPaycheckToAnnual(draft.other_benefits_annual, draft.pay_frequency),
     retirement_accounts: (draft.retirement_accounts || []).map((account) => ({
       account_id: Number(account.account_id),
       account_kind: account.account_kind || 'other'
@@ -539,22 +551,25 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
           </div>
 
           <div className="household-form-section">
-            <h4>Benefits</h4>
+            <h4>Paycheck Deductions</h4>
+            <p className="subtle" style={{ margin: 0 }}>
+              Enter each deduction as it appears on one paycheck. Orbit annualizes it from the pay frequency above.
+            </p>
             <div className="goal-form-grid">
               <label className="field">
-                <span>Health Premium</span>
+                <span>Health Premium (Per Paycheck)</span>
                 <CurrencyInput value={draft.health_premium_per_month} onChange={(value) => update('health_premium_per_month', value)} placeholder="$0" />
               </label>
               <label className="field">
-                <span>HSA Contribution</span>
+                <span>HSA Contribution (Per Paycheck)</span>
                 <CurrencyInput value={draft.hsa_contribution_annual} onChange={(value) => update('hsa_contribution_annual', value)} placeholder="$0" />
               </label>
               <label className="field">
-                <span>Dependent Care FSA</span>
+                <span>Dependent Care FSA (Per Paycheck)</span>
                 <CurrencyInput value={draft.dependent_care_fsa_annual} onChange={(value) => update('dependent_care_fsa_annual', value)} placeholder="$0" />
               </label>
               <label className="field">
-                <span>Other Benefits</span>
+                <span>Other Deductions (Per Paycheck)</span>
                 <CurrencyInput value={draft.other_benefits_annual} onChange={(value) => update('other_benefits_annual', value)} placeholder="$0" />
               </label>
             </div>
@@ -579,7 +594,7 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
 }
 
 function AccountLinkPicker({ accounts, linkedAccounts, onChange }) {
-  const activeAccounts = (accounts || []).filter((account) => !account.is_archived);
+  const activeAccounts = (accounts || []).filter((account) => !account.is_archived && account.type === 'investment');
   const linkedIds = new Set((linkedAccounts || []).map((account) => Number(account.account_id)));
 
   function toggleAccount(account) {
@@ -605,7 +620,7 @@ function AccountLinkPicker({ accounts, linkedAccounts, onChange }) {
   return (
     <div className="household-account-links">
       <div className="household-subsection-header">
-        <span>Linked Accounts</span>
+        <span>Linked Investment Accounts</span>
         <em>Balances compound into retirement projections.</em>
       </div>
 
