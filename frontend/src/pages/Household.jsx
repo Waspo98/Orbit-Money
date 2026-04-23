@@ -40,11 +40,14 @@ const RETIREMENT_OPTIONS = [
   ['457b', '457(b)'],
   ['ira', 'IRA'],
   ['roth_ira', 'Roth IRA'],
+  ['hsa', 'HSA'],
   ['sep_ira', 'SEP IRA'],
   ['simple_ira', 'SIMPLE IRA'],
   ['pension', 'Pension'],
   ['other', 'Other']
 ];
+
+const RETIREMENT_ACCOUNT_KIND_OPTIONS = RETIREMENT_OPTIONS.filter(([value]) => value !== 'none');
 
 const PAY_PERIODS = {
   weekly: 52,
@@ -116,6 +119,7 @@ function emptyDraft() {
     dependent_care_fsa_annual: '',
     other_benefits_annual: '',
     effective_date: new Date().toISOString().slice(0, 10),
+    retirement_accounts: [],
     notes: ''
   };
 }
@@ -135,6 +139,10 @@ function toDraft(member) {
     employer_match_percent: formatPercentInput(member.employer_match_percent),
     employer_match_limit_percent: formatPercentInput(member.employer_match_limit_percent),
     effective_date: new Date().toISOString().slice(0, 10),
+    retirement_accounts: (member.retirement_accounts || []).map((account) => ({
+      account_id: Number(account.account_id),
+      account_kind: account.account_kind || 'other'
+    })),
     notes: member.notes || ''
   };
 }
@@ -161,6 +169,10 @@ function toPayload(draft) {
     hsa_contribution_annual: parseCurrencyInput(draft.hsa_contribution_annual),
     dependent_care_fsa_annual: parseCurrencyInput(draft.dependent_care_fsa_annual),
     other_benefits_annual: parseCurrencyInput(draft.other_benefits_annual),
+    retirement_accounts: (draft.retirement_accounts || []).map((account) => ({
+      account_id: Number(account.account_id),
+      account_kind: account.account_kind || 'other'
+    })),
     notes: draft.notes
   };
 }
@@ -168,6 +180,7 @@ function toPayload(draft) {
 export default function Household() {
   const { alert, confirm, Dialog } = useAppDialog();
   const [data, setData] = useState(null);
+  const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingMember, setEditingMember] = useState(null);
@@ -176,7 +189,12 @@ export default function Household() {
     setLoading(true);
     setError('');
     try {
-      setData(await api.get('/api/household'));
+      const [householdData, accountData] = await Promise.all([
+        api.get('/api/household'),
+        api.get('/api/accounts')
+      ]);
+      setData(householdData);
+      setAccounts(accountData.items || []);
     } catch (err) {
       setError(err.message || 'Failed to load household');
     } finally {
@@ -313,6 +331,7 @@ export default function Household() {
       {editingMember && (
         <MemberModal
           member={editingMember.mode === 'new' ? null : editingMember}
+          accounts={accounts}
           onClose={() => setEditingMember(null)}
           onSaved={(nextData) => {
             setData(nextData);
@@ -371,7 +390,11 @@ function MemberCard({ member, onEdit, onDelete }) {
 
       <div className="household-member-meta">
         <span>{labelFor(ROLE_OPTIONS, member.role)}</span>
-        <span>{labelFor(RETIREMENT_OPTIONS, member.retirement_account_type)}</span>
+        <span>
+          {member.retirement_accounts?.length
+            ? `${member.retirement_accounts.length} linked ${member.retirement_accounts.length === 1 ? 'account' : 'accounts'}`
+            : labelFor(RETIREMENT_OPTIONS, member.retirement_account_type)}
+        </span>
         <span>{labelFor(PAY_FREQUENCY_OPTIONS, member.pay_frequency)}</span>
       </div>
     </article>
@@ -387,7 +410,7 @@ function Metric({ label, value }) {
   );
 }
 
-function MemberModal({ member, onClose, onSaved }) {
+function MemberModal({ member, accounts, onClose, onSaved }) {
   const [draft, setDraft] = useState(() => toDraft(member));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -508,6 +531,11 @@ function MemberModal({ member, onClose, onSaved }) {
                 />
               </label>
             </div>
+            <AccountLinkPicker
+              accounts={accounts}
+              linkedAccounts={draft.retirement_accounts}
+              onChange={(value) => update('retirement_accounts', value)}
+            />
           </div>
 
           <div className="household-form-section">
@@ -548,6 +576,107 @@ function MemberModal({ member, onClose, onSaved }) {
       )}
     </AnimatedModal>
   );
+}
+
+function AccountLinkPicker({ accounts, linkedAccounts, onChange }) {
+  const activeAccounts = (accounts || []).filter((account) => !account.is_archived);
+  const linkedIds = new Set((linkedAccounts || []).map((account) => Number(account.account_id)));
+
+  function toggleAccount(account) {
+    if (linkedIds.has(Number(account.id))) {
+      onChange(linkedAccounts.filter((item) => Number(item.account_id) !== Number(account.id)));
+      return;
+    }
+    onChange([
+      ...(linkedAccounts || []),
+      {
+        account_id: Number(account.id),
+        account_kind: accountKindFromAccount(account)
+      }
+    ]);
+  }
+
+  function updateKind(accountId, accountKind) {
+    onChange((linkedAccounts || []).map((item) => (
+      Number(item.account_id) === Number(accountId) ? { ...item, account_kind: accountKind } : item
+    )));
+  }
+
+  return (
+    <div className="household-account-links">
+      <div className="household-subsection-header">
+        <span>Linked Accounts</span>
+        <em>Balances compound into retirement projections.</em>
+      </div>
+
+      {activeAccounts.length === 0 ? (
+        <p className="subtle">Add an account first, then link it here for retirement planning.</p>
+      ) : (
+        <div className="goal-account-picker household-account-picker">
+          {activeAccounts.map((account) => {
+            const active = linkedIds.has(Number(account.id));
+            return (
+              <button
+                key={account.id}
+                type="button"
+                className={active ? 'active' : ''}
+                onClick={() => toggleAccount(account)}
+              >
+                <span className="goal-picker-check" aria-hidden="true" />
+                <span className="goal-picker-main">
+                  <strong>{account.name}</strong>
+                  <em>{account.institution || labelFor(RETIREMENT_ACCOUNT_KIND_OPTIONS, accountKindFromAccount(account))}</em>
+                </span>
+                <span className="goal-picker-side">
+                  <strong>{formatMoney(account.estimated_value || account.current_balance)}</strong>
+                  <em>{active ? 'Linked' : 'Available'}</em>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {(linkedAccounts || []).length > 0 && (
+        <div className="goal-allocation-editor household-linked-account-editor">
+          {linkedAccounts.map((link) => {
+            const account = activeAccounts.find((item) => Number(item.id) === Number(link.account_id));
+            if (!account) return null;
+            return (
+              <div key={link.account_id} className="goal-allocation-row">
+                <div className="goal-allocation-header">
+                  <div>
+                    <strong>{account.name}</strong>
+                    <span>{formatMoney(account.estimated_value || account.current_balance)} current balance</span>
+                  </div>
+                  <label className="field">
+                    <span>Type</span>
+                    <select value={link.account_kind || 'other'} onChange={(e) => updateKind(link.account_id, e.target.value)}>
+                      {RETIREMENT_ACCOUNT_KIND_OPTIONS.map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function accountKindFromAccount(account) {
+  const text = `${account?.name || ''} ${account?.institution || ''}`.toLowerCase();
+  if (text.includes('hsa')) return 'hsa';
+  if (text.includes('roth')) return 'roth_ira';
+  if (text.includes('403')) return '403b';
+  if (text.includes('401')) return '401k';
+  if (text.includes('457')) return '457b';
+  if (text.includes('ira')) return 'ira';
+  if (text.includes('pension')) return 'pension';
+  return account?.type === 'investment' ? 'other' : 'other';
 }
 
 function PercentInput({ value, onChange, ...props }) {

@@ -23,7 +23,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
 | `sessions.db` | Session store (separate connection, managed by `connect-sqlite3`) |
 
-### Database Schema (18 migrations)
+### Database Schema (20 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -46,6 +46,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `017_goal_sort_order.sql` | Adds custom goal ordering |
 | `018_account_balance_records.sql` | Adds dated account balance snapshots for manual/disconnected account history |
 | `019_household_income.sql` | Adds household member profiles and dated income/benefit history snapshots |
+| `020_household_retirement_accounts.sql` | Links household members to existing retirement/HSA accounts for projections |
 
 ### Key Data Model Notes
 
@@ -67,7 +68,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 
 **Goals:** Goal progress is computed from `goal_account_allocations` and active asset account balances. Allocations can be fixed dollar amounts or percentages of the account balance. The old `goals.current_amount` column is retained for compatibility, but the Goals API derives live progress at read time.
 
-**Household:** `household_members` stores the current profile, income, retirement, and benefit assumptions for each person. `household_income_records` stores dated snapshots so future projections can use compensation history without mutating old records.
+**Household:** `household_members` stores the current profile, income, retirement, and benefit assumptions for each person. `household_income_records` stores dated snapshots so future projections can use compensation history without mutating old records. `household_retirement_accounts` links existing account rows to household members so retirement projections can compound present balances without moving or duplicating account data.
 
 ## Features
 
@@ -146,12 +147,13 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Goal charts derive monthly history from existing transaction deltas and current account balances; ETA uses recent monthly progress
 - Account allocation meters are split into consistent per-goal color chunks so the same goal is visually traceable across accounts.
 - "Imagine" slider projects a hypothetical ETA with extra monthly savings
-- Selecting a goal named `Retirement` shows a Household-powered retirement calculator with editable age, return, inflation, income replacement, withdrawal, and HSA bridge assumptions
+- Selecting a goal named `Retirement` shows a Household-powered retirement calculator with editable age, return, inflation, income replacement, withdrawal, and HSA bridge assumptions. Linked household retirement accounts are used as the current-balance source when available, including HSA balances for the pre-65 bridge check.
 - Endpoints: GET `/api/goals?months=`, POST `/api/goals`, PUT `/api/goals/:id`, DELETE `/api/goals/:id`
 
 ### Household
 - Create and edit household members from the More menu after Net Worth
 - Tracks age source date, employment status, employer/title, gross income, pay cadence, annualized net pay, retirement account type, employee contribution, employer match assumptions, and benefit values
+- Links active accounts to household members as 401(k), 403(b), Roth IRA, HSA, pension, or other retirement assets so current balances feed the retirement calculator
 - Saving a profile writes a dated income snapshot for future historical income reporting
 - Summary cards show annualized take-home pay, gross income, employer retirement match, benefits value, and earners
 - Endpoints: GET `/api/household`, POST `/api/household/members`, PUT `/api/household/members/:id`, POST `/api/household/members/:id/income-records`, DELETE `/api/household/members/:id`
@@ -272,9 +274,9 @@ Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column gri
 ### Household
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/household` | Household summary, member profiles, and recent income history snapshots. |
-| POST | `/api/household/members` | Create a household member and write the first dated income snapshot. |
-| PUT | `/api/household/members/:id` | Update a household member and upsert a dated income snapshot. |
+| GET | `/api/household` | Household summary, member profiles, linked retirement accounts, and recent income history snapshots. |
+| POST | `/api/household/members` | Create a household member, save linked retirement accounts, and write the first dated income snapshot. |
+| PUT | `/api/household/members/:id` | Update a household member, replace linked retirement accounts, and upsert a dated income snapshot. |
 | POST | `/api/household/members/:id/income-records` | Upsert a manual income/benefit snapshot for a member. |
 | DELETE | `/api/household/members/:id` | Delete a member and their income history. |
 

@@ -15,7 +15,8 @@ const EMPLOYMENT_STATUSES = new Set([
   'other'
 ]);
 const PAY_FREQUENCIES = new Set(['weekly', 'biweekly', 'semimonthly', 'monthly', 'annual', 'none']);
-const RETIREMENT_TYPES = new Set(['none', '401k', '403b', '457b', 'ira', 'roth_ira', 'sep_ira', 'simple_ira', 'pension', 'other']);
+const RETIREMENT_TYPES = new Set(['none', '401k', '403b', '457b', 'ira', 'roth_ira', 'hsa', 'sep_ira', 'simple_ira', 'pension', 'other']);
+const RETIREMENT_ACCOUNT_KINDS = new Set(['401k', '403b', '457b', 'ira', 'roth_ira', 'hsa', 'sep_ira', 'simple_ira', 'pension', 'other']);
 
 const PAY_PERIODS = {
   weekly: 52,
@@ -96,8 +97,25 @@ function normalizeMemberBody(body) {
     hsa_contribution_annual: cleanNumber(body?.hsa_contribution_annual),
     dependent_care_fsa_annual: cleanNumber(body?.dependent_care_fsa_annual),
     other_benefits_annual: cleanNumber(body?.other_benefits_annual),
-    notes: cleanString(body?.notes, 800)
+    notes: cleanString(body?.notes, 800),
+    retirement_accounts: normalizeRetirementAccounts(body?.retirement_accounts)
   };
+}
+
+function normalizeRetirementAccounts(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  return value
+    .map((item) => {
+      const accountId = Number(item?.account_id ?? item?.accountId);
+      if (!Number.isInteger(accountId) || accountId <= 0 || seen.has(accountId)) return null;
+      seen.add(accountId);
+      const accountKind = RETIREMENT_ACCOUNT_KINDS.has(item?.account_kind)
+        ? item.account_kind
+        : 'other';
+      return { account_id: accountId, account_kind: accountKind };
+    })
+    .filter(Boolean);
 }
 
 function normalizeIncomeRecordBody(member, body) {
@@ -165,6 +183,34 @@ function decorateMember(member) {
   };
 }
 
+function accountBalance(row) {
+  const estimated = Number(row.estimated_value);
+  if (Number.isFinite(estimated) && estimated > 0) return estimated;
+  const current = Number(row.current_balance);
+  return Number.isFinite(current) ? current : 0;
+}
+
+function replaceRetirementAccounts(memberId, accounts) {
+  db.prepare('DELETE FROM household_retirement_accounts WHERE member_id = ?').run(memberId);
+  const insert = db.prepare(
+    `INSERT INTO household_retirement_accounts (
+       member_id, account_id, account_kind
+     ) VALUES (
+       @member_id, @account_id, @account_kind
+     )
+     ON CONFLICT(member_id, account_id) DO UPDATE SET
+       account_kind = excluded.account_kind,
+       updated_at = datetime('now')`
+  );
+  accounts.forEach((account) => {
+    const exists = db
+      .prepare('SELECT id FROM accounts WHERE id = ? AND is_archived = 0')
+      .get(account.account_id);
+    if (!exists) throw householdError('Linked retirement account was not found.', 400);
+    insert.run({ member_id: memberId, ...account });
+  });
+}
+
 function buildPayload() {
   const members = db
     .prepare(
@@ -174,6 +220,33 @@ function buildPayload() {
     )
     .all()
     .map(decorateMember);
+
+  const linkedAccounts = db
+    .prepare(
+      `SELECT hra.id, hra.member_id, hra.account_id, hra.account_kind,
+              a.name AS account_name, a.type AS account_type, a.institution,
+              a.current_balance, a.estimated_value, a.is_archived
+         FROM household_retirement_accounts hra
+         JOIN accounts a ON a.id = hra.account_id
+        WHERE a.is_archived = 0
+        ORDER BY hra.member_id ASC, hra.account_kind ASC, a.sort_order ASC, a.name ASC`
+    )
+    .all()
+    .map((row) => ({
+      ...row,
+      balance: accountBalance(row)
+    }));
+
+  const linkedByMember = linkedAccounts.reduce((map, account) => {
+    if (!map.has(account.member_id)) map.set(account.member_id, []);
+    map.get(account.member_id).push(account);
+    return map;
+  }, new Map());
+
+  const decoratedMembers = members.map((member) => ({
+    ...member,
+    retirement_accounts: linkedByMember.get(member.id) || []
+  }));
 
   const records = db
     .prepare(
@@ -191,7 +264,7 @@ function buildPayload() {
       employer_retirement_annual: employerMatchAnnual(row)
     }));
 
-  const summary = members.reduce(
+  const summary = decoratedMembers.reduce(
     (total, member) => ({
       member_count: total.member_count + 1,
       earners: total.earners + (member.employment_status === 'employed' || member.employment_status === 'self_employed' ? 1 : 0),
@@ -212,7 +285,13 @@ function buildPayload() {
     }
   );
 
-  return { summary, members, records };
+  summary.retirement_account_balance = linkedAccounts.reduce((sum, account) => sum + account.balance, 0);
+  summary.hsa_account_balance = linkedAccounts
+    .filter((account) => account.account_kind === 'hsa')
+    .reduce((sum, account) => sum + account.balance, 0);
+  summary.linked_retirement_account_count = linkedAccounts.length;
+
+  return { summary, members: decoratedMembers, records, retirement_accounts: linkedAccounts };
 }
 
 function insertIncomeRecord(record) {
@@ -285,6 +364,7 @@ router.post('/members', requireAuth, (req, res) => {
          )`
       ).run(member);
       const saved = { id: result.lastInsertRowid, ...member };
+      replaceRetirementAccounts(saved.id, member.retirement_accounts);
       insertIncomeRecord(normalizeIncomeRecordBody(saved, { ...member, effective_date: req.body?.effective_date, source: 'profile' }));
     });
     run();
@@ -329,6 +409,7 @@ router.put('/members/:id', requireAuth, (req, res) => {
           WHERE id = @id`
       ).run({ id, ...member });
       if (result.changes === 0) throw householdError('Household member not found.', 404);
+      replaceRetirementAccounts(id, member.retirement_accounts);
       insertIncomeRecord(normalizeIncomeRecordBody({ id, ...member }, { ...member, effective_date: req.body?.effective_date, source: 'profile' }));
     });
     run();

@@ -3378,6 +3378,31 @@ input, textarea, select {
   text-transform: uppercase;
 }
 
+.household-account-links {
+  display: grid;
+  gap: 12px;
+}
+
+.household-subsection-header {
+  display: grid;
+  gap: 3px;
+}
+
+.household-subsection-header span {
+  color: var(--text);
+  font-weight: 750;
+}
+
+.household-subsection-header em {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  font-style: normal;
+}
+
+.household-linked-account-editor .field {
+  margin: 0;
+}
+
 @media (max-width: 720px) {
   .household-view > .error,
   .household-view > .center-loading,
@@ -3753,6 +3778,14 @@ input, textarea, select {
   grid-column: 1 / -1;
 }
 
+.dashboard-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .retirement-planner-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 118px;
@@ -3791,6 +3824,12 @@ input, textarea, select {
 .retirement-planner-hero em {
   font-style: normal;
   font-weight: 700;
+}
+
+.retirement-planner-hero small {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .retirement-planner-hero em.income {
@@ -3903,6 +3942,21 @@ input, textarea, select {
 
 .retirement-assumption-grid .field {
   margin: 0;
+}
+
+.retirement-assumption-modal {
+  display: grid;
+  gap: 14px;
+}
+
+.retirement-assumption-modal h3 {
+  margin-bottom: 0;
+}
+
+.retirement-assumption-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .retirement-member-list {
@@ -4592,6 +4646,7 @@ input, textarea, select {
   .retirement-planner-hero,
   .retirement-metric-grid,
   .retirement-assumption-grid,
+  .retirement-assumption-summary,
   .retirement-hsa-stats,
   .retirement-account-mix {
     grid-template-columns: 1fr;
