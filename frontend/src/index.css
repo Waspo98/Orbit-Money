@@ -3715,6 +3715,17 @@ input, textarea, select {
 
 .retirement-planner-card {
   grid-column: 1 / -1;
+  cursor: pointer;
+  transition:
+    box-shadow 220ms var(--ease-out, ease),
+    border-color var(--dur-fast) var(--ease-out, ease),
+    transform var(--dur-fast) var(--ease-out, ease);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.retirement-planner-card:hover,
+.retirement-planner-card:focus-visible {
+  box-shadow: var(--shadow-md);
 }
 
 .dashboard-card-actions {
@@ -3772,12 +3783,103 @@ input, textarea, select {
 }
 
 .retirement-hero-age-field {
-  max-width: 180px;
+  max-width: 220px;
   margin-top: 6px;
 }
 
 .retirement-hero-age-field span {
   display: block;
+}
+
+.retirement-age-stepper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.retirement-age-stepper input[type="number"] {
+  width: 100%;
+}
+
+.retirement-age-buttons {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.retirement-age-buttons button {
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.retirement-planner-detail {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 240ms var(--ease-out, ease);
+}
+
+.retirement-planner-detail-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  gap: 16px;
+  opacity: 1;
+  transition:
+    opacity 180ms var(--ease-out, ease),
+    padding-top 180ms var(--ease-out, ease);
+}
+
+.retirement-planner-card.collapsed .dashboard-card-body {
+  gap: 8px;
+}
+
+.retirement-planner-card.collapsed .retirement-planner-detail {
+  grid-template-rows: 0fr;
+  pointer-events: none;
+}
+
+.retirement-planner-card.collapsed .retirement-planner-detail-inner {
+  opacity: 0;
+}
+
+.retirement-projection-panel {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.retirement-projection-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.retirement-projection-copy span,
+.retirement-projection-copy em {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-style: normal;
+}
+
+.retirement-projection-copy strong {
+  color: var(--text);
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 750;
+}
+
+.retirement-projection-controls {
+  grid-template-columns: minmax(0, 1fr) 140px;
 }
 
 .retirement-planner-hero em.income {

@@ -207,6 +207,18 @@ function futureValueSeries(current, monthly, monthlyReturn, months) {
     contribution * ((((1 + monthlyReturn) ** months) - 1) / monthlyReturn);
 }
 
+function projectRetirementByYear(current, annualSavings, annualReturn, years) {
+  const items = [{ yearOffset: 0, amount: Number(current) || 0 }];
+  let balance = Number(current) || 0;
+  const yearlyContribution = Number(annualSavings) || 0;
+  const rate = Number(annualReturn) || 0;
+  for (let year = 1; year <= years; year += 1) {
+    balance = (balance + yearlyContribution) * (1 + rate);
+    items.push({ yearOffset: year, amount: balance });
+  }
+  return items;
+}
+
 function classifyRetirementAccount(name) {
   const text = String(name || '').toLowerCase();
   if (text.includes('hsa')) return 'HSA';
@@ -636,6 +648,8 @@ function GoalProgress({ goal }) {
 
 function RetirementPlanner({ goal, household }) {
   const [editingAssumptions, setEditingAssumptions] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [scenarioAnnualSavings, setScenarioAnnualSavings] = useState('');
   const [assumptions, setAssumptions] = useState({
     currentAge: '',
     retirementAge: '67',
@@ -727,13 +741,46 @@ function RetirementPlanner({ goal, household }) {
   const sourceSummary = usesLinkedAccounts
     ? `${linkedAccounts.length} household ${linkedAccounts.length === 1 ? 'account' : 'accounts'} linked`
     : 'Using retirement goal allocations';
+  const scenarioAnnualValue = String(scenarioAnnualSavings).trim() === ''
+    ? annualSavings
+    : parseMoney(scenarioAnnualSavings);
+  const scenarioPoints = projectRetirementByYear(currentBalance, scenarioAnnualValue, annualReturn, Math.max(1, Math.round(years)));
+  const scenarioProjection = scenarioPoints[scenarioPoints.length - 1]?.amount || currentBalance;
+  const scenarioGap = scenarioProjection - targetNestEgg;
+  const scenarioRangeMax = Math.max(25000, Math.ceil(Math.max(annualSavings, targetNestEgg / Math.max(1, years)) / 5000) * 10000);
 
   function update(key, value) {
     setAssumptions((prev) => ({ ...prev, [key]: value }));
   }
 
+  function toggleCollapsed(e) {
+    if (
+      e.target.closest('button, a, input, select, textarea')
+    ) {
+      return;
+    }
+    setCollapsed((value) => !value);
+  }
+
+  function handleCardKeyDown(e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (
+      e.target.closest('button, a, input, select, textarea')
+    ) {
+      return;
+    }
+    e.preventDefault();
+    setCollapsed((value) => !value);
+  }
+
   return (
-    <section className="dashboard-card retirement-planner-card">
+    <section
+      className={`dashboard-card retirement-planner-card ${collapsed ? 'collapsed' : ''}`}
+      onClick={toggleCollapsed}
+      onKeyDown={handleCardKeyDown}
+      tabIndex={0}
+      aria-expanded={!collapsed}
+    >
       <header className="dashboard-card-header">
         <h3>Retirement Calculator</h3>
         <div className="dashboard-card-actions">
@@ -753,12 +800,22 @@ function RetirementPlanner({ goal, household }) {
             <small>{sourceSummary}</small>
             <label className="field retirement-hero-age-field">
               <span>Retirement Age</span>
-              <input
-                type="number"
-                min="1"
-                value={assumptions.retirementAge}
-                onChange={(e) => update('retirementAge', e.target.value)}
-              />
+              <div className="retirement-age-stepper">
+                <input
+                  type="number"
+                  min="1"
+                  value={assumptions.retirementAge}
+                  onChange={(e) => update('retirementAge', e.target.value)}
+                />
+                <div className="retirement-age-buttons">
+                  <button type="button" aria-label="Increase retirement age" onClick={() => update('retirementAge', String(retirementAge + 1))}>
+                    ▲
+                  </button>
+                  <button type="button" aria-label="Decrease retirement age" onClick={() => update('retirementAge', String(Math.max(currentAge, retirementAge - 1)))}>
+                    ▼
+                  </button>
+                </div>
+              </div>
             </label>
           </div>
           <div className="retirement-readiness-ring" style={{ '--retirement-progress': `${readiness}%` }}>
@@ -766,43 +823,60 @@ function RetirementPlanner({ goal, household }) {
           </div>
         </div>
 
-        <div className="retirement-metric-grid">
-          <RetirementMetric label="Target Nest Egg" value={formatMoney(targetNestEgg)} detail={`${formatMoney(annualNeed)}/yr need`} />
-          <RetirementMetric label="Household Savings" value={`${formatMoney(plannedMonthly)}/mo`} detail={`${formatMoney(employerAnnual)} employer/yr`} />
-          <RetirementMetric label="Savings Rate" value={formatPercent(savingsRate)} detail={`${formatMoney(employeeAnnual)} employee/yr`} />
-          <RetirementMetric label="Real Return" value={formatPercent(realReturn * 100)} detail={`${formatPercent(annualReturn * 100)} market minus ${formatPercent(inflation * 100)} inflation`} />
-          <RetirementMetric label="Time to Retirement" value={`${Math.round(years)} years`} detail={`${Math.round(months).toLocaleString()} months`} />
-        </div>
-
-        <div className="retirement-member-list">
-          {members.length === 0 ? (
-            <p className="subtle">Add household income and match details to unlock employer contribution projections.</p>
-          ) : members.map((member) => (
-            <div key={member.id} className="retirement-member-row">
-              <div>
-                <strong>{member.name}</strong>
-                <span>{member.retirement_accounts?.length || 0} accounts | {formatPercent(member.employee_contribution_percent)} employee | {formatPercent(member.employer_match_percent)} match</span>
-              </div>
-              <em>{formatMoney((Number(member.employee_retirement_annual) || 0) + (Number(member.employer_retirement_annual) || 0))}/yr</em>
+        <div className="retirement-planner-detail" aria-hidden={collapsed}>
+          <div className="retirement-planner-detail-inner">
+            <div className="retirement-metric-grid">
+              <RetirementMetric label="Target Nest Egg" value={formatMoney(targetNestEgg)} detail={`${formatMoney(annualNeed)}/yr need`} />
+              <RetirementMetric label="Household Savings" value={`${formatMoney(plannedMonthly)}/mo`} detail={`${formatMoney(employerAnnual)} employer/yr`} />
+              <RetirementMetric label="Savings Rate" value={formatPercent(savingsRate)} detail={`${formatMoney(employeeAnnual)} employee/yr`} />
+              <RetirementMetric label="Real Return" value={formatPercent(realReturn * 100)} detail={`${formatPercent(annualReturn * 100)} market minus ${formatPercent(inflation * 100)} inflation`} />
+              <RetirementMetric label="Time to Retirement" value={`${Math.round(years)} years`} detail={`${Math.round(months).toLocaleString()} months`} />
             </div>
-          ))}
-        </div>
 
-        <div className="retirement-hsa-panel">
-          <div>
-            <span>HSA bridge check</span>
-            <strong className={bridgeSurplus >= 0 ? 'income' : 'expense'}>
-              {hsaBridgeText}
-            </strong>
-            <em>
-              {retirementAge >= hsaAccessAge
-                ? `HSA is available by age ${Math.round(retirementAge)}.`
-                : `${formatMoney(bridgeNeed)} needed from retirement to age ${Math.round(hsaAccessAge)} before HSA behaves like a retirement account.`}
-            </em>
-          </div>
-          <div className="retirement-hsa-stats">
-            <RetirementMetric label="HSA at Retirement" value={formatMoney(projectedHsaAtRetirement)} detail={`${formatMoney(hsaAnnual)}/yr contributions`} />
-            <RetirementMetric label={`HSA at ${Math.round(hsaAccessAge)}`} value={formatMoney(projectedHsaAtAccess)} detail={`${Math.round(lockedHsaYears)} locked years after retirement`} />
+            <RetirementProjectionPanel
+              currentAge={currentAge}
+              retirementAge={retirementAge}
+              targetNestEgg={targetNestEgg}
+              annualSavings={scenarioAnnualValue}
+              annualSavingsDefault={annualSavings}
+              scenarioProjection={scenarioProjection}
+              scenarioGap={scenarioGap}
+              points={scenarioPoints}
+              rangeMax={scenarioRangeMax}
+              onAnnualSavingsChange={setScenarioAnnualSavings}
+            />
+
+            <div className="retirement-member-list">
+              {members.length === 0 ? (
+                <p className="subtle">Add household income and match details to unlock employer contribution projections.</p>
+              ) : members.map((member) => (
+                <div key={member.id} className="retirement-member-row">
+                  <div>
+                    <strong>{member.name}</strong>
+                    <span>{member.retirement_accounts?.length || 0} accounts | {formatPercent(member.employee_contribution_percent)} employee | {formatPercent(member.employer_match_percent)} match</span>
+                  </div>
+                  <em>{formatMoney((Number(member.employee_retirement_annual) || 0) + (Number(member.employer_retirement_annual) || 0))}/yr</em>
+                </div>
+              ))}
+            </div>
+
+            <div className="retirement-hsa-panel">
+              <div>
+                <span>HSA bridge check</span>
+                <strong className={bridgeSurplus >= 0 ? 'income' : 'expense'}>
+                  {hsaBridgeText}
+                </strong>
+                <em>
+                  {retirementAge >= hsaAccessAge
+                    ? `HSA is available by age ${Math.round(retirementAge)}.`
+                    : `${formatMoney(bridgeNeed)} needed from retirement to age ${Math.round(hsaAccessAge)} before HSA behaves like a retirement account.`}
+                </em>
+              </div>
+              <div className="retirement-hsa-stats">
+                <RetirementMetric label="HSA at Retirement" value={formatMoney(projectedHsaAtRetirement)} detail={`${formatMoney(hsaAnnual)}/yr contributions`} />
+                <RetirementMetric label={`HSA at ${Math.round(hsaAccessAge)}`} value={formatMoney(projectedHsaAtAccess)} detail={`${Math.round(lockedHsaYears)} locked years after retirement`} />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -866,6 +940,81 @@ function RetirementMetric({ label, value, detail }) {
       <span>{label}</span>
       <strong>{value}</strong>
       <em>{detail}</em>
+    </div>
+  );
+}
+
+function RetirementProjectionPanel({
+  currentAge,
+  retirementAge,
+  targetNestEgg,
+  annualSavings,
+  annualSavingsDefault,
+  scenarioProjection,
+  scenarioGap,
+  points,
+  rangeMax,
+  onAnnualSavingsChange
+}) {
+  const width = 640;
+  const height = 180;
+  const chartPoints = points.map((point) => ({
+    month: String(point.yearOffset),
+    amount: point.amount
+  }));
+  const line = chartPath(chartPoints, width, height);
+  const area = areaPath(chartPoints, width, height);
+
+  function handleSlider(value) {
+    onAnnualSavingsChange(formatCurrencyInput(value));
+  }
+
+  return (
+    <div className="retirement-projection-panel">
+      <div className="retirement-projection-copy">
+        <span>Projection Curve</span>
+        <strong>{scenarioGap >= 0 ? 'On pace' : 'Below target'}</strong>
+        <em>
+          {scenarioGap >= 0
+            ? `${formatMoney(scenarioGap)} above target at retirement`
+            : `${formatMoney(Math.abs(scenarioGap))} below target at retirement`}
+        </em>
+      </div>
+      <div className="goal-chart-wrap">
+        <svg className="goal-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Retirement projection">
+          <defs>
+            <linearGradient id="retirementProjectionArea" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.24" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+          <path d={area} fill="url(#retirementProjectionArea)" />
+          <path d={line} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <div className="networth-chart-labels">
+          <span>Age {Math.round(currentAge)}</span>
+          <strong>{formatMoney(scenarioProjection)}</strong>
+          <span>Age {Math.round(retirementAge)}</span>
+        </div>
+      </div>
+      <div className="goal-imagine-controls retirement-projection-controls">
+        <input
+          type="range"
+          min="0"
+          max={rangeMax}
+          step="500"
+          value={Math.min(rangeMax, Math.max(0, annualSavings))}
+          onChange={(e) => handleSlider(e.target.value)}
+        />
+        <input
+          type="text"
+          value={formatCurrencyInput(annualSavings)}
+          onChange={(e) => onAnnualSavingsChange(formatCurrencyInput(e.target.value))}
+          placeholder={formatCurrencyInput(annualSavingsDefault)}
+          inputMode="numeric"
+          aria-label="Annual savings scenario"
+        />
+      </div>
     </div>
   );
 }
