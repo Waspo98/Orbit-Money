@@ -402,7 +402,10 @@ When the selected goal is named `Retirement`, the Goals page shows a retirement
 calculator after the Goals card. It uses Household gross/net pay, employee
 retirement contribution, employer match, and the current retirement goal balance
 to project retirement readiness with editable return, inflation, income
-replacement, retirement age, and withdrawal-rate assumptions.
+replacement, retirement age, and withdrawal-rate assumptions. The calculator
+also models HSA timing separately: if the retirement age is before the HSA
+access age, it checks whether non-HSA retirement assets can bridge the gap until
+the HSA can behave like a retirement account.
 
 Storage is additive: migration `015_goal_allocations.sql` extends the existing
 `goals` table with metadata and adds `goal_account_allocations`. It does not

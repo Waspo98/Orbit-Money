@@ -3821,7 +3821,9 @@ input, textarea, select {
 }
 
 .retirement-metric-grid,
-.retirement-assumption-grid {
+.retirement-assumption-grid,
+.retirement-hsa-stats,
+.retirement-account-mix {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
@@ -3854,6 +3856,49 @@ input, textarea, select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.retirement-hsa-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.retirement-hsa-panel > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.retirement-hsa-panel > div:first-child span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.retirement-hsa-panel > div:first-child strong {
+  color: var(--text);
+  font-size: clamp(1.25rem, 6vw, 2rem);
+  line-height: 1.05;
+}
+
+.retirement-hsa-panel > div:first-child strong.income {
+  color: var(--income);
+}
+
+.retirement-hsa-panel > div:first-child strong.expense {
+  color: var(--danger);
+}
+
+.retirement-hsa-panel > div:first-child em {
+  color: var(--text-muted);
+  font-style: normal;
+  line-height: 1.4;
 }
 
 .retirement-assumption-grid .field {
@@ -4546,7 +4591,9 @@ input, textarea, select {
 
   .retirement-planner-hero,
   .retirement-metric-grid,
-  .retirement-assumption-grid {
+  .retirement-assumption-grid,
+  .retirement-hsa-stats,
+  .retirement-account-mix {
     grid-template-columns: 1fr;
   }
 

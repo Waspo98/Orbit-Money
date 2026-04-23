@@ -111,6 +111,17 @@ function formatPercent(value, digits = 1) {
   })}%`;
 }
 
+function parsePercentInput(value) {
+  const parsed = Number(String(value ?? '').replace(/[^0-9.]/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatPercentInput(value) {
+  const cleaned = String(value ?? '').replace(/[^0-9.]/g, '');
+  if (!cleaned) return '';
+  return `${cleaned}%`;
+}
+
 function ageFromBirthDate(date) {
   if (!date) return null;
   const birth = new Date(`${date}T00:00:00`);
@@ -181,6 +192,20 @@ function futureValueSeries(current, monthly, monthlyReturn, months) {
   if (monthlyReturn <= 0) return principal + contribution * months;
   return principal * ((1 + monthlyReturn) ** months) +
     contribution * ((((1 + monthlyReturn) ** months) - 1) / monthlyReturn);
+}
+
+function hasCurrencyValue(value) {
+  return String(value ?? '').replace(/[$,\s]/g, '').trim() !== '';
+}
+
+function classifyRetirementAccount(name) {
+  const text = String(name || '').toLowerCase();
+  if (text.includes('hsa')) return 'HSA';
+  if (text.includes('roth')) return 'Roth';
+  if (text.includes('403')) return '403(b)';
+  if (text.includes('401')) return '401(k)';
+  if (text.includes('ira')) return 'IRA';
+  return 'Other';
 }
 
 function monthlyNeededForTarget(current, target, monthlyReturn, months) {
@@ -610,25 +635,49 @@ function GoalProgress({ goal }) {
 function RetirementPlanner({ goal, household }) {
   const [assumptions, setAssumptions] = useState({
     currentAge: '',
-    retirementAge: 67,
-    annualReturn: 7,
-    inflation: 2.5,
-    replacementRate: 80,
-    withdrawalRate: 4
+    retirementAge: '67',
+    annualReturn: '7%',
+    inflation: '2.5%',
+    replacementRate: '80%',
+    withdrawalRate: '4%',
+    hsaCurrentBalance: '',
+    hsaAnnualContribution: '',
+    hsaAccessAge: '65'
   });
 
   const members = household?.members || [];
   const summary = household?.summary || {};
+  const allocations = goal?.allocations || [];
+  const accountMix = allocations.reduce((items, allocation) => {
+    const label = classifyRetirementAccount(allocation.account_name);
+    const existing = items.find((item) => item.label === label);
+    if (existing) {
+      existing.amount += Number(allocation.current_amount) || 0;
+    } else {
+      items.push({ label, amount: Number(allocation.current_amount) || 0 });
+    }
+    return items;
+  }, []);
+  const inferredHsaCurrent = allocations
+    .filter((allocation) => classifyRetirementAccount(allocation.account_name) === 'HSA')
+    .reduce((sum, allocation) => sum + (Number(allocation.current_amount) || 0), 0);
+  const householdHsaAnnual = members.reduce(
+    (sum, member) => sum + (Number(member.hsa_contribution_annual) || 0),
+    0
+  );
   const inferredAge =
     members
       .map((member) => ageFromBirthDate(member.birth_date))
       .find((age) => age !== null) ?? 35;
   const currentAge = Number(assumptions.currentAge) || inferredAge;
   const retirementAge = Math.max(currentAge, Number(assumptions.retirementAge) || 67);
+  const hsaAccessAge = Math.max(currentAge, Number(assumptions.hsaAccessAge) || 65);
   const years = Math.max(0, retirementAge - currentAge);
   const months = Math.round(years * 12);
-  const annualReturn = (Number(assumptions.annualReturn) || 0) / 100;
-  const inflation = (Number(assumptions.inflation) || 0) / 100;
+  const monthsToHsaAccess = Math.max(0, Math.round((hsaAccessAge - currentAge) * 12));
+  const lockedHsaYears = Math.max(0, hsaAccessAge - retirementAge);
+  const annualReturn = parsePercentInput(assumptions.annualReturn) / 100;
+  const inflation = parsePercentInput(assumptions.inflation) / 100;
   const realReturn = ((1 + annualReturn) / (1 + inflation)) - 1;
   const monthlyReturn = annualReturn / 12;
   const currentBalance = Number(goal?.current_amount) || 0;
@@ -637,10 +686,24 @@ function RetirementPlanner({ goal, household }) {
   const annualSavings = employeeAnnual + employerAnnual;
   const plannedMonthly = annualSavings / 12;
   const annualIncome = Number(summary.net_pay_annual || summary.gross_income_annual) || 0;
-  const annualNeed = annualIncome * ((Number(assumptions.replacementRate) || 0) / 100);
-  const withdrawalRate = Math.max(0.1, Number(assumptions.withdrawalRate) || 4) / 100;
+  const annualNeed = annualIncome * (parsePercentInput(assumptions.replacementRate) / 100);
+  const withdrawalRate = Math.max(0.1, parsePercentInput(assumptions.withdrawalRate) || 4) / 100;
+  const hsaCurrent = hasCurrencyValue(assumptions.hsaCurrentBalance)
+    ? parseMoney(assumptions.hsaCurrentBalance)
+    : inferredHsaCurrent;
+  const hsaAnnual = hasCurrencyValue(assumptions.hsaAnnualContribution)
+    ? parseMoney(assumptions.hsaAnnualContribution)
+    : householdHsaAnnual;
+  const hsaMonthly = hsaAnnual / 12;
+  const nonHsaCurrent = Math.max(0, currentBalance - hsaCurrent);
+  const nonHsaMonthly = Math.max(0, plannedMonthly - hsaMonthly);
   const targetNestEgg = annualNeed / withdrawalRate;
-  const projectedBalance = futureValueSeries(currentBalance, plannedMonthly, monthlyReturn, months);
+  const projectedNonHsa = futureValueSeries(nonHsaCurrent, nonHsaMonthly, monthlyReturn, months);
+  const projectedHsaAtRetirement = futureValueSeries(hsaCurrent, hsaMonthly, monthlyReturn, months);
+  const projectedHsaAtAccess = futureValueSeries(hsaCurrent, hsaMonthly, monthlyReturn, monthsToHsaAccess);
+  const projectedBalance = projectedNonHsa + projectedHsaAtRetirement;
+  const bridgeNeed = retirementAge < hsaAccessAge ? annualNeed * lockedHsaYears : 0;
+  const bridgeSurplus = projectedNonHsa - bridgeNeed;
   const gap = projectedBalance - targetNestEgg;
   const requiredMonthly = monthlyNeededForTarget(currentBalance, targetNestEgg, monthlyReturn, months);
   const savingsRate = Number(summary.gross_income_annual) > 0
@@ -680,6 +743,28 @@ function RetirementPlanner({ goal, household }) {
           <RetirementMetric label="Runway" value={`${Math.round(years)} years`} detail={`${Math.round(months).toLocaleString()} months`} />
         </div>
 
+        <div className="retirement-hsa-panel">
+          <div>
+            <span>HSA bridge check</span>
+            <strong className={bridgeSurplus >= 0 ? 'income' : 'expense'}>
+              {retirementAge >= hsaAccessAge
+                ? 'Unlocked at retirement'
+                : bridgeSurplus >= 0
+                  ? `${formatMoney(bridgeSurplus)} bridge surplus`
+                  : `${formatMoney(Math.abs(bridgeSurplus))} bridge gap`}
+            </strong>
+            <em>
+              {retirementAge >= hsaAccessAge
+                ? `HSA is available by age ${Math.round(retirementAge)}.`
+                : `${formatMoney(bridgeNeed)} needed from retirement to age ${Math.round(hsaAccessAge)} before HSA behaves like a retirement account.`}
+            </em>
+          </div>
+          <div className="retirement-hsa-stats">
+            <RetirementMetric label="HSA at Retirement" value={formatMoney(projectedHsaAtRetirement)} detail={`${formatMoney(hsaAnnual)}/yr contributions`} />
+            <RetirementMetric label={`HSA at ${Math.round(hsaAccessAge)}`} value={formatMoney(projectedHsaAtAccess)} detail={`${Math.round(lockedHsaYears)} locked years after retirement`} />
+          </div>
+        </div>
+
         <div className="retirement-assumption-grid">
           <label className="field">
             <span>Current Age</span>
@@ -691,21 +776,46 @@ function RetirementPlanner({ goal, household }) {
           </label>
           <label className="field">
             <span>Market Return</span>
-            <input type="number" min="0" step="0.1" value={assumptions.annualReturn} onChange={(e) => update('annualReturn', e.target.value)} />
+            <PercentInput value={assumptions.annualReturn} onChange={(value) => update('annualReturn', value)} placeholder="7%" />
           </label>
           <label className="field">
             <span>Inflation</span>
-            <input type="number" min="0" step="0.1" value={assumptions.inflation} onChange={(e) => update('inflation', e.target.value)} />
+            <PercentInput value={assumptions.inflation} onChange={(value) => update('inflation', value)} placeholder="2.5%" />
           </label>
           <label className="field">
             <span>Income Replacement</span>
-            <input type="number" min="0" step="1" value={assumptions.replacementRate} onChange={(e) => update('replacementRate', e.target.value)} />
+            <PercentInput value={assumptions.replacementRate} onChange={(value) => update('replacementRate', value)} placeholder="80%" />
           </label>
           <label className="field">
             <span>Withdrawal Rate</span>
-            <input type="number" min="0.1" step="0.1" value={assumptions.withdrawalRate} onChange={(e) => update('withdrawalRate', e.target.value)} />
+            <PercentInput value={assumptions.withdrawalRate} onChange={(value) => update('withdrawalRate', value)} placeholder="4%" />
+          </label>
+          <label className="field">
+            <span>HSA Balance</span>
+            <CurrencyInput value={assumptions.hsaCurrentBalance} onChange={(value) => update('hsaCurrentBalance', value)} placeholder={formatMoney(inferredHsaCurrent)} />
+          </label>
+          <label className="field">
+            <span>HSA Contribution</span>
+            <CurrencyInput value={assumptions.hsaAnnualContribution} onChange={(value) => update('hsaAnnualContribution', value)} placeholder={formatMoney(householdHsaAnnual)} />
+          </label>
+          <label className="field">
+            <span>HSA Access Age</span>
+            <input type="number" min="0" value={assumptions.hsaAccessAge} onChange={(e) => update('hsaAccessAge', e.target.value)} />
           </label>
         </div>
+
+        {accountMix.length > 0 && (
+          <div className="retirement-account-mix">
+            {accountMix.map((item) => (
+              <RetirementMetric
+                key={item.label}
+                label={item.label}
+                value={formatMoney(item.amount)}
+                detail={`${Math.round(currentBalance > 0 ? (item.amount / currentBalance) * 100 : 0)}% of retirement goal`}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="retirement-member-list">
           {members.length === 0 ? (
@@ -722,6 +832,18 @@ function RetirementPlanner({ goal, household }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function PercentInput({ value, onChange, ...props }) {
+  return (
+    <input
+      {...props}
+      type="text"
+      inputMode="decimal"
+      value={value}
+      onChange={(event) => onChange(formatPercentInput(event.target.value))}
+    />
   );
 }
 
