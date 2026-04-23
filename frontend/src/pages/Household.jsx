@@ -10,11 +10,7 @@ import { useAppDialog } from '../components/AppDialog.jsx';
 
 const ROLE_OPTIONS = [
   ['adult', 'Adult'],
-  ['spouse', 'Spouse'],
-  ['partner', 'Partner'],
-  ['child', 'Child'],
-  ['dependent', 'Dependent'],
-  ['other', 'Other']
+  ['child', 'Child']
 ];
 
 const EMPLOYMENT_OPTIONS = [
@@ -71,6 +67,17 @@ function formatPercent(value) {
   return `${number.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
 }
 
+function parsePercentInput(value) {
+  const parsed = Number(String(value ?? '').replace(/[^0-9.]/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatPercentInput(value) {
+  const cleaned = String(value ?? '').replace(/[^0-9.]/g, '');
+  if (!cleaned) return '';
+  return `${cleaned}%`;
+}
+
 function labelFor(options, value) {
   return options.find(([key]) => key === value)?.[1] || value || 'Not set';
 }
@@ -99,13 +106,10 @@ function emptyDraft() {
     gross_income_annual: '',
     net_pay_per_period: '',
     pay_frequency: 'biweekly',
-    pay_periods_per_year: 26,
     retirement_account_type: '401k',
     employee_contribution_percent: '',
-    employee_contribution_annual: '',
     employer_match_percent: '',
     employer_match_limit_percent: '',
-    employer_match_annual_cap: '',
     health_premium_per_month: '',
     hsa_contribution_annual: '',
     dependent_care_fsa_annual: '',
@@ -122,15 +126,13 @@ function toDraft(member) {
     ...member,
     gross_income_annual: formatCurrencyInput(member.gross_income_annual),
     net_pay_per_period: formatCurrencyInput(member.net_pay_per_period),
-    employee_contribution_annual: formatCurrencyInput(member.employee_contribution_annual),
-    employer_match_annual_cap: formatCurrencyInput(member.employer_match_annual_cap),
     health_premium_per_month: formatCurrencyInput(member.health_premium_per_month),
     hsa_contribution_annual: formatCurrencyInput(member.hsa_contribution_annual),
     dependent_care_fsa_annual: formatCurrencyInput(member.dependent_care_fsa_annual),
     other_benefits_annual: formatCurrencyInput(member.other_benefits_annual),
-    employee_contribution_percent: String(member.employee_contribution_percent || ''),
-    employer_match_percent: String(member.employer_match_percent || ''),
-    employer_match_limit_percent: String(member.employer_match_limit_percent || ''),
+    employee_contribution_percent: formatPercentInput(member.employee_contribution_percent),
+    employer_match_percent: formatPercentInput(member.employer_match_percent),
+    employer_match_limit_percent: formatPercentInput(member.employer_match_limit_percent),
     effective_date: new Date().toISOString().slice(0, 10),
     notes: member.notes || ''
   };
@@ -147,18 +149,17 @@ function toPayload(draft) {
     gross_income_annual: parseCurrencyInput(draft.gross_income_annual),
     net_pay_per_period: parseCurrencyInput(draft.net_pay_per_period),
     pay_frequency: draft.pay_frequency,
-    pay_periods_per_year: Number(draft.pay_periods_per_year) || PAY_PERIODS[draft.pay_frequency] || 0,
+    pay_periods_per_year: PAY_PERIODS[draft.pay_frequency] || 0,
     retirement_account_type: draft.retirement_account_type,
-    employee_contribution_percent: Number(draft.employee_contribution_percent) || 0,
-    employee_contribution_annual: parseCurrencyInput(draft.employee_contribution_annual),
-    employer_match_percent: Number(draft.employer_match_percent) || 0,
-    employer_match_limit_percent: Number(draft.employer_match_limit_percent) || 0,
-    employer_match_annual_cap: parseCurrencyInput(draft.employer_match_annual_cap),
+    employee_contribution_percent: parsePercentInput(draft.employee_contribution_percent),
+    employee_contribution_annual: 0,
+    employer_match_percent: parsePercentInput(draft.employer_match_percent),
+    employer_match_limit_percent: parsePercentInput(draft.employer_match_limit_percent),
+    employer_match_annual_cap: 0,
     health_premium_per_month: parseCurrencyInput(draft.health_premium_per_month),
     hsa_contribution_annual: parseCurrencyInput(draft.hsa_contribution_annual),
     dependent_care_fsa_annual: parseCurrencyInput(draft.dependent_care_fsa_annual),
     other_benefits_annual: parseCurrencyInput(draft.other_benefits_annual),
-    effective_date: draft.effective_date,
     notes: draft.notes
   };
 }
@@ -256,7 +257,7 @@ export default function Household() {
         <div className="empty-state">
           <div className="empty-state-icon">$</div>
           <h2>No household details yet</h2>
-          <p>Add each adult or dependent whose income, benefits, or retirement inputs should influence future planning.</p>
+          <p>Add each adult or child whose income, benefits, or retirement inputs should influence future planning.</p>
           <button type="button" className="btn-primary" onClick={() => setEditingMember({ mode: 'new' })}>
             + New Member
           </button>
@@ -414,7 +415,6 @@ function MemberModal({ member, onClose, onSaved }) {
   function update(key, value) {
     setDraft((prev) => {
       const next = { ...prev, [key]: value };
-      if (key === 'pay_frequency') next.pay_periods_per_year = PAY_PERIODS[value] ?? prev.pay_periods_per_year;
       return next;
     });
   }
@@ -488,7 +488,7 @@ function MemberModal({ member, onClose, onSaved }) {
                 <CurrencyInput value={draft.gross_income_annual} onChange={(value) => update('gross_income_annual', value)} placeholder="$90,000" />
               </label>
               <label className="field">
-                <span>Net Pay</span>
+                <span>Net Pay (Paycheck)</span>
                 <CurrencyInput value={draft.net_pay_per_period} onChange={(value) => update('net_pay_per_period', value)} placeholder="$2,500" />
               </label>
               <label className="field">
@@ -496,14 +496,6 @@ function MemberModal({ member, onClose, onSaved }) {
                 <select value={draft.pay_frequency} onChange={(e) => update('pay_frequency', e.target.value)}>
                   {PAY_FREQUENCY_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
-              </label>
-              <label className="field">
-                <span>Pay Periods</span>
-                <input type="number" min="0" step="1" value={draft.pay_periods_per_year} onChange={(e) => update('pay_periods_per_year', e.target.value)} />
-              </label>
-              <label className="field">
-                <span>Snapshot Date</span>
-                <input type="date" value={draft.effective_date} onChange={(e) => update('effective_date', e.target.value)} />
               </label>
             </div>
           </div>
@@ -518,24 +510,16 @@ function MemberModal({ member, onClose, onSaved }) {
                 </select>
               </label>
               <label className="field">
-                <span>Employee Percent</span>
-                <input type="number" min="0" max="100" step="0.1" value={draft.employee_contribution_percent} onChange={(e) => update('employee_contribution_percent', e.target.value)} placeholder="6" />
+                <span>Employee Contribution</span>
+                <PercentInput value={draft.employee_contribution_percent} onChange={(value) => update('employee_contribution_percent', value)} placeholder="6%" />
               </label>
               <label className="field">
-                <span>Employee Annual Amount</span>
-                <CurrencyInput value={draft.employee_contribution_annual} onChange={(value) => update('employee_contribution_annual', value)} placeholder="$0" />
+                <span>Employer Match</span>
+                <PercentInput value={draft.employer_match_percent} onChange={(value) => update('employer_match_percent', value)} placeholder="50%" />
               </label>
               <label className="field">
-                <span>Employer Match Percent</span>
-                <input type="number" min="0" max="100" step="0.1" value={draft.employer_match_percent} onChange={(e) => update('employer_match_percent', e.target.value)} placeholder="50" />
-              </label>
-              <label className="field">
-                <span>Match Limit Percent</span>
-                <input type="number" min="0" max="100" step="0.1" value={draft.employer_match_limit_percent} onChange={(e) => update('employer_match_limit_percent', e.target.value)} placeholder="6" />
-              </label>
-              <label className="field">
-                <span>Annual Match Cap</span>
-                <CurrencyInput value={draft.employer_match_annual_cap} onChange={(value) => update('employer_match_annual_cap', value)} placeholder="$0" />
+                <span>Maximum Employer Match</span>
+                <PercentInput value={draft.employer_match_limit_percent} onChange={(value) => update('employer_match_limit_percent', value)} placeholder="6%" />
               </label>
             </div>
           </div>
@@ -577,5 +561,17 @@ function MemberModal({ member, onClose, onSaved }) {
         </div>
       )}
     </AnimatedModal>
+  );
+}
+
+function PercentInput({ value, onChange, ...props }) {
+  return (
+    <input
+      {...props}
+      type="text"
+      inputMode="decimal"
+      value={value}
+      onChange={(event) => onChange(formatPercentInput(event.target.value))}
+    />
   );
 }

@@ -4,7 +4,7 @@ import { db } from '../db/index.js';
 
 const router = express.Router();
 
-const ROLES = new Set(['adult', 'spouse', 'partner', 'child', 'dependent', 'other']);
+const ROLES = new Set(['adult', 'child']);
 const EMPLOYMENT_STATUSES = new Set([
   'employed',
   'self_employed',
