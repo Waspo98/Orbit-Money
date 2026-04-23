@@ -7,6 +7,7 @@ import CurrencyInput, {
 } from '../components/CurrencyInput.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import AppIcon from '../components/AppIcon.jsx';
 
 const ROLE_OPTIONS = [
   ['adult', 'Adult'],
@@ -194,27 +195,6 @@ export default function Household() {
     () => [...members].sort((a, b) => Number(b.household_value_annual || 0) - Number(a.household_value_annual || 0))[0],
     [members]
   );
-  const heroStats = [
-    {
-      label: 'Net Pay',
-      value: loading ? 'Loading' : formatMoney(summary.net_pay_annual),
-      tone: Number(summary.net_pay_annual || 0) > 0 ? 'good' : ''
-    },
-    {
-      label: 'Gross',
-      value: loading ? 'Loading' : formatMoney(summary.gross_income_annual)
-    },
-    {
-      label: 'Employer Match',
-      value: loading ? 'Loading' : formatMoney(summary.employer_retirement_annual),
-      tone: Number(summary.employer_retirement_annual || 0) > 0 ? 'good' : ''
-    },
-    {
-      label: 'Earners',
-      value: loading ? 'Loading' : `${summary.earners || 0}/${summary.member_count || 0}`
-    }
-  ];
-
   async function handleDelete(member) {
     const ok = await confirm(`Delete ${member.name} and their income history?`, {
       title: 'Delete household member',
@@ -237,7 +217,6 @@ export default function Household() {
         kicker="Income And Benefits"
         title="Household"
         subtitle="Track net pay, employer benefits, retirement inputs, and compensation history."
-        stats={heroStats}
         toolbar={(
           <div className="page-hero-action-row">
             <button type="button" className="btn-primary" onClick={() => setEditingMember({ mode: 'new' })}>
@@ -255,7 +234,9 @@ export default function Household() {
         </div>
       ) : members.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">$</div>
+          <div className="empty-state-icon">
+            <AppIcon name="household" />
+          </div>
           <h2>No household details yet</h2>
           <p>Add each adult or child whose income, benefits, or retirement inputs should influence future planning.</p>
           <button type="button" className="btn-primary" onClick={() => setEditingMember({ mode: 'new' })}>
@@ -264,18 +245,6 @@ export default function Household() {
         </div>
       ) : (
         <div className="household-grid">
-          <section className="dashboard-card household-summary-card">
-            <header className="dashboard-card-header">
-              <h3>Planning Signals</h3>
-            </header>
-            <div className="dashboard-card-body">
-              <SignalRow label="Take-home pay" value={formatMoney(summary.net_pay_annual)} detail="Annualized from pay cadence" />
-              <SignalRow label="Retirement savings" value={formatMoney((summary.employee_retirement_annual || 0) + (summary.employer_retirement_annual || 0))} detail={`${formatMoney(summary.employer_retirement_annual)} employer`} />
-              <SignalRow label="Benefits value" value={formatMoney(summary.total_benefits_annual)} detail="Match, HSA, FSA, other" />
-              <SignalRow label="Largest contributor" value={topMember?.name || 'None'} detail={topMember ? formatMoney(topMember.household_value_annual) : formatMoney(0)} />
-            </div>
-          </section>
-
           <section className="dashboard-card household-members-card">
             <header className="dashboard-card-header">
               <h3>Members</h3>
@@ -294,6 +263,18 @@ export default function Household() {
                   />
                 ))}
               </div>
+            </div>
+          </section>
+
+          <section className="dashboard-card household-summary-card">
+            <header className="dashboard-card-header">
+              <h3>Planning Signals</h3>
+            </header>
+            <div className="dashboard-card-body">
+              <SignalRow label="Take-home pay" value={formatMoney(summary.net_pay_annual)} detail="Annualized from pay cadence" />
+              <SignalRow label="Retirement savings" value={formatMoney((summary.employee_retirement_annual || 0) + (summary.employer_retirement_annual || 0))} detail={`${formatMoney(summary.employer_retirement_annual)} employer`} />
+              <SignalRow label="Benefits value" value={formatMoney(summary.total_benefits_annual)} detail="Match, HSA, FSA, other" />
+              <SignalRow label="Largest contributor" value={topMember?.name || 'None'} detail={topMember ? formatMoney(topMember.household_value_annual) : formatMoney(0)} />
             </div>
           </section>
 
@@ -518,8 +499,13 @@ function MemberModal({ member, onClose, onSaved }) {
                 <PercentInput value={draft.employer_match_percent} onChange={(value) => update('employer_match_percent', value)} placeholder="50%" />
               </label>
               <label className="field">
-                <span>Maximum Employer Match</span>
-                <PercentInput value={draft.employer_match_limit_percent} onChange={(value) => update('employer_match_limit_percent', value)} placeholder="6%" />
+                <span>Matchable Contribution</span>
+                <PercentInput
+                  value={draft.employer_match_limit_percent}
+                  onChange={(value) => update('employer_match_limit_percent', value)}
+                  placeholder="6%"
+                  aria-label="Maximum employee contribution percentage eligible for employer match"
+                />
               </label>
             </div>
           </div>
