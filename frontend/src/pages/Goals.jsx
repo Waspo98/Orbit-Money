@@ -254,8 +254,27 @@ function chartPath(history, width, height) {
     .join(' ');
 }
 
+function chartPathWithRange(history, width, height, min, max) {
+  if (!history?.length) return '';
+  const safeMin = Number.isFinite(min) ? min : 0;
+  const safeMax = Number.isFinite(max) && max > safeMin ? max : safeMin + 1;
+  return history
+    .map((point, index) => {
+      const x = history.length === 1 ? width / 2 : (index / (history.length - 1)) * width;
+      const y = height - (((Number(point.amount) || 0) - safeMin) / (safeMax - safeMin)) * height;
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${Math.max(0, Math.min(height, y)).toFixed(2)}`;
+    })
+    .join(' ');
+}
+
 function areaPath(history, width, height) {
   const line = chartPath(history, width, height);
+  if (!line) return '';
+  return `${line} L ${width} ${height} L 0 ${height} Z`;
+}
+
+function areaPathWithRange(history, width, height, min, max) {
+  const line = chartPathWithRange(history, width, height, min, max);
   if (!line) return '';
   return `${line} L ${width} ${height} L 0 ${height} Z`;
 }
@@ -744,7 +763,9 @@ function RetirementPlanner({ goal, household }) {
   const scenarioAnnualValue = String(scenarioAnnualSavings).trim() === ''
     ? annualSavings
     : parseMoney(scenarioAnnualSavings);
+  const defaultPoints = projectRetirementByYear(currentBalance, annualSavings, annualReturn, Math.max(1, Math.round(years)));
   const scenarioPoints = projectRetirementByYear(currentBalance, scenarioAnnualValue, annualReturn, Math.max(1, Math.round(years)));
+  const defaultProjection = defaultPoints[defaultPoints.length - 1]?.amount || currentBalance;
   const scenarioProjection = scenarioPoints[scenarioPoints.length - 1]?.amount || currentBalance;
   const scenarioGap = scenarioProjection - targetNestEgg;
   const scenarioRangeMax = Math.max(25000, Math.ceil(Math.max(annualSavings, targetNestEgg / Math.max(1, years)) / 5000) * 10000);
@@ -837,10 +858,12 @@ function RetirementPlanner({ goal, household }) {
               currentAge={currentAge}
               retirementAge={retirementAge}
               targetNestEgg={targetNestEgg}
+              defaultProjection={defaultProjection}
               annualSavings={scenarioAnnualValue}
               annualSavingsDefault={annualSavings}
               scenarioProjection={scenarioProjection}
               scenarioGap={scenarioGap}
+              defaultPoints={defaultPoints}
               points={scenarioPoints}
               rangeMax={scenarioRangeMax}
               onAnnualSavingsChange={setScenarioAnnualSavings}
@@ -948,22 +971,43 @@ function RetirementProjectionPanel({
   currentAge,
   retirementAge,
   targetNestEgg,
+  defaultProjection,
   annualSavings,
   annualSavingsDefault,
   scenarioProjection,
   scenarioGap,
+  defaultPoints,
   points,
   rangeMax,
   onAnnualSavingsChange
 }) {
   const width = 640;
   const height = 180;
+  const baselineChartPoints = defaultPoints.map((point) => ({
+    month: String(point.yearOffset),
+    amount: point.amount
+  }));
   const chartPoints = points.map((point) => ({
     month: String(point.yearOffset),
     amount: point.amount
   }));
-  const line = chartPath(chartPoints, width, height);
-  const area = areaPath(chartPoints, width, height);
+  const yMax = Math.max(
+    targetNestEgg,
+    defaultProjection,
+    scenarioProjection,
+    ...defaultPoints.map((point) => point.amount),
+    ...points.map((point) => point.amount),
+    1
+  ) * 1.08;
+  const yMin = 0;
+  const baselineLine = chartPathWithRange(baselineChartPoints, width, height, yMin, yMax);
+  const line = chartPathWithRange(chartPoints, width, height, yMin, yMax);
+  const area = areaPathWithRange(chartPoints, width, height, yMin, yMax);
+  const targetY = height - ((targetNestEgg - yMin) / (yMax - yMin)) * height;
+  const yTicks = [1, 0.5, 0].map((ratio) => ({
+    value: yMax * ratio,
+    y: height - (height * ratio)
+  }));
 
   function handleSlider(value) {
     onAnnualSavingsChange(formatCurrencyInput(value));
@@ -988,7 +1032,20 @@ function RetirementProjectionPanel({
               <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.02" />
             </linearGradient>
           </defs>
+          {yTicks.map((tick) => (
+            <g key={tick.y}>
+              <line x1="0" y1={tick.y} x2={width} y2={tick.y} className="retirement-chart-gridline" />
+              <text x="6" y={Math.max(14, tick.y - 6)} className="retirement-chart-axis-label">
+                {formatMoney(tick.value)}
+              </text>
+            </g>
+          ))}
+          <line x1="0" y1={targetY} x2={width} y2={targetY} className="retirement-chart-target-line" />
+          <text x={width - 8} y={Math.max(14, targetY - 6)} textAnchor="end" className="retirement-chart-target-label">
+            Target {formatMoney(targetNestEgg)}
+          </text>
           <path d={area} fill="url(#retirementProjectionArea)" />
+          <path d={baselineLine} fill="none" stroke="color-mix(in srgb, var(--text-muted) 65%, transparent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="10 8" />
           <path d={line} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <div className="networth-chart-labels">
@@ -996,6 +1053,10 @@ function RetirementProjectionPanel({
           <strong>{formatMoney(scenarioProjection)}</strong>
           <span>Age {Math.round(retirementAge)}</span>
         </div>
+      </div>
+      <div className="retirement-projection-legend">
+        <span><i className="retirement-legend-line retirement-legend-line-scenario" /> Scenario</span>
+        <span><i className="retirement-legend-line retirement-legend-line-baseline" /> Current household savings</span>
       </div>
       <div className="goal-imagine-controls retirement-projection-controls">
         <input

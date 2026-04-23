@@ -3882,6 +3882,51 @@ input, textarea, select {
   grid-template-columns: minmax(0, 1fr) 140px;
 }
 
+.retirement-chart-gridline {
+  stroke: color-mix(in srgb, var(--border) 82%, transparent);
+  stroke-width: 1;
+}
+
+.retirement-chart-axis-label,
+.retirement-chart-target-label {
+  fill: var(--text-muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.retirement-chart-target-line {
+  stroke: color-mix(in srgb, var(--warning) 72%, transparent);
+  stroke-width: 2;
+  stroke-dasharray: 10 8;
+}
+
+.retirement-projection-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.retirement-projection-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.retirement-legend-line {
+  width: 24px;
+  height: 0;
+  border-top: 3px solid var(--accent);
+  border-radius: 999px;
+}
+
+.retirement-legend-line-baseline {
+  border-top-color: color-mix(in srgb, var(--text-muted) 65%, transparent);
+  border-top-style: dashed;
+}
+
 .retirement-planner-hero em.income {
   color: var(--income);
 }
