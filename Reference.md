@@ -304,14 +304,14 @@ Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column gri
 ### Backend (`backend/src/`)
 - `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
 - `db/index.js`, `db/migrations.js`
-- `db/migrations/001` through `015`
+- `db/migrations/001` through `020`
 - `routes/`: auth, health, import, transactions, accounts, categories, rules, simplefin, budgets, netWorth, mha, goals, household
 - `services/`: csvImport, ruleMatcher (exports `loadRules`, `computeEdits`, `countMatches`, `reapplyRulesToAllTransactions`, `reapplyRulesToTransaction`, `revertEditsForRule`, `applyRulesToDraft`), simplefinClient, simplefinSync, transferMatcher
 
 ### Frontend (`frontend/`)
 - `index.html` (Inter Tight font, PWA manifest link, pre-paint theme script, SW registration)
 - `public/`: manifest.webmanifest, icon.svg, icon-maskable.svg, sw.js
-- `src/main.jsx`, `src/App.jsx` (BrowserRouter, passes accounts + categories to Transactions and Dashboard), `src/Login.jsx`, `src/api.js` (get/post/put/patch/del), `src/index.css` (~3000 lines)
+- `src/main.jsx`, `src/App.jsx` (BrowserRouter, passes accounts + categories to Transactions and Dashboard), `src/Login.jsx`, `src/api.js` (get/post/put/patch/del), `src/index.css` (~7000 lines)
 - `src/hooks/useTheme.js`
 - `src/components/`: AnimatedModal, AppDialog, BottomTabs, DesktopSidebar, DropdownMenu, FilterSheet, InlinePopover, MoreSheet, PageHero, SelectableListItem, SyncErrorBanner
 - `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, HousingCalculator, NetWorth, Household, MhaTracker, Goals

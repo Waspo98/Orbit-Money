@@ -336,10 +336,10 @@ changing behavior, manually smoke test the affected area and at minimum confirm:
 
 ## Versioning
 
-Orbit Money uses SemVer-compatible package versions and displays a shorter beta
-label in the app. For beta releases, keep the user-facing build label in
-`frontend/src/version.js` as `v<major>.<minor>b`; the current beta build is
-`v0.1b`.
+Orbit Money uses SemVer-compatible package versions and displays a shorter
+user-facing build label in the app. Keep `frontend/package.json` as the source
+for the package version and keep the displayed label in
+`frontend/src/version.js`; the current app label is `v0.3`.
 
 ## Housing Calculator And Real Estate
 
@@ -375,10 +375,13 @@ employer match assumptions, and benefit values such as HSA, dependent care FSA,
 health premiums, and other annual benefits.
 
 Saving a member also writes a dated income snapshot so historical compensation
-is preserved for future reporting and retirement projection work. Storage is
-additive: migration `019_household_income.sql` adds `household_members` and
-`household_income_records`. It does not change Docker volumes, ports, auth
-behavior, imports, or sync storage.
+is preserved for future reporting and retirement projection work. Members can
+link existing retirement and HSA accounts so the Goals retirement calculator can
+use current balances without duplicating storage. Storage is additive:
+migration `019_household_income.sql` adds `household_members` and
+`household_income_records`, and migration
+`020_household_retirement_accounts.sql` adds the member-to-account links. It
+does not change Docker volumes, ports, auth behavior, imports, or sync storage.
 
 ## Goals
 

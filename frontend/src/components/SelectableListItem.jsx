@@ -1,5 +1,6 @@
 export default function SelectableListItem({
   active = false,
+  disabled = false,
   leading,
   title,
   subtitle,
@@ -16,6 +17,7 @@ export default function SelectableListItem({
       onClick={onClick}
       aria-pressed={active}
       aria-label={ariaLabel}
+      disabled={disabled}
     >
       {leading && <span className="selectable-list-leading">{leading}</span>}
       <span className="selectable-list-main">

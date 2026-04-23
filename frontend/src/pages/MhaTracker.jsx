@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import PageHero from '../components/PageHero.jsx';
+import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { TransactionRow, EditTransactionModal } from './Transactions.jsx';
 import { RuleEditor } from './Rules.jsx';
@@ -36,6 +37,12 @@ function parseYearParam(value) {
 
 function formatYearLabel(year) {
   return String(year || currentYear());
+}
+
+function categoryTypeLabel(category) {
+  if (category.is_income) return 'Income';
+  if (category.is_transfer) return 'Transfer';
+  return 'Spending';
 }
 
 function normalizeMhaTransaction(txn) {
@@ -344,27 +351,22 @@ export default function MhaTracker() {
               ) : (
                 <div className="mha-picker-list">
                   {visibleAccounts.map((account) => (
-                    <button
+                    <SelectableListItem
                       key={account.id}
-                      type="button"
-                      className={`mha-picker-row ${account.mha_default_eligible ? 'active' : ''}`}
-                      onClick={() => toggleAccount(account)}
+                      active={!!account.mha_default_eligible}
                       disabled={savingAccountId === account.id}
-                      aria-pressed={!!account.mha_default_eligible}
-                    >
-                      <span className="mha-picker-main">
-                        <strong>{account.name}</strong>
-                        <span>
-                          <span className={`type-pill type-${account.type}`}>
-                            {ACCOUNT_TYPE_LABELS[account.type] || account.type}
-                          </span>
-                          {account.institution && <em>{account.institution}</em>}
+                      className="mha-selectable-row"
+                      leading={(
+                        <span className={`type-pill type-${account.type}`}>
+                          {ACCOUNT_TYPE_LABELS[account.type] || account.type}
                         </span>
-                      </span>
-                      <span className="mha-picker-state">
-                        {account.mha_default_eligible ? 'Included' : 'Off'}
-                      </span>
-                    </button>
+                      )}
+                      title={account.name}
+                      subtitle={account.institution || 'No institution'}
+                      sidePrimary={account.mha_default_eligible ? 'Included' : 'Off'}
+                      onClick={() => toggleAccount(account)}
+                      ariaLabel={`${account.mha_default_eligible ? 'Exclude' : 'Include'} ${account.name} by default`}
+                    />
                   ))}
                 </div>
               )}
@@ -390,30 +392,20 @@ export default function MhaTracker() {
               ) : (
                 <div className="mha-picker-list">
                   {visibleCategories.map((category) => (
-                    <button
+                    <SelectableListItem
                       key={category.id}
-                      type="button"
-                      className={`mha-picker-row ${category.mha_default_eligible ? 'active' : ''}`}
-                      onClick={() => toggleCategory(category)}
+                      active={!!category.mha_default_eligible}
                       disabled={savingCategoryId === category.id}
-                      aria-pressed={!!category.mha_default_eligible}
-                    >
-                      <span className="mha-picker-main">
-                        <strong>
-                          {category.icon && <span style={{ color: category.color }}>{category.icon} </span>}
-                          {category.name}
-                        </strong>
-                        <span>
-                          <span className="type-pill">
-                            {category.is_income ? 'Income' : category.is_transfer ? 'Transfer' : 'Spending'}
-                          </span>
-                          {category.is_transfer ? <em>Excluded from budgets</em> : null}
-                        </span>
-                      </span>
-                      <span className="mha-picker-state">
-                        {category.mha_default_eligible ? 'Included' : 'Off'}
-                      </span>
-                    </button>
+                      className="mha-selectable-row"
+                      leading={category.icon ? (
+                        <span style={{ color: category.color }}>{category.icon}</span>
+                      ) : null}
+                      title={category.name}
+                      subtitle={`${categoryTypeLabel(category)}${category.is_transfer ? ' - Excluded from budgets' : ''}`}
+                      sidePrimary={category.mha_default_eligible ? 'Included' : 'Off'}
+                      onClick={() => toggleCategory(category)}
+                      ariaLabel={`${category.mha_default_eligible ? 'Disable' : 'Enable'} MHA auto-include for ${category.name}`}
+                    />
                   ))}
                 </div>
               )}
@@ -439,30 +431,20 @@ export default function MhaTracker() {
               ) : (
                 <div className="mha-picker-list">
                   {visibleIgnoredCategories.map((category) => (
-                    <button
+                    <SelectableListItem
                       key={category.id}
-                      type="button"
-                      className={`mha-picker-row ${category.mha_default_ignored ? 'ignored-active' : ''}`}
-                      onClick={() => toggleIgnoredCategory(category)}
+                      active={!!category.mha_default_ignored}
                       disabled={savingIgnoredCategoryId === category.id}
-                      aria-pressed={!!category.mha_default_ignored}
-                    >
-                      <span className="mha-picker-main">
-                        <strong>
-                          {category.icon && <span style={{ color: category.color }}>{category.icon} </span>}
-                          {category.name}
-                        </strong>
-                        <span>
-                          <span className="type-pill">
-                            {category.is_income ? 'Income' : category.is_transfer ? 'Transfer' : 'Spending'}
-                          </span>
-                          {category.is_transfer ? <em>Excluded from budgets</em> : null}
-                        </span>
-                      </span>
-                      <span className="mha-picker-state">
-                        {category.mha_default_ignored ? 'Ignored' : 'Allowed'}
-                      </span>
-                    </button>
+                      className="mha-selectable-row mha-ignore-row"
+                      leading={category.icon ? (
+                        <span style={{ color: category.color }}>{category.icon}</span>
+                      ) : null}
+                      title={category.name}
+                      subtitle={`${categoryTypeLabel(category)}${category.is_transfer ? ' - Excluded from budgets' : ''}`}
+                      sidePrimary={category.mha_default_ignored ? 'Ignored' : 'Allowed'}
+                      onClick={() => toggleIgnoredCategory(category)}
+                      ariaLabel={`${category.mha_default_ignored ? 'Allow' : 'Ignore'} ${category.name} for MHA defaults`}
+                    />
                   ))}
                 </div>
               )}

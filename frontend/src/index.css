@@ -2791,80 +2791,21 @@ input, textarea, select {
   gap: 10px;
 }
 
-.mha-picker-row {
-  min-width: 0;
+.mha-selectable-row {
   min-height: 74px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
 }
 
-.mha-picker-row:hover,
-.mha-picker-row.active {
-  border-color: transparent;
-  background: var(--accent-soft);
-}
-
-.mha-picker-row.ignored-active {
-  border-color: transparent;
-  background: color-mix(in srgb, #fee2e2 76%, var(--surface));
-}
-
-.mha-picker-row.ignored-active .mha-picker-state {
-  color: #b91c1c;
-}
-
-.mha-picker-row:disabled {
+.mha-selectable-row:disabled {
   cursor: progress;
   opacity: 0.72;
 }
 
-.mha-picker-main {
-  min-width: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.mha-picker-main strong {
-  min-width: 0;
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.96rem;
-}
-
-.mha-picker-main > span {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-}
-
-.mha-picker-main em {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-style: normal;
-}
-
-.mha-picker-state {
-  flex: 0 0 auto;
+.mha-selectable-row .selectable-list-side strong {
   color: var(--accent);
-  font-size: 0.82rem;
-  font-weight: 650;
+}
+
+.mha-ignore-row.active .selectable-list-side strong {
+  color: #b91c1c;
 }
 
 .mha-transaction-list {
@@ -2888,13 +2829,11 @@ input, textarea, select {
     grid-column: 1 / -1;
   }
 
-  .mha-picker-row,
   .mha-transaction-row {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .mha-picker-state,
   .mha-transaction-row .networth-account-side {
     width: 100%;
     min-width: 0;
