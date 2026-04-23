@@ -3757,7 +3757,8 @@ input, textarea, select {
 
 .retirement-planner-hero span,
 .retirement-metric span,
-.retirement-member-row span {
+.retirement-member-row span,
+.retirement-member-pane span {
   color: var(--text-muted);
   font-size: 0.78rem;
   font-weight: 650;
@@ -3774,12 +3775,6 @@ input, textarea, select {
 .retirement-planner-hero em {
   font-style: normal;
   font-weight: 700;
-}
-
-.retirement-planner-hero small {
-  color: var(--text-muted);
-  font-size: 0.82rem;
-  line-height: 1.35;
 }
 
 .retirement-hero-age-field {
@@ -3868,10 +3863,17 @@ input, textarea, select {
 }
 
 .retirement-projection-copy strong {
-  color: var(--text);
   font-size: 1.5rem;
   line-height: 1;
   font-weight: 750;
+}
+
+.retirement-projection-copy strong.income {
+  color: var(--income);
+}
+
+.retirement-projection-copy strong.expense {
+  color: var(--danger);
 }
 
 .retirement-projection-controls {
@@ -3895,13 +3897,21 @@ input, textarea, select {
   text-align: center;
 }
 
-.retirement-chart-labels {
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+.retirement-chart-age-labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
 }
 
-.retirement-chart-labels span,
-.retirement-chart-labels strong {
+.retirement-chart-age-labels span {
   white-space: nowrap;
+}
+
+.retirement-chart-age-labels span:last-child {
+  text-align: right;
 }
 
 .retirement-chart-gridline {
@@ -3920,33 +3930,6 @@ input, textarea, select {
   stroke: color-mix(in srgb, var(--warning) 72%, transparent);
   stroke-width: 2;
   stroke-dasharray: 10 8;
-}
-
-.retirement-projection-legend {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-}
-
-.retirement-projection-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.retirement-legend-line {
-  width: 24px;
-  height: 0;
-  border-top: 3px solid var(--accent);
-  border-radius: 999px;
-}
-
-.retirement-legend-line-baseline {
-  border-top-color: color-mix(in srgb, var(--text-muted) 65%, transparent);
-  border-top-style: dashed;
 }
 
 .retirement-planner-hero em.income {
@@ -4076,36 +4059,43 @@ input, textarea, select {
   gap: 10px;
 }
 
-.retirement-member-list {
+.retirement-member-card {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  overflow: hidden;
 }
 
-.retirement-member-row {
+.retirement-member-pane {
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
+  padding: 14px;
 }
 
-.retirement-member-row > div {
+.retirement-member-pane + .retirement-member-pane {
+  border-left: 1px solid var(--border);
+}
+
+.retirement-member-pane > div {
   min-width: 0;
   display: grid;
   gap: 3px;
 }
 
-.retirement-member-row strong {
+.retirement-member-pane strong {
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.retirement-member-row em {
+.retirement-member-pane em {
   flex: 0 0 auto;
   color: var(--text);
   font-style: normal;
@@ -4778,20 +4768,25 @@ input, textarea, select {
     width: 96px;
   }
 
-  .retirement-member-row {
+  .retirement-member-card {
+    grid-template-columns: 1fr;
+  }
+
+  .retirement-member-pane {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .retirement-member-row em {
+  .retirement-member-pane + .retirement-member-pane {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .retirement-member-pane em {
     white-space: normal;
   }
 
-  .retirement-chart-labels {
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  }
-
-  .retirement-chart-labels span:last-child {
+  .retirement-chart-age-labels span:last-child {
     text-align: right;
   }
 

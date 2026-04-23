@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DndContext,
@@ -17,6 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import AppRangeSlider from '../components/AppRangeSlider.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem from '../components/ReorderListItem.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
@@ -757,9 +758,6 @@ function RetirementPlanner({ goal, household }) {
     : bridgeSurplus >= 0
       ? `${formatMoney(bridgeSurplus)} bridge surplus`
       : `${formatMoney(Math.abs(bridgeSurplus))} bridge gap`;
-  const sourceSummary = usesLinkedAccounts
-    ? `${linkedAccounts.length} household ${linkedAccounts.length === 1 ? 'account' : 'accounts'} linked`
-    : 'Using retirement goal allocations';
   const defaultMonthlySavings = annualSavings / 12;
   const scenarioMonthlyValue = String(scenarioMonthlySavings).trim() === ''
     ? defaultMonthlySavings
@@ -822,7 +820,6 @@ function RetirementPlanner({ goal, household }) {
             <em className={gap >= 0 ? 'income' : 'expense'}>
               {gap >= 0 ? `${formatMoney(gap)} surplus` : `${formatMoney(Math.abs(gap))} short`}
             </em>
-            <small>{sourceSummary}</small>
             <label className="field retirement-hero-age-field">
               <span>Retirement Age</span>
               <div className="retirement-age-stepper">
@@ -875,7 +872,6 @@ function RetirementPlanner({ goal, household }) {
               targetNestEgg={targetNestEgg}
               defaultProjection={defaultProjection}
               monthlySavings={scenarioMonthlyValue}
-              monthlySavingsDefault={defaultMonthlySavings}
               scenarioProjection={scenarioProjection}
               scenarioGap={scenarioGap}
               defaultPoints={defaultPoints}
@@ -885,11 +881,11 @@ function RetirementPlanner({ goal, household }) {
               onMonthlySavingsChange={setScenarioMonthlySavings}
             />
 
-            <div className="retirement-member-list">
+            <div className="retirement-member-card">
               {members.length === 0 ? (
                 <p className="subtle">Add household income and match details to unlock employer contribution projections.</p>
               ) : members.map((member) => (
-                <div key={member.id} className="retirement-member-row">
+                <div key={member.id} className="retirement-member-pane">
                   <div>
                     <strong>{member.name}</strong>
                     <span>{member.retirement_accounts?.length || 0} accounts | {formatPercent(member.employee_contribution_percent)} employee | {formatPercent(member.employer_match_percent)} match</span>
@@ -989,7 +985,6 @@ function RetirementProjectionPanel({
   targetNestEgg,
   defaultProjection,
   monthlySavings,
-  monthlySavingsDefault,
   scenarioProjection,
   scenarioGap,
   defaultPoints,
@@ -1000,10 +995,6 @@ function RetirementProjectionPanel({
 }) {
   const width = 640;
   const height = 220;
-  const baselineChartPoints = defaultPoints.map((point) => ({
-    month: String(point.yearOffset),
-    amount: point.amount
-  }));
   const chartPoints = points.map((point) => ({
     month: String(point.yearOffset),
     amount: point.amount
@@ -1017,7 +1008,6 @@ function RetirementProjectionPanel({
   ) * 1.08;
   const yMax = Math.max(targetNestEgg, Math.min(10000000, computedYMax));
   const yMin = 0;
-  const baselineLine = chartPathWithRange(baselineChartPoints, width, height, yMin, yMax);
   const line = chartPathWithRange(chartPoints, width, height, yMin, yMax);
   const area = areaPathWithRange(chartPoints, width, height, yMin, yMax);
   const targetY = height - ((targetNestEgg - yMin) / (yMax - yMin)) * height;
@@ -1034,7 +1024,9 @@ function RetirementProjectionPanel({
     <div className="retirement-projection-panel">
       <div className="retirement-projection-copy">
         <span>Projection Curve</span>
-        <strong>{scenarioGap >= 0 ? 'On pace' : 'Below target'}</strong>
+        <strong className={scenarioGap >= 0 ? 'income' : 'expense'}>
+          {scenarioGap >= 0 ? 'On Pace' : 'Below Target'} | {formatMoney(scenarioProjection)}
+        </strong>
         <em>
           {scenarioGap >= 0
             ? `${formatMoney(scenarioGap)} above target at retirement`
@@ -1063,26 +1055,20 @@ function RetirementProjectionPanel({
             Target {formatMoney(targetNestEgg)}
           </text>
           <path d={area} fill="url(#retirementProjectionArea)" />
-          <path d={baselineLine} fill="none" stroke="color-mix(in srgb, var(--text-muted) 65%, transparent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="10 8" />
           <path d={line} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <div className="networth-chart-labels retirement-chart-labels">
+        <div className="retirement-chart-age-labels">
           <span>Age {Math.round(currentAge)}</span>
-          <strong>{formatMoney(scenarioProjection)}</strong>
           <span>Age {Math.round(retirementAge)}</span>
         </div>
         <div className="retirement-chart-x-label">Age</div>
       </div>
-      <div className="retirement-projection-legend">
-        <span><i className="retirement-legend-line retirement-legend-line-scenario" /> Scenario</span>
-        <span><i className="retirement-legend-line retirement-legend-line-baseline" /> Current household savings</span>
-      </div>
       <div className="goal-imagine-controls retirement-projection-controls">
-        <input
-          type="range"
+        <AppRangeSlider
           min="0"
           max={rangeMax}
           step="25"
+          hapticStep="25"
           value={Math.min(rangeMax, Math.max(0, monthlySavings))}
           onChange={(e) => handleSlider(e.target.value)}
           aria-label="Retirement savings per month"
@@ -1091,7 +1077,6 @@ function RetirementProjectionPanel({
           type="text"
           value={formatCurrencyInput(monthlySavings)}
           onChange={(e) => onMonthlySavingsChange(formatCurrencyInput(e.target.value))}
-          placeholder={formatCurrencyInput(monthlySavingsDefault)}
           inputMode="numeric"
           aria-label="Retirement savings per month"
         />
@@ -1138,23 +1123,9 @@ function GoalChart({ goal }) {
 }
 
 function ImaginePanel({ goal, imagineMonthly, imaginedEta, onChange }) {
-  const lastTickRef = useRef(null);
   const imaginedText = imaginedEta?.date
     ? `Goal will be reached in ${formatFullMonthDate(imaginedEta.date)}`
     : 'Goal needs more monthly savings history to project a date';
-
-  function tick(value) {
-    const tickValue = Math.round(Number(value) / 25);
-    if (lastTickRef.current !== tickValue) {
-      lastTickRef.current = tickValue;
-      if (navigator.vibrate) navigator.vibrate(8);
-    }
-  }
-
-  function handleSlider(value) {
-    tick(value);
-    onChange(value);
-  }
 
   return (
     <div className="goal-imagine-panel">
@@ -1164,14 +1135,13 @@ function ImaginePanel({ goal, imagineMonthly, imaginedEta, onChange }) {
         <em>{imaginedText}</em>
       </div>
       <div className="goal-imagine-controls">
-        <input
-          type="range"
+        <AppRangeSlider
           min="0"
           max="1000"
           step="25"
+          hapticStep="25"
           value={imagineMonthly}
-          onPointerDown={() => tick(imagineMonthly)}
-          onChange={(e) => handleSlider(Number(e.target.value))}
+          onChange={(e) => onChange(Number(e.target.value))}
           aria-label={`Extra monthly savings for ${goal.name}`}
         />
         <input
@@ -1708,22 +1678,12 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
 }
 
 function AllocationMeter({ allocation, maxAmount, currentAmount, otherAmount, fixedCanSteal, onChange }) {
-  const lastTickRef = useRef(null);
   const rangeValue =
     allocation.allocation_type === 'fixed'
       ? Math.min(maxAmount, allocationValueNumber(allocation))
       : allocationValueNumber(allocation);
 
-  function tick(value) {
-    const tickValue = Math.round(Number(value) / (allocation.allocation_type === 'fixed' ? 100 : 5));
-    if (lastTickRef.current !== tickValue) {
-      lastTickRef.current = tickValue;
-      if (navigator.vibrate) navigator.vibrate(8);
-    }
-  }
-
   function handleRange(value) {
-    tick(value);
     if (allocation.allocation_type === 'fixed') {
       onChange('allocation_value', formatCurrencyInput(value));
     } else {
@@ -1733,13 +1693,12 @@ function AllocationMeter({ allocation, maxAmount, currentAmount, otherAmount, fi
 
   return (
     <div className="goal-meter-wrap">
-      <input
-        type="range"
+      <AppRangeSlider
         min="0"
         max={allocation.allocation_type === 'fixed' ? Math.max(0, Math.round(maxAmount)) : 100}
         step={allocation.allocation_type === 'fixed' ? 50 : 1}
+        hapticStep={allocation.allocation_type === 'fixed' ? 100 : 5}
         value={rangeValue}
-        onPointerDown={() => tick(rangeValue)}
         onChange={(e) => handleRange(Number(e.target.value))}
         aria-label="Goal allocation meter"
       />
