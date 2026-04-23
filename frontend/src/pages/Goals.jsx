@@ -207,10 +207,6 @@ function futureValueSeries(current, monthly, monthlyReturn, months) {
     contribution * ((((1 + monthlyReturn) ** months) - 1) / monthlyReturn);
 }
 
-function hasCurrencyValue(value) {
-  return String(value ?? '').replace(/[$,\s]/g, '').trim() !== '';
-}
-
 function classifyRetirementAccount(name) {
   const text = String(name || '').toLowerCase();
   if (text.includes('hsa')) return 'HSA';
@@ -219,14 +215,6 @@ function classifyRetirementAccount(name) {
   if (text.includes('401')) return '401(k)';
   if (text.includes('ira')) return 'IRA';
   return 'Other';
-}
-
-function monthlyNeededForTarget(current, target, monthlyReturn, months) {
-  if (months <= 0) return Math.max(0, target - current);
-  if (monthlyReturn <= 0) return Math.max(0, (target - current) / months);
-  const futurePrincipal = current * ((1 + monthlyReturn) ** months);
-  const factor = (((1 + monthlyReturn) ** months) - 1) / monthlyReturn;
-  return Math.max(0, (target - futurePrincipal) / factor);
 }
 
 function chartRange(history) {
@@ -361,6 +349,7 @@ export default function Goals() {
   const goals = data?.goals || [];
   const accounts = data?.accounts || [];
   const selectedGoal = goals.find((goal) => goal.id === selectedId) || goals[0] || null;
+  const showingRetirementPlanner = isRetirementGoal(selectedGoal);
   const imaginedEta = selectedGoal ? estimateEta(selectedGoal, imagineMonthly) : null;
   async function handleDelete(goal) {
     const ok = await confirm(`Delete "${goal.name}"? Its account allocations will be removed.`, {
@@ -469,44 +458,48 @@ export default function Goals() {
         </div>
       ) : (
         <div className="goals-grid">
-          <section
-            className={`dashboard-card goals-focus-card ${focusCollapsed ? 'collapsed' : ''}`}
-            onClick={toggleFocusCard}
-            onKeyDown={handleFocusCardKeyDown}
-            tabIndex={0}
-            aria-expanded={!focusCollapsed}
-          >
-            <header className="dashboard-card-header">
-              <h3>{selectedGoal?.name || 'Goal'}</h3>
-              <div className="goals-card-actions">
-                <button type="button" className="dashboard-card-link button-link" onClick={() => openEditGoal(selectedGoal)}>
-                  Edit
-                </button>
-              </div>
-            </header>
-            <div className="dashboard-card-body">
-              <GoalProgress goal={selectedGoal} />
-              <div className="goals-focus-detail" aria-hidden={focusCollapsed}>
-                <div className="goals-focus-detail-inner">
-                  <GoalChart goal={selectedGoal} />
-                  <ImaginePanel
-                    goal={selectedGoal}
-                    imagineMonthly={imagineMonthly}
-                    imaginedEta={imaginedEta}
-                    onChange={setImagineMonthly}
-                  />
-                  <div className="goals-focus-actions">
-                    <button type="button" className="btn-secondary" onClick={() => openEditGoal(selectedGoal)}>
-                      Edit goal
-                    </button>
-                    <button type="button" className="btn-danger" onClick={() => handleDelete(selectedGoal)}>
-                      Delete
-                    </button>
+          {showingRetirementPlanner ? (
+            <RetirementPlanner goal={selectedGoal} household={household} />
+          ) : (
+            <section
+              className={`dashboard-card goals-focus-card ${focusCollapsed ? 'collapsed' : ''}`}
+              onClick={toggleFocusCard}
+              onKeyDown={handleFocusCardKeyDown}
+              tabIndex={0}
+              aria-expanded={!focusCollapsed}
+            >
+              <header className="dashboard-card-header">
+                <h3>{selectedGoal?.name || 'Goal'}</h3>
+                <div className="goals-card-actions">
+                  <button type="button" className="dashboard-card-link button-link" onClick={() => openEditGoal(selectedGoal)}>
+                    Edit
+                  </button>
+                </div>
+              </header>
+              <div className="dashboard-card-body">
+                <GoalProgress goal={selectedGoal} />
+                <div className="goals-focus-detail" aria-hidden={focusCollapsed}>
+                  <div className="goals-focus-detail-inner">
+                    <GoalChart goal={selectedGoal} />
+                    <ImaginePanel
+                      goal={selectedGoal}
+                      imagineMonthly={imagineMonthly}
+                      imaginedEta={imaginedEta}
+                      onChange={setImagineMonthly}
+                    />
+                    <div className="goals-focus-actions">
+                      <button type="button" className="btn-secondary" onClick={() => openEditGoal(selectedGoal)}>
+                        Edit goal
+                      </button>
+                      <button type="button" className="btn-danger" onClick={() => handleDelete(selectedGoal)}>
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           <section className="dashboard-card goals-list-card">
             <header className="dashboard-card-header">
@@ -562,10 +555,6 @@ export default function Goals() {
               })}
             </div>
           </section>
-
-          {isRetirementGoal(selectedGoal) && (
-            <RetirementPlanner goal={selectedGoal} household={household} />
-          )}
 
           <section className="dashboard-card goals-account-card">
             <header className="dashboard-card-header">
@@ -653,10 +642,7 @@ function RetirementPlanner({ goal, household }) {
     annualReturn: '7%',
     inflation: '2.5%',
     replacementRate: '80%',
-    withdrawalRate: '4%',
-    hsaCurrentBalance: '',
-    hsaAnnualContribution: '',
-    hsaAccessAge: '65'
+    withdrawalRate: '4%'
   });
 
   const members = household?.members || [];
@@ -699,7 +685,7 @@ function RetirementPlanner({ goal, household }) {
       .find((age) => age !== null) ?? 35;
   const currentAge = Number(assumptions.currentAge) || inferredAge;
   const retirementAge = Math.max(currentAge, Number(assumptions.retirementAge) || 67);
-  const hsaAccessAge = Math.max(currentAge, Number(assumptions.hsaAccessAge) || 65);
+  const hsaAccessAge = Math.max(currentAge, 65);
   const years = Math.max(0, retirementAge - currentAge);
   const months = Math.round(years * 12);
   const monthsToHsaAccess = Math.max(0, Math.round((hsaAccessAge - currentAge) * 12));
@@ -716,12 +702,8 @@ function RetirementPlanner({ goal, household }) {
   const annualIncome = Number(summary.net_pay_annual || summary.gross_income_annual) || 0;
   const annualNeed = annualIncome * (parsePercentInput(assumptions.replacementRate) / 100);
   const withdrawalRate = Math.max(0.1, parsePercentInput(assumptions.withdrawalRate) || 4) / 100;
-  const hsaCurrent = hasCurrencyValue(assumptions.hsaCurrentBalance)
-    ? parseMoney(assumptions.hsaCurrentBalance)
-    : inferredHsaCurrent;
-  const hsaAnnual = hasCurrencyValue(assumptions.hsaAnnualContribution)
-    ? parseMoney(assumptions.hsaAnnualContribution)
-    : householdHsaAnnual;
+  const hsaCurrent = inferredHsaCurrent;
+  const hsaAnnual = householdHsaAnnual;
   const hsaMonthly = hsaAnnual / 12;
   const nonHsaCurrent = Math.max(0, currentBalance - hsaCurrent);
   const nonHsaMonthly = Math.max(0, plannedMonthly - hsaMonthly);
@@ -758,7 +740,6 @@ function RetirementPlanner({ goal, household }) {
           <button type="button" className="dashboard-card-link button-link" onClick={() => setEditingAssumptions(true)}>
             Edit Assumptions
           </button>
-          <Link to="/household" className="dashboard-card-link">Household</Link>
         </div>
       </header>
       <div className="dashboard-card-body">
@@ -770,6 +751,15 @@ function RetirementPlanner({ goal, household }) {
               {gap >= 0 ? `${formatMoney(gap)} surplus` : `${formatMoney(Math.abs(gap))} short`}
             </em>
             <small>{sourceSummary}</small>
+            <label className="field retirement-hero-age-field">
+              <span>Retirement Age</span>
+              <input
+                type="number"
+                min="1"
+                value={assumptions.retirementAge}
+                onChange={(e) => update('retirementAge', e.target.value)}
+              />
+            </label>
           </div>
           <div className="retirement-readiness-ring" style={{ '--retirement-progress': `${readiness}%` }}>
             <span>{Math.round(readiness)}%</span>
@@ -791,7 +781,7 @@ function RetirementPlanner({ goal, household }) {
             <div key={member.id} className="retirement-member-row">
               <div>
                 <strong>{member.name}</strong>
-                <span>{member.retirement_accounts?.length || 0} linked | {formatPercent(member.employee_contribution_percent)} employee | {formatPercent(member.employer_match_percent)} match</span>
+                <span>{member.retirement_accounts?.length || 0} accounts | {formatPercent(member.employee_contribution_percent)} employee | {formatPercent(member.employer_match_percent)} match</span>
               </div>
               <em>{formatMoney((Number(member.employee_retirement_annual) || 0) + (Number(member.employer_retirement_annual) || 0))}/yr</em>
             </div>
@@ -831,10 +821,6 @@ function RetirementPlanner({ goal, household }) {
                   <input type="number" min="0" value={assumptions.currentAge} onChange={(e) => update('currentAge', e.target.value)} placeholder={String(inferredAge)} />
                 </label>
                 <label className="field">
-                  <span>Retirement Age</span>
-                  <input type="number" min="1" value={assumptions.retirementAge} onChange={(e) => update('retirementAge', e.target.value)} />
-                </label>
-                <label className="field">
                   <span>Market Return</span>
                   <PercentInput value={assumptions.annualReturn} onChange={(value) => update('annualReturn', value)} placeholder="7%" />
                 </label>
@@ -849,10 +835,6 @@ function RetirementPlanner({ goal, household }) {
                 <label className="field">
                   <span>Withdrawal Rate</span>
                   <PercentInput value={assumptions.withdrawalRate} onChange={(value) => update('withdrawalRate', value)} placeholder="4%" />
-                </label>
-                <label className="field">
-                  <span>HSA Contribution Override</span>
-                  <CurrencyInput value={assumptions.hsaAnnualContribution} onChange={(value) => update('hsaAnnualContribution', value)} placeholder={formatMoney(householdHsaAnnual)} />
                 </label>
               </div>
               <div className="modal-actions">

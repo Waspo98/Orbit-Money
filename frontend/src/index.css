@@ -3771,6 +3771,15 @@ input, textarea, select {
   line-height: 1.35;
 }
 
+.retirement-hero-age-field {
+  max-width: 180px;
+  margin-top: 6px;
+}
+
+.retirement-hero-age-field span {
+  display: block;
+}
+
 .retirement-planner-hero em.income {
   color: var(--income);
 }
