@@ -25,7 +25,7 @@ export function useDragInteractionLock(isActive) {
   }, [isActive]);
 }
 
-export function ReorderListItemPreview({
+function ReorderListItemPreview({
   as: Element = 'div',
   className = '',
   leading,
@@ -104,7 +104,7 @@ export default function ReorderListItem({
   return (
     <ReorderListItemPreview
       as={as}
-      className={`draggable ${className} ${isDragging ? 'dragging drag-source' : ''} ${previewDisplaced ? 'drag-preview-target' : ''}`.trim()}
+      className={`draggable ${className} ${isDragging ? 'dragging' : ''} ${previewDisplaced ? 'drag-preview-target' : ''}`.trim()}
       leading={leading}
       title={title}
       subtitle={subtitle}

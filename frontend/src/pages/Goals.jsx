@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DndContext,
-  DragOverlay,
   closestCenter
 } from '@dnd-kit/core';
 import {
@@ -15,7 +14,6 @@ import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppRangeSlider from '../components/AppRangeSlider.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
-  ReorderListItemPreview,
   useDragInteractionLock,
   useReorderSensors
 } from '../components/ReorderListItem.jsx';
@@ -364,7 +362,6 @@ export default function Goals() {
 
   const goals = data?.goals || [];
   const accounts = data?.accounts || [];
-  const activeDragGoal = goals.find((goal) => goal.id === activeDragId) || null;
   const selectedGoal = goals.find((goal) => goal.id === selectedId) || goals[0] || null;
   const showingRetirementPlanner = isRetirementGoal(selectedGoal);
   const imaginedEta = selectedGoal ? estimateEta(selectedGoal, imagineMonthly) : null;
@@ -578,9 +575,6 @@ export default function Goals() {
                     </div>
                   </SortableContext>
                   {activeDragId && <div className="drag-screen-blocker" aria-hidden="true" />}
-                  <DragOverlay dropAnimation={null}>
-                    {activeDragGoal ? <GoalDragOverlay goal={activeDragGoal} /> : null}
-                  </DragOverlay>
                 </DndContext>
               ) : goals.map((goal) => {
                 const leading = <span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>;
@@ -652,19 +646,6 @@ function DraggableGoalRow({ goal, previewDisplaced = false }) {
       className="goal-list-row"
       handleLabel={`Reorder ${goal.name}`}
       previewDisplaced={previewDisplaced}
-      leading={<span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>}
-      title={goal.name}
-      subtitle={`${formatMoney(goal.current_amount)} of ${formatMoney(goal.target_amount)}`}
-      sidePrimary={`${Math.round(goal.progress_percent || 0)}%`}
-      sideSecondary={formatEta(goal.eta)}
-    />
-  );
-}
-
-function GoalDragOverlay({ goal }) {
-  return (
-    <ReorderListItemPreview
-      className="goal-list-row drag-overlay-card"
       leading={<span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>}
       title={goal.name}
       subtitle={`${formatMoney(goal.current_amount)} of ${formatMoney(goal.target_amount)}`}

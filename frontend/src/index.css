@@ -4257,11 +4257,6 @@ input, textarea, select {
   border-style: solid;
 }
 
-.reorder-list-row.drag-source {
-  opacity: 0.14;
-  box-shadow: none;
-}
-
 .reorder-list-row.drag-preview-target {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent-soft) 58%, var(--surface) 42%);
@@ -5784,6 +5779,11 @@ input, textarea, select {
   cursor: pointer;
 }
 
+.account-group-toggle:disabled {
+  cursor: default;
+  opacity: 0.92;
+}
+
 .account-group-toggle:hover h3,
 .account-group-toggle:focus-visible h3 {
   color: var(--text);
@@ -5848,6 +5848,17 @@ input, textarea, select {
   overflow: hidden;
 }
 
+.account-group-tools {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 14px 10px;
+}
+
+.account-group-reorder-row .selectable-list-side {
+  justify-items: end;
+  text-align: right;
+}
+
 .account-group-list .account-row,
 .account-list.reorder-active .account-row {
   padding: 13px 14px;
@@ -5898,19 +5909,9 @@ input, textarea, select {
   z-index: 100;
 }
 
-.account-group-card.drag-source {
-  opacity: 0.14;
-  box-shadow: none;
-}
-
 .account-group-card.drag-preview-target {
   border-color: color-mix(in srgb, var(--accent) 42%, var(--border) 58%);
   background: color-mix(in srgb, var(--accent-soft) 32%, var(--surface) 68%);
-}
-
-.drag-overlay-card {
-  pointer-events: none;
-  box-shadow: var(--shadow-xl);
 }
 
 .drag-screen-blocker {
