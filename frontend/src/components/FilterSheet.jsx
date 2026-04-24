@@ -4,6 +4,7 @@ import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
 } from './CurrencyInput.jsx';
+import { formatLocalDate } from '../lib/localDate.js';
 
 // ============================================================================
 // FilterSheet — comprehensive filter UI for the Transactions page.
@@ -31,8 +32,7 @@ const HAS_EDITS_OPTIONS = [
 
 // Date preset helpers — all return { from, to } as YYYY-MM-DD strings.
 function todayIso() {
-  const d = new Date();
-  return d.toISOString().slice(0, 10);
+  return formatLocalDate();
 }
 function monthStart(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
@@ -40,12 +40,12 @@ function monthStart(date) {
 function monthEnd(date) {
   // Last day of the given month = day 0 of the next month
   const d = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  return d.toISOString().slice(0, 10);
+  return formatLocalDate(d);
 }
 function daysAgo(n) {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
+  return formatLocalDate(d);
 }
 
 const DATE_PRESETS = [

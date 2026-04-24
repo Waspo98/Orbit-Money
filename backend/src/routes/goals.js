@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
+import { formatLocalDate, formatLocalMonth } from '../lib/localDate.js';
 
 const router = express.Router();
 
@@ -13,8 +14,7 @@ function monthKey(date) {
 }
 
 function currentMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return formatLocalMonth();
 }
 
 function addMonths(key, amount) {
@@ -26,7 +26,7 @@ function addMonths(key, amount) {
 function addMonthsToDate(date, amount) {
   const next = new Date(date);
   next.setMonth(next.getMonth() + amount);
-  return next.toISOString().slice(0, 10);
+  return formatLocalDate(next);
 }
 
 function validDate(value) {

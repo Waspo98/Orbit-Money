@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
+import { formatLocalMonth } from '../lib/localDate.js';
 
 const router = express.Router();
 
@@ -164,13 +165,9 @@ function buildHistory(accounts, monthlyDeltas, balanceRecords, firstMonth, lates
   return rows.reverse();
 }
 
-function sumNetWorthChange(accounts, deltas) {
-  const accountById = new Map(accounts.map((account) => [account.id, account]));
-  return deltas.reduce((total, delta) => {
-    const account = accountById.get(delta.account_id);
-    if (!account) return total;
-    return total + contributionForAccount(account, delta.amount);
-  }, 0);
+function findYearStartRow(history, latestMonth) {
+  const yearStartMonth = `${latestMonth.slice(0, 4)}-01`;
+  return history.find((row) => row.month === yearStartMonth) ?? history[0] ?? null;
 }
 
 router.get('/', requireAuth, (req, res) => {
@@ -212,7 +209,7 @@ router.get('/', requireAuth, (req, res) => {
       )
       .get();
 
-    const todayMonth = new Date().toISOString().slice(0, 7);
+    const todayMonth = formatLocalMonth();
     const latestTransactionMonth = monthKey(latestTransaction.latest);
     const latestRecordMonth = monthKey(latestRecord.latest);
     const latestDataMonth = [latestTransactionMonth, latestRecordMonth, todayMonth]
@@ -265,17 +262,7 @@ router.get('/', requireAuth, (req, res) => {
     );
     const previous = history.length > 1 ? history[history.length - 2] : null;
     const first = history[0] || null;
-    const yearStart = `${latestMonth.slice(0, 4)}-01-01`;
-    const yearToDateDeltas = db
-      .prepare(
-        `
-        SELECT account_id, SUM(amount) AS amount
-          FROM transactions
-         WHERE date >= ?
-         GROUP BY account_id
-      `
-      )
-      .all(yearStart);
+    const yearStartRow = findYearStartRow(history, latestMonth);
 
     res.json({
       summary: {
@@ -283,7 +270,7 @@ router.get('/', requireAuth, (req, res) => {
         accountCount: accounts.length,
         monthOverMonth: previous ? current.totals.netWorth - previous.netWorth : 0,
         periodChange: first ? current.totals.netWorth - first.netWorth : 0,
-        yearToDateChange: sumNetWorthChange(accounts, yearToDateDeltas)
+        yearToDateChange: yearStartRow ? current.totals.netWorth - yearStartRow.netWorth : 0
       },
       history,
       breakdown: current.breakdown

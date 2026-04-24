@@ -8,6 +8,13 @@ import CurrencyInput, {
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import AppIcon from '../components/AppIcon.jsx';
+import {
+  formatCurrency,
+  formatPercent,
+  formatPercentInput,
+  parsePercentInput
+} from '../lib/formatters.js';
+import { formatLocalDate } from '../lib/localDate.js';
 
 const ROLE_OPTIONS = [
   ['adult', 'Adult'],
@@ -58,30 +65,6 @@ const PAY_PERIODS = {
   none: 0
 };
 
-function formatMoney(amount, digits = 0) {
-  return Number(amount || 0).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: digits
-  });
-}
-
-function formatPercent(value) {
-  const number = Number(value) || 0;
-  return `${number.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
-}
-
-function parsePercentInput(value) {
-  const parsed = Number(String(value ?? '').replace(/[^0-9.]/g, ''));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function formatPercentInput(value) {
-  const cleaned = String(value ?? '').replace(/[^0-9.]/g, '');
-  if (!cleaned) return '';
-  return `${cleaned}%`;
-}
-
 function safePayPeriods(payFrequency) {
   return Math.max(1, PAY_PERIODS[payFrequency] || 0);
 }
@@ -92,6 +75,14 @@ function annualToPerPaycheck(value, payFrequency) {
 
 function perPaycheckToAnnual(value, payFrequency) {
   return parseCurrencyInput(value) * safePayPeriods(payFrequency);
+}
+
+function monthlyToPerPaycheck(value, payFrequency) {
+  return formatCurrencyInput((Number(value) || 0) * 12 / safePayPeriods(payFrequency));
+}
+
+function perPaycheckToMonthly(value, payFrequency) {
+  return (parseCurrencyInput(value) * safePayPeriods(payFrequency)) / 12;
 }
 
 function labelFor(options, value) {
@@ -126,11 +117,11 @@ function emptyDraft() {
     employee_contribution_percent: '',
     employer_match_percent: '',
     employer_match_limit_percent: '',
-    health_premium_per_month: '',
+    health_premium_per_paycheck: '',
     hsa_contribution_annual: '',
     dependent_care_fsa_annual: '',
     other_benefits_annual: '',
-    effective_date: new Date().toISOString().slice(0, 10),
+    effective_date: formatLocalDate(),
     retirement_accounts: [],
     notes: ''
   };
@@ -143,14 +134,14 @@ function toDraft(member) {
     ...member,
     gross_income_annual: formatCurrencyInput(member.gross_income_annual),
     net_pay_per_period: formatCurrencyInput(member.net_pay_per_period),
-    health_premium_per_month: annualToPerPaycheck(member.health_premium_per_month, member.pay_frequency),
+    health_premium_per_paycheck: monthlyToPerPaycheck(member.health_premium_per_month, member.pay_frequency),
     hsa_contribution_annual: annualToPerPaycheck(member.hsa_contribution_annual, member.pay_frequency),
     dependent_care_fsa_annual: annualToPerPaycheck(member.dependent_care_fsa_annual, member.pay_frequency),
     other_benefits_annual: annualToPerPaycheck(member.other_benefits_annual, member.pay_frequency),
     employee_contribution_percent: formatPercentInput(member.employee_contribution_percent),
     employer_match_percent: formatPercentInput(member.employer_match_percent),
     employer_match_limit_percent: formatPercentInput(member.employer_match_limit_percent),
-    effective_date: new Date().toISOString().slice(0, 10),
+    effective_date: member.effective_date || formatLocalDate(),
     retirement_accounts: (member.retirement_accounts || []).map((account) => ({
       account_id: Number(account.account_id),
       account_kind: account.account_kind || 'other'
@@ -177,7 +168,7 @@ function toPayload(draft) {
     employer_match_percent: parsePercentInput(draft.employer_match_percent),
     employer_match_limit_percent: parsePercentInput(draft.employer_match_limit_percent),
     employer_match_annual_cap: 0,
-    health_premium_per_month: perPaycheckToAnnual(draft.health_premium_per_month, draft.pay_frequency),
+    health_premium_per_month: perPaycheckToMonthly(draft.health_premium_per_paycheck, draft.pay_frequency),
     hsa_contribution_annual: perPaycheckToAnnual(draft.hsa_contribution_annual, draft.pay_frequency),
     dependent_care_fsa_annual: perPaycheckToAnnual(draft.dependent_care_fsa_annual, draft.pay_frequency),
     other_benefits_annual: perPaycheckToAnnual(draft.other_benefits_annual, draft.pay_frequency),
@@ -301,10 +292,10 @@ export default function Household() {
               <h3>Planning Signals</h3>
             </header>
             <div className="dashboard-card-body">
-              <SignalRow label="Take-home pay" value={formatMoney(summary.net_pay_annual)} detail="Annualized from pay cadence" />
-              <SignalRow label="Retirement savings" value={formatMoney((summary.employee_retirement_annual || 0) + (summary.employer_retirement_annual || 0))} detail={`${formatMoney(summary.employer_retirement_annual)} employer`} />
-              <SignalRow label="Benefits value" value={formatMoney(summary.total_benefits_annual)} detail="Match, HSA, FSA, other" />
-              <SignalRow label="Largest contributor" value={topMember?.name || 'None'} detail={topMember ? formatMoney(topMember.household_value_annual) : formatMoney(0)} />
+              <SignalRow label="Take-home pay" value={formatCurrency(summary.net_pay_annual)} detail="Annualized from pay cadence" />
+              <SignalRow label="Retirement savings" value={formatCurrency((summary.employee_retirement_annual || 0) + (summary.employer_retirement_annual || 0))} detail={`${formatCurrency(summary.employer_retirement_annual)} employer`} />
+              <SignalRow label="Benefits value" value={formatCurrency(summary.total_benefits_annual)} detail="Match, HSA, FSA, other" />
+              <SignalRow label="Largest contributor" value={topMember?.name || 'None'} detail={topMember ? formatCurrency(topMember.household_value_annual) : formatCurrency(0)} />
             </div>
           </section>
 
@@ -324,11 +315,11 @@ export default function Household() {
                         <span>{new Date(`${record.effective_date}T00:00:00`).toLocaleDateString()}</span>
                       </div>
                       <div>
-                        <strong>{formatMoney(record.gross_income_annual)}</strong>
-                        <span>{formatMoney(record.net_pay_annual)} net</span>
+                        <strong>{formatCurrency(record.gross_income_annual)}</strong>
+                        <span>{formatCurrency(record.net_pay_annual)} net</span>
                       </div>
                       <div>
-                        <strong>{formatMoney(record.employer_retirement_annual)}</strong>
+                        <strong>{formatCurrency(record.employer_retirement_annual)}</strong>
                         <span>Employer match</span>
                       </div>
                     </div>
@@ -394,9 +385,9 @@ function MemberCard({ member, onEdit, onDelete }) {
       </div>
 
       <div className="household-member-metrics">
-        <Metric label="Gross" value={formatMoney(member.gross_income_annual)} />
-        <Metric label="Net Pay" value={formatMoney(member.net_pay_annual)} />
-        <Metric label="Employer Match" value={formatMoney(member.employer_retirement_annual)} />
+        <Metric label="Gross" value={formatCurrency(member.gross_income_annual)} />
+        <Metric label="Net Pay" value={formatCurrency(member.net_pay_annual)} />
+        <Metric label="Employer Match" value={formatCurrency(member.employer_retirement_annual)} />
         <Metric label="Retirement Rate" value={formatPercent(retirementRate)} />
       </div>
 
@@ -558,7 +549,7 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
             <div className="goal-form-grid">
               <label className="field">
                 <span>Health Premium (Per Paycheck)</span>
-                <CurrencyInput value={draft.health_premium_per_month} onChange={(value) => update('health_premium_per_month', value)} placeholder="$0" />
+                <CurrencyInput value={draft.health_premium_per_paycheck} onChange={(value) => update('health_premium_per_paycheck', value)} placeholder="$0" />
               </label>
               <label className="field">
                 <span>HSA Contribution (Per Paycheck)</span>
@@ -643,7 +634,7 @@ function AccountLinkPicker({ accounts, linkedAccounts, onChange }) {
                   <em>{account.institution || labelFor(RETIREMENT_ACCOUNT_KIND_OPTIONS, accountKindFromAccount(account))}</em>
                 </span>
                 <span className="goal-picker-side">
-                  <strong>{formatMoney(account.estimated_value || account.current_balance)}</strong>
+                  <strong>{formatCurrency(account.estimated_value || account.current_balance)}</strong>
                   <em>{active ? 'Linked' : 'Available'}</em>
                 </span>
               </button>
@@ -662,7 +653,7 @@ function AccountLinkPicker({ accounts, linkedAccounts, onChange }) {
                 <div className="goal-allocation-header">
                   <div>
                     <strong>{account.name}</strong>
-                    <span>{formatMoney(account.estimated_value || account.current_balance)} current balance</span>
+                    <span>{formatCurrency(account.estimated_value || account.current_balance)} current balance</span>
                   </div>
                   <label className="field">
                     <span>Type</span>

@@ -26,6 +26,14 @@ import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
 } from '../components/CurrencyInput.jsx';
+import {
+  formatCurrency,
+  formatSignedCurrency,
+  formatPercent,
+  formatPercentInput,
+  parsePercentInput
+} from '../lib/formatters.js';
+import { addMonthsToLocalDate } from '../lib/localDate.js';
 
 const GOAL_PRESETS = [
   { kind: 'retirement', label: 'Retirement', icon: '🏖️' },
@@ -70,17 +78,11 @@ const GOAL_COLORS = [
 ];
 
 function formatMoney(amount, digits = 0) {
-  return Number(amount || 0).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: digits
-  });
+  return formatCurrency(amount, { maximumFractionDigits: digits });
 }
 
 function formatSignedMoney(amount) {
-  const value = Number(amount || 0);
-  if (value === 0) return formatMoney(0);
-  return `${value > 0 ? '+' : '-'}${formatMoney(Math.abs(value))}`;
+  return formatSignedCurrency(amount);
 }
 
 const parseMoney = parseCurrencyInput;
@@ -117,23 +119,6 @@ function formatFullMonthDate(date) {
     month: 'long',
     year: 'numeric'
   });
-}
-
-function formatPercent(value, digits = 1) {
-  return `${Number(value || 0).toLocaleString(undefined, {
-    maximumFractionDigits: digits
-  })}%`;
-}
-
-function parsePercentInput(value) {
-  const parsed = Number(String(value ?? '').replace(/[^0-9.]/g, ''));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function formatPercentInput(value) {
-  const cleaned = String(value ?? '').replace(/[^0-9.]/g, '');
-  if (!cleaned) return '';
-  return `${cleaned}%`;
 }
 
 function ageFromBirthDate(date) {
@@ -180,9 +165,7 @@ function neededExtraForDesiredEta(goal) {
 }
 
 function addMonthsToDate(date, amount) {
-  const next = new Date(date);
-  next.setMonth(next.getMonth() + amount);
-  return next.toISOString().slice(0, 10);
+  return addMonthsToLocalDate(date, amount);
 }
 
 function estimateEta(goal, extraMonthly) {
@@ -199,9 +182,16 @@ function isRetirementGoal(goal) {
   return String(goal?.name || '').trim().toLowerCase() === 'retirement';
 }
 
-function futureValueSeries(current, monthly, monthlyReturn, months) {
+function effectiveMonthlyRate(annualReturn) {
+  const rate = Number(annualReturn) || 0;
+  if (rate <= -1) return -1;
+  return (1 + rate) ** (1 / 12) - 1;
+}
+
+function futureValueSeries(current, monthly, annualReturn, months) {
   const principal = Number(current) || 0;
   const contribution = Number(monthly) || 0;
+  const monthlyReturn = effectiveMonthlyRate(annualReturn);
   if (months <= 0) return principal;
   if (monthlyReturn <= 0) return principal + contribution * months;
   return principal * ((1 + monthlyReturn) ** months) +
@@ -210,12 +200,13 @@ function futureValueSeries(current, monthly, monthlyReturn, months) {
 
 function projectRetirementByYear(current, annualSavings, annualReturn, years) {
   const items = [{ yearOffset: 0, amount: Number(current) || 0 }];
-  let balance = Number(current) || 0;
-  const yearlyContribution = Number(annualSavings) || 0;
-  const rate = Number(annualReturn) || 0;
+  const principal = Number(current) || 0;
+  const monthlyContribution = (Number(annualSavings) || 0) / 12;
   for (let year = 1; year <= years; year += 1) {
-    balance = (balance + yearlyContribution) * (1 + rate);
-    items.push({ yearOffset: year, amount: balance });
+    items.push({
+      yearOffset: year,
+      amount: futureValueSeries(principal, monthlyContribution, annualReturn, year * 12)
+    });
   }
   return items;
 }
@@ -727,7 +718,6 @@ function RetirementPlanner({ goal, household }) {
   const annualReturn = parsePercentInput(assumptions.annualReturn) / 100;
   const inflation = parsePercentInput(assumptions.inflation) / 100;
   const realReturn = ((1 + annualReturn) / (1 + inflation)) - 1;
-  const monthlyReturn = annualReturn / 12;
   const currentBalance = usesLinkedAccounts ? linkedCurrentBalance : Number(goal?.current_amount) || 0;
   const employeeAnnual = Number(summary.employee_retirement_annual) || 0;
   const employerAnnual = Number(summary.employer_retirement_annual) || 0;
@@ -742,9 +732,9 @@ function RetirementPlanner({ goal, household }) {
   const nonHsaCurrent = Math.max(0, currentBalance - hsaCurrent);
   const nonHsaMonthly = Math.max(0, plannedMonthly - hsaMonthly);
   const targetNestEgg = annualNeed / withdrawalRate;
-  const projectedNonHsa = futureValueSeries(nonHsaCurrent, nonHsaMonthly, monthlyReturn, months);
-  const projectedHsaAtRetirement = futureValueSeries(hsaCurrent, hsaMonthly, monthlyReturn, months);
-  const projectedHsaAtAccess = futureValueSeries(hsaCurrent, hsaMonthly, monthlyReturn, monthsToHsaAccess);
+  const projectedNonHsa = futureValueSeries(nonHsaCurrent, nonHsaMonthly, annualReturn, months);
+  const projectedHsaAtRetirement = futureValueSeries(hsaCurrent, hsaMonthly, annualReturn, months);
+  const projectedHsaAtAccess = futureValueSeries(hsaCurrent, hsaMonthly, annualReturn, monthsToHsaAccess);
   const projectedBalance = projectedNonHsa + projectedHsaAtRetirement;
   const bridgeNeed = retirementAge < hsaAccessAge ? annualNeed * lockedHsaYears : 0;
   const bridgeSurplus = projectedNonHsa - bridgeNeed;

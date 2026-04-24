@@ -1,10 +1,19 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
-import { TransactionRow, EditTransactionModal } from './Transactions.jsx';
-import { RuleEditor } from './Rules.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import { RuleEditor } from '../components/rules/RuleEditor.jsx';
+import {
+  EditTransactionModal,
+  TransactionRow
+} from '../components/transactions/TransactionRow.jsx';
+import {
+  formatCompactCurrency,
+  formatCurrency,
+  formatSignedCurrency
+} from '../lib/formatters.js';
+import { formatLocalMonth } from '../lib/localDate.js';
 
 // ============================================================================
 // Dashboard - v16
@@ -27,77 +36,18 @@ import { useAppDialog } from '../components/AppDialog.jsx';
 // the literal sum.
 // ============================================================================
 
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
-
-const DAY_NAMES = [
-  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
-];
-
-// ---------- Formatting ----------
-
-function formatMoney(n) {
-  return Number(n).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD'
-  });
-}
-
-function formatMoneyCompact(n) {
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000) {
-    return `${n < 0 ? '-' : ''}$${(abs / 1_000_000).toFixed(1)}M`;
-  }
-  if (abs >= 10_000) {
-    return `${n < 0 ? '-' : ''}$${(abs / 1_000).toFixed(1)}k`;
-  }
-  return Number(n).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0
-  });
-}
-
-function formatMoneyWhole(n) {
-  return Number(n).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0
-  });
-}
-
-function formatSignedMoney(n) {
-  if (n === 0) return formatMoney(0);
-  const abs = Math.abs(n);
-  const formatted = abs.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD'
-  });
-  return n < 0 ? `-${formatted}` : `+${formatted}`;
-}
-
 function formatSignedCompact(n) {
-  if (n === 0) return formatMoneyCompact(0);
-  const compact = formatMoneyCompact(Math.abs(n));
+  if (n === 0) return formatCompactCurrency(0);
+  const compact = formatCompactCurrency(Math.abs(n));
   return n < 0 ? `-${compact}` : `+${compact}`;
 }
 
-function parseLocalDate(iso) {
-  if (!iso) return null;
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function formatDayMonth(iso) {
-  const dt = parseLocalDate(iso);
-  if (!dt) return '';
-  return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
 function formatLongDate(d) {
-  return `${DAY_NAMES[d.getDay()]}, ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
+  return d.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric'
+  });
 }
 
 function timeGreeting(d) {
@@ -115,16 +65,7 @@ function greetingEmoji(d) {
 }
 
 function formatTransactionAmount(amount) {
-  const abs = Math.abs(amount).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD'
-  });
-  return amount < 0 ? `-${abs}` : `+${abs}`;
-}
-
-function currentMonthKey() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return formatSignedCurrency(amount);
 }
 
 function daysInCurrentMonth() {
@@ -183,7 +124,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const month = currentMonthKey();
+  const month = formatLocalMonth();
 
   async function loadDashboard() {
     setLoading(true);
@@ -262,9 +203,10 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   }, [budgetData]);
 
   const summary = budgetData?.summary;
+  const totalSpent = Number(summary?.total_spent || 0);
   const overallPercent =
     summary && summary.total_budgeted > 0
-      ? (summary.total_spent_in_budgets / summary.total_budgeted) * 100
+      ? (totalSpent / summary.total_budgeted) * 100
       : null;
 
   const dayOfMonth = currentDayOfMonth();
@@ -281,8 +223,8 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
           dateLabel={formatLongDate(now)}
           greeting={timeGreeting(now)}
           stats={[
-            { label: 'Net worth', value: formatMoneyWhole(0) },
-            { label: 'Monthly net', value: formatMoneyCompact(0) },
+            { label: 'Net worth', value: formatCurrency(0, { maximumFractionDigits: 0 }) },
+            { label: 'Monthly net', value: formatCompactCurrency(0) },
             { label: 'Accounts', value: '0' }
           ]}
         />
@@ -320,7 +262,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
         dateLabel={formatLongDate(now)}
         greeting={timeGreeting(now)}
         stats={[
-          { label: 'Net worth', value: formatMoneyWhole(totals.net), tone: totals.net >= 0 ? 'good' : 'caution' },
+          { label: 'Net worth', value: formatCurrency(totals.net, { maximumFractionDigits: 0 }), tone: totals.net >= 0 ? 'good' : 'caution' },
           { label: 'Monthly net', value: summary ? formatSignedCompact(summary.total_net) : 'Loading', tone: summary ? (summary.total_net >= 0 ? 'good' : 'caution') : '' },
           { label: 'Budget used', value: budgetUsed, tone: overallPercent > 100 ? 'caution' : overallPercent >= 85 ? 'warn' : 'good' },
           { label: 'Accounts', value: activeAccountCount.toLocaleString() }
@@ -357,6 +299,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
           summary={summary}
           attention={budgetAttention}
           overallPercent={overallPercent}
+          totalSpent={totalSpent}
           totalBudgeted={summary?.total_budgeted || 0}
           loading={loading && !budgetData}
         />
@@ -443,7 +386,7 @@ function AccountsCard({ totals, activeCount, loading }) {
             <div
               className={`dash-networth-value ${netPositive ? 'income' : 'expense'}`}
             >
-              {formatMoney(totals.net)}
+              {formatCurrency(totals.net)}
             </div>
             <div className="subtle dash-networth-sub">
               Across {activeCount} {activeCount === 1 ? 'account' : 'accounts'}
@@ -460,7 +403,7 @@ function AccountsCard({ totals, activeCount, loading }) {
                       r.isDebt || r.value < 0 ? 'expense' : ''
                     }`}
                   >
-                    {formatMoney(r.value)}
+                    {formatCurrency(r.value)}
                   </span>
                 </li>
               ))}
@@ -499,13 +442,13 @@ function MonthCard({ summary, dayOfMonth, totalDays, loading }) {
             <div className="dash-month-stat">
               <div className="dash-month-stat-label">Income</div>
               <div className="dash-month-stat-value income">
-                {formatMoneyCompact(summary.total_income)}
+                {formatCompactCurrency(summary.total_income)}
               </div>
             </div>
             <div className="dash-month-stat">
               <div className="dash-month-stat-label">Expenses</div>
               <div className="dash-month-stat-value expense">
-                {formatMoneyCompact(Math.abs(summary.total_expenses))}
+                {formatCompactCurrency(Math.abs(summary.total_expenses))}
               </div>
             </div>
             <div className="dash-month-stat">
@@ -515,7 +458,7 @@ function MonthCard({ summary, dayOfMonth, totalDays, loading }) {
                   summary.total_net >= 0 ? 'income' : 'expense'
                 }`}
               >
-                {formatMoneyCompact(Math.abs(summary.total_net))}
+                {formatCompactCurrency(Math.abs(summary.total_net))}
               </div>
             </div>
           </div>
@@ -529,7 +472,7 @@ function MonthCard({ summary, dayOfMonth, totalDays, loading }) {
 // Budget pulse card
 // ============================================================================
 
-function BudgetPulseCard({ summary, attention, overallPercent, totalBudgeted, loading }) {
+function BudgetPulseCard({ summary, attention, overallPercent, totalBudgeted, totalSpent, loading }) {
   const hasBudgets = totalBudgeted > 0;
 
   return (
@@ -555,8 +498,8 @@ function BudgetPulseCard({ summary, attention, overallPercent, totalBudgeted, lo
         <>
           <div className="dash-budget-overall">
             <div className="dash-budget-overall-text">
-              {formatMoney(summary.total_spent_in_budgets)} of{' '}
-              {formatMoney(summary.total_budgeted)} used
+              {formatCurrency(totalSpent)} of{' '}
+              {formatCurrency(summary.total_budgeted)} used
             </div>
             <div className="dash-budget-overall-percent">
               {Math.round(overallPercent)}%
@@ -612,7 +555,7 @@ function TopSpendingCard({ topSpending, max, loading }) {
       title="Top spending this month"
       action={
         <Link
-          to={`/transactions?date_from=${currentMonthKey()}-01&type=expense&sort=abs_amount_desc`}
+          to={`/transactions?date_from=${formatLocalMonth()}-01&type=expense&sort=abs_amount_desc`}
           className="dashboard-card-link"
         >
           Browse
@@ -637,7 +580,7 @@ function TopSpendingCard({ topSpending, max, loading }) {
                     {item.category.icon}
                   </span>
                   <span className="dash-top-name">{item.category.name}</span>
-                  <span className="dash-top-amount">{formatMoney(item.spent)}</span>
+                  <span className="dash-top-amount">{formatCurrency(item.spent)}</span>
                 </div>
                 <div className="dash-top-barwrap">
                   <div

@@ -6,7 +6,7 @@ import DropdownMenu from '../components/DropdownMenu.jsx';
 import FilterSheet from '../components/FilterSheet.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
-import { RuleEditor } from './Rules.jsx';
+import { RuleEditor } from '../components/rules/RuleEditor.jsx';
 
 const DEFAULT_PAGE_SIZE = 50;
 const PAGE_SIZE_OPTIONS = [25, 50, 100];

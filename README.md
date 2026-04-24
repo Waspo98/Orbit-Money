@@ -359,6 +359,13 @@ monthly net worth trend. The trend range can be changed between 1 year, 2 years,
 The trend is derived from existing account balances and transaction history; it
 does not add new storage or change backup behavior. Mortgage accounts use the
 same `estimated_value - mortgage balance` equity calculation as the Dashboard.
+The API computes year-to-date change from monthly net-worth history snapshots
+instead of raw transaction deltas, so mortgage principal paydown does not get
+mistaken for home value.
+
+Month and date defaults in the net worth, goals, household, and transaction
+filter flows now use local calendar boundaries instead of UTC slicing, which
+prevents the app from rolling into the next month early late at night.
 
 The Housing Calculator is available from More -> Housing Calculator. Selecting
 a mortgage account prefills the estimated sale price from `estimated_value` and
@@ -372,7 +379,9 @@ The Household page is available from the More menu after Net Worth. It tracks
 household members, employment status, employer details, gross income,
 annualized net pay, retirement account type, employee retirement contributions,
 employer match assumptions, and benefit values such as HSA, dependent care FSA,
-health premiums, and other annual benefits.
+health premiums, and other annual benefits. Health premiums are entered per
+paycheck in the UI and normalized back to monthly storage on save so repeated
+edits do not drift the saved value.
 
 Saving a member also writes a dated income snapshot so historical compensation
 is preserved for future reporting and retirement projection work. Members can
@@ -408,7 +417,10 @@ to project retirement readiness with editable return, inflation, income
 replacement, retirement age, and withdrawal-rate assumptions. The calculator
 also models HSA timing separately: if the retirement age is before the HSA
 access age, it checks whether non-HSA retirement assets can bridge the gap until
-the HSA can behave like a retirement account.
+the HSA can behave like a retirement account. Retirement projections use an
+effective monthly return derived from the annual assumption and yearly charts
+reuse that same monthly-compounding model so long-range projections stay
+consistent with the headline forecast.
 
 Storage is additive: migration `015_goal_allocations.sql` extends the existing
 `goals` table with metadata and adds `goal_account_allocations`. It does not

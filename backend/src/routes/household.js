@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
+import { formatLocalDate } from '../lib/localDate.js';
 
 const router = express.Router();
 
@@ -38,7 +39,7 @@ function validDate(value) {
 }
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  return formatLocalDate();
 }
 
 function cleanString(value, max = 120) {
