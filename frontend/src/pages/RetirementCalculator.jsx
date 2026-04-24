@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
+import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppRangeSlider from '../components/AppRangeSlider.jsx';
 import CurrencyInput, { formatCurrencyInput, parseCurrencyInput } from '../components/CurrencyInput.jsx';
 import PageHero from '../components/PageHero.jsx';
@@ -40,6 +41,8 @@ const PRESETS = {
     withdrawalRate: '4.25%'
   }
 };
+
+const MONTHLY_SAVINGS_MAX = 10000;
 
 function formatMoney(amount, digits = 0) {
   return formatCurrency(amount, { maximumFractionDigits: digits });
@@ -176,6 +179,7 @@ export default function RetirementCalculator() {
   const [household, setHousehold] = useState(null);
   const [goals, setGoals] = useState([]);
   const [mode, setMode] = useState('have');
+  const [editingAssumptions, setEditingAssumptions] = useState(false);
   const [values, setValues] = useState({
     currentAge: '',
     retirementAge: 67,
@@ -263,6 +267,17 @@ export default function RetirementCalculator() {
     const endAge = Math.max(95, retirementAge + 10);
     const points = makeProjectionPoints({ currentAge, endAge, currentBalance, monthlySavings, realReturn });
     const targetPoints = points.map((point) => ({ age: point.age, amount: targetNestEgg }));
+    const chartCeilingSavings = Math.min(
+      MONTHLY_SAVINGS_MAX,
+      Math.max(3000, plannedMonthly * 3, requiredMonthly * 1.5)
+    );
+    const chartCeilingProjection = futureValue(
+      currentBalance,
+      chartCeilingSavings,
+      realReturn,
+      Math.max(1, (endAge - currentAge) * 12)
+    );
+    const chartMax = Math.max(targetNestEgg * 1.2, chartCeilingProjection, 1) * 1.08;
     const earliest = points.find((point) => point.age >= currentAge && point.amount >= targetNestEgg)?.age || null;
     const hsaAccessAge = Math.max(currentAge, 65);
     const nonHsaAtRetirement = projectedNonHsa;
@@ -278,6 +293,7 @@ export default function RetirementCalculator() {
       bridgeGap,
       bridgeNeed,
       bridgeYears,
+      chartMax,
       currentAge,
       currentBalance,
       employeeAnnual,
@@ -383,9 +399,11 @@ export default function RetirementCalculator() {
 
       <div className="retcalc-grid">
         <section className="dashboard-card retcalc-control-card">
-          <header className="dashboard-card-header">
-            <h3>Levers</h3>
-          </header>
+          <div className="retcalc-control-bar">
+            <button type="button" className="dashboard-card-link button-link" onClick={() => setEditingAssumptions(true)}>
+              Edit Assumptions
+            </button>
+          </div>
           <div className="housing-segmented retcalc-mode-tabs" role="tablist" aria-label="Retirement calculator question">
             {[
               ['have', 'What Will We Have?'],
@@ -422,9 +440,11 @@ export default function RetirementCalculator() {
                 onChange={(value) => update('retirementAge', Number(value))}
               />
               <MoneyLever
-                label="Monthly Savings"
+                label={`Monthly Savings (Currently ${formatMoney(model.plannedMonthly)})`}
+                linkTo="/household"
+                linkLabel="Edit Household"
                 value={model.monthlySavings}
-                max={Math.max(1000, Math.ceil((model.requiredMonthly * 1.6 || model.monthlySavings * 2 || 2000) / 250) * 250)}
+                max={MONTHLY_SAVINGS_MAX}
                 onChange={(value) => update('monthlySavings', formatCurrencyInput(value))}
               />
               <MoneyLever
@@ -446,9 +466,11 @@ export default function RetirementCalculator() {
                 <em>{model.earliest ? `${formatMoney(model.monthlySavings)}/mo reaches the target` : `${formatMoney(model.requiredMonthly)}/mo needed by ${Math.round(model.retirementAge)}`}</em>
               </div>
               <MoneyLever
-                label="Monthly Savings"
+                label={`Monthly Savings (Currently ${formatMoney(model.plannedMonthly)})`}
+                linkTo="/household"
+                linkLabel="Edit Household"
                 value={model.monthlySavings}
-                max={Math.max(1000, Math.ceil((model.requiredMonthly * 1.8 || model.monthlySavings * 2 || 2000) / 250) * 250)}
+                max={MONTHLY_SAVINGS_MAX}
                 onChange={(value) => update('monthlySavings', formatCurrencyInput(value))}
               />
               <MoneyLever
@@ -506,13 +528,7 @@ export default function RetirementCalculator() {
             <h3>Projection</h3>
           </header>
           <RetirementChart model={model} />
-        </section>
-
-        <section className="dashboard-card retcalc-summary-card">
-          <header className="dashboard-card-header">
-            <h3>Answer</h3>
-          </header>
-          <div className="retcalc-metric-grid">
+          <div className="retcalc-metric-grid retcalc-chart-summary">
             <Metric label="Required Monthly" value={`${formatMoney(model.requiredMonthly)}/mo`} detail={model.savingsGap > 0 ? `${formatMoney(model.savingsGap)}/mo gap` : 'Current pace clears target'} tone={model.savingsGap > 0 ? 'expense' : 'income'} />
             <Metric label="Income at Retirement" value={`${formatMoney(model.projectedAnnualIncome)}/yr`} detail={`${formatPercent(model.withdrawalRate * 100)} withdrawal`} />
             <Metric label="Earliest Target Age" value={model.earliest ? String(model.earliest) : 'After 95'} detail={`${formatPercent(model.savingsRate)} savings rate`} />
@@ -520,54 +536,9 @@ export default function RetirementCalculator() {
           </div>
         </section>
 
-        <section className="dashboard-card retcalc-assumptions-card">
-          <header className="dashboard-card-header">
-            <h3>Assumptions</h3>
-          </header>
-          <div className="retcalc-preset-row">
-            {Object.entries(PRESETS).map(([key, preset]) => (
-              <button key={key} type="button" className="btn-secondary" onClick={() => applyPreset(key)}>
-                {preset.label}
-              </button>
-            ))}
-          </div>
-          <div className="retcalc-assumption-grid">
-            <PercentLever
-              label="Market Return"
-              value={values.annualReturn}
-              numericValue={model.annualReturn * 100}
-              min="0"
-              max="12"
-              step="0.25"
-              onChange={(value) => update('annualReturn', `${value}%`)}
-              onInput={(value) => update('annualReturn', value)}
-            />
-            <PercentLever
-              label="Inflation"
-              value={values.inflation}
-              numericValue={model.inflation * 100}
-              min="0"
-              max="8"
-              step="0.25"
-              onChange={(value) => update('inflation', `${value}%`)}
-              onInput={(value) => update('inflation', value)}
-            />
-            <PercentLever
-              label="Withdrawal Rate"
-              value={values.withdrawalRate}
-              numericValue={model.withdrawalRate * 100}
-              min="2"
-              max="6"
-              step="0.25"
-              onChange={(value) => update('withdrawalRate', `${value}%`)}
-              onInput={(value) => update('withdrawalRate', value)}
-            />
-          </div>
-        </section>
-
         <section className="dashboard-card retcalc-bridge-card">
           <header className="dashboard-card-header">
-            <h3>Bridge Check</h3>
+            <h3>HSA Retirement Check</h3>
           </header>
           <div className="retcalc-bridge-editor">
             <Metric label="HSA Balance" value={formatMoney(model.hsaBalance)} detail={`${formatMoney(model.hsaAnnual)}/yr contributions`} />
@@ -642,6 +613,60 @@ export default function RetirementCalculator() {
           )}
         </section>
       </div>
+
+      {editingAssumptions && (
+        <AnimatedModal onClose={() => setEditingAssumptions(false)} size="lg" animation="zoom">
+          {({ close }) => (
+            <div className="retcalc-assumption-modal">
+              <header className="dashboard-card-header">
+                <h3>Assumptions</h3>
+              </header>
+              <div className="retcalc-preset-row">
+                {Object.entries(PRESETS).map(([key, preset]) => (
+                  <button key={key} type="button" className="btn-secondary" onClick={() => applyPreset(key)}>
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <div className="retcalc-assumption-grid">
+                <PercentLever
+                  label="Market Return"
+                  value={values.annualReturn}
+                  numericValue={model.annualReturn * 100}
+                  min="0"
+                  max="12"
+                  step="0.25"
+                  onChange={(value) => update('annualReturn', `${value}%`)}
+                  onInput={(value) => update('annualReturn', value)}
+                />
+                <PercentLever
+                  label="Inflation"
+                  value={values.inflation}
+                  numericValue={model.inflation * 100}
+                  min="0"
+                  max="8"
+                  step="0.25"
+                  onChange={(value) => update('inflation', `${value}%`)}
+                  onInput={(value) => update('inflation', value)}
+                />
+                <PercentLever
+                  label="Withdrawal Rate"
+                  value={values.withdrawalRate}
+                  numericValue={model.withdrawalRate * 100}
+                  min="2"
+                  max="6"
+                  step="0.25"
+                  onChange={(value) => update('withdrawalRate', `${value}%`)}
+                  onInput={(value) => update('withdrawalRate', value)}
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-primary" onClick={close}>Done</button>
+              </div>
+            </div>
+          )}
+        </AnimatedModal>
+      )}
     </div>
   );
 }
@@ -664,10 +689,13 @@ function SliderLever({ label, value, display, min, max, step = 1, onChange }) {
   );
 }
 
-function MoneyLever({ label, value, suffix = '/mo', max, step = 50, onChange }) {
+function MoneyLever({ label, value, suffix = '/mo', max, step = 50, linkTo, linkLabel, onChange }) {
   return (
     <div className="retcalc-lever">
-      <span>{label}</span>
+      <span className="retcalc-lever-label">
+        <span>{label}</span>
+        {linkTo && <Link to={linkTo}>{linkLabel}</Link>}
+      </span>
       <strong>{formatMoney(value)}{suffix}</strong>
       <AppRangeSlider
         min="0"
@@ -719,11 +747,7 @@ function Metric({ label, value, detail, tone = '' }) {
 function RetirementChart({ model }) {
   const width = 760;
   const height = 260;
-  const maxValue = Math.max(
-    model.targetNestEgg,
-    ...model.points.map((point) => point.amount),
-    1
-  ) * 1.08;
+  const maxValue = model.chartMax;
   const line = chartPath(model.points, width, height, 0, maxValue);
   const targetLine = chartPath(model.targetPoints, width, height, 0, maxValue);
   const area = areaPath(line, width, height);
