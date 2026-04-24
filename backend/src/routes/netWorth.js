@@ -2,6 +2,8 @@ import express from 'express';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
 import { formatLocalMonth } from '../lib/localDate.js';
+import { sendOk, sendServerError } from '../lib/http.js';
+import { parseBoundedInteger } from '../lib/routeParams.js';
 
 const router = express.Router();
 
@@ -173,8 +175,11 @@ function findYearStartRow(history, latestMonth) {
 router.get('/', requireAuth, (req, res) => {
   try {
     const allTime = String(req.query.months || '').toLowerCase() === 'all';
-    const requestedMonths = parseInt(req.query.months, 10);
-    const months = Math.min(240, Math.max(3, Number.isFinite(requestedMonths) ? requestedMonths : 24));
+    const months = parseBoundedInteger(req.query.months, {
+      fallback: 24,
+      min: 3,
+      max: 240
+    });
 
     const accounts = db
       .prepare(
@@ -264,7 +269,7 @@ router.get('/', requireAuth, (req, res) => {
     const first = history[0] || null;
     const yearStartRow = findYearStartRow(history, latestMonth);
 
-    res.json({
+    sendOk(res, {
       summary: {
         ...current.totals,
         accountCount: accounts.length,
@@ -277,7 +282,7 @@ router.get('/', requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error('Net worth failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 

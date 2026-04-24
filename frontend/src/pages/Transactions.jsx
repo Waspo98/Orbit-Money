@@ -7,14 +7,18 @@ import FilterSheet from '../components/FilterSheet.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { RuleEditor } from '../components/rules/RuleEditor.jsx';
+import {
+  formatCurrency,
+  formatSignedCurrency
+} from '../lib/formatters.js';
+import {
+  formatFullDate,
+  formatMonthDay,
+  formatMonthKeyLabel
+} from '../lib/localDate.js';
 
 const DEFAULT_PAGE_SIZE = 50;
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
 
 // CSS animation durations (kept in sync with index.css).
 const EXPAND_ANIMATION_MS = 220;
@@ -32,56 +36,20 @@ const SORT_OPTIONS = [
 
 const reportedLogoStatuses = new Set();
 
-// ============================================================================
-// Formatting helpers
-// ============================================================================
-
-function parseLocalDate(iso) {
-  if (!iso) return null;
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function formatDayMonth(iso) {
-  const dt = parseLocalDate(iso);
-  if (!dt) return '';
-  return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function formatFullDate(iso) {
-  const dt = parseLocalDate(iso);
-  if (!dt) return '';
-  return dt.toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric'
-  });
-}
-
 function monthKey(iso) {
   return iso ? iso.slice(0, 7) : '';
 }
 
 function monthLabel(key) {
-  const [y, m] = key.split('-').map(Number);
-  return `${MONTH_NAMES[m - 1]} ${y}`;
+  return formatMonthKeyLabel(key);
 }
 
 function formatAmount(amount) {
-  const abs = Math.abs(amount).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD'
-  });
-  return amount < 0 ? `-${abs}` : `+${abs}`;
+  return formatSignedCurrency(amount);
 }
 
 function formatShortAmount(amount) {
-  return Number(amount).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0
-  });
+  return formatCurrency(amount, { maximumFractionDigits: 0 });
 }
 
 function groupByMonth(items) {
@@ -811,8 +779,8 @@ function ActiveFilterPills({
   }
 
   if (filters.dateFrom || filters.dateTo) {
-    const from = filters.dateFrom ? formatDayMonth(filters.dateFrom) : '-';
-    const to = filters.dateTo ? formatDayMonth(filters.dateTo) : 'today';
+    const from = filters.dateFrom ? formatMonthDay(filters.dateFrom) : '-';
+    const to = filters.dateTo ? formatMonthDay(filters.dateTo) : 'today';
     pills.push({ key: 'date', label: `${from} -> ${to}` });
   }
 
@@ -986,7 +954,7 @@ export function TransactionRow({
         <div className="txn-main">
           <div className="txn-merchant">{txn.merchant}</div>
           <div className="txn-meta">
-            <span className="txn-date-short">{formatDayMonth(txn.date)}</span>
+            <span className="txn-date-short">{formatMonthDay(txn.date)}</span>
             {category && (
               <>
                 <span className="dot" />

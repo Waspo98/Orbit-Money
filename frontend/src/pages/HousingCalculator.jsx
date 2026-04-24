@@ -1,14 +1,11 @@
 import { useMemo, useState } from 'react';
 import PageHero from '../components/PageHero.jsx';
 import CurrencyInput, { formatCurrencyInput } from '../components/CurrencyInput.jsx';
+import { formatCurrency } from '../lib/formatters.js';
 
 function formatMoney(amount) {
   if (amount === null || amount === undefined) return null;
-  return Number(amount).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0
-  });
+  return formatCurrency(amount, { maximumFractionDigits: 0 });
 }
 
 function parseNumber(value, fallback = 0) {

@@ -10,6 +10,15 @@ import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
 } from '../components/CurrencyInput.jsx';
+import { formatCurrency } from '../lib/formatters.js';
+import {
+  addMonthsToLocalMonth,
+  daysLeftInLocalMonth,
+  formatLocalMonth,
+  formatMonthDay,
+  formatMonthKeyLabel,
+  getLocalMonthBounds
+} from '../lib/localDate.js';
 
 // ============================================================================
 // Budgets — v15
@@ -23,72 +32,32 @@ import CurrencyInput, {
 // through to see how past months measured up against the same caps.
 // ============================================================================
 
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
-
-// ---------- Date utilities ----------
-
-function monthFromDate(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
 function currentMonth() {
-  return monthFromDate(new Date());
-}
-
-function parseMonthStr(m) {
-  if (!m || !/^\d{4}-\d{2}$/.test(m)) return null;
-  const [y, mo] = m.split('-').map(Number);
-  return new Date(y, mo - 1, 1);
+  return formatLocalMonth();
 }
 
 function addMonths(m, delta) {
-  const d = parseMonthStr(m) || new Date();
-  d.setMonth(d.getMonth() + delta);
-  return monthFromDate(d);
+  return addMonthsToLocalMonth(m, delta);
 }
 
 function monthBounds(m) {
-  const d = parseMonthStr(m) || new Date();
-  const year = d.getFullYear();
-  const month = d.getMonth() + 1;
-  const start = `${year}-${String(month).padStart(2, '0')}-01`;
-  const endDate = new Date(year, month, 0).getDate();
-  const end = `${year}-${String(month).padStart(2, '0')}-${String(endDate).padStart(2, '0')}`;
-  return { start, end };
+  return getLocalMonthBounds(m);
 }
 
 function formatMonthLabel(m) {
-  const d = parseMonthStr(m);
-  if (!d) return m;
-  return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+  return formatMonthKeyLabel(m);
 }
 
 function daysLeftInMonth(m) {
-  const target = parseMonthStr(m);
-  if (!target) return null;
-  const now = new Date();
-  const cur = new Date(now.getFullYear(), now.getMonth(), 1);
-  if (target.getTime() !== cur.getTime()) return null;
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  return lastDay - now.getDate();
+  return daysLeftInLocalMonth(m);
 }
 
 function formatMoney(n) {
-  return Number(n).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD'
-  });
+  return formatCurrency(n);
 }
 
 function formatTransactionDate(date) {
-  if (!date) return '';
-  return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric'
-  });
+  return formatMonthDay(date);
 }
 
 // ============================================================================

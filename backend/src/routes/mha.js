@@ -1,10 +1,21 @@
 import express from 'express';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
+import {
+  sendBadRequest,
+  sendNotFound,
+  sendOk,
+  sendServerError
+} from '../lib/http.js';
+import { parseBooleanField, parseInteger, readIdParam } from '../lib/routeParams.js';
+import {
+  formatMhaTransaction,
+  MHA_SAVINGS_RATE,
+  summarizeMhaTransactions
+} from '../services/mhaSummary.js';
 
 const router = express.Router();
 const SETTING_KEY = 'mha_tracker_enabled';
-const SAVINGS_RATE = 0.27;
 
 function boolFlag(value) {
   return value ? 1 : 0;
@@ -15,21 +26,13 @@ function getEnabled() {
   return row?.value === '1';
 }
 
-function formatTransaction(row) {
-  return {
-    ...row,
-    mha_eligible: row.mha_eligible ? 1 : 0,
-    amount_abs: Math.abs(Number(row.amount || 0))
-  };
-}
-
 function currentYear() {
   return new Date().getFullYear();
 }
 
 function parseYear(value) {
-  const year = parseInt(value, 10);
-  if (!Number.isFinite(year) || year < 1900 || year > 2200) {
+  const year = parseInteger(value);
+  if (year === null || year < 1900 || year > 2200) {
     return currentYear();
   }
   return year;
@@ -44,8 +47,8 @@ function getYears() {
         ORDER BY year DESC`
     )
     .all()
-    .map((row) => parseInt(row.year, 10))
-    .filter(Number.isFinite);
+    .map((row) => parseInteger(row.year))
+    .filter((year) => year !== null);
   const set = new Set(years);
   set.add(currentYear());
   return Array.from(set).sort((a, b) => b - a);
@@ -53,20 +56,21 @@ function getYears() {
 
 router.get('/settings', requireAuth, (req, res) => {
   try {
-    res.json({ enabled: getEnabled() });
+    sendOk(res, { enabled: getEnabled() });
   } catch (err) {
     console.error('Get MHA settings failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 router.put('/settings', requireAuth, (req, res) => {
-  if (typeof req.body?.enabled !== 'boolean') {
-    return res.status(400).json({ error: 'enabled must be a boolean.' });
+  const enabled = parseBooleanField(req.body, 'enabled');
+  if (enabled === null) {
+    return sendBadRequest(res, 'enabled must be a boolean.');
   }
 
   try {
-    const value = req.body.enabled ? '1' : '0';
+    const value = enabled ? '1' : '0';
     db.prepare(
       `INSERT INTO app_settings (key, value, updated_at)
        VALUES (?, ?, datetime('now'))
@@ -74,10 +78,10 @@ router.put('/settings', requireAuth, (req, res) => {
          value = excluded.value,
          updated_at = datetime('now')`
     ).run(SETTING_KEY, value);
-    res.json({ enabled: req.body.enabled });
+    sendOk(res, { enabled });
   } catch (err) {
     console.error('Update MHA settings failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -145,79 +149,72 @@ router.get('/', requireAuth, (req, res) => {
                     ELSE 0
                   END
                 ) = 1
+            AND COALESCE(t.edited_is_ignored, t.is_ignored) = 0
+            AND COALESCE(t.edited_is_transfer, t.is_transfer) = 0
+            AND COALESCE(c.is_transfer, 0) = 0
             AND t.date >= ?
             AND t.date < ?
           ORDER BY t.date DESC, t.id DESC`
       )
       .all(startDate, endDate)
-      .map(formatTransaction);
+      .map(formatMhaTransaction);
+    const summary = summarizeMhaTransactions(transactions, MHA_SAVINGS_RATE);
 
-    const transactionTotal = transactions.reduce(
-      (sum, t) => sum + Math.abs(Number(t.amount || 0)),
-      0
-    );
-
-    res.json({
+    sendOk(res, {
       enabled: getEnabled(),
-      savingsRate: SAVINGS_RATE,
+      savingsRate: MHA_SAVINGS_RATE,
       year,
       years: getYears(),
       accounts,
       categories,
       transactions,
-      summary: {
-        transactionCount: transactions.length,
-        transactionTotal,
-        savings: transactionTotal * SAVINGS_RATE
-      }
+      summary
     });
   } catch (err) {
     console.error('Get MHA tracker failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 router.put('/accounts/:id/default', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid account id.' });
-  }
-  if (typeof req.body?.mha_default_eligible !== 'boolean') {
-    return res.status(400).json({ error: 'mha_default_eligible must be a boolean.' });
+  const id = readIdParam(req, res, 'id', 'account');
+  if (id === null) return;
+  const mhaDefaultEligible = parseBooleanField(req.body, 'mha_default_eligible');
+  if (mhaDefaultEligible === null) {
+    return sendBadRequest(res, 'mha_default_eligible must be a boolean.');
   }
 
   try {
     const existing = db.prepare('SELECT id FROM accounts WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Account not found.' });
+    if (!existing) return sendNotFound(res, 'Account not found.');
 
     db.prepare(
       `UPDATE accounts
           SET mha_default_eligible = ?, updated_at = datetime('now')
         WHERE id = ?`
-    ).run(boolFlag(req.body.mha_default_eligible), id);
+    ).run(boolFlag(mhaDefaultEligible), id);
 
     const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
-    res.json({ success: true, account });
+    sendOk(res, { success: true, account });
   } catch (err) {
     console.error('Update MHA account default failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 router.put('/categories/:id/default', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid category id.' });
-  }
-  if (typeof req.body?.mha_default_eligible !== 'boolean') {
-    return res.status(400).json({ error: 'mha_default_eligible must be a boolean.' });
+  const id = readIdParam(req, res, 'id', 'category');
+  if (id === null) return;
+  const mhaDefaultEligible = parseBooleanField(req.body, 'mha_default_eligible');
+  if (mhaDefaultEligible === null) {
+    return sendBadRequest(res, 'mha_default_eligible must be a boolean.');
   }
 
   try {
     const existing = db.prepare('SELECT id FROM categories WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Category not found.' });
+    if (!existing) return sendNotFound(res, 'Category not found.');
 
-    const include = boolFlag(req.body.mha_default_eligible);
+    const include = boolFlag(mhaDefaultEligible);
     db.prepare(
       `UPDATE categories
           SET mha_default_eligible = ?,
@@ -226,27 +223,26 @@ router.put('/categories/:id/default', requireAuth, (req, res) => {
     ).run(include, include, id);
 
     const category = db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
-    res.json({ success: true, category });
+    sendOk(res, { success: true, category });
   } catch (err) {
     console.error('Update MHA category default failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 router.put('/categories/:id/ignore-default', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid category id.' });
-  }
-  if (typeof req.body?.mha_default_ignored !== 'boolean') {
-    return res.status(400).json({ error: 'mha_default_ignored must be a boolean.' });
+  const id = readIdParam(req, res, 'id', 'category');
+  if (id === null) return;
+  const mhaDefaultIgnored = parseBooleanField(req.body, 'mha_default_ignored');
+  if (mhaDefaultIgnored === null) {
+    return sendBadRequest(res, 'mha_default_ignored must be a boolean.');
   }
 
   try {
     const existing = db.prepare('SELECT id FROM categories WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Category not found.' });
+    if (!existing) return sendNotFound(res, 'Category not found.');
 
-    const ignored = boolFlag(req.body.mha_default_ignored);
+    const ignored = boolFlag(mhaDefaultIgnored);
     db.prepare(
       `UPDATE categories
           SET mha_default_ignored = ?,
@@ -255,10 +251,10 @@ router.put('/categories/:id/ignore-default', requireAuth, (req, res) => {
     ).run(ignored, ignored, id);
 
     const category = db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
-    res.json({ success: true, category });
+    sendOk(res, { success: true, category });
   } catch (err) {
     console.error('Update MHA category ignore default failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 

@@ -2,6 +2,12 @@ import express from 'express';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
 import { encrypt } from '../crypto.js';
+import {
+  sendBadRequest,
+  sendOk,
+  sendServerError
+} from '../lib/http.js';
+import { parseBoundedInteger } from '../lib/routeParams.js';
 import { claimAccessUrl } from '../services/simplefinClient.js';
 import { runSync } from '../services/simplefinSync.js';
 
@@ -26,7 +32,7 @@ router.get('/status', requireAuth, (req, res) => {
       )
       .get() || null;
 
-    res.json({
+    sendOk(res, {
       connected,
       syncEnabled: connected ? !!cfg.sync_enabled : false,
       cutoverDate: cfg?.cutover_date || null,
@@ -35,7 +41,7 @@ router.get('/status', requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error('SimpleFIN status failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -50,12 +56,10 @@ router.get('/status', requireAuth, (req, res) => {
 router.post('/setup', requireAuth, async (req, res) => {
   const { setupToken, cutoverDate } = req.body || {};
   if (!setupToken || !cutoverDate) {
-    return res.status(400).json({ error: 'setupToken and cutoverDate are required.' });
+    return sendBadRequest(res, 'setupToken and cutoverDate are required.');
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(cutoverDate)) {
-    return res
-      .status(400)
-      .json({ error: 'cutoverDate must be in YYYY-MM-DD format.' });
+    return sendBadRequest(res, 'cutoverDate must be in YYYY-MM-DD format.');
   }
 
   try {
@@ -74,10 +78,10 @@ router.post('/setup', requireAuth, async (req, res) => {
     `
     ).run(encrypted, cutoverDate);
 
-    res.json({ success: true });
+    sendOk(res, { success: true });
   } catch (err) {
     console.error('SimpleFIN setup failed:', err);
-    res.status(400).json({ error: err.message || 'Setup failed' });
+    sendBadRequest(res, err.message || 'Setup failed');
   }
 });
 
@@ -88,10 +92,10 @@ router.post('/setup', requireAuth, async (req, res) => {
 router.post('/sync', requireAuth, async (req, res) => {
   try {
     const result = await runSync({ trigger: 'manual' });
-    res.json({ success: true, ...result });
+    sendOk(res, { success: true, ...result });
   } catch (err) {
     console.error('Manual sync failed:', err);
-    res.status(500).json({ error: err.message || 'Sync failed' });
+    sendServerError(res, new Error(err.message || 'Sync failed'));
   }
 });
 
@@ -100,7 +104,7 @@ router.post('/sync', requireAuth, async (req, res) => {
  * Returns recent sync log rows for display in Settings.
  */
 router.get('/sync-log', requireAuth, (req, res) => {
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+  const limit = parseBoundedInteger(req.query.limit, { fallback: 20, min: 1, max: 100 });
   try {
     const items = db
       .prepare(
@@ -113,10 +117,10 @@ router.get('/sync-log', requireAuth, (req, res) => {
           LIMIT ?`
       )
       .all(limit);
-    res.json({ items });
+    sendOk(res, { items });
   } catch (err) {
     console.error('Sync log fetch failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -134,10 +138,10 @@ router.post('/disconnect', requireAuth, (req, res) => {
               updated_at = datetime('now')
         WHERE id = 1`
     ).run();
-    res.json({ success: true });
+    sendOk(res, { success: true });
   } catch (err) {
     console.error('Disconnect failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 

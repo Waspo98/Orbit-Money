@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import PageHero from '../components/PageHero.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
+import {
+  formatCurrency,
+  formatSignedCurrency
+} from '../lib/formatters.js';
 
 const BUCKET_LABELS = {
   cash: 'Cash',
@@ -43,17 +47,11 @@ const RANGE_OPTIONS = [
 ];
 
 function formatMoney(amount, digits = 0) {
-  return Number(amount || 0).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: digits
-  });
+  return formatCurrency(amount, { maximumFractionDigits: digits });
 }
 
 function formatSignedMoney(amount) {
-  const value = Number(amount || 0);
-  if (value === 0) return formatMoney(0);
-  return `${value > 0 ? '+' : '-'}${formatMoney(Math.abs(value))}`;
+  return formatSignedCurrency(amount, { maximumFractionDigits: 0 });
 }
 
 function formatMonth(key) {

@@ -142,6 +142,13 @@ Backend syntax smoke check:
 node --check backend\src\server.js
 ```
 
+Backend automated tests:
+
+```powershell
+cd backend
+npm test
+```
+
 Production-style Docker smoke test:
 
 ```powershell
@@ -149,11 +156,11 @@ docker compose up --build -d
 Invoke-RestMethod http://localhost:5008/api/health
 ```
 
-There is not currently a root-level `check` script or automated test suite.
-When changing behavior, manually smoke test the affected area and at minimum
-confirm that the frontend builds, the container starts, `/api/health` returns
-`status: ok`, login still works, mobile layout remains usable, and the PWA
-manifest/service worker still load.
+There is not currently a root-level `check` script. When changing behavior,
+run the relevant package tests, manually smoke test the affected area, and at
+minimum confirm that the frontend builds, the container starts, `/api/health`
+returns `status: ok`, login still works, mobile layout remains usable, and the
+PWA manifest/service worker still load.
 
 ## Maintainer Deploys
 

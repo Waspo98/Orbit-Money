@@ -20,6 +20,10 @@ import ReorderListItem, {
 } from '../components/ReorderListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import CurrencyInput, { parseCurrencyInput } from '../components/CurrencyInput.jsx';
+import {
+  formatCurrency as formatUsd,
+  formatPercent
+} from '../lib/formatters.js';
 
 const TYPE_LABELS = {
   checking: 'Checking',
@@ -38,11 +42,7 @@ const TYPE_OPTIONS = Object.entries(TYPE_LABELS).map(([value, label]) => ({
 }));
 
 function formatCurrency(amount) {
-  if (amount === null || amount === undefined) return '—';
-  return Number(amount).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD'
-  });
+  return amount === null || amount === undefined ? '—' : formatUsd(amount);
 }
 
 function parseOptionalCurrency(value) {
@@ -60,9 +60,7 @@ function todayLocalDate() {
 function formatPercentChange(next, previous) {
   if (!Number.isFinite(previous) || previous === 0) return null;
   const change = ((next - previous) / Math.abs(previous)) * 100;
-  return `${Math.abs(change).toLocaleString(undefined, {
-    maximumFractionDigits: 1
-  })}% ${change >= 0 ? 'more' : 'less'}`;
+  return `${formatPercent(Math.abs(change))} ${change >= 0 ? 'more' : 'less'}`;
 }
 
 function pluralTypeLabel(type, count) {

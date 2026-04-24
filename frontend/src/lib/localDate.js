@@ -30,6 +30,29 @@ export function addMonthsToLocalDate(value, amount) {
   return formatLocalDate(base);
 }
 
+export function addMonthsToLocalMonth(value, amount) {
+  return addMonthsToLocalDate(`${value}-01`, amount).slice(0, 7);
+}
+
+export function getLocalMonthBounds(value) {
+  const startDate = parseDateOnly(`${value}-01`) || new Date();
+  const year = startDate.getFullYear();
+  const monthIndex = startDate.getMonth();
+  return {
+    start: formatLocalDate(new Date(year, monthIndex, 1)),
+    end: formatLocalDate(new Date(year, monthIndex + 1, 0))
+  };
+}
+
+export function daysLeftInLocalMonth(value, today = new Date()) {
+  const target = parseDateOnly(`${value}-01`);
+  if (!target) return null;
+  const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  if (target.getTime() !== currentMonthStart.getTime()) return null;
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  return lastDay - today.getDate();
+}
+
 export function formatMonthKeyLabel(key) {
   const date = parseDateOnly(`${key}-01`);
   if (!date) return key;

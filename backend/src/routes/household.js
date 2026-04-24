@@ -1,7 +1,14 @@
 import express from 'express';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
-import { formatLocalDate } from '../lib/localDate.js';
+import { formatLocalDate, isValidOptionalDateOnly } from '../lib/localDate.js';
+import {
+  sendNotFound,
+  sendOk,
+  sendRouteError,
+  sendServerError
+} from '../lib/http.js';
+import { readIdParam } from '../lib/routeParams.js';
 
 const router = express.Router();
 
@@ -35,7 +42,7 @@ function householdError(message, status = 400) {
 }
 
 function validDate(value) {
-  return !value || /^\d{4}-\d{2}-\d{2}$/.test(value);
+  return isValidOptionalDateOnly(value);
 }
 
 function today() {
@@ -334,10 +341,10 @@ function insertIncomeRecord(record) {
 
 router.get('/', requireAuth, (req, res) => {
   try {
-    res.json(buildPayload());
+    sendOk(res, buildPayload());
   } catch (err) {
     console.error('Household load failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -369,16 +376,16 @@ router.post('/members', requireAuth, (req, res) => {
       insertIncomeRecord(normalizeIncomeRecordBody(saved, { ...member, effective_date: req.body?.effective_date, source: 'profile' }));
     });
     run();
-    res.json({ success: true, ...buildPayload() });
+    sendOk(res, { success: true, ...buildPayload() });
   } catch (err) {
     console.error('Household member create failed:', err);
-    res.status(err.status || 500).json({ error: err.message });
+    sendRouteError(res, err);
   }
 });
 
 router.put('/members/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid member id.' });
+  const id = readIdParam(req, res, 'id', 'member');
+  if (id === null) return;
 
   try {
     const member = normalizeMemberBody(req.body || {});
@@ -414,39 +421,39 @@ router.put('/members/:id', requireAuth, (req, res) => {
       insertIncomeRecord(normalizeIncomeRecordBody({ id, ...member }, { ...member, effective_date: req.body?.effective_date, source: 'profile' }));
     });
     run();
-    res.json({ success: true, ...buildPayload() });
+    sendOk(res, { success: true, ...buildPayload() });
   } catch (err) {
     console.error('Household member update failed:', err);
-    res.status(err.status || 500).json({ error: err.message });
+    sendRouteError(res, err);
   }
 });
 
 router.post('/members/:id/income-records', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid member id.' });
+  const id = readIdParam(req, res, 'id', 'member');
+  if (id === null) return;
 
   try {
     const member = db.prepare('SELECT * FROM household_members WHERE id = ?').get(id);
     if (!member) throw householdError('Household member not found.', 404);
     insertIncomeRecord(normalizeIncomeRecordBody(member, req.body || {}));
-    res.json({ success: true, ...buildPayload() });
+    sendOk(res, { success: true, ...buildPayload() });
   } catch (err) {
     console.error('Household income record failed:', err);
-    res.status(err.status || 500).json({ error: err.message });
+    sendRouteError(res, err);
   }
 });
 
 router.delete('/members/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid member id.' });
+  const id = readIdParam(req, res, 'id', 'member');
+  if (id === null) return;
 
   try {
     const result = db.prepare('DELETE FROM household_members WHERE id = ?').run(id);
-    if (result.changes === 0) return res.status(404).json({ error: 'Household member not found.' });
-    res.json({ success: true, ...buildPayload() });
+    if (result.changes === 0) return sendNotFound(res, 'Household member not found.');
+    sendOk(res, { success: true, ...buildPayload() });
   } catch (err) {
     console.error('Household member delete failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 

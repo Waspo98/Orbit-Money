@@ -23,6 +23,13 @@ import {
   countMatches,
   revertEditsForRule
 } from '../services/ruleMatcher.js';
+import {
+  sendBadRequest,
+  sendNotFound,
+  sendOk,
+  sendServerError
+} from '../lib/http.js';
+import { parseInteger, readIdParam } from '../lib/routeParams.js';
 
 const router = express.Router();
 
@@ -66,10 +73,10 @@ router.get('/', requireAuth, (req, res) => {
       }
     }
 
-    res.json({ items, total: items.length });
+    sendOk(res, { items, total: items.length });
   } catch (err) {
     console.error('List rules failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -77,19 +84,17 @@ router.get('/', requireAuth, (req, res) => {
  * GET /api/rules/:id/match-count
  */
 router.get('/:id/match-count', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid rule id.' });
-  }
-  const rule = db.prepare('SELECT conditions FROM rules WHERE id = ?').get(id);
-  if (!rule) return res.status(404).json({ error: 'Rule not found.' });
+  const id = readIdParam(req, res, 'id', 'rule');
+  if (id === null) return;
 
   try {
+    const rule = db.prepare('SELECT conditions FROM rules WHERE id = ?').get(id);
+    if (!rule) return sendNotFound(res, 'Rule not found.');
     const count = countMatches(db, safeJsonParse(rule.conditions, []));
-    res.json({ count });
+    sendOk(res, { count });
   } catch (err) {
     console.error('Match count failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -104,10 +109,10 @@ router.post('/preview', requireAuth, (req, res) => {
   const { conditions } = req.body || {};
   try {
     const count = countMatches(db, conditions);
-    res.json({ count });
+    sendOk(res, { count });
   } catch (err) {
     console.error('Rule preview failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -118,13 +123,13 @@ router.post('/', requireAuth, (req, res) => {
   const { name, conditions, actions, priority = 0, enabled = true } = req.body || {};
 
   if (!name || typeof name !== 'string' || !name.trim()) {
-    return res.status(400).json({ error: 'name is required.' });
+    return sendBadRequest(res, 'name is required.');
   }
   if (!Array.isArray(conditions) || conditions.length === 0) {
-    return res.status(400).json({ error: 'At least one condition is required.' });
+    return sendBadRequest(res, 'At least one condition is required.');
   }
   if (!Array.isArray(actions) || actions.length === 0) {
-    return res.status(400).json({ error: 'At least one action is required.' });
+    return sendBadRequest(res, 'At least one action is required.');
   }
 
   try {
@@ -137,7 +142,7 @@ router.post('/', requireAuth, (req, res) => {
         name.trim(),
         JSON.stringify(conditions),
         JSON.stringify(actions),
-        parseInt(priority, 10) || 0,
+        parseInteger(priority) || 0,
         enabled ? 1 : 0
       );
 
@@ -152,10 +157,10 @@ router.post('/', requireAuth, (req, res) => {
       console.error('Auto-reapply after rule create failed:', err);
     }
 
-    res.json({ success: true, id: result.lastInsertRowid });
+    sendOk(res, { success: true, id: result.lastInsertRowid });
   } catch (err) {
     console.error('Create rule failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -163,13 +168,8 @@ router.post('/', requireAuth, (req, res) => {
  * PUT /api/rules/:id
  */
 router.put('/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid rule id.' });
-  }
-
-  const existing = db.prepare('SELECT id FROM rules WHERE id = ?').get(id);
-  if (!existing) return res.status(404).json({ error: 'Rule not found.' });
+  const id = readIdParam(req, res, 'id', 'rule');
+  if (id === null) return;
 
   const body = req.body || {};
   const sets = [];
@@ -177,28 +177,28 @@ router.put('/:id', requireAuth, (req, res) => {
 
   if (body.name !== undefined) {
     if (typeof body.name !== 'string' || !body.name.trim()) {
-      return res.status(400).json({ error: 'name cannot be empty.' });
+      return sendBadRequest(res, 'name cannot be empty.');
     }
     sets.push('name = ?');
     values.push(body.name.trim());
   }
   if (body.conditions !== undefined) {
     if (!Array.isArray(body.conditions) || body.conditions.length === 0) {
-      return res.status(400).json({ error: 'At least one condition is required.' });
+      return sendBadRequest(res, 'At least one condition is required.');
     }
     sets.push('conditions = ?');
     values.push(JSON.stringify(body.conditions));
   }
   if (body.actions !== undefined) {
     if (!Array.isArray(body.actions) || body.actions.length === 0) {
-      return res.status(400).json({ error: 'At least one action is required.' });
+      return sendBadRequest(res, 'At least one action is required.');
     }
     sets.push('actions = ?');
     values.push(JSON.stringify(body.actions));
   }
   if (body.priority !== undefined) {
     sets.push('priority = ?');
-    values.push(parseInt(body.priority, 10) || 0);
+    values.push(parseInteger(body.priority) || 0);
   }
   if (body.enabled !== undefined) {
     sets.push('enabled = ?');
@@ -206,13 +206,15 @@ router.put('/:id', requireAuth, (req, res) => {
   }
 
   if (sets.length === 0) {
-    return res.status(400).json({ error: 'No fields to update.' });
+    return sendBadRequest(res, 'No fields to update.');
   }
 
   sets.push("updated_at = datetime('now')");
   values.push(id);
 
   try {
+    const existing = db.prepare('SELECT id FROM rules WHERE id = ?').get(id);
+    if (!existing) return sendNotFound(res, 'Rule not found.');
     db.prepare(`UPDATE rules SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 
     // Synchronous reapply — see POST note above.
@@ -222,10 +224,10 @@ router.put('/:id', requireAuth, (req, res) => {
       console.error('Auto-reapply after rule update failed:', err);
     }
 
-    res.json({ success: true });
+    sendOk(res, { success: true });
   } catch (err) {
     console.error('Update rule failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -233,10 +235,8 @@ router.put('/:id', requireAuth, (req, res) => {
  * PATCH /api/rules/:id/enabled
  */
 router.patch('/:id/enabled', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid rule id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'rule');
+  if (id === null) return;
   const enabled = req.body?.enabled ? 1 : 0;
 
   try {
@@ -244,7 +244,7 @@ router.patch('/:id/enabled', requireAuth, (req, res) => {
       .prepare(`UPDATE rules SET enabled = ?, updated_at = datetime('now') WHERE id = ?`)
       .run(enabled, id);
     if (result.changes === 0) {
-      return res.status(404).json({ error: 'Rule not found.' });
+      return sendNotFound(res, 'Rule not found.');
     }
 
     // Synchronous reapply so the response reflects settled state.
@@ -254,10 +254,10 @@ router.patch('/:id/enabled', requireAuth, (req, res) => {
       console.error('Auto-reapply after toggle failed:', err);
     }
 
-    res.json({ success: true, enabled: !!enabled });
+    sendOk(res, { success: true, enabled: !!enabled });
   } catch (err) {
     console.error('Toggle rule failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -297,10 +297,10 @@ router.delete('/all', requireAuth, (req, res) => {
     });
 
     const deleted = run();
-    res.json({ success: true, deleted });
+    sendOk(res, { success: true, deleted });
   } catch (err) {
     console.error('Wipe all rules failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -310,10 +310,8 @@ router.delete('/all', requireAuth, (req, res) => {
  * then re-runs remaining rules to re-populate any gaps.
  */
 router.delete('/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid rule id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'rule');
+  if (id === null) return;
   try {
     const run = db.transaction(() => {
       const result = db.prepare('DELETE FROM rules WHERE id = ?').run(id);
@@ -322,7 +320,7 @@ router.delete('/:id', requireAuth, (req, res) => {
 
     const changes = run();
     if (changes === 0) {
-      return res.status(404).json({ error: 'Rule not found.' });
+      return sendNotFound(res, 'Rule not found.');
     }
 
     // Revert this rule's edits, then re-apply remaining rules. This is
@@ -330,10 +328,10 @@ router.delete('/:id', requireAuth, (req, res) => {
     // refetch confidently right after.
     revertEditsForRule(db, id);
 
-    res.json({ success: true });
+    sendOk(res, { success: true });
   } catch (err) {
     console.error('Delete rule failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -345,10 +343,10 @@ router.post('/reapply-all', requireAuth, (req, res) => {
     const start = Date.now();
     const result = reapplyRulesToAllTransactions(db);
     const elapsedMs = Date.now() - start;
-    res.json({ success: true, elapsedMs, ...result });
+    sendOk(res, { success: true, elapsedMs, ...result });
   } catch (err) {
     console.error('Reapply all rules failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 

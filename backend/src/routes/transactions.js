@@ -32,6 +32,18 @@ import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
 import { reapplyRulesToTransaction } from '../services/ruleMatcher.js';
 import { attachMerchantLogos } from '../services/merchantLogos.js';
+import {
+  sendBadRequest,
+  sendNotFound,
+  sendOk,
+  sendServerError
+} from '../lib/http.js';
+import {
+  parseBoundedInteger,
+  parseId,
+  parseInteger,
+  readIdParam
+} from '../lib/routeParams.js';
 
 const router = express.Router();
 
@@ -104,8 +116,8 @@ function parseIntList(csv) {
     .split(',')
     .map((x) => x.trim())
     .filter(Boolean)
-    .map((x) => parseInt(x, 10))
-    .filter(Number.isFinite);
+    .map(parseInteger)
+    .filter((value) => value !== null);
 }
 
 function parseCategoryList(csv) {
@@ -114,8 +126,8 @@ function parseCategoryList(csv) {
   const tokens = csv.split(',').map((x) => x.trim()).filter(Boolean);
   const ids = tokens
     .filter((t) => t !== 'uncategorized')
-    .map((t) => parseInt(t, 10))
-    .filter(Number.isFinite);
+    .map(parseInteger)
+    .filter((value) => value !== null);
   const includeUncategorized = tokens.includes('uncategorized');
   return { ids, includeUncategorized };
 }
@@ -167,8 +179,8 @@ function buildFilterWhere(q) {
     wheres.push(`account_id IN (${multiAccounts.map(() => '?').join(',')})`);
     args.push(...multiAccounts);
   } else if (q.account_id) {
-    const single = parseInt(q.account_id, 10);
-    if (Number.isFinite(single)) {
+    const single = parseId(q.account_id);
+    if (single !== null) {
       wheres.push('account_id = ?');
       args.push(single);
     }
@@ -282,8 +294,8 @@ function buildFilterWhere(q) {
 // GET /api/transactions
 // ---------------------------------------------------------------------------
 router.get('/', requireAuth, (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
+  const page = parseBoundedInteger(req.query.page, { fallback: 1, min: 1 });
+  const limit = parseBoundedInteger(req.query.limit, { fallback: 50, min: 1, max: 200 });
   const offset = (page - 1) * limit;
 
   const sortKey = String(req.query.sort || 'date_desc').toLowerCase();
@@ -318,7 +330,7 @@ router.get('/', requireAuth, (req, res) => {
       .map(hydrate);
     const items = attachMerchantLogos(db, rows);
 
-    res.json({
+    sendOk(res, {
       items,
       page,
       limit,
@@ -330,7 +342,7 @@ router.get('/', requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error('List transactions failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -338,20 +350,18 @@ router.get('/', requireAuth, (req, res) => {
 // GET /api/transactions/:id
 // ---------------------------------------------------------------------------
 router.get('/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid transaction id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'transaction');
+  if (id === null) return;
   try {
     const row = db
       .prepare(`SELECT ${SELECT_COLS}, created_at, updated_at
                   FROM transactions WHERE id = ?`)
       .get(id);
-    if (!row) return res.status(404).json({ error: 'Transaction not found.' });
-    res.json(attachMerchantLogos(db, [hydrate(row)])[0]);
+    if (!row) return sendNotFound(res, 'Transaction not found.');
+    sendOk(res, attachMerchantLogos(db, [hydrate(row)])[0]);
   } catch (err) {
     console.error('Get transaction failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -362,124 +372,122 @@ router.get('/:id', requireAuth, (req, res) => {
 // re-claim the field.
 // ---------------------------------------------------------------------------
 router.patch('/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid transaction id.' });
-  }
-
-  const existing = db
-    .prepare(
-      `SELECT id, original_merchant,
-              category_id   AS original_category_id,
-              is_transfer   AS original_is_transfer,
-              is_ignored    AS original_is_ignored,
-              CASE
-                WHEN (SELECT mha_default_ignored
-                        FROM categories c
-                       WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)) = 1
-                THEN 0
-                WHEN (SELECT mha_default_eligible FROM accounts a WHERE a.id = transactions.account_id) = 1
-                  OR (SELECT mha_default_eligible
-                        FROM categories c
-                       WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)) = 1
-                THEN 1
-                ELSE 0
-              END AS default_mha_eligible
-         FROM transactions WHERE id = ?`
-    )
-    .get(id);
-  if (!existing) return res.status(404).json({ error: 'Transaction not found.' });
-
-  const body = req.body || {};
-  const sets = [];
-  const values = [];
-
-  if (body.merchant !== undefined) {
-    if (typeof body.merchant !== 'string' || !body.merchant.trim()) {
-      return res.status(400).json({ error: 'merchant cannot be empty.' });
-    }
-    const trimmed = body.merchant.trim();
-    if (trimmed === existing.original_merchant) {
-      sets.push('edited_merchant = NULL');
-      sets.push('edited_merchant_source = NULL');
-    } else {
-      sets.push('edited_merchant = ?');
-      values.push(trimmed);
-      sets.push("edited_merchant_source = 'user'");
-    }
-  }
-
-  if (body.category_id !== undefined) {
-    const cid = body.category_id === null ? null : parseInt(body.category_id, 10);
-    if (cid !== null && !Number.isFinite(cid)) {
-      return res.status(400).json({ error: 'category_id must be an integer or null.' });
-    }
-    if (cid === existing.original_category_id) {
-      sets.push('edited_category_id = NULL');
-      sets.push('edited_category_id_source = NULL');
-    } else {
-      sets.push('edited_category_id = ?');
-      values.push(cid);
-      sets.push("edited_category_id_source = 'user'");
-    }
-  }
-
-  if (body.is_transfer !== undefined) {
-    const flag = body.is_transfer ? 1 : 0;
-    if (flag === existing.original_is_transfer) {
-      sets.push('edited_is_transfer = NULL');
-      sets.push('edited_is_transfer_source = NULL');
-    } else {
-      sets.push('edited_is_transfer = ?');
-      values.push(flag);
-      sets.push("edited_is_transfer_source = 'user'");
-    }
-  }
-
-  if (body.is_ignored !== undefined) {
-    const flag = body.is_ignored ? 1 : 0;
-    if (flag === existing.original_is_ignored) {
-      sets.push('edited_is_ignored = NULL');
-      sets.push('edited_is_ignored_source = NULL');
-    } else {
-      sets.push('edited_is_ignored = ?');
-      values.push(flag);
-      sets.push("edited_is_ignored_source = 'user'");
-    }
-  }
-
-  if (body.mha_eligible !== undefined) {
-    const flag = body.mha_eligible ? 1 : 0;
-    const defaultMhaEligible = existing.default_mha_eligible ? 1 : 0;
-    if (flag === defaultMhaEligible) {
-      sets.push('edited_mha_eligible = NULL');
-      sets.push('edited_mha_eligible_source = NULL');
-    } else {
-      sets.push('edited_mha_eligible = ?');
-      values.push(flag);
-      sets.push("edited_mha_eligible_source = 'user'");
-    }
-  }
-
-  if (body.notes !== undefined) {
-    sets.push('notes = ?');
-    values.push(typeof body.notes === 'string' ? body.notes : '');
-  }
-
-  if (sets.length === 0) {
-    return res.status(400).json({ error: 'No fields to update.' });
-  }
-
-  sets.push("updated_at = datetime('now')");
-  values.push(id);
+  const id = readIdParam(req, res, 'id', 'transaction');
+  if (id === null) return;
 
   try {
+    const existing = db
+      .prepare(
+        `SELECT id, original_merchant,
+                category_id   AS original_category_id,
+                is_transfer   AS original_is_transfer,
+                is_ignored    AS original_is_ignored,
+                CASE
+                  WHEN (SELECT mha_default_ignored
+                          FROM categories c
+                         WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)) = 1
+                  THEN 0
+                  WHEN (SELECT mha_default_eligible FROM accounts a WHERE a.id = transactions.account_id) = 1
+                    OR (SELECT mha_default_eligible
+                          FROM categories c
+                         WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)) = 1
+                  THEN 1
+                  ELSE 0
+                END AS default_mha_eligible
+           FROM transactions WHERE id = ?`
+      )
+      .get(id);
+    if (!existing) return sendNotFound(res, 'Transaction not found.');
+
+    const body = req.body || {};
+    const sets = [];
+    const values = [];
+
+    if (body.merchant !== undefined) {
+      if (typeof body.merchant !== 'string' || !body.merchant.trim()) {
+        return sendBadRequest(res, 'merchant cannot be empty.');
+      }
+      const trimmed = body.merchant.trim();
+      if (trimmed === existing.original_merchant) {
+        sets.push('edited_merchant = NULL');
+        sets.push('edited_merchant_source = NULL');
+      } else {
+        sets.push('edited_merchant = ?');
+        values.push(trimmed);
+        sets.push("edited_merchant_source = 'user'");
+      }
+    }
+
+    if (body.category_id !== undefined) {
+      const cid = body.category_id === null ? null : parseId(body.category_id);
+      if (cid === null && body.category_id !== null) {
+        return sendBadRequest(res, 'category_id must be an integer or null.');
+      }
+      if (cid === existing.original_category_id) {
+        sets.push('edited_category_id = NULL');
+        sets.push('edited_category_id_source = NULL');
+      } else {
+        sets.push('edited_category_id = ?');
+        values.push(cid);
+        sets.push("edited_category_id_source = 'user'");
+      }
+    }
+
+    if (body.is_transfer !== undefined) {
+      const flag = body.is_transfer ? 1 : 0;
+      if (flag === existing.original_is_transfer) {
+        sets.push('edited_is_transfer = NULL');
+        sets.push('edited_is_transfer_source = NULL');
+      } else {
+        sets.push('edited_is_transfer = ?');
+        values.push(flag);
+        sets.push("edited_is_transfer_source = 'user'");
+      }
+    }
+
+    if (body.is_ignored !== undefined) {
+      const flag = body.is_ignored ? 1 : 0;
+      if (flag === existing.original_is_ignored) {
+        sets.push('edited_is_ignored = NULL');
+        sets.push('edited_is_ignored_source = NULL');
+      } else {
+        sets.push('edited_is_ignored = ?');
+        values.push(flag);
+        sets.push("edited_is_ignored_source = 'user'");
+      }
+    }
+
+    if (body.mha_eligible !== undefined) {
+      const flag = body.mha_eligible ? 1 : 0;
+      const defaultMhaEligible = existing.default_mha_eligible ? 1 : 0;
+      if (flag === defaultMhaEligible) {
+        sets.push('edited_mha_eligible = NULL');
+        sets.push('edited_mha_eligible_source = NULL');
+      } else {
+        sets.push('edited_mha_eligible = ?');
+        values.push(flag);
+        sets.push("edited_mha_eligible_source = 'user'");
+      }
+    }
+
+    if (body.notes !== undefined) {
+      sets.push('notes = ?');
+      values.push(typeof body.notes === 'string' ? body.notes : '');
+    }
+
+    if (sets.length === 0) {
+      return sendBadRequest(res, 'No fields to update.');
+    }
+
+    sets.push("updated_at = datetime('now')");
+    values.push(id);
+
     db.prepare(`UPDATE transactions SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 
     const anyCleared =
       (body.merchant !== undefined && body.merchant.trim() === existing.original_merchant) ||
       (body.category_id !== undefined &&
-        (body.category_id === null ? null : parseInt(body.category_id, 10)) ===
+        (body.category_id === null ? null : parseId(body.category_id)) ===
           existing.original_category_id) ||
       (body.is_transfer !== undefined &&
         (body.is_transfer ? 1 : 0) === existing.original_is_transfer) ||
@@ -493,13 +501,13 @@ router.patch('/:id', requireAuth, (req, res) => {
     const updated = db
       .prepare(`SELECT ${SELECT_COLS} FROM transactions WHERE id = ?`)
       .get(id);
-    res.json({
+    sendOk(res, {
       success: true,
       transaction: attachMerchantLogos(db, [hydrate(updated)])[0]
     });
   } catch (err) {
     console.error('Update transaction failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -509,10 +517,8 @@ router.patch('/:id', requireAuth, (req, res) => {
 // rule can re-claim the field.
 // ---------------------------------------------------------------------------
 router.post('/:id/reset', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid transaction id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'transaction');
+  if (id === null) return;
 
   const allowed = new Set(['merchant', 'category_id', 'is_transfer', 'is_ignored', 'mha_eligible']);
   const fields = Array.isArray(req.body?.fields)
@@ -520,9 +526,7 @@ router.post('/:id/reset', requireAuth, (req, res) => {
     : [];
 
   if (fields.length === 0) {
-    return res
-      .status(400)
-      .json({ error: 'fields must include at least one editable field.' });
+    return sendBadRequest(res, 'fields must include at least one editable field.');
   }
 
   const clauses = [];
@@ -539,14 +543,14 @@ router.post('/:id/reset', requireAuth, (req, res) => {
     const updated = db
       .prepare(`SELECT ${SELECT_COLS} FROM transactions WHERE id = ?`)
       .get(id);
-    if (!updated) return res.status(404).json({ error: 'Transaction not found.' });
-    res.json({
+    if (!updated) return sendNotFound(res, 'Transaction not found.');
+    sendOk(res, {
       success: true,
       transaction: attachMerchantLogos(db, [hydrate(updated)])[0]
     });
   } catch (err) {
     console.error('Reset transaction failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -554,19 +558,17 @@ router.post('/:id/reset', requireAuth, (req, res) => {
 // DELETE /api/transactions/:id
 // ---------------------------------------------------------------------------
 router.delete('/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid transaction id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'transaction');
+  if (id === null) return;
   try {
     const result = db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
     if (result.changes === 0) {
-      return res.status(404).json({ error: 'Transaction not found.' });
+      return sendNotFound(res, 'Transaction not found.');
     }
-    res.json({ success: true });
+    sendOk(res, { success: true });
   } catch (err) {
     console.error('Delete transaction failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 

@@ -1,5 +1,6 @@
 import express from 'express';
 import { db } from '../db/index.js';
+import { sendOk, sendStatusPayload } from '../lib/http.js';
 
 const router = express.Router();
 
@@ -15,12 +16,12 @@ router.get('/', (req, res) => {
     const accounts     = db.prepare('SELECT COUNT(*) AS c FROM accounts').get().c;
     const rules        = db.prepare('SELECT COUNT(*) AS c FROM rules').get().c;
 
-    res.json({
+    sendOk(res, {
       status: 'ok',
       counts: { transactions, categories, accounts, rules }
     });
   } catch (err) {
-    res.status(500).json({ status: 'error', error: err.message });
+    sendStatusPayload(res, 500, { status: 'error', error: err.message });
   }
 });
 

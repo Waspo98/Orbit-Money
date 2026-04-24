@@ -8,3 +8,16 @@ export function formatLocalDate(date = new Date()) {
 export function formatLocalMonth(date = new Date()) {
   return formatLocalDate(date).slice(0, 7);
 }
+
+export function isValidDateOnly(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function isValidOptionalDateOnly(value) {
+  return !value || isValidDateOnly(value);
+}

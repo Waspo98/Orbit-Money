@@ -1,5 +1,11 @@
 import express from 'express';
 import { config } from '../config.js';
+import {
+  sendBadRequest,
+  sendOk,
+  sendServerError,
+  sendUnauthorized
+} from '../lib/http.js';
 
 const router = express.Router();
 
@@ -12,17 +18,17 @@ router.post('/login', (req, res) => {
   const { username, password } = req.body || {};
 
   if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required' });
+    return sendBadRequest(res, 'Username and password required');
   }
 
   if (username === config.adminUsername && password === config.adminPassword) {
     req.session.authenticated = true;
     req.session.username = username;
-    return res.json({ success: true, username });
+    return sendOk(res, { success: true, username });
   }
 
   // Same error for bad user or bad password — don't leak which one was wrong.
-  return res.status(401).json({ error: 'Invalid credentials' });
+  return sendUnauthorized(res, 'Invalid credentials');
 });
 
 /**
@@ -32,10 +38,10 @@ router.post('/login', (req, res) => {
 router.post('/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) {
-      return res.status(500).json({ error: 'Logout failed' });
+      return sendServerError(res, new Error('Logout failed'));
     }
     res.clearCookie('connect.sid');
-    res.json({ success: true });
+    sendOk(res, { success: true });
   });
 });
 
@@ -45,9 +51,9 @@ router.post('/logout', (req, res) => {
  */
 router.get('/me', (req, res) => {
   if (req.session && req.session.authenticated) {
-    return res.json({ authenticated: true, username: req.session.username });
+    return sendOk(res, { authenticated: true, username: req.session.username });
   }
-  res.json({ authenticated: false });
+  sendOk(res, { authenticated: false });
 });
 
 export default router;

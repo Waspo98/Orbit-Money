@@ -21,6 +21,13 @@
 import express from 'express';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
+import {
+  sendBadRequest,
+  sendNotFound,
+  sendOk,
+  sendServerError
+} from '../lib/http.js';
+import { parseId, readIdParam } from '../lib/routeParams.js';
 
 const router = express.Router();
 
@@ -160,7 +167,7 @@ router.get('/', requireAuth, (req, res) => {
       0
     );
 
-    res.json({
+    sendOk(res, {
       month,
       budgeted: budgetedItems,
       unbudgeted: unbudgetedItems,
@@ -177,7 +184,7 @@ router.get('/', requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error('List budgets failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -195,10 +202,10 @@ router.get('/months', requireAuth, (req, res) => {
           ORDER BY month DESC`
       )
       .all();
-    res.json({ items: rows.map((r) => r.month) });
+    sendOk(res, { items: rows.map((r) => r.month) });
   } catch (err) {
     console.error('List budget months failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -209,15 +216,13 @@ router.get('/months', requireAuth, (req, res) => {
 router.put('/', requireAuth, (req, res) => {
   const { category_id, amount, rollover = 0 } = req.body || {};
 
-  const catId = parseInt(category_id, 10);
-  if (!Number.isFinite(catId)) {
-    return res.status(400).json({ error: 'category_id must be an integer.' });
+  const catId = parseId(category_id);
+  if (catId === null) {
+    return sendBadRequest(res, 'category_id must be an integer.');
   }
   const amt = Number(amount);
   if (!Number.isFinite(amt) || amt < 0) {
-    return res
-      .status(400)
-      .json({ error: 'amount must be a non-negative number.' });
+    return sendBadRequest(res, 'amount must be a non-negative number.');
   }
 
   try {
@@ -225,12 +230,10 @@ router.put('/', requireAuth, (req, res) => {
       .prepare('SELECT is_income, is_transfer FROM categories WHERE id = ?')
       .get(catId);
     if (!category) {
-      return res.status(400).json({ error: 'category_id does not exist.' });
+      return sendBadRequest(res, 'category_id does not exist.');
     }
     if (category.is_income || category.is_transfer) {
-      return res
-        .status(400)
-        .json({ error: 'Budgets can only be created for spending categories.' });
+      return sendBadRequest(res, 'Budgets can only be created for spending categories.');
     }
 
     const existing = db
@@ -243,7 +246,7 @@ router.put('/', requireAuth, (req, res) => {
             SET amount = ?, rollover = ?, updated_at = datetime('now')
           WHERE id = ?`
       ).run(amt, rollover ? 1 : 0, existing.id);
-      res.json({ success: true, id: existing.id, created: false });
+      sendOk(res, { success: true, id: existing.id, created: false });
     } else {
       const result = db
         .prepare(
@@ -251,11 +254,11 @@ router.put('/', requireAuth, (req, res) => {
            VALUES (?, ?, ?)`
         )
         .run(catId, amt, rollover ? 1 : 0);
-      res.json({ success: true, id: result.lastInsertRowid, created: true });
+      sendOk(res, { success: true, id: result.lastInsertRowid, created: true });
     }
   } catch (err) {
     console.error('Upsert budget failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -263,19 +266,17 @@ router.put('/', requireAuth, (req, res) => {
 // DELETE /api/budgets/:id
 // ---------------------------------------------------------------------------
 router.delete('/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid budget id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'budget');
+  if (id === null) return;
   try {
     const result = db.prepare('DELETE FROM budgets WHERE id = ?').run(id);
     if (result.changes === 0) {
-      return res.status(404).json({ error: 'Budget not found.' });
+      return sendNotFound(res, 'Budget not found.');
     }
-    res.json({ success: true });
+    sendOk(res, { success: true });
   } catch (err) {
     console.error('Delete budget failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 

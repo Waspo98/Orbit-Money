@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
+import { sendBadRequest, sendOk } from '../lib/http.js';
 import { importRocketMoneyCSV } from '../services/csvImport.js';
 
 const router = express.Router();
@@ -22,15 +23,15 @@ const upload = multer({
  */
 router.post('/rocket-money', requireAuth, upload.single('file'), (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded.' });
+    return sendBadRequest(res, 'No file uploaded.');
   }
 
   try {
     const summary = importRocketMoneyCSV(db, req.file.buffer);
-    res.json({ success: true, ...summary });
+    sendOk(res, { success: true, ...summary });
   } catch (err) {
     console.error('CSV import failed:', err);
-    res.status(400).json({ error: err.message || 'Import failed' });
+    sendBadRequest(res, err.message || 'Import failed');
   }
 });
 

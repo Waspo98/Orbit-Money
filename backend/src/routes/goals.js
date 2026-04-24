@@ -1,7 +1,19 @@
 import express from 'express';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
-import { formatLocalDate, formatLocalMonth } from '../lib/localDate.js';
+import {
+  formatLocalDate,
+  formatLocalMonth,
+  isValidOptionalDateOnly
+} from '../lib/localDate.js';
+import {
+  sendBadRequest,
+  sendNotFound,
+  sendOk,
+  sendRouteError,
+  sendServerError
+} from '../lib/http.js';
+import { parseId, parseInteger, readIdParam } from '../lib/routeParams.js';
 
 const router = express.Router();
 
@@ -30,7 +42,7 @@ function addMonthsToDate(date, amount) {
 }
 
 function validDate(value) {
-  return !value || /^\d{4}-\d{2}-\d{2}$/.test(value);
+  return isValidOptionalDateOnly(value);
 }
 
 function goalError(message, status = 400) {
@@ -353,8 +365,8 @@ function normalizeGoalBody(body) {
   const rawAllocations = Array.isArray(body?.allocations) ? body.allocations : [];
   const seen = new Set();
   const allocations = rawAllocations.map((row) => {
-    const accountId = parseInt(row?.account_id, 10);
-    if (!Number.isFinite(accountId)) throw goalError('Each allocation needs a valid account_id.');
+    const accountId = parseId(row?.account_id);
+    if (accountId === null) throw goalError('Each allocation needs a valid account_id.');
     if (seen.has(accountId)) throw goalError('Each account can only be allocated once per goal.');
     seen.add(accountId);
 
@@ -567,38 +579,38 @@ function saveGoal(existingId, body) {
 
 router.get('/', requireAuth, (req, res) => {
   try {
-    const requestedMonths = parseInt(req.query.months, 10);
-    res.json(buildGoalsPayload(requestedMonths));
+    const requestedMonths = parseInteger(req.query.months);
+    sendOk(res, buildGoalsPayload(requestedMonths));
   } catch (err) {
     console.error('List goals failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 router.post('/', requireAuth, (req, res) => {
   try {
     const id = saveGoal(null, req.body || {});
-    res.json({ success: true, id, ...buildGoalsPayload(24) });
+    sendOk(res, { success: true, id, ...buildGoalsPayload(24) });
   } catch (err) {
     console.error('Create goal failed:', err);
-    res.status(err.status || 500).json({ error: err.message });
+    sendRouteError(res, err);
   }
 });
 
 router.put('/reorder', requireAuth, (req, res) => {
   const ids = Array.isArray(req.body?.ids)
-    ? req.body.ids.map((id) => parseInt(id, 10)).filter(Number.isFinite)
+    ? req.body.ids.map(parseId).filter((id) => id !== null)
     : [];
 
   if (ids.length === 0 || new Set(ids).size !== ids.length) {
-    return res.status(400).json({ error: 'ids must be a non-empty list of unique goal ids.' });
+    return sendBadRequest(res, 'ids must be a non-empty list of unique goal ids.');
   }
 
   try {
     const existing = db.prepare('SELECT id FROM goals').all().map((row) => row.id);
     const existingSet = new Set(existing);
     if (ids.length !== existing.length || ids.some((id) => !existingSet.has(id))) {
-      return res.status(400).json({ error: 'ids must include every goal exactly once.' });
+      return sendBadRequest(res, 'ids must include every goal exactly once.');
     }
 
     const update = db.prepare('UPDATE goals SET sort_order = ? WHERE id = ?');
@@ -607,41 +619,37 @@ router.put('/reorder', requireAuth, (req, res) => {
     });
     run();
 
-    res.json({ success: true, ...buildGoalsPayload(24) });
+    sendOk(res, { success: true, ...buildGoalsPayload(24) });
   } catch (err) {
     console.error('Reorder goals failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 router.put('/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid goal id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'goal');
+  if (id === null) return;
   try {
     const savedId = saveGoal(id, req.body || {});
-    res.json({ success: true, id: savedId, ...buildGoalsPayload(24) });
+    sendOk(res, { success: true, id: savedId, ...buildGoalsPayload(24) });
   } catch (err) {
     console.error('Update goal failed:', err);
-    res.status(err.status || 500).json({ error: err.message });
+    sendRouteError(res, err);
   }
 });
 
 router.delete('/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid goal id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'goal');
+  if (id === null) return;
   try {
     const result = db.prepare('DELETE FROM goals WHERE id = ?').run(id);
     if (result.changes === 0) {
-      return res.status(404).json({ error: 'Goal not found.' });
+      return sendNotFound(res, 'Goal not found.');
     }
-    res.json({ success: true });
+    sendOk(res, { success: true });
   } catch (err) {
     console.error('Delete goal failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 

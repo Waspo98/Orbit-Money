@@ -1,6 +1,14 @@
 import express from 'express';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
+import {
+  sendBadRequest,
+  sendCreated,
+  sendNotFound,
+  sendOk,
+  sendServerError
+} from '../lib/http.js';
+import { readIdParam } from '../lib/routeParams.js';
 
 const router = express.Router();
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -91,10 +99,10 @@ router.get('/', requireAuth, (req, res) => {
       `
       )
       .all();
-    res.json({ items: rows.map(serializeCategory) });
+    sendOk(res, { items: rows.map(serializeCategory) });
   } catch (err) {
     console.error('List categories failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -109,13 +117,13 @@ router.post('/', requireAuth, (req, res) => {
       : 0;
 
   if (!name) {
-    return res.status(400).json({ error: 'name cannot be empty.' });
+    return sendBadRequest(res, 'name cannot be empty.');
   }
   if (!HEX_COLOR_RE.test(color)) {
-    return res.status(400).json({ error: 'color must be a 6-digit hex value.' });
+    return sendBadRequest(res, 'color must be a 6-digit hex value.');
   }
   if (icon && icon.length > 24) {
-    return res.status(400).json({ error: 'emoji must be 24 characters or fewer.' });
+    return sendBadRequest(res, 'emoji must be 24 characters or fewer.');
   }
 
   try {
@@ -139,22 +147,20 @@ router.post('/', requireAuth, (req, res) => {
       `
       )
       .get(result.lastInsertRowid);
-    res.status(201).json({ success: true, category: serializeCategory(row) });
+    sendCreated(res, { success: true, category: serializeCategory(row) });
   } catch (err) {
     console.error('Create category failed:', err);
-    res.status(400).json({ error: err.message });
+    sendBadRequest(res, err.message);
   }
 });
 
 router.put('/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid category id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'category');
+  if (id === null) return;
 
   const existing = db.prepare('SELECT id FROM categories WHERE id = ?').get(id);
   if (!existing) {
-    return res.status(404).json({ error: 'Category not found.' });
+    return sendNotFound(res, 'Category not found.');
   }
 
   const body = req.body || {};
@@ -164,7 +170,7 @@ router.put('/:id', requireAuth, (req, res) => {
   if (body.name !== undefined) {
     const name = normalizeName(body.name);
     if (!name) {
-      return res.status(400).json({ error: 'name cannot be empty.' });
+      return sendBadRequest(res, 'name cannot be empty.');
     }
     sets.push('name = ?');
     values.push(name);
@@ -173,7 +179,7 @@ router.put('/:id', requireAuth, (req, res) => {
   if (body.color !== undefined) {
     const color = normalizeColor(body.color);
     if (!HEX_COLOR_RE.test(color)) {
-      return res.status(400).json({ error: 'color must be a 6-digit hex value.' });
+      return sendBadRequest(res, 'color must be a 6-digit hex value.');
     }
     sets.push('color = ?');
     values.push(color);
@@ -182,7 +188,7 @@ router.put('/:id', requireAuth, (req, res) => {
   if (body.icon !== undefined) {
     const icon = normalizeIcon(body.icon);
     if (icon && icon.length > 24) {
-      return res.status(400).json({ error: 'emoji must be 24 characters or fewer.' });
+      return sendBadRequest(res, 'emoji must be 24 characters or fewer.');
     }
     sets.push('icon = ?');
     values.push(icon);
@@ -190,7 +196,7 @@ router.put('/:id', requireAuth, (req, res) => {
 
   if (body.mha_default_eligible !== undefined) {
     if (typeof body.mha_default_eligible !== 'boolean') {
-      return res.status(400).json({ error: 'mha_default_eligible must be a boolean.' });
+      return sendBadRequest(res, 'mha_default_eligible must be a boolean.');
     }
     const eligible = body.mha_default_eligible ? 1 : 0;
     sets.push('mha_default_eligible = ?');
@@ -201,7 +207,7 @@ router.put('/:id', requireAuth, (req, res) => {
   }
 
   if (sets.length === 0) {
-    return res.status(400).json({ error: 'No fields to update.' });
+    return sendBadRequest(res, 'No fields to update.');
   }
 
   try {
@@ -225,34 +231,33 @@ router.put('/:id', requireAuth, (req, res) => {
       `
       )
       .get(id);
-    res.json({ success: true, category: serializeCategory(row) });
+    sendOk(res, { success: true, category: serializeCategory(row) });
   } catch (err) {
     console.error('Update category failed:', err);
-    res.status(400).json({ error: err.message });
+    sendBadRequest(res, err.message);
   }
 });
 
 router.delete('/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid category id.' });
-  }
-
-  const category = db.prepare('SELECT id, name FROM categories WHERE id = ?').get(id);
-  if (!category) {
-    return res.status(404).json({ error: 'Category not found.' });
-  }
-
-  const ruleCount = categoryRuleCount(id);
-  if (ruleCount > 0) {
-    return res.status(400).json({
-      error: `Can't delete "${category.name}" while ${ruleCount} rule${
-        ruleCount === 1 ? '' : 's'
-      } still reference it. Update or delete those rules first.`
-    });
-  }
+  const id = readIdParam(req, res, 'id', 'category');
+  if (id === null) return;
 
   try {
+    const category = db.prepare('SELECT id, name FROM categories WHERE id = ?').get(id);
+    if (!category) {
+      return sendNotFound(res, 'Category not found.');
+    }
+
+    const ruleCount = categoryRuleCount(id);
+    if (ruleCount > 0) {
+      return sendBadRequest(
+        res,
+        `Can't delete "${category.name}" while ${ruleCount} rule${
+          ruleCount === 1 ? '' : 's'
+        } still reference it. Update or delete those rules first.`
+      );
+    }
+
     const run = db.transaction(() => {
       const originalTransactions = db
         .prepare('UPDATE transactions SET category_id = NULL WHERE category_id = ?')
@@ -281,12 +286,12 @@ router.delete('/:id', requireAuth, (req, res) => {
 
     const result = run();
     if (result.deleted === 0) {
-      return res.status(404).json({ error: 'Category not found.' });
+      return sendNotFound(res, 'Category not found.');
     }
-    res.json({ success: true, ...result });
+    sendOk(res, { success: true, ...result });
   } catch (err) {
     console.error('Delete category failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 

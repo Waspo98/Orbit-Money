@@ -52,6 +52,10 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 
 **Sign convention:** expenses are negative, income is positive (flipped from Rocket Money's positive-expense format during CSV import).
 
+**Money representation:** SQLite stores current money fields as `REAL`. New calculation code should centralize parsing, rounding, and summing through `backend/src/lib/money.js` until a dedicated integer-cents migration is planned and tested.
+
+**Route template:** Express handlers should validate and normalize route inputs at the boundary, use `backend/src/lib/routeParams.js` for common id/boolean/bounded-integer parsing, and send responses through `backend/src/lib/http.js` helpers (`sendOk`, `sendBadRequest`, `sendNotFound`, `sendServerError`, etc.) so API success and error shapes stay mechanical.
+
 **Transaction sources:** `csv_import`, `simplefin`, `manual` — tracked in `source` column, deduplicated via `external_id`.
 
 **Original / edited provenance (migration 008):** Rules and manual edits never mutate the raw imported values. Each editable field has an `original_*` column (populated at import, never touched afterward) and a nullable `edited_*` column with an `edited_*_source` tag (`'user'`, `'rule:{id}'`, `'system:*'`, or NULL). Display values are computed as `COALESCE(edited_X, original_X)` at the API layer so the UI sees one logical merchant/category/flag regardless of how it got there. User edits are sticky — rules never override `source='user'`. System edits are reserved for app-owned derivations like transfer matching and are preserved during rule reapply.
@@ -118,6 +122,9 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Node `fetch` rejects inline URL credentials — implementation strips them and sends as Basic Auth header
 
 - Transactions with missing/zero SimpleFIN `posted` timestamps are skipped instead of being stored as `1970-01-01`; if a later sync returns a valid date for a previously affected transaction ID, the sync repairs that row's raw date/details.
+
+### MHA Tracker
+- Eligible transaction totals exclude transactions whose displayed state is ignored or transfer. Eligibility can still come from account defaults, category defaults, or transaction overrides, but ignored/transfer rows are filtered out before summary totals and savings are computed.
 
 ### Accounts
 - Full CRUD + merge (reassigns all transactions to target, deletes source) + archive/unarchive
@@ -305,9 +312,11 @@ Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column gri
 ### Backend (`backend/src/`)
 - `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
 - `db/index.js`, `db/migrations.js`
+- `lib/`: http, localDate, money, routeParams
 - `db/migrations/001` through `020`
 - `routes/`: auth, health, import, transactions, accounts, categories, rules, simplefin, budgets, netWorth, mha, goals, household
-- `services/`: csvImport, ruleMatcher (exports `loadRules`, `computeEdits`, `countMatches`, `reapplyRulesToAllTransactions`, `reapplyRulesToTransaction`, `revertEditsForRule`, `applyRulesToDraft`), simplefinClient, simplefinSync, transferMatcher
+- `services/`: csvImport, mhaSummary, ruleMatcher (exports `loadRules`, `computeEdits`, `countMatches`, `reapplyRulesToAllTransactions`, `reapplyRulesToTransaction`, `revertEditsForRule`, `applyRulesToDraft`), simplefinClient, simplefinSync, transferMatcher
+- `test/`: Node built-in test runner coverage for backend helpers and calculation services
 
 ### Frontend (`frontend/`)
 - `index.html` (Inter Tight font, PWA manifest link, pre-paint theme script, SW registration)

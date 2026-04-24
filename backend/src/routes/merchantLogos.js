@@ -7,6 +7,13 @@ import {
   reportMerchantLogoStatus,
   searchMerchantLogoBrands
 } from '../services/merchantLogos.js';
+import {
+  sendBadRequest,
+  sendNotFound,
+  sendOk,
+  sendServerError
+} from '../lib/http.js';
+import { parseId } from '../lib/routeParams.js';
 
 const router = express.Router();
 
@@ -15,15 +22,15 @@ router.post('/report', requireAuth, (req, res) => {
   const status = String(req.body?.status || '').trim();
 
   if (!merchantKey || !['loaded', 'failed'].includes(status)) {
-    return res.status(400).json({ error: 'merchant_key and valid status are required.' });
+    return sendBadRequest(res, 'merchant_key and valid status are required.');
   }
 
   try {
     const result = reportMerchantLogoStatus(db, { merchantKey, status });
-    res.json({ success: true, ...result });
+    sendOk(res, { success: true, ...result });
   } catch (err) {
     console.error('Report merchant logo status failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -33,10 +40,10 @@ router.post('/override', requireAuth, (req, res) => {
   const rawLogoUrl = String(req.body?.logo_url || '').trim();
 
   if (!merchantKey) {
-    return res.status(400).json({ error: 'merchant_key is required.' });
+    return sendBadRequest(res, 'merchant_key is required.');
   }
   if (!useCategoryIcon && !rawLogoUrl) {
-    return res.status(400).json({ error: 'logo_url is required unless using the category icon.' });
+    return sendBadRequest(res, 'logo_url is required unless using the category icon.');
   }
 
   let logoUrl = null;
@@ -48,7 +55,7 @@ router.post('/override', requireAuth, (req, res) => {
       }
       logoUrl = parsed.toString();
     } catch (err) {
-      return res.status(400).json({ error: err.message || 'Logo URL is invalid.' });
+      return sendBadRequest(res, err.message || 'Logo URL is invalid.');
     }
   }
 
@@ -59,52 +66,52 @@ router.post('/override', requireAuth, (req, res) => {
       hide: useCategoryIcon
     });
     if (!result.updated) {
-      return res.status(404).json({ error: 'Merchant logo entry not found.' });
+      return sendNotFound(res, 'Merchant logo entry not found.');
     }
-    res.json({ success: true, ...result });
+    sendOk(res, { success: true, ...result });
   } catch (err) {
     console.error('Override merchant logo failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 router.post('/ensure', requireAuth, (req, res) => {
-  const transactionId = Number(req.body?.transaction_id);
-  if (!Number.isInteger(transactionId) || transactionId <= 0) {
-    return res.status(400).json({ error: 'transaction_id is required.' });
+  const transactionId = parseId(req.body?.transaction_id);
+  if (transactionId === null || transactionId <= 0) {
+    return sendBadRequest(res, 'transaction_id is required.');
   }
 
   try {
     const result = ensureMerchantLogoEntryForTransaction(db, transactionId);
     if (!result.found) {
-      return res.status(404).json({ error: 'Transaction not found.' });
+      return sendNotFound(res, 'Transaction not found.');
     }
     if (!result.merchant_logo) {
-      return res.status(400).json({ error: 'This transaction does not have a merchant name to override.' });
+      return sendBadRequest(res, 'This transaction does not have a merchant name to override.');
     }
-    res.json({ success: true, merchant_logo: result.merchant_logo });
+    sendOk(res, { success: true, merchant_logo: result.merchant_logo });
   } catch (err) {
     console.error('Ensure merchant logo failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 router.post('/search', requireAuth, async (req, res) => {
-  const transactionId = Number(req.body?.transaction_id);
+  const transactionId = parseId(req.body?.transaction_id);
   const query = String(req.body?.query || '').trim();
-  if (!Number.isInteger(transactionId) || transactionId <= 0) {
-    return res.status(400).json({ error: 'transaction_id is required.' });
+  if (transactionId === null || transactionId <= 0) {
+    return sendBadRequest(res, 'transaction_id is required.');
   }
   if (!query) {
-    return res.status(400).json({ error: 'query is required.' });
+    return sendBadRequest(res, 'query is required.');
   }
 
   try {
     const result = await searchMerchantLogoBrands(db, { transactionId, query });
     if (!result.found) {
-      return res.status(404).json({ error: 'Transaction not found.' });
+      return sendNotFound(res, 'Transaction not found.');
     }
-    res.json({
+    sendOk(res, {
       success: true,
       configured: result.configured,
       merchant_logo: result.merchant_logo,
@@ -112,7 +119,7 @@ router.post('/search', requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('Search merchant logos failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 

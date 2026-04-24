@@ -6,6 +6,7 @@ import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { TransactionRow, EditTransactionModal } from './Transactions.jsx';
 import { RuleEditor } from './Rules.jsx';
+import { formatCurrency } from '../lib/formatters.js';
 
 const ACCOUNT_TYPE_LABELS = {
   checking: 'Checking',
@@ -19,11 +20,7 @@ const ACCOUNT_TYPE_LABELS = {
 };
 
 function formatMoney(amount, digits = 2) {
-  return Number(amount || 0).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: digits
-  });
+  return formatCurrency(amount, { maximumFractionDigits: digits });
 }
 
 function currentYear() {

@@ -1,6 +1,13 @@
 import express from 'express';
 import { requireAuth } from '../auth.js';
 import { db } from '../db/index.js';
+import {
+  sendBadRequest,
+  sendNotFound,
+  sendOk,
+  sendServerError
+} from '../lib/http.js';
+import { parseId, parseInteger, readIdParam } from '../lib/routeParams.js';
 
 const router = express.Router();
 
@@ -46,10 +53,10 @@ router.get('/', requireAuth, (req, res) => {
       )
       .all();
 
-    res.json({ items });
+    sendOk(res, { items });
   } catch (err) {
     console.error('List accounts failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -67,13 +74,13 @@ router.get('/', requireAuth, (req, res) => {
 router.post('/reorder', requireAuth, (req, res) => {
   const orderedIds = Array.isArray(req.body?.orderedIds) ? req.body.orderedIds : null;
   if (!orderedIds || orderedIds.length === 0) {
-    return res.status(400).json({ error: 'orderedIds must be a non-empty array.' });
+    return sendBadRequest(res, 'orderedIds must be a non-empty array.');
   }
 
   // Validate each id is a number.
-  const ids = orderedIds.map((id) => parseInt(id, 10)).filter(Number.isFinite);
+  const ids = orderedIds.map(parseInteger).filter((id) => id !== null);
   if (ids.length !== orderedIds.length) {
-    return res.status(400).json({ error: 'orderedIds must contain only numeric ids.' });
+    return sendBadRequest(res, 'orderedIds must contain only numeric ids.');
   }
 
   try {
@@ -88,10 +95,10 @@ router.post('/reorder', requireAuth, (req, res) => {
     });
 
     run();
-    res.json({ success: true, reordered: ids.length });
+    sendOk(res, { success: true, reordered: ids.length });
   } catch (err) {
     console.error('Reorder failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -99,26 +106,22 @@ router.post('/reorder', requireAuth, (req, res) => {
  * PUT /api/accounts/:id
  */
 router.put('/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid account id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'account');
+  if (id === null) return;
 
   const existing = db.prepare('SELECT id FROM accounts WHERE id = ?').get(id);
   if (!existing) {
-    return res.status(404).json({ error: 'Account not found.' });
+    return sendNotFound(res, 'Account not found.');
   }
 
   const body = req.body || {};
 
   if (body.type !== undefined && !VALID_TYPES.includes(body.type)) {
-    return res
-      .status(400)
-      .json({ error: `type must be one of: ${VALID_TYPES.join(', ')}` });
+    return sendBadRequest(res, `type must be one of: ${VALID_TYPES.join(', ')}`);
   }
 
   if (body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim())) {
-    return res.status(400).json({ error: 'name cannot be empty.' });
+    return sendBadRequest(res, 'name cannot be empty.');
   }
 
   const sets = [];
@@ -148,7 +151,7 @@ router.put('/:id', requireAuth, (req, res) => {
       if (col === 'current_balance') {
         v = Number(v);
         if (!Number.isFinite(v)) {
-          return res.status(400).json({ error: 'current_balance must be a valid number.' });
+          return sendBadRequest(res, 'current_balance must be a valid number.');
         }
       }
       if (col === 'estimated_value') {
@@ -157,7 +160,7 @@ router.put('/:id', requireAuth, (req, res) => {
         } else {
           v = Number(v);
           if (!Number.isFinite(v) || v < 0) {
-            return res.status(400).json({ error: 'estimated_value must be a non-negative number.' });
+            return sendBadRequest(res, 'estimated_value must be a non-negative number.');
           }
         }
       }
@@ -166,7 +169,7 @@ router.put('/:id', requireAuth, (req, res) => {
   }
 
   if (sets.length === 0) {
-    return res.status(400).json({ error: 'No fields to update.' });
+    return sendBadRequest(res, 'No fields to update.');
   }
 
   sets.push("updated_at = datetime('now')");
@@ -175,18 +178,16 @@ router.put('/:id', requireAuth, (req, res) => {
   try {
     db.prepare(`UPDATE accounts SET ${sets.join(', ')} WHERE id = ?`).run(...values);
     const updated = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
-    res.json({ success: true, account: updated });
+    sendOk(res, { success: true, account: updated });
   } catch (err) {
     console.error('Update account failed:', err);
-    res.status(400).json({ error: err.message });
+    sendBadRequest(res, err.message);
   }
 });
 
 router.post('/:id/archive', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid account id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'account');
+  if (id === null) return;
   try {
     const result = db
       .prepare(
@@ -195,20 +196,18 @@ router.post('/:id/archive', requireAuth, (req, res) => {
       )
       .run(id);
     if (result.changes === 0) {
-      return res.status(404).json({ error: 'Account not found.' });
+      return sendNotFound(res, 'Account not found.');
     }
-    res.json({ success: true });
+    sendOk(res, { success: true });
   } catch (err) {
     console.error('Archive failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 router.post('/:id/unarchive', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid account id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'account');
+  if (id === null) return;
   try {
     const result = db
       .prepare(
@@ -217,39 +216,37 @@ router.post('/:id/unarchive', requireAuth, (req, res) => {
       )
       .run(id);
     if (result.changes === 0) {
-      return res.status(404).json({ error: 'Account not found.' });
+      return sendNotFound(res, 'Account not found.');
     }
-    res.json({ success: true });
+    sendOk(res, { success: true });
   } catch (err) {
     console.error('Unarchive failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 router.post('/:id/records', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid account id.' });
-  }
+  const id = readIdParam(req, res, 'id', 'account');
+  if (id === null) return;
 
   const recordDate = String(req.body?.date || '').trim();
   if (!isValidDateOnly(recordDate)) {
-    return res.status(400).json({ error: 'date must be a valid YYYY-MM-DD date.' });
+    return sendBadRequest(res, 'date must be a valid YYYY-MM-DD date.');
   }
 
   const balance = Number(req.body?.balance);
   if (!Number.isFinite(balance)) {
-    return res.status(400).json({ error: 'balance must be a valid number.' });
+    return sendBadRequest(res, 'balance must be a valid number.');
   }
   const previousBalance =
     req.body?.previousBalance === undefined ? null : Number(req.body.previousBalance);
   if (previousBalance !== null && !Number.isFinite(previousBalance)) {
-    return res.status(400).json({ error: 'previousBalance must be a valid number.' });
+    return sendBadRequest(res, 'previousBalance must be a valid number.');
   }
 
   const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
   if (!account) {
-    return res.status(404).json({ error: 'Account not found.' });
+    return sendNotFound(res, 'Account not found.');
   }
 
   try {
@@ -312,7 +309,7 @@ router.post('/:id/records', requireAuth, (req, res) => {
     });
 
     const updated = run();
-    res.json({
+    sendOk(res, {
       success: true,
       account: updated,
       record: {
@@ -323,25 +320,26 @@ router.post('/:id/records', requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error('Add account record failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 router.post('/:id/merge', requireAuth, (req, res) => {
-  const sourceId = parseInt(req.params.id, 10);
-  const targetId = parseInt(req.body?.targetId, 10);
+  const sourceId = readIdParam(req, res, 'id', 'account');
+  if (sourceId === null) return;
+  const targetId = parseId(req.body?.targetId);
 
-  if (!Number.isFinite(sourceId) || !Number.isFinite(targetId)) {
-    return res.status(400).json({ error: 'Invalid account ids.' });
+  if (targetId === null) {
+    return sendBadRequest(res, 'Invalid account ids.');
   }
   if (sourceId === targetId) {
-    return res.status(400).json({ error: "Can't merge an account into itself." });
+    return sendBadRequest(res, "Can't merge an account into itself.");
   }
 
   const source = db.prepare('SELECT * FROM accounts WHERE id = ?').get(sourceId);
   const target = db.prepare('SELECT * FROM accounts WHERE id = ?').get(targetId);
-  if (!source) return res.status(404).json({ error: 'Source account not found.' });
-  if (!target) return res.status(404).json({ error: 'Target account not found.' });
+  if (!source) return sendNotFound(res, 'Source account not found.');
+  if (!target) return sendNotFound(res, 'Target account not found.');
 
   try {
     const run = db.transaction(() => {
@@ -360,7 +358,7 @@ router.post('/:id/merge', requireAuth, (req, res) => {
     });
     const transactionsMoved = run();
 
-    res.json({
+    sendOk(res, {
       success: true,
       transactionsMoved,
       mergedSourceName: source.name,
@@ -368,35 +366,34 @@ router.post('/:id/merge', requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error('Merge failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 router.delete('/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: 'Invalid account id.' });
-  }
-
-  const txnCount = db
-    .prepare('SELECT COUNT(*) AS c FROM transactions WHERE account_id = ?')
-    .get(id).c;
-
-  if (txnCount > 0) {
-    return res.status(400).json({
-      error: `Can't delete an account with ${txnCount} transactions. Merge or archive instead.`
-    });
-  }
+  const id = readIdParam(req, res, 'id', 'account');
+  if (id === null) return;
 
   try {
+    const txnCount = db
+      .prepare('SELECT COUNT(*) AS c FROM transactions WHERE account_id = ?')
+      .get(id).c;
+
+    if (txnCount > 0) {
+      return sendBadRequest(
+        res,
+        `Can't delete an account with ${txnCount} transactions. Merge or archive instead.`
+      );
+    }
+
     const result = db.prepare('DELETE FROM accounts WHERE id = ?').run(id);
     if (result.changes === 0) {
-      return res.status(404).json({ error: 'Account not found.' });
+      return sendNotFound(res, 'Account not found.');
     }
-    res.json({ success: true });
+    sendOk(res, { success: true });
   } catch (err) {
     console.error('Delete failed:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
