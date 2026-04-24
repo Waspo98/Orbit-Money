@@ -2,23 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppIcon from './AppIcon.jsx';
 import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
-
-const MORE_ITEMS = [
-  { id: 'rules', label: 'Rules', description: 'Automate merchant names and categories', icon: 'rules', path: '/rules' },
-  { id: 'categories', label: 'Category Manager', description: 'Organize spending categories', icon: 'categories', path: '/categories' },
-  { id: 'goals', label: 'Goals', description: 'Track savings targets', icon: 'goals', path: '/goals' },
-  { id: 'housing', label: 'Housing Calculator', description: 'Selling, buying, and payment estimates', icon: 'housing', path: '/housing-calculator' },
-  { id: 'networth', label: 'Net Worth', description: 'Assets minus liabilities over time', icon: 'networth', path: '/net-worth' },
-  { id: 'household', label: 'Household', description: 'Net pay, benefits, and income history', icon: 'household', path: '/household' },
-  { id: 'mha', label: 'MHA Tracker', description: 'Track housing allowance transactions', icon: 'mha', path: '/mha-tracker', feature: 'mha' },
-  { id: 'settings', label: 'Settings', description: 'Maintenance and configuration', icon: 'settings', path: '/settings' }
-];
+import { getMoreRoutes } from '../navigation.js';
 
 export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) {
   const navigate = useNavigate();
   const [closing, setClosing] = useState(false);
   const timerRef = useRef(null);
-  const visibleItems = MORE_ITEMS.filter((item) => item.feature !== 'mha' || mhaTrackerEnabled);
+  const visibleItems = getMoreRoutes({ mhaTrackerEnabled });
 
   useEffect(() => {
     if (open) setClosing(false);
@@ -85,7 +75,7 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
         <div className="more-grid">
           {visibleItems.map((item) => (
             <button
-              key={item.id}
+              key={item.path}
               type="button"
               className={`more-card ${item.comingSoon ? 'coming-soon' : ''}`}
               onClick={() => handleItemClick(item)}
@@ -102,5 +92,3 @@ export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) 
     </div>
   );
 }
-
-export { MORE_ITEMS };

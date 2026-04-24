@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import PageHero from '../components/PageHero.jsx';
 import CurrencyInput, { formatCurrencyInput } from '../components/CurrencyInput.jsx';
+import PercentInput from '../components/PercentInput.jsx';
 import { formatCurrency } from '../lib/formatters.js';
 
 function formatMoney(amount) {
@@ -18,14 +19,6 @@ function parseNumber(value, fallback = 0) {
 
 function hasValue(value) {
   return String(value ?? '').replace(/[$,%\s,]/g, '').trim() !== '';
-}
-
-function formatPercentInput(value) {
-  const cleaned = String(value || '').replace(/[^0-9.]/g, '');
-  if (!cleaned) return '';
-  const [whole, decimal = ''] = cleaned.split('.');
-  const percent = `${whole || '0'}${cleaned.includes('.') ? `.${decimal.slice(0, 2)}` : ''}`;
-  return `${percent}%`;
 }
 
 function mortgagePayment(principal, annualRatePercent, years) {
@@ -343,11 +336,9 @@ function PercentField({ label, value, placeholder = '0%', onChange }) {
   return (
     <label className="field housing-field">
       <span>{label}</span>
-      <input
-        type="text"
-        inputMode="decimal"
+      <PercentInput
         value={value}
-        onChange={(e) => onChange(formatPercentInput(e.target.value))}
+        onChange={onChange}
         placeholder={placeholder}
       />
     </label>

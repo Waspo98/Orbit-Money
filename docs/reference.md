@@ -23,7 +23,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
 | `sessions.db` | Session store (separate connection, managed by `connect-sqlite3`) |
 
-### Database Schema (20 migrations)
+### Database Schema (21 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -47,12 +47,13 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `018_account_balance_records.sql` | Adds dated account balance snapshots for manual/disconnected account history |
 | `019_household_income.sql` | Adds household member profiles and dated income/benefit history snapshots |
 | `020_household_retirement_accounts.sql` | Links household members to existing retirement/HSA accounts for projections |
+| `021_integer_cents.sql` | Converts money storage to integer cents and splits goal allocation percent vs fixed-amount storage |
 
 ### Key Data Model Notes
 
 **Sign convention:** expenses are negative, income is positive (flipped from Rocket Money's positive-expense format during CSV import).
 
-**Money representation:** SQLite stores current money fields as `REAL`. New calculation code should centralize parsing, rounding, and summing through `backend/src/lib/money.js` until a dedicated integer-cents migration is planned and tested.
+**Money representation:** SQLite stores money fields as integer cents. API responses and request bodies still use dollar values for the frontend. Convert at route/service boundaries with `backend/src/lib/money.js`; do not store floating-point dollars in SQLite. Percent fields remain percent values, and goal allocations store percent allocations in `allocation_percent` while fixed-dollar allocations use integer cents in `allocation_amount`.
 
 **Route template:** Express handlers should validate and normalize route inputs at the boundary, use `backend/src/lib/routeParams.js` for common id/boolean/bounded-integer parsing, and send responses through `backend/src/lib/http.js` helpers (`sendOk`, `sendBadRequest`, `sendNotFound`, `sendServerError`, etc.) so API success and error shapes stay mechanical.
 
@@ -70,7 +71,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 
 **Budgets:** One row per spending `category_id` (globally applied). Transfer and income categories are excluded from budget rows and per-category spending lists; income is summarized separately in the monthly Income / Expenses / Net stat row. The `budgets` table retains the `rollover` column from migration 001 for future Phase 2 work but it's not consumed by the current UI.
 
-**Goals:** Goal progress is computed from `goal_account_allocations` and active asset account balances. Allocations can be fixed dollar amounts or percentages of the account balance. The old `goals.current_amount` column is retained for compatibility, but the Goals API derives live progress at read time.
+**Goals:** Goal progress is computed from `goal_account_allocations` and active asset account balances. Allocations can be fixed dollar amounts or percentages of the account balance; fixed allocations are stored as integer cents and percentage allocations remain percent values. The old `goals.current_amount` column is retained for compatibility, but the Goals API derives live progress at read time.
 
 **Household:** `household_members` stores the current profile, income, retirement, and benefit assumptions for each person. `household_income_records` stores dated snapshots so future projections can use compensation history without mutating old records. `household_retirement_accounts` links existing account rows to household members so retirement projections can compound present balances without moving or duplicating account data.
 
@@ -194,9 +195,11 @@ Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column gri
 - `AnimatedModal` component: render-prop pattern (`{({ close }) => ...}`), 180ms slide/zoom animations via `.closing` CSS classes. Saved closes animate; canceled closes should feel immediate unless a specific flow says otherwise.
 - `PageHero` component and `useMorphingPageHero(initialHeight)` hook own the morphing sticky hero measurement logic. Reuse `PageHero` for page headers; pass `chrome` and `toolbar` slots when a page needs custom header controls.
 - `AppDialog.jsx` exposes `useAppDialog()` for modal alert/confirmation flows. Prefer it over native `alert()` / `confirm()` so mobile UX and destructive-action styling stay consistent.
-- `BottomTabs.jsx` owns the primary navigation item list; `DesktopSidebar.jsx` imports `PRIMARY_TABS` so desktop and mobile navigation labels/icons stay aligned.
+- `frontend/src/navigation.js` owns route metadata. `BottomTabs.jsx`, `DesktopSidebar.jsx`, `MoreSheet.jsx`, `App.jsx`, and route visibility should read from it so labels, icons, route rendering, and feature gating stay aligned.
 - `SelectableListItem.jsx` is the shared two-line selectable card/row primitive. Use it for lists where one item is selected, such as goal/category pickers; selected rows use the shared green active treatment.
 - `CurrencyInput.jsx` is the shared primitive for editable dollar amounts. Use it for money text fields so values format with `$` and comma grouping while typing; pair saved values with `parseCurrencyInput`.
+- `SearchField.jsx` is the shared rounded search primitive for page toolbars and collapsed page-hero search slots.
+- `PercentInput.jsx` is the shared editable percent primitive; pair ad hoc percent formatting with `formatPercentInput` from `frontend/src/lib/formatters.js`.
 - Overlay behavior: modals, app dialogs, sheets, and full-screen popovers blur the app backdrop and lock body scroll. `DropdownMenu` stays anchored to its trigger, does not blur the page, and does not lock scroll.
 - Three-way theme toggle (☀️ / 💻 / 🌙): localStorage persistence with pre-paint script in `index.html` to avoid flash
 - 40+ CSS custom properties for light/dark themes, emerald-600/500 accent
@@ -313,7 +316,7 @@ Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column gri
 - `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
 - `db/index.js`, `db/migrations.js`
 - `lib/`: http, localDate, money, routeParams
-- `db/migrations/001` through `020`
+- `db/migrations/001` through `021`
 - `routes/`: auth, health, import, transactions, accounts, categories, rules, simplefin, budgets, netWorth, mha, goals, household
 - `services/`: csvImport, mhaSummary, ruleMatcher (exports `loadRules`, `computeEdits`, `countMatches`, `reapplyRulesToAllTransactions`, `reapplyRulesToTransaction`, `revertEditsForRule`, `applyRulesToDraft`), simplefinClient, simplefinSync, transferMatcher
 - `test/`: Node built-in test runner coverage for backend helpers and calculation services

@@ -1,17 +1,10 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import AppIcon from './AppIcon.jsx';
-import { PRIMARY_TABS } from './BottomTabs.jsx';
-import { MORE_ITEMS } from './MoreSheet.jsx';
+import { getNavigationRoutes } from '../navigation.js';
 
 export default function DesktopSidebar({ mhaTrackerEnabled = false }) {
   const navigate = useNavigate();
-  const links = [
-    ...PRIMARY_TABS.map((item) => ({
-      ...item,
-      path: item.to
-    })),
-    ...MORE_ITEMS.filter((item) => item.feature !== 'mha' || mhaTrackerEnabled)
-  ];
+  const links = getNavigationRoutes({ mhaTrackerEnabled });
 
   return (
     <aside className="desktop-sidebar">

@@ -8,6 +8,7 @@ import {
   sendRouteError,
   sendServerError
 } from '../lib/http.js';
+import { dollarsToCents, moneyFieldsToDollars } from '../lib/money.js';
 import { readIdParam } from '../lib/routeParams.js';
 
 const router = express.Router();
@@ -34,6 +35,17 @@ const PAY_PERIODS = {
   annual: 1,
   none: 0
 };
+const MEMBER_MONEY_FIELDS = [
+  'gross_income_annual',
+  'net_pay_per_period',
+  'employee_contribution_annual',
+  'employer_match_annual_cap',
+  'health_premium_per_month',
+  'hsa_contribution_annual',
+  'dependent_care_fsa_annual',
+  'other_benefits_annual'
+];
+const ACCOUNT_MONEY_FIELDS = ['current_balance', 'estimated_value'];
 
 function householdError(message, status = 400) {
   const err = new Error(message);
@@ -59,6 +71,21 @@ function cleanNumber(value, fallback = 0) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.max(0, number);
+}
+
+function cleanMoney(value, fallback = 0) {
+  if (value === null || value === undefined || value === '') return fallback;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return dollarsToCents(Math.max(0, number));
+}
+
+function serializeMember(row) {
+  return moneyFieldsToDollars(row, MEMBER_MONEY_FIELDS);
+}
+
+function serializeAccount(row) {
+  return moneyFieldsToDollars(row, ACCOUNT_MONEY_FIELDS);
 }
 
 function periodsFor(payFrequency, body) {
@@ -91,20 +118,20 @@ function normalizeMemberBody(body) {
     employment_status: employmentStatus,
     employer: cleanString(body?.employer, 120),
     job_title: cleanString(body?.job_title, 120),
-    gross_income_annual: cleanNumber(body?.gross_income_annual),
-    net_pay_per_period: cleanNumber(body?.net_pay_per_period),
+    gross_income_annual: cleanMoney(body?.gross_income_annual),
+    net_pay_per_period: cleanMoney(body?.net_pay_per_period),
     pay_frequency: payFrequency,
     pay_periods_per_year: periodsFor(payFrequency, body),
     retirement_account_type: retirementType,
     employee_contribution_percent: Math.min(100, cleanNumber(body?.employee_contribution_percent)),
-    employee_contribution_annual: cleanNumber(body?.employee_contribution_annual),
+    employee_contribution_annual: cleanMoney(body?.employee_contribution_annual),
     employer_match_percent: Math.min(100, cleanNumber(body?.employer_match_percent)),
     employer_match_limit_percent: Math.min(100, cleanNumber(body?.employer_match_limit_percent)),
-    employer_match_annual_cap: cleanNumber(body?.employer_match_annual_cap),
-    health_premium_per_month: cleanNumber(body?.health_premium_per_month),
-    hsa_contribution_annual: cleanNumber(body?.hsa_contribution_annual),
-    dependent_care_fsa_annual: cleanNumber(body?.dependent_care_fsa_annual),
-    other_benefits_annual: cleanNumber(body?.other_benefits_annual),
+    employer_match_annual_cap: cleanMoney(body?.employer_match_annual_cap),
+    health_premium_per_month: cleanMoney(body?.health_premium_per_month),
+    hsa_contribution_annual: cleanMoney(body?.hsa_contribution_annual),
+    dependent_care_fsa_annual: cleanMoney(body?.dependent_care_fsa_annual),
+    other_benefits_annual: cleanMoney(body?.other_benefits_annual),
     notes: cleanString(body?.notes, 800),
     retirement_accounts: normalizeRetirementAccounts(body?.retirement_accounts)
   };
@@ -136,19 +163,19 @@ function normalizeIncomeRecordBody(member, body) {
   return {
     member_id: member.id,
     effective_date: effectiveDate,
-    gross_income_annual: cleanNumber(body?.gross_income_annual, member.gross_income_annual),
-    net_pay_per_period: cleanNumber(body?.net_pay_per_period, member.net_pay_per_period),
+    gross_income_annual: cleanMoney(body?.gross_income_annual, member.gross_income_annual),
+    net_pay_per_period: cleanMoney(body?.net_pay_per_period, member.net_pay_per_period),
     pay_frequency: payFrequency,
     pay_periods_per_year: periodsFor(payFrequency, body?.pay_periods_per_year == null ? member : body),
     employee_contribution_percent: Math.min(100, cleanNumber(body?.employee_contribution_percent, member.employee_contribution_percent)),
-    employee_contribution_annual: cleanNumber(body?.employee_contribution_annual, member.employee_contribution_annual),
+    employee_contribution_annual: cleanMoney(body?.employee_contribution_annual, member.employee_contribution_annual),
     employer_match_percent: Math.min(100, cleanNumber(body?.employer_match_percent, member.employer_match_percent)),
     employer_match_limit_percent: Math.min(100, cleanNumber(body?.employer_match_limit_percent, member.employer_match_limit_percent)),
-    employer_match_annual_cap: cleanNumber(body?.employer_match_annual_cap, member.employer_match_annual_cap),
-    health_premium_per_month: cleanNumber(body?.health_premium_per_month, member.health_premium_per_month),
-    hsa_contribution_annual: cleanNumber(body?.hsa_contribution_annual, member.hsa_contribution_annual),
-    dependent_care_fsa_annual: cleanNumber(body?.dependent_care_fsa_annual, member.dependent_care_fsa_annual),
-    other_benefits_annual: cleanNumber(body?.other_benefits_annual, member.other_benefits_annual),
+    employer_match_annual_cap: cleanMoney(body?.employer_match_annual_cap, member.employer_match_annual_cap),
+    health_premium_per_month: cleanMoney(body?.health_premium_per_month, member.health_premium_per_month),
+    hsa_contribution_annual: cleanMoney(body?.hsa_contribution_annual, member.hsa_contribution_annual),
+    dependent_care_fsa_annual: cleanMoney(body?.dependent_care_fsa_annual, member.dependent_care_fsa_annual),
+    other_benefits_annual: cleanMoney(body?.other_benefits_annual, member.other_benefits_annual),
     source: cleanString(body?.source, 40) || 'manual',
     notes: cleanString(body?.notes, 800)
   };
@@ -227,6 +254,7 @@ function buildPayload() {
         ORDER BY id ASC`
     )
     .all()
+    .map(serializeMember)
     .map(decorateMember);
 
   const linkedAccounts = db
@@ -240,6 +268,7 @@ function buildPayload() {
         ORDER BY hra.member_id ASC, hra.account_kind ASC, a.sort_order ASC, a.name ASC`
     )
     .all()
+    .map(serializeAccount)
     .map((row) => ({
       ...row,
       balance: accountBalance(row)
@@ -265,6 +294,7 @@ function buildPayload() {
         LIMIT 80`
     )
     .all()
+    .map(serializeMember)
     .map((row) => ({
       ...row,
       net_pay_annual: (Number(row.net_pay_per_period) || 0) * (Number(row.pay_periods_per_year) || 0),
@@ -373,7 +403,10 @@ router.post('/members', requireAuth, (req, res) => {
       ).run(member);
       const saved = { id: result.lastInsertRowid, ...member };
       replaceRetirementAccounts(saved.id, member.retirement_accounts);
-      insertIncomeRecord(normalizeIncomeRecordBody(saved, { ...member, effective_date: req.body?.effective_date, source: 'profile' }));
+      insertIncomeRecord(normalizeIncomeRecordBody(saved, {
+        effective_date: req.body?.effective_date,
+        source: 'profile'
+      }));
     });
     run();
     sendOk(res, { success: true, ...buildPayload() });
@@ -418,7 +451,10 @@ router.put('/members/:id', requireAuth, (req, res) => {
       ).run({ id, ...member });
       if (result.changes === 0) throw householdError('Household member not found.', 404);
       replaceRetirementAccounts(id, member.retirement_accounts);
-      insertIncomeRecord(normalizeIncomeRecordBody({ id, ...member }, { ...member, effective_date: req.body?.effective_date, source: 'profile' }));
+      insertIncomeRecord(normalizeIncomeRecordBody({ id, ...member }, {
+        effective_date: req.body?.effective_date,
+        source: 'profile'
+      }));
     });
     run();
     sendOk(res, { success: true, ...buildPayload() });

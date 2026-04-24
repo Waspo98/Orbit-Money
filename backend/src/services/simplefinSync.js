@@ -28,6 +28,7 @@ import { decrypt } from '../crypto.js';
 import { fetchAccounts } from './simplefinClient.js';
 import { loadRules, applyRulesToDraft } from './ruleMatcher.js';
 import { matchTransfers } from './transferMatcher.js';
+import { dollarsToCents } from '../lib/money.js';
 
 const STALE_RUN_MINUTES = 15;
 const LOOKBACK_BUFFER_DAYS = 7; // re-fetch the last N days on every sync
@@ -219,7 +220,7 @@ export async function runSync({ trigger = 'manual' } = {}) {
       const linked = findAccountBySfId.get(sf.id);
       if (linked) {
         sfToLocalId.set(sf.id, linked.id);
-        updateBalance.run(parseFloat(sf.balance) || 0, linked.id);
+        updateBalance.run(dollarsToCents(parseFloat(sf.balance) || 0), linked.id);
         continue;
       }
 
@@ -231,7 +232,7 @@ export async function runSync({ trigger = 'manual' } = {}) {
         const existing = findAccountByInstLast4.get(institution, last4);
         if (existing) {
           linkSfId.run(sf.id, existing.id);
-          updateBalance.run(parseFloat(sf.balance) || 0, existing.id);
+          updateBalance.run(dollarsToCents(parseFloat(sf.balance) || 0), existing.id);
           sfToLocalId.set(sf.id, existing.id);
           continue;
         }
@@ -245,7 +246,7 @@ export async function runSync({ trigger = 'manual' } = {}) {
         institution,
         last4,
         sf.id,
-        parseFloat(sf.balance) || 0
+        dollarsToCents(parseFloat(sf.balance) || 0)
       );
       sfToLocalId.set(sf.id, result.lastInsertRowid);
       accountsCreated++;
@@ -308,6 +309,7 @@ export async function runSync({ trigger = 'manual' } = {}) {
             skipped++;
             continue;
           }
+          const amountCents = dollarsToCents(amount);
 
           const rawMerchant = (tx.payee || tx.description || 'Unknown').trim();
           const originalDesc = (tx.description || tx.payee || '').trim();
@@ -318,7 +320,7 @@ export async function runSync({ trigger = 'manual' } = {}) {
           const draft = {
             account_id: accountId,
             date: isoDate,
-            amount,
+            amount: amountCents,
             original_merchant: rawMerchant,
             original_description: originalDesc,
             original_category_id: categoriesUncat,
@@ -330,7 +332,7 @@ export async function runSync({ trigger = 'manual' } = {}) {
           const result = insertTxn.run(
             accountId,
             isoDate,
-            amount,
+            amountCents,
             rawMerchant,
             originalDesc,
             categoriesUncat,
@@ -353,7 +355,7 @@ export async function runSync({ trigger = 'manual' } = {}) {
             repairEpochTxn.run(
               accountId,
               isoDate,
-              amount,
+              amountCents,
               rawMerchant,
               originalDesc,
               tx.id,

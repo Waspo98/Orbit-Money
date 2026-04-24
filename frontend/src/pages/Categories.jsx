@@ -6,6 +6,7 @@ import AnimatedModal from '../components/AnimatedModal.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import InlinePopover from '../components/InlinePopover.jsx';
 import PageHero from '../components/PageHero.jsx';
+import SearchField from '../components/SearchField.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 
 const COLOR_PRESETS = [
@@ -165,12 +166,11 @@ export default function Categories({
       />
 
       <div className="rules-toolbar categories-toolbar">
-        <input
-          type="search"
-          className="rules-search categories-search"
-          placeholder="Search categories..."
+        <SearchField
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={setSearch}
+          placeholder="Search categories..."
+          className="categories-search"
         />
       </div>
 

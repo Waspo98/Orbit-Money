@@ -27,6 +27,7 @@ import {
   sendOk,
   sendServerError
 } from '../lib/http.js';
+import { centsToDollars, dollarsToCents } from '../lib/money.js';
 import { parseId, readIdParam } from '../lib/routeParams.js';
 
 const router = express.Router();
@@ -93,8 +94,8 @@ router.get('/', requireAuth, (req, res) => {
       )
       .get(start, end);
 
-    const total_income = Number(flow?.income || 0);
-    const total_expenses = Number(flow?.expenses || 0);
+    const total_income = centsToDollars(flow?.income || 0);
+    const total_expenses = centsToDollars(flow?.expenses || 0);
 
     const categories = db
       .prepare(
@@ -122,7 +123,7 @@ router.get('/', requireAuth, (req, res) => {
     for (const cat of categories) {
       const budget = budgetByCat.get(cat.id);
       const spendRow = spendByCat.get(cat.id);
-      const spent = spendRow ? Number(spendRow.spent) : 0;
+      const spent = spendRow ? centsToDollars(spendRow.spent) : 0;
       const txnCount = spendRow ? spendRow.n : 0;
 
       const item = {
@@ -135,7 +136,7 @@ router.get('/', requireAuth, (req, res) => {
           is_transfer: !!cat.is_transfer
         },
         budget_id: budget?.id ?? null,
-        amount: budget ? Number(budget.amount) : null,
+        amount: budget ? centsToDollars(budget.amount) : null,
         rollover: budget ? (budget.rollover ? 1 : 0) : null,
         spent,
         transaction_count: txnCount
@@ -224,6 +225,7 @@ router.put('/', requireAuth, (req, res) => {
   if (!Number.isFinite(amt) || amt < 0) {
     return sendBadRequest(res, 'amount must be a non-negative number.');
   }
+  const amountCents = dollarsToCents(amt);
 
   try {
     const category = db
@@ -245,7 +247,7 @@ router.put('/', requireAuth, (req, res) => {
         `UPDATE budgets
             SET amount = ?, rollover = ?, updated_at = datetime('now')
           WHERE id = ?`
-      ).run(amt, rollover ? 1 : 0, existing.id);
+      ).run(amountCents, rollover ? 1 : 0, existing.id);
       sendOk(res, { success: true, id: existing.id, created: false });
     } else {
       const result = db
@@ -253,7 +255,7 @@ router.put('/', requireAuth, (req, res) => {
           `INSERT INTO budgets (category_id, amount, rollover)
            VALUES (?, ?, ?)`
         )
-        .run(catId, amt, rollover ? 1 : 0);
+        .run(catId, amountCents, rollover ? 1 : 0);
       sendOk(res, { success: true, id: result.lastInsertRowid, created: true });
     }
   } catch (err) {

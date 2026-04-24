@@ -38,6 +38,7 @@ import {
   sendOk,
   sendServerError
 } from '../lib/http.js';
+import { centsToDollars, dollarsToCents } from '../lib/money.js';
 import {
   parseBoundedInteger,
   parseId,
@@ -97,6 +98,7 @@ const SELECT_COLS = `
 
 function hydrate(row) {
   if (!row) return row;
+  row.amount = centsToDollars(row.amount);
   row.has_edits =
     row.edited_merchant_source !== null ||
     row.edited_category_id_source !== null ||
@@ -236,12 +238,12 @@ function buildFilterWhere(q) {
   const amountMin = parseNumber(q.amount_min);
   if (amountMin !== null && amountMin >= 0) {
     wheres.push('ABS(amount) >= ?');
-    args.push(amountMin);
+    args.push(dollarsToCents(amountMin));
   }
   const amountMax = parseNumber(q.amount_max);
   if (amountMax !== null && amountMax >= 0) {
     wheres.push('ABS(amount) <= ?');
-    args.push(amountMax);
+    args.push(dollarsToCents(amountMax));
   }
 
   // ----- Transaction type -----

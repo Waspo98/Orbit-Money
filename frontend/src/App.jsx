@@ -28,22 +28,11 @@ import SyncErrorBanner from './components/SyncErrorBanner.jsx';
 import MoreSheet from './components/MoreSheet.jsx';
 import { useTheme } from './hooks/useTheme.js';
 import { api } from './api.js';
+import { ROUTES, getNavigationRoutes, getRoute } from './navigation.js';
 
 // Bottom tabs always visible. (Previously we hid them on Settings/import to
 // keep the UI focused, but with the More tab the sheet can be opened from any
 // page so keeping tabs visible is fine and more consistent.)
-
-const PRIMARY_NAV_ROUTES = ['/dashboard', '/transactions', '/budgets', '/accounts'];
-const MORE_NAV_ROUTES = [
-  '/rules',
-  '/categories',
-  '/goals',
-  '/housing-calculator',
-  '/net-worth',
-  '/household',
-  '/mha-tracker',
-  '/settings'
-];
 
 function transitionBetween(fromPath, toPath, routes) {
   const fromIndex = routes.indexOf(fromPath);
@@ -68,6 +57,7 @@ function AppShell() {
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [lookupsReady, setLookupsReady] = useState(false);
+  const [lookupError, setLookupError] = useState('');
   const [mhaTrackerEnabled, setMhaTrackerEnabled] = useState(false);
 
   const { mode: themeMode, setMode: setThemeMode } = useTheme();
@@ -76,25 +66,11 @@ function AppShell() {
   const navigate = useNavigate();
   const navigationType = useNavigationType();
   const previousPathRef = useRef(location.pathname);
-  const hasPageHero =
-    location.pathname === '/dashboard' ||
-    location.pathname === '/transactions' ||
-    location.pathname === '/categories' ||
-    location.pathname === '/budgets' ||
-    location.pathname === '/accounts' ||
-    location.pathname === '/rules' ||
-    location.pathname === '/housing-calculator' ||
-    location.pathname === '/net-worth' ||
-    location.pathname === '/household' ||
-    location.pathname === '/goals' ||
-    location.pathname === '/settings' ||
-    location.pathname === '/mha-tracker';
+  const currentRoute = getRoute(location.pathname);
+  const hasPageHero = !!currentRoute?.hasPageHero;
   const navigationRoutes = useMemo(
     () =>
-      [
-        ...PRIMARY_NAV_ROUTES,
-        ...MORE_NAV_ROUTES.filter((route) => route !== '/mha-tracker' || mhaTrackerEnabled)
-      ],
+      getNavigationRoutes({ mhaTrackerEnabled }).map((route) => route.path),
     [mhaTrackerEnabled]
   );
   const explicitTransition =
@@ -132,6 +108,7 @@ function AppShell() {
   }
 
   async function loadLookups() {
+    setLookupError('');
     try {
       const [a, c] = await Promise.all([
         api.get('/api/accounts'),
@@ -142,8 +119,12 @@ function AppShell() {
       setCategories(c.items);
       setMhaTrackerEnabled(!!mha.enabled);
       setLookupsReady(true);
+      return true;
     } catch (err) {
       console.error('Failed to load lookups:', err);
+      setLookupError(err.message || 'Failed to load app data.');
+      setLookupsReady(false);
+      return false;
     }
   }
 
@@ -169,73 +150,57 @@ function AppShell() {
     setCategories([]);
     setMhaTrackerEnabled(false);
     setLookupsReady(false);
+    setLookupError('');
     navigate('/', { replace: true });
   }
 
   async function handleSettingsImportComplete() {
-    await loadLookups();
-    navigate('/transactions', { state: { transition: 'back' } });
-  }
-
-  function renderRoute(pathname = location.pathname) {
-    switch (pathname) {
-      case '/dashboard':
-        return (
-          <Dashboard
-            accounts={accounts}
-            categories={categories}
-            mhaTrackerEnabled={mhaTrackerEnabled}
-          />
-        );
-      case '/transactions':
-        return (
-          <Transactions
-            accounts={accounts}
-            categories={categories}
-            mhaTrackerEnabled={mhaTrackerEnabled}
-          />
-        );
-      case '/budgets':
-        return <Budgets />;
-      case '/accounts':
-        return <Accounts onChange={loadLookups} />;
-      case '/rules':
-        return <Rules />;
-      case '/categories':
-        return (
-          <Categories
-            mhaTrackerEnabled={mhaTrackerEnabled}
-            onChange={loadLookups}
-          />
-        );
-      case '/housing-calculator':
-        return <HousingCalculator accounts={accounts} />;
-      case '/net-worth':
-        return <NetWorth />;
-      case '/household':
-        return <Household />;
-      case '/goals':
-        return <Goals />;
-      case '/mha-tracker':
-        return mhaTrackerEnabled ? <MhaTracker /> : <Navigate to="/settings" replace />;
-      case '/settings':
-        return (
-          <Settings
-            themeMode={themeMode}
-            onThemeChange={setThemeMode}
-            onLogout={handleLogout}
-            mhaTrackerEnabled={mhaTrackerEnabled}
-            onMhaTrackerChange={setMhaTrackerEnabled}
-            onImportComplete={handleSettingsImportComplete}
-          />
-        );
-      case '/':
-      case '/import':
-        return <Navigate to={pathname === '/' ? '/dashboard' : '/settings'} replace />;
-      default:
-        return <Navigate to="/dashboard" replace />;
+    const loaded = await loadLookups();
+    if (loaded) {
+      navigate('/transactions', { state: { transition: 'back' } });
     }
   }
+
+  const routeElements = {
+    '/dashboard': (
+      <Dashboard
+        accounts={accounts}
+        categories={categories}
+        mhaTrackerEnabled={mhaTrackerEnabled}
+      />
+    ),
+    '/transactions': (
+      <Transactions
+        accounts={accounts}
+        categories={categories}
+        mhaTrackerEnabled={mhaTrackerEnabled}
+      />
+    ),
+    '/budgets': <Budgets />,
+    '/accounts': <Accounts onChange={loadLookups} />,
+    '/rules': <Rules />,
+    '/categories': (
+      <Categories
+        mhaTrackerEnabled={mhaTrackerEnabled}
+        onChange={loadLookups}
+      />
+    ),
+    '/housing-calculator': <HousingCalculator accounts={accounts} />,
+    '/net-worth': <NetWorth />,
+    '/household': <Household />,
+    '/goals': <Goals />,
+    '/mha-tracker': mhaTrackerEnabled ? <MhaTracker /> : <Navigate to="/settings" replace />,
+    '/settings': (
+      <Settings
+        themeMode={themeMode}
+        onThemeChange={setThemeMode}
+        onLogout={handleLogout}
+        mhaTrackerEnabled={mhaTrackerEnabled}
+        onMhaTrackerChange={setMhaTrackerEnabled}
+        onImportComplete={handleSettingsImportComplete}
+      />
+    )
+  };
 
   if (authState === 'loading') {
     return (
@@ -269,7 +234,16 @@ function AppShell() {
       <SyncErrorBanner onOpenSettings={() => navigate('/settings')} />
 
       <main className="app-main">
-        {!lookupsReady ? (
+        {lookupError ? (
+          <div className="empty-state app-load-error">
+            <div className="empty-state-icon">!</div>
+            <h2>Could not load app data</h2>
+            <p>{lookupError}</p>
+            <button type="button" className="btn-primary" onClick={loadLookups}>
+              Retry
+            </button>
+          </div>
+        ) : !lookupsReady ? (
           <div className="center-loading">
             <div className="spinner" />
           </div>
@@ -280,18 +254,13 @@ function AppShell() {
           >
             <Routes location={location}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={renderRoute('/dashboard')} />
-              <Route path="/transactions" element={renderRoute('/transactions')} />
-              <Route path="/budgets" element={renderRoute('/budgets')} />
-              <Route path="/accounts" element={renderRoute('/accounts')} />
-              <Route path="/rules" element={renderRoute('/rules')} />
-              <Route path="/categories" element={renderRoute('/categories')} />
-              <Route path="/housing-calculator" element={renderRoute('/housing-calculator')} />
-              <Route path="/net-worth" element={renderRoute('/net-worth')} />
-              <Route path="/household" element={renderRoute('/household')} />
-              <Route path="/goals" element={renderRoute('/goals')} />
-              <Route path="/mha-tracker" element={renderRoute('/mha-tracker')} />
-              <Route path="/settings" element={renderRoute('/settings')} />
+              {ROUTES.map((route) => (
+                <Route
+                  key={route.path}
+                  path={route.path}
+                  element={routeElements[route.path]}
+                />
+              ))}
               <Route path="/import" element={<Navigate to="/settings" replace />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

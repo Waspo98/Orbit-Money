@@ -13,6 +13,7 @@ import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppRangeSlider from '../components/AppRangeSlider.jsx';
 import PageHero from '../components/PageHero.jsx';
+import PercentInput from '../components/PercentInput.jsx';
 import ReorderListItem, {
   useDragInteractionLock,
   useReorderSensors
@@ -27,7 +28,6 @@ import {
   formatCurrency,
   formatSignedCurrency,
   formatPercent,
-  formatPercentInput,
   parsePercentInput
 } from '../lib/formatters.js';
 import { addMonthsToLocalDate } from '../lib/localDate.js';
@@ -966,18 +966,6 @@ function RetirementPlanner({ goal, household }) {
         </AnimatedModal>
       )}
     </section>
-  );
-}
-
-function PercentInput({ value, onChange, ...props }) {
-  return (
-    <input
-      {...props}
-      type="text"
-      inputMode="decimal"
-      value={value}
-      onChange={(event) => onChange(formatPercentInput(event.target.value))}
-    />
   );
 }
 

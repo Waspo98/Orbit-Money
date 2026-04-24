@@ -4,8 +4,8 @@ import { api } from '../api.js';
 import PageHero from '../components/PageHero.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
-import { TransactionRow, EditTransactionModal } from './Transactions.jsx';
-import { RuleEditor } from './Rules.jsx';
+import { TransactionRow, EditTransactionModal } from '../components/transactions/TransactionRow.jsx';
+import { RuleEditor } from '../components/rules/RuleEditor.jsx';
 import { formatCurrency } from '../lib/formatters.js';
 
 const ACCOUNT_TYPE_LABELS = {

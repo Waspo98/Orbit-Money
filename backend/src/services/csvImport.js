@@ -17,6 +17,7 @@
 import Papa from 'papaparse';
 import crypto from 'crypto';
 import { reapplyRulesToAllTransactions } from './ruleMatcher.js';
+import { dollarsToCents } from '../lib/money.js';
 
 const REQUIRED_COLUMNS = [
   'Date',
@@ -207,7 +208,7 @@ export function importRocketMoneyCSV(db, csvBuffer) {
       const notes = (row['Note'] || '').trim() || null;
       const isIgnored = (row['Ignored From'] || '').trim() ? 1 : 0;
 
-      const amountCents = Math.round(amount * 100);
+      const amountCents = dollarsToCents(amount);
       const contentHash = computeContentHash({
         date,
         amountCents,
@@ -218,7 +219,7 @@ export function importRocketMoneyCSV(db, csvBuffer) {
       const result = insertTxn.run(
         accountId,
         date,
-        amount,
+        amountCents,
         originalMerchant,
         originalDesc,
         categoryId,

@@ -6,6 +6,7 @@ import CurrencyInput, {
   parseCurrencyInput
 } from '../components/CurrencyInput.jsx';
 import PageHero from '../components/PageHero.jsx';
+import PercentInput from '../components/PercentInput.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import AppIcon from '../components/AppIcon.jsx';
 import {
@@ -683,16 +684,4 @@ function accountKindFromAccount(account) {
   if (text.includes('ira')) return 'ira';
   if (text.includes('pension')) return 'pension';
   return account?.type === 'investment' ? 'other' : 'other';
-}
-
-function PercentInput({ value, onChange, ...props }) {
-  return (
-    <input
-      {...props}
-      type="text"
-      inputMode="decimal"
-      value={value}
-      onChange={(event) => onChange(formatPercentInput(event.target.value))}
-    />
-  );
 }

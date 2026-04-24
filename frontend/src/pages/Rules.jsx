@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import PageHero from '../components/PageHero.jsx';
+import SearchField from '../components/SearchField.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { RuleEditor } from '../components/rules/RuleEditor.jsx';
 import { summarizeAction, summarizeCondition } from '../components/rules/ruleDefinitions.js';
@@ -106,12 +107,10 @@ export default function Rules() {
       {error && <div className="error">{error}</div>}
 
       <div className="rules-toolbar">
-        <input
-          type="search"
-          className="rules-search"
-          placeholder="Search rules by name, merchant, or category..."
+        <SearchField
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={setSearch}
+          placeholder="Search rules by name, merchant, or category..."
         />
       </div>
 

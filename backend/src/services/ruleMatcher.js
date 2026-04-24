@@ -22,6 +22,8 @@
 //      whether it's a rule, a user edit, or the original bank value.
 // =============================================================================
 
+import { centsToDollars } from '../lib/money.js';
+
 function safeJsonParse(s, fallback) {
   try {
     return JSON.parse(s);
@@ -87,7 +89,7 @@ function matchesCondition(transaction, condition) {
       // Stored amounts are negative for expenses, positive for income;
       // comparing the signed value would make `> 15` never match an
       // expense.
-      actual = Math.abs(Number(transaction.amount) || 0);
+      actual = Math.abs(centsToDollars(transaction.amount));
       break;
     case 'account_id':
       actual = transaction.account_id;
@@ -457,7 +459,7 @@ export function revertEditsForRule(db, ruleId) {
  * Build an insert-ready transaction object with rule-driven edits pre-populated.
  * Used by SimpleFIN sync and any future manual-entry path.
  *
- * `draft` must have: account_id, date, amount, original_merchant,
+ * `draft` must have: account_id, date, amount in cents, original_merchant,
  * original_description, original_category_id, original_is_transfer (0/1),
  * original_is_ignored (0/1).
  */

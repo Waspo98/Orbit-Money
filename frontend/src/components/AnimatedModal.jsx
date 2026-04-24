@@ -28,9 +28,10 @@ export default function AnimatedModal({ onClose, size = 'md', animation = 'defau
   const [closingAnimation, setClosingAnimation] = useState('default');
   const timerRef = useRef(null);
 
-  function close(options = {}) {
+  function close(options = { animate: true }) {
     if (closing) return;
-    if (!options.animate && !options.animation) {
+    const shouldAnimate = options.animate !== false || !!options.animation;
+    if (!shouldAnimate) {
       onClose();
       return;
     }

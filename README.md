@@ -179,6 +179,10 @@ Back up the `orbit-money-data` Docker volume before upgrading, changing storage
 settings, or experimenting with migrations. Schema changes are applied through
 versioned SQL migrations in `backend/src/db/migrations/`.
 
+Money values are stored in SQLite as integer cents and serialized through the
+API as dollar values for the frontend. Percentage fields remain decimal percent
+values, not money.
+
 ## Development
 
 Docker is the supported runtime. For code validation outside Docker, install

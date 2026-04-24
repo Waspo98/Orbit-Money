@@ -43,5 +43,8 @@ export function parsePercentInput(value) {
 export function formatPercentInput(value) {
   const cleaned = String(value ?? '').replace(/[^0-9.]/g, '');
   if (!cleaned) return '';
-  return `${cleaned}%`;
+  const [whole, ...decimalParts] = cleaned.split('.');
+  const decimals = decimalParts.join('').slice(0, 2);
+  const hasDecimal = cleaned.includes('.');
+  return `${whole || '0'}${hasDecimal ? `.${decimals}` : ''}%`;
 }

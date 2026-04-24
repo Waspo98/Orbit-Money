@@ -15,6 +15,7 @@ public/
 
 # Runtime data (if running locally without Docker)
 data/
+backups/
 *.db
 *.db-journal
 *.db-wal

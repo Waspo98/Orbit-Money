@@ -75,8 +75,7 @@ export function matchTransfers(db) {
           const b = group[j];
 
           // Opposite sign + equal magnitude + different accounts
-          const sameSize = Math.round(Math.abs(a.amount) * 100) ===
-                            Math.round(Math.abs(b.amount) * 100);
+          const sameSize = Math.abs(a.amount) === Math.abs(b.amount);
           const oppositeSigns = (a.amount > 0) !== (b.amount > 0);
           const differentAccounts = a.account_id !== b.account_id;
 

@@ -7,12 +7,18 @@ import {
   sendOk,
   sendServerError
 } from '../lib/http.js';
+import { dollarsToCents, moneyFieldsToDollars } from '../lib/money.js';
 import { parseId, parseInteger, readIdParam } from '../lib/routeParams.js';
 
 const router = express.Router();
 
 const VALID_TYPES = ['checking', 'savings', 'credit', 'investment', 'loan', 'mortgage', 'cash', 'other'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ACCOUNT_MONEY_FIELDS = ['current_balance', 'estimated_value'];
+
+function serializeAccount(row) {
+  return moneyFieldsToDollars(row, ACCOUNT_MONEY_FIELDS);
+}
 
 function isValidDateOnly(value) {
   if (typeof value !== 'string' || !DATE_RE.test(value)) return false;
@@ -51,7 +57,8 @@ router.get('/', requireAuth, (req, res) => {
          ORDER BY a.is_archived ASC, a.sort_order ASC, a.name ASC
       `
       )
-      .all();
+      .all()
+      .map(serializeAccount);
 
     sendOk(res, { items });
   } catch (err) {
@@ -153,6 +160,7 @@ router.put('/:id', requireAuth, (req, res) => {
         if (!Number.isFinite(v)) {
           return sendBadRequest(res, 'current_balance must be a valid number.');
         }
+        v = dollarsToCents(v);
       }
       if (col === 'estimated_value') {
         if (v === '' || v === null) {
@@ -162,6 +170,7 @@ router.put('/:id', requireAuth, (req, res) => {
           if (!Number.isFinite(v) || v < 0) {
             return sendBadRequest(res, 'estimated_value must be a non-negative number.');
           }
+          v = dollarsToCents(v);
         }
       }
       values.push(v);
@@ -178,7 +187,7 @@ router.put('/:id', requireAuth, (req, res) => {
   try {
     db.prepare(`UPDATE accounts SET ${sets.join(', ')} WHERE id = ?`).run(...values);
     const updated = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
-    sendOk(res, { success: true, account: updated });
+    sendOk(res, { success: true, account: serializeAccount(updated) });
   } catch (err) {
     console.error('Update account failed:', err);
     sendBadRequest(res, err.message);
@@ -234,15 +243,17 @@ router.post('/:id/records', requireAuth, (req, res) => {
     return sendBadRequest(res, 'date must be a valid YYYY-MM-DD date.');
   }
 
-  const balance = Number(req.body?.balance);
-  if (!Number.isFinite(balance)) {
+  const balanceDollars = Number(req.body?.balance);
+  if (!Number.isFinite(balanceDollars)) {
     return sendBadRequest(res, 'balance must be a valid number.');
   }
+  const balance = dollarsToCents(balanceDollars);
   const previousBalance =
     req.body?.previousBalance === undefined ? null : Number(req.body.previousBalance);
   if (previousBalance !== null && !Number.isFinite(previousBalance)) {
     return sendBadRequest(res, 'previousBalance must be a valid number.');
   }
+  const previousBalanceCents = previousBalance === null ? null : dollarsToCents(previousBalance);
 
   const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
   if (!account) {
@@ -271,14 +282,14 @@ router.post('/:id/records', requireAuth, (req, res) => {
         )
         .get(id, recordDate).count;
 
-      if (priorRecords === 0 && previousBalance !== null && previousBalance !== balance) {
+      if (priorRecords === 0 && previousBalanceCents !== null && previousBalanceCents !== balance) {
         const baselineDate = previousMonthEnd(recordDate);
         db.prepare(
           `
           INSERT OR IGNORE INTO account_balance_records (account_id, record_date, balance)
           VALUES (?, ?, ?)
         `
-        ).run(id, baselineDate, previousBalance);
+        ).run(id, baselineDate, previousBalanceCents);
       }
 
       insertRecord.run(id, recordDate, balance);
@@ -311,11 +322,11 @@ router.post('/:id/records', requireAuth, (req, res) => {
     const updated = run();
     sendOk(res, {
       success: true,
-      account: updated,
+      account: serializeAccount(updated),
       record: {
         account_id: id,
         date: recordDate,
-        balance
+        balance: balanceDollars
       }
     });
   } catch (err) {

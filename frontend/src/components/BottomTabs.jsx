@@ -1,23 +1,18 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import AppIcon from './AppIcon.jsx';
-
-const PRIMARY_TABS = [
-  { to: '/dashboard',    label: 'Dashboard',    icon: 'dashboard' },
-  { to: '/transactions', label: 'Transactions', icon: 'transactions' },
-  { to: '/budgets',      label: 'Budgets',      icon: 'budgets' },
-  { to: '/accounts',     label: 'Accounts',     icon: 'accounts' }
-];
+import { getPrimaryRoutes } from '../navigation.js';
 
 export default function BottomTabs({ onMoreClick }) {
   const location = useLocation();
-  const currentIndex = PRIMARY_TABS.findIndex((tab) => tab.to === location.pathname);
+  const primaryTabs = getPrimaryRoutes();
+  const currentIndex = primaryTabs.findIndex((tab) => tab.path === location.pathname);
 
   return (
     <nav className="bottom-tabs" aria-label="Primary navigation">
-      {PRIMARY_TABS.map((t, index) => (
+      {primaryTabs.map((t, index) => (
         <NavLink
-          key={t.to}
-          to={t.to}
+          key={t.path}
+          to={t.path}
           state={
             currentIndex >= 0 && index !== currentIndex
               ? { transition: index > currentIndex ? 'forward' : 'back' }
@@ -43,5 +38,3 @@ export default function BottomTabs({ onMoreClick }) {
     </nav>
   );
 }
-
-export { PRIMARY_TABS };

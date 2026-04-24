@@ -7,6 +7,7 @@ import {
   sendOk,
   sendServerError
 } from '../lib/http.js';
+import { moneyFieldsToDollars } from '../lib/money.js';
 import { parseBooleanField, parseInteger, readIdParam } from '../lib/routeParams.js';
 import {
   formatMhaTransaction,
@@ -16,6 +17,7 @@ import {
 
 const router = express.Router();
 const SETTING_KEY = 'mha_tracker_enabled';
+const ACCOUNT_MONEY_FIELDS = ['current_balance'];
 
 function boolFlag(value) {
   return value ? 1 : 0;
@@ -94,7 +96,8 @@ router.get('/', requireAuth, (req, res) => {
     const accounts = db
       .prepare(
         `SELECT id, name, type, institution, account_number_last4,
-                current_balance, is_archived, sort_order, mha_default_eligible
+                current_balance / 100.0 AS current_balance,
+                is_archived, sort_order, mha_default_eligible
            FROM accounts
           WHERE is_archived = 0
           ORDER BY sort_order ASC, name ASC`
@@ -112,7 +115,7 @@ router.get('/', requireAuth, (req, res) => {
 
     const transactions = db
       .prepare(
-        `SELECT t.id, t.account_id, t.date, t.amount,
+        `SELECT t.id, t.account_id, t.date, t.amount / 100.0 AS amount,
                 COALESCE(t.edited_merchant, t.original_merchant) AS merchant,
                 t.original_description,
                 t.notes,
@@ -194,7 +197,10 @@ router.put('/accounts/:id/default', requireAuth, (req, res) => {
         WHERE id = ?`
     ).run(boolFlag(mhaDefaultEligible), id);
 
-    const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
+    const account = moneyFieldsToDollars(
+      db.prepare('SELECT * FROM accounts WHERE id = ?').get(id),
+      ACCOUNT_MONEY_FIELDS
+    );
     sendOk(res, { success: true, account });
   } catch (err) {
     console.error('Update MHA account default failed:', err);

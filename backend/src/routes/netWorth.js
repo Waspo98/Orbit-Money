@@ -184,7 +184,9 @@ router.get('/', requireAuth, (req, res) => {
     const accounts = db
       .prepare(
         `
-        SELECT id, name, type, institution, current_balance, estimated_value
+        SELECT id, name, type, institution,
+               current_balance / 100.0 AS current_balance,
+               estimated_value / 100.0 AS estimated_value
           FROM accounts
          WHERE is_archived = 0
          ORDER BY sort_order ASC, name ASC
@@ -237,7 +239,7 @@ router.get('/', requireAuth, (req, res) => {
     const monthlyDeltas = db
       .prepare(
         `
-        SELECT account_id, substr(date, 1, 7) AS month, SUM(amount) AS amount
+        SELECT account_id, substr(date, 1, 7) AS month, SUM(amount) / 100.0 AS amount
           FROM transactions
          WHERE date >= ?
          GROUP BY account_id, substr(date, 1, 7)
@@ -249,7 +251,7 @@ router.get('/', requireAuth, (req, res) => {
     const balanceRecords = db
       .prepare(
         `
-        SELECT account_id, record_date, balance
+        SELECT account_id, record_date, balance / 100.0 AS balance
           FROM account_balance_records
          WHERE record_date <= ?
          ORDER BY account_id ASC, record_date DESC

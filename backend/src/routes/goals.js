@@ -13,6 +13,7 @@ import {
   sendRouteError,
   sendServerError
 } from '../lib/http.js';
+import { centsToDollars, dollarsToCents } from '../lib/money.js';
 import { parseId, parseInteger, readIdParam } from '../lib/routeParams.js';
 
 const router = express.Router();
@@ -69,12 +70,12 @@ function allocatableBasis(account, reserves, balancesByAccount = null) {
   return Math.max(0, accountBalance(account, balancesByAccount) - (reserves.get(account.id) || 0));
 }
 
-function allocationDollars(allocation, account, reserves, balancesByAccount = null) {
+function allocationAmount(allocation, account, reserves, balancesByAccount = null) {
   const basis = allocatableBasis(account, reserves, balancesByAccount);
   if (allocation.allocation_type === 'percent') {
-    return basis * ((Number(allocation.allocation_value) || 0) / 100);
+    return Math.round(basis * ((Number(allocation.allocation_percent) || 0) / 100));
   }
-  return Math.min(Number(allocation.allocation_value) || 0, basis);
+  return Math.min(Number(allocation.allocation_amount) || 0, basis);
 }
 
 function monthlyPace(history) {
@@ -125,7 +126,8 @@ function fetchAllocations() {
   return db
     .prepare(
       `SELECT ga.id, ga.goal_id, ga.account_id, ga.allocation_type,
-              ga.allocation_value, ga.reserve_amount, ga.created_at, ga.updated_at,
+              ga.allocation_percent, ga.allocation_amount,
+              ga.reserve_amount, ga.created_at, ga.updated_at,
               g.name AS goal_name
          FROM goal_account_allocations ga
          JOIN goals g ON g.id = ga.goal_id
@@ -227,7 +229,7 @@ function buildHistories(accounts, goals, allocations, months) {
       const total = (allocationsByGoal.get(goal.id) || []).reduce((sum, allocation) => {
         const account = accountById.get(allocation.account_id);
         if (!account) return sum;
-        return sum + allocationDollars(allocation, account, reserves, monthBalances);
+        return sum + allocationAmount(allocation, account, reserves, monthBalances);
       }, 0);
       histories.get(goal.id).push({ month: cursor, amount: total });
     }
@@ -271,7 +273,7 @@ function buildGoalsPayload(monthCount = 24) {
     const currentAmount = goalAllocations.reduce((sum, allocation) => {
       const account = accountById.get(allocation.account_id);
       if (!account) return sum;
-      return sum + allocationDollars(allocation, account, reserves);
+      return sum + allocationAmount(allocation, account, reserves);
     }, 0);
     const targetAmount = Number(goal.target_amount) || 0;
     const pace = monthlyPace(history);
@@ -279,12 +281,15 @@ function buildGoalsPayload(monthCount = 24) {
 
     return {
       ...goal,
-      target_amount: targetAmount,
-      current_amount: currentAmount,
+      target_amount: centsToDollars(targetAmount),
+      current_amount: centsToDollars(currentAmount),
       progress_percent: targetAmount > 0 ? Math.min(100, (currentAmount / targetAmount) * 100) : 0,
-      monthly_pace: pace,
+      monthly_pace: centsToDollars(pace),
       eta,
-      history,
+      history: history.map((point) => ({
+        ...point,
+        amount: centsToDollars(point.amount)
+      })),
       allocations: goalAllocations.map((allocation) => {
         const account = accountById.get(allocation.account_id);
         return {
@@ -293,9 +298,11 @@ function buildGoalsPayload(monthCount = 24) {
           account_id: allocation.account_id,
           account_name: account?.name || 'Deleted account',
           allocation_type: allocation.allocation_type,
-          allocation_value: Number(allocation.allocation_value) || 0,
-          reserve_amount: Number(allocation.reserve_amount) || 0,
-          current_amount: account ? allocationDollars(allocation, account, reserves) : 0
+          allocation_value: allocation.allocation_type === 'percent'
+            ? Number(allocation.allocation_percent) || 0
+            : centsToDollars(allocation.allocation_amount),
+          reserve_amount: centsToDollars(allocation.reserve_amount),
+          current_amount: account ? centsToDollars(allocationAmount(allocation, account, reserves)) : 0
         };
       })
     };
@@ -305,38 +312,44 @@ function buildGoalsPayload(monthCount = 24) {
     const accountAllocations = allocationsByAccount.get(account.id) || [];
     const reserveAmount = reserves.get(account.id) || 0;
     const basis = allocatableBasis(account, reserves);
+    const allocatedAmount = accountAllocations.reduce(
+      (sum, allocation) => sum + allocationAmount(allocation, account, reserves),
+      0
+    );
     const allocationItems = accountAllocations.map((allocation) => ({
       id: allocation.id,
       goal_id: allocation.goal_id,
       goal_name: allocation.goal_name,
       allocation_type: allocation.allocation_type,
-      allocation_value: Number(allocation.allocation_value) || 0,
-      reserve_amount: Number(allocation.reserve_amount) || 0,
-      current_amount: allocationDollars(allocation, account, reserves)
+      allocation_value: allocation.allocation_type === 'percent'
+        ? Number(allocation.allocation_percent) || 0
+        : centsToDollars(allocation.allocation_amount),
+      reserve_amount: centsToDollars(allocation.reserve_amount),
+      current_amount: centsToDollars(allocationAmount(allocation, account, reserves))
     }));
-    const allocatedAmount = allocationItems.reduce((sum, item) => sum + item.current_amount, 0);
 
     return {
       ...account,
-      current_balance: Number(account.current_balance) || 0,
-      reserve_amount: reserveAmount,
-      allocatable_amount: basis,
-      allocated_amount: allocatedAmount,
-      remaining_amount: Math.max(0, basis - allocatedAmount),
+      current_balance: centsToDollars(account.current_balance),
+      estimated_value: account.estimated_value == null ? null : centsToDollars(account.estimated_value),
+      reserve_amount: centsToDollars(reserveAmount),
+      allocatable_amount: centsToDollars(basis),
+      allocated_amount: centsToDollars(allocatedAmount),
+      remaining_amount: centsToDollars(Math.max(0, basis - allocatedAmount)),
       allocated_percent: basis > 0 ? (allocatedAmount / basis) * 100 : 0,
       allocations: allocationItems
     };
   });
 
-  const totalTarget = hydratedGoals.reduce((sum, goal) => sum + goal.target_amount, 0);
-  const totalSaved = hydratedGoals.reduce((sum, goal) => sum + goal.current_amount, 0);
+  const totalTarget = goals.reduce((sum, goal) => sum + (Number(goal.target_amount) || 0), 0);
+  const totalSaved = hydratedGoals.reduce((sum, goal) => sum + dollarsToCents(goal.current_amount), 0);
   const projectedGoals = hydratedGoals.filter((goal) => goal.eta.status === 'projected').length;
 
   return {
     summary: {
       goal_count: hydratedGoals.length,
-      total_target: totalTarget,
-      total_saved: totalSaved,
+      total_target: centsToDollars(totalTarget),
+      total_saved: centsToDollars(totalSaved),
       progress_percent: totalTarget > 0 ? Math.min(100, (totalSaved / totalTarget) * 100) : 0,
       projected_goals: projectedGoals
     },
@@ -354,6 +367,7 @@ function normalizeGoalBody(body) {
   if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
     throw goalError('target_amount must be a positive number.');
   }
+  const targetAmountCents = dollarsToCents(targetAmount);
 
   const targetDate = body?.target_date ? String(body.target_date) : null;
   if (!validDate(targetDate)) throw goalError('target_date must use YYYY-MM-DD.');
@@ -386,14 +400,19 @@ function normalizeGoalBody(body) {
     return {
       account_id: accountId,
       allocation_type: allocationType,
-      allocation_value: allocationValue,
-      reserve_amount: reserveAmount
+      allocation_percent: allocationType === 'percent' ? allocationValue : 0,
+      allocation_amount: allocationType === 'fixed' ? dollarsToCents(allocationValue) : 0,
+      reserve_amount: dollarsToCents(reserveAmount)
     };
-  }).filter((row) => row.allocation_value > 0);
+  }).filter((row) =>
+    row.allocation_type === 'percent'
+      ? row.allocation_percent > 0
+      : row.allocation_amount > 0
+  );
 
   return {
     name,
-    target_amount: targetAmount,
+    target_amount: targetAmountCents,
     target_date: targetDate,
     kind,
     icon,
@@ -425,7 +444,7 @@ function validateAccounts(allocations) {
 }
 
 function accountAllocationTotal(rows, account, reserves) {
-  return rows.reduce((sum, row) => sum + allocationDollars(row, account, reserves), 0);
+  return rows.reduce((sum, row) => sum + allocationAmount(row, account, reserves), 0);
 }
 
 function reduceOtherAllocations(accountId, protectedGoalId, overflow, basis, rows) {
@@ -433,36 +452,41 @@ function reduceOtherAllocations(accountId, protectedGoalId, overflow, basis, row
     .filter((row) => row.goal_id !== protectedGoalId)
     .map((row) => ({
       ...row,
-      dollars:
+      amount:
         row.allocation_type === 'percent'
-          ? basis * ((Number(row.allocation_value) || 0) / 100)
-          : Number(row.allocation_value) || 0
+          ? Math.round(basis * ((Number(row.allocation_percent) || 0) / 100))
+          : Number(row.allocation_amount) || 0
     }))
-    .filter((row) => row.dollars > 0);
+    .filter((row) => row.amount > 0);
 
-  const reducible = candidates.reduce((sum, row) => sum + row.dollars, 0);
-  if (reducible + 0.01 < overflow) {
+  const reducible = candidates.reduce((sum, row) => sum + row.amount, 0);
+  if (reducible < overflow) {
     throw goalError('This allocation is larger than the account has available to steal.');
   }
 
   const update = db.prepare(
     `UPDATE goal_account_allocations
-        SET allocation_value = ?, updated_at = datetime('now')
+        SET allocation_percent = ?, allocation_amount = ?, updated_at = datetime('now')
       WHERE id = ?`
   );
   const remove = db.prepare('DELETE FROM goal_account_allocations WHERE id = ?');
 
   for (const row of candidates) {
-    const removeDollars = Math.min(row.dollars, overflow * (row.dollars / reducible));
-    let nextValue =
-      row.allocation_type === 'percent'
-        ? (Number(row.allocation_value) || 0) - ((removeDollars / basis) * 100)
-        : (Number(row.allocation_value) || 0) - removeDollars;
-    nextValue = Math.max(0, nextValue);
-    if (nextValue < 0.01) {
+    const removeAmount = Math.min(row.amount, Math.round(overflow * (row.amount / reducible)));
+    let nextPercent = Number(row.allocation_percent) || 0;
+    let nextAmount = Number(row.allocation_amount) || 0;
+    if (row.allocation_type === 'percent') {
+      nextPercent = Math.max(0, nextPercent - ((removeAmount / basis) * 100));
+    } else {
+      nextAmount = Math.max(0, nextAmount - removeAmount);
+    }
+    const isEmpty = row.allocation_type === 'percent'
+      ? nextPercent < 0.01
+      : nextAmount < 1;
+    if (isEmpty) {
       remove.run(row.id);
     } else {
-      update.run(nextValue, row.id);
+      update.run(nextPercent, nextAmount, row.id);
     }
   }
 
@@ -488,7 +512,7 @@ function rebalanceAccounts(accountIds, protectedGoalId, stealFromOthers) {
     let basis = allocatableBasis(account, reserves);
     let total = accountAllocationTotal(rows, account, reserves);
 
-    if (total <= basis + 0.01) continue;
+    if (total <= basis) continue;
     if (!stealFromOthers) {
       throw goalError('This account does not have enough open balance for that allocation.');
     }
@@ -501,7 +525,7 @@ function rebalanceAccounts(accountIds, protectedGoalId, stealFromOthers) {
     basis = allocatableBasis(account, reserves);
     total = accountAllocationTotal(rows, account, reserves);
 
-    if (total > basis + 0.01) {
+    if (total > basis) {
       throw goalError('Allocation is still above the account balance after stealing from other goals.');
     }
   }
@@ -552,15 +576,16 @@ function saveGoal(existingId, body) {
 
     const insertAllocation = db.prepare(
       `INSERT INTO goal_account_allocations
-         (goal_id, account_id, allocation_type, allocation_value, reserve_amount)
-       VALUES (?, ?, ?, ?, ?)`
+         (goal_id, account_id, allocation_type, allocation_percent, allocation_amount, reserve_amount)
+       VALUES (?, ?, ?, ?, ?, ?)`
     );
     for (const allocation of normalized.allocations) {
       insertAllocation.run(
         goalId,
         allocation.account_id,
         allocation.allocation_type,
-        allocation.allocation_value,
+        allocation.allocation_percent,
+        allocation.allocation_amount,
         allocation.reserve_amount
       );
     }

@@ -1,3 +1,4 @@
+import { dollarsToCents } from '../lib/money.js';
 import { reapplyRulesToAllTransactions } from './ruleMatcher.js';
 
 const ACCOUNT_SEED = [
@@ -206,8 +207,8 @@ function upsertDemoAccounts(db) {
         account.type,
         account.institution,
         account.last4,
-        account.balance,
-        account.estimatedValue ?? null,
+        dollarsToCents(account.balance),
+        account.estimatedValue == null ? null : dollarsToCents(account.estimatedValue),
         account.sortOrder,
         existing.id
       );
@@ -218,8 +219,8 @@ function upsertDemoAccounts(db) {
         account.type,
         account.institution,
         account.last4,
-        account.balance,
-        account.estimatedValue ?? null,
+        dollarsToCents(account.balance),
+        account.estimatedValue == null ? null : dollarsToCents(account.estimatedValue),
         account.sortOrder
       );
       accountIds[account.key.replace('demo-', '')] = result.lastInsertRowid;
@@ -311,7 +312,7 @@ function refreshExistingDemoData(db, categories) {
       const params = [
         accountIds[accountKey],
         isoDaysAgo(daysAgo),
-        amount,
+        dollarsToCents(amount),
         merchant,
         `${merchant} demo transaction`,
         category?.id ?? null,
@@ -382,7 +383,7 @@ export function seedDemoData(db) {
       insertTxn.run(
         accountIds[accountKey],
         isoDaysAgo(daysAgo),
-        amount,
+        dollarsToCents(amount),
         merchant,
         `${merchant} demo transaction`,
         category?.id ?? null,
@@ -397,7 +398,7 @@ export function seedDemoData(db) {
 
     for (const [categoryName, amount] of BUDGET_SEED) {
       const category = categories.get(categoryName);
-      if (category) insertBudget.run(category.id, amount);
+      if (category) insertBudget.run(category.id, dollarsToCents(amount));
     }
 
     return { inserted, rulesCreated };
