@@ -550,6 +550,10 @@ export default function Goals() {
             await load();
             setSelectedId(savedId);
           }}
+          onDeleted={async () => {
+            setWizardGoal(null);
+            await load();
+          }}
         />
       )}
 
@@ -740,7 +744,7 @@ function AccountAllocationRow({ account }) {
   );
 }
 
-function GoalWizard({ goal, accounts, confirm, onClose, onSaved }) {
+function GoalWizard({ goal, accounts, confirm, onClose, onSaved, onDeleted }) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -912,6 +916,27 @@ function GoalWizard({ goal, accounts, confirm, onClose, onSaved }) {
     }
   }
 
+  async function deleteGoal(close) {
+    if (!goal) return;
+    const ok = await confirm(`Delete "${goal.name}"? Its account allocations will be removed.`, {
+      title: 'Delete goal',
+      confirmLabel: 'Delete',
+      destructive: true
+    });
+    if (!ok) return;
+
+    setSaving(true);
+    setError('');
+    try {
+      await api.del(`/api/goals/${goal.id}`);
+      close({ animation: 'zoom' });
+      setTimeout(() => onDeleted(), 180);
+    } catch (err) {
+      setError(err.message || 'Delete failed');
+      setSaving(false);
+    }
+  }
+
   return (
     <AnimatedModal onClose={onClose} size="lg" animation="zoom">
       {({ close }) => (
@@ -1052,19 +1077,26 @@ function GoalWizard({ goal, accounts, confirm, onClose, onSaved }) {
 
           {error && <div className="error">{error}</div>}
 
-          <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={step === 0 ? close : () => setStep((value) => value - 1)}>
-              {step === 0 ? 'Cancel' : 'Back'}
-            </button>
-            {step < 2 ? (
-              <button type="button" className="btn-primary" onClick={goNext}>
-                Next
-              </button>
-            ) : (
-              <button type="button" className="btn-primary" onClick={() => save(close)} disabled={saving}>
-                {saving ? 'Saving...' : goal ? 'Save goal' : 'Create goal'}
+          <div className={`modal-actions goal-wizard-actions ${goal ? 'has-danger' : ''}`}>
+            {goal && (
+              <button type="button" className="btn-danger" onClick={() => deleteGoal(close)} disabled={saving}>
+                Delete Goal
               </button>
             )}
+            <div className="goal-wizard-primary-actions">
+              <button type="button" className="btn-secondary" onClick={step === 0 ? close : () => setStep((value) => value - 1)} disabled={saving}>
+                {step === 0 ? 'Cancel' : 'Back'}
+              </button>
+              {step < 2 ? (
+                <button type="button" className="btn-primary" onClick={goNext} disabled={saving}>
+                  Next
+                </button>
+              ) : (
+                <button type="button" className="btn-primary" onClick={() => save(close)} disabled={saving}>
+                  {saving ? 'Saving...' : goal ? 'Save goal' : 'Create goal'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

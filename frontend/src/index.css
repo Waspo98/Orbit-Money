@@ -4496,6 +4496,19 @@ input, textarea, select {
   gap: 14px;
 }
 
+.goal-wizard-actions {
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.goal-wizard-primary-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-left: auto;
+}
+
 .goal-preset-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
