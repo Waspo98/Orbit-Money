@@ -2,17 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
-  PointerSensor,
-  TouchSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
+  DragOverlay,
   closestCenter
 } from '@dnd-kit/core';
 import {
   SortableContext,
   verticalListSortingStrategy,
-  sortableKeyboardCoordinates,
   useSortable,
   arrayMove
 } from '@dnd-kit/sortable';
@@ -22,7 +17,11 @@ import { api } from '../api.js';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import PageHero from '../components/PageHero.jsx';
-import ReorderListItem from '../components/ReorderListItem.jsx';
+import ReorderListItem, {
+  ReorderListItemPreview,
+  useDragInteractionLock,
+  useReorderSensors
+} from '../components/ReorderListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import CurrencyInput, { parseCurrencyInput } from '../components/CurrencyInput.jsx';
 
@@ -138,6 +137,56 @@ function findAccountGroup(groups, accountId) {
   return groups.find((group) => group.items.some((account) => account.id === accountId));
 }
 
+function AccountGroupDragOverlay({ group }) {
+  const totalTone = group.total < 0 ? 'negative' : 'positive';
+
+  return (
+    <section className="dashboard-card account-group-card drag-overlay-card">
+      <header className="dashboard-card-header account-group-header">
+        <span className="drag-grip" aria-hidden="true">⋮⋮</span>
+        <div>
+          <h3>{pluralTypeLabel(group.type, group.items.length)}</h3>
+          <span className="muted">
+            {group.items.length.toLocaleString()} {group.items.length === 1 ? 'account' : 'accounts'}
+          </span>
+        </div>
+        <strong className={`account-group-total ${totalTone}`}>{formatCurrency(group.total)}</strong>
+      </header>
+      <ul className="account-list reorder-active">
+        {group.items.map((account) => (
+          <li key={account.id}>
+            <AccountRowDragOverlay account={account} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function AccountRowDragOverlay({ account }) {
+  const metaParts = [
+    TYPE_LABELS[account.type] || account.type,
+    account.institution,
+    account.account_number_last4 ? `...${account.account_number_last4}` : '',
+    account.is_archived ? 'Archived' : ''
+  ].filter(Boolean);
+
+  return (
+    <div className={`selectable-list-item reorder-list-row drag-overlay-card ${account.is_archived ? 'archived' : ''}`}>
+      <span className="drag-grip reorder-drag-handle" aria-hidden="true">
+        <span aria-hidden="true">⋮⋮</span>
+      </span>
+      <span className="selectable-list-main">
+        <strong>{account.name}</strong>
+        <em>{metaParts.join(' | ')}</em>
+      </span>
+      <span className="selectable-list-side">
+        <strong>{formatCurrency(account.current_balance)}</strong>
+      </span>
+    </div>
+  );
+}
+
 // ============================================================================
 // Main page
 // ============================================================================
@@ -153,6 +202,8 @@ export default function Accounts({ onChange }) {
   const [merging, setMerging] = useState(null);
   const [recording, setRecording] = useState(null);
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
+  const [activeDragId, setActiveDragId] = useState(null);
+  const [overDragId, setOverDragId] = useState(null);
 
   // Reorder mode: when true, rows become drag handles and ALL other
   // interactions (expand, action buttons, dropdown, See transactions) are
@@ -160,20 +211,7 @@ export default function Accounts({ onChange }) {
   // Reorder button, exited via Done.
   const [reorderMode, setReorderMode] = useState(false);
 
-  // Sensors are only used while in reorder mode. No activation threshold —
-  // any movement starts a drag immediately because there are no competing
-  // interactions to distinguish from.
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 0 }
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: { distance: 0 }
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates
-    })
-  );
+  const sensors = useReorderSensors();
 
   async function load() {
     setLoading(true);
@@ -195,11 +233,16 @@ export default function Accounts({ onChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showArchived]);
 
+  useDragInteractionLock(Boolean(activeDragId));
+
   // Exiting reorder mode: nothing to save explicitly — each drop has
   // already persisted. But if the user archived/edited before entering
   // reorder mode, we want to make sure we're synced.
   function toggleReorderMode() {
-    setReorderMode((v) => !v);
+    setReorderMode((value) => {
+      if (value) resetDragState();
+      return !value;
+    });
   }
 
   function toggleAccountGroup(type) {
@@ -263,11 +306,6 @@ export default function Accounts({ onChange }) {
   const investmentsBalance = activeAccounts
     .filter((account) => account.type === 'investment')
     .reduce((total, account) => total + (Number(account.current_balance) || 0), 0);
-  const accountsSubtitle = `${accountTypeSummary(accounts) || 'No accounts'}${
-    showArchived ? ' including archived' : ''
-  }${
-    reorderMode ? ' · Drag a row to reorder' : ''
-  }`;
   const accountHeroStats = [
     {
       label: 'Cash',
@@ -290,14 +328,60 @@ export default function Accounts({ onChange }) {
     }
   ];
 
+  const activeDragKind = groupTypeFromSortable(activeDragId)
+    ? 'group'
+    : accountIdFromSortable(activeDragId)
+      ? 'account'
+      : null;
+  const activeDragGroup = activeDragKind === 'group'
+    ? accountGroups.find((group) => groupSortableId(group.type) === activeDragId) || null
+    : null;
+  const activeDragAccount = activeDragKind === 'account'
+    ? accounts.find((account) => accountSortableId(account.id) === activeDragId) || null
+    : null;
+
+  function normalizeOverId(activeId, overId, groups) {
+    if (!activeId || !overId) return null;
+
+    const activeGroupType = groupTypeFromSortable(activeId);
+    if (activeGroupType) {
+      const overGroupType = groupTypeFromSortable(overId);
+      if (overGroupType) return groupSortableId(overGroupType);
+
+      const overAccountId = accountIdFromSortable(overId);
+      if (overAccountId) {
+        const owningGroup = findAccountGroup(groups, overAccountId);
+        return owningGroup ? groupSortableId(owningGroup.type) : null;
+      }
+    }
+
+    return overId;
+  }
+
+  function resetDragState() {
+    setActiveDragId(null);
+    setOverDragId(null);
+  }
+
+  function handleDragStart(event) {
+    setActiveDragId(event.active?.id ?? null);
+    setOverDragId(null);
+  }
+
+  function handleDragOver(event) {
+    setOverDragId(normalizeOverId(event.active?.id, event.over?.id, accountGroups));
+  }
+
   async function handleDragEnd(event) {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    const normalizedOverId = normalizeOverId(active?.id, over?.id, accountGroups);
+    resetDragState();
+    if (!normalizedOverId || active.id === normalizedOverId) return;
 
     const activeGroupType = groupTypeFromSortable(active.id);
-    const overGroupType = groupTypeFromSortable(over.id);
+    const overGroupType = groupTypeFromSortable(normalizedOverId);
     const activeAccountId = accountIdFromSortable(active.id);
-    const overAccountId = accountIdFromSortable(over.id);
+    const overAccountId = accountIdFromSortable(normalizedOverId);
 
     let reordered = null;
 
@@ -339,13 +423,13 @@ export default function Accounts({ onChange }) {
   }
 
   return (
-    <div className={`accounts-view ${reorderMode ? 'reorder-mode' : ''}`}>
+    <div className={`accounts-view ${reorderMode ? 'reorder-mode' : ''} ${activeDragId ? 'dragging-active' : ''}`}>
       <PageHero
         id="accounts-title"
         variant="accounts"
         kicker="Your Money's Home Base"
         title="Accounts"
-        subtitle={accountsSubtitle}
+        subtitle={`${accountTypeSummary(accounts) || 'No accounts'}${showArchived ? ' including archived' : ''}`}
         stats={accountHeroStats}
       />
 
@@ -425,22 +509,38 @@ export default function Accounts({ onChange }) {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          onDragCancel={resetDragState}
         >
           <SortableContext
             items={accountGroups.map((group) => groupSortableId(group.type))}
             strategy={verticalListSortingStrategy}
           >
-            <div className="account-group-grid reorder-active">
+            <div className="account-group-grid reorder-active reorder-drag-scope">
               {accountGroups.map((group) => (
-                <DraggableAccountGroup key={group.type} group={group}>
+                <DraggableAccountGroup
+                  key={group.type}
+                  group={group}
+                  disabled={activeDragKind === 'account'}
+                  previewDisplaced={
+                    activeDragKind === 'group' &&
+                    groupSortableId(group.type) === overDragId &&
+                    groupSortableId(group.type) !== activeDragId
+                  }
+                >
                   <SortableContext
                     items={group.items.map((account) => accountSortableId(account.id))}
                     strategy={verticalListSortingStrategy}
                   >
                     <ul className="account-list reorder-active">
                       {group.items.map((a) => (
-                        <DraggableReorderRow key={a.id} account={a} />
+                        <DraggableReorderRow
+                          key={a.id}
+                          account={a}
+                          disabled={activeDragKind === 'group'}
+                        />
                       ))}
                     </ul>
                   </SortableContext>
@@ -448,6 +548,14 @@ export default function Accounts({ onChange }) {
               ))}
             </div>
           </SortableContext>
+          {activeDragId && <div className="drag-screen-blocker" aria-hidden="true" />}
+          <DragOverlay dropAnimation={null}>
+            {activeDragGroup ? (
+              <AccountGroupDragOverlay group={activeDragGroup} />
+            ) : activeDragAccount ? (
+              <AccountRowDragOverlay account={activeDragAccount} />
+            ) : null}
+          </DragOverlay>
         </DndContext>
       ) : (
         // Normal mode: grouped cards with all account actions available.
@@ -559,7 +667,7 @@ function AccountGroup({ group, children, collapsed, onToggle }) {
   );
 }
 
-function DraggableAccountGroup({ group, children }) {
+function DraggableAccountGroup({ group, children, disabled = false, previewDisplaced = false }) {
   const {
     attributes,
     listeners,
@@ -567,7 +675,10 @@ function DraggableAccountGroup({ group, children }) {
     transform,
     transition,
     isDragging
-  } = useSortable({ id: groupSortableId(group.type) });
+  } = useSortable({
+    id: groupSortableId(group.type),
+    disabled
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -579,7 +690,7 @@ function DraggableAccountGroup({ group, children }) {
     <section
       ref={setNodeRef}
       style={style}
-      className={`dashboard-card account-group-card draggable ${isDragging ? 'dragging' : ''}`}
+      className={`dashboard-card account-group-card draggable ${isDragging ? 'dragging drag-source' : ''} ${previewDisplaced ? 'drag-preview-target' : ''}`}
     >
       <header className="dashboard-card-header account-group-header account-group-drag-handle" {...attributes} {...listeners}>
         <span className="drag-grip" aria-hidden="true">⋮⋮</span>
@@ -596,7 +707,7 @@ function DraggableAccountGroup({ group, children }) {
   );
 }
 
-function DraggableReorderRow({ account }) {
+function DraggableReorderRow({ account, disabled = false }) {
   const metaParts = [
     TYPE_LABELS[account.type] || account.type,
     account.institution,
@@ -610,6 +721,7 @@ function DraggableReorderRow({ account }) {
       as="li"
       className={`account-row ${account.is_archived ? 'archived' : ''}`}
       handleLabel={`Reorder ${account.name}`}
+      disabled={disabled}
       title={account.name}
       subtitle={metaParts.join(' | ')}
       sidePrimary={formatCurrency(account.current_balance)}

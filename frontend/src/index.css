@@ -193,6 +193,11 @@ html, body {
               color var(--dur-base) var(--ease-in-out);
 }
 
+body.drag-interaction-lock {
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
 #root { min-height: 100vh; min-height: 100dvh; }
 
 a { color: var(--accent); text-decoration: none; transition: color var(--dur-fast); }
@@ -1177,6 +1182,7 @@ input, textarea, select {
   color: var(--muted);
   letter-spacing: -1px;
   flex-shrink: 0;
+  touch-action: none;
 }
 
 /* Prevent text selection mid-drag */
@@ -2119,6 +2125,10 @@ input, textarea, select {
   max-width: 960px;
   margin: 0 auto;
   min-height: calc(100dvh - 140px);
+}
+
+.accounts-view.dragging-active {
+  touch-action: none;
 }
 
 .categories-view { min-height: calc(100dvh - 140px); }
@@ -4219,8 +4229,11 @@ input, textarea, select {
   padding-left: 10px;
   cursor: grab;
   border-style: dashed;
-  touch-action: none;
   border: 1px dashed var(--border-strong, var(--border));
+  transition: transform var(--dur-base) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease-out),
+              border-color var(--dur-base) var(--ease-out),
+              background-color var(--dur-base) var(--ease-out);
 }
 
 .selectable-list-item.reorder-list-row.no-leading {
@@ -4242,6 +4255,16 @@ input, textarea, select {
   box-shadow: var(--shadow-xl);
   z-index: 100;
   border-style: solid;
+}
+
+.reorder-list-row.drag-source {
+  opacity: 0.14;
+  box-shadow: none;
+}
+
+.reorder-list-row.drag-preview-target {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 58%, var(--surface) 42%);
 }
 
 .reorder-drag-handle {
@@ -5861,9 +5884,12 @@ input, textarea, select {
   padding-inline: 10px;
 }
 
-.account-group-card.draggable,
-.account-list.reorder-active .account-row.draggable {
-  touch-action: none;
+.account-group-card.draggable {
+  transition: transform var(--dur-base) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease-out),
+              opacity var(--dur-fast) var(--ease-out),
+              border-color var(--dur-base) var(--ease-out),
+              background-color var(--dur-base) var(--ease-out);
 }
 
 .account-group-card.dragging {
@@ -5872,10 +5898,45 @@ input, textarea, select {
   z-index: 100;
 }
 
+.account-group-card.drag-source {
+  opacity: 0.14;
+  box-shadow: none;
+}
+
+.account-group-card.drag-preview-target {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border) 58%);
+  background: color-mix(in srgb, var(--accent-soft) 32%, var(--surface) 68%);
+}
+
+.drag-overlay-card {
+  pointer-events: none;
+  box-shadow: var(--shadow-xl);
+}
+
+.drag-screen-blocker {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: auto;
+  touch-action: none;
+  background: transparent;
+}
+
+.dragging-active .reorder-drag-scope .draggable:not(.dragging),
+.dragging-active .reorder-drag-scope .draggable:not(.dragging) * {
+  pointer-events: none;
+}
+
+.dragging-active .reorder-drag-scope .draggable.dragging,
+.dragging-active .reorder-drag-scope .draggable.dragging * {
+  pointer-events: auto;
+}
+
 .account-group-drag-handle {
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
+  touch-action: none;
 }
 
 .account-group-drag-handle:active {

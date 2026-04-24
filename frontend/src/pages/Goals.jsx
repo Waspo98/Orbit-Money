@@ -2,24 +2,23 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DndContext,
-  PointerSensor,
-  TouchSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
+  DragOverlay,
   closestCenter
 } from '@dnd-kit/core';
 import {
   SortableContext,
   verticalListSortingStrategy,
-  sortableKeyboardCoordinates,
   arrayMove
 } from '@dnd-kit/sortable';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppRangeSlider from '../components/AppRangeSlider.jsx';
 import PageHero from '../components/PageHero.jsx';
-import ReorderListItem from '../components/ReorderListItem.jsx';
+import ReorderListItem, {
+  ReorderListItemPreview,
+  useDragInteractionLock,
+  useReorderSensors
+} from '../components/ReorderListItem.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import CurrencyInput, {
@@ -332,17 +331,9 @@ export default function Goals() {
   const [imagineMonthly, setImagineMonthly] = useState(50);
   const [focusCollapsed, setFocusCollapsed] = useState(true);
   const [reorderMode, setReorderMode] = useState(false);
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 0 }
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: { distance: 0 }
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates
-    })
-  );
+  const [activeDragId, setActiveDragId] = useState(null);
+  const [overDragId, setOverDragId] = useState(null);
+  const sensors = useReorderSensors();
 
   async function load() {
     setLoading(true);
@@ -369,8 +360,11 @@ export default function Goals() {
     load();
   }, []);
 
+  useDragInteractionLock(Boolean(activeDragId));
+
   const goals = data?.goals || [];
   const accounts = data?.accounts || [];
+  const activeDragGoal = goals.find((goal) => goal.id === activeDragId) || null;
   const selectedGoal = goals.find((goal) => goal.id === selectedId) || goals[0] || null;
   const showingRetirementPlanner = isRetirementGoal(selectedGoal);
   const imaginedEta = selectedGoal ? estimateEta(selectedGoal, imagineMonthly) : null;
@@ -397,8 +391,23 @@ export default function Goals() {
     setWizardGoal(goal);
   }
 
+  function resetDragState() {
+    setActiveDragId(null);
+    setOverDragId(null);
+  }
+
+  function handleGoalDragStart(event) {
+    setActiveDragId(event.active?.id ?? null);
+    setOverDragId(null);
+  }
+
+  function handleGoalDragOver(event) {
+    setOverDragId(event.over?.id ?? null);
+  }
+
   async function handleGoalDragEnd(event) {
     const { active, over } = event;
+    resetDragState();
     if (!over || active.id === over.id) return;
 
     const oldIndex = goals.findIndex((goal) => goal.id === active.id);
@@ -418,6 +427,13 @@ export default function Goals() {
       setData(data);
       alert(err.message || 'Reorder failed', { title: 'Reorder failed' });
     }
+  }
+
+  function toggleReorderMode() {
+    setReorderMode((value) => {
+      if (value) resetDragState();
+      return !value;
+    });
   }
 
   function toggleFocusCard(e) {
@@ -443,7 +459,7 @@ export default function Goals() {
   }
 
   return (
-    <div className="goals-view">
+    <div className={`goals-view ${activeDragId ? 'dragging-active' : ''}`}>
       <PageHero
         id="goals-title"
         variant="goals"
@@ -531,7 +547,7 @@ export default function Goals() {
                 <button
                   type="button"
                   className="dashboard-card-link button-link"
-                  onClick={() => setReorderMode((value) => !value)}
+                  onClick={toggleReorderMode}
                 >
                   {reorderMode ? 'Done' : 'Reorder'}
                 </button>
@@ -542,18 +558,29 @@ export default function Goals() {
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
+                  onDragStart={handleGoalDragStart}
+                  onDragOver={handleGoalDragOver}
                   onDragEnd={handleGoalDragEnd}
+                  onDragCancel={resetDragState}
                 >
                   <SortableContext
                     items={goals.map((goal) => goal.id)}
                     strategy={verticalListSortingStrategy}
                   >
-                    <div className="goal-list reorder-active">
+                    <div className="goal-list reorder-active reorder-drag-scope">
                       {goals.map((goal) => (
-                        <DraggableGoalRow key={goal.id} goal={goal} />
+                        <DraggableGoalRow
+                          key={goal.id}
+                          goal={goal}
+                          previewDisplaced={goal.id === overDragId && goal.id !== activeDragId}
+                        />
                       ))}
                     </div>
                   </SortableContext>
+                  {activeDragId && <div className="drag-screen-blocker" aria-hidden="true" />}
+                  <DragOverlay dropAnimation={null}>
+                    {activeDragGoal ? <GoalDragOverlay goal={activeDragGoal} /> : null}
+                  </DragOverlay>
                 </DndContext>
               ) : goals.map((goal) => {
                 const leading = <span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>;
@@ -618,12 +645,26 @@ function presetFor(kind) {
   return GOAL_PRESETS.find((preset) => preset.kind === kind) || GOAL_PRESETS[GOAL_PRESETS.length - 1];
 }
 
-function DraggableGoalRow({ goal }) {
+function DraggableGoalRow({ goal, previewDisplaced = false }) {
   return (
     <ReorderListItem
       id={goal.id}
       className="goal-list-row"
       handleLabel={`Reorder ${goal.name}`}
+      previewDisplaced={previewDisplaced}
+      leading={<span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>}
+      title={goal.name}
+      subtitle={`${formatMoney(goal.current_amount)} of ${formatMoney(goal.target_amount)}`}
+      sidePrimary={`${Math.round(goal.progress_percent || 0)}%`}
+      sideSecondary={formatEta(goal.eta)}
+    />
+  );
+}
+
+function GoalDragOverlay({ goal }) {
+  return (
+    <ReorderListItemPreview
+      className="goal-list-row drag-overlay-card"
       leading={<span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>}
       title={goal.name}
       subtitle={`${formatMoney(goal.current_amount)} of ${formatMoney(goal.target_amount)}`}

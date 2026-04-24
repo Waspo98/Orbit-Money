@@ -410,6 +410,12 @@ balances backward over time, similar to the Net Worth page. ETA is projected
 from recent monthly goal history, and the "imagine" control estimates a new ETA
 with extra monthly savings added on top.
 
+Accounts and Goals reorder mode now share the same mobile drag behavior: touch
+drags activate from the handle after a short hold, the dragged card is rendered
+in a detached overlay so it stays under the finger, and the app blocks other
+touch targets until the drag ends. The hovered drop target still gets the green
+preview highlight before release.
+
 When the selected goal is named `Retirement`, the Goals page shows a retirement
 calculator after the Goals card. It uses Household gross/net pay, employee
 retirement contribution, employer match, and the current retirement goal balance
