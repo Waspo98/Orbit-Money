@@ -148,15 +148,20 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 
 ### Goals
 - Create and edit saving targets from the More menu with a three-step wizard: purpose, accounts, allocation
-- Supported goal kinds: retirement, college, car, home, emergency, travel, custom
+- Supported goal kinds: college, car, home, emergency, travel, custom
 - Allocations can connect multiple active asset accounts to a goal: checking, savings, cash, investment, or other
 - Each account allocation can apply either a percent of the account balance or a fixed dollar amount
 - Wizard shows each account's existing goal allocations and can steal allocation from other goals when explicitly enabled
 - Goal charts derive monthly history from existing transaction deltas and current account balances; ETA uses recent monthly progress
 - Account allocation meters are split into consistent per-goal color chunks so the same goal is visually traceable across accounts.
 - "Imagine" slider projects a hypothetical ETA with extra monthly savings
-- Selecting a goal named `Retirement` shows a Household-powered retirement calculator with a compact summary card plus an assumptions modal for age, return, inflation, income replacement, withdrawal, and HSA contribution overrides. Linked household retirement accounts are used as the current-balance source when available, including HSA balances for the pre-65 bridge check.
 - Endpoints: GET `/api/goals?months=`, POST `/api/goals`, PUT `/api/goals/:id`, DELETE `/api/goals/:id`
+
+### Retirement Calculator
+- Standalone More-menu page at `/retirement-calculator`.
+- Uses Household retirement inputs and linked retirement/HSA accounts as the automatic current-balance and contribution source.
+- Question modes answer "What Will We Have?", "When Can We Retire?", and "How Much To Save?" from the same projection model.
+- Assumption controls cover market return, inflation, and withdrawal rate presets; bridge checks separate HSA assets from non-HSA retirement balances before age 65.
 
 ### Household
 - Create and edit household members from the More menu after Net Worth
@@ -186,7 +191,7 @@ Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column gri
 ### Navigation
 - **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More
 - **Desktop sidebar:** Lists every page directly, in the same order as the mobile More menu, with Settings last. Bottom tabs are hidden on desktop.
-- **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Goals, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings last.
+- **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Savings Goals, Retirement Calculator, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings last.
 - **Deprecated hamburger:** the old hamburger menu was removed; do not reintroduce it.
 - **Settings page:** Appearance, MHA visibility, Rocket Money CSV import, SimpleFIN configuration/sync log, account controls, and app build details.
 - **React Router v6:** Client-side routing with browser back/forward support. All routes served via Express catch-all for deep-link support.
@@ -327,7 +332,7 @@ Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column gri
 - `src/main.jsx`, `src/App.jsx` (BrowserRouter, passes accounts + categories to Transactions and Dashboard), `src/Login.jsx`, `src/api.js` (get/post/put/patch/del), `src/index.css` (~7000 lines)
 - `src/hooks/useTheme.js`
 - `src/components/`: AnimatedModal, AppDialog, BottomTabs, DesktopSidebar, DropdownMenu, FilterSheet, InlinePopover, MoreSheet, PageHero, SelectableListItem, SyncErrorBanner
-- `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, HousingCalculator, NetWorth, Household, MhaTracker, Goals
+- `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, HousingCalculator, NetWorth, Household, MhaTracker, Goals, RetirementCalculator
 
 ## Known Gotchas
 - **better-sqlite3 `.iterate()` + write transaction** = "database connection is busy" — always use `.all()` instead

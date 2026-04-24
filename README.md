@@ -6,7 +6,7 @@ stores data in SQLite, and runs as a Docker Compose app.
 
 ## Features
 
-- Account, transaction, budget, category, rule, goal, household, and net worth views
+- Account, transaction, budget, category, rule, savings goal, retirement calculator, household, and net worth views
 - Rocket Money CSV import
 - SimpleFIN bank sync
 - Merchant logo enrichment with optional Logo.dev keys

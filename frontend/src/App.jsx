@@ -21,6 +21,7 @@ import HousingCalculator from './pages/HousingCalculator.jsx';
 import NetWorth from './pages/NetWorth.jsx';
 import MhaTracker from './pages/MhaTracker.jsx';
 import Goals from './pages/Goals.jsx';
+import RetirementCalculator from './pages/RetirementCalculator.jsx';
 import Household from './pages/Household.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
@@ -189,6 +190,7 @@ function AppShell() {
     '/net-worth': <NetWorth />,
     '/household': <Household />,
     '/goals': <Goals />,
+    '/retirement-calculator': <RetirementCalculator />,
     '/mha-tracker': mhaTrackerEnabled ? <MhaTracker /> : <Navigate to="/settings" replace />,
     '/settings': (
       <Settings
