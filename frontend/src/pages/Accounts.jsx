@@ -13,6 +13,7 @@ import {
 import { api } from '../api.js';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import CollapseIndicator from '../components/CollapseIndicator.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
   useDragInteractionLock,
@@ -618,7 +619,7 @@ function AccountGroup({ group, children, collapsed, disabled = false, onToggle }
         </div>
         <span className="account-group-header-side">
           <strong className={`account-group-total ${totalTone}`}>{formatCurrency(group.total)}</strong>
-          <span className="month-nav-caret account-group-caret" aria-hidden="true">▾</span>
+          <CollapseIndicator expanded={!collapsed} className="account-group-caret" />
         </span>
       </button>
       <div className="account-group-body" aria-hidden={collapsed}>

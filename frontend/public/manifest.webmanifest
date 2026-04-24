@@ -1,6 +1,6 @@
 {
   "name": "Orbit Money",
-  "short_name": "Orbit",
+  "short_name": "Orbit Money",
   "description": "Self-hosted personal finance tracker",
   "start_url": "/",
   "scope": "/",

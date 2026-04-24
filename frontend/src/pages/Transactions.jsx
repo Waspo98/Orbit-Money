@@ -47,16 +47,27 @@ function formatShortAmount(amount) {
   return formatCurrency(amount, { maximumFractionDigits: 0 });
 }
 
-function groupByMonth(items) {
+function groupByMonth(items, countsByMonth = {}) {
   const groups = [];
   let current = null;
   for (const item of items) {
     const key = monthKey(item.date);
     if (!current || current.key !== key) {
-      current = { key, label: monthLabel(key), items: [] };
+      current = {
+        id: `${key}-${groups.length}`,
+        key,
+        label: monthLabel(key),
+        count: countsByMonth[key],
+        items: []
+      };
       groups.push(current);
     }
     current.items.push(item);
+  }
+  for (const group of groups) {
+    if (!Number.isFinite(group.count)) {
+      group.count = group.items.length;
+    }
   }
   return groups;
 }
@@ -154,6 +165,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   const [total, setTotal] = useState(0);
   const [grandTotal, setGrandTotal] = useState(0);
   const [monthlyTotal, setMonthlyTotal] = useState(0);
+  const [monthCounts, setMonthCounts] = useState({});
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -163,7 +175,8 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const groupRefs = useRef(new Map());
-  const [stickyMonth, setStickyMonth] = useState(null);
+  const floatingHeaderRef = useRef(null);
+  const [pinnedMonth, setPinnedMonth] = useState(null);
 
   // Local (debounced) search input - keeps typing snappy, writes to URL
   // after a short idle window so the server request doesn't fire per
@@ -200,6 +213,11 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
       setTotal(data.total);
       setGrandTotal(data.grandTotal ?? data.total);
       setMonthlyTotal(data.monthlyTotal ?? 0);
+      setMonthCounts(
+        Object.fromEntries(
+          (data.monthCounts || []).map((row) => [row.month, Number(row.count) || 0])
+        )
+      );
       setTotalPages(data.totalPages);
     } catch (err) {
       setError(err.message || 'Failed to load transactions');
@@ -294,8 +312,16 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     setItems((prev) => prev.map((t) => (t.id === id ? full : t)));
   }
   function removeLocal(id) {
+    const removed = items.find((t) => t.id === id);
     setItems((prev) => prev.filter((t) => t.id !== id));
     setTotal((t) => Math.max(0, t - 1));
+    if (removed?.date) {
+      const key = monthKey(removed.date);
+      setMonthCounts((prev) => ({
+        ...prev,
+        [key]: Math.max(0, (prev[key] || 1) - 1)
+      }));
+    }
     setExpandedId(null);
   }
 
@@ -349,7 +375,10 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
 
   const activeCount = countActiveFilters(filters);
   const isFiltered = activeCount > 0;
-  const groups = groupByMonth(items);
+  const groups = useMemo(
+    () => groupByMonth(items, monthCounts),
+    [items, monthCounts]
+  );
   const visibleIncome = items
     .filter((t) => t.amount > 0 && !t.is_transfer && !t.is_ignored)
     .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -360,63 +389,73 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
 
   useEffect(() => {
     if (!groups.length) {
-      setStickyMonth(null);
+      setPinnedMonth(null);
       return undefined;
     }
 
-    function updateStickyMonth() {
-      const firstGroup = groupRefs.current.get(groups[0]?.key);
-      const firstHeader = firstGroup?.querySelector('.txn-month-header');
-      if (!firstGroup || !firstHeader) {
-        setStickyMonth(null);
-        return;
-      }
+    function updatePinnedMonth() {
+      const topOffset = 0;
+      const headerHeight =
+        floatingHeaderRef.current?.getBoundingClientRect().height || 52;
+      let activeIndex = -1;
 
-      if (firstHeader.getBoundingClientRect().top > 0) {
-        setStickyMonth(null);
-        return;
-      }
-
-      let active = null;
-      for (const group of groups) {
-        const node = groupRefs.current.get(group.key);
+      for (let index = 0; index < groups.length; index += 1) {
+        const node = groupRefs.current.get(groups[index].id);
         if (!node) continue;
         const rect = node.getBoundingClientRect();
-        if (rect.top <= 0 && rect.bottom > 0) {
-          active = { group, rect };
-          break;
+        if (rect.top <= topOffset && rect.bottom > topOffset + headerHeight) {
+          activeIndex = index;
         }
       }
 
-      if (!active) {
-        setStickyMonth(null);
+      if (activeIndex < 0) {
+        setPinnedMonth(null);
         return;
       }
 
-      const nextStickyMonth = {
-        key: active.group.key,
-        label: active.group.label,
-        count: active.group.items.length,
-        left: active.rect.left,
-        width: active.rect.width
+      const group = groups[activeIndex];
+      const node = groupRefs.current.get(group.id);
+      if (!node) {
+        setPinnedMonth(null);
+        return;
+      }
+
+      const rect = node.getBoundingClientRect();
+      const nextGroup = groups[activeIndex + 1];
+      const nextNode = nextGroup ? groupRefs.current.get(nextGroup.id) : null;
+      const nextTop = nextNode?.getBoundingClientRect().top;
+      const translateY =
+        typeof nextTop === 'number'
+          ? Math.min(0, nextTop - topOffset - headerHeight)
+          : 0;
+
+      const nextPinnedMonth = {
+        key: group.id,
+        label: group.label,
+        count: group.count,
+        left: rect.left,
+        width: rect.width,
+        translateY
       };
 
-      setStickyMonth((prev) =>
+      setPinnedMonth((prev) =>
         prev &&
-        prev.key === nextStickyMonth.key &&
-        Math.abs(prev.left - nextStickyMonth.left) < 0.5 &&
-        Math.abs(prev.width - nextStickyMonth.width) < 0.5
+        prev.key === nextPinnedMonth.key &&
+        prev.count === nextPinnedMonth.count &&
+        Math.abs(prev.left - nextPinnedMonth.left) < 0.5 &&
+        Math.abs(prev.width - nextPinnedMonth.width) < 0.5 &&
+        Math.abs(prev.translateY - nextPinnedMonth.translateY) < 0.5
           ? prev
-          : nextStickyMonth
+          : nextPinnedMonth
       );
     }
 
-    updateStickyMonth();
-    window.addEventListener('scroll', updateStickyMonth, { passive: true });
-    window.addEventListener('resize', updateStickyMonth);
+    updatePinnedMonth();
+    window.addEventListener('scroll', updatePinnedMonth, { passive: true });
+    window.addEventListener('resize', updatePinnedMonth);
     return () => {
-      window.removeEventListener('scroll', updateStickyMonth);
-      window.removeEventListener('resize', updateStickyMonth);
+      window.removeEventListener('scroll', updatePinnedMonth);
+      window.removeEventListener('resize', updatePinnedMonth);
     };
   }, [groups]);
 
@@ -529,19 +568,21 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           </div>
         )}
       />
-      {stickyMonth && (
+      {pinnedMonth && (
         <header
-          className="txn-floating-month-header"
+          ref={floatingHeaderRef}
+          className="txn-pinned-month-header"
           style={{
-            left: `${stickyMonth.left}px`,
-            width: `${stickyMonth.width}px`
+            left: `${pinnedMonth.left}px`,
+            width: `${pinnedMonth.width}px`,
+            transform: `translateY(${pinnedMonth.translateY}px)`
           }}
           aria-hidden="true"
         >
-          <span className="txn-month-label">{stickyMonth.label}</span>
+          <span className="txn-month-label">{pinnedMonth.label}</span>
           <span className="txn-month-count">
-            {stickyMonth.count}{' '}
-            {stickyMonth.count === 1 ? 'transaction' : 'transactions'}
+            {pinnedMonth.count}{' '}
+            {pinnedMonth.count === 1 ? 'transaction' : 'transactions'}
           </span>
         </header>
       )}
@@ -575,18 +616,18 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         <>
           {groups.map((group) => (
             <section
-              key={group.key}
+              key={group.id}
               className="txn-month-group"
               ref={(node) => {
-                if (node) groupRefs.current.set(group.key, node);
-                else groupRefs.current.delete(group.key);
+                if (node) groupRefs.current.set(group.id, node);
+                else groupRefs.current.delete(group.id);
               }}
             >
               <header className="txn-month-header">
                 <span className="txn-month-label">{group.label}</span>
                 <span className="txn-month-count">
-                  {group.items.length}{' '}
-                  {group.items.length === 1 ? 'transaction' : 'transactions'}
+                  {group.count}{' '}
+                  {group.count === 1 ? 'transaction' : 'transactions'}
                 </span>
               </header>
 

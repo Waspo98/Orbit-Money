@@ -320,6 +320,15 @@ router.get('/', requireAuth, (req, res) => {
       .prepare('SELECT COUNT(*) AS c FROM transactions WHERE date >= ? AND date <= ?')
       .get(monthStart, monthEnd).c;
 
+    const monthCounts = db
+      .prepare(
+        `SELECT substr(date, 1, 7) AS month, COUNT(*) AS count
+           FROM transactions
+           ${clause}
+           GROUP BY substr(date, 1, 7)`
+      )
+      .all(...args);
+
     const rows = db
       .prepare(
         `SELECT ${SELECT_COLS}
@@ -339,6 +348,7 @@ router.get('/', requireAuth, (req, res) => {
       total,
       grandTotal,
       monthlyTotal,
+      monthCounts,
       totalPages: Math.max(1, Math.ceil(total / limit)),
       sort: sortKey in SORT_MAP ? sortKey : 'date_desc'
     });

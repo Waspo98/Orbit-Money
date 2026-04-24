@@ -12,6 +12,7 @@ import {
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppRangeSlider from '../components/AppRangeSlider.jsx';
+import CollapseIndicator from '../components/CollapseIndicator.jsx';
 import PageHero from '../components/PageHero.jsx';
 import PercentInput from '../components/PercentInput.jsx';
 import ReorderListItem, {
@@ -507,6 +508,7 @@ export default function Goals() {
               <header className="dashboard-card-header">
                 <h3>{selectedGoal?.name || 'Goal'}</h3>
                 <div className="goals-card-actions">
+                  <CollapseIndicator expanded={!focusCollapsed} />
                   <button type="button" className="dashboard-card-link button-link" onClick={() => openEditGoal(selectedGoal)}>
                     Edit
                   </button>
@@ -819,6 +821,7 @@ function RetirementPlanner({ goal, household }) {
       <header className="dashboard-card-header">
         <h3>Retirement Calculator</h3>
         <div className="dashboard-card-actions">
+          <CollapseIndicator expanded={!collapsed} />
           <button type="button" className="dashboard-card-link button-link" onClick={() => setEditingAssumptions(true)}>
             Edit Assumptions
           </button>

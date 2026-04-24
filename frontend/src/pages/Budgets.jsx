@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import CollapseIndicator from '../components/CollapseIndicator.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import PageHero from '../components/PageHero.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
@@ -887,6 +888,7 @@ function BudgetedRow({ item, expanded, transactionsState, onToggle, onEdit, onDe
             <span className="subtle"> / {formatMoney(amount)}</span>
           </span>
         </div>
+        <CollapseIndicator expanded={expanded} className="budget-row-collapse-indicator" />
         <DropdownMenu
           items={menuItems}
           ariaLabel={`Actions for ${category.name} budget`}
