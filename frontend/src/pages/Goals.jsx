@@ -12,9 +12,7 @@ import {
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppRangeSlider from '../components/AppRangeSlider.jsx';
-import CollapseIndicator from '../components/CollapseIndicator.jsx';
 import PageHero from '../components/PageHero.jsx';
-import PercentInput from '../components/PercentInput.jsx';
 import ReorderListItem, {
   useDragInteractionLock,
   useReorderSensors
@@ -27,20 +25,17 @@ import CurrencyInput, {
 } from '../components/CurrencyInput.jsx';
 import {
   formatCurrency,
-  formatSignedCurrency,
-  formatPercent,
-  parsePercentInput
+  formatSignedCurrency
 } from '../lib/formatters.js';
 import { addMonthsToLocalDate } from '../lib/localDate.js';
 
 const GOAL_PRESETS = [
-  { kind: 'retirement', label: 'Retirement', icon: '🏖️' },
-  { kind: 'college', label: 'Kids College', icon: '🎓' },
-  { kind: 'car', label: 'New Car', icon: '🚗' },
-  { kind: 'home', label: 'Home', icon: '🏠' },
-  { kind: 'emergency', label: 'Emergency Fund', icon: '🛟' },
-  { kind: 'travel', label: 'Travel', icon: '✈️' },
-  { kind: 'custom', label: 'Something Else', icon: '✨' }
+  { kind: 'college', label: 'Kids College', icon: '??' },
+  { kind: 'car', label: 'New Car', icon: '??' },
+  { kind: 'home', label: 'Home', icon: '??' },
+  { kind: 'emergency', label: 'Emergency Fund', icon: '??' },
+  { kind: 'travel', label: 'Travel', icon: '??' },
+  { kind: 'custom', label: 'Something Else', icon: '?' }
 ];
 
 const ACCOUNT_TYPE_LABELS = {
@@ -51,18 +46,6 @@ const ACCOUNT_TYPE_LABELS = {
   other: 'Other'
 };
 
-const RETIREMENT_ACCOUNT_KIND_LABELS = {
-  '401k': '401(k)',
-  '403b': '403(b)',
-  '457b': '457(b)',
-  ira: 'IRA',
-  roth_ira: 'Roth IRA',
-  sep_ira: 'SEP IRA',
-  simple_ira: 'SIMPLE IRA',
-  hsa: 'HSA',
-  pension: 'Pension',
-  other: 'Other'
-};
 
 const GOAL_COLORS = [
   '#10b981',
@@ -119,19 +102,6 @@ function formatFullMonthDate(date) {
   });
 }
 
-function ageFromBirthDate(date) {
-  if (!date) return null;
-  const birth = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(birth.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  const hadBirthday =
-    now.getMonth() > birth.getMonth() ||
-    (now.getMonth() === birth.getMonth() && now.getDate() >= birth.getDate());
-  if (!hadBirthday) age -= 1;
-  return age >= 0 ? age : null;
-}
-
 function formatEta(eta) {
   if (!eta) return 'No ETA yet';
   if (eta.status === 'complete') return 'Reached';
@@ -174,49 +144,6 @@ function estimateEta(goal, extraMonthly) {
   if (monthly <= 0) return { date: null, months: null, status: 'stalled' };
   const months = Math.ceil((target - current) / monthly);
   return { date: addMonthsToDate(new Date(), months), months, status: 'projected' };
-}
-
-function isRetirementGoal(goal) {
-  return String(goal?.name || '').trim().toLowerCase() === 'retirement';
-}
-
-function effectiveMonthlyRate(annualReturn) {
-  const rate = Number(annualReturn) || 0;
-  if (rate <= -1) return -1;
-  return (1 + rate) ** (1 / 12) - 1;
-}
-
-function futureValueSeries(current, monthly, annualReturn, months) {
-  const principal = Number(current) || 0;
-  const contribution = Number(monthly) || 0;
-  const monthlyReturn = effectiveMonthlyRate(annualReturn);
-  if (months <= 0) return principal;
-  if (monthlyReturn <= 0) return principal + contribution * months;
-  return principal * ((1 + monthlyReturn) ** months) +
-    contribution * ((((1 + monthlyReturn) ** months) - 1) / monthlyReturn);
-}
-
-function projectRetirementByYear(current, annualSavings, annualReturn, years) {
-  const items = [{ yearOffset: 0, amount: Number(current) || 0 }];
-  const principal = Number(current) || 0;
-  const monthlyContribution = (Number(annualSavings) || 0) / 12;
-  for (let year = 1; year <= years; year += 1) {
-    items.push({
-      yearOffset: year,
-      amount: futureValueSeries(principal, monthlyContribution, annualReturn, year * 12)
-    });
-  }
-  return items;
-}
-
-function classifyRetirementAccount(name) {
-  const text = String(name || '').toLowerCase();
-  if (text.includes('hsa')) return 'HSA';
-  if (text.includes('roth')) return 'Roth';
-  if (text.includes('403')) return '403(b)';
-  if (text.includes('401')) return '401(k)';
-  if (text.includes('ira')) return 'IRA';
-  return 'Other';
 }
 
 function chartRange(history) {
@@ -364,7 +291,6 @@ export default function Goals() {
   const goals = data?.goals || [];
   const accounts = data?.accounts || [];
   const selectedGoal = goals.find((goal) => goal.id === selectedId) || goals[0] || null;
-  const showingRetirementPlanner = isRetirementGoal(selectedGoal);
   const imaginedEta = selectedGoal ? estimateEta(selectedGoal, imagineMonthly) : null;
   async function handleDelete(goal) {
     const ok = await confirm(`Delete "${goal.name}"? Its account allocations will be removed.`, {
@@ -462,7 +388,7 @@ export default function Goals() {
         id="goals-title"
         variant="goals"
         kicker="Saving Targets"
-        title="Goals"
+        title="Savings Goals"
         subtitle="Connect asset accounts, allocate savings, and project when each target lands."
         toolbar={(
           <div className="page-hero-action-row">
@@ -489,59 +415,54 @@ export default function Goals() {
       ) : goals.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">G</div>
-          <h2>No goals yet</h2>
+          <h2>No savings goals yet</h2>
           <p>Create a saving target and connect the accounts that should count toward it.</p>
           <button type="button" className="btn-primary" onClick={openNewGoal}>+ New Goal</button>
         </div>
       ) : (
         <div className="goals-grid">
-          {showingRetirementPlanner ? (
-            <RetirementPlanner goal={selectedGoal} household={household} />
-          ) : (
-            <section
-              className={`dashboard-card goals-focus-card ${focusCollapsed ? 'collapsed' : ''}`}
-              onClick={toggleFocusCard}
-              onKeyDown={handleFocusCardKeyDown}
-              tabIndex={0}
-              aria-expanded={!focusCollapsed}
-            >
-              <header className="dashboard-card-header">
-                <h3>{selectedGoal?.name || 'Goal'}</h3>
-                <div className="goals-card-actions">
-                  <CollapseIndicator expanded={!focusCollapsed} />
-                  <button type="button" className="dashboard-card-link button-link" onClick={() => openEditGoal(selectedGoal)}>
-                    Edit
-                  </button>
-                </div>
-              </header>
-              <div className="dashboard-card-body">
-                <GoalProgress goal={selectedGoal} />
-                <div className="goals-focus-detail" aria-hidden={focusCollapsed}>
-                  <div className="goals-focus-detail-inner">
-                    <GoalChart goal={selectedGoal} />
-                    <ImaginePanel
-                      goal={selectedGoal}
-                      imagineMonthly={imagineMonthly}
-                      imaginedEta={imaginedEta}
-                      onChange={setImagineMonthly}
-                    />
-                    <div className="goals-focus-actions">
-                      <button type="button" className="btn-secondary" onClick={() => openEditGoal(selectedGoal)}>
-                        Edit goal
-                      </button>
-                      <button type="button" className="btn-danger" onClick={() => handleDelete(selectedGoal)}>
-                        Delete
-                      </button>
-                    </div>
+          <section
+            className={`dashboard-card goals-focus-card ${focusCollapsed ? 'collapsed' : ''}`}
+            onClick={toggleFocusCard}
+            onKeyDown={handleFocusCardKeyDown}
+            tabIndex={0}
+            aria-expanded={!focusCollapsed}
+          >
+            <header className="dashboard-card-header">
+              <h3>{selectedGoal?.name || 'Goal'}</h3>
+              <div className="goals-card-actions">
+                <button type="button" className="dashboard-card-link button-link" onClick={() => openEditGoal(selectedGoal)}>
+                  Edit
+                </button>
+              </div>
+            </header>
+            <div className="dashboard-card-body">
+              <GoalProgress goal={selectedGoal} />
+              <div className="goals-focus-detail" aria-hidden={focusCollapsed}>
+                <div className="goals-focus-detail-inner">
+                  <GoalChart goal={selectedGoal} />
+                  <ImaginePanel
+                    goal={selectedGoal}
+                    imagineMonthly={imagineMonthly}
+                    imaginedEta={imaginedEta}
+                    onChange={setImagineMonthly}
+                  />
+                  <div className="goals-focus-actions">
+                    <button type="button" className="btn-secondary" onClick={() => openEditGoal(selectedGoal)}>
+                      Edit goal
+                    </button>
+                    <button type="button" className="btn-danger" onClick={() => handleDelete(selectedGoal)}>
+                      Delete
+                    </button>
                   </div>
                 </div>
               </div>
-            </section>
-          )}
+            </div>
+          </section>
 
           <section className="dashboard-card goals-list-card">
             <header className="dashboard-card-header">
-              <h3>Goals</h3>
+              <h3>Savings Goals</h3>
               {goals.length > 1 && (
                 <button
                   type="button"
@@ -629,6 +550,10 @@ export default function Goals() {
             await load();
             setSelectedId(savedId);
           }}
+          onDeleted={async () => {
+            setWizardGoal(null);
+            await load();
+          }}
         />
       )}
 
@@ -677,414 +602,6 @@ function GoalProgress({ goal }) {
         <SignalRow className="goal-eta-row goal-projected-row" label="Projected ETA" value={formatEta(goal?.eta)} />
         <SignalRow className="goal-monthly-row" label="Monthly pace" value={formatSignedMoney(goal?.monthly_pace)} />
       </div>
-    </div>
-  );
-}
-
-function RetirementPlanner({ goal, household }) {
-  const [editingAssumptions, setEditingAssumptions] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
-  const [scenarioMonthlySavings, setScenarioMonthlySavings] = useState('');
-  const [assumptions, setAssumptions] = useState({
-    currentAge: '',
-    retirementAge: '67',
-    annualReturn: '7%',
-    inflation: '2.5%',
-    replacementRate: '80%',
-    withdrawalRate: '4%'
-  });
-
-  const members = household?.members || [];
-  const summary = household?.summary || {};
-  const allocations = goal?.allocations || [];
-  const linkedAccounts = members.flatMap((member) => (
-    (member.retirement_accounts || []).map((account) => ({
-      ...account,
-      member_name: member.name,
-      balance: Number(account.balance ?? account.estimated_value ?? account.current_balance) || 0
-    }))
-  ));
-  const usesLinkedAccounts = linkedAccounts.length > 0;
-  const accountSources = usesLinkedAccounts
-    ? linkedAccounts.map((account) => ({
-      label: RETIREMENT_ACCOUNT_KIND_LABELS[account.account_kind] || classifyRetirementAccount(account.account_name),
-      amount: account.balance,
-      name: account.account_name,
-      owner: account.member_name,
-      kind: account.account_kind
-    }))
-    : allocations.map((allocation) => ({
-      label: classifyRetirementAccount(allocation.account_name),
-      amount: Number(allocation.current_amount) || 0,
-      name: allocation.account_name,
-      owner: null,
-      kind: classifyRetirementAccount(allocation.account_name).toLowerCase()
-    }));
-  const linkedCurrentBalance = accountSources.reduce((sum, source) => sum + source.amount, 0);
-  const inferredHsaCurrent = accountSources
-    .filter((source) => source.kind === 'hsa' || source.label === 'HSA')
-    .reduce((sum, source) => sum + source.amount, 0);
-  const householdHsaAnnual = members.reduce(
-    (sum, member) => sum + (Number(member.hsa_contribution_annual) || 0),
-    0
-  );
-  const inferredAge =
-    members
-      .map((member) => ageFromBirthDate(member.birth_date))
-      .find((age) => age !== null) ?? 35;
-  const currentAge = Number(assumptions.currentAge) || inferredAge;
-  const retirementAge = Math.max(currentAge, Number(assumptions.retirementAge) || 67);
-  const hsaAccessAge = Math.max(currentAge, 65);
-  const years = Math.max(0, retirementAge - currentAge);
-  const months = Math.round(years * 12);
-  const monthsToHsaAccess = Math.max(0, Math.round((hsaAccessAge - currentAge) * 12));
-  const lockedHsaYears = Math.max(0, hsaAccessAge - retirementAge);
-  const annualReturn = parsePercentInput(assumptions.annualReturn) / 100;
-  const inflation = parsePercentInput(assumptions.inflation) / 100;
-  const realReturn = ((1 + annualReturn) / (1 + inflation)) - 1;
-  const currentBalance = usesLinkedAccounts ? linkedCurrentBalance : Number(goal?.current_amount) || 0;
-  const employeeAnnual = Number(summary.employee_retirement_annual) || 0;
-  const employerAnnual = Number(summary.employer_retirement_annual) || 0;
-  const annualSavings = employeeAnnual + employerAnnual;
-  const plannedMonthly = annualSavings / 12;
-  const annualIncome = Number(summary.net_pay_annual || summary.gross_income_annual) || 0;
-  const annualNeed = annualIncome * (parsePercentInput(assumptions.replacementRate) / 100);
-  const withdrawalRate = Math.max(0.1, parsePercentInput(assumptions.withdrawalRate) || 4) / 100;
-  const hsaCurrent = inferredHsaCurrent;
-  const hsaAnnual = householdHsaAnnual;
-  const hsaMonthly = hsaAnnual / 12;
-  const nonHsaCurrent = Math.max(0, currentBalance - hsaCurrent);
-  const nonHsaMonthly = Math.max(0, plannedMonthly - hsaMonthly);
-  const targetNestEgg = annualNeed / withdrawalRate;
-  const projectedNonHsa = futureValueSeries(nonHsaCurrent, nonHsaMonthly, annualReturn, months);
-  const projectedHsaAtRetirement = futureValueSeries(hsaCurrent, hsaMonthly, annualReturn, months);
-  const projectedHsaAtAccess = futureValueSeries(hsaCurrent, hsaMonthly, annualReturn, monthsToHsaAccess);
-  const projectedBalance = projectedNonHsa + projectedHsaAtRetirement;
-  const bridgeNeed = retirementAge < hsaAccessAge ? annualNeed * lockedHsaYears : 0;
-  const bridgeSurplus = projectedNonHsa - bridgeNeed;
-  const gap = projectedBalance - targetNestEgg;
-  const savingsRate = Number(summary.gross_income_annual) > 0
-    ? (annualSavings / Number(summary.gross_income_annual)) * 100
-    : 0;
-  const readiness = Math.min(100, targetNestEgg > 0 ? (projectedBalance / targetNestEgg) * 100 : 0);
-  const hsaBridgeText = retirementAge >= hsaAccessAge
-    ? `HSA available by age ${Math.round(retirementAge)}`
-    : bridgeSurplus >= 0
-      ? `${formatMoney(bridgeSurplus)} bridge surplus`
-      : `${formatMoney(Math.abs(bridgeSurplus))} bridge gap`;
-  const defaultMonthlySavings = annualSavings / 12;
-  const scenarioMonthlyValue = String(scenarioMonthlySavings).trim() === ''
-    ? defaultMonthlySavings
-    : parseMoney(scenarioMonthlySavings);
-  const scenarioAnnualValue = scenarioMonthlyValue * 12;
-  const scenarioRangeMaxMonthly = Math.max(1000, Math.ceil((Math.max(defaultMonthlySavings, targetNestEgg / Math.max(1, months)) * 1.75) / 250) * 250);
-  const maxRangeAnnualValue = scenarioRangeMaxMonthly * 12;
-  const defaultPoints = projectRetirementByYear(currentBalance, annualSavings, annualReturn, Math.max(1, Math.round(years)));
-  const scenarioPoints = projectRetirementByYear(currentBalance, scenarioAnnualValue, annualReturn, Math.max(1, Math.round(years)));
-  const maxRangePoints = projectRetirementByYear(currentBalance, maxRangeAnnualValue, annualReturn, Math.max(1, Math.round(years)));
-  const defaultProjection = defaultPoints[defaultPoints.length - 1]?.amount || currentBalance;
-  const scenarioProjection = scenarioPoints[scenarioPoints.length - 1]?.amount || currentBalance;
-  const scenarioGap = scenarioProjection - targetNestEgg;
-
-  function update(key, value) {
-    setAssumptions((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function toggleCollapsed(e) {
-    if (
-      e.target.closest('button, a, input, select, textarea')
-    ) {
-      return;
-    }
-    setCollapsed((value) => !value);
-  }
-
-  function handleCardKeyDown(e) {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    if (
-      e.target.closest('button, a, input, select, textarea')
-    ) {
-      return;
-    }
-    e.preventDefault();
-    setCollapsed((value) => !value);
-  }
-
-  return (
-    <section
-      className={`dashboard-card retirement-planner-card ${collapsed ? 'collapsed' : ''}`}
-      onClick={toggleCollapsed}
-      onKeyDown={handleCardKeyDown}
-      tabIndex={0}
-      aria-expanded={!collapsed}
-    >
-      <header className="dashboard-card-header">
-        <h3>Retirement Calculator</h3>
-        <div className="dashboard-card-actions">
-          <CollapseIndicator expanded={!collapsed} />
-          <button type="button" className="dashboard-card-link button-link" onClick={() => setEditingAssumptions(true)}>
-            Edit Assumptions
-          </button>
-        </div>
-      </header>
-      <div className="dashboard-card-body">
-        <div className="retirement-planner-hero">
-          <div>
-            <span>Projected at {Math.round(retirementAge)}</span>
-            <strong>{formatMoney(projectedBalance)}</strong>
-            <em className={gap >= 0 ? 'income' : 'expense'}>
-              {gap >= 0 ? `${formatMoney(gap)} surplus` : `${formatMoney(Math.abs(gap))} short`}
-            </em>
-            <label className="field retirement-hero-age-field">
-              <span>Retirement Age</span>
-              <div className="retirement-age-stepper">
-                <input
-                  type="number"
-                  min="1"
-                  max="99"
-                  value={assumptions.retirementAge}
-                  onChange={(e) => update('retirementAge', e.target.value)}
-                />
-                <div className="retirement-age-actions">
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    aria-label="Decrease retirement age"
-                    onClick={() => update('retirementAge', String(Math.max(currentAge, retirementAge - 1)))}
-                  >
-                    Down
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    aria-label="Increase retirement age"
-                    onClick={() => update('retirementAge', String(Math.min(99, retirementAge + 1)))}
-                  >
-                    Up
-                  </button>
-                </div>
-              </div>
-            </label>
-          </div>
-          <div className="retirement-readiness-ring" style={{ '--retirement-progress': `${readiness}%` }}>
-            <span>{Math.round(readiness)}%</span>
-          </div>
-        </div>
-
-        <div className="retirement-planner-detail" aria-hidden={collapsed}>
-          <div className="retirement-planner-detail-inner">
-            <div className="retirement-metric-grid">
-              <RetirementMetric label="Target Nest Egg" value={formatMoney(targetNestEgg)} detail={`${formatMoney(annualNeed)}/yr need`} />
-              <RetirementMetric label="Household Savings" value={`${formatMoney(plannedMonthly)}/mo`} detail={`${formatMoney(employerAnnual)} employer/yr`} />
-              <RetirementMetric label="Savings Rate" value={formatPercent(savingsRate)} detail={`${formatMoney(employeeAnnual)} employee/yr`} />
-              <RetirementMetric label="Real Return" value={formatPercent(realReturn * 100)} detail={`${formatPercent(annualReturn * 100)} market minus ${formatPercent(inflation * 100)} inflation`} />
-              <RetirementMetric label="Time to Retirement" value={`${Math.round(years)} years`} detail={`${Math.round(months).toLocaleString()} months`} />
-            </div>
-
-            <RetirementProjectionPanel
-              currentAge={currentAge}
-              retirementAge={retirementAge}
-              targetNestEgg={targetNestEgg}
-              defaultProjection={defaultProjection}
-              monthlySavings={scenarioMonthlyValue}
-              scenarioProjection={scenarioProjection}
-              scenarioGap={scenarioGap}
-              defaultPoints={defaultPoints}
-              points={scenarioPoints}
-              maxRangePoints={maxRangePoints}
-              rangeMax={scenarioRangeMaxMonthly}
-              onMonthlySavingsChange={setScenarioMonthlySavings}
-            />
-
-            <div className="retirement-member-card">
-              {members.length === 0 ? (
-                <p className="subtle">Add household income and match details to unlock employer contribution projections.</p>
-              ) : members.map((member) => (
-                <div key={member.id} className="retirement-member-pane">
-                  <div>
-                    <strong>{member.name}</strong>
-                    <span>{member.retirement_accounts?.length || 0} accounts | {formatPercent(member.employee_contribution_percent)} employee | {formatPercent(member.employer_match_percent)} match</span>
-                  </div>
-                  <em>{formatMoney((Number(member.employee_retirement_annual) || 0) + (Number(member.employer_retirement_annual) || 0))}/yr</em>
-                </div>
-              ))}
-            </div>
-
-            <div className="retirement-hsa-panel">
-              <div>
-                <span>HSA bridge check</span>
-                <strong className={bridgeSurplus >= 0 ? 'income' : 'expense'}>
-                  {hsaBridgeText}
-                </strong>
-                <em>
-                  {retirementAge >= hsaAccessAge
-                    ? `HSA is available by age ${Math.round(retirementAge)}.`
-                    : `${formatMoney(bridgeNeed)} needed from retirement to age ${Math.round(hsaAccessAge)} before HSA behaves like a retirement account.`}
-                </em>
-              </div>
-              <div className="retirement-hsa-stats">
-                <RetirementMetric label="HSA at Retirement" value={formatMoney(projectedHsaAtRetirement)} detail={`${formatMoney(hsaAnnual)}/yr contributions`} />
-                <RetirementMetric label={`HSA at ${Math.round(hsaAccessAge)}`} value={formatMoney(projectedHsaAtAccess)} detail={`${Math.round(lockedHsaYears)} locked years after retirement`} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {editingAssumptions && (
-        <AnimatedModal onClose={() => setEditingAssumptions(false)} size="lg" animation="zoom">
-          {({ close }) => (
-            <div className="retirement-assumption-modal">
-              <h3>Retirement Assumptions</h3>
-              <p className="subtle">
-                Linked household accounts supply current balances. These assumptions only adjust the projection math.
-              </p>
-              <div className="retirement-assumption-grid">
-                <label className="field">
-                  <span>Current Age</span>
-                  <input type="number" min="0" value={assumptions.currentAge} onChange={(e) => update('currentAge', e.target.value)} placeholder={String(inferredAge)} />
-                </label>
-                <label className="field">
-                  <span>Market Return</span>
-                  <PercentInput value={assumptions.annualReturn} onChange={(value) => update('annualReturn', value)} placeholder="7%" />
-                </label>
-                <label className="field">
-                  <span>Inflation</span>
-                  <PercentInput value={assumptions.inflation} onChange={(value) => update('inflation', value)} placeholder="2.5%" />
-                </label>
-                <label className="field">
-                  <span>Income Replacement</span>
-                  <PercentInput value={assumptions.replacementRate} onChange={(value) => update('replacementRate', value)} placeholder="80%" />
-                </label>
-                <label className="field">
-                  <span>Withdrawal Rate</span>
-                  <PercentInput value={assumptions.withdrawalRate} onChange={(value) => update('withdrawalRate', value)} placeholder="4%" />
-                </label>
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn-primary" onClick={close}>Done</button>
-              </div>
-            </div>
-          )}
-        </AnimatedModal>
-      )}
-    </section>
-  );
-}
-
-function RetirementMetric({ label, value, detail }) {
-  return (
-    <div className="retirement-metric">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <em>{detail}</em>
-    </div>
-  );
-}
-
-function RetirementProjectionPanel({
-  currentAge,
-  retirementAge,
-  targetNestEgg,
-  defaultProjection,
-  monthlySavings,
-  scenarioProjection,
-  scenarioGap,
-  defaultPoints,
-  points,
-  maxRangePoints,
-  rangeMax,
-  onMonthlySavingsChange
-}) {
-  const width = 640;
-  const height = 220;
-  const chartPoints = points.map((point) => ({
-    month: String(point.yearOffset),
-    amount: point.amount
-  }));
-  const computedYMax = Math.max(
-    targetNestEgg,
-    defaultProjection,
-    ...maxRangePoints.map((point) => point.amount),
-    ...defaultPoints.map((point) => point.amount),
-    1
-  ) * 1.08;
-  const yMax = Math.max(targetNestEgg, Math.min(10000000, computedYMax));
-  const yMin = 0;
-  const line = chartPathWithRange(chartPoints, width, height, yMin, yMax);
-  const area = areaPathWithRange(chartPoints, width, height, yMin, yMax);
-  const targetY = height - ((targetNestEgg - yMin) / (yMax - yMin)) * height;
-  const yTicks = [1, 0.5, 0].map((ratio) => ({
-    value: yMax * ratio,
-    y: height - (height * ratio)
-  }));
-
-  function handleSlider(value) {
-    onMonthlySavingsChange(formatCurrencyInput(value));
-  }
-
-  return (
-    <div className="retirement-projection-panel">
-      <div className="retirement-projection-copy">
-        <span>Projection Curve</span>
-        <strong className={scenarioGap >= 0 ? 'income' : 'expense'}>
-          {scenarioGap >= 0 ? 'On Pace' : 'Below Target'} | {formatMoney(scenarioProjection)}
-        </strong>
-        <em>
-          {scenarioGap >= 0
-            ? `${formatMoney(scenarioGap)} above target at retirement`
-            : `${formatMoney(Math.abs(scenarioGap))} below target at retirement`}
-        </em>
-      </div>
-      <div className="goal-chart-wrap">
-        <div className="retirement-chart-axis-title">Projected Balance</div>
-        <svg className="goal-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Retirement projection">
-          <defs>
-            <linearGradient id="retirementProjectionArea" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.24" />
-              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-          {yTicks.map((tick) => (
-            <g key={tick.y}>
-              <line x1="0" y1={tick.y} x2={width} y2={tick.y} className="retirement-chart-gridline" />
-              <text x="6" y={Math.max(14, tick.y - 6)} className="retirement-chart-axis-label">
-                {formatMoney(tick.value)}
-              </text>
-            </g>
-          ))}
-          <line x1="0" y1={targetY} x2={width} y2={targetY} className="retirement-chart-target-line" />
-          <text x={width - 8} y={Math.max(14, targetY - 6)} textAnchor="end" className="retirement-chart-target-label">
-            Target {formatMoney(targetNestEgg)}
-          </text>
-          <path d={area} fill="url(#retirementProjectionArea)" />
-          <path d={line} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <div className="retirement-chart-age-labels">
-          <span>Age {Math.round(currentAge)}</span>
-          <span>Age {Math.round(retirementAge)}</span>
-        </div>
-        <div className="retirement-chart-x-label">Age</div>
-      </div>
-      <div className="goal-imagine-controls retirement-projection-controls">
-        <AppRangeSlider
-          min="0"
-          max={rangeMax}
-          step="25"
-          hapticStep="25"
-          value={Math.min(rangeMax, Math.max(0, monthlySavings))}
-          onChange={(e) => handleSlider(e.target.value)}
-          aria-label="Retirement savings per month"
-        />
-        <input
-          type="text"
-          value={formatCurrencyInput(monthlySavings)}
-          onChange={(e) => onMonthlySavingsChange(formatCurrencyInput(e.target.value))}
-          inputMode="numeric"
-          aria-label="Retirement savings per month"
-        />
-      </div>
-      <div className="retirement-projection-input-label">Retirement Savings Per Month</div>
     </div>
   );
 }
@@ -1227,7 +744,7 @@ function AccountAllocationRow({ account }) {
   );
 }
 
-function GoalWizard({ goal, accounts, confirm, onClose, onSaved }) {
+function GoalWizard({ goal, accounts, confirm, onClose, onSaved, onDeleted }) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -1399,6 +916,27 @@ function GoalWizard({ goal, accounts, confirm, onClose, onSaved }) {
     }
   }
 
+  async function deleteGoal(close) {
+    if (!goal) return;
+    const ok = await confirm(`Delete "${goal.name}"? Its account allocations will be removed.`, {
+      title: 'Delete goal',
+      confirmLabel: 'Delete',
+      destructive: true
+    });
+    if (!ok) return;
+
+    setSaving(true);
+    setError('');
+    try {
+      await api.del(`/api/goals/${goal.id}`);
+      close({ animation: 'zoom' });
+      setTimeout(() => onDeleted(), 180);
+    } catch (err) {
+      setError(err.message || 'Delete failed');
+      setSaving(false);
+    }
+  }
+
   return (
     <AnimatedModal onClose={onClose} size="lg" animation="zoom">
       {({ close }) => (
@@ -1539,19 +1077,26 @@ function GoalWizard({ goal, accounts, confirm, onClose, onSaved }) {
 
           {error && <div className="error">{error}</div>}
 
-          <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={step === 0 ? close : () => setStep((value) => value - 1)}>
-              {step === 0 ? 'Cancel' : 'Back'}
-            </button>
-            {step < 2 ? (
-              <button type="button" className="btn-primary" onClick={goNext}>
-                Next
-              </button>
-            ) : (
-              <button type="button" className="btn-primary" onClick={() => save(close)} disabled={saving}>
-                {saving ? 'Saving...' : goal ? 'Save goal' : 'Create goal'}
+          <div className={`modal-actions goal-wizard-actions ${goal ? 'has-danger' : ''}`}>
+            {goal && (
+              <button type="button" className="btn-danger" onClick={() => deleteGoal(close)} disabled={saving}>
+                Delete Goal
               </button>
             )}
+            <div className="goal-wizard-primary-actions">
+              <button type="button" className="btn-secondary" onClick={step === 0 ? close : () => setStep((value) => value - 1)} disabled={saving}>
+                {step === 0 ? 'Cancel' : 'Back'}
+              </button>
+              {step < 2 ? (
+                <button type="button" className="btn-primary" onClick={goNext} disabled={saving}>
+                  Next
+                </button>
+              ) : (
+                <button type="button" className="btn-primary" onClick={() => save(close)} disabled={saving}>
+                  {saving ? 'Saving...' : goal ? 'Save goal' : 'Create goal'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

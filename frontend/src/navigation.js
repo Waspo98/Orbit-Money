@@ -45,8 +45,16 @@ export const ROUTES = [
   },
   {
     path: '/goals',
-    label: 'Goals',
+    label: 'Savings Goals',
     description: 'Track savings targets',
+    icon: 'goals',
+    nav: 'more',
+    hasPageHero: true
+  },
+  {
+    path: '/retirement-calculator',
+    label: 'Retirement Calculator',
+    description: 'Project retirement age, savings, and income',
     icon: 'goals',
     nav: 'more',
     hasPageHero: true
