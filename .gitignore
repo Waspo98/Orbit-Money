@@ -5,6 +5,8 @@
 # Dependencies
 node_modules/
 .tools/
+Server_info.md
+*local-notes*.md
 
 # Build output
 dist/

@@ -17,4 +17,4 @@ jobs:
     steps:
       - name: Deploy beta on home server
         shell: cmd
-        run: call "C:\Docker\Compose\Orbit Money\Orbit Money Beta\deploy-beta.cmd"
+        run: call "C:\Docker\Compose\Orbit Money\deploy\beta\deploy-beta.cmd"
