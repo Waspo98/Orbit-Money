@@ -6532,6 +6532,13 @@ input, textarea, select {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.retcalc-bridge-copy {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .retcalc-member-list,
 .retcalc-account-list {
   display: grid;
