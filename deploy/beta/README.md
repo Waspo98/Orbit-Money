@@ -16,13 +16,23 @@ for shared secrets. It overrides:
 - `SESSION_NAME=orbit_beta.sid` so local beta and production browser sessions do not collide.
 - `SEED_DEMO_DATA=1` so a fresh beta volume starts with demo data.
 
-Run from this folder:
+Beta is Docker-only. Do not run beta through Vite, a local preview server, or a
+`start-beta` helper. The supported path always rebuilds and restarts the
+`orbit-money-beta` Docker container.
+
+Run from the project root:
+
+```bat
+scripts\deploy-beta.cmd
+```
+
+Or run the underlying maintainer script from this folder:
 
 ```bat
 deploy-beta.cmd
 ```
 
-Or run from the project root:
+That script ultimately runs:
 
 ```bat
 docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta up --build -d

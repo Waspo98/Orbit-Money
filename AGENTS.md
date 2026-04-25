@@ -65,6 +65,12 @@
 - Public-facing services must stay compatible with the existing Docker/network setup.
 - Update docs when behavior changes.
 - If storage or backup behavior changes, flag it clearly.
+- Beta is Docker-only. When asked to deploy beta, use
+  `cmd /c scripts\deploy-beta.cmd` from the repo root, which delegates to
+  `deploy\beta\deploy-beta.cmd` and runs Docker Compose project
+  `orbitmoney-beta` on host port `5019`.
+- Do not use a Vite dev server, local preview server, or `start-beta` helper for
+  beta. There is intentionally no supported non-Docker beta deployment path.
 
 ## Versioning and releases
 - Do not bump the app version for routine rebuilds, beta deploys, live deploys,

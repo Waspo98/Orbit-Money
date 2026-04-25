@@ -122,8 +122,12 @@ app. It lives in `deploy/beta/`, builds from this repo root, and runs a separate
 Docker container and volume:
 
 ```powershell
-docker compose -f deploy\beta\docker-compose.yml -p orbitmoney-beta up --build -d
+cmd /c scripts\deploy-beta.cmd
 ```
+
+Beta is always deployed through Docker. Do not use a Vite dev server, preview
+server, or `start-beta` helper for beta; the supported beta path rebuilds and
+restarts the `orbit-money-beta` Docker container on port `5019`.
 
 See `deploy/beta/README.md` for the beta port, volume, demo-data behavior, and
 maintainer deploy script.
@@ -168,7 +172,8 @@ This repo includes optional GitHub Actions workflows for the maintainer's
 self-hosted Windows runner:
 
 - Pushes to `main` call `scripts\deploy-live.cmd`
-- Pushes to `Beta` call `deploy\beta\deploy-beta.cmd`
+- Pushes to `Beta` call `scripts\deploy-beta.cmd`, which delegates to
+  `deploy\beta\deploy-beta.cmd`
 
 Those workflows are specific to the maintainer's server checkout and Docker
 host. Self-hosters do not need GitHub Actions to run the app.
