@@ -6227,20 +6227,43 @@ input, textarea, select {
 
 .retirement-calculator-view > .error,
 .retirement-calculator-view > .center-loading,
-.retcalc-answer-card,
-.retcalc-grid {
+.retcalc-workbench-card,
+.retcalc-audit-list {
   width: min(1120px, calc(100% - 32px));
   margin-left: auto;
   margin-right: auto;
 }
 
-.retcalc-answer-card {
+.retcalc-sticky-summary {
+  display: none;
+}
+
+.retcalc-workbench-card {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 18px;
+}
+
+.retcalc-workbench-top {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 128px;
   align-items: center;
   gap: 18px;
-  margin-bottom: 14px;
-  padding: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.retcalc-workbench-body {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.82fr) minmax(0, 1.18fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.retcalc-control-panel,
+.retcalc-projection-panel {
+  min-width: 0;
 }
 
 .retcalc-answer-main {
@@ -6315,26 +6338,10 @@ input, textarea, select {
   transform: translateY(16px);
 }
 
-.retcalc-grid {
+.retcalc-audit-list {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
+  gap: 10px;
   margin-bottom: 112px;
-}
-
-@media (min-width: 920px) {
-  .retcalc-grid {
-    grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.2fr);
-    align-items: start;
-  }
-
-  .retcalc-chart-card {
-    grid-row: span 2;
-  }
-
-  .retcalc-bridge-card {
-    grid-column: 1 / -1;
-  }
 }
 
 .retcalc-control-bar {
@@ -6590,6 +6597,67 @@ input, textarea, select {
   line-height: 1.45;
 }
 
+.retcalc-audit-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.retcalc-audit-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.retcalc-audit-toggle {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.retcalc-audit-toggle > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.retcalc-audit-toggle strong {
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 780;
+}
+
+.retcalc-audit-toggle em {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.retcalc-audit-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.retcalc-audit-body {
+  padding: 0 16px 16px;
+}
+
 .retcalc-member-list,
 .retcalc-account-list {
   display: grid;
@@ -6681,8 +6749,61 @@ input, textarea, select {
   color: var(--income);
 }
 
+@media (max-width: 920px) {
+  .retcalc-workbench-body {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 720px) {
-  .retcalc-answer-card {
+  .retcalc-sticky-summary {
+    position: sticky;
+    top: 0;
+    z-index: 12;
+    width: min(100% - 24px, 680px);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    margin: -4px auto 10px;
+    padding: 9px 12px;
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(16px);
+  }
+
+  .retcalc-sticky-summary span,
+  .retcalc-sticky-summary em {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-style: normal;
+    font-weight: 750;
+    white-space: nowrap;
+  }
+
+  .retcalc-sticky-summary strong {
+    min-width: 0;
+    color: var(--text);
+    font-size: 0.98rem;
+    font-weight: 820;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .retcalc-sticky-summary em.income {
+    color: var(--income);
+  }
+
+  .retcalc-sticky-summary em.expense {
+    color: var(--danger);
+  }
+
+  .retcalc-workbench-top {
     grid-template-columns: 1fr;
     align-items: start;
   }
@@ -6716,17 +6837,27 @@ input, textarea, select {
     align-items: stretch;
     flex-direction: column;
   }
+
+  .retcalc-audit-header {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .retcalc-audit-action {
+    justify-content: flex-start;
+    padding-left: 40px;
+  }
 }
 
 @media (max-width: 460px) {
   .retirement-calculator-view > .error,
   .retirement-calculator-view > .center-loading,
-  .retcalc-answer-card,
-  .retcalc-grid {
+  .retcalc-workbench-card,
+  .retcalc-audit-list {
     width: min(100% - 24px, 680px);
   }
 
-  .retcalc-answer-card {
+  .retcalc-workbench-card {
     padding: 14px;
   }
 

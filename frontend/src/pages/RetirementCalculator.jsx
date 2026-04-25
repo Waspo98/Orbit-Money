@@ -180,6 +180,11 @@ export default function RetirementCalculator() {
   const [goals, setGoals] = useState([]);
   const [mode, setMode] = useState('have');
   const [editingAssumptions, setEditingAssumptions] = useState(false);
+  const [openSections, setOpenSections] = useState({
+    hsa: false,
+    household: false,
+    accounts: false
+  });
   const [values, setValues] = useState({
     currentAge: '',
     retirementAge: 67,
@@ -356,6 +361,10 @@ export default function RetirementCalculator() {
     }));
   }
 
+  function toggleSection(section) {
+    setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  }
+
   const heroStats = [
     { label: 'Projected', value: formatMoney(model.projectedBalance), tone: model.gap >= 0 ? 'income' : 'expense' },
     { label: 'Target', value: formatMoney(model.targetNestEgg) },
@@ -392,188 +401,202 @@ export default function RetirementCalculator() {
 
       {error && <div className="error">{error}</div>}
 
-      <section className="dashboard-card retcalc-answer-card">
-        <div className="retcalc-answer-main">
-          <span className="retcalc-eyebrow">At age {Math.round(model.retirementAge)}</span>
-          <strong>{formatMoney(model.projectedBalance)}</strong>
-          <em className={model.gap >= 0 ? 'income' : 'expense'}>
-            {model.gap >= 0
-              ? `${formatMoney(model.gap)} above target`
-              : `${formatMoney(Math.abs(model.gap))} below target`}
-          </em>
+      <div className="retcalc-sticky-summary" aria-label="Retirement summary">
+        <span>Age {Math.round(model.retirementAge)}</span>
+        <strong>{formatMoney(model.projectedBalance)}</strong>
+        <em className={model.gap >= 0 ? 'income' : 'expense'}>{Math.round(model.readiness)}% Ready</em>
+      </div>
+
+      <section className="dashboard-card retcalc-workbench-card">
+        <div className="retcalc-workbench-top">
+          <div className="retcalc-answer-main">
+            <span className="retcalc-eyebrow">At age {Math.round(model.retirementAge)}</span>
+            <strong>{formatMoney(model.projectedBalance)}</strong>
+            <em className={model.gap >= 0 ? 'income' : 'expense'}>
+              {model.gap >= 0
+                ? `${formatMoney(model.gap)} above target`
+                : `${formatMoney(Math.abs(model.gap))} below target`}
+            </em>
+          </div>
+          <div className="retcalc-readiness" style={{ '--retcalc-progress': `${Math.min(100, model.readiness)}%` }}>
+            <span>{Math.round(model.readiness)}%</span>
+            <em>Ready</em>
+          </div>
         </div>
-        <div className="retcalc-readiness" style={{ '--retcalc-progress': `${Math.min(100, model.readiness)}%` }}>
-          <span>{Math.round(model.readiness)}%</span>
-          <em>Ready</em>
+
+        <div className="retcalc-workbench-body">
+          <div className="retcalc-control-panel">
+            <div className="retcalc-control-bar">
+              <button type="button" className="dashboard-card-link button-link" onClick={() => setEditingAssumptions(true)}>
+                Edit Assumptions
+              </button>
+            </div>
+            <div className="housing-segmented retcalc-mode-tabs" role="tablist" aria-label="Retirement calculator question">
+              {[
+                ['have', 'What Will We Have?'],
+                ['when', 'When Can We Retire?'],
+                ['save', 'How Much To Save?']
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={mode === key ? 'active' : ''}
+                  onClick={() => setMode(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {mode === 'have' && (
+              <div className="retcalc-lever-stack">
+                <div className="retcalc-question-answer">
+                  <span>Projected at {Math.round(model.retirementAge)}</span>
+                  <strong>{formatMoney(model.projectedBalance)}</strong>
+                  <em className={model.gap >= 0 ? 'income' : 'expense'}>
+                    {model.gap >= 0 ? `${formatMoney(model.gap)} above target` : `${formatMoney(Math.abs(model.gap))} below target`}
+                  </em>
+                </div>
+                <SliderLever
+                  label="Retirement Age"
+                  value={model.retirementAge}
+                  display={String(Math.round(model.retirementAge))}
+                  min={Math.max(40, Math.floor(model.currentAge))}
+                  max="80"
+                  step="1"
+                  onChange={(value) => update('retirementAge', Number(value))}
+                />
+                <MoneyLever
+                  label={`Monthly Savings (Currently ${formatMoney(model.plannedMonthly)})`}
+                  linkTo="/household"
+                  linkLabel="Edit Household"
+                  value={model.monthlySavings}
+                  max={MONTHLY_SAVINGS_MAX}
+                  onChange={(value) => update('monthlySavings', formatCurrencyInput(value))}
+                />
+                <MoneyLever
+                  label="Retirement Spending"
+                  value={model.annualSpending}
+                  suffix="/yr"
+                  max={Math.max(60000, Math.ceil((model.baselineSpending * 1.6 || 100000) / 10000) * 10000)}
+                  step="1000"
+                  onChange={(value) => update('annualSpending', formatCurrencyInput(value))}
+                />
+              </div>
+            )}
+
+            {mode === 'when' && (
+              <div className="retcalc-lever-stack">
+                <div className="retcalc-question-answer">
+                  <span>Earliest target age</span>
+                  <strong>{model.earliest ? model.earliest : 'After 95'}</strong>
+                  <em>{model.earliest ? `${formatMoney(model.monthlySavings)}/mo reaches the target` : `${formatMoney(model.requiredMonthly)}/mo needed by ${Math.round(model.retirementAge)}`}</em>
+                </div>
+                <MoneyLever
+                  label={`Monthly Savings (Currently ${formatMoney(model.plannedMonthly)})`}
+                  linkTo="/household"
+                  linkLabel="Edit Household"
+                  value={model.monthlySavings}
+                  max={MONTHLY_SAVINGS_MAX}
+                  onChange={(value) => update('monthlySavings', formatCurrencyInput(value))}
+                />
+                <MoneyLever
+                  label="Retirement Spending"
+                  value={model.annualSpending}
+                  suffix="/yr"
+                  max={Math.max(60000, Math.ceil((model.baselineSpending * 1.6 || 100000) / 10000) * 10000)}
+                  step="1000"
+                  onChange={(value) => update('annualSpending', formatCurrencyInput(value))}
+                />
+                <SliderLever
+                  label="Current Age"
+                  value={model.currentAge}
+                  display={String(Math.round(model.currentAge))}
+                  min="18"
+                  max={Math.max(80, Math.round(model.retirementAge))}
+                  step="1"
+                  onChange={(value) => update('currentAge', Number(value))}
+                />
+              </div>
+            )}
+
+            {mode === 'save' && (
+              <div className="retcalc-lever-stack">
+                <div className="retcalc-question-answer">
+                  <span>Required savings</span>
+                  <strong>{formatMoney(model.requiredMonthly)}/mo</strong>
+                  <em className={model.savingsGap > 0 ? 'expense' : 'income'}>
+                    {model.savingsGap > 0 ? `${formatMoney(model.savingsGap)}/mo more than current pace` : 'Current pace clears the target'}
+                  </em>
+                </div>
+                <SliderLever
+                  label="Retirement Age"
+                  value={model.retirementAge}
+                  display={String(Math.round(model.retirementAge))}
+                  min={Math.max(40, Math.floor(model.currentAge))}
+                  max="80"
+                  step="1"
+                  onChange={(value) => update('retirementAge', Number(value))}
+                />
+                <MoneyLever
+                  label="Retirement Spending"
+                  value={model.annualSpending}
+                  suffix="/yr"
+                  max={Math.max(60000, Math.ceil((model.baselineSpending * 1.6 || 100000) / 10000) * 10000)}
+                  step="1000"
+                  onChange={(value) => update('annualSpending', formatCurrencyInput(value))}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="retcalc-projection-panel">
+            <header className="dashboard-card-header">
+              <h3>Projection</h3>
+            </header>
+            <RetirementChart model={model} />
+            <div className="retcalc-metric-grid retcalc-chart-summary">
+              <Metric label="Required Monthly" value={`${formatMoney(model.requiredMonthly)}/mo`} detail={model.savingsGap > 0 ? `${formatMoney(model.savingsGap)}/mo gap` : 'Current pace clears target'} tone={model.savingsGap > 0 ? 'expense' : 'income'} />
+              <Metric label="Income at Retirement" value={`${formatMoney(model.projectedAnnualIncome)}/yr`} detail={`${formatPercent(model.withdrawalRate * 100)} withdrawal`} />
+              <Metric label="Earliest Target Age" value={model.earliest ? String(model.earliest) : 'After 95'} detail={`${formatPercent(model.savingsRate)} savings rate`} />
+              <Metric label="Real Return" value={formatPercent(model.realReturn * 100)} detail={`${formatPercent(model.annualReturn * 100)} return minus ${formatPercent(model.inflation * 100)} inflation`} />
+            </div>
+          </div>
         </div>
       </section>
 
-      <div className="retcalc-grid">
-        <section className="dashboard-card retcalc-control-card">
-          <div className="retcalc-control-bar">
-            <button type="button" className="dashboard-card-link button-link" onClick={() => setEditingAssumptions(true)}>
-              Edit Assumptions
-            </button>
-          </div>
-          <div className="housing-segmented retcalc-mode-tabs" role="tablist" aria-label="Retirement calculator question">
-            {[
-              ['have', 'What Will We Have?'],
-              ['when', 'When Can We Retire?'],
-              ['save', 'How Much To Save?']
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                className={mode === key ? 'active' : ''}
-                onClick={() => setMode(key)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {mode === 'have' && (
-            <div className="retcalc-lever-stack">
-              <div className="retcalc-question-answer">
-                <span>Projected at {Math.round(model.retirementAge)}</span>
-                <strong>{formatMoney(model.projectedBalance)}</strong>
-                <em className={model.gap >= 0 ? 'income' : 'expense'}>
-                  {model.gap >= 0 ? `${formatMoney(model.gap)} above target` : `${formatMoney(Math.abs(model.gap))} below target`}
-                </em>
-              </div>
-              <SliderLever
-                label="Retirement Age"
-                value={model.retirementAge}
-                display={String(Math.round(model.retirementAge))}
-                min={Math.max(40, Math.floor(model.currentAge))}
-                max="80"
-                step="1"
-                onChange={(value) => update('retirementAge', Number(value))}
-              />
-              <MoneyLever
-                label={`Monthly Savings (Currently ${formatMoney(model.plannedMonthly)})`}
-                linkTo="/household"
-                linkLabel="Edit Household"
-                value={model.monthlySavings}
-                max={MONTHLY_SAVINGS_MAX}
-                onChange={(value) => update('monthlySavings', formatCurrencyInput(value))}
-              />
-              <MoneyLever
-                label="Retirement Spending"
-                value={model.annualSpending}
-                suffix="/yr"
-                max={Math.max(60000, Math.ceil((model.baselineSpending * 1.6 || 100000) / 10000) * 10000)}
-                step="1000"
-                onChange={(value) => update('annualSpending', formatCurrencyInput(value))}
-              />
-            </div>
-          )}
-
-          {mode === 'when' && (
-            <div className="retcalc-lever-stack">
-              <div className="retcalc-question-answer">
-                <span>Earliest target age</span>
-                <strong>{model.earliest ? model.earliest : 'After 95'}</strong>
-                <em>{model.earliest ? `${formatMoney(model.monthlySavings)}/mo reaches the target` : `${formatMoney(model.requiredMonthly)}/mo needed by ${Math.round(model.retirementAge)}`}</em>
-              </div>
-              <MoneyLever
-                label={`Monthly Savings (Currently ${formatMoney(model.plannedMonthly)})`}
-                linkTo="/household"
-                linkLabel="Edit Household"
-                value={model.monthlySavings}
-                max={MONTHLY_SAVINGS_MAX}
-                onChange={(value) => update('monthlySavings', formatCurrencyInput(value))}
-              />
-              <MoneyLever
-                label="Retirement Spending"
-                value={model.annualSpending}
-                suffix="/yr"
-                max={Math.max(60000, Math.ceil((model.baselineSpending * 1.6 || 100000) / 10000) * 10000)}
-                step="1000"
-                onChange={(value) => update('annualSpending', formatCurrencyInput(value))}
-              />
-              <SliderLever
-                label="Current Age"
-                value={model.currentAge}
-                display={String(Math.round(model.currentAge))}
-                min="18"
-                max={Math.max(80, Math.round(model.retirementAge))}
-                step="1"
-                onChange={(value) => update('currentAge', Number(value))}
-              />
-            </div>
-          )}
-
-          {mode === 'save' && (
-            <div className="retcalc-lever-stack">
-              <div className="retcalc-question-answer">
-                <span>Required savings</span>
-                <strong>{formatMoney(model.requiredMonthly)}/mo</strong>
-                <em className={model.savingsGap > 0 ? 'expense' : 'income'}>
-                  {model.savingsGap > 0 ? `${formatMoney(model.savingsGap)}/mo more than current pace` : 'Current pace clears the target'}
-                </em>
-              </div>
-              <SliderLever
-                label="Retirement Age"
-                value={model.retirementAge}
-                display={String(Math.round(model.retirementAge))}
-                min={Math.max(40, Math.floor(model.currentAge))}
-                max="80"
-                step="1"
-                onChange={(value) => update('retirementAge', Number(value))}
-              />
-              <MoneyLever
-                label="Retirement Spending"
-                value={model.annualSpending}
-                suffix="/yr"
-                max={Math.max(60000, Math.ceil((model.baselineSpending * 1.6 || 100000) / 10000) * 10000)}
-                step="1000"
-                onChange={(value) => update('annualSpending', formatCurrencyInput(value))}
-              />
-            </div>
-          )}
-        </section>
-
-        <section className="dashboard-card retcalc-chart-card">
-          <header className="dashboard-card-header">
-            <h3>Projection</h3>
-          </header>
-          <RetirementChart model={model} />
-          <div className="retcalc-metric-grid retcalc-chart-summary">
-            <Metric label="Required Monthly" value={`${formatMoney(model.requiredMonthly)}/mo`} detail={model.savingsGap > 0 ? `${formatMoney(model.savingsGap)}/mo gap` : 'Current pace clears target'} tone={model.savingsGap > 0 ? 'expense' : 'income'} />
-            <Metric label="Income at Retirement" value={`${formatMoney(model.projectedAnnualIncome)}/yr`} detail={`${formatPercent(model.withdrawalRate * 100)} withdrawal`} />
-            <Metric label="Earliest Target Age" value={model.earliest ? String(model.earliest) : 'After 95'} detail={`${formatPercent(model.savingsRate)} savings rate`} />
-            <Metric label="Real Return" value={formatPercent(model.realReturn * 100)} detail={`${formatPercent(model.annualReturn * 100)} return minus ${formatPercent(model.inflation * 100)} inflation`} />
-          </div>
-        </section>
-
-        <section className="dashboard-card retcalc-bridge-card">
-          <header className="dashboard-card-header">
-            <h3>How HSA Counts</h3>
-          </header>
+      <div className="retcalc-audit-list">
+        <AuditSection
+          title="How HSA Counts"
+          summary={`${formatMoney(model.projectedHsaAtRetirement)} projected HSA portion`}
+          open={openSections.hsa}
+          onToggle={() => toggleSection('hsa')}
+        >
           <p className="retcalc-bridge-copy">
-            The big projection includes your HSA. This section separates it because before age 65, HSA money is mostly
-            for qualified medical expenses; the bridge check asks whether your other retirement money can cover general
-            spending until then.
+            The top projection includes your HSA. Before age 65, this check also separates the HSA from the rest of
+            retirement savings, because non-HSA money usually needs to cover general living expenses until HSA access
+            is simpler.
           </p>
           <div className="retcalc-bridge-editor">
             <Metric label="Current HSA Inputs" value={formatMoney(model.hsaBalance)} detail={`${formatMoney(model.hsaMonthlyForProjection)}/mo HSA contributions`} />
-            <Metric label="Top Number Includes HSA" value={formatMoney(model.projectedHsaAtRetirement)} detail="Projected HSA portion at retirement" />
-            <Metric label="Other Money at Retirement" value={formatMoney(model.nonHsaAtRetirement)} detail="Used for the pre-65 bridge check" />
+            <Metric label="HSA in Top Number" value={formatMoney(model.projectedHsaAtRetirement)} detail="Projected HSA portion at retirement" />
+            <Metric label="Non-HSA at Retirement" value={formatMoney(model.nonHsaAtRetirement)} detail="Used for the pre-65 bridge check" />
             <Metric
-              label="If Retiring Before 65"
+              label="Before Age 65"
               value={model.hsaBridgeStatus}
               detail={model.hsaBridgeDetail}
               tone={model.bridgeGap >= 0 ? 'income' : 'expense'}
             />
           </div>
-        </section>
+        </AuditSection>
 
-        <section className="dashboard-card retcalc-household-card">
-          <header className="dashboard-card-header">
-            <h3>Household Inputs</h3>
-            <Link to="/household" className="dashboard-card-link">Edit Household</Link>
-          </header>
+        <AuditSection
+          title="Household Inputs"
+          summary={`${formatMoney(model.plannedMonthly)}/mo planned savings`}
+          action={<Link to="/household" className="dashboard-card-link">Edit Household</Link>}
+          open={openSections.household}
+          onToggle={() => toggleSection('household')}
+        >
           <div className="retcalc-member-list">
             {model.members.length === 0 ? (
               <p className="subtle">Add household income and retirement details to fill this automatically.</p>
@@ -587,13 +610,15 @@ export default function RetirementCalculator() {
               </div>
             ))}
           </div>
-        </section>
+        </AuditSection>
 
-        <section className="dashboard-card retcalc-accounts-card">
-          <header className="dashboard-card-header">
-            <h3>Retirement Accounts</h3>
-            <Link to="/accounts" className="dashboard-card-link">View Accounts</Link>
-          </header>
+        <AuditSection
+          title="Retirement Accounts"
+          summary={`${formatMoney(model.currentBalance)} across ${model.accounts.length} accounts`}
+          action={<Link to="/accounts" className="dashboard-card-link">View Accounts</Link>}
+          open={openSections.accounts}
+          onToggle={() => toggleSection('accounts')}
+        >
           {model.accounts.length === 0 ? (
             <p className="subtle">Link retirement accounts from Household to include balances here.</p>
           ) : (
@@ -627,7 +652,7 @@ export default function RetirementCalculator() {
               </div>
             </>
           )}
-        </section>
+        </AuditSection>
       </div>
 
       {editingAssumptions && (
@@ -757,6 +782,31 @@ function Metric({ label, value, detail, tone = '' }) {
       <strong>{value}</strong>
       <em>{detail}</em>
     </div>
+  );
+}
+
+function AuditSection({ title, summary, action, open, onToggle, children }) {
+  return (
+    <section className={`dashboard-card retcalc-audit-card ${open ? 'open' : ''}`.trim()}>
+      <div className="retcalc-audit-header">
+        <button
+          type="button"
+          className="retcalc-audit-toggle"
+          onClick={onToggle}
+          aria-expanded={open}
+        >
+          <span>
+            <strong>{title}</strong>
+            <em>{summary}</em>
+          </span>
+          <span className={`collapse-indicator ${open ? 'expanded' : ''}`.trim()} aria-hidden="true">
+            <span className="collapse-indicator-chevron" />
+          </span>
+        </button>
+        {action && <div className="retcalc-audit-action">{action}</div>}
+      </div>
+      {open && <div className="retcalc-audit-body">{children}</div>}
+    </section>
   );
 }
 
