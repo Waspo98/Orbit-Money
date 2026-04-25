@@ -284,6 +284,15 @@ export default function RetirementCalculator() {
     const bridgeYears = Math.max(0, hsaAccessAge - retirementAge);
     const bridgeNeed = bridgeYears * annualSpending;
     const bridgeGap = bridgeNeed > 0 ? nonHsaAtRetirement - bridgeNeed : nonHsaAtRetirement;
+    const needsHsaBridge = retirementAge < hsaAccessAge;
+    const hsaBridgeStatus = !needsHsaBridge
+      ? 'Not Needed'
+      : bridgeGap >= 0
+        ? 'Covered'
+        : `${formatMoney(Math.abs(bridgeGap))} Short`;
+    const hsaBridgeDetail = !needsHsaBridge
+      ? 'Retirement age is 65 or later'
+      : `${formatMoney(bridgeNeed)} estimated spending before 65`;
 
     return {
       accounts,
@@ -305,6 +314,8 @@ export default function RetirementCalculator() {
       hsaAccessAge,
       hsaAnnual,
       hsaBalance,
+      hsaBridgeDetail,
+      hsaBridgeStatus,
       hsaMonthly,
       hsaMonthlyForProjection,
       inflation,
@@ -538,16 +549,21 @@ export default function RetirementCalculator() {
 
         <section className="dashboard-card retcalc-bridge-card">
           <header className="dashboard-card-header">
-            <h3>HSA Retirement Check</h3>
+            <h3>How HSA Counts</h3>
           </header>
+          <p className="retcalc-bridge-copy">
+            The big projection includes your HSA. This section separates it because before age 65, HSA money is mostly
+            for qualified medical expenses; the bridge check asks whether your other retirement money can cover general
+            spending until then.
+          </p>
           <div className="retcalc-bridge-editor">
-            <Metric label="HSA Balance" value={formatMoney(model.hsaBalance)} detail={`${formatMoney(model.hsaAnnual)}/yr contributions`} />
-            <Metric label="HSA at Retirement" value={formatMoney(model.projectedHsaAtRetirement)} detail={`${formatMoney(model.hsaMonthlyForProjection)}/mo into HSA`} />
-            <Metric label="Non-HSA at Retirement" value={formatMoney(model.nonHsaAtRetirement)} detail={`Before age ${Math.round(model.hsaAccessAge)}`} />
+            <Metric label="Current HSA Inputs" value={formatMoney(model.hsaBalance)} detail={`${formatMoney(model.hsaMonthlyForProjection)}/mo HSA contributions`} />
+            <Metric label="Top Number Includes HSA" value={formatMoney(model.projectedHsaAtRetirement)} detail="Projected HSA portion at retirement" />
+            <Metric label="Other Money at Retirement" value={formatMoney(model.nonHsaAtRetirement)} detail="Used for the pre-65 bridge check" />
             <Metric
-              label="Bridge"
-              value={model.retirementAge >= model.hsaAccessAge ? 'Clear' : formatMoney(Math.abs(model.bridgeGap))}
-              detail={model.retirementAge >= model.hsaAccessAge ? 'HSA is accessible' : `${Math.round(model.bridgeYears)} years before HSA access`}
+              label="If Retiring Before 65"
+              value={model.hsaBridgeStatus}
+              detail={model.hsaBridgeDetail}
               tone={model.bridgeGap >= 0 ? 'income' : 'expense'}
             />
           </div>
