@@ -173,13 +173,16 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Endpoints: GET `/api/household`, POST `/api/household/members`, PUT `/api/household/members/:id`, POST `/api/household/members/:id/income-records`, DELETE `/api/household/members/:id`
 
 ### Dashboard
-Multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column grid on foldable/tablet widths (≥640px) with Recent Activity spanning full width. Data comes from parallel calls to existing endpoints — no dashboard-specific backend.
+Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column grid on foldable/tablet widths (≥640px), with Recent Activity spanning full width. The `Customize My Dashboard` button opens one modal list where every dashboard card has a visibility toggle and drag handle. Layout and dashboard-only hidden biggest transactions are persisted in `localStorage`; no dashboard-specific backend or schema is used.
 
 - **Accounts card:** net worth (active balances plus mortgage estimated-value equity), breakdown by group (Cash = checking+savings+cash, Investments, Credit cards, Loans, Real Estate, Other). Rows with zero balance are hidden.
 - **This month card:** Day X of Y + compact Income / Expenses / Net trio
-- **Budget pulse card:** overall progress bar + up to 3 "attention" categories (over-budget first, then 85%+), or a success message when all are on track
+- **Budget pulse card:** overall progress bar + daily spend pace + up to 5 "attention" categories (over-budget first, then 85%+), or a success message when all are on track
 - **Top spending card:** up to 7 categories with horizontal bars scaled to the biggest spender; bars use each category's color
-- **Recent activity card:** last 10 transactions, tap-to-navigate to full Transactions page
+- **Biggest transactions card:** top 5 largest transactions from the fetched dashboard transaction pool. `Hide From Card` is dashboard-only and does not set the transaction ignored flag used by budgets/reports.
+- **Subscriptions / Recurring and Upcoming cards:** derive likely monthly recurring merchants from recent transaction history without writing recurring rules.
+- **Uncategorized, Month vs Last Month, Goals Progress, Goal Focus, Retirement Snapshot, MHA Tracker Summary, Mortgage Snapshot, Needs Attention:** reuse existing route data from Transactions, Budgets, Goals, Household, MHA, and Accounts.
+- **Recent activity card:** last 10 transactions with the shared `TransactionRow` actions
 - Shimmer skeleton loading per card
 - Empty state routes new users to Settings, where Rocket Money import and SimpleFIN setup live
 
