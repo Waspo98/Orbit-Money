@@ -612,7 +612,7 @@ export default function Settings({
 
       <section className="settings-section settings-about-section" aria-labelledby="settings-about-title">
         <div className="settings-about-brand">
-          <img src="/icon.svg" alt="" className="settings-about-icon" />
+          <img src="/icon-512.png" alt="" className="settings-about-icon" />
           <div>
             <h3 id="settings-about-title">Orbit Money</h3>
             <p>Personal finance PWA</p>
