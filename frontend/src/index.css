@@ -2827,6 +2827,19 @@ input, textarea, select {
   margin: 0;
 }
 
+.dash-top-amount {
+  display: inline-grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.dash-top-amount em {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
 .dash-stat-stack {
   display: grid;
   gap: 10px;
@@ -2898,6 +2911,60 @@ input, textarea, select {
   color: var(--text-muted);
   font-size: 0.8rem;
   font-style: normal;
+}
+
+.dash-month-compare-table {
+  display: grid;
+  gap: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.dash-month-compare-head,
+.dash-month-compare-row {
+  display: grid;
+  grid-template-columns: minmax(82px, 1fr) repeat(3, minmax(72px, auto));
+  gap: 8px;
+  align-items: baseline;
+  min-width: 360px;
+}
+
+.dash-month-compare-head {
+  padding-bottom: 8px;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dash-month-compare-row {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.dash-month-compare-row span {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.dash-month-compare-row strong,
+.dash-month-compare-row em {
+  color: var(--text);
+  font-size: 0.9rem;
+  font-style: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dash-month-compare-row em.income {
+  color: var(--income);
+}
+
+.dash-month-compare-row em.expense {
+  color: var(--expense);
 }
 
 .dash-goal-total {
@@ -2994,6 +3061,11 @@ input, textarea, select {
 }
 
 .dashboard-customize-list {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-goal-picker-list {
   display: grid;
   gap: 8px;
 }
@@ -6959,6 +7031,24 @@ input, textarea, select {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+.retcalc-preset-row .btn-secondary.active {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.retcalc-assumption-group {
+  display: grid;
+  gap: 8px;
+}
+
+.retcalc-assumption-group > span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .retcalc-assumption-modal {

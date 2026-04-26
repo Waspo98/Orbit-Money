@@ -34,13 +34,26 @@ const PRESETS = {
     inflation: '2.5%',
     withdrawalRate: '4%'
   },
-  growth: {
-    label: 'Growth',
+  aggressive: {
+    label: 'Aggressive',
     annualReturn: '8.5%',
     inflation: '2.25%',
     withdrawalRate: '4.25%'
   }
 };
+const RETIREMENT_PREFS_STORAGE_KEY = 'orbit-money-retirement-preferences-v1';
+
+function readRetirementPreferences() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RETIREMENT_PREFS_STORAGE_KEY));
+    return {
+      retirementAge: Number(saved?.retirementAge) || 67,
+      presetKey: PRESETS[saved?.presetKey] ? saved.presetKey : 'balanced'
+    };
+  } catch {
+    return { retirementAge: 67, presetKey: 'balanced' };
+  }
+}
 
 const MONTHLY_SAVINGS_MAX = 10000;
 
@@ -174,6 +187,8 @@ function mixForAccounts(accounts) {
 }
 
 export default function RetirementCalculator() {
+  const savedPreferences = useMemo(readRetirementPreferences, []);
+  const initialPreset = PRESETS[savedPreferences.presetKey] || PRESETS.balanced;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [household, setHousehold] = useState(null);
@@ -185,14 +200,15 @@ export default function RetirementCalculator() {
     household: false,
     accounts: false
   });
+  const [preferredPresetKey, setPreferredPresetKey] = useState(savedPreferences.presetKey);
   const [values, setValues] = useState({
     currentAge: '',
-    retirementAge: 67,
+    retirementAge: savedPreferences.retirementAge,
     monthlySavings: '',
     annualSpending: '',
-    annualReturn: PRESETS.balanced.annualReturn,
-    inflation: PRESETS.balanced.inflation,
-    withdrawalRate: PRESETS.balanced.withdrawalRate
+    annualReturn: initialPreset.annualReturn,
+    inflation: initialPreset.inflation,
+    withdrawalRate: initialPreset.withdrawalRate
   });
 
   useEffect(() => {
@@ -219,6 +235,20 @@ export default function RetirementCalculator() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        RETIREMENT_PREFS_STORAGE_KEY,
+        JSON.stringify({
+          retirementAge: Number(values.retirementAge) || 67,
+          presetKey: preferredPresetKey
+        })
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [preferredPresetKey, values.retirementAge]);
 
   const model = useMemo(() => {
     const members = household?.members || [];
@@ -353,6 +383,7 @@ export default function RetirementCalculator() {
   function applyPreset(presetKey) {
     const preset = PRESETS[presetKey];
     if (!preset) return;
+    setPreferredPresetKey(presetKey);
     setValues((prev) => ({
       ...prev,
       annualReturn: preset.annualReturn,
@@ -662,12 +693,29 @@ export default function RetirementCalculator() {
               <header className="dashboard-card-header">
                 <h3>Assumptions</h3>
               </header>
-              <div className="retcalc-preset-row">
-                {Object.entries(PRESETS).map(([key, preset]) => (
-                  <button key={key} type="button" className="btn-secondary" onClick={() => applyPreset(key)}>
-                    {preset.label}
-                  </button>
-                ))}
+              <SliderLever
+                label="Preferred Retirement Age"
+                value={values.retirementAge}
+                display={String(Math.round(Number(values.retirementAge) || 67))}
+                min={Math.max(40, Math.floor(model.currentAge))}
+                max="80"
+                step="1"
+                onChange={(value) => update('retirementAge', Number(value))}
+              />
+              <div className="retcalc-assumption-group">
+                <span>Default Growth Estimator</span>
+                <div className="retcalc-preset-row">
+                  {Object.entries(PRESETS).map(([key, preset]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`btn-secondary ${preferredPresetKey === key ? 'active' : ''}`}
+                      onClick={() => applyPreset(key)}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="retcalc-assumption-grid">
                 <PercentLever

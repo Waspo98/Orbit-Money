@@ -15,6 +15,7 @@ import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import SelectableListItem from '../components/SelectableListItem.jsx';
 import {
   useDragInteractionLock,
   useReorderSensors
@@ -54,12 +55,6 @@ import {
 // otherwise, the displayed groups may look off but net worth is still
 // the literal sum.
 // ============================================================================
-
-function formatSignedCompact(n) {
-  if (n === 0) return formatCompactCurrency(0);
-  const compact = formatCompactCurrency(Math.abs(n));
-  return n < 0 ? `-${compact}` : `+${compact}`;
-}
 
 function formatLongDate(d) {
   return d.toLocaleDateString(undefined, {
@@ -104,6 +99,13 @@ const CREDIT_TYPES = new Set(['credit']);
 const LOAN_TYPES = new Set(['loan']);
 const DASHBOARD_LAYOUT_STORAGE_KEY = 'orbit-money-dashboard-layout-v2';
 const BIGGEST_TRANSACTIONS_HIDDEN_KEY = 'orbit-money-biggest-transactions-hidden-v1';
+const GOAL_FOCUS_STORAGE_KEY = 'orbit-money-dashboard-goal-focus-v1';
+const RETIREMENT_PREFS_STORAGE_KEY = 'orbit-money-retirement-preferences-v1';
+const DASHBOARD_RETIREMENT_PRESETS = {
+  conservative: { label: 'Conservative', annualReturn: 0.05, inflation: 0.03 },
+  balanced: { label: 'Balanced', annualReturn: 0.07, inflation: 0.025 },
+  aggressive: { label: 'Aggressive', annualReturn: 0.085, inflation: 0.0225 }
+};
 
 const DASHBOARD_CARD_DEFS = [
   {
@@ -177,11 +179,6 @@ const DASHBOARD_CARD_DEFS = [
     description: 'Home value, balance, and equity.'
   },
   {
-    id: 'needs-attention',
-    title: 'Needs Attention',
-    description: 'A combined list of dashboard follow-ups.'
-  },
-  {
     id: 'recent-activity',
     title: 'Recent Transactions',
     description: 'Latest activity with full transaction actions.'
@@ -221,6 +218,27 @@ function readHiddenBiggestTransactions() {
     return Array.isArray(saved) ? saved.map(Number).filter(Number.isFinite) : [];
   } catch {
     return [];
+  }
+}
+
+function readGoalFocusId() {
+  try {
+    const value = Number(localStorage.getItem(GOAL_FOCUS_STORAGE_KEY));
+    return Number.isFinite(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function readRetirementPreferences() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RETIREMENT_PREFS_STORAGE_KEY));
+    return {
+      retirementAge: Number(saved?.retirementAge) || 67,
+      presetKey: DASHBOARD_RETIREMENT_PRESETS[saved?.presetKey] ? saved.presetKey : 'balanced'
+    };
+  } catch {
+    return { retirementAge: 67, presetKey: 'balanced' };
   }
 }
 
@@ -339,6 +357,64 @@ function buildRecurringGroups(transactions) {
     .sort((a, b) => a.nextDate.localeCompare(b.nextDate));
 }
 
+function ageFromBirthDate(date) {
+  if (!date) return null;
+  const birth = parseDateValue(date);
+  if (!birth) return null;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const hadBirthday =
+    now.getMonth() > birth.getMonth() ||
+    (now.getMonth() === birth.getMonth() && now.getDate() >= birth.getDate());
+  if (!hadBirthday) age -= 1;
+  return age >= 0 ? age : null;
+}
+
+function effectiveMonthlyRate(annualReturn) {
+  const rate = Number(annualReturn) || 0;
+  if (rate <= -1) return -1;
+  return (1 + rate) ** (1 / 12) - 1;
+}
+
+function futureValue(current, monthly, annualReturn, months) {
+  const principal = Number(current) || 0;
+  const contribution = Number(monthly) || 0;
+  const monthCount = Math.max(0, Number(months) || 0);
+  const monthlyReturn = effectiveMonthlyRate(annualReturn);
+  if (monthCount <= 0) return principal;
+  if (Math.abs(monthlyReturn) < 0.000001) {
+    return principal + contribution * monthCount;
+  }
+  return principal * ((1 + monthlyReturn) ** monthCount) +
+    contribution * ((((1 + monthlyReturn) ** monthCount) - 1) / monthlyReturn);
+}
+
+function retirementProjection(householdData, preferences) {
+  const summary = householdData?.summary || {};
+  const members = householdData?.members || [];
+  const currentBalance = Number(summary.retirement_account_balance) || 0;
+  const monthlyContributions =
+    ((Number(summary.employee_retirement_annual) || 0) +
+    (Number(summary.employer_retirement_annual) || 0)) / 12;
+  const currentAge =
+    members
+      .map((member) => ageFromBirthDate(member.birth_date))
+      .filter((age) => age !== null)
+      .sort((a, b) => b - a)[0] ?? 35;
+  const retirementAge = Math.max(currentAge, Number(preferences?.retirementAge) || 67);
+  const preset = DASHBOARD_RETIREMENT_PRESETS[preferences?.presetKey] || DASHBOARD_RETIREMENT_PRESETS.balanced;
+  const realReturn = ((1 + preset.annualReturn) / (1 + preset.inflation)) - 1;
+  const months = Math.max(0, Math.round((retirementAge - currentAge) * 12));
+
+  return {
+    currentBalance,
+    monthlyContributions,
+    projectedBalance: futureValue(currentBalance, monthlyContributions, realReturn, months),
+    preset,
+    retirementAge
+  };
+}
+
 // ============================================================================
 // Main page
 // ============================================================================
@@ -358,6 +434,10 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   const [customizing, setCustomizing] = useState(false);
   const [hiddenBiggestTransactionIds, setHiddenBiggestTransactionIds] = useState(
     readHiddenBiggestTransactions
+  );
+  const [goalFocusId, setGoalFocusId] = useState(readGoalFocusId);
+  const [retirementPreferences, setRetirementPreferences] = useState(
+    readRetirementPreferences
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -419,6 +499,25 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
     }
   }, [hiddenBiggestTransactionIds]);
 
+  useEffect(() => {
+    function handleStorage(event) {
+      if (event.key === RETIREMENT_PREFS_STORAGE_KEY) {
+        setRetirementPreferences(readRetirementPreferences());
+      }
+    }
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (goalFocusId) localStorage.setItem(GOAL_FOCUS_STORAGE_KEY, String(goalFocusId));
+      else localStorage.removeItem(GOAL_FOCUS_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, [goalFocusId]);
+
   const now = new Date();
   const totals = useMemo(() => groupAccountBalances(accounts), [accounts]);
   const activeAccountCount = useMemo(
@@ -447,8 +546,6 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
     combined.sort((a, b) => b.spent - a.spent);
     return combined.slice(0, 7);
   }, [budgetData]);
-
-  const topSpendingMax = topSpending.length > 0 ? topSpending[0].spent : 0;
 
   // --- Budget pulse: attention-needing categories ---------------------------
   const budgetAttention = useMemo(() => {
@@ -482,8 +579,6 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
 
   const dayOfMonth = currentDayOfMonth();
   const totalDays = daysInCurrentMonth();
-  const budgetUsed =
-    overallPercent !== null ? `${Math.round(overallPercent)}%` : 'Not set';
   const daysRemaining = Math.max(0, totalDays - dayOfMonth);
   const dailySpendPace =
     summary && summary.total_budgeted > 0 && daysRemaining > 0
@@ -505,48 +600,6 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
     () => accounts.filter((account) => !account.is_archived && account.type === 'mortgage'),
     [accounts]
   );
-  const needsAttention = useMemo(() => {
-    const rows = [];
-    const uncategorizedCount = Number(uncategorizedData?.total || 0);
-    if (uncategorizedCount > 0) {
-      rows.push({
-        label: 'Uncategorized',
-        detail: `${uncategorizedCount} transaction${uncategorizedCount === 1 ? '' : 's'}`,
-        to: '/transactions?categories=uncategorized&include_ignored=0&include_transfers=0'
-      });
-    }
-    const overBudget = (budgetData?.budgeted || []).filter(
-      (item) => item.amount > 0 && item.spent > item.amount
-    );
-    if (overBudget.length > 0) {
-      rows.push({
-        label: 'Over Budget',
-        detail: `${overBudget.length} categor${overBudget.length === 1 ? 'y' : 'ies'}`,
-        to: '/budgets'
-      });
-    }
-    const closeBudget = (budgetData?.budgeted || []).filter(
-      (item) => item.amount > 0 && item.spent <= item.amount && item.spent / item.amount >= 0.85
-    );
-    if (closeBudget.length > 0) {
-      rows.push({
-        label: 'Almost Over Budget',
-        detail: `${closeBudget.length} categor${closeBudget.length === 1 ? 'y' : 'ies'}`,
-        to: '/budgets'
-      });
-    }
-    const stalledGoals = (goalsData?.goals || []).filter(
-      (goal) => goal.progress_percent < 100 && goal.eta?.status === 'stalled'
-    );
-    if (stalledGoals.length > 0) {
-      rows.push({
-        label: 'Stalled Goals',
-        detail: `${stalledGoals.length} goal${stalledGoals.length === 1 ? '' : 's'}`,
-        to: '/goals'
-      });
-    }
-    return rows.slice(0, 6);
-  }, [budgetData, goalsData, uncategorizedData]);
   const visibleDashboardCards = dashboardLayout.filter((item) => item.visible);
 
   function hideBiggestTransaction(id) {
@@ -573,7 +626,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
         return (
           <TopSpendingCard
             topSpending={topSpending}
-            max={topSpendingMax}
+            totalSpent={totalSpent}
             loading={loading && !budgetData}
           />
         );
@@ -638,9 +691,22 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
       case 'goals-progress':
         return <GoalsProgressCard goalsData={goalsData} loading={loading && !goalsData} />;
       case 'goal-focus':
-        return <GoalFocusCard goalsData={goalsData} loading={loading && !goalsData} />;
+        return (
+          <GoalFocusCard
+            goalsData={goalsData}
+            selectedGoalId={goalFocusId}
+            onSelectGoal={setGoalFocusId}
+            loading={loading && !goalsData}
+          />
+        );
       case 'retirement':
-        return <RetirementSnapshotCard householdData={householdData} loading={loading && !householdData} />;
+        return (
+          <RetirementSnapshotCard
+            householdData={householdData}
+            preferences={retirementPreferences}
+            loading={loading && !householdData}
+          />
+        );
       case 'mha':
         return <MhaSummaryCard data={mhaData} enabled={mhaTrackerEnabled} loading={loading && !mhaData} />;
       case 'upcoming':
@@ -653,8 +719,6 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
         );
       case 'mortgage':
         return <MortgageSnapshotCard accounts={mortgageAccounts} loading={loading && accounts.length === 0} />;
-      case 'needs-attention':
-        return <NeedsAttentionCard items={needsAttention} loading={loading && !budgetData} />;
       case 'recent-activity':
         return (
           <RecentActivityCard
@@ -681,11 +745,6 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
         <DashboardHero
           dateLabel={formatLongDate(now)}
           greeting={timeGreeting(now)}
-          stats={[
-            { label: 'Net worth', value: formatCurrency(0, { maximumFractionDigits: 0 }) },
-            { label: 'Monthly net', value: formatCompactCurrency(0) },
-            { label: 'Accounts', value: '0' }
-          ]}
         />
         <div className="empty-state">
           <div className="empty-state-icon">$</div>
@@ -720,12 +779,6 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
       <DashboardHero
         dateLabel={formatLongDate(now)}
         greeting={timeGreeting(now)}
-        stats={[
-          { label: 'Net worth', value: formatCurrency(totals.net, { maximumFractionDigits: 0 }), tone: totals.net >= 0 ? 'good' : 'caution' },
-          { label: 'Monthly net', value: summary ? formatSignedCompact(summary.total_net) : 'Loading', tone: summary ? (summary.total_net >= 0 ? 'good' : 'caution') : '' },
-          { label: 'Budget used', value: budgetUsed, tone: overallPercent > 100 ? 'caution' : overallPercent >= 85 ? 'warn' : 'good' },
-          { label: 'Accounts', value: activeAccountCount.toLocaleString() }
-        ]}
       />
 
       {error && <div className="error">{error}</div>}
@@ -759,7 +812,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   );
 }
 
-function DashboardHero({ dateLabel, greeting, stats }) {
+function DashboardHero({ dateLabel, greeting }) {
   const navigate = useNavigate();
 
   return (
@@ -769,7 +822,6 @@ function DashboardHero({ dateLabel, greeting, stats }) {
       kicker="Financial Orbit"
       title="Dashboard"
       subtitle={`${dateLabel} · ${greeting} ${greetingEmoji(new Date())}`}
-      stats={stats}
       initialHeight={420}
       statLabel="Dashboard summary"
       chrome={(hero) => (
@@ -959,7 +1011,7 @@ function BudgetPulseCard({
           />
 
           <div className="dash-mini-stat-row">
-            <span>Daily spend pace</span>
+            <span>Daily Spend Remaining</span>
             <strong className={dailySpendPace !== null && dailySpendPace < 0 ? 'expense' : ''}>
               {dailySpendPace === null
                 ? 'Not set'
@@ -1011,7 +1063,7 @@ function BudgetPulseCard({
 // Top spending card
 // ============================================================================
 
-function TopSpendingCard({ topSpending, max, loading }) {
+function TopSpendingCard({ topSpending, totalSpent, loading }) {
   return (
     <DashboardCard
       title="Top spending this month"
@@ -1029,34 +1081,44 @@ function TopSpendingCard({ topSpending, max, loading }) {
       ) : topSpending.length === 0 ? (
         <p className="subtle" style={{ margin: 0 }}>No spending yet this month.</p>
       ) : (
-        <ul className="dash-top-list">
-          {topSpending.map((item) => {
-            const pct = max > 0 ? (item.spent / max) * 100 : 0;
-            return (
-              <li key={item.category.id} className="dash-top-row">
-                <div className="dash-top-head">
-                  <span
-                    className="dash-top-icon"
-                    style={{ color: item.category.color }}
-                  >
-                    {item.category.icon}
-                  </span>
-                  <span className="dash-top-name">{item.category.name}</span>
-                  <span className="dash-top-amount">{formatCurrency(item.spent)}</span>
-                </div>
-                <div className="dash-top-barwrap">
-                  <div
-                    className="dash-top-bar"
-                    style={{
-                      width: `${pct}%`,
-                      background: item.category.color || 'var(--accent)'
-                    }}
-                  />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <div className="dash-mini-stat-row">
+            <span>Total Spend</span>
+            <strong>{formatCurrency(totalSpent)}</strong>
+            <em>Bars show share of total monthly spend</em>
+          </div>
+          <ul className="dash-top-list">
+            {topSpending.map((item) => {
+              const pct = totalSpent > 0 ? (item.spent / totalSpent) * 100 : 0;
+              return (
+                <li key={item.category.id} className="dash-top-row">
+                  <div className="dash-top-head">
+                    <span
+                      className="dash-top-icon"
+                      style={{ color: item.category.color }}
+                    >
+                      {item.category.icon}
+                    </span>
+                    <span className="dash-top-name">{item.category.name}</span>
+                    <span className="dash-top-amount">
+                      {formatCurrency(item.spent)}
+                      <em>{Math.round(pct)}%</em>
+                    </span>
+                  </div>
+                  <div className="dash-top-barwrap">
+                    <div
+                      className="dash-top-bar"
+                      style={{
+                        width: `${Math.max(2, pct)}%`,
+                        background: item.category.color || 'var(--accent)'
+                      }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </DashboardCard>
   );
@@ -1115,7 +1177,7 @@ function BiggestTransactionsCard({
                   className="dash-inline-action"
                   onClick={() => onHide(txn.id)}
                 >
-                  Hide From Card
+                  Hide From Dashboard
                 </button>
               </div>
             </li>
@@ -1148,20 +1210,25 @@ function RecurringCard({ groups, categoryById, loading }) {
           No recurring expenses detected yet.
         </p>
       ) : (
-        <ul className="dash-compact-list">
-          {groups.map((group) => (
-            <li key={`${group.merchant}-${group.amount}`} className="dash-compact-row">
-              <div className="dash-compact-main">
-                <strong>{group.merchant}</strong>
-                <span>{categoryName(categoryById, group.category_id)} - {group.count} hits</span>
-              </div>
-              <div className="dash-compact-side">
-                <strong className="expense">{formatCurrency(group.amount)}</strong>
-                <em>Next {formatShortDate(group.nextDate)}</em>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="dash-compact-list">
+            {groups.map((group) => (
+              <li key={`${group.merchant}-${group.amount}`} className="dash-compact-row">
+                <div className="dash-compact-main">
+                  <strong>{group.merchant}</strong>
+                  <span>{categoryName(categoryById, group.category_id)} - {group.count} hits</span>
+                </div>
+                <div className="dash-compact-side">
+                  <strong className="expense">{formatCurrency(group.amount)}</strong>
+                  <em>Next {formatShortDate(group.nextDate)}</em>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="dash-card-note">
+            Detected from merchants with 2+ hits across 2+ months, roughly 21-45 days apart.
+          </p>
+        </>
       )}
     </DashboardCard>
   );
@@ -1285,7 +1352,7 @@ function MonthComparisonCard({ month, previousMonth, summary, previousSummary, l
       title="Month vs Last Month"
       action={
         <Link to={transactionMonthUrl(month)} className="dashboard-card-link">
-          {formatShortMonth(month)}
+          Details
         </Link>
       }
     >
@@ -1296,26 +1363,30 @@ function MonthComparisonCard({ month, previousMonth, summary, previousSummary, l
           Need two months of activity to compare.
         </p>
       ) : (
-        <ul className="dash-compare-list">
+        <div className="dash-month-compare-table">
+          <div className="dash-month-compare-head">
+            <span>Metric</span>
+            <strong>{formatShortMonth(month)}</strong>
+            <strong>{formatShortMonth(previousMonth)}</strong>
+            <strong>Change</strong>
+          </div>
           {rows.map((row) => {
             const current = Number(row.current || 0);
             const previous = Number(row.previous || 0);
             const delta = current - previous;
             return (
-              <li key={row.label}>
+              <div key={row.label} className="dash-month-compare-row">
                 <span>{row.label}</span>
                 <strong>{formatCurrency(current)}</strong>
+                <strong>{formatCurrency(previous)}</strong>
                 <em className={delta < 0 ? 'income' : delta > 0 ? 'expense' : ''}>
                   {delta === 0 ? 'No change' : `${delta > 0 ? '+' : ''}${formatCurrency(delta)}`}
                 </em>
-              </li>
+              </div>
             );
           })}
-        </ul>
+        </div>
       )}
-      <p className="dash-card-note">
-        Compared with {formatMonthKeyLabel(previousMonth)}.
-      </p>
     </DashboardCard>
   );
 }
@@ -1366,59 +1437,119 @@ function GoalsProgressCard({ goalsData, loading }) {
   );
 }
 
-function GoalFocusCard({ goalsData, loading }) {
+function GoalFocusCard({ goalsData, selectedGoalId, onSelectGoal, loading }) {
+  const [picking, setPicking] = useState(false);
   const goals = goalsData?.goals || [];
   const goal =
+    goals.find((item) => item.id === selectedGoalId) ||
     goals.find((item) => item.progress_percent < 100 && item.eta?.status === 'stalled') ||
     goals.find((item) => item.progress_percent < 100) ||
     goals[0];
 
   return (
-    <DashboardCard
-      title="Goal Focus"
-      action={<Link to="/goals" className="dashboard-card-link">Open</Link>}
-    >
-      {loading ? (
-        <CardSkeleton />
-      ) : !goal ? (
-        <p className="subtle" style={{ margin: 0 }}>
-          Add a goal to focus on.
-        </p>
-      ) : (
-        <div className="dash-focus-goal">
-          <div
-            className="dash-focus-ring"
-            style={{ '--goal-progress': `${Math.max(0, Math.min(100, goal.progress_percent || 0))}%` }}
+    <>
+      <DashboardCard
+        title="Goal Focus"
+        action={
+          <button
+            type="button"
+            className="dashboard-card-link dashboard-card-action-button"
+            onClick={() => setPicking(true)}
           >
-            <span>{Math.round(goal.progress_percent || 0)}%</span>
+            Pick Goal
+          </button>
+        }
+      >
+        {loading ? (
+          <CardSkeleton />
+        ) : !goal ? (
+          <p className="subtle" style={{ margin: 0 }}>
+            Add a goal to focus on.
+          </p>
+        ) : (
+          <div className="dash-focus-goal">
+            <div
+              className="dash-focus-ring"
+              style={{ '--goal-progress': `${Math.max(0, Math.min(100, goal.progress_percent || 0))}%` }}
+            >
+              <span>{Math.round(goal.progress_percent || 0)}%</span>
+            </div>
+            <div className="dash-focus-copy">
+              <strong>{goal.name}</strong>
+              <span>{formatCurrency(goal.current_amount || 0)} saved</span>
+              <em>
+                {goal.eta?.status === 'complete'
+                  ? 'Reached'
+                  : goal.eta?.date
+                    ? `ETA ${formatShortDate(goal.eta.date)}`
+                    : 'Needs monthly pace'}
+              </em>
+            </div>
           </div>
-          <div className="dash-focus-copy">
-            <strong>{goal.name}</strong>
-            <span>{formatCurrency(goal.current_amount || 0)} saved</span>
-            <em>
-              {goal.eta?.status === 'complete'
-                ? 'Reached'
-                : goal.eta?.date
-                  ? `ETA ${formatShortDate(goal.eta.date)}`
-                  : 'Needs monthly pace'}
-            </em>
-          </div>
-        </div>
+        )}
+      </DashboardCard>
+      {picking && (
+        <GoalFocusPickerModal
+          goals={goals}
+          selectedGoalId={goal?.id || null}
+          onPick={(id) => {
+            onSelectGoal(id);
+            setPicking(false);
+          }}
+          onClose={() => setPicking(false)}
+        />
       )}
-    </DashboardCard>
+    </>
   );
 }
 
-function RetirementSnapshotCard({ householdData, loading }) {
+function GoalFocusPickerModal({ goals, selectedGoalId, onPick, onClose }) {
+  return (
+    <AnimatedModal onClose={onClose} size="lg">
+      {({ close }) => (
+        <>
+          <div className="modal-header">
+            <h3>Pick Goal</h3>
+            <button type="button" className="modal-close" onClick={close} aria-label="Close">
+              x
+            </button>
+          </div>
+          <div className="dashboard-goal-picker-list">
+            {goals.length === 0 ? (
+              <p className="subtle">No goals are available yet.</p>
+            ) : goals.map((goal) => (
+              <SelectableListItem
+                key={goal.id}
+                active={goal.id === selectedGoalId}
+                leading={goal.icon || '$'}
+                title={goal.name}
+                subtitle={`${Math.round(goal.progress_percent || 0)}% funded`}
+                sidePrimary={formatCurrency(goal.current_amount || 0)}
+                sideSecondary={goal.eta?.date ? formatShortDate(goal.eta.date) : 'No ETA'}
+                onClick={() => onPick(goal.id)}
+                ariaLabel={`Focus dashboard on ${goal.name}`}
+              />
+            ))}
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={close}>
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+    </AnimatedModal>
+  );
+}
+
+function RetirementSnapshotCard({ householdData, preferences, loading }) {
   const summary = householdData?.summary;
-  const annualContributions =
-    Number(summary?.employee_retirement_annual || 0) +
-    Number(summary?.employer_retirement_annual || 0);
+  const projection = retirementProjection(householdData, preferences);
 
   return (
     <DashboardCard
       title="Retirement Snapshot"
-      action={<Link to="/household" className="dashboard-card-link">Household</Link>}
+      action={<Link to="/retirement-calculator" className="dashboard-card-link">Retirement Calc</Link>}
     >
       {loading ? (
         <CardSkeleton />
@@ -1429,19 +1560,19 @@ function RetirementSnapshotCard({ householdData, loading }) {
       ) : (
         <div className="dash-stat-stack">
           <div className="dash-mini-stat-row">
-            <span>Linked balance</span>
-            <strong>{formatCurrency(summary.retirement_account_balance || 0)}</strong>
+            <span>Current Retirement Balance</span>
+            <strong>{formatCurrency(projection.currentBalance)}</strong>
             <em>{summary.linked_retirement_account_count || 0} accounts</em>
           </div>
           <div className="dash-mini-stat-row">
-            <span>Annual contributions</span>
-            <strong>{formatCurrency(annualContributions)}</strong>
+            <span>Current Monthly Contributions</span>
+            <strong>{formatCurrency(projection.monthlyContributions)}</strong>
             <em>Employee + match</em>
           </div>
           <div className="dash-mini-stat-row">
-            <span>HSA balance</span>
-            <strong>{formatCurrency(summary.hsa_account_balance || 0)}</strong>
-            <em>Linked accounts</em>
+            <span>Projected Retirement</span>
+            <strong>{formatCurrency(projection.projectedBalance)}</strong>
+            <em>Age {Math.round(projection.retirementAge)} - {projection.preset.label}</em>
           </div>
         </div>
       )}
@@ -1453,7 +1584,7 @@ function MhaSummaryCard({ data, enabled, loading }) {
   return (
     <DashboardCard
       title="MHA Tracker Summary"
-      action={<Link to="/mha-tracker" className="dashboard-card-link">MHA</Link>}
+      action={<Link to="/mha-tracker" className="dashboard-card-link">MHA Tracker</Link>}
     >
       {loading ? (
         <CardSkeleton />
@@ -1518,35 +1649,6 @@ function MortgageSnapshotCard({ accounts, loading }) {
             <em>{totalValue > 0 ? `${Math.round((equity / totalValue) * 100)}% equity` : 'No value set'}</em>
           </div>
         </div>
-      )}
-    </DashboardCard>
-  );
-}
-
-function NeedsAttentionCard({ items, loading }) {
-  return (
-    <DashboardCard
-      title="Needs Attention"
-      action={<Link to="/transactions" className="dashboard-card-link">Review</Link>}
-    >
-      {loading ? (
-        <CardSkeleton />
-      ) : items.length === 0 ? (
-        <p className="subtle" style={{ margin: 0 }}>
-          Nothing urgent on the dashboard right now.
-        </p>
-      ) : (
-        <ul className="dash-compact-list">
-          {items.map((item) => (
-            <li key={item.label} className="dash-compact-row">
-              <div className="dash-compact-main">
-                <strong>{item.label}</strong>
-                <span>{item.detail}</span>
-              </div>
-              <Link to={item.to} className="dashboard-card-link">Open</Link>
-            </li>
-          ))}
-        </ul>
       )}
     </DashboardCard>
   );

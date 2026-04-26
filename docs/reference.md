@@ -162,6 +162,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Uses Household retirement inputs and linked retirement/HSA accounts as the automatic current-balance and contribution source.
 - Question modes answer "What Will We Have?", "When Can We Retire?", and "How Much To Save?" from the same projection model.
 - Assumption controls cover market return, inflation, and withdrawal rate presets; bridge checks separate HSA assets from non-HSA retirement balances before age 65.
+- Preferred retirement age and default growth estimator (Conservative, Balanced, Aggressive) persist in `localStorage` and feed the Dashboard retirement snapshot.
 
 ### Household
 - Create and edit household members from the More menu after Net Worth
@@ -179,9 +180,9 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - **This month card:** Day X of Y + compact Income / Expenses / Net trio
 - **Budget pulse card:** overall progress bar + daily spend pace + up to 5 "attention" categories (over-budget first, then 85%+), or a success message when all are on track
 - **Top spending card:** up to 7 categories with horizontal bars scaled to the biggest spender; bars use each category's color
-- **Biggest transactions card:** top 5 largest transactions from the fetched dashboard transaction pool. `Hide From Card` is dashboard-only and does not set the transaction ignored flag used by budgets/reports.
-- **Subscriptions / Recurring and Upcoming cards:** derive likely monthly recurring merchants from recent transaction history without writing recurring rules.
-- **Uncategorized, Month vs Last Month, Goals Progress, Goal Focus, Retirement Snapshot, MHA Tracker Summary, Mortgage Snapshot, Needs Attention:** reuse existing route data from Transactions, Budgets, Goals, Household, MHA, and Accounts.
+- **Biggest transactions card:** top 5 largest transactions from the fetched dashboard transaction pool. `Hide From Dashboard` is dashboard-only and does not set the transaction ignored flag used by budgets/reports.
+- **Subscriptions / Recurring and Upcoming cards:** derive likely monthly recurring merchants from recent transaction history without writing recurring rules. Merchants need 2+ hits across 2+ months with an average 21-45 day interval.
+- **Uncategorized, Month vs Last Month, Goals Progress, Goal Focus, Retirement Snapshot, MHA Tracker Summary, Mortgage Snapshot:** reuse existing route data from Transactions, Budgets, Goals, Household, MHA, and Accounts.
 - **Recent activity card:** last 10 transactions with the shared `TransactionRow` actions
 - Shimmer skeleton loading per card
 - Empty state routes new users to Settings, where Rocket Money import and SimpleFIN setup live
@@ -357,7 +358,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 
 ## Planned
 - **Phase 2 Budgets:** rollover (column already exists), income targets with proper direction, category groupings, spending pace
-- **Phase 2 Dashboard:** month-over-month comparison on the This Month card, spending-over-time and net-worth charts
+- **Phase 2 Dashboard:** spending-over-time and net-worth charts
 - **Recurring bills / subscriptions detection**
 - **Bulk merge suggestions:** Auto-pair SimpleFIN duplicates with RM accounts by institution + last-4
 - **Mortgage calculator, credit score** (placeholders in More sheet)
