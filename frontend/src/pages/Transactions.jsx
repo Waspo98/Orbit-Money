@@ -370,6 +370,21 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     }
   }
 
+  async function handleMarkRecurring(txn) {
+    try {
+      await api.post('/api/upcoming/from-transaction', {
+        transaction_id: txn.id
+      });
+      alert(`Added "${txn.merchant || 'transaction'}" to Upcoming.`, {
+        title: 'Recurring item saved'
+      });
+    } catch (err) {
+      alert(err.message || 'Could not create recurring item', {
+        title: 'Mark as recurring failed'
+      });
+    }
+  }
+
   const accountById = new Map(accounts.map((a) => [a.id, a]));
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
@@ -646,6 +661,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                     hideAccountInMeta={filters.accountIds.length === 1}
                     onEdit={() => setEditingTxn(t)}
                     onCreateRule={() => setNewRuleFromTxn(t)}
+                    onMarkRecurring={() => handleMarkRecurring(t)}
                     onToggleTransfer={() => handleToggle(t, 'is_transfer')}
                     onToggleIgnored={() => handleToggle(t, 'is_ignored')}
                     onToggleMhaEligible={() => handleToggle(t, 'mha_eligible')}

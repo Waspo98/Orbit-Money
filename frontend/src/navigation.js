@@ -52,6 +52,14 @@ export const ROUTES = [
     hasPageHero: true
   },
   {
+    path: '/upcoming',
+    label: 'Upcoming',
+    description: 'Bills, subscriptions, and income',
+    icon: 'transactions',
+    nav: 'more',
+    hasPageHero: true
+  },
+  {
     path: '/retirement-calculator',
     label: 'Retirement Calculator',
     description: 'Project retirement age, savings, and income',

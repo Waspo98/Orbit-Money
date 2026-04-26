@@ -23,6 +23,7 @@ import mhaRoutes from './routes/mha.js';
 import goalsRoutes from './routes/goals.js';
 import householdRoutes from './routes/household.js';
 import merchantLogosRoutes from './routes/merchantLogos.js';
+import upcomingRoutes from './routes/upcoming.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -76,6 +77,7 @@ app.use('/api/mha', mhaRoutes);
 app.use('/api/goals', goalsRoutes);
 app.use('/api/household', householdRoutes);
 app.use('/api/merchant-logos', merchantLogosRoutes);
+app.use('/api/upcoming', upcomingRoutes);
 
 // Any other /api/* is a 404.
 app.use('/api', requireAuth, (req, res) => {

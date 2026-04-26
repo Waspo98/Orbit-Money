@@ -136,7 +136,7 @@ const DASHBOARD_CARD_DEFS = [
   {
     id: 'subscriptions',
     title: 'Subscriptions / Recurring',
-    description: 'Recurring merchants detected from history.'
+    description: 'Saved subscription items from Upcoming.'
   },
   {
     id: 'uncategorized',
@@ -171,7 +171,7 @@ const DASHBOARD_CARD_DEFS = [
   {
     id: 'upcoming',
     title: 'Upcoming',
-    description: 'Estimated recurring bills and income.'
+    description: 'Saved bills, subscriptions, and income.'
   },
   {
     id: 'mortgage',
@@ -270,26 +270,9 @@ function groupAccountBalances(accounts) {
   return { cash, investments, credit, loans, realEstate, other, net };
 }
 
-function monthKeyFromDate(value) {
-  return String(value || '').slice(0, 7);
-}
-
 function parseDateValue(value) {
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function daysBetween(a, b) {
-  const start = parseDateValue(a);
-  const end = parseDateValue(b);
-  if (!start || !end) return null;
-  return Math.round((end.getTime() - start.getTime()) / 86400000);
-}
-
-function addDays(value, amount) {
-  const date = parseDateValue(value) || new Date();
-  date.setDate(date.getDate() + amount);
-  return date.toISOString().slice(0, 10);
 }
 
 function formatShortDate(value) {
@@ -307,54 +290,25 @@ function transactionMonthUrl(month, extra = '') {
   return `/transactions?date_from=${month}-01${extra}`;
 }
 
-function categoryName(categoryById, categoryId) {
-  return categoryById.get(categoryId)?.name || 'Uncategorized';
+function kindLabel(kind) {
+  if (kind === 'bill') return 'Bill';
+  if (kind === 'income') return 'Income';
+  return 'Subscription';
 }
 
-function buildRecurringGroups(transactions) {
-  const byMerchant = new Map();
-  for (const txn of transactions || []) {
-    if (txn.is_ignored || txn.is_transfer) continue;
-    const merchant = String(txn.merchant || '').trim();
-    if (!merchant) continue;
-    const key = `${merchant.toLowerCase()}|${Math.sign(Number(txn.amount) || 0)}`;
-    if (!byMerchant.has(key)) byMerchant.set(key, []);
-    byMerchant.get(key).push(txn);
+function frequencyLabel(item) {
+  const type = item?.frequency_type;
+  if (type === 'weekly') return 'Weekly';
+  if (type === 'biweekly') return 'Biweekly';
+  if (type === 'semimonthly') return 'Twice monthly';
+  if (type === 'bimonthly') return 'Every 2 months';
+  if (type === 'yearly') return 'Yearly';
+  if (type === 'custom') {
+    const interval = Number(item.frequency_interval) || 1;
+    const unit = String(item.frequency_unit || 'days').replace(/s$/, '');
+    return `Every ${interval} ${unit}${interval === 1 ? '' : 's'}`;
   }
-
-  return Array.from(byMerchant.values())
-    .map((items) => {
-      const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date));
-      const months = new Set(sorted.map((txn) => monthKeyFromDate(txn.date)));
-      if (sorted.length < 2 || months.size < 2) return null;
-
-      const intervals = [];
-      for (let i = 1; i < sorted.length; i += 1) {
-        const interval = daysBetween(sorted[i - 1].date, sorted[i].date);
-        if (interval !== null && interval > 0) intervals.push(interval);
-      }
-      const averageInterval = intervals.length
-        ? intervals.reduce((sum, value) => sum + value, 0) / intervals.length
-        : 30;
-      if (averageInterval < 21 || averageInterval > 45) return null;
-
-      const latest = sorted[sorted.length - 1];
-      const nextDate = addDays(latest.date, Math.round(averageInterval));
-      const averageAmount =
-        sorted.reduce((sum, txn) => sum + Math.abs(Number(txn.amount) || 0), 0) /
-        sorted.length;
-      return {
-        merchant: latest.merchant,
-        amount: averageAmount,
-        direction: Number(latest.amount) < 0 ? 'expense' : 'income',
-        category_id: latest.category_id,
-        count: sorted.length,
-        latestDate: latest.date,
-        nextDate
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.nextDate.localeCompare(b.nextDate));
+  return 'Monthly';
 }
 
 function ageFromBirthDate(date) {
@@ -427,6 +381,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   const [recent, setRecent] = useState([]);
   const [dashboardTransactions, setDashboardTransactions] = useState([]);
   const [uncategorizedData, setUncategorizedData] = useState(null);
+  const [upcomingData, setUpcomingData] = useState(null);
   const [goalsData, setGoalsData] = useState(null);
   const [householdData, setHouseholdData] = useState(null);
   const [mhaData, setMhaData] = useState(null);
@@ -450,12 +405,15 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
     setError('');
     try {
       const optional = (path) => api.get(path).catch(() => null);
-      const [b, t, prevBudget, txns, uncategorized, goals, household, mha] = await Promise.all([
+      const [b, t, prevBudget, txns, uncategorized, upcoming, goals, household, mha] = await Promise.all([
         api.get(`/api/budgets?month=${month}`),
         api.get('/api/transactions?limit=10&page=1'),
         optional(`/api/budgets?month=${previousMonth}`),
         optional('/api/transactions?limit=200&page=1&include_ignored=0&include_transfers=0&sort=date_desc'),
-        optional('/api/transactions?limit=5&page=1&categories=uncategorized&include_ignored=0&include_transfers=0&sort=date_desc'),
+        optional(`/api/transactions?limit=5&page=1&categories=${
+          categories.find((category) => String(category.name || '').toLowerCase() === 'uncategorized')?.id || 'uncategorized'
+        }&include_ignored=0&include_transfers=0&sort=date_desc`),
+        optional('/api/upcoming'),
         optional('/api/goals?months=12'),
         optional('/api/household'),
         optional('/api/mha')
@@ -464,7 +422,13 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
       setRecent(t.items || []);
       setPreviousBudgetData(prevBudget);
       setDashboardTransactions(txns?.items || []);
-      setUncategorizedData(uncategorized);
+      setUncategorizedData({
+        ...uncategorized,
+        categoryId: categories.find(
+          (category) => String(category.name || '').toLowerCase() === 'uncategorized'
+        )?.id || null
+      });
+      setUpcomingData(upcoming);
       setGoalsData(goals);
       setHouseholdData(household);
       setMhaData(mha);
@@ -585,10 +549,6 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
       ? (summary.total_budgeted - totalSpent) / daysRemaining
       : null;
   const previousSummary = previousBudgetData?.summary;
-  const recurringGroups = useMemo(
-    () => buildRecurringGroups(dashboardTransactions),
-    [dashboardTransactions]
-  );
   const biggestTransactions = useMemo(() => {
     const hidden = new Set(hiddenBiggestTransactionIds);
     return dashboardTransactions
@@ -610,6 +570,18 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
 
   function resetHiddenBiggestTransactions() {
     setHiddenBiggestTransactionIds([]);
+  }
+
+  function updateRetirementPreferences(patch) {
+    setRetirementPreferences((prev) => {
+      const next = { ...prev, ...patch };
+      try {
+        localStorage.setItem(RETIREMENT_PREFS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
   }
 
   function renderDashboardCard(cardId) {
@@ -665,16 +637,14 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
       case 'subscriptions':
         return (
           <RecurringCard
-            groups={recurringGroups.filter((group) => group.direction === 'expense').slice(0, 5)}
-            categoryById={categoryById}
-            loading={loading && dashboardTransactions.length === 0}
+            items={(upcomingData?.items || []).filter((item) => item.kind === 'subscription').slice(0, 5)}
+            loading={loading && !upcomingData}
           />
         );
       case 'uncategorized':
         return (
           <UncategorizedCard
             data={uncategorizedData}
-            categoryById={categoryById}
             loading={loading && !uncategorizedData}
           />
         );
@@ -704,6 +674,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
           <RetirementSnapshotCard
             householdData={householdData}
             preferences={retirementPreferences}
+            onChangePreferences={updateRetirementPreferences}
             loading={loading && !householdData}
           />
         );
@@ -712,9 +683,8 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
       case 'upcoming':
         return (
           <UpcomingCard
-            groups={recurringGroups.slice(0, 8)}
-            categoryById={categoryById}
-            loading={loading && dashboardTransactions.length === 0}
+            items={upcomingData?.upcoming || []}
+            loading={loading && !upcomingData}
           />
         );
       case 'mortgage':
@@ -1085,7 +1055,6 @@ function TopSpendingCard({ topSpending, totalSpent, loading }) {
           <div className="dash-mini-stat-row">
             <span>Total Spend</span>
             <strong>{formatCurrency(totalSpent)}</strong>
-            <em>Bars show share of total monthly spend</em>
           </div>
           <ul className="dash-top-list">
             {topSpending.map((item) => {
@@ -1197,36 +1166,36 @@ function BiggestTransactionsCard({
 // Recurring and upcoming cards
 // ============================================================================
 
-function RecurringCard({ groups, categoryById, loading }) {
+function RecurringCard({ items, loading }) {
   return (
     <DashboardCard
       title="Subscriptions / Recurring"
-      action={<Link to="/transactions" className="dashboard-card-link">Review</Link>}
+      action={<Link to="/upcoming" className="dashboard-card-link">Review</Link>}
     >
       {loading ? (
         <CardSkeleton />
-      ) : groups.length === 0 ? (
+      ) : items.length === 0 ? (
         <p className="subtle" style={{ margin: 0 }}>
-          No recurring expenses detected yet.
+          No subscriptions saved yet.
         </p>
       ) : (
         <>
           <ul className="dash-compact-list">
-            {groups.map((group) => (
-              <li key={`${group.merchant}-${group.amount}`} className="dash-compact-row">
+            {items.map((item) => (
+              <li key={item.id} className="dash-compact-row">
                 <div className="dash-compact-main">
-                  <strong>{group.merchant}</strong>
-                  <span>{categoryName(categoryById, group.category_id)} - {group.count} hits</span>
+                  <strong>{item.name || item.merchant}</strong>
+                  <span>{item.category_name || 'Uncategorized'} - {frequencyLabel(item)}</span>
                 </div>
                 <div className="dash-compact-side">
-                  <strong className="expense">{formatCurrency(group.amount)}</strong>
-                  <em>Next {formatShortDate(group.nextDate)}</em>
+                  <strong className="expense">{formatCurrency(item.amount)}</strong>
+                  <em>Next {formatShortDate(item.next_date)}</em>
                 </div>
               </li>
             ))}
           </ul>
           <p className="dash-card-note">
-            Detected from merchants with 2+ hits across 2+ months, roughly 21-45 days apart.
+            Managed from Upcoming. Suggestions are based on recurring merchants in transaction history.
           </p>
         </>
       )}
@@ -1234,36 +1203,31 @@ function RecurringCard({ groups, categoryById, loading }) {
   );
 }
 
-function UpcomingCard({ groups, categoryById, loading }) {
-  const upcoming = groups
-    .filter((group) => group.nextDate >= new Date().toISOString().slice(0, 10))
-    .sort((a, b) => a.nextDate.localeCompare(b.nextDate))
-    .slice(0, 6);
-
+function UpcomingCard({ items, loading }) {
   return (
     <DashboardCard
       title="Upcoming: Bills and Income"
-      action={<Link to="/transactions" className="dashboard-card-link">History</Link>}
+      action={<Link to="/upcoming" className="dashboard-card-link">Upcoming</Link>}
     >
       {loading ? (
         <CardSkeleton />
-      ) : upcoming.length === 0 ? (
+      ) : items.length === 0 ? (
         <p className="subtle" style={{ margin: 0 }}>
-          No upcoming recurring activity detected.
+          No upcoming bills, subscriptions, or income saved.
         </p>
       ) : (
         <ul className="dash-compact-list">
-          {upcoming.map((group) => (
-            <li key={`${group.merchant}-${group.direction}`} className="dash-compact-row">
+          {items.map((item) => (
+            <li key={item.id} className="dash-compact-row">
               <div className="dash-compact-main">
-                <strong>{group.merchant}</strong>
-                <span>{categoryName(categoryById, group.category_id)}</span>
+                <strong>{item.name || item.merchant}</strong>
+                <span>{kindLabel(item.kind)} - {item.category_name || 'Uncategorized'}</span>
               </div>
               <div className="dash-compact-side">
-                <strong className={group.direction === 'income' ? 'income' : 'expense'}>
-                  {group.direction === 'income' ? '+' : '-'}{formatCurrency(group.amount)}
+                <strong className={item.direction === 'income' ? 'income' : 'expense'}>
+                  {item.direction === 'income' ? '+' : '-'}{formatCurrency(item.amount)}
                 </strong>
-                <em>{formatShortDate(group.nextDate)}</em>
+                <em>{formatShortDate(item.next_date)}</em>
               </div>
             </li>
           ))}
@@ -1286,7 +1250,7 @@ function UncategorizedCard({ data, loading }) {
       title="Uncategorized Transactions"
       action={
         <Link
-          to="/transactions?categories=uncategorized&include_ignored=0&include_transfers=0"
+          to={`/transactions?categories=${data?.categoryId || 'uncategorized'}&include_ignored=0&include_transfers=0`}
           className="dashboard-card-link"
         >
           Categorize
@@ -1542,9 +1506,24 @@ function GoalFocusPickerModal({ goals, selectedGoalId, onPick, onClose }) {
   );
 }
 
-function RetirementSnapshotCard({ householdData, preferences, loading }) {
+function RetirementSnapshotCard({
+  householdData,
+  preferences,
+  onChangePreferences,
+  loading
+}) {
   const summary = householdData?.summary;
   const projection = retirementProjection(householdData, preferences);
+  const presetKeys = Object.keys(DASHBOARD_RETIREMENT_PRESETS);
+  const currentPresetIndex = Math.max(0, presetKeys.indexOf(preferences.presetKey));
+  const nextPresetKey = presetKeys[(currentPresetIndex + 1) % presetKeys.length];
+
+  function adjustAge(delta) {
+    const current = Number(preferences.retirementAge) || 67;
+    onChangePreferences({
+      retirementAge: Math.max(40, Math.min(80, current + delta))
+    });
+  }
 
   return (
     <DashboardCard
@@ -1573,6 +1552,29 @@ function RetirementSnapshotCard({ householdData, preferences, loading }) {
             <span>Projected Retirement</span>
             <strong>{formatCurrency(projection.projectedBalance)}</strong>
             <em>Age {Math.round(projection.retirementAge)} - {projection.preset.label}</em>
+            <div className="dash-retirement-controls" aria-label="Retirement projection controls">
+              <button
+                type="button"
+                className="btn-secondary btn-compact"
+                onClick={() => adjustAge(-1)}
+              >
+                -1 Age
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-compact"
+                onClick={() => adjustAge(1)}
+              >
+                +1 Age
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-compact"
+                onClick={() => onChangePreferences({ presetKey: nextPresetKey })}
+              >
+                {projection.preset.label}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1747,6 +1749,21 @@ function RecentActivityCard({
     }
   }
 
+  async function handleMarkRecurring(txn) {
+    try {
+      await api.post('/api/upcoming/from-transaction', {
+        transaction_id: txn.id
+      });
+      alert(`Added "${txn.merchant || 'transaction'}" to Upcoming.`, {
+        title: 'Recurring item saved'
+      });
+    } catch (err) {
+      alert(err.message || 'Could not create recurring item', {
+        title: 'Mark as recurring failed'
+      });
+    }
+  }
+
   return (
     <>
       <DashboardCard
@@ -1777,6 +1794,7 @@ function RecentActivityCard({
                 hideAccountInMeta={false}
                 onEdit={() => setEditingTxn(t)}
                 onCreateRule={() => setNewRuleFromTxn(t)}
+                onMarkRecurring={() => handleMarkRecurring(t)}
                 onToggleTransfer={() => handleToggle(t, 'is_transfer')}
                 onToggleIgnored={() => handleToggle(t, 'is_ignored')}
                 onToggleMhaEligible={() => handleToggle(t, 'mha_eligible')}

@@ -26,6 +26,7 @@ export function TransactionRow({
   hideAccountInMeta,
   onEdit,
   onCreateRule,
+  onMarkRecurring,
   onToggleTransfer,
   onToggleIgnored,
   onToggleMhaEligible,
@@ -40,6 +41,7 @@ export function TransactionRow({
   const actionItems = [
     { label: 'Edit', onClick: onEdit },
     { label: 'Create rule', onClick: onCreateRule },
+    ...(onMarkRecurring ? [{ label: 'Mark as recurring', onClick: onMarkRecurring }] : []),
     {
       label: txn.is_transfer ? 'Unmark as transfer' : 'Mark as transfer',
       onClick: onToggleTransfer
@@ -149,6 +151,7 @@ export function TransactionRow({
           interactive={expanded}
           onEdit={onEdit}
           onCreateRule={onCreateRule}
+          onMarkRecurring={onMarkRecurring}
           onToggleTransfer={onToggleTransfer}
           onToggleIgnored={onToggleIgnored}
           onToggleMhaEligible={onToggleMhaEligible}
@@ -497,6 +500,7 @@ function TransactionDetail({
   interactive,
   onEdit,
   onCreateRule,
+  onMarkRecurring,
   onToggleTransfer,
   onToggleIgnored,
   onToggleMhaEligible,
@@ -633,6 +637,16 @@ function TransactionDetail({
         >
           Create rule
         </button>
+        {onMarkRecurring && (
+          <button
+            type="button"
+            className="btn-secondary btn-compact"
+            onClick={onMarkRecurring}
+            {...tabProps}
+          >
+            Mark as recurring
+          </button>
+        )}
         <button
           type="button"
           className={`btn-secondary btn-compact ${txn.is_transfer ? 'btn-active' : ''} ${transferEdited ? 'edited' : ''}`}

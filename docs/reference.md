@@ -23,7 +23,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
 | `sessions.db` | Session store (separate connection, managed by `connect-sqlite3`) |
 
-### Database Schema (21 migrations)
+### Database Schema (22 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -48,6 +48,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `019_household_income.sql` | Adds household member profiles and dated income/benefit history snapshots |
 | `020_household_retirement_accounts.sql` | Links household members to existing retirement/HSA accounts for projections |
 | `021_integer_cents.sql` | Converts money storage to integer cents and splits goal allocation percent vs fixed-amount storage |
+| `022_upcoming_items.sql` | Adds saved Upcoming bills, subscriptions, income items, and dismissed recurring-suggestion keys |
 
 ### Key Data Model Notes
 
@@ -83,6 +84,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 - Tap-to-expand transaction cards — grid-template-rows animated expand/contract (220ms), auto-scroll-into-view on expand (accounts for bottom tabs height)
 - Inline edit modal: merchant, category, notes (date/amount read-only — bank ground truth)
 - Transaction deletion and transfer/ignored toggles
+- "Mark as recurring" is available from the transaction row menu and expanded transaction card; it creates a monthly Upcoming item seeded from that transaction.
 - Edit provenance UI: "edited manually" / "applied by rule" badges, per-field "reset to original" buttons, inline display of the original value alongside the edited one
 
 ### Search, Filter, and Sort
@@ -173,6 +175,15 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Summary cards show annualized take-home pay, gross income, employer retirement match, benefits value, and earners
 - Endpoints: GET `/api/household`, POST `/api/household/members`, PUT `/api/household/members/:id`, POST `/api/household/members/:id/income-records`, DELETE `/api/household/members/:id`
 
+### Upcoming
+- Standalone More-menu page at `/upcoming` for saved bills, subscriptions, and income.
+- Supports manual entries with type, amount, next date, category, account, notes, and frequency: weekly, biweekly, twice monthly, monthly, bimonthly, yearly, or custom every X days/weeks/months.
+- Transaction rows can seed a recurring item with "Mark as recurring".
+- Suggestions are generated from recent transaction history, emphasizing income and Bills & Utilities style categories before other merchants. Suggestions can be accepted or dismissed.
+- Dashboard Subscriptions and Upcoming cards read from `/api/upcoming` rather than frontend-only transaction heuristics.
+- Monthly summary values normalize different frequencies to monthly equivalents.
+- Endpoints: GET `/api/upcoming`, POST `/api/upcoming`, PUT `/api/upcoming/:id`, DELETE `/api/upcoming/:id`, POST `/api/upcoming/from-transaction`, POST `/api/upcoming/suggestions/accept`, POST `/api/upcoming/suggestions/dismiss`
+
 ### Dashboard
 Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column grid on foldable/tablet widths (≥640px), with Recent Activity spanning full width. The `Customize My Dashboard` button opens one modal list where every dashboard card has a visibility toggle and drag handle. Layout and dashboard-only hidden biggest transactions are persisted in `localStorage`; no dashboard-specific backend or schema is used.
 
@@ -181,7 +192,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - **Budget pulse card:** overall progress bar + daily spend pace + up to 5 "attention" categories (over-budget first, then 85%+), or a success message when all are on track
 - **Top spending card:** up to 7 categories with horizontal bars scaled to the biggest spender; bars use each category's color
 - **Biggest transactions card:** top 5 largest transactions from the fetched dashboard transaction pool. `Hide From Dashboard` is dashboard-only and does not set the transaction ignored flag used by budgets/reports.
-- **Subscriptions / Recurring and Upcoming cards:** derive likely monthly recurring merchants from recent transaction history without writing recurring rules. Merchants need 2+ hits across 2+ months with an average 21-45 day interval.
+- **Subscriptions / Recurring and Upcoming cards:** read saved bills, subscriptions, and income from `/api/upcoming`. The Upcoming page owns manual entries and accepted suggestions.
 - **Uncategorized, Month vs Last Month, Goals Progress, Goal Focus, Retirement Snapshot, MHA Tracker Summary, Mortgage Snapshot:** reuse existing route data from Transactions, Budgets, Goals, Household, MHA, and Accounts.
 - **Recent activity card:** last 10 transactions with the shared `TransactionRow` actions
 - Shimmer skeleton loading per card
@@ -195,7 +206,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 ### Navigation
 - **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More
 - **Desktop sidebar:** Lists every page directly, in the same order as the mobile More menu, with Settings last. Bottom tabs are hidden on desktop.
-- **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Savings Goals, Retirement Calculator, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings last.
+- **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Savings Goals, Upcoming, Retirement Calculator, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings last.
 - **Deprecated hamburger:** the old hamburger menu was removed; do not reintroduce it.
 - **Settings page:** Appearance, MHA visibility, Rocket Money CSV import, SimpleFIN configuration/sync log, account controls, and app build details.
 - **React Router v6:** Client-side routing with browser back/forward support. All routes served via Express catch-all for deep-link support.
@@ -290,6 +301,17 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 | POST | `/api/goals` | Create a goal with `{ name, target_amount, target_date?, kind?, allocations, stealFromOthers? }`. |
 | PUT | `/api/goals/:id` | Replace goal metadata and allocations. Can rebalance other goals when stealing is enabled. |
 | DELETE | `/api/goals/:id` | Delete a goal and its allocation rows. |
+
+### Upcoming
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/upcoming` | Active saved items, upcoming sorted items, recurring suggestions, and monthly-equivalent summary totals |
+| POST | `/api/upcoming` | Create a manual item |
+| PUT | `/api/upcoming/:id` | Replace an upcoming item |
+| DELETE | `/api/upcoming/:id` | Delete an upcoming item |
+| POST | `/api/upcoming/from-transaction` | Create a monthly recurring item from `{ transaction_id }` |
+| POST | `/api/upcoming/suggestions/accept` | Accept a suggestion and create an item |
+| POST | `/api/upcoming/suggestions/dismiss` | Dismiss a suggestion key |
 
 ### Household
 | Method | Path | Description |

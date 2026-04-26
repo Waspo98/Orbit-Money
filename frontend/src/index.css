@@ -2881,6 +2881,18 @@ input, textarea, select {
   font-style: normal;
 }
 
+.dash-retirement-controls {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dash-retirement-controls .btn-compact {
+  min-height: 32px;
+  padding: 6px 10px;
+}
+
 .dash-compare-list li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2923,10 +2935,10 @@ input, textarea, select {
 .dash-month-compare-head,
 .dash-month-compare-row {
   display: grid;
-  grid-template-columns: minmax(82px, 1fr) repeat(3, minmax(72px, auto));
-  gap: 8px;
+  grid-template-columns: minmax(62px, 0.8fr) repeat(3, minmax(58px, auto));
+  gap: 6px;
   align-items: baseline;
-  min-width: 360px;
+  min-width: 326px;
 }
 
 .dash-month-compare-head {
@@ -3413,6 +3425,213 @@ input, textarea, select {
     width: 100%;
     min-width: 0;
     justify-items: stretch;
+  }
+}
+
+/* ---------- Upcoming ---------- */
+
+.upcoming-view {
+  min-height: calc(100dvh - 140px);
+}
+
+.page-hero-upcoming {
+  --hero-start: #052e24;
+  --hero-mid: #0f766e;
+  --hero-end: #047857;
+}
+
+.upcoming-view > .error,
+.upcoming-view > .center-loading,
+.upcoming-view > .empty-state,
+.upcoming-content {
+  width: calc(100% - 40px);
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.upcoming-content {
+  display: grid;
+  gap: 14px;
+  transition: opacity 160ms ease-out;
+}
+
+.upcoming-content.refreshing {
+  opacity: 0.72;
+}
+
+.upcoming-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.upcoming-tabs button {
+  min-width: 0;
+  min-height: 42px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.upcoming-tabs button:last-child {
+  border-right: 0;
+}
+
+.upcoming-tabs button:hover,
+.upcoming-tabs button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.upcoming-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.upcoming-item {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr) minmax(124px, auto);
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.upcoming-suggestion {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+}
+
+.upcoming-date,
+.upcoming-main,
+.upcoming-side {
+  min-width: 0;
+}
+
+.upcoming-date {
+  display: grid;
+  gap: 2px;
+}
+
+.upcoming-date strong {
+  color: var(--text);
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.upcoming-date span,
+.upcoming-main span,
+.upcoming-main em {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-style: normal;
+}
+
+.upcoming-main {
+  display: grid;
+  gap: 4px;
+}
+
+.upcoming-main strong {
+  display: block;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.upcoming-main span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.upcoming-side {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  text-align: right;
+}
+
+.upcoming-side > strong {
+  color: var(--text);
+  font-size: 1.02rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.upcoming-side > strong.income {
+  color: var(--income);
+}
+
+.upcoming-side > strong.expense {
+  color: var(--expense);
+}
+
+.upcoming-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.danger-link {
+  color: var(--danger);
+}
+
+.upcoming-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 14px;
+}
+
+.upcoming-custom-frequency {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.upcoming-notes-field {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .upcoming-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .upcoming-tabs button:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .upcoming-item {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .upcoming-side {
+    justify-items: stretch;
+    text-align: left;
+  }
+
+  .upcoming-actions {
+    justify-content: flex-start;
+  }
+
+  .upcoming-editor-grid {
+    grid-template-columns: 1fr;
   }
 }
 
