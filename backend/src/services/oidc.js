@@ -139,6 +139,45 @@ function profileName(profile) {
   return profile.name || profile.preferred_username || profile.email || 'Authentik User';
 }
 
+function applyPendingHouseholdShares(userId, email) {
+  if (!email) return null;
+  const shares = db
+    .prepare(
+      `SELECT id, household_id, role
+         FROM household_shares
+        WHERE lower(invited_email) = lower(?)
+          AND revoked_at IS NULL`
+    )
+    .all(email);
+
+  const insertMembership = db.prepare(
+    `INSERT INTO household_memberships (household_id, user_id, role)
+     VALUES (?, ?, ?)
+     ON CONFLICT(household_id, user_id) DO UPDATE SET
+       role = CASE
+         WHEN role = 'owner' THEN role
+         WHEN excluded.role = 'admin' THEN 'admin'
+         ELSE role
+       END,
+       updated_at = datetime('now')`
+  );
+  const markAccepted = db.prepare(
+    `UPDATE household_shares
+        SET accepted_by_user_id = ?,
+            accepted_at = COALESCE(accepted_at, datetime('now')),
+            updated_at = datetime('now')
+      WHERE id = ?`
+  );
+
+  let preferredHouseholdId = null;
+  for (const share of shares) {
+    insertMembership.run(share.household_id, userId, share.role || 'member');
+    markAccepted.run(userId, share.id);
+    preferredHouseholdId = preferredHouseholdId || share.household_id;
+  }
+  return preferredHouseholdId;
+}
+
 function resolveUserAndHousehold(profile) {
   const existing = db
     .prepare('SELECT * FROM users WHERE authentik_sub = ?')
@@ -172,7 +211,21 @@ function resolveUserAndHousehold(profile) {
     .run(profile.sub, profile.email || null, profileName(profile)).lastInsertRowid;
 }
 
-function defaultMembershipForUser(userId, displayName) {
+function defaultMembershipForUser(userId, displayName, preferredHouseholdId = null) {
+  if (preferredHouseholdId) {
+    const preferred = db
+      .prepare(
+        `SELECT hm.household_id, hm.role, h.name
+           FROM household_memberships hm
+           JOIN households h ON h.id = hm.household_id
+          WHERE hm.user_id = ?
+            AND hm.household_id = ?
+          LIMIT 1`
+      )
+      .get(userId, preferredHouseholdId);
+    if (preferred) return preferred;
+  }
+
   const membership = db
     .prepare(
       `SELECT hm.household_id, hm.role, h.name
@@ -201,7 +254,8 @@ export async function completeOidcLogin(req, code, state) {
   const profile = await verifyIdToken(tokens.id_token, req.session.oidcNonce);
   const displayName = profileName(profile);
   const userId = resolveUserAndHousehold(profile);
-  const membership = defaultMembershipForUser(userId, displayName);
+  const preferredHouseholdId = applyPendingHouseholdShares(userId, profile.email || null);
+  const membership = defaultMembershipForUser(userId, displayName, preferredHouseholdId);
 
   delete req.session.oidcState;
   delete req.session.oidcNonce;

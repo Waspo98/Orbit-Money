@@ -476,6 +476,14 @@ input, textarea, select {
   margin: 16px 0;
 }
 
+.success-banner {
+  padding: 12px 14px;
+  background: var(--success-bg);
+  color: var(--success);
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+}
+
 .info-banner {
   padding: 14px 16px;
   background: var(--accent-soft);
@@ -7842,6 +7850,57 @@ input, textarea, select {
   white-space: nowrap;
 }
 
+.settings-share-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.settings-share-form .field {
+  margin-bottom: 0;
+}
+
+.settings-share-list {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.settings-share-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.settings-share-row > div {
+  min-width: 0;
+}
+
+.settings-share-row strong,
+.settings-share-row span:not(.pill) {
+  display: block;
+}
+
+.settings-share-row strong {
+  font-size: 0.94rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.settings-share-row span:not(.pill) {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
 .settings-import-button {
   width: 100%;
 }
@@ -7924,6 +7983,10 @@ input, textarea, select {
 @media (max-width: 640px) {
   .settings-action { flex-direction: column; align-items: stretch; }
   .settings-action > button { width: 100%; }
+  .settings-share-form { grid-template-columns: 1fr; }
+  .settings-share-form > button { width: 100%; }
+  .settings-share-row { align-items: stretch; flex-direction: column; }
+  .settings-share-row > button { width: 100%; }
   .settings-theme-toggle { grid-template-columns: 1fr; }
   .settings-theme-option { min-height: auto; }
   .settings-about-details { grid-template-columns: 1fr; }

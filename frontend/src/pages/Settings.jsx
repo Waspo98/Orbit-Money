@@ -42,6 +42,10 @@ function todayIso() {
   return `${y}-${m}-${day}`;
 }
 
+function displayPerson(person) {
+  return person?.display_name || person?.displayName || person?.email || person?.username || 'Shared user';
+}
+
 export default function Settings({
   themeMode = 'system',
   onThemeChange,
@@ -65,6 +69,11 @@ export default function Settings({
   const [syncLog, setSyncLog] = useState([]);
   const [showLog, setShowLog] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [sharing, setSharing] = useState(null);
+  const [sharingEmail, setSharingEmail] = useState('');
+  const [sharingBusy, setSharingBusy] = useState(false);
+  const [sharingError, setSharingError] = useState('');
+  const [sharingMessage, setSharingMessage] = useState('');
   const [mhaBusy, setMhaBusy] = useState(false);
   const [mhaError, setMhaError] = useState('');
   const [file, setFile] = useState(null);
@@ -92,8 +101,19 @@ export default function Settings({
     }
   }
 
+  async function loadSharing() {
+    try {
+      const data = await api.get('/api/household-sharing');
+      setSharing(data);
+    } catch (err) {
+      console.error('Household sharing fetch failed:', err);
+      setSharingError(err.message || 'Could not load sharing settings.');
+    }
+  }
+
   useEffect(() => {
     loadStatus();
+    loadSharing();
   }, []);
 
   async function handleSetup(e) {
@@ -170,6 +190,48 @@ export default function Settings({
       await onLogout();
     } finally {
       setSigningOut(false);
+    }
+  }
+
+  async function handleShare(e) {
+    e.preventDefault();
+    const email = sharingEmail.trim();
+    if (!email) return;
+    setSharingBusy(true);
+    setSharingError('');
+    setSharingMessage('');
+    try {
+      const data = await api.post('/api/household-sharing/shares', { email });
+      setSharing(data);
+      setSharingEmail('');
+      setSharingMessage(`${email} can now sign in with an Overbay.App account.`);
+    } catch (err) {
+      setSharingError(err.message || 'Sharing failed.');
+    } finally {
+      setSharingBusy(false);
+    }
+  }
+
+  async function handleRevokeShare(share) {
+    const ok = await confirm(
+      `Stop sharing with ${share.invited_email}? If they have not signed in yet, this removes their pending access.`,
+      {
+        title: 'Remove share',
+        confirmLabel: 'Remove',
+        destructive: true
+      }
+    );
+    if (!ok) return;
+    setSharingBusy(true);
+    setSharingError('');
+    setSharingMessage('');
+    try {
+      const data = await api.del(`/api/household-sharing/shares/${share.id}`);
+      setSharing(data);
+    } catch (err) {
+      setSharingError(err.message || 'Could not remove share.');
+    } finally {
+      setSharingBusy(false);
     }
   }
 
@@ -593,6 +655,80 @@ export default function Settings({
           <h3>Account</h3>
           <p>Session controls and app build details.</p>
         </div>
+
+        <div className="settings-action">
+          <div className="settings-action-info">
+            <strong>Signed in</strong>
+            <p>
+              {sharing?.currentUser
+                ? `${displayPerson(sharing.currentUser)} - ${sharing.currentUser.role}`
+                : 'Loading account details...'}
+            </p>
+          </div>
+        </div>
+
+        {sharing?.currentUser?.canManageSharing && (
+          <form className="settings-share-form" onSubmit={handleShare}>
+            <label className="field">
+              <span>Share with a partner</span>
+              <input
+                type="email"
+                value={sharingEmail}
+                onChange={(e) => setSharingEmail(e.target.value)}
+                placeholder="partner@example.com"
+                autoComplete="email"
+                disabled={sharingBusy}
+              />
+            </label>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={sharingBusy || !sharingEmail.trim()}
+            >
+              {sharingBusy ? 'Sharing...' : 'Share'}
+            </button>
+          </form>
+        )}
+
+        {sharingError && <div className="error" style={{ marginTop: 12 }}>{sharingError}</div>}
+        {sharingMessage && <div className="success-banner" style={{ marginTop: 12 }}>{sharingMessage}</div>}
+
+        {sharing && (
+          <div className="settings-share-list" aria-label="Household access">
+            {sharing.users.map((user) => (
+              <div className="settings-share-row" key={`user-${user.id}`}>
+                <div>
+                  <strong>{displayPerson(user)}</strong>
+                  <span>{user.email || user.username || 'No email on file'}</span>
+                </div>
+                <span className="pill accent">{user.role}</span>
+              </div>
+            ))}
+
+            {sharing.shares
+              .filter((share) => !share.accepted_at)
+              .map((share) => (
+                <div className="settings-share-row" key={`share-${share.id}`}>
+                  <div>
+                    <strong>{share.invited_email}</strong>
+                    <span>Waiting for Authentik sign in</span>
+                  </div>
+                  {sharing.currentUser?.canManageSharing ? (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => handleRevokeShare(share)}
+                      disabled={sharingBusy}
+                    >
+                      Remove
+                    </button>
+                  ) : (
+                    <span className="pill warning">pending</span>
+                  )}
+                </div>
+              ))}
+          </div>
+        )}
 
         <div className="settings-action">
           <div className="settings-action-info">

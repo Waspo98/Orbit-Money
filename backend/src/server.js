@@ -22,6 +22,7 @@ import netWorthRoutes from './routes/netWorth.js';
 import mhaRoutes from './routes/mha.js';
 import goalsRoutes from './routes/goals.js';
 import householdRoutes from './routes/household.js';
+import householdSharingRoutes from './routes/householdSharing.js';
 import merchantLogosRoutes from './routes/merchantLogos.js';
 import upcomingRoutes from './routes/upcoming.js';
 
@@ -76,6 +77,7 @@ app.use('/api/net-worth', netWorthRoutes);
 app.use('/api/mha', mhaRoutes);
 app.use('/api/goals', goalsRoutes);
 app.use('/api/household', householdRoutes);
+app.use('/api/household-sharing', householdSharingRoutes);
 app.use('/api/merchant-logos', merchantLogosRoutes);
 app.use('/api/upcoming', upcomingRoutes);
 
