@@ -26,7 +26,11 @@ export function formatLocalMonth(date = new Date()) {
 
 export function addMonthsToLocalDate(value, amount) {
   const base = value instanceof Date ? new Date(value) : parseDateOnly(value) || new Date();
+  const day = base.getDate();
+  base.setDate(1);
   base.setMonth(base.getMonth() + amount);
+  const lastDay = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+  base.setDate(Math.min(day, lastDay));
   return formatLocalDate(base);
 }
 

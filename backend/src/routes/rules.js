@@ -41,6 +41,35 @@ function safeJsonParse(s, fallback) {
   }
 }
 
+function parseCategoryActionValue(value) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function validateActions(householdId, actions) {
+  const categoryIds = [];
+  for (const action of actions) {
+    if (action?.type !== 'categorize') continue;
+    const categoryId = parseCategoryActionValue(action.value);
+    if (categoryId === null) {
+      return 'Categorize actions must choose a valid category.';
+    }
+    categoryIds.push(categoryId);
+  }
+
+  const uniqueIds = Array.from(new Set(categoryIds));
+  if (uniqueIds.length === 0) return null;
+
+  const placeholders = uniqueIds.map(() => '?').join(',');
+  const rows = db
+    .prepare(`SELECT id FROM categories WHERE household_id = ? AND id IN (${placeholders})`)
+    .all(householdId, ...uniqueIds);
+  if (rows.length !== uniqueIds.length) {
+    return 'Categorize actions can only use categories from this household.';
+  }
+  return null;
+}
+
 /**
  * GET /api/rules?withCounts=1
  */
@@ -136,6 +165,10 @@ router.post('/', requireAuth, (req, res) => {
   if (!Array.isArray(actions) || actions.length === 0) {
     return sendBadRequest(res, 'At least one action is required.');
   }
+  const actionError = validateActions(householdId, actions);
+  if (actionError) {
+    return sendBadRequest(res, actionError);
+  }
 
   try {
     const result = db
@@ -199,6 +232,10 @@ router.put('/:id', requireAuth, (req, res) => {
   if (body.actions !== undefined) {
     if (!Array.isArray(body.actions) || body.actions.length === 0) {
       return sendBadRequest(res, 'At least one action is required.');
+    }
+    const actionError = validateActions(householdId, body.actions);
+    if (actionError) {
+      return sendBadRequest(res, actionError);
     }
     sets.push('actions = ?');
     values.push(JSON.stringify(body.actions));

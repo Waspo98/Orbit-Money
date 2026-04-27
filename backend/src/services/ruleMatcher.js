@@ -40,11 +40,38 @@ function safeRegex(pattern) {
   }
 }
 
+function parseCategoryActionValue(value) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function sanitizeActions(actions, validCategoryIds) {
+  if (!Array.isArray(actions)) return null;
+  const sanitized = [];
+  for (const action of actions) {
+    if (!action || typeof action !== 'object') continue;
+    if (action.type === 'categorize') {
+      const categoryId = parseCategoryActionValue(action.value);
+      if (categoryId === null || !validCategoryIds.has(categoryId)) continue;
+      sanitized.push({ ...action, value: categoryId });
+      continue;
+    }
+    sanitized.push(action);
+  }
+  return sanitized;
+}
+
 /**
  * Fetch all enabled rules from the DB, parse JSON, filter out malformed ones.
  * Returns [{ id, conditions, actions }] ready for matching.
  */
 export function loadRules(db, householdId = 1) {
+  const validCategoryIds = new Set(
+    db
+      .prepare('SELECT id FROM categories WHERE household_id = ?')
+      .all(householdId)
+      .map((row) => row.id)
+  );
   const rows = db
     .prepare(
       `SELECT id, conditions, actions
@@ -59,7 +86,7 @@ export function loadRules(db, householdId = 1) {
     .map((r) => ({
       id: r.id,
       conditions: safeJsonParse(r.conditions, null),
-      actions: safeJsonParse(r.actions, null)
+      actions: sanitizeActions(safeJsonParse(r.actions, null), validCategoryIds)
     }))
     .filter(
       (r) =>

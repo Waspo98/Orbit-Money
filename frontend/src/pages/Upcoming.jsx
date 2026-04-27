@@ -8,6 +8,7 @@ import CurrencyInput, {
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { formatCurrency } from '../lib/formatters.js';
+import { addMonthsToLocalDate, formatLocalDate } from '../lib/localDate.js';
 
 const KIND_OPTIONS = [
   { value: 'bill', label: 'Bill' },
@@ -34,13 +35,11 @@ const FILTERS = [
 ];
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return formatLocalDate();
 }
 
 function addOneMonthIso() {
-  const date = new Date();
-  date.setMonth(date.getMonth() + 1);
-  return date.toISOString().slice(0, 10);
+  return addMonthsToLocalDate(formatLocalDate(), 1);
 }
 
 function formatShortDate(value) {

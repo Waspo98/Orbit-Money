@@ -191,18 +191,6 @@ function resolveUserAndHousehold(profile) {
     return existing.id;
   }
 
-  const oidcUsers = db
-    .prepare('SELECT COUNT(*) AS count FROM users WHERE oidc_sub IS NOT NULL')
-    .get().count;
-  if (oidcUsers === 0) {
-    db.prepare(
-      `UPDATE users
-          SET oidc_sub = ?, email = ?, display_name = ?, updated_at = datetime('now')
-        WHERE id = 1`
-    ).run(profile.sub, profile.email || null, profileName(profile));
-    return 1;
-  }
-
   return db
     .prepare(
       `INSERT INTO users (oidc_sub, email, display_name)

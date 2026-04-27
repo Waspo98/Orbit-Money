@@ -9,6 +9,7 @@ import {
   sendRouteError,
   sendServerError
 } from '../lib/http.js';
+import { formatLocalDate, isValidDateOnly } from '../lib/localDate.js';
 import { centsToDollars, dollarsToCents } from '../lib/money.js';
 import { parseId, readIdParam } from '../lib/routeParams.js';
 
@@ -27,35 +28,58 @@ function upcomingError(message, status = 400) {
 }
 
 function isoDate(value) {
-  if (!value || typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : value;
+  return isValidDateOnly(value) ? value : null;
+}
+
+function parseDateParts(value) {
+  const [year, month, day] = value.split('-').map(Number);
+  return { year, month, day };
+}
+
+function formatDateParts(year, month, day) {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function daysInMonth(year, month) {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function addDays(value, days) {
+  const { year, month, day } = parseDateParts(value);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return formatDateParts(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+}
+
+function addMonthsClamped(value, monthsToAdd) {
+  const { year, month, day } = parseDateParts(value);
+  const monthIndex = (year * 12) + (month - 1) + monthsToAdd;
+  const nextYear = Math.floor(monthIndex / 12);
+  const nextMonth = (monthIndex % 12) + 1;
+  const nextDay = Math.min(day, daysInMonth(nextYear, nextMonth));
+  return formatDateParts(nextYear, nextMonth, nextDay);
 }
 
 function addInterval(value, item) {
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
+  if (!isoDate(value)) return value;
   const type = item.frequency_type || 'monthly';
-  if (type === 'weekly') date.setDate(date.getDate() + 7);
-  else if (type === 'biweekly') date.setDate(date.getDate() + 14);
-  else if (type === 'semimonthly') date.setDate(date.getDate() + 15);
-  else if (type === 'bimonthly') date.setMonth(date.getMonth() + 2);
-  else if (type === 'yearly') date.setFullYear(date.getFullYear() + 1);
+  if (type === 'weekly') return addDays(value, 7);
+  if (type === 'biweekly') return addDays(value, 14);
+  if (type === 'semimonthly') return addDays(value, 15);
+  if (type === 'bimonthly') return addMonthsClamped(value, 2);
+  if (type === 'yearly') return addMonthsClamped(value, 12);
   else if (type === 'custom') {
     const interval = Math.max(1, Number(item.frequency_interval) || 1);
     const unit = FREQUENCY_UNITS.has(item.frequency_unit) ? item.frequency_unit : 'days';
-    if (unit === 'days') date.setDate(date.getDate() + interval);
-    else if (unit === 'weeks') date.setDate(date.getDate() + interval * 7);
-    else date.setMonth(date.getMonth() + interval);
-  } else {
-    date.setMonth(date.getMonth() + 1);
+    if (unit === 'days') return addDays(value, interval);
+    if (unit === 'weeks') return addDays(value, interval * 7);
+    return addMonthsClamped(value, interval);
   }
-  return date.toISOString().slice(0, 10);
+  return addMonthsClamped(value, 1);
 }
 
 function advanceToUpcoming(value, item) {
   let next = value;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = formatLocalDate();
   for (let i = 0; i < 240 && next < today; i += 1) {
     const advanced = addInterval(next, item);
     if (advanced === next) break;
@@ -65,8 +89,11 @@ function advanceToUpcoming(value, item) {
 }
 
 function daysBetween(a, b) {
-  const start = new Date(`${a}T00:00:00`);
-  const end = new Date(`${b}T00:00:00`);
+  const startParts = isoDate(a) ? parseDateParts(a) : null;
+  const endParts = isoDate(b) ? parseDateParts(b) : null;
+  if (!startParts || !endParts) return null;
+  const start = new Date(Date.UTC(startParts.year, startParts.month - 1, startParts.day));
+  const end = new Date(Date.UTC(endParts.year, endParts.month - 1, endParts.day));
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
   return Math.round((end.getTime() - start.getTime()) / 86400000);
 }
@@ -79,7 +106,13 @@ function normalizeKind(value, direction = 'expense', categoryName = '') {
   return 'subscription';
 }
 
-function normalizeBody(body) {
+function validateLinkedRow(table, id, householdId, label) {
+  if (id === null) return;
+  const row = db.prepare(`SELECT id FROM ${table} WHERE id = ? AND household_id = ?`).get(id, householdId);
+  if (!row) throw upcomingError(`${label} was not found in this household.`, 400);
+}
+
+function normalizeBody(body, householdId) {
   const name = String(body?.name || body?.merchant || '').trim();
   if (!name) throw upcomingError('Name is required.');
   const direction = body?.direction === 'income' ? 'income' : 'expense';
@@ -93,6 +126,10 @@ function normalizeBody(body) {
   if (!Number.isFinite(amount)) throw upcomingError('amount must be a number.');
   const categoryId = parseId(body?.category_id);
   const accountId = parseId(body?.account_id);
+  const sourceTransactionId = parseId(body?.source_transaction_id);
+  validateLinkedRow('categories', categoryId, householdId, 'Category');
+  validateLinkedRow('accounts', accountId, householdId, 'Account');
+  validateLinkedRow('transactions', sourceTransactionId, householdId, 'Source transaction');
 
   return {
     name: name.slice(0, 120),
@@ -107,7 +144,7 @@ function normalizeBody(body) {
     next_date: nextDate,
     category_id: categoryId,
     account_id: accountId,
-    source_transaction_id: parseId(body?.source_transaction_id),
+    source_transaction_id: sourceTransactionId,
     notes: body?.notes == null ? null : String(body.notes).trim().slice(0, 500)
   };
 }
@@ -127,8 +164,8 @@ function fetchItems(householdId) {
               c.name AS category_name, c.color AS category_color, c.icon AS category_icon,
               a.name AS account_name
          FROM upcoming_items ui
-         LEFT JOIN categories c ON c.id = ui.category_id
-         LEFT JOIN accounts a ON a.id = ui.account_id
+         LEFT JOIN categories c ON c.id = ui.category_id AND c.household_id = ui.household_id
+         LEFT JOIN accounts a ON a.id = ui.account_id AND a.household_id = ui.household_id
         WHERE ui.household_id = ?
           AND ui.status = 'active'
         ORDER BY ui.next_date ASC, ui.id ASC`
@@ -201,6 +238,7 @@ function buildSuggestions(householdId) {
               c.name AS category_name
          FROM transactions t
          LEFT JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
+          AND c.household_id = t.household_id
         WHERE t.household_id = ?
           AND COALESCE(t.edited_is_transfer, t.is_transfer) = 0
           AND COALESCE(t.edited_is_ignored, t.is_ignored) = 0
@@ -315,7 +353,7 @@ router.get('/', requireAuth, (req, res) => {
 router.post('/', requireAuth, (req, res) => {
   const householdId = requireHouseholdId(req);
   try {
-    const id = createItem(householdId, normalizeBody(req.body || {}));
+    const id = createItem(householdId, normalizeBody(req.body || {}, householdId));
     sendCreated(res, { success: true, id, items: fetchItems(householdId) });
   } catch (err) {
     sendRouteError(res, err);
@@ -335,6 +373,7 @@ router.post('/from-transaction', requireAuth, (req, res) => {
                 c.name AS category_name
            FROM transactions t
            LEFT JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
+            AND c.household_id = t.household_id
           WHERE t.id = ? AND t.household_id = ?`
       )
       .get(id, householdId);
@@ -354,7 +393,7 @@ router.post('/from-transaction', requireAuth, (req, res) => {
       frequency_type: 'monthly',
       source: 'transaction',
       source_transaction_id: row.id
-    });
+    }, householdId);
     const itemId = createItem(householdId, payload);
     sendCreated(res, { success: true, id: itemId, items: fetchItems(householdId) });
   } catch (err) {
@@ -365,7 +404,7 @@ router.post('/from-transaction', requireAuth, (req, res) => {
 router.post('/suggestions/accept', requireAuth, (req, res) => {
   const householdId = requireHouseholdId(req);
   try {
-    const suggestion = normalizeBody({ ...(req.body || {}), source: 'suggestion' });
+    const suggestion = normalizeBody({ ...(req.body || {}), source: 'suggestion' }, householdId);
     const id = createItem(householdId, suggestion);
     if (req.body?.key) {
       db.prepare(
@@ -401,7 +440,7 @@ router.put('/:id', requireAuth, (req, res) => {
   const id = readIdParam(req, res, 'id', 'upcoming item');
   if (id === null) return;
   try {
-    const payload = normalizeBody(req.body || {});
+    const payload = normalizeBody(req.body || {}, householdId);
     const result = db
       .prepare(
         `UPDATE upcoming_items

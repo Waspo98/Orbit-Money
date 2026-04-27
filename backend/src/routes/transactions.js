@@ -440,6 +440,14 @@ router.patch('/:id', requireAuth, (req, res) => {
       if (cid === null && body.category_id !== null) {
         return sendBadRequest(res, 'category_id must be an integer or null.');
       }
+      if (cid !== null) {
+        const category = db
+          .prepare('SELECT id FROM categories WHERE id = ? AND household_id = ?')
+          .get(cid, householdId);
+        if (!category) {
+          return sendBadRequest(res, 'category_id does not exist in this household.');
+        }
+      }
       if (cid === existing.original_category_id) {
         sets.push('edited_category_id = NULL');
         sets.push('edited_category_id_source = NULL');
