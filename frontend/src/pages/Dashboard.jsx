@@ -82,6 +82,13 @@ function formatTransactionAmount(amount) {
   return formatSignedCurrency(amount);
 }
 
+function formatWholeCurrency(amount) {
+  return formatCurrency(Math.round(Number(amount) || 0), {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0
+  });
+}
+
 function daysInCurrentMonth() {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
@@ -130,8 +137,8 @@ const DASHBOARD_CARD_DEFS = [
   },
   {
     id: 'biggest-transactions',
-    title: 'Biggest Transactions',
-    description: 'Top 5 transactions with dashboard-only hiding.'
+    title: 'Biggest Monthly Transactions',
+    description: 'Top 5 current-month expense transactions with dashboard-only hiding.'
   },
   {
     id: 'subscriptions',
@@ -290,6 +297,13 @@ function transactionMonthUrl(month, extra = '') {
   return `/transactions?date_from=${month}-01${extra}`;
 }
 
+function monthEndDate(month) {
+  const [year, monthNumber] = String(month || '').split('-').map(Number);
+  if (!year || !monthNumber) return '';
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  return `${month}-${String(lastDay).padStart(2, '0')}`;
+}
+
 function kindLabel(kind) {
   if (kind === 'bill') return 'Bill';
   if (kind === 'income') return 'Income';
@@ -409,7 +423,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
         api.get(`/api/budgets?month=${month}`),
         api.get('/api/transactions?limit=10&page=1'),
         optional(`/api/budgets?month=${previousMonth}`),
-        optional('/api/transactions?limit=200&page=1&include_ignored=0&include_transfers=0&sort=date_desc'),
+        optional(`/api/transactions?limit=50&page=1&type=expense&date_from=${month}-01&date_to=${monthEndDate(month)}&include_ignored=0&include_transfers=0&exclude_credit_card_payments=1&sort=abs_amount_desc`),
         optional(`/api/transactions?limit=5&page=1&categories=${
           categories.find((category) => String(category.name || '').toLowerCase() === 'uncategorized')?.id || 'uncategorized'
         }&include_ignored=0&include_transfers=0&sort=date_desc`),
@@ -1106,7 +1120,7 @@ function BiggestTransactionsCard({
 }) {
   return (
     <DashboardCard
-      title="Biggest Transactions"
+      title="Biggest Monthly Transactions"
       action={
         hiddenCount > 0 ? (
           <button
@@ -1117,7 +1131,10 @@ function BiggestTransactionsCard({
             Show Hidden
           </button>
         ) : (
-          <Link to="/transactions?sort=abs_amount_desc" className="dashboard-card-link">
+          <Link
+            to={`/transactions?date_from=${formatLocalMonth()}-01&date_to=${monthEndDate(formatLocalMonth())}&type=expense&include_ignored=0&include_transfers=0&exclude_credit_card_payments=1&sort=abs_amount_desc`}
+            className="dashboard-card-link"
+          >
             Browse
           </Link>
         )
@@ -1341,10 +1358,10 @@ function MonthComparisonCard({ month, previousMonth, summary, previousSummary, l
             return (
               <div key={row.label} className="dash-month-compare-row">
                 <span>{row.label}</span>
-                <strong>{formatCurrency(current)}</strong>
-                <strong>{formatCurrency(previous)}</strong>
+                <strong>{formatWholeCurrency(current)}</strong>
+                <strong>{formatWholeCurrency(previous)}</strong>
                 <em className={delta < 0 ? 'income' : delta > 0 ? 'expense' : ''}>
-                  {delta === 0 ? 'No change' : `${delta > 0 ? '+' : ''}${formatCurrency(delta)}`}
+                  {delta === 0 ? 'No change' : `${delta > 0 ? '+' : ''}${formatWholeCurrency(delta)}`}
                 </em>
               </div>
             );

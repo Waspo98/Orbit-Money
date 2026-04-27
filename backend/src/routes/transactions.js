@@ -47,6 +47,13 @@ import {
 } from '../lib/routeParams.js';
 
 const router = express.Router();
+const CREDIT_PAYMENT_HINTS = [
+  'credit card payment',
+  'card payment',
+  'cc payment',
+  'payment thank you',
+  'autopay payment'
+];
 
 // ---------------------------------------------------------------------------
 // SELECT projection used by every read endpoint. Returns both the
@@ -266,6 +273,25 @@ function buildFilterWhere(q, householdId) {
   }
   if (q.include_transfers === '0' && type !== 'transfer') {
     wheres.push(`NOT (${isTransferExpr})`);
+  }
+  if (q.exclude_credit_card_payments === '1') {
+    const textExpr = `LOWER(
+      COALESCE(edited_merchant, original_merchant, '') || ' ' ||
+      COALESCE(original_description, '')
+    )`;
+    const categoryExpr = `LOWER(COALESCE((
+      SELECT c.name
+        FROM categories c
+       WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)
+    ), ''))`;
+    const parts = [];
+    for (const hint of CREDIT_PAYMENT_HINTS) {
+      parts.push(`${textExpr} LIKE ?`);
+      args.push(`%${hint}%`);
+    }
+    parts.push(`(${categoryExpr} LIKE ? AND ${categoryExpr} LIKE ?)`);
+    args.push('%credit%', '%payment%');
+    wheres.push(`NOT (${parts.join(' OR ')})`);
   }
 
   // ----- Has edits -----

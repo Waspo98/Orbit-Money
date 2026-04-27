@@ -104,6 +104,7 @@ Transactions page toolbar has a debounced search input + filter sheet + sort dro
 - **amount_min** / **amount_max** — absolute-value match so `50` catches both ±$50
 - **type** — all / income / expense / transfer
 - **include_ignored** — default true; can hide
+- **exclude_credit_card_payments** — `1` hides credit-card-payment style rows for dashboard/report views
 - **has_edits** — any / yes / no
 - **sort** — `date_desc | date_asc | amount_desc | amount_asc | abs_amount_desc | abs_amount_asc | merchant_asc`
 
@@ -198,7 +199,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - **This month card:** Day X of Y + compact Income / Expenses / Net trio
 - **Budget pulse card:** overall progress bar + daily spend pace + up to 5 "attention" categories (over-budget first, then 85%+), or a success message when all are on track
 - **Top spending card:** up to 7 categories with horizontal bars scaled to the biggest spender; bars use each category's color
-- **Biggest transactions card:** top 5 largest transactions from the fetched dashboard transaction pool. `Hide From Dashboard` is dashboard-only and does not set the transaction ignored flag used by budgets/reports.
+- **Biggest Monthly Transactions card:** top 5 current-month expenses, excluding income, ignored rows, transfers, and credit-card-payment style rows. `Hide From Dashboard` is dashboard-only and does not set the transaction ignored flag used by budgets/reports.
 - **Subscriptions / Recurring and Upcoming cards:** read saved bills, subscriptions, and income from `/api/upcoming`. The Upcoming page owns manual entries and accepted suggestions.
 - **Uncategorized, Month vs Last Month, Goals Progress, Goal Focus, Retirement Snapshot, MHA Tracker Summary, Mortgage Snapshot:** reuse existing route data from Transactions, Budgets, Goals, Household, MHA, and Accounts.
 - **Recent activity card:** last 10 transactions with the shared `TransactionRow` actions
