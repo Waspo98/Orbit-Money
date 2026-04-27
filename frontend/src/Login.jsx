@@ -40,18 +40,6 @@ export default function Login({ onLogin }) {
         <h1 className="login-title">Orbit Money</h1>
         <p className="login-subtitle">Welcome back.</p>
 
-        {oidcEnabled && (
-          <button type="button" className="btn-primary" onClick={handleOidcLogin}>
-            {authConfig.oidcLoginLabel || 'Log in with OIDC'}
-          </button>
-        )}
-
-        {oidcEnabled && localEnabled && (
-          <div className="login-divider" aria-hidden="true">
-            <span>or</span>
-          </div>
-        )}
-
         {localEnabled && (
           <>
             <label className="field">
@@ -83,6 +71,18 @@ export default function Login({ onLogin }) {
               {loading ? 'Signing In...' : 'Sign In'}
             </button>
           </>
+        )}
+
+        {oidcEnabled && localEnabled && (
+          <div className="login-divider" aria-hidden="true">
+            <span>or</span>
+          </div>
+        )}
+
+        {oidcEnabled && (
+          <button type="button" className="btn-primary" onClick={handleOidcLogin}>
+            {authConfig.oidcLoginLabel || 'Log in with OIDC'}
+          </button>
         )}
       </form>
     </div>
