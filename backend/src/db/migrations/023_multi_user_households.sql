@@ -76,6 +76,14 @@ SELECT name, color, icon, is_transfer, is_income, sort_order,
   FROM categories
  ORDER BY sort_order ASC, name ASC;
 
+CREATE TEMP TABLE transactions_preserve AS SELECT * FROM transactions;
+CREATE TEMP TABLE budgets_preserve AS SELECT * FROM budgets;
+CREATE TEMP TABLE goals_preserve AS SELECT id, linked_account_id FROM goals;
+CREATE TEMP TABLE goal_account_allocations_preserve AS SELECT * FROM goal_account_allocations;
+CREATE TEMP TABLE account_balance_records_preserve AS SELECT * FROM account_balance_records;
+CREATE TEMP TABLE household_retirement_accounts_preserve AS SELECT * FROM household_retirement_accounts;
+CREATE TEMP TABLE upcoming_items_preserve AS SELECT * FROM upcoming_items;
+
 DROP INDEX IF EXISTS idx_accounts_institution_last4;
 DROP INDEX IF EXISTS idx_accounts_sort_order;
 DROP INDEX IF EXISTS idx_accounts_mha_default;
@@ -166,6 +174,27 @@ DROP INDEX IF EXISTS idx_transactions_edited_mha;
 ALTER TABLE transactions
   ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
 
+DELETE FROM transactions;
+
+INSERT INTO transactions (
+  id, account_id, date, original_merchant, original_description,
+  category_id, notes, is_transfer, transfer_pair_id, is_ignored,
+  source, external_id, imported_at, updated_at, edited_merchant,
+  edited_merchant_source, edited_category_id, edited_category_id_source,
+  edited_is_transfer, edited_is_transfer_source, edited_is_ignored,
+  edited_is_ignored_source, edited_mha_eligible, edited_mha_eligible_source,
+  amount, household_id
+)
+SELECT
+  id, account_id, date, original_merchant, original_description,
+  category_id, notes, is_transfer, transfer_pair_id, is_ignored,
+  source, external_id, imported_at, updated_at, edited_merchant,
+  edited_merchant_source, edited_category_id, edited_category_id_source,
+  edited_is_transfer, edited_is_transfer_source, edited_is_ignored,
+  edited_is_ignored_source, edited_mha_eligible, edited_mha_eligible_source,
+  amount, 1
+  FROM transactions_preserve;
+
 CREATE UNIQUE INDEX idx_transactions_household_source_external
   ON transactions(household_id, source, external_id)
   WHERE external_id IS NOT NULL;
@@ -233,7 +262,7 @@ INSERT INTO budgets_new (
   id, household_id, category_id, rollover, created_at, updated_at, amount
 )
 SELECT id, 1, category_id, rollover, created_at, updated_at, amount
-  FROM budgets;
+  FROM budgets_preserve;
 
 DROP TABLE budgets;
 ALTER TABLE budgets_new RENAME TO budgets;
@@ -244,11 +273,30 @@ CREATE INDEX idx_budgets_household_category
 ALTER TABLE goals
   ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
 
+UPDATE goals
+   SET linked_account_id = (
+     SELECT linked_account_id
+       FROM goals_preserve
+      WHERE goals_preserve.id = goals.id
+   )
+ WHERE id IN (SELECT id FROM goals_preserve);
+
 CREATE INDEX idx_goals_household_sort
   ON goals(household_id, sort_order, id);
 
 ALTER TABLE goal_account_allocations
   ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
+
+DELETE FROM goal_account_allocations;
+
+INSERT INTO goal_account_allocations (
+  id, goal_id, account_id, allocation_type, allocation_percent,
+  allocation_amount, reserve_amount, created_at, updated_at, household_id
+)
+SELECT
+  id, goal_id, account_id, allocation_type, allocation_percent,
+  allocation_amount, reserve_amount, created_at, updated_at, 1
+  FROM goal_account_allocations_preserve;
 
 CREATE INDEX idx_goal_allocations_household_goal
   ON goal_account_allocations(household_id, goal_id);
@@ -258,6 +306,14 @@ CREATE INDEX idx_goal_allocations_household_account
 
 ALTER TABLE account_balance_records
   ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
+
+DELETE FROM account_balance_records;
+
+INSERT INTO account_balance_records (
+  id, account_id, record_date, created_at, updated_at, balance, household_id
+)
+SELECT id, account_id, record_date, created_at, updated_at, balance, 1
+  FROM account_balance_records_preserve;
 
 CREATE INDEX idx_account_balance_records_household_account_date
   ON account_balance_records(household_id, account_id, record_date DESC);
@@ -320,11 +376,32 @@ CREATE INDEX idx_household_income_records_household_member_date
 ALTER TABLE household_retirement_accounts
   ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
 
+DELETE FROM household_retirement_accounts;
+
+INSERT INTO household_retirement_accounts (
+  id, member_id, account_id, account_kind, created_at, updated_at, household_id
+)
+SELECT id, member_id, account_id, account_kind, created_at, updated_at, 1
+  FROM household_retirement_accounts_preserve;
+
 CREATE INDEX idx_household_retirement_accounts_household_member
   ON household_retirement_accounts(household_id, member_id);
 
 ALTER TABLE upcoming_items
   ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
+
+DELETE FROM upcoming_items;
+
+INSERT INTO upcoming_items (
+  id, name, kind, source, merchant, amount, direction, frequency_type,
+  frequency_interval, frequency_unit, next_date, category_id, account_id,
+  source_transaction_id, status, notes, created_at, updated_at, household_id
+)
+SELECT
+  id, name, kind, source, merchant, amount, direction, frequency_type,
+  frequency_interval, frequency_unit, next_date, category_id, account_id,
+  source_transaction_id, status, notes, created_at, updated_at, 1
+  FROM upcoming_items_preserve;
 
 CREATE INDEX idx_upcoming_items_household_status_date
   ON upcoming_items(household_id, status, next_date);
