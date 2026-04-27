@@ -7,6 +7,8 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [authConfig, setAuthConfig] = useState({ authProvider: 'local' });
+  const localEnabled = authConfig.localEnabled ?? authConfig.authProvider === 'local';
+  const oidcEnabled = authConfig.oidcEnabled ?? authConfig.authProvider === 'oidc';
 
   useEffect(() => {
     api.get('/api/auth/config')
@@ -28,7 +30,7 @@ export default function Login({ onLogin }) {
     }
   }
 
-  function handleAuthentikLogin() {
+  function handleOidcLogin() {
     window.location.href = authConfig.oidcLoginUrl || '/api/auth/oidc/login';
   }
 
@@ -38,11 +40,19 @@ export default function Login({ onLogin }) {
         <h1 className="login-title">Orbit Money</h1>
         <p className="login-subtitle">Welcome back.</p>
 
-        {authConfig.authProvider === 'authentik' ? (
-          <button type="button" className="btn-primary" onClick={handleAuthentikLogin}>
-            Sign in with Overbay.App account
+        {oidcEnabled && (
+          <button type="button" className="btn-primary" onClick={handleOidcLogin}>
+            {authConfig.oidcLoginLabel || 'Log in with OIDC'}
           </button>
-        ) : (
+        )}
+
+        {oidcEnabled && localEnabled && (
+          <div className="login-divider" aria-hidden="true">
+            <span>or</span>
+          </div>
+        )}
+
+        {localEnabled && (
           <>
             <label className="field">
               <span>Username</span>

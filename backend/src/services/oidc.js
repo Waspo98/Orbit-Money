@@ -38,7 +38,7 @@ async function fetchJson(url, options = {}) {
 
 export async function getDiscovery() {
   if (discoveryCache) return discoveryCache;
-  const issuer = config.authentikIssuerUrl.replace(/\/+$/, '');
+  const issuer = config.oidcIssuerUrl.replace(/\/+$/, '');
   discoveryCache = await fetchJson(`${issuer}/.well-known/openid-configuration`);
   return discoveryCache;
 }
@@ -61,10 +61,10 @@ export async function buildAuthorizationUrl(req) {
   req.session.oidcCodeVerifier = codeVerifier;
 
   const params = new URLSearchParams({
-    client_id: config.authentikClientId,
-    redirect_uri: config.authentikRedirectUri,
+    client_id: config.oidcClientId,
+    redirect_uri: config.oidcRedirectUri,
     response_type: 'code',
-    scope: 'openid email profile',
+    scope: config.oidcScopes,
     state,
     nonce,
     code_challenge: sha256UrlSafe(codeVerifier),
@@ -79,9 +79,9 @@ async function exchangeCodeForTokens(code, codeVerifier) {
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
-    redirect_uri: config.authentikRedirectUri,
-    client_id: config.authentikClientId,
-    client_secret: config.authentikClientSecret,
+    redirect_uri: config.oidcRedirectUri,
+    client_id: config.oidcClientId,
+    client_secret: config.oidcClientSecret,
     code_verifier: codeVerifier
   });
 
@@ -111,7 +111,7 @@ async function verifyIdToken(idToken, expectedNonce) {
 
   const jwks = await getJwks();
   const jwk = jwks.keys?.find((key) => key.kid === decoded.header.kid);
-  if (!jwk) throw new Error('Could not find a matching Authentik signing key.');
+  if (!jwk) throw new Error('Could not find a matching OIDC signing key.');
 
   const key = crypto.createPublicKey({ key: jwk, format: 'jwk' });
   const verifier = crypto.createVerify('RSA-SHA256');
@@ -122,10 +122,10 @@ async function verifyIdToken(idToken, expectedNonce) {
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const issuer = config.authentikIssuerUrl.replace(/\/+$/, '');
+  const issuer = config.oidcIssuerUrl.replace(/\/+$/, '');
   if (decoded.payload.iss?.replace(/\/+$/, '') !== issuer) throw new Error('ID token issuer mismatch.');
   const audiences = Array.isArray(decoded.payload.aud) ? decoded.payload.aud : [decoded.payload.aud];
-  if (!audiences.includes(config.authentikClientId)) {
+  if (!audiences.includes(config.oidcClientId)) {
     throw new Error('ID token audience mismatch.');
   }
   if (Number(decoded.payload.exp) <= now) throw new Error('ID token is expired.');
@@ -136,7 +136,7 @@ async function verifyIdToken(idToken, expectedNonce) {
 }
 
 function profileName(profile) {
-  return profile.name || profile.preferred_username || profile.email || 'Authentik User';
+  return profile.name || profile.preferred_username || profile.email || 'OIDC User';
 }
 
 function applyPendingHouseholdShares(userId, email) {
@@ -180,7 +180,7 @@ function applyPendingHouseholdShares(userId, email) {
 
 function resolveUserAndHousehold(profile) {
   const existing = db
-    .prepare('SELECT * FROM users WHERE authentik_sub = ?')
+    .prepare('SELECT * FROM users WHERE oidc_sub = ?')
     .get(profile.sub);
   if (existing) {
     db.prepare(
@@ -192,12 +192,12 @@ function resolveUserAndHousehold(profile) {
   }
 
   const oidcUsers = db
-    .prepare('SELECT COUNT(*) AS count FROM users WHERE authentik_sub IS NOT NULL')
+    .prepare('SELECT COUNT(*) AS count FROM users WHERE oidc_sub IS NOT NULL')
     .get().count;
   if (oidcUsers === 0) {
     db.prepare(
       `UPDATE users
-          SET authentik_sub = ?, email = ?, display_name = ?, updated_at = datetime('now')
+          SET oidc_sub = ?, email = ?, display_name = ?, updated_at = datetime('now')
         WHERE id = 1`
     ).run(profile.sub, profile.email || null, profileName(profile));
     return 1;
@@ -205,7 +205,7 @@ function resolveUserAndHousehold(profile) {
 
   return db
     .prepare(
-      `INSERT INTO users (authentik_sub, email, display_name)
+      `INSERT INTO users (oidc_sub, email, display_name)
        VALUES (?, ?, ?)`
     )
     .run(profile.sub, profile.email || null, profileName(profile)).lastInsertRowid;

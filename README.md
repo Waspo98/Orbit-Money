@@ -10,7 +10,7 @@ stores data in SQLite, and runs as a Docker Compose app.
 - Rocket Money CSV import
 - SimpleFIN bank sync
 - Merchant logo enrichment with optional Logo.dev keys
-- Local admin login or Authentik OIDC login, with household-scoped data
+- Local login, optional OIDC login, or both, with household-scoped data
 - SQLite storage in a Docker volume
 - Installable PWA with manifest and service worker
 
@@ -65,9 +65,9 @@ docker compose down
 
 Required values:
 
-- `AUTH_PROVIDER`, either `local` or `authentik`
+- `AUTH_PROVIDER`, one of `local`, `oidc`, or `both`
 - `ADMIN_USERNAME`, when using local auth
-- `ADMIN_PASSWORD`, when using local auth
+- `ADMIN_PASSWORD`, when using local auth or `AUTH_PROVIDER=both`
 - `SESSION_SECRET`
 
 Optional or feature-specific values:
@@ -75,8 +75,12 @@ Optional or feature-specific values:
 - `API_KEY` enables programmatic API access through the `X-API-Key` header.
   Multi-user API requests may pass `X-Household-ID`; otherwise household `1`
   is used for backward compatibility.
-- `AUTHENTIK_ISSUER_URL`, `AUTHENTIK_CLIENT_ID`, `AUTHENTIK_CLIENT_SECRET`, and
-  `AUTHENTIK_REDIRECT_URI` are required when `AUTH_PROVIDER=authentik`.
+- `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, and
+  `OIDC_REDIRECT_URI` are required when `AUTH_PROVIDER=oidc` or `both`.
+- `OIDC_LOGIN_LABEL` customizes the OIDC login button. The default is
+  `Log in with OIDC`.
+- Existing private installs that still use the old `AUTHENTIK_*` variable names
+  continue to work, but new installs should use `OIDC_*`.
 - `SIMPLEFIN_ENCRYPTION_KEY` is required before SimpleFIN sync can be used.
 - `LOGO_DEV_PUBLISHABLE_KEY` enables merchant logo display.
 - `LOGO_DEV_SECRET_KEY` enables server-side brand search for manual logo overrides.
@@ -87,19 +91,22 @@ Optional or feature-specific values:
 `SIMPLEFIN_ENCRYPTION_KEY` and `SESSION_SECRET` should be strong random values.
 `SIMPLEFIN_ENCRYPTION_KEY` must be a 64-character hex string.
 
-## Authentik And Multi-User Data
+## Auth And Multi-User Data
 
 Orbit Money stores users, households, and memberships in SQLite. Existing
 single-user data is migrated into household `1` (`Neal Household`) and remains
-in the same Docker volume. The first Authentik user to sign in claims that
+in the same Docker volume. The first OIDC user to sign in claims that
 legacy household so the current data follows the real owner into SSO.
 
-New Authentik users receive their own household with default app settings and
-category defaults copied from the app default tables. Those defaults are stored
-in SQLite as `app_default_settings` and `app_default_categories` so future
-defaults can be changed without rewriting existing households.
+New OIDC users receive their own household with default app settings and category
+defaults copied from the app default tables. Those defaults are stored in SQLite
+as `app_default_settings` and `app_default_categories` so future defaults can be
+changed without rewriting existing households.
 
-For Authentik, configure an OAuth2/OpenID provider with this callback:
+For a simple self-hosted install, keep `AUTH_PROVIDER=local` and use the
+username/password login. For SSO, set `AUTH_PROVIDER=oidc`. To show both the
+local form and the OIDC button on the login page, set `AUTH_PROVIDER=both`.
+Authentik, Authelia, Keycloak, and similar providers should use this callback:
 
 ```text
 https://your-orbit-domain.example/api/auth/oidc/callback

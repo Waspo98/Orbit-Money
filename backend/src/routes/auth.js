@@ -12,7 +12,15 @@ import { buildAuthorizationUrl, completeOidcLogin } from '../services/oidc.js';
 const router = express.Router();
 
 function authProvider() {
-  return config.authProvider === 'authentik' ? 'authentik' : 'local';
+  return config.authProvider;
+}
+
+function oidcEnabled() {
+  return config.authProvider === 'oidc' || config.authProvider === 'both';
+}
+
+function localEnabled() {
+  return config.authProvider === 'local' || config.authProvider === 'both';
 }
 
 function setSessionIdentity(req, identity) {
@@ -44,16 +52,19 @@ function currentSessionPayload(req) {
 router.get('/config', (req, res) => {
   sendOk(res, {
     authProvider: authProvider(),
-    oidcLoginUrl: authProvider() === 'authentik' ? '/api/auth/oidc/login' : null
+    localEnabled: localEnabled(),
+    oidcEnabled: oidcEnabled(),
+    oidcLoginUrl: oidcEnabled() ? '/api/auth/oidc/login' : null,
+    oidcLoginLabel: config.oidcLoginLabel
   });
 });
 
 /**
  * POST /api/auth/login
- * Local fallback login. Authentik deployments should use /api/auth/oidc/login.
+ * Local login. OIDC-only deployments should use /api/auth/oidc/login.
  */
 router.post('/login', (req, res) => {
-  if (authProvider() !== 'local') {
+  if (!localEnabled()) {
     return sendBadRequest(res, 'Password login is disabled for this deployment.');
   }
 
@@ -92,7 +103,7 @@ router.post('/login', (req, res) => {
 });
 
 router.get('/oidc/login', async (req, res) => {
-  if (authProvider() !== 'authentik') {
+  if (!oidcEnabled()) {
     return res.redirect('/');
   }
 
@@ -106,7 +117,7 @@ router.get('/oidc/login', async (req, res) => {
 });
 
 router.get('/oidc/callback', async (req, res) => {
-  if (authProvider() !== 'authentik') {
+  if (!oidcEnabled()) {
     return res.redirect('/');
   }
 
@@ -116,7 +127,7 @@ router.get('/oidc/callback', async (req, res) => {
     res.redirect('/');
   } catch (err) {
     console.error('OIDC callback failed:', err);
-    res.status(401).send('Authentik login failed. Return to Orbit Money and try again.');
+    res.status(401).send('OIDC login failed. Return to Orbit Money and try again.');
   }
 });
 
@@ -134,7 +145,12 @@ router.get('/me', (req, res) => {
   if (req.session && req.session.authenticated) {
     return sendOk(res, currentSessionPayload(req));
   }
-  sendOk(res, { authenticated: false, authProvider: authProvider() });
+  sendOk(res, {
+    authenticated: false,
+    authProvider: authProvider(),
+    localEnabled: localEnabled(),
+    oidcEnabled: oidcEnabled()
+  });
 });
 
 export default router;
