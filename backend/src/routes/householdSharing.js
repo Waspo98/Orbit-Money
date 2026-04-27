@@ -28,9 +28,19 @@ function canManageSharing(req) {
   return req.household?.role === 'owner' || req.household?.role === 'admin';
 }
 
+function canRemoveUsers(req) {
+  return req.household?.role === 'owner';
+}
+
 function requireShareManager(req) {
   if (!canManageSharing(req)) {
     throw sharingError('Only household owners and admins can manage sharing.', 403);
+  }
+}
+
+function requireUserRemover(req) {
+  if (!canRemoveUsers(req)) {
+    throw sharingError('Only household owners can remove family members.', 403);
   }
 }
 
@@ -77,7 +87,8 @@ function buildPayload(req) {
       email: req.user?.email || null,
       displayName: req.user?.display_name || req.user?.username || null,
       role: req.household?.role || 'member',
-      canManageSharing: canManageSharing(req)
+      canManageSharing: canManageSharing(req),
+      canRemoveUsers: canRemoveUsers(req)
     },
     users: listUsers(householdId),
     shares: listShares(householdId)
@@ -176,6 +187,67 @@ router.delete('/shares/:id', requireAuth, (req, res) => {
       )
       .run(id, householdId);
     if (result.changes === 0) return sendNotFound(res, 'Share was not found.');
+    sendOk(res, { success: true, ...buildPayload(req) });
+  } catch (err) {
+    sendRouteError(res, err);
+  }
+});
+
+router.delete('/users/:id', requireAuth, (req, res) => {
+  const id = readIdParam(req, res, 'id', 'user');
+  if (id === null) return;
+
+  try {
+    requireUserRemover(req);
+    const householdId = requireHouseholdId(req);
+    const currentUserId = Number(req.user?.id);
+    if (id === currentUserId) {
+      throw sharingError('You cannot remove yourself from your own household.', 400);
+    }
+
+    const membership = db
+      .prepare(
+        `SELECT hm.user_id, hm.role, u.email, u.display_name, u.username
+           FROM household_memberships hm
+           JOIN users u ON u.id = hm.user_id
+          WHERE hm.household_id = ?
+            AND hm.user_id = ?`
+      )
+      .get(householdId, id);
+    if (!membership) return sendNotFound(res, 'Family member was not found.');
+
+    if (membership.role === 'owner') {
+      const ownerCount = db
+        .prepare(
+          `SELECT COUNT(*) AS count
+             FROM household_memberships
+            WHERE household_id = ?
+              AND role = 'owner'`
+        )
+        .get(householdId).count;
+      if (ownerCount <= 1) {
+        throw sharingError('You cannot remove the last owner from a household.', 400);
+      }
+    }
+
+    const remove = db.transaction(() => {
+      db.prepare(
+        `DELETE FROM household_memberships
+          WHERE household_id = ?
+            AND user_id = ?`
+      ).run(householdId, id);
+
+      db.prepare(
+        `UPDATE household_shares
+            SET revoked_at = COALESCE(revoked_at, datetime('now')),
+                updated_at = datetime('now')
+          WHERE household_id = ?
+            AND accepted_by_user_id = ?
+            AND revoked_at IS NULL`
+      ).run(householdId, id);
+    });
+    remove();
+
     sendOk(res, { success: true, ...buildPayload(req) });
   } catch (err) {
     sendRouteError(res, err);

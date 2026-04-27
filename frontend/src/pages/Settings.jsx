@@ -235,6 +235,31 @@ export default function Settings({
     }
   }
 
+  async function handleRemoveFamilyMember(user) {
+    const name = displayPerson(user);
+    const ok = await confirm(
+      `Remove ${name} from this household? They will no longer be able to access this family's data.`,
+      {
+        title: 'Remove family member',
+        confirmLabel: 'Remove',
+        destructive: true
+      }
+    );
+    if (!ok) return;
+    setSharingBusy(true);
+    setSharingError('');
+    setSharingMessage('');
+    try {
+      const data = await api.del(`/api/household-sharing/users/${user.id}`);
+      setSharing(data);
+      setSharingMessage(`${name} was removed from this household.`);
+    } catch (err) {
+      setSharingError(err.message || 'Could not remove family member.');
+    } finally {
+      setSharingBusy(false);
+    }
+  }
+
   async function handleMhaToggle() {
     const next = !mhaTrackerEnabled;
     setMhaBusy(true);
@@ -701,7 +726,19 @@ export default function Settings({
                   <strong>{displayPerson(user)}</strong>
                   <span>{user.email || user.username || 'No email on file'}</span>
                 </div>
-                <span className="pill accent">{user.role}</span>
+                <div className="settings-share-row-actions">
+                  <span className="pill accent">{user.role}</span>
+                  {sharing.currentUser?.canRemoveUsers && user.id !== sharing.currentUser.id && (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => handleRemoveFamilyMember(user)}
+                      disabled={sharingBusy}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
 
@@ -711,7 +748,7 @@ export default function Settings({
                 <div className="settings-share-row" key={`share-${share.id}`}>
                   <div>
                     <strong>{share.invited_email}</strong>
-                    <span>Waiting for Authentik sign in</span>
+                    <span>Waiting for OIDC sign in</span>
                   </div>
                   {sharing.currentUser?.canManageSharing ? (
                     <button

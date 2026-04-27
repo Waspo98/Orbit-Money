@@ -143,6 +143,25 @@ router.post('/logout', (req, res) => {
 
 router.get('/me', (req, res) => {
   if (req.session && req.session.authenticated) {
+    const householdId = req.session.householdId || 1;
+    const membership = db
+      .prepare(
+        `SELECT role
+           FROM household_memberships
+          WHERE user_id = ?
+            AND household_id = ?`
+      )
+      .get(req.session.userId || 1, householdId);
+    if (!membership) {
+      req.session.authenticated = false;
+      return sendOk(res, {
+        authenticated: false,
+        authProvider: authProvider(),
+        localEnabled: localEnabled(),
+        oidcEnabled: oidcEnabled()
+      });
+    }
+    req.session.householdRole = membership.role || req.session.householdRole || 'member';
     return sendOk(res, currentSessionPayload(req));
   }
   sendOk(res, {

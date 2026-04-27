@@ -1,4 +1,5 @@
 import { config } from './config.js';
+import { db } from './db/index.js';
 
 function parseHouseholdHeader(req) {
   const raw = req.header('X-Household-ID');
@@ -19,6 +20,20 @@ export function requireAuth(req, res, next) {
   }
 
   if (req.session && req.session.authenticated) {
+    const householdId = req.session.householdId || 1;
+    const membership = db
+      .prepare(
+        `SELECT role
+           FROM household_memberships
+          WHERE user_id = ?
+            AND household_id = ?`
+      )
+      .get(req.session.userId || 1, householdId);
+    if (!membership) {
+      req.session.authenticated = false;
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     req.user = {
       id: req.session.userId || 1,
       username: req.session.username || null,
@@ -26,8 +41,8 @@ export function requireAuth(req, res, next) {
       display_name: req.session.displayName || req.session.username || null
     };
     req.household = {
-      id: req.session.householdId || 1,
-      role: req.session.householdRole || 'owner'
+      id: householdId,
+      role: membership.role || req.session.householdRole || 'member'
     };
     return next();
   }

@@ -16,6 +16,11 @@ export default function Login({ onLogin }) {
       .catch(() => setAuthConfig({ authProvider: 'local' }));
   }, []);
 
+  useEffect(() => {
+    document.body.classList.add('login-scroll-lock');
+    return () => document.body.classList.remove('login-scroll-lock');
+  }, []);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
