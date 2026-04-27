@@ -51,7 +51,8 @@ http://localhost:5008
 
 The login page includes a small `Continue with sample data` link. It creates an
 isolated sample household for that browser/device so you can edit demo accounts,
-transactions, budgets, and rules without changing a real household.
+transactions, budgets, and rules without changing a real household. Sample
+households are removed automatically after 48 hours of inactivity.
 
 Check health:
 

@@ -10,6 +10,7 @@ import {
 import { buildAuthorizationUrl, completeOidcLogin } from '../services/oidc.js';
 import { createHouseholdForUser } from '../services/householdDefaults.js';
 import { seedDemoDataForHousehold } from '../services/demoSeed.js';
+import { touchSampleUser } from '../services/sampleHouseholds.js';
 
 const router = express.Router();
 
@@ -145,6 +146,7 @@ router.post('/sample', (req, res) => {
       }
 
       seedDemoDataForHousehold(db, membership.household_id);
+      touchSampleUser(db, user.id);
       return { user, membership };
     });
 
@@ -225,6 +227,9 @@ router.get('/me', (req, res) => {
       });
     }
     req.session.householdRole = membership.role || req.session.householdRole || 'member';
+    if (String(req.session.username || '').startsWith('sample:')) {
+      touchSampleUser(db, req.session.userId || 1);
+    }
     return sendOk(res, currentSessionPayload(req));
   }
   sendOk(res, {

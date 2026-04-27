@@ -1,5 +1,6 @@
 import { config } from './config.js';
 import { db } from './db/index.js';
+import { touchSampleUser } from './services/sampleHouseholds.js';
 
 function parseHouseholdHeader(req) {
   const raw = req.header('X-Household-ID');
@@ -34,6 +35,9 @@ export function requireAuth(req, res, next) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    if (String(req.session.username || '').startsWith('sample:')) {
+      touchSampleUser(db, req.session.userId || 1);
+    }
     req.user = {
       id: req.session.userId || 1,
       username: req.session.username || null,

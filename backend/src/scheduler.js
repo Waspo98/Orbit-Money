@@ -16,6 +16,7 @@
 // =============================================================================
 
 import { db } from './db/index.js';
+import { cleanupExpiredSampleHouseholds } from './services/sampleHouseholds.js';
 import { runSync } from './services/simplefinSync.js';
 
 const TICK_MS = 60 * 60 * 1000; // 60 minutes
@@ -31,6 +32,15 @@ function localTodayIsoDate() {
 }
 
 async function tick() {
+  try {
+    const result = cleanupExpiredSampleHouseholds(db);
+    if (result.householdsDeleted > 0 || result.usersDeleted > 0) {
+      console.log('[scheduler] Sample cleanup done:', result);
+    }
+  } catch (err) {
+    console.error('[scheduler] Sample cleanup failed:', err.message || err);
+  }
+
   const now = new Date();
   if (now.getHours() < SCHEDULED_HOUR) return;
 
