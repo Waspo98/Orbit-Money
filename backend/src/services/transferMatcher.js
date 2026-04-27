@@ -25,7 +25,7 @@
  *
  * Returns the number of pairs created (= number of transactions updated / 2).
  */
-export function matchTransfers(db) {
+export function matchTransfers(db, householdId = 1) {
   // Only consider transactions that:
   //   - display in a transfer-flagged category
   //   - aren't already paired
@@ -36,13 +36,15 @@ export function matchTransfers(db) {
       SELECT t.id, t.account_id, t.date, t.amount
       FROM transactions t
       JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
-      WHERE c.is_transfer = 1
+      WHERE t.household_id = ?
+        AND c.household_id = ?
+        AND c.is_transfer = 1
         AND t.transfer_pair_id IS NULL
         AND COALESCE(t.edited_is_ignored, t.is_ignored) = 0
       ORDER BY t.date DESC, t.id ASC
     `
     )
-    .all();
+    .all(householdId, householdId);
 
   // Group by date, then look for opposite-sign matches within each date group.
   const byDate = new Map();
@@ -58,6 +60,7 @@ export function matchTransfers(db) {
         transfer_pair_id = ?,
         updated_at = datetime('now')
     WHERE id = ?
+      AND household_id = ?
   `);
 
   let pairsCreated = 0;
@@ -80,8 +83,8 @@ export function matchTransfers(db) {
           const differentAccounts = a.account_id !== b.account_id;
 
           if (sameSize && oppositeSigns && differentAccounts) {
-            pairTxn.run(b.id, a.id);
-            pairTxn.run(a.id, b.id);
+            pairTxn.run(b.id, a.id, householdId);
+            pairTxn.run(a.id, b.id, householdId);
             consumed.add(a.id);
             consumed.add(b.id);
             pairsCreated++;

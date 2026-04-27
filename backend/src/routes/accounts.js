@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import {
   sendBadRequest,
@@ -41,6 +41,7 @@ function previousMonthEnd(value) {
  */
 router.get('/', requireAuth, (req, res) => {
   const includeArchived = req.query.includeArchived === '1';
+  const householdId = requireHouseholdId(req);
   try {
     const items = db
       .prepare(
@@ -51,13 +52,14 @@ router.get('/', requireAuth, (req, res) => {
                a.simplefin_account_id, a.created_at, a.updated_at,
                COUNT(t.id) AS transaction_count
           FROM accounts a
-          LEFT JOIN transactions t ON t.account_id = a.id
-         ${includeArchived ? '' : 'WHERE a.is_archived = 0'}
+          LEFT JOIN transactions t ON t.account_id = a.id AND t.household_id = ?
+         WHERE a.household_id = ?
+           ${includeArchived ? '' : 'AND a.is_archived = 0'}
          GROUP BY a.id
          ORDER BY a.is_archived ASC, a.sort_order ASC, a.name ASC
       `
       )
-      .all()
+      .all(householdId, householdId)
       .map(serializeAccount);
 
     sendOk(res, { items });
@@ -79,6 +81,7 @@ router.get('/', requireAuth, (req, res) => {
  * written.
  */
 router.post('/reorder', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const orderedIds = Array.isArray(req.body?.orderedIds) ? req.body.orderedIds : null;
   if (!orderedIds || orderedIds.length === 0) {
     return sendBadRequest(res, 'orderedIds must be a non-empty array.');
@@ -92,12 +95,14 @@ router.post('/reorder', requireAuth, (req, res) => {
 
   try {
     const update = db.prepare(
-      `UPDATE accounts SET sort_order = ?, updated_at = datetime('now') WHERE id = ?`
+      `UPDATE accounts
+          SET sort_order = ?, updated_at = datetime('now')
+        WHERE id = ? AND household_id = ?`
     );
 
     const run = db.transaction(() => {
       ids.forEach((id, index) => {
-        update.run(index * 10, id);
+        update.run(index * 10, id, householdId);
       });
     });
 
@@ -113,10 +118,11 @@ router.post('/reorder', requireAuth, (req, res) => {
  * PUT /api/accounts/:id
  */
 router.put('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'account');
   if (id === null) return;
 
-  const existing = db.prepare('SELECT id FROM accounts WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT id FROM accounts WHERE id = ? AND household_id = ?').get(id, householdId);
   if (!existing) {
     return sendNotFound(res, 'Account not found.');
   }
@@ -182,11 +188,11 @@ router.put('/:id', requireAuth, (req, res) => {
   }
 
   sets.push("updated_at = datetime('now')");
-  values.push(id);
+  values.push(id, householdId);
 
   try {
-    db.prepare(`UPDATE accounts SET ${sets.join(', ')} WHERE id = ?`).run(...values);
-    const updated = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
+    db.prepare(`UPDATE accounts SET ${sets.join(', ')} WHERE id = ? AND household_id = ?`).run(...values);
+    const updated = db.prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?').get(id, householdId);
     sendOk(res, { success: true, account: serializeAccount(updated) });
   } catch (err) {
     console.error('Update account failed:', err);
@@ -195,15 +201,16 @@ router.put('/:id', requireAuth, (req, res) => {
 });
 
 router.post('/:id/archive', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'account');
   if (id === null) return;
   try {
     const result = db
       .prepare(
         `UPDATE accounts SET is_archived = 1, updated_at = datetime('now')
-          WHERE id = ?`
+          WHERE id = ? AND household_id = ?`
       )
-      .run(id);
+      .run(id, householdId);
     if (result.changes === 0) {
       return sendNotFound(res, 'Account not found.');
     }
@@ -215,15 +222,16 @@ router.post('/:id/archive', requireAuth, (req, res) => {
 });
 
 router.post('/:id/unarchive', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'account');
   if (id === null) return;
   try {
     const result = db
       .prepare(
         `UPDATE accounts SET is_archived = 0, updated_at = datetime('now')
-          WHERE id = ?`
+          WHERE id = ? AND household_id = ?`
       )
-      .run(id);
+      .run(id, householdId);
     if (result.changes === 0) {
       return sendNotFound(res, 'Account not found.');
     }
@@ -235,6 +243,7 @@ router.post('/:id/unarchive', requireAuth, (req, res) => {
 });
 
 router.post('/:id/records', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'account');
   if (id === null) return;
 
@@ -255,7 +264,7 @@ router.post('/:id/records', requireAuth, (req, res) => {
   }
   const previousBalanceCents = previousBalance === null ? null : dollarsToCents(previousBalance);
 
-  const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
+  const account = db.prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?').get(id, householdId);
   if (!account) {
     return sendNotFound(res, 'Account not found.');
   }
@@ -264,9 +273,9 @@ router.post('/:id/records', requireAuth, (req, res) => {
     const run = db.transaction(() => {
       const insertRecord = db.prepare(
         `
-        INSERT INTO account_balance_records (account_id, record_date, balance)
-        VALUES (?, ?, ?)
-        ON CONFLICT(account_id, record_date) DO UPDATE SET
+        INSERT INTO account_balance_records (household_id, account_id, record_date, balance)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(household_id, account_id, record_date) DO UPDATE SET
           balance = excluded.balance,
           updated_at = datetime('now')
       `
@@ -277,46 +286,46 @@ router.post('/:id/records', requireAuth, (req, res) => {
           `
           SELECT COUNT(*) AS count
             FROM account_balance_records
-           WHERE account_id = ? AND record_date < ?
+           WHERE household_id = ? AND account_id = ? AND record_date < ?
         `
         )
-        .get(id, recordDate).count;
+        .get(householdId, id, recordDate).count;
 
       if (priorRecords === 0 && previousBalanceCents !== null && previousBalanceCents !== balance) {
         const baselineDate = previousMonthEnd(recordDate);
         db.prepare(
           `
-          INSERT OR IGNORE INTO account_balance_records (account_id, record_date, balance)
-          VALUES (?, ?, ?)
+          INSERT OR IGNORE INTO account_balance_records (household_id, account_id, record_date, balance)
+          VALUES (?, ?, ?, ?)
         `
-        ).run(id, baselineDate, previousBalanceCents);
+        ).run(householdId, id, baselineDate, previousBalanceCents);
       }
 
-      insertRecord.run(id, recordDate, balance);
+      insertRecord.run(householdId, id, recordDate, balance);
 
       const latestRecord = db
         .prepare(
           `
           SELECT record_date, balance
             FROM account_balance_records
-           WHERE account_id = ?
+           WHERE household_id = ? AND account_id = ?
            ORDER BY record_date DESC, id DESC
            LIMIT 1
         `
         )
-        .get(id);
+        .get(householdId, id);
 
       if (latestRecord?.record_date === recordDate) {
         db.prepare(
           `
           UPDATE accounts
              SET current_balance = ?, is_manual = 1, updated_at = datetime('now')
-           WHERE id = ?
+           WHERE id = ? AND household_id = ?
         `
-        ).run(balance, id);
+        ).run(balance, id, householdId);
       }
 
-      return db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
+      return db.prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?').get(id, householdId);
     });
 
     const updated = run();
@@ -336,6 +345,7 @@ router.post('/:id/records', requireAuth, (req, res) => {
 });
 
 router.post('/:id/merge', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const sourceId = readIdParam(req, res, 'id', 'account');
   if (sourceId === null) return;
   const targetId = parseId(req.body?.targetId);
@@ -347,24 +357,24 @@ router.post('/:id/merge', requireAuth, (req, res) => {
     return sendBadRequest(res, "Can't merge an account into itself.");
   }
 
-  const source = db.prepare('SELECT * FROM accounts WHERE id = ?').get(sourceId);
-  const target = db.prepare('SELECT * FROM accounts WHERE id = ?').get(targetId);
+  const source = db.prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?').get(sourceId, householdId);
+  const target = db.prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?').get(targetId, householdId);
   if (!source) return sendNotFound(res, 'Source account not found.');
   if (!target) return sendNotFound(res, 'Target account not found.');
 
   try {
     const run = db.transaction(() => {
       const moved = db
-        .prepare('UPDATE transactions SET account_id = ? WHERE account_id = ?')
-        .run(targetId, sourceId).changes;
+        .prepare('UPDATE transactions SET account_id = ? WHERE account_id = ? AND household_id = ?')
+        .run(targetId, sourceId, householdId).changes;
       if (source.estimated_value != null && target.estimated_value == null) {
         db.prepare(
           `UPDATE accounts
               SET estimated_value = ?, updated_at = datetime('now')
-            WHERE id = ?`
-        ).run(source.estimated_value, targetId);
+            WHERE id = ? AND household_id = ?`
+        ).run(source.estimated_value, targetId, householdId);
       }
-      db.prepare('DELETE FROM accounts WHERE id = ?').run(sourceId);
+      db.prepare('DELETE FROM accounts WHERE id = ? AND household_id = ?').run(sourceId, householdId);
       return moved;
     });
     const transactionsMoved = run();
@@ -382,13 +392,14 @@ router.post('/:id/merge', requireAuth, (req, res) => {
 });
 
 router.delete('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'account');
   if (id === null) return;
 
   try {
     const txnCount = db
-      .prepare('SELECT COUNT(*) AS c FROM transactions WHERE account_id = ?')
-      .get(id).c;
+      .prepare('SELECT COUNT(*) AS c FROM transactions WHERE account_id = ? AND household_id = ?')
+      .get(id, householdId).c;
 
     if (txnCount > 0) {
       return sendBadRequest(
@@ -397,7 +408,7 @@ router.delete('/:id', requireAuth, (req, res) => {
       );
     }
 
-    const result = db.prepare('DELETE FROM accounts WHERE id = ?').run(id);
+    const result = db.prepare('DELETE FROM accounts WHERE id = ? AND household_id = ?').run(id, householdId);
     if (result.changes === 0) {
       return sendNotFound(res, 'Account not found.');
     }

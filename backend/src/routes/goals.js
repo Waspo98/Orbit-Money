@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import {
   formatLocalDate,
@@ -98,31 +98,33 @@ function estimateEta(currentAmount, targetAmount, monthlyAmount) {
   };
 }
 
-function fetchGoals() {
+function fetchGoals(householdId) {
   return db
     .prepare(
       `SELECT id, name, target_amount, current_amount, target_date,
               linked_account_id, kind, icon, notes, sort_order, created_at, updated_at
          FROM goals
+        WHERE household_id = ?
         ORDER BY sort_order ASC, id ASC`
     )
-    .all();
+    .all(householdId);
 }
 
-function fetchEligibleAccounts() {
+function fetchEligibleAccounts(householdId) {
   return db
     .prepare(
       `SELECT id, name, type, institution, account_number_last4,
               current_balance, estimated_value, is_archived, sort_order
          FROM accounts
-        WHERE is_archived = 0
+        WHERE household_id = ?
+          AND is_archived = 0
         ORDER BY sort_order ASC, name ASC`
     )
-    .all()
+    .all(householdId)
     .filter((account) => ELIGIBLE_ACCOUNT_TYPES.has(account.type));
 }
 
-function fetchAllocations() {
+function fetchAllocations(householdId) {
   return db
     .prepare(
       `SELECT ga.id, ga.goal_id, ga.account_id, ga.allocation_type,
@@ -131,21 +133,24 @@ function fetchAllocations() {
               g.name AS goal_name
          FROM goal_account_allocations ga
          JOIN goals g ON g.id = ga.goal_id
+        WHERE ga.household_id = ?
+          AND g.household_id = ?
         ORDER BY ga.created_at ASC, ga.id ASC`
     )
-    .all();
+    .all(householdId, householdId);
 }
 
-function buildHistories(accounts, goals, allocations, months) {
+function buildHistories(householdId, accounts, goals, allocations, months) {
   const latestTransaction = db
-    .prepare('SELECT MAX(date) AS latest, MIN(date) AS earliest FROM transactions')
-    .get();
+    .prepare('SELECT MAX(date) AS latest, MIN(date) AS earliest FROM transactions WHERE household_id = ?')
+    .get(householdId);
   const latestRecord = db
     .prepare(
       `SELECT MAX(record_date) AS latest, MIN(record_date) AS earliest
-         FROM account_balance_records`
+         FROM account_balance_records
+         WHERE household_id = ?`
     )
-    .get();
+    .get(householdId);
 
   const todayMonth = currentMonth();
   const latestDataMonth = [
@@ -165,19 +170,21 @@ function buildHistories(accounts, goals, allocations, months) {
     .prepare(
       `SELECT account_id, substr(date, 1, 7) AS month, SUM(amount) AS amount
          FROM transactions
-        WHERE date >= ?
+        WHERE household_id = ?
+          AND date >= ?
         GROUP BY account_id, substr(date, 1, 7)
         ORDER BY month ASC`
     )
-    .all(`${firstMonth}-01`);
+    .all(householdId, `${firstMonth}-01`);
   const balanceRecords = db
     .prepare(
       `SELECT account_id, record_date, balance
          FROM account_balance_records
-        WHERE record_date <= ?
+        WHERE household_id = ?
+          AND record_date <= ?
         ORDER BY account_id ASC, record_date DESC`
     )
-    .all(`${latestMonth}-31`);
+    .all(householdId, `${latestMonth}-31`);
 
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const balancesByAccount = new Map(accounts.map((account) => [account.id, Number(account.current_balance) || 0]));
@@ -248,11 +255,11 @@ function buildHistories(accounts, goals, allocations, months) {
   return histories;
 }
 
-function buildGoalsPayload(monthCount = 24) {
+function buildGoalsPayload(householdId, monthCount = 24) {
   const months = Math.min(60, Math.max(3, Number.isFinite(monthCount) ? monthCount : 24));
-  const goals = fetchGoals();
-  const accounts = fetchEligibleAccounts();
-  const allocations = fetchAllocations();
+  const goals = fetchGoals(householdId);
+  const accounts = fetchEligibleAccounts(householdId);
+  const allocations = fetchAllocations(householdId);
   const accountById = new Map(accounts.map((account) => [account.id, account]));
   const allocationsByGoal = new Map();
   const allocationsByAccount = new Map();
@@ -265,7 +272,7 @@ function buildGoalsPayload(monthCount = 24) {
     allocationsByAccount.get(allocation.account_id).push(allocation);
   }
 
-  const histories = buildHistories(accounts, goals, allocations, months);
+  const histories = buildHistories(householdId, accounts, goals, allocations, months);
 
   const hydratedGoals = goals.map((goal) => {
     const goalAllocations = allocationsByGoal.get(goal.id) || [];
@@ -422,14 +429,14 @@ function normalizeGoalBody(body) {
   };
 }
 
-function validateAccounts(allocations) {
+function validateAccounts(householdId, allocations) {
   if (allocations.length === 0) {
     throw goalError('Connect at least one account and add an allocation.');
   }
   const placeholders = allocations.map(() => '?').join(',');
   const rows = db
-    .prepare(`SELECT id, type, is_archived FROM accounts WHERE id IN (${placeholders})`)
-    .all(...allocations.map((row) => row.account_id));
+    .prepare(`SELECT id, type, is_archived FROM accounts WHERE household_id = ? AND id IN (${placeholders})`)
+    .all(householdId, ...allocations.map((row) => row.account_id));
   const byId = new Map(rows.map((row) => [row.id, row]));
 
   for (const allocation of allocations) {
@@ -447,7 +454,7 @@ function accountAllocationTotal(rows, account, reserves) {
   return rows.reduce((sum, row) => sum + allocationAmount(row, account, reserves), 0);
 }
 
-function reduceOtherAllocations(accountId, protectedGoalId, overflow, basis, rows) {
+function reduceOtherAllocations(householdId, accountId, protectedGoalId, overflow, basis, rows) {
   const candidates = rows
     .filter((row) => row.goal_id !== protectedGoalId)
     .map((row) => ({
@@ -467,9 +474,9 @@ function reduceOtherAllocations(accountId, protectedGoalId, overflow, basis, row
   const update = db.prepare(
     `UPDATE goal_account_allocations
         SET allocation_percent = ?, allocation_amount = ?, updated_at = datetime('now')
-      WHERE id = ?`
+      WHERE id = ? AND household_id = ?`
   );
-  const remove = db.prepare('DELETE FROM goal_account_allocations WHERE id = ?');
+  const remove = db.prepare('DELETE FROM goal_account_allocations WHERE id = ? AND household_id = ?');
 
   for (const row of candidates) {
     const removeAmount = Math.min(row.amount, Math.round(overflow * (row.amount / reducible)));
@@ -484,30 +491,30 @@ function reduceOtherAllocations(accountId, protectedGoalId, overflow, basis, row
       ? nextPercent < 0.01
       : nextAmount < 1;
     if (isEmpty) {
-      remove.run(row.id);
+      remove.run(row.id, householdId);
     } else {
-      update.run(nextPercent, nextAmount, row.id);
+      update.run(nextPercent, nextAmount, row.id, householdId);
     }
   }
 
   return db
-    .prepare('SELECT * FROM goal_account_allocations WHERE account_id = ?')
-    .all(accountId);
+    .prepare('SELECT * FROM goal_account_allocations WHERE account_id = ? AND household_id = ?')
+    .all(accountId, householdId);
 }
 
-function rebalanceAccounts(accountIds, protectedGoalId, stealFromOthers) {
+function rebalanceAccounts(householdId, accountIds, protectedGoalId, stealFromOthers) {
   const uniqueIds = Array.from(new Set(accountIds));
   if (uniqueIds.length === 0) return;
 
   for (const accountId of uniqueIds) {
     const account = db
-      .prepare('SELECT id, current_balance FROM accounts WHERE id = ?')
-      .get(accountId);
+      .prepare('SELECT id, current_balance FROM accounts WHERE id = ? AND household_id = ?')
+      .get(accountId, householdId);
     if (!account) continue;
 
     let rows = db
-      .prepare('SELECT * FROM goal_account_allocations WHERE account_id = ?')
-      .all(accountId);
+      .prepare('SELECT * FROM goal_account_allocations WHERE account_id = ? AND household_id = ?')
+      .all(accountId, householdId);
     let reserves = reserveByAccount(rows);
     let basis = allocatableBasis(account, reserves);
     let total = accountAllocationTotal(rows, account, reserves);
@@ -520,7 +527,7 @@ function rebalanceAccounts(accountIds, protectedGoalId, stealFromOthers) {
       throw goalError('This account has no allocatable balance after reserve.');
     }
 
-    rows = reduceOtherAllocations(accountId, protectedGoalId, total - basis, basis, rows);
+    rows = reduceOtherAllocations(householdId, accountId, protectedGoalId, total - basis, basis, rows);
     reserves = reserveByAccount(rows);
     basis = allocatableBasis(account, reserves);
     total = accountAllocationTotal(rows, account, reserves);
@@ -531,20 +538,20 @@ function rebalanceAccounts(accountIds, protectedGoalId, stealFromOthers) {
   }
 }
 
-function saveGoal(existingId, body) {
+function saveGoal(householdId, existingId, body) {
   const normalized = normalizeGoalBody(body);
-  validateAccounts(normalized.allocations);
+  validateAccounts(householdId, normalized.allocations);
 
   const run = db.transaction(() => {
     let goalId = existingId;
     if (goalId) {
-      const existing = db.prepare('SELECT id FROM goals WHERE id = ?').get(goalId);
+      const existing = db.prepare('SELECT id FROM goals WHERE id = ? AND household_id = ?').get(goalId, householdId);
       if (!existing) throw goalError('Goal not found.', 404);
       db.prepare(
         `UPDATE goals
             SET name = ?, target_amount = ?, target_date = ?, kind = ?, icon = ?,
                 notes = ?, updated_at = datetime('now')
-          WHERE id = ?`
+          WHERE id = ? AND household_id = ?`
       ).run(
         normalized.name,
         normalized.target_amount,
@@ -552,17 +559,19 @@ function saveGoal(existingId, body) {
         normalized.kind,
         normalized.icon,
         normalized.notes,
-        goalId
+        goalId,
+        householdId
       );
-      db.prepare('DELETE FROM goal_account_allocations WHERE goal_id = ?').run(goalId);
+      db.prepare('DELETE FROM goal_account_allocations WHERE goal_id = ? AND household_id = ?').run(goalId, householdId);
     } else {
-      const nextOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM goals').get().next_order;
+      const nextOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM goals WHERE household_id = ?').get(householdId).next_order;
       const result = db
         .prepare(
-          `INSERT INTO goals (name, target_amount, current_amount, target_date, kind, icon, notes, sort_order)
-           VALUES (?, ?, 0, ?, ?, ?, ?, ?)`
+          `INSERT INTO goals (household_id, name, target_amount, current_amount, target_date, kind, icon, notes, sort_order)
+           VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?)`
         )
         .run(
+          householdId,
           normalized.name,
           normalized.target_amount,
           normalized.target_date,
@@ -576,11 +585,12 @@ function saveGoal(existingId, body) {
 
     const insertAllocation = db.prepare(
       `INSERT INTO goal_account_allocations
-         (goal_id, account_id, allocation_type, allocation_percent, allocation_amount, reserve_amount)
-       VALUES (?, ?, ?, ?, ?, ?)`
+         (household_id, goal_id, account_id, allocation_type, allocation_percent, allocation_amount, reserve_amount)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     );
     for (const allocation of normalized.allocations) {
       insertAllocation.run(
+        householdId,
         goalId,
         allocation.account_id,
         allocation.allocation_type,
@@ -591,6 +601,7 @@ function saveGoal(existingId, body) {
     }
 
     rebalanceAccounts(
+      householdId,
       normalized.allocations.map((row) => row.account_id),
       goalId,
       normalized.stealFromOthers
@@ -603,9 +614,10 @@ function saveGoal(existingId, body) {
 }
 
 router.get('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
     const requestedMonths = parseInteger(req.query.months);
-    sendOk(res, buildGoalsPayload(requestedMonths));
+    sendOk(res, buildGoalsPayload(householdId, requestedMonths));
   } catch (err) {
     console.error('List goals failed:', err);
     sendServerError(res, err);
@@ -613,9 +625,10 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 router.post('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
-    const id = saveGoal(null, req.body || {});
-    sendOk(res, { success: true, id, ...buildGoalsPayload(24) });
+    const id = saveGoal(householdId, null, req.body || {});
+    sendOk(res, { success: true, id, ...buildGoalsPayload(householdId, 24) });
   } catch (err) {
     console.error('Create goal failed:', err);
     sendRouteError(res, err);
@@ -623,6 +636,7 @@ router.post('/', requireAuth, (req, res) => {
 });
 
 router.put('/reorder', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const ids = Array.isArray(req.body?.ids)
     ? req.body.ids.map(parseId).filter((id) => id !== null)
     : [];
@@ -632,19 +646,19 @@ router.put('/reorder', requireAuth, (req, res) => {
   }
 
   try {
-    const existing = db.prepare('SELECT id FROM goals').all().map((row) => row.id);
+    const existing = db.prepare('SELECT id FROM goals WHERE household_id = ?').all(householdId).map((row) => row.id);
     const existingSet = new Set(existing);
     if (ids.length !== existing.length || ids.some((id) => !existingSet.has(id))) {
       return sendBadRequest(res, 'ids must include every goal exactly once.');
     }
 
-    const update = db.prepare('UPDATE goals SET sort_order = ? WHERE id = ?');
+    const update = db.prepare('UPDATE goals SET sort_order = ? WHERE id = ? AND household_id = ?');
     const run = db.transaction(() => {
-      ids.forEach((id, index) => update.run(index, id));
+      ids.forEach((id, index) => update.run(index, id, householdId));
     });
     run();
 
-    sendOk(res, { success: true, ...buildGoalsPayload(24) });
+    sendOk(res, { success: true, ...buildGoalsPayload(householdId, 24) });
   } catch (err) {
     console.error('Reorder goals failed:', err);
     sendServerError(res, err);
@@ -652,11 +666,12 @@ router.put('/reorder', requireAuth, (req, res) => {
 });
 
 router.put('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'goal');
   if (id === null) return;
   try {
-    const savedId = saveGoal(id, req.body || {});
-    sendOk(res, { success: true, id: savedId, ...buildGoalsPayload(24) });
+    const savedId = saveGoal(householdId, id, req.body || {});
+    sendOk(res, { success: true, id: savedId, ...buildGoalsPayload(householdId, 24) });
   } catch (err) {
     console.error('Update goal failed:', err);
     sendRouteError(res, err);
@@ -664,10 +679,11 @@ router.put('/:id', requireAuth, (req, res) => {
 });
 
 router.delete('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'goal');
   if (id === null) return;
   try {
-    const result = db.prepare('DELETE FROM goals WHERE id = ?').run(id);
+    const result = db.prepare('DELETE FROM goals WHERE id = ? AND household_id = ?').run(id, householdId);
     if (result.changes === 0) {
       return sendNotFound(res, 'Goal not found.');
     }

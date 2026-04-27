@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import {
   sendBadRequest,
@@ -28,8 +28,10 @@ function normalizeColor(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function categoryRuleCount(categoryId) {
-  const rules = db.prepare('SELECT conditions, actions FROM rules').all();
+function categoryRuleCount(categoryId, householdId) {
+  const rules = db
+    .prepare('SELECT conditions, actions FROM rules WHERE household_id = ?')
+    .all(householdId);
   return rules.reduce((count, rule) => {
     let referencesCategory = false;
     try {
@@ -60,7 +62,7 @@ function categoryRuleCount(categoryId) {
   }, 0);
 }
 
-function serializeCategory(row) {
+function serializeCategory(row, householdId) {
   if (!row) return null;
   return {
     ...row,
@@ -70,7 +72,7 @@ function serializeCategory(row) {
     mha_default_ignored: !!row.mha_default_ignored,
     transaction_count: Number(row.transaction_count || 0),
     budget_count: Number(row.budget_count || 0),
-    rule_count: categoryRuleCount(Number(row.id))
+    rule_count: categoryRuleCount(Number(row.id), householdId)
   };
 }
 
@@ -80,6 +82,7 @@ function serializeCategory(row) {
  * frontend caches this, uses it for lookup when rendering transactions.
  */
 router.get('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
     const rows = db
       .prepare(
@@ -92,14 +95,17 @@ router.get('/', requireAuth, (req, res) => {
           FROM categories c
           LEFT JOIN transactions t
             ON COALESCE(t.edited_category_id, t.category_id) = c.id
+           AND t.household_id = ?
           LEFT JOIN budgets b
             ON b.category_id = c.id
+           AND b.household_id = ?
+         WHERE c.household_id = ?
          GROUP BY c.id
          ORDER BY c.sort_order ASC, c.name ASC
       `
       )
-      .all();
-    sendOk(res, { items: rows.map(serializeCategory) });
+      .all(householdId, householdId, householdId);
+    sendOk(res, { items: rows.map((row) => serializeCategory(row, householdId)) });
   } catch (err) {
     console.error('List categories failed:', err);
     sendServerError(res, err);
@@ -107,6 +113,7 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 router.post('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const body = req.body || {};
   const name = normalizeName(body.name);
   const color = normalizeColor(body.color || '#888888');
@@ -128,26 +135,26 @@ router.post('/', requireAuth, (req, res) => {
 
   try {
     const nextOrder =
-      (db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS max_order FROM categories').get()
+      (db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS max_order FROM categories WHERE household_id = ?').get(householdId)
         .max_order || 0) + 10;
     const result = db
       .prepare(
         `
-        INSERT INTO categories (name, color, icon, sort_order, mha_default_eligible)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO categories (household_id, name, color, icon, sort_order, mha_default_eligible)
+        VALUES (?, ?, ?, ?, ?, ?)
       `
       )
-      .run(name, color, icon, nextOrder, mhaDefaultEligible);
+      .run(householdId, name, color, icon, nextOrder, mhaDefaultEligible);
     const row = db
       .prepare(
         `
         SELECT c.*, 0 AS transaction_count, 0 AS budget_count
-          FROM categories c
-         WHERE c.id = ?
+         FROM categories c
+         WHERE c.id = ? AND c.household_id = ?
       `
       )
-      .get(result.lastInsertRowid);
-    sendCreated(res, { success: true, category: serializeCategory(row) });
+      .get(result.lastInsertRowid, householdId);
+    sendCreated(res, { success: true, category: serializeCategory(row, householdId) });
   } catch (err) {
     console.error('Create category failed:', err);
     sendBadRequest(res, err.message);
@@ -155,10 +162,11 @@ router.post('/', requireAuth, (req, res) => {
 });
 
 router.put('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'category');
   if (id === null) return;
 
-  const existing = db.prepare('SELECT id FROM categories WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT id FROM categories WHERE id = ? AND household_id = ?').get(id, householdId);
   if (!existing) {
     return sendNotFound(res, 'Category not found.');
   }
@@ -211,9 +219,10 @@ router.put('/:id', requireAuth, (req, res) => {
   }
 
   try {
-    db.prepare(`UPDATE categories SET ${sets.join(', ')} WHERE id = ?`).run(
+    db.prepare(`UPDATE categories SET ${sets.join(', ')} WHERE id = ? AND household_id = ?`).run(
       ...values,
-      id
+      id,
+      householdId
     );
     const row = db
       .prepare(
@@ -224,14 +233,16 @@ router.put('/:id', requireAuth, (req, res) => {
           FROM categories c
           LEFT JOIN transactions t
             ON COALESCE(t.edited_category_id, t.category_id) = c.id
+           AND t.household_id = ?
           LEFT JOIN budgets b
             ON b.category_id = c.id
-         WHERE c.id = ?
+           AND b.household_id = ?
+         WHERE c.id = ? AND c.household_id = ?
          GROUP BY c.id
       `
       )
-      .get(id);
-    sendOk(res, { success: true, category: serializeCategory(row) });
+      .get(householdId, householdId, id, householdId);
+    sendOk(res, { success: true, category: serializeCategory(row, householdId) });
   } catch (err) {
     console.error('Update category failed:', err);
     sendBadRequest(res, err.message);
@@ -239,16 +250,17 @@ router.put('/:id', requireAuth, (req, res) => {
 });
 
 router.delete('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'category');
   if (id === null) return;
 
   try {
-    const category = db.prepare('SELECT id, name FROM categories WHERE id = ?').get(id);
+    const category = db.prepare('SELECT id, name FROM categories WHERE id = ? AND household_id = ?').get(id, householdId);
     if (!category) {
       return sendNotFound(res, 'Category not found.');
     }
 
-    const ruleCount = categoryRuleCount(id);
+    const ruleCount = categoryRuleCount(id, householdId);
     if (ruleCount > 0) {
       return sendBadRequest(
         res,
@@ -260,8 +272,8 @@ router.delete('/:id', requireAuth, (req, res) => {
 
     const run = db.transaction(() => {
       const originalTransactions = db
-        .prepare('UPDATE transactions SET category_id = NULL WHERE category_id = ?')
-        .run(id).changes;
+        .prepare('UPDATE transactions SET category_id = NULL WHERE category_id = ? AND household_id = ?')
+        .run(id, householdId).changes;
       const editedTransactions = db
         .prepare(
           `
@@ -269,13 +281,14 @@ router.delete('/:id', requireAuth, (req, res) => {
              SET edited_category_id = NULL,
                  edited_category_id_source = NULL
            WHERE edited_category_id = ?
+             AND household_id = ?
         `
         )
-        .run(id).changes;
+        .run(id, householdId).changes;
       const budgetsRemoved = db
-        .prepare('SELECT COUNT(*) AS c FROM budgets WHERE category_id = ?')
-        .get(id).c;
-      const result = db.prepare('DELETE FROM categories WHERE id = ?').run(id);
+        .prepare('SELECT COUNT(*) AS c FROM budgets WHERE category_id = ? AND household_id = ?')
+        .get(id, householdId).c;
+      const result = db.prepare('DELETE FROM categories WHERE id = ? AND household_id = ?').run(id, householdId);
       return {
         deleted: result.changes,
         originalTransactions,

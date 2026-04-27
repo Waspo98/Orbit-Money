@@ -173,18 +173,18 @@ function isoDaysAgo(daysAgo) {
   return d.toISOString().slice(0, 10);
 }
 
-function loadCategoryMap(db) {
-  const rows = db.prepare('SELECT id, name, is_transfer FROM categories').all();
+function loadCategoryMap(db, householdId = 1) {
+  const rows = db.prepare('SELECT id, name, is_transfer FROM categories WHERE household_id = ?').all(householdId);
   return new Map(rows.map((c) => [c.name, c]));
 }
 
-function upsertDemoAccounts(db) {
-  const findByName = db.prepare('SELECT id FROM accounts WHERE name = ?');
+function upsertDemoAccounts(db, householdId = 1) {
+  const findByName = db.prepare('SELECT id FROM accounts WHERE household_id = ? AND name = ?');
   const insertAccount = db.prepare(`
     INSERT INTO accounts
-      (name, type, institution, account_number_last4, current_balance,
+      (household_id, name, type, institution, account_number_last4, current_balance,
        estimated_value, is_manual, is_archived, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, ?)
   `);
   const updateAccount = db.prepare(`
     UPDATE accounts
@@ -201,7 +201,7 @@ function upsertDemoAccounts(db) {
 
   const accountIds = {};
   for (const account of ACCOUNT_SEED) {
-    const existing = findByName.get(account.name);
+    const existing = findByName.get(householdId, account.name);
     if (existing) {
       updateAccount.run(
         account.type,
@@ -215,6 +215,7 @@ function upsertDemoAccounts(db) {
       accountIds[account.key.replace('demo-', '')] = existing.id;
     } else {
       const result = insertAccount.run(
+        householdId,
         account.name,
         account.type,
         account.institution,
@@ -229,11 +230,11 @@ function upsertDemoAccounts(db) {
   return accountIds;
 }
 
-function upsertDemoRules(db, categories) {
-  const findRule = db.prepare('SELECT id FROM rules WHERE name = ?');
+function upsertDemoRules(db, categories, householdId = 1) {
+  const findRule = db.prepare('SELECT id FROM rules WHERE household_id = ? AND name = ?');
   const insertRule = db.prepare(`
-    INSERT INTO rules (name, conditions, actions, priority, enabled)
-    VALUES (?, ?, ?, ?, 1)
+    INSERT INTO rules (household_id, name, conditions, actions, priority, enabled)
+    VALUES (?, ?, ?, ?, ?, 1)
   `);
   const updateRule = db.prepare(`
     UPDATE rules
@@ -242,7 +243,7 @@ function upsertDemoRules(db, categories) {
            priority = ?,
            enabled = 1,
            updated_at = datetime('now')
-     WHERE name = ?
+     WHERE name = ? AND household_id = ?
   `);
 
   let changed = 0;
@@ -258,27 +259,27 @@ function upsertDemoRules(db, categories) {
       actions.push({ type: 'categorize', value: category.id });
     }
     const actionsJson = JSON.stringify(actions);
-    const existing = findRule.get(name);
+    const existing = findRule.get(householdId, name);
     if (existing) {
-      updateRule.run(conditions, actionsJson, priority, name);
+      updateRule.run(conditions, actionsJson, priority, name, householdId);
     } else {
-      insertRule.run(name, conditions, actionsJson, priority);
+      insertRule.run(householdId, name, conditions, actionsJson, priority);
     }
     changed++;
   }
   return changed;
 }
 
-function refreshExistingDemoData(db, categories) {
+function refreshExistingDemoData(db, categories, householdId = 1) {
   const hasDemoTransactions = db
-    .prepare("SELECT COUNT(*) AS c FROM transactions WHERE external_id LIKE 'demo-txn-%'")
-    .get().c > 0;
+    .prepare("SELECT COUNT(*) AS c FROM transactions WHERE household_id = ? AND external_id LIKE 'demo-txn-%'")
+    .get(householdId).c > 0;
 
   if (!hasDemoTransactions) {
     return { refreshed: false, transactions: 0, rules: 0 };
   }
 
-  const accountIds = upsertDemoAccounts(db);
+  const accountIds = upsertDemoAccounts(db, householdId);
   const uncategorized = categories.get('Uncategorized');
   const updateTxn = db.prepare(`
     UPDATE transactions
@@ -290,18 +291,19 @@ function refreshExistingDemoData(db, categories) {
            category_id = ?,
            notes = ?,
            is_transfer = ?,
-           updated_at = datetime('now')
+       updated_at = datetime('now')
      WHERE external_id = ?
        AND source = 'manual'
+       AND household_id = ?
   `);
   const insertTxn = db.prepare(`
     INSERT INTO transactions
       (account_id, date, amount, original_merchant, original_description,
        category_id, notes, is_transfer, is_ignored, source, external_id,
-       updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'manual', ?, datetime('now'))
+       updated_at, household_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'manual', ?, datetime('now'), ?)
   `);
-  const findTxn = db.prepare('SELECT id FROM transactions WHERE external_id = ?');
+  const findTxn = db.prepare('SELECT id FROM transactions WHERE household_id = ? AND external_id = ?');
 
   const run = db.transaction(() => {
     let changed = 0;
@@ -318,9 +320,10 @@ function refreshExistingDemoData(db, categories) {
         category?.id ?? null,
         index % 9 === 0 ? 'Demo note for showcase mode.' : null,
         isTransfer,
-        externalId
+        externalId,
+        householdId
       ];
-      if (findTxn.get(externalId)) {
+      if (findTxn.get(householdId, externalId)) {
         updateTxn.run(...params);
       } else {
         insertTxn.run(...params);
@@ -328,28 +331,29 @@ function refreshExistingDemoData(db, categories) {
       changed++;
     });
 
-    const rules = upsertDemoRules(db, categories);
+    const rules = upsertDemoRules(db, categories, householdId);
     return { transactions: changed, rules, accounts: Object.keys(accountIds).length };
   });
 
   const result = run();
-  reapplyRulesToAllTransactions(db);
+  reapplyRulesToAllTransactions(db, householdId);
   return { refreshed: true, ...result };
 }
 
 export function seedDemoData(db) {
+  const householdId = 1;
   const existing = db
     .prepare(
       `SELECT
-         (SELECT COUNT(*) FROM accounts) AS accounts,
-         (SELECT COUNT(*) FROM transactions) AS transactions`
+         (SELECT COUNT(*) FROM accounts WHERE household_id = 1) AS accounts,
+         (SELECT COUNT(*) FROM transactions WHERE household_id = 1) AS transactions`
     )
     .get();
 
-  const categories = loadCategoryMap(db);
+  const categories = loadCategoryMap(db, householdId);
 
   if (existing.accounts > 0 || existing.transactions > 0) {
-    const refreshed = refreshExistingDemoData(db, categories);
+    const refreshed = refreshExistingDemoData(db, categories, householdId);
     if (refreshed.refreshed) {
       console.log(`Demo seed: refreshed ${refreshed.transactions} showcase transactions and ${refreshed.rules} rules.`);
       return { seeded: false, ...refreshed };
@@ -364,17 +368,17 @@ export function seedDemoData(db) {
     INSERT INTO transactions
       (account_id, date, amount, original_merchant, original_description,
        category_id, notes, is_transfer, is_ignored, source, external_id,
-       updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'manual', ?, datetime('now'))
+       updated_at, household_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'manual', ?, datetime('now'), ?)
   `);
 
   const insertBudget = db.prepare(`
-    INSERT OR IGNORE INTO budgets (category_id, amount, rollover)
-    VALUES (?, ?, 0)
+    INSERT OR IGNORE INTO budgets (household_id, category_id, amount, rollover)
+    VALUES (?, ?, ?, 0)
   `);
 
   const run = db.transaction(() => {
-    const accountIds = upsertDemoAccounts(db);
+    const accountIds = upsertDemoAccounts(db, householdId);
 
     let inserted = 0;
     TXN_SEED.forEach(([accountKey, amount, merchant, categoryName, daysAgo], index) => {
@@ -389,23 +393,24 @@ export function seedDemoData(db) {
         category?.id ?? null,
         index % 9 === 0 ? 'Demo note for showcase mode.' : null,
         isTransfer,
-        `demo-txn-${String(index + 1).padStart(3, '0')}`
+        `demo-txn-${String(index + 1).padStart(3, '0')}`,
+        householdId
       );
       inserted++;
     });
 
-    const rulesCreated = upsertDemoRules(db, categories);
+    const rulesCreated = upsertDemoRules(db, categories, householdId);
 
     for (const [categoryName, amount] of BUDGET_SEED) {
       const category = categories.get(categoryName);
-      if (category) insertBudget.run(category.id, dollarsToCents(amount));
+      if (category) insertBudget.run(householdId, category.id, dollarsToCents(amount));
     }
 
     return { inserted, rulesCreated };
   });
 
   const result = run();
-  reapplyRulesToAllTransactions(db);
+  reapplyRulesToAllTransactions(db, householdId);
   console.log(
     `Demo seed: created ${ACCOUNT_SEED.length} accounts, ${result.inserted} transactions, and ${result.rulesCreated} rules.`
   );

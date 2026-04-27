@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import { formatLocalDate, isValidOptionalDateOnly } from '../lib/localDate.js';
 import {
@@ -225,13 +225,13 @@ function accountBalance(row) {
   return Number.isFinite(current) ? current : 0;
 }
 
-function replaceRetirementAccounts(memberId, accounts) {
-  db.prepare('DELETE FROM household_retirement_accounts WHERE member_id = ?').run(memberId);
+function replaceRetirementAccounts(householdId, memberId, accounts) {
+  db.prepare('DELETE FROM household_retirement_accounts WHERE member_id = ? AND household_id = ?').run(memberId, householdId);
   const insert = db.prepare(
     `INSERT INTO household_retirement_accounts (
-       member_id, account_id, account_kind
+       household_id, member_id, account_id, account_kind
      ) VALUES (
-       @member_id, @account_id, @account_kind
+       @household_id, @member_id, @account_id, @account_kind
      )
      ON CONFLICT(member_id, account_id) DO UPDATE SET
        account_kind = excluded.account_kind,
@@ -239,21 +239,22 @@ function replaceRetirementAccounts(memberId, accounts) {
   );
   accounts.forEach((account) => {
     const exists = db
-      .prepare('SELECT id FROM accounts WHERE id = ? AND is_archived = 0')
-      .get(account.account_id);
+      .prepare('SELECT id FROM accounts WHERE id = ? AND household_id = ? AND is_archived = 0')
+      .get(account.account_id, householdId);
     if (!exists) throw householdError('Linked retirement account was not found.', 400);
-    insert.run({ member_id: memberId, ...account });
+    insert.run({ household_id: householdId, member_id: memberId, ...account });
   });
 }
 
-function buildPayload() {
+function buildPayload(householdId) {
   const members = db
     .prepare(
       `SELECT *
          FROM household_members
+        WHERE household_id = ?
         ORDER BY id ASC`
     )
-    .all()
+    .all(householdId)
     .map(serializeMember)
     .map(decorateMember);
 
@@ -264,10 +265,12 @@ function buildPayload() {
               a.current_balance, a.estimated_value, a.is_archived
          FROM household_retirement_accounts hra
          JOIN accounts a ON a.id = hra.account_id
-        WHERE a.is_archived = 0
+        WHERE hra.household_id = ?
+          AND a.household_id = ?
+          AND a.is_archived = 0
         ORDER BY hra.member_id ASC, hra.account_kind ASC, a.sort_order ASC, a.name ASC`
     )
-    .all()
+    .all(householdId, householdId)
     .map(serializeAccount)
     .map((row) => ({
       ...row,
@@ -290,10 +293,12 @@ function buildPayload() {
       `SELECT r.*, m.name AS member_name
          FROM household_income_records r
          JOIN household_members m ON m.id = r.member_id
+        WHERE r.household_id = ?
+          AND m.household_id = ?
         ORDER BY r.effective_date DESC, r.id DESC
         LIMIT 80`
     )
-    .all()
+    .all(householdId, householdId)
     .map(serializeMember)
     .map((row) => ({
       ...row,
@@ -332,17 +337,17 @@ function buildPayload() {
   return { summary, members: decoratedMembers, records, retirement_accounts: linkedAccounts };
 }
 
-function insertIncomeRecord(record) {
+function insertIncomeRecord(householdId, record) {
   db.prepare(
     `INSERT INTO household_income_records (
-       member_id, effective_date, gross_income_annual, net_pay_per_period,
+       household_id, member_id, effective_date, gross_income_annual, net_pay_per_period,
        pay_frequency, pay_periods_per_year, employee_contribution_percent,
        employee_contribution_annual, employer_match_percent,
        employer_match_limit_percent, employer_match_annual_cap,
        health_premium_per_month, hsa_contribution_annual,
        dependent_care_fsa_annual, other_benefits_annual, source, notes
      ) VALUES (
-       @member_id, @effective_date, @gross_income_annual, @net_pay_per_period,
+       @household_id, @member_id, @effective_date, @gross_income_annual, @net_pay_per_period,
        @pay_frequency, @pay_periods_per_year, @employee_contribution_percent,
        @employee_contribution_annual, @employer_match_percent,
        @employer_match_limit_percent, @employer_match_annual_cap,
@@ -366,12 +371,13 @@ function insertIncomeRecord(record) {
        source = excluded.source,
        notes = excluded.notes,
        updated_at = datetime('now')`
-  ).run(record);
+  ).run({ household_id: householdId, ...record });
 }
 
 router.get('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
-    sendOk(res, buildPayload());
+    sendOk(res, buildPayload(householdId));
   } catch (err) {
     console.error('Household load failed:', err);
     sendServerError(res, err);
@@ -379,12 +385,13 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 router.post('/members', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
     const member = normalizeMemberBody(req.body || {});
     const run = db.transaction(() => {
       const result = db.prepare(
         `INSERT INTO household_members (
-           name, role, birth_date, employment_status, employer, job_title,
+           household_id, name, role, birth_date, employment_status, employer, job_title,
            gross_income_annual, net_pay_per_period, pay_frequency, pay_periods_per_year,
            retirement_account_type, employee_contribution_percent,
            employee_contribution_annual, employer_match_percent,
@@ -392,7 +399,7 @@ router.post('/members', requireAuth, (req, res) => {
            health_premium_per_month, hsa_contribution_annual,
            dependent_care_fsa_annual, other_benefits_annual, notes
          ) VALUES (
-           @name, @role, @birth_date, @employment_status, @employer, @job_title,
+           @household_id, @name, @role, @birth_date, @employment_status, @employer, @job_title,
            @gross_income_annual, @net_pay_per_period, @pay_frequency, @pay_periods_per_year,
            @retirement_account_type, @employee_contribution_percent,
            @employee_contribution_annual, @employer_match_percent,
@@ -400,16 +407,16 @@ router.post('/members', requireAuth, (req, res) => {
            @health_premium_per_month, @hsa_contribution_annual,
            @dependent_care_fsa_annual, @other_benefits_annual, @notes
          )`
-      ).run(member);
+      ).run({ household_id: householdId, ...member });
       const saved = { id: result.lastInsertRowid, ...member };
-      replaceRetirementAccounts(saved.id, member.retirement_accounts);
-      insertIncomeRecord(normalizeIncomeRecordBody(saved, {
+      replaceRetirementAccounts(householdId, saved.id, member.retirement_accounts);
+      insertIncomeRecord(householdId, normalizeIncomeRecordBody(saved, {
         effective_date: req.body?.effective_date,
         source: 'profile'
       }));
     });
     run();
-    sendOk(res, { success: true, ...buildPayload() });
+    sendOk(res, { success: true, ...buildPayload(householdId) });
   } catch (err) {
     console.error('Household member create failed:', err);
     sendRouteError(res, err);
@@ -417,6 +424,7 @@ router.post('/members', requireAuth, (req, res) => {
 });
 
 router.put('/members/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'member');
   if (id === null) return;
 
@@ -447,17 +455,17 @@ router.put('/members/:id', requireAuth, (req, res) => {
                 other_benefits_annual = @other_benefits_annual,
                 notes = @notes,
                 updated_at = datetime('now')
-          WHERE id = @id`
-      ).run({ id, ...member });
+          WHERE id = @id AND household_id = @household_id`
+      ).run({ id, household_id: householdId, ...member });
       if (result.changes === 0) throw householdError('Household member not found.', 404);
-      replaceRetirementAccounts(id, member.retirement_accounts);
-      insertIncomeRecord(normalizeIncomeRecordBody({ id, ...member }, {
+      replaceRetirementAccounts(householdId, id, member.retirement_accounts);
+      insertIncomeRecord(householdId, normalizeIncomeRecordBody({ id, ...member }, {
         effective_date: req.body?.effective_date,
         source: 'profile'
       }));
     });
     run();
-    sendOk(res, { success: true, ...buildPayload() });
+    sendOk(res, { success: true, ...buildPayload(householdId) });
   } catch (err) {
     console.error('Household member update failed:', err);
     sendRouteError(res, err);
@@ -465,14 +473,15 @@ router.put('/members/:id', requireAuth, (req, res) => {
 });
 
 router.post('/members/:id/income-records', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'member');
   if (id === null) return;
 
   try {
-    const member = db.prepare('SELECT * FROM household_members WHERE id = ?').get(id);
+    const member = db.prepare('SELECT * FROM household_members WHERE id = ? AND household_id = ?').get(id, householdId);
     if (!member) throw householdError('Household member not found.', 404);
-    insertIncomeRecord(normalizeIncomeRecordBody(member, req.body || {}));
-    sendOk(res, { success: true, ...buildPayload() });
+    insertIncomeRecord(householdId, normalizeIncomeRecordBody(member, req.body || {}));
+    sendOk(res, { success: true, ...buildPayload(householdId) });
   } catch (err) {
     console.error('Household income record failed:', err);
     sendRouteError(res, err);
@@ -480,13 +489,14 @@ router.post('/members/:id/income-records', requireAuth, (req, res) => {
 });
 
 router.delete('/members/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'member');
   if (id === null) return;
 
   try {
-    const result = db.prepare('DELETE FROM household_members WHERE id = ?').run(id);
+    const result = db.prepare('DELETE FROM household_members WHERE id = ? AND household_id = ?').run(id, householdId);
     if (result.changes === 0) return sendNotFound(res, 'Household member not found.');
-    sendOk(res, { success: true, ...buildPayload() });
+    sendOk(res, { success: true, ...buildPayload(householdId) });
   } catch (err) {
     console.error('Household member delete failed:', err);
     sendServerError(res, err);

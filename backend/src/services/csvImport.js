@@ -59,7 +59,7 @@ function computeContentHash({ date, amountCents, originalDescription, accountKey
     .slice(0, 16);
 }
 
-export function importRocketMoneyCSV(db, csvBuffer) {
+export function importRocketMoneyCSV(db, csvBuffer, householdId = 1) {
   // --- 1. Parse -------------------------------------------------------------
   const csvText = csvBuffer.toString('utf-8');
   const parsed = Papa.parse(csvText, {
@@ -103,7 +103,9 @@ export function importRocketMoneyCSV(db, csvBuffer) {
   }
 
   // --- 4. Category lookup ---------------------------------------------------
-  const categories = db.prepare('SELECT id, name FROM categories').all();
+  const categories = db
+    .prepare('SELECT id, name FROM categories WHERE household_id = ?')
+    .all(householdId);
   const categoryIdByName = new Map(
     categories.map((c) => [c.name.toLowerCase(), c.id])
   );
@@ -113,17 +115,18 @@ export function importRocketMoneyCSV(db, csvBuffer) {
   // --- 5. Prepared statements ----------------------------------------------
   const findAccount = db.prepare(`
     SELECT id FROM accounts
-    WHERE institution IS ? AND account_number_last4 IS ?
+    WHERE household_id = ?
+      AND institution IS ? AND account_number_last4 IS ?
   `);
   const insertAccount = db.prepare(`
-    INSERT INTO accounts (name, type, institution, account_number_last4, is_manual, current_balance)
-    VALUES (?, ?, ?, ?, 1, 0)
+    INSERT INTO accounts (household_id, name, type, institution, account_number_last4, is_manual, current_balance)
+    VALUES (?, ?, ?, ?, ?, 1, 0)
   `);
 
-  const findRule = db.prepare('SELECT id FROM rules WHERE name = ?');
+  const findRule = db.prepare('SELECT id FROM rules WHERE household_id = ? AND name = ?');
   const insertRule = db.prepare(`
-    INSERT INTO rules (name, conditions, actions, priority, enabled)
-    VALUES (?, ?, ?, 0, 1)
+    INSERT INTO rules (household_id, name, conditions, actions, priority, enabled)
+    VALUES (?, ?, ?, ?, 0, 1)
   `);
 
   // Note: original_merchant holds the raw bank "Name" field. Edited values
@@ -131,8 +134,8 @@ export function importRocketMoneyCSV(db, csvBuffer) {
   const insertTxn = db.prepare(`
     INSERT OR IGNORE INTO transactions
       (account_id, date, amount, original_merchant, original_description,
-       category_id, notes, is_ignored, source, external_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'csv_import', ?)
+       category_id, notes, is_ignored, source, external_id, household_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'csv_import', ?, ?)
   `);
 
   // --- 6. Atomic import -----------------------------------------------------
@@ -146,12 +149,13 @@ export function importRocketMoneyCSV(db, csvBuffer) {
 
     for (const [key, acct] of accountsMap) {
       const existing = canMatchExistingAccount(acct)
-        ? findAccount.get(acct.institution, acct.account_number_last4)
+        ? findAccount.get(householdId, acct.institution, acct.account_number_last4)
         : null;
       if (existing) {
         accountIdByKey.set(key, existing.id);
       } else {
         const result = insertAccount.run(
+          householdId,
           acct.name,
           acct.type,
           acct.institution,
@@ -164,8 +168,9 @@ export function importRocketMoneyCSV(db, csvBuffer) {
 
     for (const [ruleName, customName] of rulesMap) {
       const friendlyName = `Auto: ${ruleName} → ${customName}`;
-      if (findRule.get(friendlyName)) continue;
+      if (findRule.get(householdId, friendlyName)) continue;
       insertRule.run(
+        householdId,
         friendlyName,
         JSON.stringify([
           { field: 'merchant', operator: 'contains', value: ruleName }
@@ -225,7 +230,8 @@ export function importRocketMoneyCSV(db, csvBuffer) {
         categoryId,
         notes,
         isIgnored,
-        contentHash
+        contentHash,
+        householdId
       );
 
       if (result.changes === 1) inserted++;
@@ -242,7 +248,7 @@ export function importRocketMoneyCSV(db, csvBuffer) {
   // RM Custom Name mappings take effect immediately.
   let reapplyResult = { processed: 0, updated: 0 };
   try {
-    reapplyResult = reapplyRulesToAllTransactions(db);
+    reapplyResult = reapplyRulesToAllTransactions(db, householdId);
   } catch (err) {
     console.error('Post-import reapply failed (non-fatal):', err);
   }

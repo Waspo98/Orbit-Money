@@ -34,32 +34,42 @@ async function tick() {
   const now = new Date();
   if (now.getHours() < SCHEDULED_HOUR) return;
 
-  const cfg = db.prepare('SELECT * FROM simplefin_config WHERE id = 1').get();
-  if (!cfg || !cfg.access_url_encrypted || !cfg.sync_enabled) return;
-
-  // Check the most recent successful sync's local date.
-  const lastSuccess = db
+  const configs = db
     .prepare(
-      `SELECT finished_at FROM sync_log
-        WHERE status = 'success'
-        ORDER BY finished_at DESC
-        LIMIT 1`
+      `SELECT household_id, last_sync_at
+         FROM simplefin_config
+        WHERE access_url_encrypted IS NOT NULL
+          AND sync_enabled = 1`
     )
-    .get();
+    .all();
+  if (configs.length === 0) return;
 
-  if (lastSuccess?.finished_at) {
-    // sqlite `datetime('now')` returns UTC text. Convert to local date.
-    const lastLocalDate = new Date(lastSuccess.finished_at + 'Z')
-      .toLocaleDateString('en-CA'); // yyyy-mm-dd in local tz
-    if (lastLocalDate === localTodayIsoDate()) return; // already ran today
-  }
+  for (const cfg of configs) {
+    // Check the most recent successful sync's local date.
+    const lastSuccess = db
+      .prepare(
+        `SELECT finished_at FROM sync_log
+          WHERE household_id = ?
+            AND status = 'success'
+          ORDER BY finished_at DESC
+          LIMIT 1`
+      )
+      .get(cfg.household_id);
 
-  try {
-    console.log('[scheduler] Triggering daily sync...');
-    const result = await runSync({ trigger: 'scheduled' });
-    console.log('[scheduler] Sync done:', result);
-  } catch (err) {
-    console.error('[scheduler] Sync failed:', err.message || err);
+    if (lastSuccess?.finished_at) {
+      // sqlite `datetime('now')` returns UTC text. Convert to local date.
+      const lastLocalDate = new Date(lastSuccess.finished_at + 'Z')
+        .toLocaleDateString('en-CA'); // yyyy-mm-dd in local tz
+      if (lastLocalDate === localTodayIsoDate()) continue; // already ran today
+    }
+
+    try {
+      console.log(`[scheduler] Triggering daily sync for household ${cfg.household_id}...`);
+      const result = await runSync({ trigger: 'scheduled', householdId: cfg.household_id });
+      console.log('[scheduler] Sync done:', result);
+    } catch (err) {
+      console.error('[scheduler] Sync failed:', err.message || err);
+    }
   }
 }
 

@@ -13,6 +13,7 @@ services:
       - ../../.env
     environment:
       PORT: 5008
+      AUTH_PROVIDER: local
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: admin
       SESSION_NAME: orbit_beta.sid

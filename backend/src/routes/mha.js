@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import {
   sendBadRequest,
@@ -23,8 +23,8 @@ function boolFlag(value) {
   return value ? 1 : 0;
 }
 
-function getEnabled() {
-  const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(SETTING_KEY);
+function getEnabled(householdId) {
+  const row = db.prepare('SELECT value FROM app_settings WHERE household_id = ? AND key = ?').get(householdId, SETTING_KEY);
   return row?.value === '1';
 }
 
@@ -40,15 +40,16 @@ function parseYear(value) {
   return year;
 }
 
-function getYears() {
+function getYears(householdId) {
   const years = db
     .prepare(
       `SELECT DISTINCT substr(date, 1, 4) AS year
          FROM transactions
-        WHERE date IS NOT NULL
+       WHERE date IS NOT NULL
+         AND household_id = ?
         ORDER BY year DESC`
     )
-    .all()
+    .all(householdId)
     .map((row) => parseInteger(row.year))
     .filter((year) => year !== null);
   const set = new Set(years);
@@ -57,8 +58,9 @@ function getYears() {
 }
 
 router.get('/settings', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
-    sendOk(res, { enabled: getEnabled() });
+    sendOk(res, { enabled: getEnabled(householdId) });
   } catch (err) {
     console.error('Get MHA settings failed:', err);
     sendServerError(res, err);
@@ -66,6 +68,7 @@ router.get('/settings', requireAuth, (req, res) => {
 });
 
 router.put('/settings', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const enabled = parseBooleanField(req.body, 'enabled');
   if (enabled === null) {
     return sendBadRequest(res, 'enabled must be a boolean.');
@@ -74,12 +77,12 @@ router.put('/settings', requireAuth, (req, res) => {
   try {
     const value = enabled ? '1' : '0';
     db.prepare(
-      `INSERT INTO app_settings (key, value, updated_at)
-       VALUES (?, ?, datetime('now'))
-       ON CONFLICT(key) DO UPDATE SET
+      `INSERT INTO app_settings (household_id, key, value, updated_at)
+       VALUES (?, ?, ?, datetime('now'))
+       ON CONFLICT(household_id, key) DO UPDATE SET
          value = excluded.value,
          updated_at = datetime('now')`
-    ).run(SETTING_KEY, value);
+    ).run(householdId, SETTING_KEY, value);
     sendOk(res, { enabled });
   } catch (err) {
     console.error('Update MHA settings failed:', err);
@@ -88,6 +91,7 @@ router.put('/settings', requireAuth, (req, res) => {
 });
 
 router.get('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
     const year = parseYear(req.query.year);
     const startDate = `${year}-01-01`;
@@ -99,19 +103,21 @@ router.get('/', requireAuth, (req, res) => {
                 current_balance / 100.0 AS current_balance,
                 is_archived, sort_order, mha_default_eligible
            FROM accounts
-          WHERE is_archived = 0
+          WHERE household_id = ?
+            AND is_archived = 0
           ORDER BY sort_order ASC, name ASC`
       )
-      .all();
+      .all(householdId);
 
     const categories = db
       .prepare(
         `SELECT id, name, color, icon, is_transfer, is_income, sort_order,
                 mha_default_eligible, mha_default_ignored
            FROM categories
+          WHERE household_id = ?
           ORDER BY sort_order ASC, name COLLATE NOCASE ASC`
       )
-      .all();
+      .all(householdId);
 
     const transactions = db
       .prepare(
@@ -142,7 +148,10 @@ router.get('/', requireAuth, (req, res) => {
            FROM transactions t
            JOIN accounts a ON a.id = t.account_id
            LEFT JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
-          WHERE COALESCE(
+          WHERE t.household_id = ?
+            AND a.household_id = ?
+            AND (c.id IS NULL OR c.household_id = ?)
+            AND COALESCE(
                   t.edited_mha_eligible,
                   CASE
                     WHEN COALESCE(c.mha_default_ignored, 0) = 1 THEN 0
@@ -159,15 +168,15 @@ router.get('/', requireAuth, (req, res) => {
             AND t.date < ?
           ORDER BY t.date DESC, t.id DESC`
       )
-      .all(startDate, endDate)
+      .all(householdId, householdId, householdId, startDate, endDate)
       .map(formatMhaTransaction);
     const summary = summarizeMhaTransactions(transactions, MHA_SAVINGS_RATE);
 
     sendOk(res, {
-      enabled: getEnabled(),
+      enabled: getEnabled(householdId),
       savingsRate: MHA_SAVINGS_RATE,
       year,
-      years: getYears(),
+      years: getYears(householdId),
       accounts,
       categories,
       transactions,
@@ -180,6 +189,7 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 router.put('/accounts/:id/default', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'account');
   if (id === null) return;
   const mhaDefaultEligible = parseBooleanField(req.body, 'mha_default_eligible');
@@ -188,17 +198,17 @@ router.put('/accounts/:id/default', requireAuth, (req, res) => {
   }
 
   try {
-    const existing = db.prepare('SELECT id FROM accounts WHERE id = ?').get(id);
+    const existing = db.prepare('SELECT id FROM accounts WHERE id = ? AND household_id = ?').get(id, householdId);
     if (!existing) return sendNotFound(res, 'Account not found.');
 
     db.prepare(
       `UPDATE accounts
           SET mha_default_eligible = ?, updated_at = datetime('now')
-        WHERE id = ?`
-    ).run(boolFlag(mhaDefaultEligible), id);
+        WHERE id = ? AND household_id = ?`
+    ).run(boolFlag(mhaDefaultEligible), id, householdId);
 
     const account = moneyFieldsToDollars(
-      db.prepare('SELECT * FROM accounts WHERE id = ?').get(id),
+      db.prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?').get(id, householdId),
       ACCOUNT_MONEY_FIELDS
     );
     sendOk(res, { success: true, account });
@@ -209,6 +219,7 @@ router.put('/accounts/:id/default', requireAuth, (req, res) => {
 });
 
 router.put('/categories/:id/default', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'category');
   if (id === null) return;
   const mhaDefaultEligible = parseBooleanField(req.body, 'mha_default_eligible');
@@ -217,7 +228,7 @@ router.put('/categories/:id/default', requireAuth, (req, res) => {
   }
 
   try {
-    const existing = db.prepare('SELECT id FROM categories WHERE id = ?').get(id);
+    const existing = db.prepare('SELECT id FROM categories WHERE id = ? AND household_id = ?').get(id, householdId);
     if (!existing) return sendNotFound(res, 'Category not found.');
 
     const include = boolFlag(mhaDefaultEligible);
@@ -225,10 +236,10 @@ router.put('/categories/:id/default', requireAuth, (req, res) => {
       `UPDATE categories
           SET mha_default_eligible = ?,
               mha_default_ignored = CASE WHEN ? = 1 THEN 0 ELSE mha_default_ignored END
-        WHERE id = ?`
-    ).run(include, include, id);
+        WHERE id = ? AND household_id = ?`
+    ).run(include, include, id, householdId);
 
-    const category = db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
+    const category = db.prepare('SELECT * FROM categories WHERE id = ? AND household_id = ?').get(id, householdId);
     sendOk(res, { success: true, category });
   } catch (err) {
     console.error('Update MHA category default failed:', err);
@@ -237,6 +248,7 @@ router.put('/categories/:id/default', requireAuth, (req, res) => {
 });
 
 router.put('/categories/:id/ignore-default', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'category');
   if (id === null) return;
   const mhaDefaultIgnored = parseBooleanField(req.body, 'mha_default_ignored');
@@ -245,7 +257,7 @@ router.put('/categories/:id/ignore-default', requireAuth, (req, res) => {
   }
 
   try {
-    const existing = db.prepare('SELECT id FROM categories WHERE id = ?').get(id);
+    const existing = db.prepare('SELECT id FROM categories WHERE id = ? AND household_id = ?').get(id, householdId);
     if (!existing) return sendNotFound(res, 'Category not found.');
 
     const ignored = boolFlag(mhaDefaultIgnored);
@@ -253,10 +265,10 @@ router.put('/categories/:id/ignore-default', requireAuth, (req, res) => {
       `UPDATE categories
           SET mha_default_ignored = ?,
               mha_default_eligible = CASE WHEN ? = 1 THEN 0 ELSE mha_default_eligible END
-        WHERE id = ?`
-    ).run(ignored, ignored, id);
+        WHERE id = ? AND household_id = ?`
+    ).run(ignored, ignored, id, householdId);
 
-    const category = db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
+    const category = db.prepare('SELECT * FROM categories WHERE id = ? AND household_id = ?').get(id, householdId);
     sendOk(res, { success: true, category });
   } catch (err) {
     console.error('Update MHA category ignore default failed:', err);

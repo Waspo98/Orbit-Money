@@ -1,0 +1,219 @@
+import crypto from 'crypto';
+import { config } from '../config.js';
+import { db } from '../db/index.js';
+import { createHouseholdForUser } from './householdDefaults.js';
+
+let discoveryCache = null;
+let jwksCache = null;
+
+function base64Url(input) {
+  return Buffer.from(input)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function decodeBase64Url(input) {
+  const padded = input.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(input.length / 4) * 4, '=');
+  return Buffer.from(padded, 'base64');
+}
+
+function randomUrlSafe(bytes = 32) {
+  return base64Url(crypto.randomBytes(bytes));
+}
+
+function sha256UrlSafe(value) {
+  return base64Url(crypto.createHash('sha256').update(value).digest());
+}
+
+async function fetchJson(url, options = {}) {
+  const res = await fetch(url, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error_description || data.error || `OIDC request failed: ${res.status}`);
+  }
+  return data;
+}
+
+export async function getDiscovery() {
+  if (discoveryCache) return discoveryCache;
+  const issuer = config.authentikIssuerUrl.replace(/\/+$/, '');
+  discoveryCache = await fetchJson(`${issuer}/.well-known/openid-configuration`);
+  return discoveryCache;
+}
+
+async function getJwks() {
+  if (jwksCache) return jwksCache;
+  const discovery = await getDiscovery();
+  jwksCache = await fetchJson(discovery.jwks_uri);
+  return jwksCache;
+}
+
+export async function buildAuthorizationUrl(req) {
+  const discovery = await getDiscovery();
+  const state = randomUrlSafe();
+  const nonce = randomUrlSafe();
+  const codeVerifier = randomUrlSafe(64);
+
+  req.session.oidcState = state;
+  req.session.oidcNonce = nonce;
+  req.session.oidcCodeVerifier = codeVerifier;
+
+  const params = new URLSearchParams({
+    client_id: config.authentikClientId,
+    redirect_uri: config.authentikRedirectUri,
+    response_type: 'code',
+    scope: 'openid email profile',
+    state,
+    nonce,
+    code_challenge: sha256UrlSafe(codeVerifier),
+    code_challenge_method: 'S256'
+  });
+
+  return `${discovery.authorization_endpoint}?${params.toString()}`;
+}
+
+async function exchangeCodeForTokens(code, codeVerifier) {
+  const discovery = await getDiscovery();
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: config.authentikRedirectUri,
+    client_id: config.authentikClientId,
+    client_secret: config.authentikClientSecret,
+    code_verifier: codeVerifier
+  });
+
+  return fetchJson(discovery.token_endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body
+  });
+}
+
+function decodeJwt(token) {
+  const parts = token.split('.');
+  if (parts.length !== 3) throw new Error('Invalid ID token.');
+  return {
+    header: JSON.parse(decodeBase64Url(parts[0]).toString('utf8')),
+    payload: JSON.parse(decodeBase64Url(parts[1]).toString('utf8')),
+    signingInput: `${parts[0]}.${parts[1]}`,
+    signature: decodeBase64Url(parts[2])
+  };
+}
+
+async function verifyIdToken(idToken, expectedNonce) {
+  const decoded = decodeJwt(idToken);
+  if (decoded.header.alg !== 'RS256') {
+    throw new Error(`Unsupported ID token algorithm: ${decoded.header.alg || 'unknown'}`);
+  }
+
+  const jwks = await getJwks();
+  const jwk = jwks.keys?.find((key) => key.kid === decoded.header.kid);
+  if (!jwk) throw new Error('Could not find a matching Authentik signing key.');
+
+  const key = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+  const verifier = crypto.createVerify('RSA-SHA256');
+  verifier.update(decoded.signingInput);
+  verifier.end();
+  if (!verifier.verify(key, decoded.signature)) {
+    throw new Error('ID token signature is invalid.');
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const issuer = config.authentikIssuerUrl.replace(/\/+$/, '');
+  if (decoded.payload.iss?.replace(/\/+$/, '') !== issuer) throw new Error('ID token issuer mismatch.');
+  const audiences = Array.isArray(decoded.payload.aud) ? decoded.payload.aud : [decoded.payload.aud];
+  if (!audiences.includes(config.authentikClientId)) {
+    throw new Error('ID token audience mismatch.');
+  }
+  if (Number(decoded.payload.exp) <= now) throw new Error('ID token is expired.');
+  if (decoded.payload.nonce !== expectedNonce) throw new Error('ID token nonce mismatch.');
+  if (!decoded.payload.sub) throw new Error('ID token is missing subject.');
+
+  return decoded.payload;
+}
+
+function profileName(profile) {
+  return profile.name || profile.preferred_username || profile.email || 'Authentik User';
+}
+
+function resolveUserAndHousehold(profile) {
+  const existing = db
+    .prepare('SELECT * FROM users WHERE authentik_sub = ?')
+    .get(profile.sub);
+  if (existing) {
+    db.prepare(
+      `UPDATE users
+          SET email = ?, display_name = ?, updated_at = datetime('now')
+        WHERE id = ?`
+    ).run(profile.email || null, profileName(profile), existing.id);
+    return existing.id;
+  }
+
+  const oidcUsers = db
+    .prepare('SELECT COUNT(*) AS count FROM users WHERE authentik_sub IS NOT NULL')
+    .get().count;
+  if (oidcUsers === 0) {
+    db.prepare(
+      `UPDATE users
+          SET authentik_sub = ?, email = ?, display_name = ?, updated_at = datetime('now')
+        WHERE id = 1`
+    ).run(profile.sub, profile.email || null, profileName(profile));
+    return 1;
+  }
+
+  return db
+    .prepare(
+      `INSERT INTO users (authentik_sub, email, display_name)
+       VALUES (?, ?, ?)`
+    )
+    .run(profile.sub, profile.email || null, profileName(profile)).lastInsertRowid;
+}
+
+function defaultMembershipForUser(userId, displayName) {
+  const membership = db
+    .prepare(
+      `SELECT hm.household_id, hm.role, h.name
+         FROM household_memberships hm
+         JOIN households h ON h.id = hm.household_id
+        WHERE hm.user_id = ?
+        ORDER BY CASE hm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, hm.id ASC
+        LIMIT 1`
+    )
+    .get(userId);
+
+  if (membership) return membership;
+  const householdId = createHouseholdForUser(db, userId, displayName);
+  return db
+    .prepare('SELECT id AS household_id, name, ? AS role FROM households WHERE id = ?')
+    .get('owner', householdId);
+}
+
+export async function completeOidcLogin(req, code, state) {
+  if (!state || state !== req.session.oidcState) {
+    throw new Error('OIDC state mismatch.');
+  }
+  if (!code) throw new Error('OIDC callback did not include a code.');
+
+  const tokens = await exchangeCodeForTokens(code, req.session.oidcCodeVerifier);
+  const profile = await verifyIdToken(tokens.id_token, req.session.oidcNonce);
+  const displayName = profileName(profile);
+  const userId = resolveUserAndHousehold(profile);
+  const membership = defaultMembershipForUser(userId, displayName);
+
+  delete req.session.oidcState;
+  delete req.session.oidcNonce;
+  delete req.session.oidcCodeVerifier;
+
+  return {
+    userId,
+    householdId: membership.household_id,
+    role: membership.role,
+    username: profile.preferred_username || profile.email || profile.sub,
+    email: profile.email || null,
+    displayName,
+    householdName: membership.name
+  };
+}

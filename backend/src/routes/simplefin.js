@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import { encrypt } from '../crypto.js';
 import {
@@ -18,19 +18,21 @@ const router = express.Router();
  * High-level connection + last-sync status for the Settings page + banner.
  */
 router.get('/status', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
-    const cfg = db.prepare('SELECT * FROM simplefin_config WHERE id = 1').get();
+    const cfg = db.prepare('SELECT * FROM simplefin_config WHERE household_id = ?').get(householdId);
     const connected = !!(cfg && cfg.access_url_encrypted);
 
     const lastSync = db
       .prepare(
         `SELECT id, started_at, finished_at, status, error_message,
                 transactions_inserted, accounts_unmatched
-           FROM sync_log
-          ORDER BY started_at DESC
-          LIMIT 1`
+          FROM sync_log
+         WHERE household_id = ?
+         ORDER BY started_at DESC
+         LIMIT 1`
       )
-      .get() || null;
+      .get(householdId) || null;
 
     sendOk(res, {
       connected,
@@ -54,6 +56,7 @@ router.get('/status', requireAuth, (req, res) => {
  * waits for the 6 AM scheduler.
  */
 router.post('/setup', requireAuth, async (req, res) => {
+  const householdId = requireHouseholdId(req);
   const { setupToken, cutoverDate } = req.body || {};
   if (!setupToken || !cutoverDate) {
     return sendBadRequest(res, 'setupToken and cutoverDate are required.');
@@ -68,15 +71,15 @@ router.post('/setup', requireAuth, async (req, res) => {
 
     db.prepare(
       `
-      INSERT INTO simplefin_config (id, access_url_encrypted, cutover_date, sync_enabled, updated_at)
-      VALUES (1, ?, ?, 1, datetime('now'))
-      ON CONFLICT(id) DO UPDATE SET
+      INSERT INTO simplefin_config (household_id, access_url_encrypted, cutover_date, sync_enabled, updated_at)
+      VALUES (?, ?, ?, 1, datetime('now'))
+      ON CONFLICT(household_id) DO UPDATE SET
         access_url_encrypted = excluded.access_url_encrypted,
         cutover_date = excluded.cutover_date,
         sync_enabled = 1,
         updated_at = datetime('now')
     `
-    ).run(encrypted, cutoverDate);
+    ).run(householdId, encrypted, cutoverDate);
 
     sendOk(res, { success: true });
   } catch (err) {
@@ -90,8 +93,9 @@ router.post('/setup', requireAuth, async (req, res) => {
  * Kicks off a manual sync. Returns the summary when complete.
  */
 router.post('/sync', requireAuth, async (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
-    const result = await runSync({ trigger: 'manual' });
+    const result = await runSync({ trigger: 'manual', householdId });
     sendOk(res, { success: true, ...result });
   } catch (err) {
     console.error('Manual sync failed:', err);
@@ -104,6 +108,7 @@ router.post('/sync', requireAuth, async (req, res) => {
  * Returns recent sync log rows for display in Settings.
  */
 router.get('/sync-log', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const limit = parseBoundedInteger(req.query.limit, { fallback: 20, min: 1, max: 100 });
   try {
     const items = db
@@ -113,10 +118,11 @@ router.get('/sync-log', requireAuth, (req, res) => {
                 rm_rows_deleted, accounts_created, accounts_unmatched,
                 transfers_matched, error_message
            FROM sync_log
+          WHERE household_id = ?
           ORDER BY started_at DESC
           LIMIT ?`
       )
-      .all(limit);
+      .all(householdId, limit);
     sendOk(res, { items });
   } catch (err) {
     console.error('Sync log fetch failed:', err);
@@ -130,14 +136,15 @@ router.get('/sync-log', requireAuth, (req, res) => {
  * transactions or accounts — those stay for history.
  */
 router.post('/disconnect', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
     db.prepare(
       `UPDATE simplefin_config
           SET access_url_encrypted = NULL,
               sync_enabled = 0,
               updated_at = datetime('now')
-        WHERE id = 1`
-    ).run();
+        WHERE household_id = ?`
+    ).run(householdId);
     sendOk(res, { success: true });
   } catch (err) {
     console.error('Disconnect failed:', err);

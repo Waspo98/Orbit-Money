@@ -16,7 +16,7 @@
 // =============================================================================
 
 import express from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import {
   reapplyRulesToAllTransactions,
@@ -45,6 +45,7 @@ function safeJsonParse(s, fallback) {
  * GET /api/rules?withCounts=1
  */
 router.get('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const withCounts = req.query.withCounts === '1';
 
   try {
@@ -52,9 +53,10 @@ router.get('/', requireAuth, (req, res) => {
       .prepare(
         `SELECT id, name, conditions, actions, priority, enabled, created_at, updated_at
            FROM rules
-           ORDER BY priority DESC, id ASC`
+          WHERE household_id = ?
+          ORDER BY priority DESC, id ASC`
       )
-      .all();
+      .all(householdId);
 
     const items = rows.map((r) => ({
       id: r.id,
@@ -69,7 +71,7 @@ router.get('/', requireAuth, (req, res) => {
 
     if (withCounts) {
       for (const item of items) {
-        item.match_count = countMatches(db, item.conditions);
+        item.match_count = countMatches(db, item.conditions, householdId);
       }
     }
 
@@ -84,13 +86,14 @@ router.get('/', requireAuth, (req, res) => {
  * GET /api/rules/:id/match-count
  */
 router.get('/:id/match-count', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'rule');
   if (id === null) return;
 
   try {
-    const rule = db.prepare('SELECT conditions FROM rules WHERE id = ?').get(id);
+    const rule = db.prepare('SELECT conditions FROM rules WHERE id = ? AND household_id = ?').get(id, householdId);
     if (!rule) return sendNotFound(res, 'Rule not found.');
-    const count = countMatches(db, safeJsonParse(rule.conditions, []));
+    const count = countMatches(db, safeJsonParse(rule.conditions, []), householdId);
     sendOk(res, { count });
   } catch (err) {
     console.error('Match count failed:', err);
@@ -106,9 +109,10 @@ router.get('/:id/match-count', requireAuth, (req, res) => {
  * purely condition-driven in v12).
  */
 router.post('/preview', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const { conditions } = req.body || {};
   try {
-    const count = countMatches(db, conditions);
+    const count = countMatches(db, conditions, householdId);
     sendOk(res, { count });
   } catch (err) {
     console.error('Rule preview failed:', err);
@@ -120,6 +124,7 @@ router.post('/preview', requireAuth, (req, res) => {
  * POST /api/rules
  */
 router.post('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const { name, conditions, actions, priority = 0, enabled = true } = req.body || {};
 
   if (!name || typeof name !== 'string' || !name.trim()) {
@@ -135,10 +140,11 @@ router.post('/', requireAuth, (req, res) => {
   try {
     const result = db
       .prepare(
-        `INSERT INTO rules (name, conditions, actions, priority, enabled)
-         VALUES (?, ?, ?, ?, ?)`
+        `INSERT INTO rules (household_id, name, conditions, actions, priority, enabled)
+         VALUES (?, ?, ?, ?, ?, ?)`
       )
       .run(
+        householdId,
         name.trim(),
         JSON.stringify(conditions),
         JSON.stringify(actions),
@@ -152,7 +158,7 @@ router.post('/', requireAuth, (req, res) => {
     // (~8K transactions), this adds a second or two to the save but makes
     // the UI predictable.
     try {
-      reapplyRulesToAllTransactions(db);
+      reapplyRulesToAllTransactions(db, householdId);
     } catch (err) {
       console.error('Auto-reapply after rule create failed:', err);
     }
@@ -168,6 +174,7 @@ router.post('/', requireAuth, (req, res) => {
  * PUT /api/rules/:id
  */
 router.put('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'rule');
   if (id === null) return;
 
@@ -210,16 +217,16 @@ router.put('/:id', requireAuth, (req, res) => {
   }
 
   sets.push("updated_at = datetime('now')");
-  values.push(id);
+  values.push(id, householdId);
 
   try {
-    const existing = db.prepare('SELECT id FROM rules WHERE id = ?').get(id);
+    const existing = db.prepare('SELECT id FROM rules WHERE id = ? AND household_id = ?').get(id, householdId);
     if (!existing) return sendNotFound(res, 'Rule not found.');
-    db.prepare(`UPDATE rules SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+    db.prepare(`UPDATE rules SET ${sets.join(', ')} WHERE id = ? AND household_id = ?`).run(...values);
 
     // Synchronous reapply — see POST note above.
     try {
-      reapplyRulesToAllTransactions(db);
+      reapplyRulesToAllTransactions(db, householdId);
     } catch (err) {
       console.error('Auto-reapply after rule update failed:', err);
     }
@@ -235,21 +242,22 @@ router.put('/:id', requireAuth, (req, res) => {
  * PATCH /api/rules/:id/enabled
  */
 router.patch('/:id/enabled', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'rule');
   if (id === null) return;
   const enabled = req.body?.enabled ? 1 : 0;
 
   try {
     const result = db
-      .prepare(`UPDATE rules SET enabled = ?, updated_at = datetime('now') WHERE id = ?`)
-      .run(enabled, id);
+      .prepare(`UPDATE rules SET enabled = ?, updated_at = datetime('now') WHERE id = ? AND household_id = ?`)
+      .run(enabled, id, householdId);
     if (result.changes === 0) {
       return sendNotFound(res, 'Rule not found.');
     }
 
     // Synchronous reapply so the response reflects settled state.
     try {
-      reapplyRulesToAllTransactions(db);
+      reapplyRulesToAllTransactions(db, householdId);
     } catch (err) {
       console.error('Auto-reapply after toggle failed:', err);
     }
@@ -267,31 +275,36 @@ router.patch('/:id/enabled', requireAuth, (req, res) => {
  * transactions fall back to originals. User edits are preserved.
  */
 router.delete('/all', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
     const run = db.transaction(() => {
-      const result = db.prepare('DELETE FROM rules').run();
+      const result = db.prepare('DELETE FROM rules WHERE household_id = ?').run(householdId);
 
       // Clear every rule-sourced edit across all four editable fields.
       db.prepare(
         `UPDATE transactions
             SET edited_merchant = NULL, edited_merchant_source = NULL
-          WHERE edited_merchant_source LIKE 'rule:%'`
-      ).run();
+          WHERE edited_merchant_source LIKE 'rule:%'
+            AND household_id = ?`
+      ).run(householdId);
       db.prepare(
         `UPDATE transactions
             SET edited_category_id = NULL, edited_category_id_source = NULL
-          WHERE edited_category_id_source LIKE 'rule:%'`
-      ).run();
+          WHERE edited_category_id_source LIKE 'rule:%'
+            AND household_id = ?`
+      ).run(householdId);
       db.prepare(
         `UPDATE transactions
             SET edited_is_transfer = NULL, edited_is_transfer_source = NULL
-          WHERE edited_is_transfer_source LIKE 'rule:%'`
-      ).run();
+          WHERE edited_is_transfer_source LIKE 'rule:%'
+            AND household_id = ?`
+      ).run(householdId);
       db.prepare(
         `UPDATE transactions
             SET edited_is_ignored = NULL, edited_is_ignored_source = NULL
-          WHERE edited_is_ignored_source LIKE 'rule:%'`
-      ).run();
+          WHERE edited_is_ignored_source LIKE 'rule:%'
+            AND household_id = ?`
+      ).run(householdId);
 
       return result.changes;
     });
@@ -310,11 +323,12 @@ router.delete('/all', requireAuth, (req, res) => {
  * then re-runs remaining rules to re-populate any gaps.
  */
 router.delete('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'rule');
   if (id === null) return;
   try {
     const run = db.transaction(() => {
-      const result = db.prepare('DELETE FROM rules WHERE id = ?').run(id);
+      const result = db.prepare('DELETE FROM rules WHERE id = ? AND household_id = ?').run(id, householdId);
       return result.changes;
     });
 
@@ -326,7 +340,7 @@ router.delete('/:id', requireAuth, (req, res) => {
     // Revert this rule's edits, then re-apply remaining rules. This is
     // synchronous so the response reflects settled state — the client can
     // refetch confidently right after.
-    revertEditsForRule(db, id);
+    revertEditsForRule(db, id, householdId);
 
     sendOk(res, { success: true });
   } catch (err) {
@@ -339,9 +353,10 @@ router.delete('/:id', requireAuth, (req, res) => {
  * POST /api/rules/reapply-all
  */
 router.post('/reapply-all', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
     const start = Date.now();
-    const result = reapplyRulesToAllTransactions(db);
+    const result = reapplyRulesToAllTransactions(db, householdId);
     const elapsedMs = Date.now() - start;
     sendOk(res, { success: true, elapsedMs, ...result });
   } catch (err) {

@@ -56,18 +56,19 @@ function simpleFinPostedToIsoDate(posted) {
  * Find a previous sync_log row that's still 'running'. If it's recent, throws
  * to prevent overlap. If it's stale, marks it as error and allows the new run.
  */
-function guardAgainstOverlap() {
+function guardAgainstOverlap(householdId) {
   const stale = db
     .prepare(
       `
       SELECT id, started_at
       FROM sync_log
-      WHERE status = 'running'
+      WHERE household_id = ?
+        AND status = 'running'
       ORDER BY started_at DESC
       LIMIT 1
     `
     )
-    .get();
+    .get(householdId);
 
   if (!stale) return;
 
@@ -84,8 +85,9 @@ function guardAgainstOverlap() {
        SET status = 'error',
            finished_at = datetime('now'),
            error_message = 'Sync appeared to crash (marked stale after 15 min).'
-       WHERE id = ?`
-  ).run(stale.id);
+       WHERE id = ?
+         AND household_id = ?`
+  ).run(stale.id, householdId);
 }
 
 /**
@@ -118,11 +120,11 @@ function extractLast4(sfAccount) {
  * Run a full sync. `trigger` is 'manual' | 'scheduled'.
  * Returns a summary object; errors throw and are logged to sync_log.
  */
-export async function runSync({ trigger = 'manual' } = {}) {
-  guardAgainstOverlap();
+export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
+  guardAgainstOverlap(householdId);
 
   // Load config
-  const cfg = db.prepare('SELECT * FROM simplefin_config WHERE id = 1').get();
+  const cfg = db.prepare('SELECT * FROM simplefin_config WHERE household_id = ?').get(householdId);
   if (!cfg || !cfg.access_url_encrypted) {
     throw new Error('SimpleFIN is not configured. Connect it in Settings first.');
   }
@@ -140,9 +142,9 @@ export async function runSync({ trigger = 'manual' } = {}) {
 
   // Open a sync_log row
   const logInsert = db.prepare(`
-    INSERT INTO sync_log (status, trigger) VALUES ('running', ?)
+    INSERT INTO sync_log (household_id, status, trigger) VALUES (?, 'running', ?)
   `);
-  const logId = logInsert.run(trigger).lastInsertRowid;
+  const logId = logInsert.run(householdId, trigger).lastInsertRowid;
 
   const markLog = db.prepare(`
     UPDATE sync_log
@@ -156,6 +158,7 @@ export async function runSync({ trigger = 'manual' } = {}) {
            transfers_matched = ?,
            error_message = ?
      WHERE id = ?
+       AND household_id = ?
   `);
 
   try {
@@ -177,9 +180,10 @@ export async function runSync({ trigger = 'manual' } = {}) {
     const deletion = db
       .prepare(
         `DELETE FROM transactions
-          WHERE source = 'csv_import' AND date > ?`
+          WHERE household_id = ?
+            AND source = 'csv_import' AND date > ?`
       )
-      .run(cutoverDate);
+      .run(householdId, cutoverDate);
     const rmDeleted = deletion.changes;
 
     // --- Step 2: Fetch from SimpleFIN. ---------------------------------------
@@ -188,24 +192,27 @@ export async function runSync({ trigger = 'manual' } = {}) {
     // --- Step 3: Upsert accounts. --------------------------------------------
     const findAccountByInstLast4 = db.prepare(`
       SELECT id FROM accounts
-       WHERE institution IS ? AND account_number_last4 IS ?
+       WHERE household_id = ?
+         AND institution IS ? AND account_number_last4 IS ?
     `);
     const findAccountBySfId = db.prepare(`
-      SELECT id FROM accounts WHERE simplefin_account_id = ?
+      SELECT id FROM accounts WHERE household_id = ? AND simplefin_account_id = ?
     `);
     const linkSfId = db.prepare(`
       UPDATE accounts SET simplefin_account_id = ?, is_manual = 0, updated_at = datetime('now')
        WHERE id = ?
+         AND household_id = ?
     `);
     const updateBalance = db.prepare(`
       UPDATE accounts
          SET current_balance = ?, updated_at = datetime('now')
        WHERE id = ?
+         AND household_id = ?
     `);
     const insertAccount = db.prepare(`
-      INSERT INTO accounts (name, type, institution, account_number_last4,
+      INSERT INTO accounts (household_id, name, type, institution, account_number_last4,
                             simplefin_account_id, current_balance, is_manual)
-      VALUES (?, ?, ?, ?, ?, ?, 0)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0)
     `);
 
     let accountsCreated = 0;
@@ -217,10 +224,10 @@ export async function runSync({ trigger = 'manual' } = {}) {
 
     for (const sf of payload.accounts) {
       // Already linked by simplefin_account_id?
-      const linked = findAccountBySfId.get(sf.id);
+      const linked = findAccountBySfId.get(householdId, sf.id);
       if (linked) {
         sfToLocalId.set(sf.id, linked.id);
-        updateBalance.run(dollarsToCents(parseFloat(sf.balance) || 0), linked.id);
+        updateBalance.run(dollarsToCents(parseFloat(sf.balance) || 0), linked.id, householdId);
         continue;
       }
 
@@ -229,10 +236,10 @@ export async function runSync({ trigger = 'manual' } = {}) {
       const last4 = extractLast4(sf);
 
       if (institution && last4) {
-        const existing = findAccountByInstLast4.get(institution, last4);
+        const existing = findAccountByInstLast4.get(householdId, institution, last4);
         if (existing) {
-          linkSfId.run(sf.id, existing.id);
-          updateBalance.run(dollarsToCents(parseFloat(sf.balance) || 0), existing.id);
+          linkSfId.run(sf.id, existing.id, householdId);
+          updateBalance.run(dollarsToCents(parseFloat(sf.balance) || 0), existing.id, householdId);
           sfToLocalId.set(sf.id, existing.id);
           continue;
         }
@@ -241,6 +248,7 @@ export async function runSync({ trigger = 'manual' } = {}) {
       // No match → create new, flag unmatched.
       const type = guessAccountTypeFromSimpleFin(sf);
       const result = insertAccount.run(
+        householdId,
         sf.name || 'SimpleFIN Account',
         type,
         institution,
@@ -254,11 +262,11 @@ export async function runSync({ trigger = 'manual' } = {}) {
     }
 
     // --- Step 4: Insert transactions (with rule matcher). --------------------
-    const rules = loadRules(db);
+    const rules = loadRules(db, householdId);
     const categoriesUncat =
       db
-        .prepare(`SELECT id FROM categories WHERE lower(name) = 'uncategorized'`)
-        .get()?.id ?? null;
+        .prepare(`SELECT id FROM categories WHERE household_id = ? AND lower(name) = 'uncategorized'`)
+        .get(householdId)?.id ?? null;
 
     // v12: original_merchant holds the raw bank merchant name. Rule-driven
     // edits (if any) are pre-populated into the edited_* columns via
@@ -273,8 +281,8 @@ export async function runSync({ trigger = 'manual' } = {}) {
          edited_category_id, edited_category_id_source,
          edited_is_transfer, edited_is_transfer_source,
          edited_is_ignored, edited_is_ignored_source,
-         source, external_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'simplefin', ?)
+         source, external_id, household_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'simplefin', ?, ?)
     `);
     const repairEpochTxn = db.prepare(`
       UPDATE transactions
@@ -286,6 +294,7 @@ export async function runSync({ trigger = 'manual' } = {}) {
        WHERE source = 'simplefin'
          AND external_id = ?
          AND date = ?
+         AND household_id = ?
     `);
 
     let inserted = 0;
@@ -347,7 +356,8 @@ export async function runSync({ trigger = 'manual' } = {}) {
             hydrated.edited_is_transfer_source,
             hydrated.edited_is_ignored,
             hydrated.edited_is_ignored_source,
-            tx.id  // SimpleFIN transaction id → external_id
+            tx.id,
+            householdId
           );
           if (result.changes === 1) {
             inserted++;
@@ -359,7 +369,8 @@ export async function runSync({ trigger = 'manual' } = {}) {
               rawMerchant,
               originalDesc,
               tx.id,
-              UNIX_EPOCH_ISO_DATE
+              UNIX_EPOCH_ISO_DATE,
+              householdId
             );
             skipped++; // duplicate (already synced previously)
           }
@@ -369,14 +380,14 @@ export async function runSync({ trigger = 'manual' } = {}) {
     insertRun();
 
     // --- Step 5: Transfer matcher. ------------------------------------------
-    const transfersPaired = matchTransfers(db);
+    const transfersPaired = matchTransfers(db, householdId);
 
     // --- Step 6: Persist last_sync_at. --------------------------------------
     db.prepare(`
       UPDATE simplefin_config
          SET last_sync_at = datetime('now'), updated_at = datetime('now')
-       WHERE id = 1
-    `).run();
+       WHERE household_id = ?
+    `).run(householdId);
 
     // --- Step 7: Finalize log row. ------------------------------------------
     // SimpleFIN may have returned per-institution errors. Surface them but
@@ -396,7 +407,8 @@ export async function runSync({ trigger = 'manual' } = {}) {
       accountsUnmatched,
       transfersPaired,
       errorMsg,
-      logId
+      logId,
+      householdId
     );
 
     return {
@@ -410,7 +422,7 @@ export async function runSync({ trigger = 'manual' } = {}) {
       error: errorMsg
     };
   } catch (err) {
-    markLog.run('error', 0, 0, 0, 0, 0, 0, err.message || String(err), logId);
+    markLog.run('error', 0, 0, 0, 0, 0, 0, err.message || String(err), logId, householdId);
     throw err;
   }
 }

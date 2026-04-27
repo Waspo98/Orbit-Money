@@ -28,7 +28,7 @@
 // =============================================================================
 
 import express from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import { reapplyRulesToTransaction } from '../services/ruleMatcher.js';
 import { attachMerchantLogos } from '../services/merchantLogos.js';
@@ -170,9 +170,9 @@ const SORT_MAP = {
  * Build the SQL WHERE clause + arg array from request query params.
  * Returns { clause, args } where clause is either '' or 'WHERE ...'.
  */
-function buildFilterWhere(q) {
-  const wheres = [];
-  const args = [];
+function buildFilterWhere(q, householdId) {
+  const wheres = ['household_id = ?'];
+  const args = [householdId];
 
   // ----- Account filter -----
   // `accounts` (multi) takes precedence over `account_id` (legacy single).
@@ -296,6 +296,7 @@ function buildFilterWhere(q) {
 // GET /api/transactions
 // ---------------------------------------------------------------------------
 router.get('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const page = parseBoundedInteger(req.query.page, { fallback: 1, min: 1 });
   const limit = parseBoundedInteger(req.query.limit, { fallback: 50, min: 1, max: 200 });
   const offset = (page - 1) * limit;
@@ -304,7 +305,7 @@ router.get('/', requireAuth, (req, res) => {
   const orderBy = SORT_MAP[sortKey] || SORT_MAP.date_desc;
 
   try {
-    const { clause, args } = buildFilterWhere(req.query);
+    const { clause, args } = buildFilterWhere(req.query, householdId);
 
     const total = db
       .prepare(`SELECT COUNT(*) AS c FROM transactions ${clause}`)
@@ -312,13 +313,13 @@ router.get('/', requireAuth, (req, res) => {
 
     // Unfiltered total — useful for the UI to say "12 of 8,428".
     const grandTotal = db
-      .prepare('SELECT COUNT(*) AS c FROM transactions')
-      .get().c;
+      .prepare('SELECT COUNT(*) AS c FROM transactions WHERE household_id = ?')
+      .get(householdId).c;
 
     const { start: monthStart, end: monthEnd } = currentMonthBounds();
     const monthlyTotal = db
-      .prepare('SELECT COUNT(*) AS c FROM transactions WHERE date >= ? AND date <= ?')
-      .get(monthStart, monthEnd).c;
+      .prepare('SELECT COUNT(*) AS c FROM transactions WHERE household_id = ? AND date >= ? AND date <= ?')
+      .get(householdId, monthStart, monthEnd).c;
 
     const monthCounts = db
       .prepare(
@@ -362,13 +363,15 @@ router.get('/', requireAuth, (req, res) => {
 // GET /api/transactions/:id
 // ---------------------------------------------------------------------------
 router.get('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'transaction');
   if (id === null) return;
   try {
     const row = db
       .prepare(`SELECT ${SELECT_COLS}, created_at, updated_at
-                  FROM transactions WHERE id = ?`)
-      .get(id);
+                  FROM transactions
+                 WHERE id = ? AND household_id = ?`)
+      .get(id, householdId);
     if (!row) return sendNotFound(res, 'Transaction not found.');
     sendOk(res, attachMerchantLogos(db, [hydrate(row)])[0]);
   } catch (err) {
@@ -384,6 +387,7 @@ router.get('/:id', requireAuth, (req, res) => {
 // re-claim the field.
 // ---------------------------------------------------------------------------
 router.patch('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'transaction');
   if (id === null) return;
 
@@ -406,9 +410,10 @@ router.patch('/:id', requireAuth, (req, res) => {
                   THEN 1
                   ELSE 0
                 END AS default_mha_eligible
-           FROM transactions WHERE id = ?`
+           FROM transactions WHERE id = ?
+             AND household_id = ?`
       )
-      .get(id);
+      .get(id, householdId);
     if (!existing) return sendNotFound(res, 'Transaction not found.');
 
     const body = req.body || {};
@@ -492,9 +497,9 @@ router.patch('/:id', requireAuth, (req, res) => {
     }
 
     sets.push("updated_at = datetime('now')");
-    values.push(id);
+    values.push(id, householdId);
 
-    db.prepare(`UPDATE transactions SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+    db.prepare(`UPDATE transactions SET ${sets.join(', ')} WHERE id = ? AND household_id = ?`).run(...values);
 
     const anyCleared =
       (body.merchant !== undefined && body.merchant.trim() === existing.original_merchant) ||
@@ -507,12 +512,12 @@ router.patch('/:id', requireAuth, (req, res) => {
         (body.is_ignored ? 1 : 0) === existing.original_is_ignored);
 
     if (anyCleared) {
-      reapplyRulesToTransaction(db, id);
+      reapplyRulesToTransaction(db, id, householdId);
     }
 
     const updated = db
-      .prepare(`SELECT ${SELECT_COLS} FROM transactions WHERE id = ?`)
-      .get(id);
+      .prepare(`SELECT ${SELECT_COLS} FROM transactions WHERE id = ? AND household_id = ?`)
+      .get(id, householdId);
     sendOk(res, {
       success: true,
       transaction: attachMerchantLogos(db, [hydrate(updated)])[0]
@@ -529,6 +534,7 @@ router.patch('/:id', requireAuth, (req, res) => {
 // rule can re-claim the field.
 // ---------------------------------------------------------------------------
 router.post('/:id/reset', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'transaction');
   if (id === null) return;
 
@@ -549,12 +555,12 @@ router.post('/:id/reset', requireAuth, (req, res) => {
   clauses.push("updated_at = datetime('now')");
 
   try {
-    db.prepare(`UPDATE transactions SET ${clauses.join(', ')} WHERE id = ?`).run(id);
-    reapplyRulesToTransaction(db, id);
+    db.prepare(`UPDATE transactions SET ${clauses.join(', ')} WHERE id = ? AND household_id = ?`).run(id, householdId);
+    reapplyRulesToTransaction(db, id, householdId);
 
     const updated = db
-      .prepare(`SELECT ${SELECT_COLS} FROM transactions WHERE id = ?`)
-      .get(id);
+      .prepare(`SELECT ${SELECT_COLS} FROM transactions WHERE id = ? AND household_id = ?`)
+      .get(id, householdId);
     if (!updated) return sendNotFound(res, 'Transaction not found.');
     sendOk(res, {
       success: true,
@@ -570,10 +576,11 @@ router.post('/:id/reset', requireAuth, (req, res) => {
 // DELETE /api/transactions/:id
 // ---------------------------------------------------------------------------
 router.delete('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'transaction');
   if (id === null) return;
   try {
-    const result = db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
+    const result = db.prepare('DELETE FROM transactions WHERE id = ? AND household_id = ?').run(id, householdId);
     if (result.changes === 0) {
       return sendNotFound(res, 'Transaction not found.');
     }

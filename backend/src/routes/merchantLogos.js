@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import {
   ensureMerchantLogoEntryForTransaction,
@@ -76,13 +76,14 @@ router.post('/override', requireAuth, (req, res) => {
 });
 
 router.post('/ensure', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const transactionId = parseId(req.body?.transaction_id);
   if (transactionId === null || transactionId <= 0) {
     return sendBadRequest(res, 'transaction_id is required.');
   }
 
   try {
-    const result = ensureMerchantLogoEntryForTransaction(db, transactionId);
+    const result = ensureMerchantLogoEntryForTransaction(db, transactionId, householdId);
     if (!result.found) {
       return sendNotFound(res, 'Transaction not found.');
     }
@@ -97,6 +98,7 @@ router.post('/ensure', requireAuth, (req, res) => {
 });
 
 router.post('/search', requireAuth, async (req, res) => {
+  const householdId = requireHouseholdId(req);
   const transactionId = parseId(req.body?.transaction_id);
   const query = String(req.body?.query || '').trim();
   if (transactionId === null || transactionId <= 0) {
@@ -107,7 +109,7 @@ router.post('/search', requireAuth, async (req, res) => {
   }
 
   try {
-    const result = await searchMerchantLogoBrands(db, { transactionId, query });
+    const result = await searchMerchantLogoBrands(db, { transactionId, query, householdId });
     if (!result.found) {
       return sendNotFound(res, 'Transaction not found.');
     }

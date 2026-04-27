@@ -19,7 +19,7 @@
 // =============================================================================
 
 import express from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import {
   sendBadRequest,
@@ -56,6 +56,7 @@ function monthBounds(yyyymm) {
 // the requested month.
 // ---------------------------------------------------------------------------
 router.get('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const month = parseMonth(req.query.month) || currentMonth();
   const { start, end } = monthBounds(month);
 
@@ -69,14 +70,16 @@ router.get('/', requireAuth, (req, res) => {
            COUNT(*) AS n
          FROM transactions t
          JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
-         WHERE t.date >= ? AND t.date <= ?
+         WHERE t.household_id = ?
+           AND c.household_id = ?
+           AND t.date >= ? AND t.date <= ?
            AND COALESCE(t.edited_is_ignored,  t.is_ignored)  = 0
            AND COALESCE(t.edited_is_transfer, t.is_transfer) = 0
            AND c.is_income = 0
            AND c.is_transfer = 0
          GROUP BY cat_id`
       )
-      .all(start, end);
+      .all(householdId, householdId, start, end);
 
     const spendByCat = new Map(spending.map((r) => [r.cat_id, r]));
 
@@ -88,11 +91,12 @@ router.get('/', requireAuth, (req, res) => {
            SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income,
            SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END) AS expenses
          FROM transactions
-         WHERE date >= ? AND date <= ?
+         WHERE household_id = ?
+           AND date >= ? AND date <= ?
            AND COALESCE(edited_is_ignored,  is_ignored)  = 0
            AND COALESCE(edited_is_transfer, is_transfer) = 0`
       )
-      .get(start, end);
+      .get(householdId, start, end);
 
     const total_income = centsToDollars(flow?.income || 0);
     const total_expenses = centsToDollars(flow?.expenses || 0);
@@ -100,20 +104,23 @@ router.get('/', requireAuth, (req, res) => {
     const categories = db
       .prepare(
         `SELECT id, name, color, icon, is_income, is_transfer, sort_order
-           FROM categories
-          WHERE is_transfer = 0 AND is_income = 0
+          FROM categories
+          WHERE household_id = ?
+            AND is_transfer = 0 AND is_income = 0
           ORDER BY sort_order, name`
       )
-      .all();
+      .all(householdId);
 
     const budgets = db
       .prepare(
         `SELECT b.id, b.category_id, b.amount, b.rollover
-           FROM budgets b
-           JOIN categories c ON c.id = b.category_id
-          WHERE c.is_transfer = 0 AND c.is_income = 0`
+          FROM budgets b
+          JOIN categories c ON c.id = b.category_id
+          WHERE b.household_id = ?
+            AND c.household_id = ?
+            AND c.is_transfer = 0 AND c.is_income = 0`
       )
-      .all();
+      .all(householdId, householdId);
     const budgetByCat = new Map(budgets.map((b) => [b.category_id, b]));
 
     const budgetedItems = [];
@@ -194,15 +201,17 @@ router.get('/', requireAuth, (req, res) => {
 // Distinct months that have activity. Populates the month picker.
 // ---------------------------------------------------------------------------
 router.get('/months', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
     const rows = db
       .prepare(
         `SELECT strftime('%Y-%m', date) AS month
            FROM transactions
+          WHERE household_id = ?
           GROUP BY month
           ORDER BY month DESC`
       )
-      .all();
+      .all(householdId);
     sendOk(res, { items: rows.map((r) => r.month) });
   } catch (err) {
     console.error('List budget months failed:', err);
@@ -215,6 +224,7 @@ router.get('/months', requireAuth, (req, res) => {
 // Upsert a single global budget. Body: { category_id, amount, rollover? }
 // ---------------------------------------------------------------------------
 router.put('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const { category_id, amount, rollover = 0 } = req.body || {};
 
   const catId = parseId(category_id);
@@ -229,8 +239,8 @@ router.put('/', requireAuth, (req, res) => {
 
   try {
     const category = db
-      .prepare('SELECT is_income, is_transfer FROM categories WHERE id = ?')
-      .get(catId);
+      .prepare('SELECT is_income, is_transfer FROM categories WHERE id = ? AND household_id = ?')
+      .get(catId, householdId);
     if (!category) {
       return sendBadRequest(res, 'category_id does not exist.');
     }
@@ -239,23 +249,23 @@ router.put('/', requireAuth, (req, res) => {
     }
 
     const existing = db
-      .prepare('SELECT id FROM budgets WHERE category_id = ?')
-      .get(catId);
+      .prepare('SELECT id FROM budgets WHERE category_id = ? AND household_id = ?')
+      .get(catId, householdId);
 
     if (existing) {
       db.prepare(
         `UPDATE budgets
             SET amount = ?, rollover = ?, updated_at = datetime('now')
-          WHERE id = ?`
-      ).run(amountCents, rollover ? 1 : 0, existing.id);
+          WHERE id = ? AND household_id = ?`
+      ).run(amountCents, rollover ? 1 : 0, existing.id, householdId);
       sendOk(res, { success: true, id: existing.id, created: false });
     } else {
       const result = db
         .prepare(
-          `INSERT INTO budgets (category_id, amount, rollover)
-           VALUES (?, ?, ?)`
+          `INSERT INTO budgets (household_id, category_id, amount, rollover)
+           VALUES (?, ?, ?, ?)`
         )
-        .run(catId, amountCents, rollover ? 1 : 0);
+        .run(householdId, catId, amountCents, rollover ? 1 : 0);
       sendOk(res, { success: true, id: result.lastInsertRowid, created: true });
     }
   } catch (err) {
@@ -268,10 +278,11 @@ router.put('/', requireAuth, (req, res) => {
 // DELETE /api/budgets/:id
 // ---------------------------------------------------------------------------
 router.delete('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'budget');
   if (id === null) return;
   try {
-    const result = db.prepare('DELETE FROM budgets WHERE id = ?').run(id);
+    const result = db.prepare('DELETE FROM budgets WHERE id = ? AND household_id = ?').run(id, householdId);
     if (result.changes === 0) {
       return sendNotFound(res, 'Budget not found.');
     }

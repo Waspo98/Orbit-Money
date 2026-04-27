@@ -44,15 +44,16 @@ function safeRegex(pattern) {
  * Fetch all enabled rules from the DB, parse JSON, filter out malformed ones.
  * Returns [{ id, conditions, actions }] ready for matching.
  */
-export function loadRules(db) {
+export function loadRules(db, householdId = 1) {
   const rows = db
     .prepare(
       `SELECT id, conditions, actions
          FROM rules
-        WHERE enabled = 1
+        WHERE household_id = ?
+          AND enabled = 1
         ORDER BY priority DESC, id ASC`
     )
-    .all();
+    .all(householdId);
 
   return rows
     .map((r) => ({
@@ -272,7 +273,7 @@ export function computeEdits(transaction, rules) {
  * Count how many transactions a given condition set would match.
  * Purely based on the original values — no side effects, no writes.
  */
-export function countMatches(db, conditions) {
+export function countMatches(db, conditions, householdId = 1) {
   if (!Array.isArray(conditions) || conditions.length === 0) return 0;
 
   const rows = db
@@ -284,9 +285,10 @@ export function countMatches(db, conditions) {
               category_id AS original_category_id,
               is_transfer AS original_is_transfer,
               is_ignored  AS original_is_ignored
-         FROM transactions`
+         FROM transactions
+        WHERE household_id = ?`
     )
-    .all();
+    .all(householdId);
 
   let n = 0;
   for (const r of rows) {
@@ -299,8 +301,8 @@ export function countMatches(db, conditions) {
  * Re-run all enabled rules against every transaction in the DB.
  * Returns { processed, updated }.
  */
-export function reapplyRulesToAllTransactions(db) {
-  const rules = loadRules(db);
+export function reapplyRulesToAllTransactions(db, householdId = 1) {
+  const rules = loadRules(db, householdId);
 
   const rows = db
     .prepare(
@@ -320,9 +322,10 @@ export function reapplyRulesToAllTransactions(db) {
               edited_is_transfer_source,
               edited_is_ignored,
               edited_is_ignored_source
-         FROM transactions`
+         FROM transactions
+        WHERE household_id = ?`
     )
-    .all();
+    .all(householdId);
 
   const updateStmt = db.prepare(`
     UPDATE transactions
@@ -336,6 +339,7 @@ export function reapplyRulesToAllTransactions(db) {
            edited_is_ignored_source  = ?,
            updated_at                = datetime('now')
      WHERE id = ?
+       AND household_id = ?
   `);
 
   const run = db.transaction(() => {
@@ -352,7 +356,8 @@ export function reapplyRulesToAllTransactions(db) {
         edits.edited_is_transfer_source,
         edits.edited_is_ignored,
         edits.edited_is_ignored_source,
-        r.id
+        r.id,
+        householdId
       );
       updated++;
     }
@@ -366,8 +371,8 @@ export function reapplyRulesToAllTransactions(db) {
  * Apply rules to a single transaction row by id. Used after a targeted PATCH
  * to re-evaluate just that one transaction.
  */
-export function reapplyRulesToTransaction(db, id) {
-  const rules = loadRules(db);
+export function reapplyRulesToTransaction(db, id, householdId = 1) {
+  const rules = loadRules(db, householdId);
   const r = db
     .prepare(
       `SELECT id,
@@ -387,9 +392,10 @@ export function reapplyRulesToTransaction(db, id) {
               edited_is_ignored,
               edited_is_ignored_source
          FROM transactions
-        WHERE id = ?`
+        WHERE id = ?
+          AND household_id = ?`
     )
-    .get(id);
+    .get(id, householdId);
   if (!r) return { updated: 0 };
 
   const { edits, changed } = computeEdits(r, rules);
@@ -406,7 +412,8 @@ export function reapplyRulesToTransaction(db, id) {
             edited_is_ignored         = ?,
             edited_is_ignored_source  = ?,
             updated_at                = datetime('now')
-      WHERE id = ?`
+      WHERE id = ?
+        AND household_id = ?`
   ).run(
     edits.edited_merchant,
     edits.edited_merchant_source,
@@ -416,7 +423,8 @@ export function reapplyRulesToTransaction(db, id) {
     edits.edited_is_transfer_source,
     edits.edited_is_ignored,
     edits.edited_is_ignored_source,
-    id
+    id,
+    householdId
   );
   return { updated: 1 };
 }
@@ -425,34 +433,38 @@ export function reapplyRulesToTransaction(db, id) {
  * Clear every edit whose source is `rule:{ruleId}` and re-run remaining rules
  * to fill any gaps. Used when a rule is deleted.
  */
-export function revertEditsForRule(db, ruleId) {
+export function revertEditsForRule(db, ruleId, householdId = 1) {
   const source = `rule:${ruleId}`;
 
   const run = db.transaction(() => {
     db.prepare(
       `UPDATE transactions
           SET edited_merchant = NULL, edited_merchant_source = NULL
-        WHERE edited_merchant_source = ?`
-    ).run(source);
+        WHERE edited_merchant_source = ?
+          AND household_id = ?`
+    ).run(source, householdId);
     db.prepare(
       `UPDATE transactions
           SET edited_category_id = NULL, edited_category_id_source = NULL
-        WHERE edited_category_id_source = ?`
-    ).run(source);
+        WHERE edited_category_id_source = ?
+          AND household_id = ?`
+    ).run(source, householdId);
     db.prepare(
       `UPDATE transactions
           SET edited_is_transfer = NULL, edited_is_transfer_source = NULL
-        WHERE edited_is_transfer_source = ?`
-    ).run(source);
+        WHERE edited_is_transfer_source = ?
+          AND household_id = ?`
+    ).run(source, householdId);
     db.prepare(
       `UPDATE transactions
           SET edited_is_ignored = NULL, edited_is_ignored_source = NULL
-        WHERE edited_is_ignored_source = ?`
-    ).run(source);
+        WHERE edited_is_ignored_source = ?
+          AND household_id = ?`
+    ).run(source, householdId);
   });
 
   run();
-  return reapplyRulesToAllTransactions(db);
+  return reapplyRulesToAllTransactions(db, householdId);
 }
 
 /**

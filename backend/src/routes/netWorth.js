@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import { formatLocalMonth } from '../lib/localDate.js';
 import { sendOk, sendServerError } from '../lib/http.js';
@@ -173,6 +173,7 @@ function findYearStartRow(history, latestMonth) {
 }
 
 router.get('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
     const allTime = String(req.query.months || '').toLowerCase() === 'all';
     const months = parseBoundedInteger(req.query.months, {
@@ -188,11 +189,12 @@ router.get('/', requireAuth, (req, res) => {
                current_balance / 100.0 AS current_balance,
                estimated_value / 100.0 AS estimated_value
           FROM accounts
-         WHERE is_archived = 0
+         WHERE household_id = ?
+           AND is_archived = 0
          ORDER BY sort_order ASC, name ASC
       `
       )
-      .all();
+      .all(householdId);
 
     const latestTransaction = db
       .prepare(
@@ -201,9 +203,10 @@ router.get('/', requireAuth, (req, res) => {
           MAX(date) AS latest,
           MIN(date) AS earliest
           FROM transactions
+         WHERE household_id = ?
       `
       )
-      .get();
+      .get(householdId);
 
     const latestRecord = db
       .prepare(
@@ -212,9 +215,10 @@ router.get('/', requireAuth, (req, res) => {
           MAX(record_date) AS latest,
           MIN(record_date) AS earliest
           FROM account_balance_records
+         WHERE household_id = ?
       `
       )
-      .get();
+      .get(householdId);
 
     const todayMonth = formatLocalMonth();
     const latestTransactionMonth = monthKey(latestTransaction.latest);
@@ -241,23 +245,25 @@ router.get('/', requireAuth, (req, res) => {
         `
         SELECT account_id, substr(date, 1, 7) AS month, SUM(amount) / 100.0 AS amount
           FROM transactions
-         WHERE date >= ?
+         WHERE household_id = ?
+           AND date >= ?
          GROUP BY account_id, substr(date, 1, 7)
          ORDER BY month ASC
       `
       )
-      .all(`${firstMonth}-01`);
+      .all(householdId, `${firstMonth}-01`);
 
     const balanceRecords = db
       .prepare(
         `
         SELECT account_id, record_date, balance / 100.0 AS balance
           FROM account_balance_records
-         WHERE record_date <= ?
+         WHERE household_id = ?
+           AND record_date <= ?
          ORDER BY account_id ASC, record_date DESC
       `
       )
-      .all(`${latestMonth}-31`);
+      .all(householdId, `${latestMonth}-31`);
 
     const current = buildCurrentSummary(accounts);
     const history = buildHistory(

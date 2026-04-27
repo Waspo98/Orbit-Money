@@ -5,7 +5,7 @@
 ## Stack
 - **Frontend:** React 18 (Vite build, client-side routing via React Router v6)
 - **Backend:** Node.js 20 + Express
-- **Auth:** Session-based login (credentials in `.env`); `API_KEY` header for programmatic access
+- **Auth:** Local session login or Authentik OIDC; `API_KEY` header for programmatic access
 - **Data:** SQLite (better-sqlite3) + Docker named volume
 - **Key dependencies:** `express`, `express-session`, `better-sqlite3`, `multer` (CSV upload), `papaparse` (CSV parsing), `@dnd-kit/core` + `@dnd-kit/sortable` (accounts reorder)
 
@@ -23,7 +23,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
 | `sessions.db` | Session store (separate connection, managed by `connect-sqlite3`) |
 
-### Database Schema (22 migrations)
+### Database Schema (23 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -49,6 +49,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `020_household_retirement_accounts.sql` | Links household members to existing retirement/HSA accounts for projections |
 | `021_integer_cents.sql` | Converts money storage to integer cents and splits goal allocation percent vs fixed-amount storage |
 | `022_upcoming_items.sql` | Adds saved Upcoming bills, subscriptions, income items, and dismissed recurring-suggestion keys |
+| `023_multi_user_households.sql` | Adds users, households, memberships, Authentik-ready ownership, household-scoped defaults, and migrates existing data to household `1` |
 
 ### Key Data Model Notes
 
@@ -61,6 +62,8 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 **Transaction sources:** `csv_import`, `simplefin`, `manual` — tracked in `source` column, deduplicated via `external_id`.
 
 **Original / edited provenance (migration 008):** Rules and manual edits never mutate the raw imported values. Each editable field has an `original_*` column (populated at import, never touched afterward) and a nullable `edited_*` column with an `edited_*_source` tag (`'user'`, `'rule:{id}'`, `'system:*'`, or NULL). Display values are computed as `COALESCE(edited_X, original_X)` at the API layer so the UI sees one logical merchant/category/flag regardless of how it got there. User edits are sticky — rules never override `source='user'`. System edits are reserved for app-owned derivations like transfer matching and are preserved during rule reapply.
+
+**Multi-user ownership:** Tenant-owned data carries `household_id`. Existing single-user data is assigned to household `1` during migration. Uniqueness that used to be global, such as category name, SimpleFIN account id, transaction external id, and app settings, is now scoped by household. New Authentik users get a household seeded from `app_default_settings` and `app_default_categories`.
 
 **Rules:** JSON-serialized `conditions` (array of `{field, operator, value}`) and `actions` (array of `{type, value}`). Condition fields: `merchant`, `original_description`, `amount`, `account_id`, `category_id`. All condition evaluation runs against originals only, making match counts stable. Action types: `rename`, `categorize`, `mark_transfer`, `mark_ignored`. First rule (priority DESC, id ASC) to claim a given field wins; lower-priority rules skip it.
 
@@ -239,7 +242,10 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 ### Auth
 | Method | Path | Description |
 |---|---|---|
-| POST | `/api/auth/login` | Session login |
+| GET | `/api/auth/config` | Active auth provider and OIDC login URL |
+| POST | `/api/auth/login` | Local session login |
+| GET | `/api/auth/oidc/login` | Start Authentik OIDC login |
+| GET | `/api/auth/oidc/callback` | Authentik OIDC callback |
 | POST | `/api/auth/logout` | Session logout |
 | GET | `/api/auth/me` | Check auth status |
 

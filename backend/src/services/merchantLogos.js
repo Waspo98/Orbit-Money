@@ -249,7 +249,7 @@ export function attachMerchantLogos(db, rows) {
   });
 }
 
-export function ensureMerchantLogoEntryForTransaction(db, transactionId) {
+export function ensureMerchantLogoEntryForTransaction(db, transactionId, householdId = 1) {
   const row = db
     .prepare(`
       SELECT id,
@@ -257,10 +257,11 @@ export function ensureMerchantLogoEntryForTransaction(db, transactionId) {
              original_merchant,
              original_description,
              edited_merchant_source
-        FROM transactions
+       FROM transactions
        WHERE id = ?
+         AND household_id = ?
     `)
-    .get(transactionId);
+    .get(transactionId, householdId);
 
   if (!row) return { found: false };
 
@@ -294,8 +295,8 @@ export function ensureMerchantLogoEntryForTransaction(db, transactionId) {
   return { found: true, merchant_logo: formatCachedLogo(cached) };
 }
 
-export async function searchMerchantLogoBrands(db, { transactionId, query }) {
-  const ensured = ensureMerchantLogoEntryForTransaction(db, transactionId);
+export async function searchMerchantLogoBrands(db, { transactionId, query, householdId = 1 }) {
+  const ensured = ensureMerchantLogoEntryForTransaction(db, transactionId, householdId);
   if (!ensured.found) return { found: false };
 
   const cleanedQuery = cleanMerchantName(query).slice(0, 80);

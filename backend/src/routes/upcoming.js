@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import {
   sendBadRequest,
@@ -120,7 +120,7 @@ function serializeItem(row) {
   };
 }
 
-function fetchItems() {
+function fetchItems(householdId) {
   return db
     .prepare(
       `SELECT ui.*,
@@ -129,28 +129,30 @@ function fetchItems() {
          FROM upcoming_items ui
          LEFT JOIN categories c ON c.id = ui.category_id
          LEFT JOIN accounts a ON a.id = ui.account_id
-        WHERE ui.status = 'active'
+        WHERE ui.household_id = ?
+          AND ui.status = 'active'
         ORDER BY ui.next_date ASC, ui.id ASC`
     )
-    .all()
+    .all(householdId)
     .map(serializeItem);
 }
 
-function fetchDismissedKeys() {
+function fetchDismissedKeys(householdId) {
   return new Set(
-    db.prepare('SELECT suggestion_key FROM upcoming_dismissed_suggestions').all().map((row) => row.suggestion_key)
+    db.prepare('SELECT suggestion_key FROM upcoming_dismissed_suggestions WHERE household_id = ?').all(householdId).map((row) => row.suggestion_key)
   );
 }
 
-function existingMerchantKeys() {
+function existingMerchantKeys(householdId) {
   return new Set(
     db
       .prepare(
         `SELECT lower(COALESCE(merchant, name)) || '|' || direction AS key
-           FROM upcoming_items
-          WHERE status = 'active'`
+          FROM upcoming_items
+          WHERE household_id = ?
+            AND status = 'active'`
       )
-      .all()
+      .all(householdId)
       .map((row) => row.key)
   );
 }
@@ -188,7 +190,7 @@ function suggestionPriority(categoryName, direction) {
   return 1;
 }
 
-function buildSuggestions() {
+function buildSuggestions(householdId) {
   const rows = db
     .prepare(
       `SELECT t.id, t.account_id, t.date, t.amount / 100.0 AS amount,
@@ -199,12 +201,13 @@ function buildSuggestions() {
               c.name AS category_name
          FROM transactions t
          LEFT JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
-        WHERE COALESCE(t.edited_is_transfer, t.is_transfer) = 0
+        WHERE t.household_id = ?
+          AND COALESCE(t.edited_is_transfer, t.is_transfer) = 0
           AND COALESCE(t.edited_is_ignored, t.is_ignored) = 0
           AND t.date >= date('now', '-18 months')
         ORDER BY t.date ASC, t.id ASC`
     )
-    .all();
+    .all(householdId);
 
   const groups = new Map();
   for (const row of rows) {
@@ -216,8 +219,8 @@ function buildSuggestions() {
     groups.get(key).push({ ...row, direction });
   }
 
-  const dismissed = fetchDismissedKeys();
-  const existing = existingMerchantKeys();
+  const dismissed = fetchDismissedKeys(householdId);
+  const existing = existingMerchantKeys(householdId);
 
   return Array.from(groups.entries())
     .map(([key, items]) => {
@@ -262,27 +265,28 @@ function buildSuggestions() {
     .slice(0, 20);
 }
 
-function createItem(payload) {
+function createItem(householdId, payload) {
   const result = db
     .prepare(
       `INSERT INTO upcoming_items (
-         name, kind, source, merchant, amount, direction, frequency_type,
+         household_id, name, kind, source, merchant, amount, direction, frequency_type,
          frequency_interval, frequency_unit, next_date, category_id, account_id,
          source_transaction_id, notes
        ) VALUES (
-         @name, @kind, @source, @merchant, @amount, @direction, @frequency_type,
+         @household_id, @name, @kind, @source, @merchant, @amount, @direction, @frequency_type,
          @frequency_interval, @frequency_unit, @next_date, @category_id, @account_id,
          @source_transaction_id, @notes
        )`
     )
-    .run(payload);
+    .run({ household_id: householdId, ...payload });
   return result.lastInsertRowid;
 }
 
 router.get('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
-    const items = fetchItems();
-    const suggestions = buildSuggestions();
+    const items = fetchItems(householdId);
+    const suggestions = buildSuggestions(householdId);
     const upcoming = items.slice(0, 8);
     const monthlyExpenses = items
       .filter((item) => item.direction === 'expense')
@@ -309,15 +313,17 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 router.post('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
-    const id = createItem(normalizeBody(req.body || {}));
-    sendCreated(res, { success: true, id, items: fetchItems() });
+    const id = createItem(householdId, normalizeBody(req.body || {}));
+    sendCreated(res, { success: true, id, items: fetchItems(householdId) });
   } catch (err) {
     sendRouteError(res, err);
   }
 });
 
 router.post('/from-transaction', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = parseId(req.body?.transaction_id);
   if (id === null) return sendBadRequest(res, 'transaction_id must be an integer.');
   try {
@@ -329,9 +335,9 @@ router.post('/from-transaction', requireAuth, (req, res) => {
                 c.name AS category_name
            FROM transactions t
            LEFT JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
-          WHERE t.id = ?`
+          WHERE t.id = ? AND t.household_id = ?`
       )
-      .get(id);
+      .get(id, householdId);
     if (!row) return sendNotFound(res, 'Transaction not found.');
 
     const direction = Number(row.amount) >= 0 ? 'income' : 'expense';
@@ -349,39 +355,41 @@ router.post('/from-transaction', requireAuth, (req, res) => {
       source: 'transaction',
       source_transaction_id: row.id
     });
-    const itemId = createItem(payload);
-    sendCreated(res, { success: true, id: itemId, items: fetchItems() });
+    const itemId = createItem(householdId, payload);
+    sendCreated(res, { success: true, id: itemId, items: fetchItems(householdId) });
   } catch (err) {
     sendRouteError(res, err);
   }
 });
 
 router.post('/suggestions/accept', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   try {
     const suggestion = normalizeBody({ ...(req.body || {}), source: 'suggestion' });
-    const id = createItem(suggestion);
+    const id = createItem(householdId, suggestion);
     if (req.body?.key) {
       db.prepare(
-        `INSERT INTO upcoming_dismissed_suggestions (suggestion_key)
-         VALUES (?)
-         ON CONFLICT(suggestion_key) DO UPDATE SET dismissed_at = datetime('now')`
-      ).run(String(req.body.key));
+        `INSERT INTO upcoming_dismissed_suggestions (household_id, suggestion_key)
+         VALUES (?, ?)
+         ON CONFLICT(household_id, suggestion_key) DO UPDATE SET dismissed_at = datetime('now')`
+      ).run(householdId, String(req.body.key));
     }
-    sendCreated(res, { success: true, id, items: fetchItems() });
+    sendCreated(res, { success: true, id, items: fetchItems(householdId) });
   } catch (err) {
     sendRouteError(res, err);
   }
 });
 
 router.post('/suggestions/dismiss', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const key = String(req.body?.key || '').trim();
   if (!key) return sendBadRequest(res, 'Suggestion key is required.');
   try {
     db.prepare(
-      `INSERT INTO upcoming_dismissed_suggestions (suggestion_key)
-       VALUES (?)
-       ON CONFLICT(suggestion_key) DO UPDATE SET dismissed_at = datetime('now')`
-    ).run(key);
+      `INSERT INTO upcoming_dismissed_suggestions (household_id, suggestion_key)
+       VALUES (?, ?)
+       ON CONFLICT(household_id, suggestion_key) DO UPDATE SET dismissed_at = datetime('now')`
+    ).run(householdId, key);
     sendOk(res, { success: true });
   } catch (err) {
     sendServerError(res, err);
@@ -389,6 +397,7 @@ router.post('/suggestions/dismiss', requireAuth, (req, res) => {
 });
 
 router.put('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'upcoming item');
   if (id === null) return;
   try {
@@ -411,23 +420,24 @@ router.put('/:id', requireAuth, (req, res) => {
                 source_transaction_id = @source_transaction_id,
                 notes = @notes,
                 updated_at = datetime('now')
-          WHERE id = @id`
+          WHERE id = @id AND household_id = @household_id`
       )
-      .run({ id, ...payload });
+      .run({ id, household_id: householdId, ...payload });
     if (result.changes === 0) return sendNotFound(res, 'Upcoming item not found.');
-    sendOk(res, { success: true, items: fetchItems() });
+    sendOk(res, { success: true, items: fetchItems(householdId) });
   } catch (err) {
     sendRouteError(res, err);
   }
 });
 
 router.delete('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'upcoming item');
   if (id === null) return;
   try {
-    const result = db.prepare('DELETE FROM upcoming_items WHERE id = ?').run(id);
+    const result = db.prepare('DELETE FROM upcoming_items WHERE id = ? AND household_id = ?').run(id, householdId);
     if (result.changes === 0) return sendNotFound(res, 'Upcoming item not found.');
-    sendOk(res, { success: true, items: fetchItems() });
+    sendOk(res, { success: true, items: fetchItems(householdId) });
   } catch (err) {
     sendServerError(res, err);
   }
