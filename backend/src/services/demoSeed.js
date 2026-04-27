@@ -340,15 +340,14 @@ function refreshExistingDemoData(db, categories, householdId = 1) {
   return { refreshed: true, ...result };
 }
 
-export function seedDemoData(db) {
-  const householdId = 1;
+export function seedDemoDataForHousehold(db, householdId = 1) {
   const existing = db
     .prepare(
       `SELECT
-         (SELECT COUNT(*) FROM accounts WHERE household_id = 1) AS accounts,
-         (SELECT COUNT(*) FROM transactions WHERE household_id = 1) AS transactions`
+         (SELECT COUNT(*) FROM accounts WHERE household_id = ?) AS accounts,
+         (SELECT COUNT(*) FROM transactions WHERE household_id = ?) AS transactions`
     )
-    .get();
+    .get(householdId, householdId);
 
   const categories = loadCategoryMap(db, householdId);
 
@@ -415,4 +414,8 @@ export function seedDemoData(db) {
     `Demo seed: created ${ACCOUNT_SEED.length} accounts, ${result.inserted} transactions, and ${result.rulesCreated} rules.`
   );
   return { seeded: true, accounts: ACCOUNT_SEED.length, transactions: result.inserted, rules: result.rulesCreated };
+}
+
+export function seedDemoData(db) {
+  return seedDemoDataForHousehold(db, 1);
 }

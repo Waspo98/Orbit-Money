@@ -6,6 +6,7 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sampleLoading, setSampleLoading] = useState(false);
   const [authConfig, setAuthConfig] = useState({ authProvider: 'local' });
   const localEnabled = authConfig.localEnabled ?? authConfig.authProvider === 'local';
   const oidcEnabled = authConfig.oidcEnabled ?? authConfig.authProvider === 'oidc';
@@ -35,6 +36,30 @@ export default function Login({ onLogin }) {
     }
   }
 
+  function sampleDeviceId() {
+    const key = 'orbit_money_sample_device_id';
+    const existing = window.localStorage.getItem(key);
+    if (existing) return existing;
+    const bytes = new Uint8Array(24);
+    window.crypto.getRandomValues(bytes);
+    const id = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    window.localStorage.setItem(key, id);
+    return id;
+  }
+
+  async function handleSampleData() {
+    setError('');
+    setSampleLoading(true);
+    try {
+      await api.post('/api/auth/sample', { deviceId: sampleDeviceId() });
+      onLogin();
+    } catch (err) {
+      setError(err.message || 'Could not load sample data');
+    } finally {
+      setSampleLoading(false);
+    }
+  }
+
   function handleOidcLogin() {
     window.location.href = authConfig.oidcLoginUrl || '/api/auth/oidc/login';
   }
@@ -53,7 +78,6 @@ export default function Login({ onLogin }) {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                autoFocus
                 autoComplete="username"
                 required
               />
@@ -89,6 +113,15 @@ export default function Login({ onLogin }) {
             {authConfig.oidcLoginLabel || 'Log in with OIDC'}
           </button>
         )}
+
+        <button
+          type="button"
+          className="login-sample-link"
+          onClick={handleSampleData}
+          disabled={sampleLoading}
+        >
+          {sampleLoading ? 'Loading sample data...' : 'Continue with sample data'}
+        </button>
       </form>
     </div>
   );

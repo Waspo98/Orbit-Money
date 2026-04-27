@@ -8,6 +8,8 @@ import {
   sendUnauthorized
 } from '../lib/http.js';
 import { buildAuthorizationUrl, completeOidcLogin } from '../services/oidc.js';
+import { createHouseholdForUser } from '../services/householdDefaults.js';
+import { seedDemoDataForHousehold } from '../services/demoSeed.js';
 
 const router = express.Router();
 
@@ -100,6 +102,67 @@ router.post('/login', (req, res) => {
   }
 
   return sendUnauthorized(res, 'Invalid credentials');
+});
+
+router.post('/sample', (req, res) => {
+  const rawDeviceId = String(req.body?.deviceId || '').trim();
+  if (!/^[a-zA-Z0-9_-]{16,80}$/.test(rawDeviceId)) {
+    return sendBadRequest(res, 'Sample data device id is invalid.');
+  }
+
+  try {
+    const username = `sample:${rawDeviceId}`;
+    const displayName = 'Sample Data';
+    const run = db.transaction(() => {
+      let user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+      if (!user) {
+        const result = db
+          .prepare(
+            `INSERT INTO users (username, display_name, is_local_admin)
+             VALUES (?, ?, 0)`
+          )
+          .run(username, displayName);
+        user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+      }
+
+      let membership = db
+        .prepare(
+          `SELECT hm.household_id, hm.role, h.name
+             FROM household_memberships hm
+             JOIN households h ON h.id = hm.household_id
+            WHERE hm.user_id = ?
+            ORDER BY hm.id ASC
+            LIMIT 1`
+        )
+        .get(user.id);
+
+      if (!membership) {
+        const householdId = createHouseholdForUser(db, user.id, 'Sample Data');
+        db.prepare('UPDATE households SET name = ? WHERE id = ?').run('Sample Data', householdId);
+        membership = db
+          .prepare('SELECT id AS household_id, name, ? AS role FROM households WHERE id = ?')
+          .get('owner', householdId);
+      }
+
+      seedDemoDataForHousehold(db, membership.household_id);
+      return { user, membership };
+    });
+
+    const { user, membership } = run();
+    setSessionIdentity(req, {
+      userId: user.id,
+      username,
+      email: null,
+      displayName,
+      householdId: membership.household_id,
+      role: membership.role || 'owner',
+      householdName: membership.name || 'Sample Data'
+    });
+    return sendOk(res, { success: true, sample: true, ...currentSessionPayload(req) });
+  } catch (err) {
+    console.error('Sample data login failed:', err);
+    return sendServerError(res, err);
+  }
 });
 
 router.get('/oidc/login', async (req, res) => {
