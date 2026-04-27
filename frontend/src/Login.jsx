@@ -40,7 +40,7 @@ export default function Login({ onLogin }) {
 
         {authConfig.authProvider === 'authentik' ? (
           <button type="button" className="btn-primary" onClick={handleAuthentikLogin}>
-            Sign In With Authentik
+            Sign in with Overbay.App account
           </button>
         ) : (
           <>
