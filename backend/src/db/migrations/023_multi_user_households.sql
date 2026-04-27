@@ -164,7 +164,7 @@ DROP INDEX IF EXISTS idx_transactions_edited_merchant_source;
 DROP INDEX IF EXISTS idx_transactions_edited_mha;
 
 ALTER TABLE transactions
-  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1 REFERENCES households(id) ON DELETE CASCADE;
+  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
 
 CREATE UNIQUE INDEX idx_transactions_household_source_external
   ON transactions(household_id, source, external_id)
@@ -242,13 +242,13 @@ CREATE INDEX idx_budgets_household_category
   ON budgets(household_id, category_id);
 
 ALTER TABLE goals
-  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1 REFERENCES households(id) ON DELETE CASCADE;
+  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
 
 CREATE INDEX idx_goals_household_sort
   ON goals(household_id, sort_order, id);
 
 ALTER TABLE goal_account_allocations
-  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1 REFERENCES households(id) ON DELETE CASCADE;
+  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
 
 CREATE INDEX idx_goal_allocations_household_goal
   ON goal_account_allocations(household_id, goal_id);
@@ -257,7 +257,7 @@ CREATE INDEX idx_goal_allocations_household_account
   ON goal_account_allocations(household_id, account_id);
 
 ALTER TABLE account_balance_records
-  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1 REFERENCES households(id) ON DELETE CASCADE;
+  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
 
 CREATE INDEX idx_account_balance_records_household_account_date
   ON account_balance_records(household_id, account_id, record_date DESC);
@@ -285,7 +285,7 @@ DROP TABLE simplefin_config;
 ALTER TABLE simplefin_config_new RENAME TO simplefin_config;
 
 ALTER TABLE sync_log
-  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1 REFERENCES households(id) ON DELETE CASCADE;
+  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
 
 CREATE INDEX idx_sync_log_household_started
   ON sync_log(household_id, started_at DESC);
@@ -306,25 +306,25 @@ DROP TABLE app_settings;
 ALTER TABLE app_settings_new RENAME TO app_settings;
 
 ALTER TABLE household_members
-  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1 REFERENCES households(id) ON DELETE CASCADE;
+  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
 
 CREATE INDEX idx_household_members_household
   ON household_members(household_id, id);
 
 ALTER TABLE household_income_records
-  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1 REFERENCES households(id) ON DELETE CASCADE;
+  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
 
 CREATE INDEX idx_household_income_records_household_member_date
   ON household_income_records(household_id, member_id, effective_date DESC);
 
 ALTER TABLE household_retirement_accounts
-  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1 REFERENCES households(id) ON DELETE CASCADE;
+  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
 
 CREATE INDEX idx_household_retirement_accounts_household_member
   ON household_retirement_accounts(household_id, member_id);
 
 ALTER TABLE upcoming_items
-  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1 REFERENCES households(id) ON DELETE CASCADE;
+  ADD COLUMN household_id INTEGER NOT NULL DEFAULT 1;
 
 CREATE INDEX idx_upcoming_items_household_status_date
   ON upcoming_items(household_id, status, next_date);
