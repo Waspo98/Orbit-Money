@@ -5,6 +5,7 @@ import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
 import { getMoreRoutes } from '../navigation.js';
 
 const TOUCH_PULL_START_PX = 8;
+const SCROLL_EDGE_GUARD_PX = 1;
 
 export default function MoreSheet({
   open,
@@ -254,6 +255,29 @@ export default function MoreSheet({
     event.currentTarget.setPointerCapture?.(event.pointerId);
   }
 
+  function getScrollInfo() {
+    const node = scrollRef.current;
+    if (!node) {
+      return { node: null, scrollTop: 0, maxScrollTop: 0 };
+    }
+
+    const maxScrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
+    return {
+      node,
+      scrollTop: node.scrollTop,
+      maxScrollTop
+    };
+  }
+
+  function guardScrollEdges(node, maxScrollTop) {
+    if (!node || maxScrollTop <= SCROLL_EDGE_GUARD_PX) return;
+    if (node.scrollTop <= 0) {
+      node.scrollTop = SCROLL_EDGE_GUARD_PX;
+    } else if (node.scrollTop >= maxScrollTop) {
+      node.scrollTop = maxScrollTop - SCROLL_EDGE_GUARD_PX;
+    }
+  }
+
   function handlePointerMove(event) {
     const drag = dragRef.current;
     if (!drag.active || drag.pointerType === 'touch' || drag.startScrollTop > 0) return;
@@ -285,15 +309,17 @@ export default function MoreSheet({
   function handleTouchStart(event) {
     if (event.touches.length !== 1) return;
     const touch = event.touches[0];
+    const { node, scrollTop, maxScrollTop } = getScrollInfo();
+    guardScrollEdges(node, maxScrollTop);
     dragRef.current = {
       active: true,
       pointerId: touch.identifier,
       pointerType: 'touch',
       pulling: false,
-      startedAtTop: (scrollRef.current?.scrollTop || 0) <= 0,
+      startedAtTop: scrollTop <= SCROLL_EDGE_GUARD_PX,
       startY: touch.clientY,
       lastY: touch.clientY,
-      startScrollTop: scrollRef.current?.scrollTop || 0,
+      startScrollTop: scrollTop,
       distance: 0,
       lastMoveAt: window.performance.now(),
       velocityY: 0,
@@ -305,12 +331,12 @@ export default function MoreSheet({
     const drag = dragRef.current;
     if (!drag.active || drag.pointerType !== 'touch' || event.touches.length !== 1) return;
 
-    const sheet = scrollRef.current;
+    const { node: sheet, maxScrollTop } = getScrollInfo();
     if (!sheet) return;
     const touch = event.touches[0];
     const nextY = touch.clientY;
     const movingDown = nextY > drag.lastY;
-    const atTop = sheet.scrollTop <= 0;
+    const atTop = sheet.scrollTop <= SCROLL_EDGE_GUARD_PX;
     const now = window.performance.now();
     const elapsed = Math.max(1, now - drag.lastMoveAt);
     drag.velocityY = (nextY - drag.lastY) / elapsed;
@@ -320,6 +346,7 @@ export default function MoreSheet({
 
     if (!drag.startedAtTop) {
       drag.startY = nextY;
+      guardScrollEdges(sheet, maxScrollTop);
       resetPullDistance();
       return;
     }
@@ -327,6 +354,7 @@ export default function MoreSheet({
     if (!drag.pulling) {
       if (!atTop || !movingDown) {
         drag.startY = nextY;
+        guardScrollEdges(sheet, maxScrollTop);
         resetPullDistance();
         return;
       }
