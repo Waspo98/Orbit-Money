@@ -14,6 +14,7 @@ export default function MoreSheet({
   const [closing, setClosing] = useState(false);
   const [dragY, setDragY] = useState(0);
   const timerRef = useRef(null);
+  const scrollRef = useRef(null);
   const dragRef = useRef({
     active: false,
     pointerId: null,
@@ -65,6 +66,37 @@ export default function MoreSheet({
     };
   }, []);
 
+  useEffect(() => {
+    if (!open || !scrollRef.current) return undefined;
+    const scrollNode = scrollRef.current;
+
+    function onNativeTouchStart(event) {
+      if (event.touches.length !== 1) return;
+      handleTouchStart(event);
+    }
+
+    function onNativeTouchMove(event) {
+      handleTouchMove(event);
+    }
+
+    function onNativeTouchEnd() {
+      finishTouchDrag();
+    }
+
+    scrollNode.addEventListener('touchstart', onNativeTouchStart, { passive: true });
+    scrollNode.addEventListener('touchmove', onNativeTouchMove, { passive: false });
+    scrollNode.addEventListener('touchend', onNativeTouchEnd, { passive: true });
+    scrollNode.addEventListener('touchcancel', resetDrag, { passive: true });
+
+    return () => {
+      scrollNode.removeEventListener('touchstart', onNativeTouchStart);
+      scrollNode.removeEventListener('touchmove', onNativeTouchMove);
+      scrollNode.removeEventListener('touchend', onNativeTouchEnd);
+      scrollNode.removeEventListener('touchcancel', resetDrag);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   if (!open) return null;
 
   function handleItemClick(item) {
@@ -115,7 +147,7 @@ export default function MoreSheet({
       pulling: true,
       startY: event.clientY,
       lastY: event.clientY,
-      startScrollTop: event.currentTarget.scrollTop,
+      startScrollTop: scrollRef.current?.scrollTop || 0,
       distance: 0,
       dragged: false
     };
@@ -164,7 +196,7 @@ export default function MoreSheet({
       pulling: false,
       startY: touch.clientY,
       lastY: touch.clientY,
-      startScrollTop: event.currentTarget.scrollTop,
+      startScrollTop: scrollRef.current?.scrollTop || 0,
       distance: 0,
       dragged: false
     };
@@ -174,7 +206,8 @@ export default function MoreSheet({
     const drag = dragRef.current;
     if (!drag.active || drag.pointerType !== 'touch' || event.touches.length !== 1) return;
 
-    const sheet = event.currentTarget;
+    const sheet = scrollRef.current;
+    if (!sheet) return;
     const touch = event.touches[0];
     const nextY = touch.clientY;
     const movingDown = nextY > drag.lastY;
@@ -190,8 +223,9 @@ export default function MoreSheet({
         return;
       }
 
-      const initialPull = nextY - drag.startY;
-      if (initialPull < 4) return;
+      if (event.cancelable) event.preventDefault();
+      const initialPull = Math.max(0, nextY - drag.startY);
+      if (initialPull < 2) return;
       drag.pulling = true;
     }
 
@@ -245,28 +279,26 @@ export default function MoreSheet({
         onPointerMove={handlePointerMove}
         onPointerUp={finishPointerDrag}
         onPointerCancel={cancelPointerDrag}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={finishTouchDrag}
-        onTouchCancel={resetDrag}
       >
         <div className="more-sheet-handle" aria-hidden />
 
-        <div className="more-grid">
-          {visibleItems.map((item) => (
-            <button
-              key={item.path}
-              type="button"
-              className={`more-card ${item.comingSoon ? 'coming-soon' : ''}`}
-              onClick={() => handleItemClick(item)}
-              disabled={item.comingSoon}
-            >
-              <AppIcon name={item.icon} className="more-card-icon" />
-              <div className="more-card-label">{item.label}</div>
-              <div className="more-card-description">{item.description}</div>
-              {item.comingSoon && <span className="more-card-badge">Soon</span>}
-            </button>
-          ))}
+        <div className="more-sheet-scroll" ref={scrollRef}>
+          <div className="more-grid">
+            {visibleItems.map((item) => (
+              <button
+                key={item.path}
+                type="button"
+                className={`more-card ${item.comingSoon ? 'coming-soon' : ''}`}
+                onClick={() => handleItemClick(item)}
+                disabled={item.comingSoon}
+              >
+                <AppIcon name={item.icon} className="more-card-icon" />
+                <div className="more-card-label">{item.label}</div>
+                <div className="more-card-description">{item.description}</div>
+                {item.comingSoon && <span className="more-card-badge">Soon</span>}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
