@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   closestCenter
@@ -106,6 +106,7 @@ const CREDIT_TYPES = new Set(['credit']);
 const LOAN_TYPES = new Set(['loan']);
 const DASHBOARD_LAYOUT_STORAGE_KEY = 'orbit-money-dashboard-layout-v2';
 const BIGGEST_TRANSACTIONS_HIDDEN_KEY = 'orbit-money-biggest-transactions-hidden-v1';
+const TRANSACTION_REVIEW_HANDLED_KEY = 'orbit-money-transaction-review-handled-v1';
 const GOAL_FOCUS_STORAGE_KEY = 'orbit-money-dashboard-goal-focus-v1';
 const RETIREMENT_PREFS_STORAGE_KEY = 'orbit-money-retirement-preferences-v1';
 const DASHBOARD_RETIREMENT_PRESETS = {
@@ -149,6 +150,11 @@ const DASHBOARD_CARD_DEFS = [
     id: 'uncategorized',
     title: 'Uncategorized Transactions',
     description: 'Recent transactions that need a category.'
+  },
+  {
+    id: 'categorize-recent',
+    title: 'Categorize Recent Transactions',
+    description: 'Swipe through transactions that need a quick category check.'
   },
   {
     id: 'month-comparison',
@@ -225,6 +231,26 @@ function readHiddenBiggestTransactions() {
     return Array.isArray(saved) ? saved.map(Number).filter(Number.isFinite) : [];
   } catch {
     return [];
+  }
+}
+
+function readHandledReviewIds() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(TRANSACTION_REVIEW_HANDLED_KEY));
+    return Array.isArray(saved) ? saved.map(Number).filter(Number.isFinite) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeHandledReviewIds(ids) {
+  try {
+    localStorage.setItem(
+      TRANSACTION_REVIEW_HANDLED_KEY,
+      JSON.stringify(Array.from(new Set(ids)).slice(-1000))
+    );
+  } catch {
+    /* ignore */
   }
 }
 
@@ -401,6 +427,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   const [mhaData, setMhaData] = useState(null);
   const [dashboardLayout, setDashboardLayout] = useState(readDashboardLayout);
   const [customizing, setCustomizing] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [hiddenBiggestTransactionIds, setHiddenBiggestTransactionIds] = useState(
     readHiddenBiggestTransactions
   );
@@ -662,6 +689,13 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
             loading={loading && !uncategorizedData}
           />
         );
+      case 'categorize-recent':
+        return (
+          <CategorizeRecentCard
+            loading={loading}
+            onOpen={() => setReviewOpen(true)}
+          />
+        );
       case 'month-comparison':
         return (
           <MonthComparisonCard
@@ -790,6 +824,15 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
           layout={dashboardLayout}
           onChange={setDashboardLayout}
           onClose={() => setCustomizing(false)}
+        />
+      )}
+
+      {reviewOpen && (
+        <TransactionReviewModal
+          categories={categories}
+          accounts={accounts}
+          onClose={() => setReviewOpen(false)}
+          onRefresh={loadDashboard}
         />
       )}
     </div>
@@ -1305,6 +1348,465 @@ function UncategorizedCard({ data, loading }) {
         </>
       )}
     </DashboardCard>
+  );
+}
+
+function CategorizeRecentCard({ loading, onOpen }) {
+  return (
+    <DashboardCard title="Categorize Recent Transactions">
+      {loading ? (
+        <CardSkeleton />
+      ) : (
+        <div className="review-launch-card">
+          <div className="review-launch-icon" aria-hidden="true">
+            ?
+          </div>
+          <div>
+            <strong>Quick category check</strong>
+            <p>
+              Review uncategorized transactions, noisy merchant names, likely transfers,
+              and category pattern changes.
+            </p>
+          </div>
+          <button type="button" className="btn-primary" onClick={onOpen}>
+            Categorize Recent Transactions
+          </button>
+        </div>
+      )}
+    </DashboardCard>
+  );
+}
+
+function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
+  const [handledIds, setHandledIds] = useState(readHandledReviewIds);
+  const [items, setItems] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [batchReviewed, setBatchReviewed] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [ruleTxn, setRuleTxn] = useState(null);
+  const [allDone, setAllDone] = useState(false);
+  const [funMode, setFunMode] = useState(false);
+  const [dragX, setDragX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef({ active: false, startX: 0 });
+
+  const currentTxn = items[currentIndex] || null;
+  const batchComplete = batchReviewed >= 10 || (!currentTxn && items.length > 0);
+  const accountById = useMemo(
+    () => new Map(accounts.map((account) => [account.id, account])),
+    [accounts]
+  );
+  const categoryById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories]
+  );
+
+  useEffect(() => {
+    loadQueue({ handled: handledIds, fun: funMode });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [funMode]);
+
+  function rememberHandled(id) {
+    setHandledIds((prev) => {
+      const next = prev.includes(id) ? prev : [...prev, id];
+      writeHandledReviewIds(next);
+      return next;
+    });
+  }
+
+  function hydrateFunItems(rows) {
+    return rows.map((txn) => {
+      const category = categoryById.get(txn.category_id);
+      const account = accountById.get(txn.account_id);
+      return {
+        ...txn,
+        category_name: category?.name || null,
+        category_color: category?.color || null,
+        category_icon: category?.icon || null,
+        account_name: account?.name || null,
+        review_reasons: ['fun_review']
+      };
+    });
+  }
+
+  async function loadQueue(options = {}) {
+    const handled = options.handled || handledIds;
+    const fun = options.fun ?? funMode;
+    setLoading(true);
+    setError('');
+    setCategoryPickerOpen(false);
+    setCurrentIndex(0);
+    setBatchReviewed(0);
+    setDragX(0);
+
+    try {
+      if (fun) {
+        const data = await api.get('/api/transactions?limit=100&page=1&include_ignored=0&sort=date_desc');
+        const handledSet = new Set(handled);
+        const nextItems = hydrateFunItems(data.items || [])
+          .filter((txn) => !handledSet.has(txn.id))
+          .slice(0, 10);
+        setItems(nextItems);
+        setAllDone(nextItems.length === 0);
+      } else {
+        const exclude = handled.length ? `&exclude=${handled.join(',')}` : '';
+        const data = await api.get(`/api/transactions/review-queue?limit=10${exclude}`);
+        setItems(data.items || []);
+        setAllDone((data.items || []).length === 0);
+      }
+    } catch (err) {
+      setError(err.message || 'Could not load review queue.');
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function advance(txn) {
+    if (txn) rememberHandled(txn.id);
+    setCategoryPickerOpen(false);
+    setDragX(0);
+    setBatchReviewed((count) => count + 1);
+    setCurrentIndex((index) => index + 1);
+  }
+
+  function handleApprove() {
+    if (!currentTxn || saving) return;
+    advance(currentTxn);
+  }
+
+  function handleReject() {
+    if (!currentTxn || saving) return;
+    setCategoryPickerOpen(true);
+    setDragX(0);
+  }
+
+  async function chooseCategory(categoryId) {
+    if (!currentTxn || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      await api.patch(`/api/transactions/${currentTxn.id}`, {
+        category_id: categoryId
+      });
+      advance(currentTxn);
+      onRefresh?.();
+    } catch (err) {
+      setError(err.message || 'Could not update category.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function skipCurrent() {
+    if (!currentTxn || saving) return;
+    advance(currentTxn);
+  }
+
+  function viewMore() {
+    loadQueue({ handled: handledIds, fun: funMode });
+  }
+
+  function startFunMode() {
+    setFunMode(true);
+    setAllDone(false);
+  }
+
+  function onPointerDown(event) {
+    if (!currentTxn || categoryPickerOpen || saving) return;
+    if (event.target.closest('button, a, input, select, textarea')) return;
+    dragRef.current = { active: true, startX: event.clientX };
+    setDragging(true);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function onPointerMove(event) {
+    if (!dragRef.current.active) return;
+    setDragX(event.clientX - dragRef.current.startX);
+  }
+
+  function onPointerUp(event) {
+    if (!dragRef.current.active) return;
+    dragRef.current.active = false;
+    setDragging(false);
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (dragX > 90) handleApprove();
+    else if (dragX < -90) handleReject();
+    else setDragX(0);
+  }
+
+  function makeRuleDraft(txn) {
+    const categoryId = txn.category_id || txn.suggested_category_id || categories[0]?.id || '';
+    return {
+      name: `Categorize ${txn.merchant || 'merchant'}`,
+      conditions: [
+        {
+          field: 'merchant',
+          operator: 'contains',
+          value: txn.merchant || txn.original_merchant || ''
+        }
+      ],
+      actions: categoryId
+        ? [{ type: 'categorize', value: categoryId }]
+        : [{ type: 'rename', value: txn.merchant || '' }],
+      enabled: true
+    };
+  }
+
+  const cardRotation = Math.max(-10, Math.min(10, dragX / 18));
+  const cardTone = dragX > 40 ? 'yes' : dragX < -40 ? 'no' : '';
+
+  return (
+    <AnimatedModal onClose={onClose} size="lg" animation="zoom">
+      {({ close }) => (
+        <>
+          <div className="modal-header">
+            <h3>Categorize Recent Transactions</h3>
+            <button type="button" className="modal-close" onClick={close} aria-label="Close">
+              x
+            </button>
+          </div>
+
+          <div className="transaction-review-modal">
+            {loading ? (
+              <div className="center-loading review-loading">
+                <div className="spinner" />
+              </div>
+            ) : error ? (
+              <div className="error">{error}</div>
+            ) : allDone ? (
+              <div className="review-empty-state">
+                <div className="review-launch-icon" aria-hidden="true">
+                  !
+                </div>
+                <h4>PHEW all transactions are categorized for now.</h4>
+                <p>Want to go through more transactions just for fun, ya sicko?</p>
+                <div className="review-empty-actions">
+                  <button type="button" className="btn-primary" onClick={startFunMode}>
+                    Yes I need the dopamine
+                  </button>
+                  <button type="button" className="btn-secondary" onClick={close}>
+                    No thanks, I have self-control
+                  </button>
+                </div>
+              </div>
+            ) : batchComplete ? (
+              <div className="review-empty-state">
+                <div className="review-launch-icon" aria-hidden="true">
+                  10
+                </div>
+                <h4>Ten down.</h4>
+                <p>Want another stack, or are we calling that a responsible little victory?</p>
+                <div className="review-empty-actions">
+                  <button type="button" className="btn-primary" onClick={viewMore}>
+                    View More Transactions
+                  </button>
+                  <button type="button" className="btn-secondary" onClick={close}>
+                    Done For Now
+                  </button>
+                </div>
+              </div>
+            ) : currentTxn && categoryPickerOpen ? (
+              <CategoryReviewPicker
+                txn={currentTxn}
+                categories={categories}
+                currentCategory={categoryById.get(currentTxn.category_id)}
+                suggestedCategory={categoryById.get(currentTxn.suggested_category_id)}
+                saving={saving}
+                onChoose={chooseCategory}
+                onBack={() => setCategoryPickerOpen(false)}
+              />
+            ) : currentTxn ? (
+              <>
+                <div className="review-progress-row">
+                  <span>{Math.min(batchReviewed + 1, 10)} of 10</span>
+                  <strong>Is this category correct?</strong>
+                </div>
+
+                <div className="review-swipe-stage">
+                  <div
+                    className={`review-swipe-card ${dragging ? 'dragging' : ''} ${cardTone}`}
+                    style={{
+                      transform: `translateX(${dragX}px) rotate(${cardRotation}deg)`
+                    }}
+                    onPointerDown={onPointerDown}
+                    onPointerMove={onPointerMove}
+                    onPointerUp={onPointerUp}
+                    onPointerCancel={() => {
+                      dragRef.current.active = false;
+                      setDragging(false);
+                      setDragX(0);
+                    }}
+                  >
+                    <div className="review-swipe-choice yes">Yes</div>
+                    <div className="review-swipe-choice no">No</div>
+                    <ReviewTransactionCard
+                      txn={currentTxn}
+                      category={categoryById.get(currentTxn.category_id)}
+                      account={accountById.get(currentTxn.account_id)}
+                    />
+                  </div>
+                </div>
+
+                <div className="review-answer-actions">
+                  <button type="button" className="btn-secondary" onClick={handleReject}>
+                    No
+                  </button>
+                  <button type="button" className="btn-primary" onClick={handleApprove}>
+                    Yes
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {!loading && !allDone && !batchComplete && currentTxn && (
+              <div className="review-bottom-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setRuleTxn(currentTxn)}
+                  disabled={saving}
+                >
+                  Create A Rule
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={skipCurrent}
+                  disabled={saving}
+                >
+                  Skip For Now
+                </button>
+              </div>
+            )}
+          </div>
+
+          {ruleTxn && (
+            <RuleEditor
+              rule={makeRuleDraft(ruleTxn)}
+              accounts={accounts}
+              categories={categories}
+              onClose={() => setRuleTxn(null)}
+              onSaved={() => {
+                setRuleTxn(null);
+                if (currentTxn) advance(currentTxn);
+                onRefresh?.();
+              }}
+            />
+          )}
+        </>
+      )}
+    </AnimatedModal>
+  );
+}
+
+function ReviewTransactionCard({ txn, category, account }) {
+  return (
+    <div className="review-card-content">
+      <div className="review-card-topline">
+        <span>{formatShortDate(txn.date)}</span>
+        {account?.name && <span>{account.name}</span>}
+      </div>
+      <strong className="review-card-merchant">{txn.merchant || 'Transaction'}</strong>
+      {txn.original_description && (
+        <p>{txn.original_description}</p>
+      )}
+      <div className="review-card-category">
+        <span
+          className="review-category-mark"
+          style={category?.color ? { color: category.color } : undefined}
+          aria-hidden="true"
+        >
+          {category?.icon || '?'}
+        </span>
+        <div>
+          <span>Current category</span>
+          <strong>{category?.name || txn.category_name || 'Uncategorized'}</strong>
+        </div>
+      </div>
+      <div className="review-card-footer">
+        <strong className={Number(txn.amount) < 0 ? 'expense' : 'income'}>
+          {formatTransactionAmount(Number(txn.amount) || 0)}
+        </strong>
+        <ReviewReasonPills reasons={txn.review_reasons || []} />
+      </div>
+    </div>
+  );
+}
+
+function ReviewReasonPills({ reasons }) {
+  const labels = {
+    uncategorized: 'Uncategorized',
+    merchant_review: 'Merchant Check',
+    likely_transfer: 'Likely Transfer',
+    changed_pattern: 'Changed Pattern',
+    fun_review: 'Bonus Round'
+  };
+  return (
+    <span className="review-reason-list">
+      {reasons.slice(0, 3).map((reason) => (
+        <span key={reason} className="pill accent">
+          {labels[reason] || 'Review'}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function CategoryReviewPicker({
+  txn,
+  categories,
+  currentCategory,
+  suggestedCategory,
+  saving,
+  onChoose,
+  onBack
+}) {
+  const orderedCategories = useMemo(() => {
+    const suggestedId = suggestedCategory?.id;
+    return [...categories].sort((a, b) => {
+      if (a.id === suggestedId) return -1;
+      if (b.id === suggestedId) return 1;
+      return (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name);
+    });
+  }, [categories, suggestedCategory?.id]);
+
+  return (
+    <div className="review-category-picker">
+      <button type="button" className="btn-ghost review-back-button" onClick={onBack}>
+        Back
+      </button>
+      <div className="review-picker-heading">
+        <span>{txn.merchant || 'Transaction'}</span>
+        <strong>Pick the right category</strong>
+        <em>Currently {currentCategory?.name || 'Uncategorized'}</em>
+      </div>
+      <div className="review-category-list">
+        {orderedCategories.map((category) => (
+          <SelectableListItem
+            key={category.id}
+            active={category.id === txn.category_id}
+            disabled={saving}
+            leading={
+              <span
+                className="review-category-dot"
+                style={{ background: category.color }}
+                aria-hidden="true"
+              >
+                {category.icon || '$'}
+              </span>
+            }
+            title={category.name}
+            subtitle={category.id === suggestedCategory?.id ? 'Usual category for this merchant' : ''}
+            sidePrimary={category.id === txn.category_id ? 'Current' : ''}
+            onClick={() => onChoose(category.id)}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 

@@ -6,15 +6,16 @@ set "NODE_DIR=%ROOT%\.tools\node-v20.20.2-win-x64"
 
 cd /d "%ROOT%\frontend"
 
-where npm >nul 2>nul
-if not errorlevel 1 (
-  npm run build
+if exist "%NODE_DIR%\node.exe" if exist "%NODE_DIR%\npm.cmd" (
+  set "PATH=%NODE_DIR%;%PATH%"
+  call "%NODE_DIR%\npm.cmd" run build
   if errorlevel 1 exit /b 1
   exit /b 0
 )
 
-if exist "%NODE_DIR%\npm.cmd" (
-  call "%NODE_DIR%\npm.cmd" run build
+where npm >nul 2>nul
+if not errorlevel 1 (
+  npm run build
   if errorlevel 1 exit /b 1
   exit /b 0
 )

@@ -7,6 +7,7 @@ stores data in SQLite, and runs as a Docker Compose app.
 ## Features
 
 - Account, transaction, budget, category, rule, savings goal, retirement calculator, household, and net worth views
+- Dashboard transaction review queue for quickly confirming or changing recent categories
 - Rocket Money CSV import
 - SimpleFIN bank sync
 - Merchant logo enrichment with optional Logo.dev keys
@@ -175,15 +176,16 @@ Frontend production build:
 cmd /c scripts\build-frontend.cmd
 ```
 
-Backend syntax smoke check:
+Backend syntax smoke check and automated tests:
+
+```powershell
+cmd /c scripts\check-backend.cmd
+```
+
+Equivalent manual backend checks:
 
 ```powershell
 node --check backend\src\server.js
-```
-
-Backend automated tests:
-
-```powershell
 cd backend
 npm test
 ```
@@ -226,7 +228,7 @@ values, not money.
 ## Development
 
 Docker is the supported runtime. For code validation outside Docker, install
-Node.js 20+ and run package commands directly in `backend/` or `frontend/`.
+Node.js 20+ or provide the private `.tools` runtime used by the helper scripts.
 Local dependency folders and build output are ignored by Git.
 
 ## Documentation

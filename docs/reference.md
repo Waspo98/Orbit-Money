@@ -201,6 +201,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - **Top spending card:** up to 7 categories with horizontal bars scaled to the biggest spender; bars use each category's color
 - **Biggest Monthly Transactions card:** top 5 current-month expenses, excluding income, ignored rows, transfers, and credit-card-payment style rows. `Hide From Dashboard` is dashboard-only and does not set the transaction ignored flag used by budgets/reports.
 - **Subscriptions / Recurring and Upcoming cards:** read saved bills, subscriptions, and income from `/api/upcoming`. The Upcoming page owns manual entries and accepted suggestions.
+- **Categorize Recent Transactions card:** opens a swipe-style review modal that asks whether each category is correct, batches reviews in groups of 10, and lets the user change the category, create a rule, or skip the transaction. Candidates come from recent uncategorized transactions, noisy imported merchant text, likely transfers, and category pattern changes. Reviewed/skipped card IDs are stored in browser localStorage; category changes still use the normal transaction edit API.
 - **Uncategorized, Month vs Last Month, Goals Progress, Goal Focus, Retirement Snapshot, MHA Tracker Summary, Mortgage Snapshot:** reuse existing route data from Transactions, Budgets, Goals, Household, MHA, and Accounts.
 - **Recent activity card:** last 10 transactions with the shared `TransactionRow` actions
 - Shimmer skeleton loading per card
@@ -380,7 +381,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - **NavLink renders `<a>` elements** — need explicit `text-decoration: none; outline: none;` on all states to prevent flash-underline on tap
 - **SW needs a fetch listener** (even pass-through) to satisfy PWA install criteria in some browsers
 - **Rules with match counts** loads slowly with many rules — `withCounts=1` scans all transactions per rule. For 300+ rules × 8K+ transactions, expect 10–20 second initial load.
-- **Windows build tooling:** use Node.js 20+ on PATH. `cmd /c scripts\build-frontend.cmd` runs the frontend production build from the repo root and can fall back to a private `.tools` runtime if one exists locally.
+- **Windows build tooling:** use Node.js 20+ on PATH or the private `.tools` runtime. `cmd /c scripts\build-frontend.cmd` runs the frontend production build from the repo root, and `cmd /c scripts\check-backend.cmd` runs the backend syntax smoke check and tests. Both helpers prefer `.tools` when it exists locally, then fall back to system Node/npm.
 - **Repeated page hero UI:** before adding or changing a page header, check `PageHero.jsx` first. Shared morph behavior belongs in `useMorphingPageHero`; page-specific stat/chrome content belongs in the page.
 - **Native browser dialogs:** use `useAppDialog()` instead of `alert()` / `confirm()` so confirmations animate and share the app's button styling.
 - **Button copy:** visible button labels should use Title Case for words, e.g. `+ New Category`, `Add Budget`, `Save`.

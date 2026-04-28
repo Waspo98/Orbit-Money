@@ -95,13 +95,13 @@
 - Prefer small, reversible changes.
 - Before changing auth, Docker, ports, volumes, or database storage, explain the impact first.
 - Use Node.js 20+ for local validation. The public repo does not track a
-  portable Node runtime; `scripts\build-frontend.cmd` will use system `npm`
-  first and can fall back to a private `.tools` runtime if one exists.
+  portable Node runtime; `scripts\build-frontend.cmd` and
+  `scripts\check-backend.cmd` prefer a private `.tools` runtime if one exists
+  and fall back to system Node/npm.
 - After frontend changes, run `cmd /c scripts\build-frontend.cmd` from the repo root
   or `npm run build` in `frontend` with Node.js 20+ on PATH.
-- After backend changes, run a syntax smoke check with Node.js 20+
-  (`node --check backend\src\server.js`)
-  plus any route/service-specific check that exists.
+- After backend changes, run `cmd /c scripts\check-backend.cmd` from the repo
+  root, plus any route/service-specific check that exists.
 - For schema changes, add a new migration; never edit an applied migration.
 
 ## Frontend conventions

@@ -163,6 +163,114 @@ function currentMonthBounds() {
   return { start, end };
 }
 
+const MERCHANT_NOISE_HINTS = [
+  'checkcard',
+  'debit card',
+  'online transfer',
+  'pos debit',
+  'purchase authorized',
+  'recurring debit',
+  'web authorized'
+];
+
+const TRANSFER_HINTS = [
+  'ach transfer',
+  'autopay',
+  'automatic payment',
+  'cc payment',
+  'credit card payment',
+  'mobile transfer',
+  'online banking transfer',
+  'online transfer',
+  'payment from',
+  'payment to',
+  'transfer from',
+  'transfer to'
+];
+
+function normalizeMerchant(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[#*]\d+/g, ' ')
+    .replace(/\b\d{2,}\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\b(llc|inc|co|corp|store|pos|debit|card|purchase)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function textForReview(row) {
+  return `${row.merchant || ''} ${row.original_merchant || ''} ${row.original_description || ''}`.toLowerCase();
+}
+
+function looksNoisyMerchant(row) {
+  const merchant = String(row.merchant || '').trim();
+  if (!merchant) return true;
+  const text = textForReview(row);
+  if (MERCHANT_NOISE_HINTS.some((hint) => text.includes(hint))) return true;
+  if (merchant.length > 34 && /\d{3,}/.test(merchant)) return true;
+  if (/[#*]\d{3,}/.test(merchant)) return true;
+  if ((merchant.match(/\d/g) || []).length >= 6) return true;
+  return false;
+}
+
+function daysBetween(a, b) {
+  const first = Date.parse(`${a}T00:00:00Z`);
+  const second = Date.parse(`${b}T00:00:00Z`);
+  if (!Number.isFinite(first) || !Number.isFinite(second)) return Infinity;
+  return Math.abs(first - second) / (24 * 60 * 60 * 1000);
+}
+
+function hasLikelyTransferPair(row, rows) {
+  const amount = Number(row.amount) || 0;
+  if (amount === 0) return false;
+  return rows.some((candidate) => {
+    if (candidate.id === row.id || candidate.account_id === row.account_id) return false;
+    const otherAmount = Number(candidate.amount) || 0;
+    if (Math.sign(amount) === Math.sign(otherAmount)) return false;
+    const tolerance = Math.max(1, Math.abs(amount) * 0.01);
+    return Math.abs(Math.abs(amount) - Math.abs(otherAmount)) <= tolerance &&
+      daysBetween(row.date, candidate.date) <= 3;
+  });
+}
+
+function buildMerchantPatterns(rows) {
+  const patterns = new Map();
+  for (const row of rows) {
+    if (!row.category_id || row.is_transfer || row.is_ignored) continue;
+    const key = normalizeMerchant(row.merchant);
+    if (!key || key.length < 3) continue;
+    if (!patterns.has(key)) patterns.set(key, { total: 0, categories: new Map() });
+    const pattern = patterns.get(key);
+    pattern.total += 1;
+    pattern.categories.set(row.category_id, (pattern.categories.get(row.category_id) || 0) + 1);
+  }
+
+  for (const pattern of patterns.values()) {
+    let dominantCategoryId = null;
+    let dominantCount = 0;
+    for (const [categoryId, count] of pattern.categories.entries()) {
+      if (count > dominantCount) {
+        dominantCategoryId = categoryId;
+        dominantCount = count;
+      }
+    }
+    pattern.dominantCategoryId = dominantCategoryId;
+    pattern.dominantCount = dominantCount;
+  }
+  return patterns;
+}
+
+function changedCategoryPattern(row, patterns) {
+  if (!row.category_id) return null;
+  const pattern = patterns.get(normalizeMerchant(row.merchant));
+  if (!pattern || pattern.total < 3 || pattern.dominantCount < 2) return null;
+  if (pattern.dominantCategoryId === row.category_id) return null;
+  const currentCount = pattern.categories.get(row.category_id) || 0;
+  if (pattern.dominantCount - currentCount < 2) return null;
+  return pattern.dominantCategoryId;
+}
+
 const SORT_MAP = {
   date_desc:        'date DESC, id DESC',
   date_asc:         'date ASC, id ASC',
@@ -381,6 +489,89 @@ router.get('/', requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error('List transactions failed:', err);
+    sendServerError(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/transactions/review-queue
+// Recent transactions that deserve a quick category confirmation.
+// ---------------------------------------------------------------------------
+router.get('/review-queue', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  const limit = parseBoundedInteger(req.query.limit, { fallback: 10, min: 1, max: 25 });
+  const excludedIds = new Set(parseIntList(req.query.exclude));
+
+  try {
+    const categoryRows = db
+      .prepare('SELECT id, name, color, icon FROM categories WHERE household_id = ?')
+      .all(householdId);
+    const categoriesById = new Map(categoryRows.map((category) => [category.id, category]));
+
+    const accountRows = db
+      .prepare('SELECT id, name FROM accounts WHERE household_id = ?')
+      .all(householdId);
+    const accountsById = new Map(accountRows.map((account) => [account.id, account]));
+
+    const rows = db
+      .prepare(
+        `SELECT ${SELECT_COLS}
+           FROM transactions
+          WHERE household_id = ?
+            AND COALESCE(edited_is_ignored, is_ignored) = 0
+          ORDER BY date DESC, id DESC
+          LIMIT 1000`
+      )
+      .all(householdId)
+      .map(hydrate);
+
+    const patterns = buildMerchantPatterns(rows);
+    const candidates = [];
+
+    for (const row of rows) {
+      const category = categoriesById.get(row.category_id);
+      const categoryName = category?.name || null;
+      const reasons = [];
+      const suggestedCategoryId = changedCategoryPattern(row, patterns);
+      const text = textForReview(row);
+
+      if (!row.category_id || String(categoryName || '').toLowerCase() === 'uncategorized') {
+        reasons.push('uncategorized');
+      }
+      if (looksNoisyMerchant(row)) {
+        reasons.push('merchant_review');
+      }
+      if (!row.is_transfer && (
+        TRANSFER_HINTS.some((hint) => text.includes(hint)) ||
+        hasLikelyTransferPair(row, rows)
+      )) {
+        reasons.push('likely_transfer');
+      }
+      if (suggestedCategoryId) {
+        reasons.push('changed_pattern');
+      }
+
+      if (reasons.length === 0) continue;
+
+      candidates.push({
+        ...row,
+        category_name: categoryName,
+        category_color: category?.color || null,
+        category_icon: category?.icon || null,
+        account_name: accountsById.get(row.account_id)?.name || null,
+        review_reasons: reasons,
+        suggested_category_id: suggestedCategoryId
+      });
+    }
+
+    const remaining = candidates.filter((row) => !excludedIds.has(row.id));
+    sendOk(res, {
+      items: attachMerchantLogos(db, remaining.slice(0, limit)),
+      total: remaining.length,
+      limit
+    });
+  } catch (err) {
+    console.error('Review queue failed:', err);
     sendServerError(res, err);
   }
 });
