@@ -9,7 +9,7 @@ export function useReorderSensors() {
       activationConstraint: { distance: 8 }
     }),
     useSensor(TouchSensor, {
-      activationConstraint: { delay: 180, tolerance: 8 }
+      activationConstraint: { distance: 8 }
     })
   );
 }
