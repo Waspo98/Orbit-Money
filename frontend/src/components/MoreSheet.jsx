@@ -4,8 +4,24 @@ import AppIcon from './AppIcon.jsx';
 import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
 import { getMoreRoutes } from '../navigation.js';
 
-const TOUCH_PULL_START_PX = 8;
-const SCROLL_EDGE_GUARD_PX = 1;
+const DRAG_START_PX = 12;
+const DRAG_CLOSE_PX = 92;
+const DRAG_CLOSE_VELOCITY = 0.55;
+
+function createGestureState() {
+  return {
+    active: false,
+    mode: 'idle',
+    pointerType: null,
+    pointerId: null,
+    startedAtTop: false,
+    startY: 0,
+    lastY: 0,
+    lastMoveAt: 0,
+    distance: 0,
+    velocityY: 0
+  };
+}
 
 export default function MoreSheet({
   open,
@@ -15,72 +31,46 @@ export default function MoreSheet({
 }) {
   const navigate = useNavigate();
   const [drawerState, setDrawerState] = useState('opening');
-  const [settling, setSettling] = useState(false);
   const timerRef = useRef(null);
-  const frameRef = useRef(null);
+  const enterFrameRef = useRef(null);
   const dragFrameRef = useRef(null);
-  const dragYRef = useRef(0);
-  const pendingDragYRef = useRef(0);
   const sheetRef = useRef(null);
   const scrollRef = useRef(null);
-  const dragRef = useRef({
-    active: false,
-    pointerId: null,
-    pointerType: null,
-    pulling: false,
-    startedAtTop: false,
-    startY: 0,
-    lastY: 0,
-    startScrollTop: 0,
-    distance: 0,
-    lastMoveAt: 0,
-    velocityY: 0,
-    dragged: false
-  });
+  const gestureRef = useRef(createGestureState());
+  const pendingTransformRef = useRef(0);
+  const pendingDraggingRef = useRef(false);
   const suppressNextClickRef = useRef(false);
   const visibleItems = getMoreRoutes({ mhaTrackerEnabled, navigationPreferences });
 
   useEffect(() => {
-    if (open) {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      setDrawerState('opening');
-      setSheetOffsetImmediate(0, { dragging: false });
-      setSettling(false);
-      suppressNextClickRef.current = false;
-      frameRef.current = window.requestAnimationFrame(() => {
-        setDrawerState('open');
-      });
-    }
+    if (!open) return undefined;
+
+    clearCloseTimer();
+    cancelDragFrame();
+    gestureRef.current = createGestureState();
+    suppressNextClickRef.current = false;
+    setSheetTransform(0, { dragging: false });
+    setDrawerState('opening');
+
+    enterFrameRef.current = window.requestAnimationFrame(() => {
+      setDrawerState('open');
+    });
 
     return () => {
-      if (frameRef.current) {
-        window.cancelAnimationFrame(frameRef.current);
-        frameRef.current = null;
+      if (enterFrameRef.current) {
+        window.cancelAnimationFrame(enterFrameRef.current);
+        enterFrameRef.current = null;
       }
     };
   }, [open]);
 
-  function close(options = { animate: true }) {
-    if (drawerState === 'closing') return;
-    const shouldAnimate = options?.animate !== false;
-    if (!shouldAnimate) {
-      onClose();
-      return;
-    }
-    setSettling(false);
-    setSheetOffsetImmediate(0, { dragging: false });
-    setDrawerState('closing');
-    timerRef.current = setTimeout(onClose, OVERLAY_ANIM_MS);
-  }
-
   useEffect(() => {
-    if (!open) return;
-    function onKey(e) {
-      if (e.key === 'Escape') close({ animate: true });
+    if (!open) return undefined;
+
+    function onKey(event) {
+      if (event.key === 'Escape') close({ animate: true });
     }
+
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,119 +78,105 @@ export default function MoreSheet({
 
   useBodyScrollLock(open);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (dragFrameRef.current) {
-        window.cancelAnimationFrame(dragFrameRef.current);
-        dragFrameRef.current = null;
-      }
-    };
-  }, []);
+  useEffect(() => (
+    () => {
+      clearCloseTimer();
+      cancelDragFrame();
+    }
+  ), []);
 
   useEffect(() => {
     if (!open || !scrollRef.current) return undefined;
     const scrollNode = scrollRef.current;
 
-    function onNativeTouchStart(event) {
+    function onTouchStart(event) {
       if (event.touches.length !== 1) return;
-      handleTouchStart(event);
+      startTouchGesture(event.touches[0]);
     }
 
-    function onNativeTouchMove(event) {
-      handleTouchMove(event);
+    function onTouchMove(event) {
+      moveTouchGesture(event);
     }
 
-    function onNativeTouchEnd() {
-      finishTouchDrag();
+    function onTouchEnd() {
+      finishGesture();
     }
 
-    scrollNode.addEventListener('touchstart', onNativeTouchStart, { passive: true });
-    scrollNode.addEventListener('touchmove', onNativeTouchMove, { passive: false });
-    scrollNode.addEventListener('touchend', onNativeTouchEnd, { passive: true });
-    scrollNode.addEventListener('touchcancel', onNativeTouchEnd, { passive: true });
+    scrollNode.addEventListener('touchstart', onTouchStart, { passive: true });
+    scrollNode.addEventListener('touchmove', onTouchMove, { passive: false });
+    scrollNode.addEventListener('touchend', onTouchEnd, { passive: true });
+    scrollNode.addEventListener('touchcancel', onTouchEnd, { passive: true });
 
     return () => {
-      scrollNode.removeEventListener('touchstart', onNativeTouchStart);
-      scrollNode.removeEventListener('touchmove', onNativeTouchMove);
-      scrollNode.removeEventListener('touchend', onNativeTouchEnd);
-      scrollNode.removeEventListener('touchcancel', onNativeTouchEnd);
+      scrollNode.removeEventListener('touchstart', onTouchStart);
+      scrollNode.removeEventListener('touchmove', onTouchMove);
+      scrollNode.removeEventListener('touchend', onTouchEnd);
+      scrollNode.removeEventListener('touchcancel', onTouchEnd);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  if (!open) return null;
-
-  function handleItemClick(item) {
-    if (suppressNextClickRef.current) return;
-    if (item.comingSoon) return;
-    close({ animate: true });
-    setTimeout(() => {
-      navigate(item.path, { state: { transition: 'from-more' } });
-    }, OVERLAY_ANIM_MS);
+  function clearCloseTimer() {
+    if (!timerRef.current) return;
+    window.clearTimeout(timerRef.current);
+    timerRef.current = null;
   }
 
-  function resetDrag() {
-    dragRef.current = {
-      active: false,
-      pointerId: null,
-      pointerType: null,
-      pulling: false,
-      startedAtTop: false,
-      startY: 0,
-      lastY: 0,
-      startScrollTop: 0,
-      distance: 0,
-      lastMoveAt: 0,
-      velocityY: 0,
-      dragged: false
-    };
-    setSettling(false);
-    setSheetOffsetImmediate(0, { dragging: false });
+  function cancelDragFrame() {
+    if (!dragFrameRef.current) return;
+    window.cancelAnimationFrame(dragFrameRef.current);
+    dragFrameRef.current = null;
   }
 
-  function applySheetOffset(value, options = { dragging: false }) {
+  function setSheetTransform(value, { dragging }) {
     const sheet = sheetRef.current;
     if (!sheet) return;
+    sheet.classList.toggle('dragging', Boolean(dragging && value > 0));
     sheet.style.transform = `translateY(${value}px)`;
-    sheet.classList.toggle('dragging', Boolean(options.dragging && value > 0));
   }
 
-  function setSheetOffsetImmediate(value, options = { dragging: false }) {
-    if (dragFrameRef.current) {
-      window.cancelAnimationFrame(dragFrameRef.current);
-      dragFrameRef.current = null;
-    }
-    dragYRef.current = value;
-    pendingDragYRef.current = value;
-    applySheetOffset(value, options);
-  }
-
-  function setSheetOffsetOnFrame(value, options = { dragging: false }) {
-    if (Math.abs(value - dragYRef.current) < 0.5) return;
-
-    dragYRef.current = value;
-    pendingDragYRef.current = value;
+  function scheduleSheetTransform(value, options) {
+    pendingTransformRef.current = value;
+    pendingDraggingRef.current = Boolean(options.dragging);
     if (dragFrameRef.current) return;
 
     dragFrameRef.current = window.requestAnimationFrame(() => {
       dragFrameRef.current = null;
-      applySheetOffset(pendingDragYRef.current, options);
+      setSheetTransform(pendingTransformRef.current, {
+        dragging: pendingDraggingRef.current
+      });
     });
   }
 
-  function resetPullDistance() {
-    dragRef.current.distance = 0;
-    if (dragYRef.current !== 0) {
-      setSheetOffsetImmediate(0, { dragging: false });
+  function close(options = { animate: true }) {
+    if (drawerState === 'closing') return;
+
+    if (options?.animate === false) {
+      onClose();
+      return;
     }
+
+    gestureRef.current = createGestureState();
+    cancelDragFrame();
+    setSheetTransform(0, { dragging: false });
+    setDrawerState('closing');
+    timerRef.current = window.setTimeout(onClose, OVERLAY_ANIM_MS);
   }
 
-  function setPullDistance(value) {
-    const distance = Math.min(Math.max(value, 0), window.innerHeight);
-    dragRef.current.distance = distance;
-    if (distance > 6) dragRef.current.dragged = true;
-    setSheetOffsetOnFrame(distance, { dragging: true });
+  function closeFromGesture() {
+    maybeSuppressClick();
+    gestureRef.current = createGestureState();
+    cancelDragFrame();
+    setDrawerState('closing');
+    setSheetTransform(window.innerHeight, { dragging: false });
+    timerRef.current = window.setTimeout(onClose, OVERLAY_ANIM_MS);
+  }
+
+  function snapBackFromGesture() {
+    maybeSuppressClick();
+    gestureRef.current = createGestureState();
+    cancelDragFrame();
+    setSheetTransform(0, { dragging: false });
   }
 
   function maybeSuppressClick() {
@@ -211,178 +187,133 @@ export default function MoreSheet({
   }
 
   function shouldCloseDrawer(distance, velocityY) {
-    const distanceThreshold = Math.min(72, window.innerHeight * 0.08);
-    return distance > distanceThreshold || velocityY > 0.35;
+    return distance > DRAG_CLOSE_PX || velocityY > DRAG_CLOSE_VELOCITY;
   }
 
-  function finishDrawerDrag() {
-    const drag = dragRef.current;
-    const finalY = drag.distance;
-    const velocityY = drag.velocityY;
-    const dragged = drag.dragged;
+  function handleItemClick(item) {
+    if (suppressNextClickRef.current || item.comingSoon) return;
+    close({ animate: true });
+    window.setTimeout(() => {
+      navigate(item.path, { state: { transition: 'from-more' } });
+    }, OVERLAY_ANIM_MS);
+  }
 
-    if (dragged && shouldCloseDrawer(finalY, velocityY)) {
-      maybeSuppressClick();
-      setSettling(true);
-      setSheetOffsetImmediate(window.innerHeight, { dragging: false });
-      setDrawerState('closing');
-      timerRef.current = window.setTimeout(onClose, OVERLAY_ANIM_MS);
-    } else if (dragged) {
-      maybeSuppressClick();
-      resetDrag();
-    } else {
-      resetDrag();
+  function startTouchGesture(touch) {
+    const scrollTop = scrollRef.current?.scrollTop || 0;
+    gestureRef.current = {
+      active: true,
+      mode: 'pending',
+      pointerType: 'touch',
+      pointerId: touch.identifier,
+      startedAtTop: scrollTop <= 0,
+      startY: touch.clientY,
+      lastY: touch.clientY,
+      lastMoveAt: window.performance.now(),
+      distance: 0,
+      velocityY: 0
+    };
+  }
+
+  function moveTouchGesture(event) {
+    const gesture = gestureRef.current;
+    if (!gesture.active || gesture.pointerType !== 'touch' || event.touches.length !== 1) {
+      return;
     }
+
+    const touch = event.touches[0];
+    const nextY = touch.clientY;
+    const totalY = nextY - gesture.startY;
+    const now = window.performance.now();
+    const elapsed = Math.max(1, now - gesture.lastMoveAt);
+    gesture.velocityY = (nextY - gesture.lastY) / elapsed;
+    gesture.lastY = nextY;
+    gesture.lastMoveAt = now;
+
+    if (gesture.mode === 'scroll') return;
+
+    if (gesture.mode === 'pending') {
+      if (!gesture.startedAtTop || totalY < 0) {
+        gesture.mode = 'scroll';
+        return;
+      }
+
+      if (totalY < DRAG_START_PX) return;
+      gesture.mode = 'sheet';
+    }
+
+    if (gesture.mode !== 'sheet') return;
+    if (event.cancelable) event.preventDefault();
+
+    const distance = Math.max(0, totalY);
+    gesture.distance = distance;
+    scheduleSheetTransform(distance, { dragging: true });
   }
 
-  function handlePointerDown(event) {
+  function startPointerGesture(event) {
     if (event.pointerType === 'touch') return;
     if (event.button != null && event.button !== 0) return;
-    dragRef.current = {
+
+    gestureRef.current = {
       active: true,
-      pointerId: event.pointerId,
+      mode: 'sheet',
       pointerType: event.pointerType || 'mouse',
-      pulling: true,
+      pointerId: event.pointerId,
       startedAtTop: true,
       startY: event.clientY,
       lastY: event.clientY,
-      startScrollTop: scrollRef.current?.scrollTop || 0,
-      distance: 0,
       lastMoveAt: window.performance.now(),
-      velocityY: 0,
-      dragged: false
+      distance: 0,
+      velocityY: 0
     };
     event.currentTarget.setPointerCapture?.(event.pointerId);
   }
 
-  function getScrollInfo() {
-    const node = scrollRef.current;
-    if (!node) {
-      return { node: null, scrollTop: 0, maxScrollTop: 0 };
-    }
+  function movePointerGesture(event) {
+    const gesture = gestureRef.current;
+    if (!gesture.active || gesture.pointerType === 'touch' || gesture.mode !== 'sheet') return;
 
-    const maxScrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
-    return {
-      node,
-      scrollTop: node.scrollTop,
-      maxScrollTop
-    };
-  }
-
-  function guardScrollEdges(node, maxScrollTop) {
-    if (!node || maxScrollTop <= SCROLL_EDGE_GUARD_PX) return;
-    if (node.scrollTop <= 0) {
-      node.scrollTop = SCROLL_EDGE_GUARD_PX;
-    } else if (node.scrollTop >= maxScrollTop) {
-      node.scrollTop = maxScrollTop - SCROLL_EDGE_GUARD_PX;
-    }
-  }
-
-  function handlePointerMove(event) {
-    const drag = dragRef.current;
-    if (!drag.active || drag.pointerType === 'touch' || drag.startScrollTop > 0) return;
-
-    const nextY = Math.max(0, event.clientY - drag.startY);
+    const nextY = event.clientY;
+    const distance = Math.max(0, nextY - gesture.startY);
     const now = window.performance.now();
-    const elapsed = Math.max(1, now - drag.lastMoveAt);
-    drag.velocityY = (event.clientY - drag.lastY) / elapsed;
-    drag.lastY = event.clientY;
-    drag.lastMoveAt = now;
-    if (nextY > 6) {
-      event.preventDefault();
-    }
-    setPullDistance(nextY);
+    const elapsed = Math.max(1, now - gesture.lastMoveAt);
+    gesture.velocityY = (nextY - gesture.lastY) / elapsed;
+    gesture.lastY = nextY;
+    gesture.lastMoveAt = now;
+    gesture.distance = distance;
+
+    if (distance > 6) event.preventDefault();
+    scheduleSheetTransform(distance, { dragging: true });
   }
 
-  function finishPointerDrag(event) {
-    const drag = dragRef.current;
-    if (!drag.active || drag.pointerType === 'touch') return;
+  function finishPointerGesture(event) {
+    const gesture = gestureRef.current;
+    if (!gesture.active || gesture.pointerType === 'touch') return;
 
     event.currentTarget.releasePointerCapture?.(event.pointerId);
-    finishDrawerDrag();
+    finishGesture();
   }
 
-  function cancelPointerDrag() {
-    resetDrag();
-  }
+  function finishGesture() {
+    const gesture = gestureRef.current;
+    if (!gesture.active) return;
 
-  function handleTouchStart(event) {
-    if (event.touches.length !== 1) return;
-    const touch = event.touches[0];
-    const { node, scrollTop, maxScrollTop } = getScrollInfo();
-    guardScrollEdges(node, maxScrollTop);
-    dragRef.current = {
-      active: true,
-      pointerId: touch.identifier,
-      pointerType: 'touch',
-      pulling: false,
-      startedAtTop: scrollTop <= SCROLL_EDGE_GUARD_PX,
-      startY: touch.clientY,
-      lastY: touch.clientY,
-      startScrollTop: scrollTop,
-      distance: 0,
-      lastMoveAt: window.performance.now(),
-      velocityY: 0,
-      dragged: false
-    };
-  }
-
-  function handleTouchMove(event) {
-    const drag = dragRef.current;
-    if (!drag.active || drag.pointerType !== 'touch' || event.touches.length !== 1) return;
-
-    const { node: sheet, maxScrollTop } = getScrollInfo();
-    if (!sheet) return;
-    const touch = event.touches[0];
-    const nextY = touch.clientY;
-    const movingDown = nextY > drag.lastY;
-    const atTop = sheet.scrollTop <= SCROLL_EDGE_GUARD_PX;
-    const now = window.performance.now();
-    const elapsed = Math.max(1, now - drag.lastMoveAt);
-    drag.velocityY = (nextY - drag.lastY) / elapsed;
-
-    drag.lastY = nextY;
-    drag.lastMoveAt = now;
-
-    if (!drag.startedAtTop) {
-      drag.startY = nextY;
-      guardScrollEdges(sheet, maxScrollTop);
-      resetPullDistance();
+    if (
+      gesture.mode === 'sheet' &&
+      shouldCloseDrawer(gesture.distance, gesture.velocityY)
+    ) {
+      closeFromGesture();
       return;
     }
 
-    if (!drag.pulling) {
-      if (!atTop || !movingDown) {
-        drag.startY = nextY;
-        guardScrollEdges(sheet, maxScrollTop);
-        resetPullDistance();
-        return;
-      }
-
-      const initialPull = Math.max(0, nextY - drag.startY);
-      if (initialPull < TOUCH_PULL_START_PX) return;
-      if (event.cancelable) event.preventDefault();
-      drag.pulling = true;
-    }
-
-    const nextDistance = nextY - drag.startY;
-    if (nextDistance <= 0) {
-      drag.pulling = false;
-      drag.startY = nextY;
-      resetPullDistance();
+    if (gesture.mode === 'sheet' && gesture.distance > 0) {
+      snapBackFromGesture();
       return;
     }
 
-    if (event.cancelable) event.preventDefault();
-    setPullDistance(nextDistance);
+    gestureRef.current = createGestureState();
   }
 
-  function finishTouchDrag() {
-    const drag = dragRef.current;
-    if (!drag.active || drag.pointerType !== 'touch') return;
-
-    finishDrawerDrag();
-  }
+  if (!open) return null;
 
   const isClosing = drawerState === 'closing';
   const sheetOffset = drawerState === 'open' ? '0px' : '100%';
@@ -397,9 +328,9 @@ export default function MoreSheet({
     >
       <div
         ref={sheetRef}
-        className={`more-sheet ${isClosing ? 'closing' : ''} ${settling ? 'settling' : ''}`.trim()}
+        className={`more-sheet ${isClosing ? 'closing' : ''}`.trim()}
         style={{ transform: `translateY(${sheetOffset})` }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
         onClickCapture={(event) => {
           if (!suppressNextClickRef.current) return;
           event.preventDefault();
@@ -409,10 +340,10 @@ export default function MoreSheet({
         <div
           className="more-sheet-handle"
           aria-hidden
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={finishPointerDrag}
-          onPointerCancel={cancelPointerDrag}
+          onPointerDown={startPointerGesture}
+          onPointerMove={movePointerGesture}
+          onPointerUp={finishPointerGesture}
+          onPointerCancel={finishGesture}
         />
 
         <div className="more-sheet-scroll" ref={scrollRef}>
