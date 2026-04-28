@@ -228,13 +228,6 @@ export default function Upcoming({ accounts = [], categories = [] }) {
     }
   }
 
-  const stats = [
-    { label: 'Active', value: String(data?.summary?.active_count || 0) },
-    { label: 'Monthly Bills', value: formatCurrency(data?.summary?.monthly_expenses || 0) },
-    { label: 'Monthly Income', value: formatCurrency(data?.summary?.monthly_income || 0), tone: 'good' },
-    { label: 'Suggestions', value: String(data?.summary?.suggestion_count || 0) }
-  ];
-
   return (
     <div className="upcoming-view">
       <PageHero
@@ -243,15 +236,11 @@ export default function Upcoming({ accounts = [], categories = [] }) {
         kicker="Money Calendar"
         title="Upcoming"
         subtitle="Bills, subscriptions, and income in one place."
-        stats={stats}
-        initialHeight={420}
+        initialHeight={300}
         toolbar={
           <div className="page-hero-action-row">
-            <button type="button" className="btn-secondary" onClick={() => setFilter('suggestions')}>
-              Suggestions
-            </button>
             <button type="button" className="btn-primary" onClick={() => openNew()}>
-              Add Upcoming
+              + Add Upcoming
             </button>
           </div>
         }
@@ -285,8 +274,8 @@ export default function Upcoming({ accounts = [], categories = [] }) {
           <div className="empty-state">
             <h2>No Upcoming Items</h2>
             <p>Add a bill, subscription, or income item manually, or review suggestions found from transactions.</p>
-            <button type="button" className="btn-primary" onClick={() => openNew(filter === 'all' ? 'bill' : filter)}>
-              Add Upcoming
+            <button type="button" className="btn-primary" onClick={() => setFilter('suggestions')}>
+              View Suggestions
             </button>
           </div>
         ) : (

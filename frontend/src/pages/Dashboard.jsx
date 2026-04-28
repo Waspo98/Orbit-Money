@@ -35,6 +35,7 @@ import {
   formatLocalMonth,
   formatMonthKeyLabel
 } from '../lib/localDate.js';
+import { sortCategoriesByName } from '../lib/categorySort.js';
 
 // ============================================================================
 // Dashboard - v16
@@ -1392,6 +1393,7 @@ function CategorizeRecentCard({ loading, onOpen }) {
 }
 
 function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
+  const { confirm, Dialog } = useAppDialog();
   const [handledIds, setHandledIds] = useState(readHandledReviewIds);
   const [items, setItems] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1400,12 +1402,16 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [pickerClosing, setPickerClosing] = useState(false);
   const [ruleTxn, setRuleTxn] = useState(null);
   const [allDone, setAllDone] = useState(false);
   const [funMode, setFunMode] = useState(false);
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
   const dragRef = useRef({ active: false, startX: 0, readySide: null });
+  const transitionTimerRef = useRef(null);
+  const pickerTimerRef = useRef(null);
 
   const currentTxn = items[currentIndex] || null;
   const batchComplete = batchReviewed >= 10 || (!currentTxn && items.length > 0);
@@ -1422,6 +1428,11 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
     loadQueue({ handled: handledIds, fun: funMode });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [funMode]);
+
+  useEffect(() => () => {
+    window.clearTimeout(transitionTimerRef.current);
+    window.clearTimeout(pickerTimerRef.current);
+  }, []);
 
   function rememberHandled(id) {
     setHandledIds((prev) => {
@@ -1452,9 +1463,11 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
     setLoading(true);
     setError('');
     setCategoryPickerOpen(false);
+    setPickerClosing(false);
     setCurrentIndex(0);
     setBatchReviewed(0);
     setDragX(0);
+    setTransitioning(false);
     dragRef.current.readySide = null;
 
     try {
@@ -1483,36 +1496,58 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
   function advance(txn) {
     if (txn) rememberHandled(txn.id);
     setCategoryPickerOpen(false);
+    setPickerClosing(false);
     setDragX(0);
+    setTransitioning(true);
     dragRef.current.readySide = null;
     setBatchReviewed((count) => count + 1);
     setCurrentIndex((index) => index + 1);
+    window.clearTimeout(transitionTimerRef.current);
+    transitionTimerRef.current = window.setTimeout(() => {
+      setTransitioning(false);
+    }, 240);
   }
 
   function handleApprove() {
-    if (!currentTxn || saving) return;
+    if (!currentTxn || saving || transitioning) return;
     advance(currentTxn);
   }
 
   function handleReject() {
-    if (!currentTxn || saving) return;
+    if (!currentTxn || saving || transitioning) return;
     setCategoryPickerOpen(true);
+    setPickerClosing(false);
     setDragX(0);
   }
 
   async function chooseCategory(categoryId) {
     if (!currentTxn || saving) return;
+    const nextCategory = categoryById.get(categoryId);
+    const confirmed = await confirm(
+      `Change "${currentTxn.merchant || 'this transaction'}" to "${nextCategory?.name || 'this category'}"?`,
+      {
+        title: 'Confirm Category',
+        confirmLabel: 'Change Category',
+        cancelLabel: 'Keep Looking'
+      }
+    );
+    if (!confirmed) return;
+
     setSaving(true);
     setError('');
     try {
       await api.patch(`/api/transactions/${currentTxn.id}`, {
         category_id: categoryId
       });
-      advance(currentTxn);
-      onRefresh?.();
+      setPickerClosing(true);
+      window.clearTimeout(pickerTimerRef.current);
+      pickerTimerRef.current = window.setTimeout(() => {
+        advance(currentTxn);
+        onRefresh?.();
+        setSaving(false);
+      }, 170);
     } catch (err) {
       setError(err.message || 'Could not update category.');
-    } finally {
       setSaving(false);
     }
   }
@@ -1531,8 +1566,32 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
     setAllDone(false);
   }
 
+  function closeCategoryPicker() {
+    setPickerClosing(true);
+    window.clearTimeout(pickerTimerRef.current);
+    pickerTimerRef.current = window.setTimeout(() => {
+      setCategoryPickerOpen(false);
+      setPickerClosing(false);
+    }, 170);
+  }
+
+  function goBackReview() {
+    if (currentIndex <= 0 || saving || transitioning) return;
+    setCategoryPickerOpen(false);
+    setPickerClosing(false);
+    setDragX(0);
+    dragRef.current.readySide = null;
+    setCurrentIndex((index) => Math.max(0, index - 1));
+    setBatchReviewed((count) => Math.max(0, count - 1));
+    setTransitioning(true);
+    window.clearTimeout(transitionTimerRef.current);
+    transitionTimerRef.current = window.setTimeout(() => {
+      setTransitioning(false);
+    }, 220);
+  }
+
   function onPointerDown(event) {
-    if (!currentTxn || categoryPickerOpen || saving) return;
+    if (!currentTxn || categoryPickerOpen || saving || transitioning) return;
     if (event.target.closest('button, a, input, select, textarea')) return;
     dragRef.current = { active: true, startX: event.clientX, readySide: null };
     setDragging(true);
@@ -1639,13 +1698,25 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
                 currentCategory={categoryById.get(currentTxn.category_id)}
                 suggestedCategory={categoryById.get(currentTxn.suggested_category_id)}
                 saving={saving}
+                closing={pickerClosing}
                 onChoose={chooseCategory}
-                onBack={() => setCategoryPickerOpen(false)}
+                onBack={closeCategoryPicker}
               />
             ) : currentTxn ? (
               <>
                 <div className="review-progress-row">
-                  <span>{Math.min(batchReviewed + 1, 10)} of 10</span>
+                  <span className="review-counter-wrap">
+                    <button
+                      type="button"
+                      className="review-counter-back"
+                      onClick={goBackReview}
+                      disabled={currentIndex <= 0 || saving || transitioning}
+                      aria-label="Go back to previous transaction"
+                    >
+                      <span aria-hidden="true">&larr;</span>
+                    </button>
+                    <span>{Math.min(batchReviewed + 1, 10)} of 10</span>
+                  </span>
                   <strong>Is this category correct?</strong>
                 </div>
 
@@ -1655,7 +1726,8 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
                     <span>Confirm</span>
                   </div>
                   <div
-                    className={`review-swipe-card ${dragging ? 'dragging' : ''} ${cardTone}`}
+                    key={currentTxn.id}
+                    className={`review-swipe-card ${dragging ? 'dragging' : ''} ${transitioning ? 'entering' : ''} ${cardTone}`}
                     style={{
                       transform: `translateX(${dragX}px) rotate(${cardRotation}deg)`
                     }}
@@ -1722,6 +1794,7 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
               }}
             />
           )}
+          <Dialog />
         </>
       )}
     </AnimatedModal>
@@ -1776,7 +1849,6 @@ function ReviewReasonPills({ reasons }) {
   const labels = {
     uncategorized: 'Uncategorized',
     merchant_review: 'Merchant Check',
-    likely_transfer: 'Likely Transfer',
     changed_pattern: 'Changed Pattern',
     fun_review: 'Bonus Round'
   };
@@ -1797,21 +1869,22 @@ function CategoryReviewPicker({
   currentCategory,
   suggestedCategory,
   saving,
+  closing,
   onChoose,
   onBack
 }) {
   const orderedCategories = useMemo(() => {
     const suggestedId = suggestedCategory?.id;
-    return [...categories].sort((a, b) => {
+    return sortCategoriesByName(categories).sort((a, b) => {
       if (a.id === suggestedId) return -1;
       if (b.id === suggestedId) return 1;
-      return (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name);
+      return 0;
     });
   }, [categories, suggestedCategory?.id]);
 
   return (
-    <div className="review-category-picker">
-      <button type="button" className="btn-ghost review-back-button" onClick={onBack}>
+    <div className={`review-category-picker ${closing ? 'closing' : ''}`}>
+      <button type="button" className="btn-secondary review-back-button" onClick={onBack}>
         Back
       </button>
       <div className="review-picker-heading">

@@ -424,6 +424,111 @@ input, textarea, select {
   cursor: not-allowed;
 }
 
+.app-select {
+  position: relative;
+  min-width: 0;
+}
+
+.app-select-trigger {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast), border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.app-select-trigger:hover,
+.app-select-trigger:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface-hover);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.app-select-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.app-select-trigger span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-select-caret {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.app-select-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  display: grid;
+  max-height: 240px;
+  padding: 6px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  transform-origin: top;
+  animation: appSelectIn 140ms var(--ease-out);
+}
+
+.app-select-menu.closing {
+  animation: appSelectOut 140ms var(--ease-in-out) forwards;
+}
+
+.app-select-option {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-select-option:hover,
+.app-select-option:focus,
+.app-select-option.selected {
+  outline: none;
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+@keyframes appSelectIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes appSelectOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-4px) scale(0.98); }
+}
+
 
 /* ================== 3. PRIMITIVES — Cards, pills, banners ================== */
 
@@ -948,7 +1053,11 @@ input, textarea, select {
   align-items: center;
 }
 
-.rule-builder-grid select,
+.rule-builder-grid .app-select,
+.rule-builder-grid input {
+  min-width: 0;
+}
+
 .rule-builder-grid input {
   padding: 8px 10px;
   background: var(--surface);
@@ -961,11 +1070,14 @@ input, textarea, select {
   transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
 
-.rule-builder-grid select:focus,
 .rule-builder-grid input:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.rule-select-span-2 {
+  grid-column: span 2;
 }
 
 .rule-between {
@@ -1026,8 +1138,8 @@ input, textarea, select {
       "value    value     value";
     gap: 6px;
   }
-  .rule-builder-grid > select:nth-child(1) { grid-area: field;    }
-  .rule-builder-grid > select:nth-child(2) { grid-area: operator; }
+  .rule-builder-grid > .app-select:nth-child(1) { grid-area: field;    }
+  .rule-builder-grid > .app-select:nth-child(2) { grid-area: operator; }
   .rule-builder-grid > *:nth-child(3)      { grid-area: value;    }
   .rule-builder-grid > button              { grid-area: remove;   }
 }
@@ -3019,6 +3131,46 @@ input, textarea, select {
   font-size: 0.82rem;
 }
 
+.review-counter-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.review-counter-back {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background var(--dur-fast), border-color var(--dur-fast), transform var(--dur-fast);
+}
+
+.review-counter-back:hover:not(:disabled),
+.review-counter-back:focus:not(:disabled) {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.review-counter-back:active:not(:disabled) {
+  transform: translateX(-1px);
+}
+
+.review-counter-back:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
 .review-progress-row strong {
   color: var(--text);
   font-size: 0.98rem;
@@ -3063,11 +3215,13 @@ input, textarea, select {
   user-select: none;
   transition: transform 180ms var(--ease-out), box-shadow var(--dur-fast);
   will-change: transform;
+  animation: reviewCardPop 180ms var(--ease-out);
 }
 
 .review-swipe-card.dragging {
   cursor: grabbing;
   transition: none;
+  animation: none;
 }
 
 .review-card-content {
@@ -3233,7 +3387,7 @@ input, textarea, select {
 .review-bottom-actions,
 .review-empty-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 
@@ -3241,7 +3395,10 @@ input, textarea, select {
 .review-empty-actions .btn-primary,
 .review-empty-actions .btn-secondary {
   width: 100%;
-  min-height: 46px;
+  min-height: 48px;
+  white-space: normal;
+  line-height: 1.15;
+  padding-block: 12px;
 }
 
 .review-swipe-hint {
@@ -3325,10 +3482,30 @@ input, textarea, select {
 .review-category-picker {
   display: grid;
   gap: 12px;
+  animation: reviewPickerIn 170ms var(--ease-out);
+}
+
+.review-category-picker.closing {
+  animation: reviewPickerOut 170ms var(--ease-in-out) forwards;
 }
 
 .review-back-button {
   justify-self: start;
+}
+
+@keyframes reviewCardPop {
+  0% { opacity: 0; transform: translateY(12px) scale(0.965); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes reviewPickerIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes reviewPickerOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(10px) scale(0.985); }
 }
 
 .review-picker-heading {
@@ -3975,7 +4152,7 @@ input, textarea, select {
 
 .page-hero-upcoming {
   --hero-start: #052e24;
-  --hero-mid: #0f766e;
+  --hero-mid: #065f46;
   --hero-end: #047857;
 }
 

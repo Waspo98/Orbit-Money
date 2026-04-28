@@ -30,6 +30,7 @@ import SyncErrorBanner from './components/SyncErrorBanner.jsx';
 import MoreSheet from './components/MoreSheet.jsx';
 import { useTheme } from './hooks/useTheme.js';
 import { api } from './api.js';
+import { sortCategoriesByName } from './lib/categorySort.js';
 import { ROUTES, getNavigationRoutes, getRoute } from './navigation.js';
 
 // Bottom tabs always visible. (Previously we hid them on Settings/import to
@@ -118,7 +119,7 @@ function AppShell() {
       ]);
       const mha = await api.get('/api/mha/settings');
       setAccounts(a.items);
-      setCategories(c.items);
+      setCategories(sortCategoriesByName(c.items));
       setMhaTrackerEnabled(!!mha.enabled);
       setLookupsReady(true);
       return true;

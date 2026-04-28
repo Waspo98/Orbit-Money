@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api.js';
+import { sortCategoriesByName } from '../../lib/categorySort.js';
+import AppSelect from '../AppSelect.jsx';
 import AnimatedModal from '../AnimatedModal.jsx';
 import CurrencyInput, {
   formatCurrencyInput,
@@ -16,6 +18,7 @@ import {
 
 export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
   const isNew = !rule.id;
+  const sortedCategories = useMemo(() => sortCategoriesByName(categories), [categories]);
 
   const [name, setName] = useState(rule.name || '');
   const [conditions, setConditions] = useState(
@@ -73,7 +76,7 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
       value: nextField === 'account_id'
         ? (accounts[0]?.id ?? '')
         : nextField === 'category_id'
-          ? (categories[0]?.id ?? '')
+          ? (sortedCategories[0]?.id ?? '')
           : ''
     });
   }
@@ -98,7 +101,7 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
 
   function changeActionType(index, nextType) {
     let value = '';
-    if (nextType === 'categorize') value = categories[0]?.id ?? '';
+    if (nextType === 'categorize') value = sortedCategories[0]?.id ?? '';
     if (nextType === 'mark_transfer' || nextType === 'mark_ignored') value = true;
     updateAction(index, { type: nextType, value });
   }
@@ -171,7 +174,7 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
                   index={index}
                   condition={condition}
                   accounts={accounts}
-                  categories={categories}
+                  categories={sortedCategories}
                   onFieldChange={(field) => changeField(index, field)}
                   onUpdate={(patch) => updateCondition(index, patch)}
                   onRemove={conditions.length > 1 ? () => removeCondition(index) : null}
@@ -188,7 +191,7 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
                 <ActionRow
                   key={index}
                   action={action}
-                  categories={categories}
+                  categories={sortedCategories}
                   onTypeChange={(type) => changeActionType(index, type)}
                   onUpdate={(patch) => updateAction(index, patch)}
                   onRemove={actions.length > 1 ? () => removeAction(index) : null}
@@ -257,41 +260,43 @@ function ConditionRow({
     <div className="rule-row-builder">
       {index > 0 && <div className="rule-and-label">and</div>}
       <div className="rule-builder-grid">
-        <select value={condition.field} onChange={(event) => onFieldChange(event.target.value)}>
-          {FIELD_OPTIONS.map((field) => (
-            <option key={field.value} value={field.value}>{field.label}</option>
-          ))}
-        </select>
+        <AppSelect
+          value={condition.field}
+          options={FIELD_OPTIONS}
+          onChange={onFieldChange}
+          ariaLabel="Condition field"
+        />
 
-        <select
+        <AppSelect
           value={condition.operator}
-          onChange={(event) => onUpdate({ operator: event.target.value })}
-        >
-          {operators.map((operator) => (
-            <option key={operator} value={operator}>
-              {OPERATOR_LABELS[operator] || operator}
-            </option>
-          ))}
-        </select>
+          options={operators.map((operator) => ({
+            value: operator,
+            label: OPERATOR_LABELS[operator] || operator
+          }))}
+          onChange={(operator) => onUpdate({ operator })}
+          ariaLabel="Condition operator"
+        />
 
         {condition.field === 'account_id' ? (
-          <select
+          <AppSelect
             value={condition.value || ''}
-            onChange={(event) => onUpdate({ value: Number(event.target.value) })}
-          >
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>{account.name}</option>
-            ))}
-          </select>
+            options={accounts.map((account) => ({
+              value: account.id,
+              label: account.name
+            }))}
+            onChange={(nextValue) => onUpdate({ value: Number(nextValue) })}
+            ariaLabel="Condition account"
+          />
         ) : condition.field === 'category_id' ? (
-          <select
+          <AppSelect
             value={condition.value || ''}
-            onChange={(event) => onUpdate({ value: Number(event.target.value) })}
-          >
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>{category.name}</option>
-            ))}
-          </select>
+            options={categories.map((category) => ({
+              value: category.id,
+              label: category.name
+            }))}
+            onChange={(nextValue) => onUpdate({ value: Number(nextValue) })}
+            ariaLabel="Condition category"
+          />
         ) : condition.operator === 'between' ? (
           <div className="rule-between">
             <CurrencyInput
@@ -353,23 +358,25 @@ function ActionRow({ action, categories, onTypeChange, onUpdate, onRemove }) {
   return (
     <div className="rule-row-builder">
       <div className="rule-builder-grid">
-        <select value={action.type} onChange={(event) => onTypeChange(event.target.value)}>
-          {ACTION_TYPES.map((type) => (
-            <option key={type.value} value={type.value}>{type.label}</option>
-          ))}
-        </select>
+        <AppSelect
+          value={action.type}
+          options={ACTION_TYPES}
+          onChange={onTypeChange}
+          ariaLabel="Rule action"
+        />
 
         {needsValue ? (
           action.type === 'categorize' ? (
-            <select
+            <AppSelect
+              className="rule-select-span-2"
               value={action.value || ''}
-              onChange={(event) => onUpdate({ value: Number(event.target.value) })}
-              style={{ gridColumn: 'span 2' }}
-            >
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>{category.name}</option>
-              ))}
-            </select>
+              options={categories.map((category) => ({
+                value: category.id,
+                label: category.name
+              }))}
+              onChange={(nextValue) => onUpdate({ value: Number(nextValue) })}
+              ariaLabel="Rule category"
+            />
           ) : (
             <input
               type="text"

@@ -173,21 +173,6 @@ const MERCHANT_NOISE_HINTS = [
   'web authorized'
 ];
 
-const TRANSFER_HINTS = [
-  'ach transfer',
-  'autopay',
-  'automatic payment',
-  'cc payment',
-  'credit card payment',
-  'mobile transfer',
-  'online banking transfer',
-  'online transfer',
-  'payment from',
-  'payment to',
-  'transfer from',
-  'transfer to'
-];
-
 function normalizeMerchant(value) {
   return String(value || '')
     .toLowerCase()
@@ -212,26 +197,6 @@ function looksNoisyMerchant(row) {
   if (/[#*]\d{3,}/.test(merchant)) return true;
   if ((merchant.match(/\d/g) || []).length >= 6) return true;
   return false;
-}
-
-function daysBetween(a, b) {
-  const first = Date.parse(`${a}T00:00:00Z`);
-  const second = Date.parse(`${b}T00:00:00Z`);
-  if (!Number.isFinite(first) || !Number.isFinite(second)) return Infinity;
-  return Math.abs(first - second) / (24 * 60 * 60 * 1000);
-}
-
-function hasLikelyTransferPair(row, rows) {
-  const amount = Number(row.amount) || 0;
-  if (amount === 0) return false;
-  return rows.some((candidate) => {
-    if (candidate.id === row.id || candidate.account_id === row.account_id) return false;
-    const otherAmount = Number(candidate.amount) || 0;
-    if (Math.sign(amount) === Math.sign(otherAmount)) return false;
-    const tolerance = Math.max(1, Math.abs(amount) * 0.01);
-    return Math.abs(Math.abs(amount) - Math.abs(otherAmount)) <= tolerance &&
-      daysBetween(row.date, candidate.date) <= 3;
-  });
 }
 
 function buildMerchantPatterns(rows) {
@@ -533,19 +498,12 @@ router.get('/review-queue', requireAuth, (req, res) => {
       const categoryName = category?.name || null;
       const reasons = [];
       const suggestedCategoryId = changedCategoryPattern(row, patterns);
-      const text = textForReview(row);
 
       if (!row.category_id || String(categoryName || '').toLowerCase() === 'uncategorized') {
         reasons.push('uncategorized');
       }
       if (looksNoisyMerchant(row)) {
         reasons.push('merchant_review');
-      }
-      if (!row.is_transfer && (
-        TRANSFER_HINTS.some((hint) => text.includes(hint)) ||
-        hasLikelyTransferPair(row, rows)
-      )) {
-        reasons.push('likely_transfer');
       }
       if (suggestedCategoryId) {
         reasons.push('changed_pattern');
