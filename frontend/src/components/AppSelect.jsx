@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export default function AppSelect({
   value,
@@ -90,7 +91,39 @@ export default function AppSelect({
       width: `${menuPosition.width}px`,
       maxHeight: `${menuPosition.maxHeight}px`
     }
+    : usePageCenteredMenu
+      ? {
+        position: 'fixed',
+        visibility: 'hidden'
+      }
     : undefined;
+
+  const menu = open ? (
+    <div
+      ref={menuRef}
+      className={`app-select-menu ${usePageCenteredMenu ? 'app-select-menu-page-centered' : ''} ${closing ? 'closing' : ''}`.trim()}
+      style={menuStyle}
+      role="listbox"
+    >
+      {options.map((option) => (
+        <button
+          type="button"
+          key={option.value}
+          className={`app-select-option ${
+            String(option.value) === String(value) ? 'selected' : ''
+          }`}
+          role="option"
+          aria-selected={String(option.value) === String(value)}
+          onClick={() => {
+            onChange(option.value);
+            closeMenu();
+          }}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  ) : null;
 
   return (
     <div ref={rootRef} className={`app-select ${className}`}>
@@ -107,32 +140,7 @@ export default function AppSelect({
         <span className="app-select-caret" aria-hidden="true">v</span>
       </button>
 
-      {open && (
-        <div
-          ref={menuRef}
-          className={`app-select-menu ${usePageCenteredMenu ? 'app-select-menu-page-centered' : ''} ${closing ? 'closing' : ''}`.trim()}
-          style={menuStyle}
-          role="listbox"
-        >
-          {options.map((option) => (
-            <button
-              type="button"
-              key={option.value}
-              className={`app-select-option ${
-                String(option.value) === String(value) ? 'selected' : ''
-              }`}
-              role="option"
-              aria-selected={String(option.value) === String(value)}
-              onClick={() => {
-                onChange(option.value);
-                closeMenu();
-              }}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {usePageCenteredMenu && menu ? createPortal(menu, document.body) : menu}
     </div>
   );
 }
