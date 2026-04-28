@@ -4,6 +4,7 @@ import BrandLogo from '../components/BrandLogo.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { APP_VERSION_LABEL } from '../version.js';
+import { APP_ICON_512 } from '../brandAssets.js';
 
 const THEME_OPTIONS = [
   {
@@ -786,7 +787,7 @@ export default function Settings({
 
       <section className="settings-section settings-about-section" aria-labelledby="settings-about-title">
         <div className="settings-about-brand">
-          <img src="/icon-512.png" alt="" className="settings-about-icon" />
+          <img src={APP_ICON_512} alt="" className="settings-about-icon" />
           <div>
             <h3 id="settings-about-title"><BrandLogo /></h3>
             <p>Personal finance PWA</p>

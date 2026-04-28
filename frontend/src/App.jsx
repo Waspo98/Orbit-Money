@@ -31,6 +31,7 @@ import SyncErrorBanner from './components/SyncErrorBanner.jsx';
 import MoreSheet from './components/MoreSheet.jsx';
 import { useTheme } from './hooks/useTheme.js';
 import { api } from './api.js';
+import { APP_ICON_192 } from './brandAssets.js';
 import { sortCategoriesByName } from './lib/categorySort.js';
 import { ROUTES, getNavigationRoutes, getRoute } from './navigation.js';
 
@@ -231,7 +232,7 @@ function AppShell() {
           onClick={() => navigate('/dashboard')}
           aria-label="Go to dashboard"
         >
-          <img src="/icon-192.png" alt="" className="brand-mark brand-mark-image" />
+          <img src={APP_ICON_192} alt="" className="brand-mark brand-mark-image" />
           <BrandLogo />
         </button>
 

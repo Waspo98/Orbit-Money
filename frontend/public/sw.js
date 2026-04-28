@@ -9,7 +9,7 @@
 // below to invalidate the existing cache.
 // =============================================================================
 
-const CACHE_NAME = 'orbit-money-v1';
+const CACHE_NAME = 'orbit-money-v0.51-brand-20260428a';
 
 self.addEventListener('install', (event) => {
   // Take over immediately on first install.

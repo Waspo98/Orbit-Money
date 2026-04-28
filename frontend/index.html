@@ -11,9 +11,10 @@
     <title>Orbit Money</title>
 
     <!-- PWA -->
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" href="/icon-192.png" type="image/png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest?v=0.51.0-20260428a" />
+    <link rel="icon" href="/icon-192.png?v=0.51.0-20260428a" type="image/png" />
+    <link rel="icon" href="/icon.svg?v=0.51.0-20260428a" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=0.51.0-20260428a" />
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -22,6 +23,78 @@
       href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+
+    <style>
+      html,
+      body,
+      #root {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: #fafaf7;
+      }
+
+      :root[data-theme="dark"] body {
+        background: #0a1410;
+      }
+
+      .initial-splash {
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: #fafaf7;
+      }
+
+      :root[data-theme="dark"] .initial-splash {
+        background: #0a1410;
+      }
+
+      .initial-splash-icon {
+        width: 76px;
+        height: 76px;
+        border-radius: 20px;
+        object-fit: cover;
+        box-shadow: 0 12px 30px rgba(26, 31, 27, 0.08);
+      }
+
+      .initial-splash-wordmark {
+        width: min(220px, 64vw);
+        height: auto;
+      }
+
+      .initial-splash-wordmark-dark {
+        display: none;
+      }
+
+      :root[data-theme="dark"] .initial-splash-wordmark-light {
+        display: none;
+      }
+
+      :root[data-theme="dark"] .initial-splash-wordmark-dark {
+        display: block;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) body,
+        :root:not([data-theme="light"]) .initial-splash {
+          background: #0a1410;
+        }
+
+        :root:not([data-theme="light"]) .initial-splash-wordmark-light {
+          display: none;
+        }
+
+        :root:not([data-theme="light"]) .initial-splash-wordmark-dark {
+          display: block;
+        }
+      }
+    </style>
 
     <script>
       // Apply theme from localStorage before first paint to avoid flash.
@@ -40,7 +113,7 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
           navigator.serviceWorker
-            .register('/sw.js')
+            .register('/sw.js?v=0.51.0-20260428a', { updateViaCache: 'none' })
             .catch(function (err) {
               console.warn('Service worker registration failed:', err);
             });
@@ -49,7 +122,21 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="initial-splash" role="img" aria-label="Orbit Money">
+        <img class="initial-splash-icon" src="/icon-192.png?v=0.51.0-20260428a" alt="" />
+        <img
+          class="initial-splash-wordmark initial-splash-wordmark-light"
+          src="/splash-wordmark-light.svg?v=0.51.0-20260428a"
+          alt=""
+        />
+        <img
+          class="initial-splash-wordmark initial-splash-wordmark-dark"
+          src="/splash-wordmark-dark.svg?v=0.51.0-20260428a"
+          alt=""
+        />
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

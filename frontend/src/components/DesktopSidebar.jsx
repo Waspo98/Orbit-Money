@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import AppIcon from './AppIcon.jsx';
 import BrandLogo from './BrandLogo.jsx';
 import { getNavigationRoutes } from '../navigation.js';
+import { APP_ICON_192 } from '../brandAssets.js';
 
 export default function DesktopSidebar({ mhaTrackerEnabled = false }) {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ export default function DesktopSidebar({ mhaTrackerEnabled = false }) {
         onClick={() => navigate('/dashboard')}
         aria-label="Go to dashboard"
       >
-        <img src="/icon-192.png" alt="" className="brand-mark brand-mark-image" />
+        <img src={APP_ICON_192} alt="" className="brand-mark brand-mark-image" />
         <BrandLogo />
       </button>
       <nav className="sidebar-nav">
