@@ -275,7 +275,7 @@ function AppShell() {
       <SyncErrorBanner onOpenSettings={() => navigate('/settings')} />
 
       <main className="app-main">
-        <DepthPattern className="app-depth-pattern" />
+        <DepthPattern className="app-depth-pattern" seedKey={location.pathname} />
         {lookupError ? (
           <div className="empty-state app-load-error">
             <div className="empty-state-icon">!</div>
