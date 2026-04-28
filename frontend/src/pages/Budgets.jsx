@@ -662,6 +662,7 @@ function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump })
           }))}
           onChange={onJump}
           ariaLabel="Jump to month"
+          menuPlacement="page-center"
         >
           {monthOptions.map((m) => (
             <option key={m} value={m}>

@@ -11,10 +11,11 @@ export default function MoreSheet({
   navigationPreferences
 }) {
   const navigate = useNavigate();
-  const [closing, setClosing] = useState(false);
+  const [drawerState, setDrawerState] = useState('opening');
   const [dragY, setDragY] = useState(0);
   const [settling, setSettling] = useState(false);
   const timerRef = useRef(null);
+  const frameRef = useRef(null);
   const scrollRef = useRef(null);
   const dragRef = useRef({
     active: false,
@@ -34,21 +35,33 @@ export default function MoreSheet({
 
   useEffect(() => {
     if (open) {
-      setClosing(false);
+      setDrawerState('opening');
       setDragY(0);
       setSettling(false);
       suppressNextClickRef.current = false;
+      frameRef.current = window.requestAnimationFrame(() => {
+        setDrawerState('open');
+      });
     }
+
+    return () => {
+      if (frameRef.current) {
+        window.cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
   }, [open]);
 
   function close(options = { animate: true }) {
-    if (closing) return;
+    if (drawerState === 'closing') return;
     const shouldAnimate = options?.animate !== false;
     if (!shouldAnimate) {
       onClose();
       return;
     }
-    setClosing(true);
+    setSettling(false);
+    setDragY(0);
+    setDrawerState('closing');
     timerRef.current = setTimeout(onClose, OVERLAY_ANIM_MS);
   }
 
@@ -159,7 +172,7 @@ export default function MoreSheet({
       maybeSuppressClick();
       setSettling(true);
       setDragY(window.innerHeight);
-      setClosing(true);
+      setDrawerState('closing');
       timerRef.current = window.setTimeout(onClose, OVERLAY_ANIM_MS);
     } else if (dragged) {
       maybeSuppressClick();
@@ -285,17 +298,20 @@ export default function MoreSheet({
     finishDrawerDrag();
   }
 
+  const isClosing = drawerState === 'closing';
+  const sheetOffset = dragY > 0 ? `${dragY}px` : drawerState === 'open' ? '0px' : '100%';
+
   return (
     <div
-      className={`more-sheet-backdrop ${closing ? 'closing' : ''}`}
+      className={`more-sheet-backdrop ${drawerState === 'open' ? 'open' : ''} ${isClosing ? 'closing' : ''}`.trim()}
       onClick={() => close({ animate: true })}
       role="dialog"
       aria-modal="true"
       aria-label="More navigation"
     >
       <div
-        className={`more-sheet ${closing ? 'closing' : ''} ${dragY > 0 && !settling ? 'dragging' : ''} ${settling ? 'settling' : ''}`.trim()}
-        style={dragY > 0 ? { transform: `translateY(${dragY}px)` } : undefined}
+        className={`more-sheet ${isClosing ? 'closing' : ''} ${dragY > 0 && !settling ? 'dragging' : ''} ${settling ? 'settling' : ''}`.trim()}
+        style={{ transform: `translateY(${sheetOffset})` }}
         onClick={(e) => e.stopPropagation()}
         onClickCapture={(event) => {
           if (!suppressNextClickRef.current) return;
