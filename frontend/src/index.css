@@ -396,12 +396,12 @@ input, textarea, select {
   height: 8px;
   border-right: 2px solid currentColor;
   border-bottom: 2px solid currentColor;
-  transform: translateY(-1px) rotate(45deg);
+  transform: translateX(2px) rotate(135deg);
   transition: transform var(--dur-base) var(--ease-out);
 }
 
 .collapse-indicator.expanded .collapse-indicator-chevron {
-  transform: translateY(1px) rotate(225deg);
+  transform: translateY(-1px) rotate(45deg);
 }
 
 :is(.dashboard-card, .budget-row):hover .collapse-indicator,
@@ -9167,6 +9167,7 @@ input, textarea, select {
   display: flex;
   align-items: center;
   margin: 0;
+  min-height: 54px;
   font-size: 1.18rem;
   font-weight: 700;
   line-height: 1;
@@ -9177,22 +9178,28 @@ input, textarea, select {
   --brand-logo-height: 40px;
 }
 
-.settings-about-details {
+.settings-about-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   margin: 18px 0 0;
 }
 
-.settings-about-details > div {
-  padding: 14px 16px;
+.settings-about-info-card {
+  min-width: 0;
+  min-height: 84px;
+  display: grid;
+  align-content: center;
+  gap: 7px;
+  padding: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
 }
 
-.settings-about-details dt {
-  margin-bottom: 5px;
+.settings-about-info-label {
   color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 700;
@@ -9200,11 +9207,50 @@ input, textarea, select {
   text-transform: uppercase;
 }
 
-.settings-about-details dd {
-  margin: 0;
+.settings-about-info-card strong {
   color: var(--text);
   font-weight: 600;
   font-size: 0.94rem;
+  overflow-wrap: anywhere;
+}
+
+.settings-donate-card {
+  appearance: none;
+  cursor: pointer;
+  justify-items: center;
+  text-align: center;
+  transition:
+    background-color var(--dur-fast),
+    border-color var(--dur-fast),
+    color var(--dur-fast),
+    transform var(--dur-fast);
+}
+
+.settings-donate-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.settings-donate-card:active {
+  transform: translateY(1px);
+}
+
+.settings-signout-card {
+  align-content: stretch;
+  gap: 14px;
+}
+
+.settings-signout-card .settings-action-info {
+  min-width: 0;
+}
+
+.settings-signout-card .btn-danger {
+  width: 100%;
+}
+
+.settings-about-build strong {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
 }
 
 .settings-developer-line {
@@ -9216,47 +9262,6 @@ input, textarea, select {
 
 .settings-donate-button {
   width: 100%;
-}
-
-.settings-signout-action {
-  margin: 0;
-}
-
-.settings-about-bottom-row {
-  display: grid;
-  grid-template-columns: minmax(116px, 0.34fr) minmax(0, 1fr);
-  gap: 16px;
-  align-items: stretch;
-  margin-top: 16px;
-}
-
-.settings-about-build {
-  padding: 18px 20px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-}
-
-.settings-about-build dt {
-  margin-bottom: 5px;
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.settings-about-build dd {
-  margin: 0;
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-
-.settings-about-details div:first-child dd {
-  font-family: var(--font-mono);
-  font-size: 0.88rem;
 }
 
 .settings-about-footer {
@@ -9283,8 +9288,8 @@ input, textarea, select {
   .settings-theme-toggle { grid-template-columns: 1fr; }
   .settings-theme-toggle-two { grid-template-columns: 1fr; }
   .settings-theme-option { min-height: auto; }
-  .settings-about-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .settings-about-bottom-row { grid-template-columns: 1fr; }
+  .settings-about-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .settings-about-info-card { min-height: 80px; }
   .settings-developer-line { align-items: stretch; flex-direction: column; }
 }
 

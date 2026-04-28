@@ -70,7 +70,7 @@ const SETTINGS_CARD_DEFS = [
   },
   {
     id: 'features',
-    title: 'App Features',
+    title: 'Turn App Features On/Off',
     description: 'Show, hide, and reorder navigation sections.'
   },
   {
@@ -146,18 +146,6 @@ function todayIso() {
 
 function displayPerson(person) {
   return person?.display_name || person?.displayName || person?.email || person?.username || 'Shared user';
-}
-
-function formatPageList(routes) {
-  const names = routes.map((route) => route.label);
-  if (names.length === 0) return 'All optional pages are on.';
-  if (names.length === 1) return `${names[0]} is turned off.`;
-  if (names.length === 2) return `${names[0]} and ${names[1]} are turned off.`;
-  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]} are turned off.`;
-}
-
-function formatTurnedOffCount(count) {
-  return `${count} ${count === 1 ? 'Page' : 'Pages'} Turned Off`;
 }
 
 function SettingsCard({
@@ -271,7 +259,6 @@ export default function Settings({
   }, [normalizedNavigationPreferences]);
 
   const optionalFeatureRoutes = ROUTES.filter((route) => route.nav && !route.locked);
-  const turnedOffFeatureRoutes = optionalFeatureRoutes.filter((route) => !isFeatureVisible(route));
   const settingsOrder = normalizeSettingsCardOrder(settingsCardOrder);
 
   useDragInteractionLock(Boolean(settingsDragId || moreDragId));
@@ -685,16 +672,10 @@ export default function Settings({
       <SettingsCard
         id="features"
         key="features"
-        title="App Features"
+        title="Turn App Features On/Off"
         description="Show, hide, and reorder navigation sections."
         collapsed={collapsedCards.has('features')}
         onToggle={() => toggleCardCollapsed('features')}
-        collapsedContent={
-          <div className="settings-collapsed-summary">
-            <strong>{formatTurnedOffCount(turnedOffFeatureRoutes.length)}</strong>
-            <span>{formatPageList(turnedOffFeatureRoutes)}</span>
-          </div>
-        }
       >
         <div className="settings-card-top-action">
           <button
@@ -1248,27 +1229,26 @@ export default function Settings({
           </div>
         </div>
 
-        <dl className="settings-about-details">
-          <div>
-            <dt>Developer</dt>
-            <dd>Neal Overbay</dd>
-          </div>
-          <div>
-            <dd>
-              <button type="button" className="btn-secondary btn-compact settings-donate-button" onClick={handleDonatePlaceholder}>
-                Donate
-              </button>
-            </dd>
-          </div>
-        </dl>
-
-        <div className="settings-about-bottom-row">
-          <div className="settings-about-build">
-            <dt>Build</dt>
-            <dd>{APP_VERSION_LABEL}</dd>
+        <div className="settings-about-grid">
+          <div className="settings-about-info-card">
+            <span className="settings-about-info-label">Developer</span>
+            <strong>Neal Overbay</strong>
           </div>
 
-          <div className="settings-action settings-signout-action">
+          <button
+            type="button"
+            className="settings-about-info-card settings-donate-card"
+            onClick={handleDonatePlaceholder}
+          >
+            <strong>Donate</strong>
+          </button>
+
+          <div className="settings-about-info-card settings-about-build">
+            <span className="settings-about-info-label">Build</span>
+            <strong>{APP_VERSION_LABEL}</strong>
+          </div>
+
+          <div className="settings-about-info-card settings-signout-card">
             <div className="settings-action-info">
               <strong>Sign Out</strong>
               <p>Ends this browser session and returns to the login screen.</p>
