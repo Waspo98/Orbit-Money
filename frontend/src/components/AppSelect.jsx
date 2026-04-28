@@ -16,17 +16,32 @@ export default function AppSelect({
   const [menuPosition, setMenuPosition] = useState(null);
   const rootRef = useRef(null);
   const menuRef = useRef(null);
+  const closeTimerRef = useRef(null);
   const selected = options.find((option) => String(option.value) === String(value));
   const usePageCenteredMenu = menuPlacement === 'page-center';
+
+  function openMenu() {
+    if (usePageCenteredMenu) setMenuPosition(null);
+    setClosing(false);
+    setOpen(true);
+  }
 
   function closeMenu() {
     if (!open || closing) return;
     setClosing(true);
-    window.setTimeout(() => {
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = window.setTimeout(() => {
       setOpen(false);
       setClosing(false);
+      closeTimerRef.current = null;
     }, 140);
   }
+
+  useEffect(() => (
+    () => {
+      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+    }
+  ), []);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -130,7 +145,7 @@ export default function AppSelect({
       <button
         type="button"
         className="app-select-trigger"
-        onClick={() => (open ? closeMenu() : setOpen(true))}
+        onClick={() => (open ? closeMenu() : openMenu())}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -140,7 +155,9 @@ export default function AppSelect({
         <span className="app-select-caret" aria-hidden="true">v</span>
       </button>
 
-      {usePageCenteredMenu && menu ? createPortal(menu, document.body) : menu}
+      {usePageCenteredMenu && menu && typeof document !== 'undefined'
+        ? createPortal(menu, document.body)
+        : menu}
     </div>
   );
 }

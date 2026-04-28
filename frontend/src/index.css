@@ -1343,6 +1343,8 @@ input, textarea, select {
   border-radius: 2px;
   margin: 0 auto 12px;
   opacity: 0.6;
+  cursor: grab;
+  touch-action: none;
 }
 
 .more-sheet-scroll {

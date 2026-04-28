@@ -35,6 +35,10 @@ export default function MoreSheet({
 
   useEffect(() => {
     if (open) {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
       setDrawerState('opening');
       setDragY(0);
       setSettling(false);
@@ -318,12 +322,15 @@ export default function MoreSheet({
           event.preventDefault();
           event.stopPropagation();
         }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={finishPointerDrag}
-        onPointerCancel={cancelPointerDrag}
       >
-        <div className="more-sheet-handle" aria-hidden />
+        <div
+          className="more-sheet-handle"
+          aria-hidden
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishPointerDrag}
+          onPointerCancel={cancelPointerDrag}
+        />
 
         <div className="more-sheet-scroll" ref={scrollRef}>
           <div className="more-grid">
