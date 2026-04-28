@@ -13,6 +13,7 @@ import {
 import { api } from '../api.js';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import AppSelect from '../components/AppSelect.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
@@ -20,7 +21,7 @@ import ReorderListItem, {
   useReorderSensors
 } from '../components/ReorderListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
-import CurrencyInput, { parseCurrencyInput } from '../components/CurrencyInput.jsx';
+import CurrencyInput, { formatCurrencyInput, parseCurrencyInput } from '../components/CurrencyInput.jsx';
 import {
   formatCurrency as formatUsd,
   formatPercent
@@ -878,7 +879,7 @@ function EditAccountModal({ account, onClose, onSaved }) {
   const [type, setType] = useState(account.type);
   const [institution, setInstitution] = useState(account.institution || '');
   const [estimatedValue, setEstimatedValue] = useState(
-    account.estimated_value == null ? '' : String(account.estimated_value)
+    account.estimated_value == null ? '' : formatCurrencyInput(account.estimated_value)
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -933,13 +934,12 @@ function EditAccountModal({ account, onClose, onSaved }) {
 
             <label className="field">
               <span>Type</span>
-              <select value={type} onChange={(e) => setType(e.target.value)}>
-                {TYPE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+              <AppSelect
+                value={type}
+                options={TYPE_OPTIONS}
+                onChange={setType}
+                ariaLabel="Account type"
+              />
             </label>
 
             <label className="field">
@@ -1022,9 +1022,14 @@ function MergeAccountModal({ source, candidates, onClose, onMerged }) {
 
           <label className="field">
             <span>Merge into</span>
-            <select
+            <AppSelect
               value={targetId}
-              onChange={(e) => setTargetId(e.target.value)}
+              onChange={setTargetId}
+              ariaLabel="Merge target account"
+              options={candidates.map((a) => ({
+                value: a.id,
+                label: `${a.name}${a.institution ? ` - ${a.institution}` : ''}${a.account_number_last4 ? ` ...${a.account_number_last4}` : ''}`
+              }))}
             >
               {candidates.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -1035,7 +1040,7 @@ function MergeAccountModal({ source, candidates, onClose, onMerged }) {
                     : ''}
                 </option>
               ))}
-            </select>
+            </AppSelect>
           </label>
 
           {target && (

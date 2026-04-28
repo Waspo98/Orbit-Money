@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
+import AppSelect from '../components/AppSelect.jsx';
 import PageHero from '../components/PageHero.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
@@ -550,19 +551,22 @@ function YearNav({ year, yearOptions, canGoForward, onPrev, onNext, onJump }) {
       </button>
 
       <div className="month-nav-label-wrap">
-        <span className="month-nav-label-text">{formatYearLabel(year)}</span>
-        <select
+        <AppSelect
           className="month-nav-select"
           value={year}
-          onChange={(e) => onJump(Number(e.target.value))}
-          aria-label="Jump to year"
+          options={yearOptions.map((option) => ({
+            value: option,
+            label: formatYearLabel(option)
+          }))}
+          onChange={(value) => onJump(Number(value))}
+          ariaLabel="Jump to year"
         >
           {yearOptions.map((option) => (
             <option key={option} value={option}>
               {formatYearLabel(option)}
             </option>
           ))}
-        </select>
+        </AppSelect>
       </div>
 
       <button

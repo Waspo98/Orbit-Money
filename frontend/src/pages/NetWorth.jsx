@@ -305,8 +305,12 @@ function NetWorthChart({ history }) {
             <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.02" />
           </linearGradient>
         </defs>
-        <path d={areaPath} fill="url(#networthArea)" />
-        <path d={path} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={areaPath} fill="url(#networthArea)">
+          <title>{`Net worth range: ${formatMoney(first?.netWorth || 0)} to ${formatMoney(latest?.netWorth || 0)}`}</title>
+        </path>
+        <path d={path} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+          <title>{`Latest net worth: ${formatMoney(latest?.netWorth || 0)} in ${formatMonth(latest?.month)}`}</title>
+        </path>
         {history.map((point, index) => {
           if (history.length > 18 && index !== 0 && index !== history.length - 1 && index % 4 !== 0) {
             return null;
@@ -314,7 +318,11 @@ function NetWorthChart({ history }) {
           const { min, max } = getRange(history);
           const x = history.length === 1 ? width / 2 : (index / (history.length - 1)) * width;
           const y = height - ((Number(point.netWorth) - min) / (max - min)) * height;
-          return <circle key={point.month} cx={x} cy={y} r="4" fill="var(--surface)" stroke="var(--accent)" strokeWidth="3" />;
+          return (
+            <circle key={point.month} cx={x} cy={y} r="4" fill="var(--surface)" stroke="var(--accent)" strokeWidth="3">
+              <title>{`${formatMonth(point.month)}: ${formatMoney(point.netWorth)}`}</title>
+            </circle>
+          );
         })}
       </svg>
       <div className="networth-chart-labels">

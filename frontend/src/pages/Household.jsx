@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import AppSelect from '../components/AppSelect.jsx';
 import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
@@ -56,6 +57,7 @@ const RETIREMENT_OPTIONS = [
 ];
 
 const RETIREMENT_ACCOUNT_KIND_OPTIONS = RETIREMENT_OPTIONS.filter(([value]) => value !== 'none');
+const HSA_RETIREMENT_RATE_STORAGE_KEY = 'orbit-money-hsa-retirement-rate-members-v1';
 
 const PAY_PERIODS = {
   weekly: 52,
@@ -88,6 +90,36 @@ function perPaycheckToMonthly(value, payFrequency) {
 
 function labelFor(options, value) {
   return options.find(([key]) => key === value)?.[1] || value || 'Not set';
+}
+
+function appSelectOptions(options) {
+  return options.map(([value, label]) => ({ value, label }));
+}
+
+function readHsaRetirementRateMemberIds() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(HSA_RETIREMENT_RATE_STORAGE_KEY));
+    return Array.isArray(saved) ? saved.map(Number).filter(Number.isFinite) : [];
+  } catch {
+    return [];
+  }
+}
+
+function shouldIncludeHsaInRetirementRate(memberId) {
+  return readHsaRetirementRateMemberIds().includes(Number(memberId));
+}
+
+function setIncludeHsaInRetirementRate(memberId, include) {
+  try {
+    const ids = new Set(readHsaRetirementRateMemberIds());
+    const id = Number(memberId);
+    if (!Number.isFinite(id)) return;
+    if (include) ids.add(id);
+    else ids.delete(id);
+    localStorage.setItem(HSA_RETIREMENT_RATE_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+  } catch {
+    /* Local preference only; ignore storage failures. */
+  }
 }
 
 function ageFromBirthDate(date) {
@@ -363,9 +395,14 @@ function SignalRow({ label, value, detail }) {
 
 function MemberCard({ member, onEdit, onDelete }) {
   const age = ageFromBirthDate(member.birth_date);
+  const includeHsa = shouldIncludeHsaInRetirementRate(member.id);
+  const retirementContributions =
+    Number(member.employee_retirement_annual || 0) +
+    Number(member.employer_retirement_annual || 0) +
+    (includeHsa ? Number(member.hsa_contribution_annual || 0) : 0);
   const retirementRate =
     Number(member.gross_income_annual || 0) > 0
-      ? ((Number(member.employee_retirement_annual || 0) + Number(member.employer_retirement_annual || 0)) / Number(member.gross_income_annual)) * 100
+      ? (retirementContributions / Number(member.gross_income_annual)) * 100
       : 0;
 
   return (
@@ -416,6 +453,9 @@ function Metric({ label, value }) {
 
 function MemberModal({ member, accounts, onClose, onSaved }) {
   const [draft, setDraft] = useState(() => toDraft(member));
+  const [includeHsaInRate, setIncludeHsaInRate] = useState(
+    () => !!member?.id && shouldIncludeHsaInRetirementRate(member.id)
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const isEdit = !!member;
@@ -440,6 +480,9 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
       const nextData = isEdit
         ? await api.put(`/api/household/members/${member.id}`, payload)
         : await api.post('/api/household/members', payload);
+      if (isEdit) {
+        setIncludeHsaInRetirementRate(member.id, includeHsaInRate);
+      }
       close({ animation: 'zoom' });
       setTimeout(() => onSaved(nextData), 180);
     } catch (err) {
@@ -463,9 +506,12 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
               </label>
               <label className="field">
                 <span>Role</span>
-                <select value={draft.role} onChange={(e) => update('role', e.target.value)}>
-                  {ROLE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
+                <AppSelect
+                  value={draft.role}
+                  options={appSelectOptions(ROLE_OPTIONS)}
+                  onChange={(value) => update('role', value)}
+                  ariaLabel="Household role"
+                />
               </label>
               <label className="field">
                 <span>Birth Date</span>
@@ -473,9 +519,12 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
               </label>
               <label className="field">
                 <span>Status</span>
-                <select value={draft.employment_status} onChange={(e) => update('employment_status', e.target.value)}>
-                  {EMPLOYMENT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
+                <AppSelect
+                  value={draft.employment_status}
+                  options={appSelectOptions(EMPLOYMENT_OPTIONS)}
+                  onChange={(value) => update('employment_status', value)}
+                  ariaLabel="Employment status"
+                />
               </label>
               <label className="field">
                 <span>Employer</span>
@@ -501,9 +550,12 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
               </label>
               <label className="field">
                 <span>Pay Frequency</span>
-                <select value={draft.pay_frequency} onChange={(e) => update('pay_frequency', e.target.value)}>
-                  {PAY_FREQUENCY_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
+                <AppSelect
+                  value={draft.pay_frequency}
+                  options={appSelectOptions(PAY_FREQUENCY_OPTIONS)}
+                  onChange={(value) => update('pay_frequency', value)}
+                  ariaLabel="Pay frequency"
+                />
               </label>
             </div>
           </div>
@@ -513,9 +565,12 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
             <div className="goal-form-grid">
               <label className="field">
                 <span>Account Type</span>
-                <select value={draft.retirement_account_type} onChange={(e) => update('retirement_account_type', e.target.value)}>
-                  {RETIREMENT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
+                <AppSelect
+                  value={draft.retirement_account_type}
+                  options={appSelectOptions(RETIREMENT_OPTIONS)}
+                  onChange={(value) => update('retirement_account_type', value)}
+                  ariaLabel="Retirement account type"
+                />
               </label>
               <label className="field">
                 <span>Employee Contribution</span>
@@ -555,6 +610,16 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
               <label className="field">
                 <span>HSA Contribution (Per Paycheck)</span>
                 <CurrencyInput value={draft.hsa_contribution_annual} onChange={(value) => update('hsa_contribution_annual', value)} placeholder="$0" />
+                {isEdit && (
+                  <label className="inline-check household-hsa-rate-check">
+                    <input
+                      type="checkbox"
+                      checked={includeHsaInRate}
+                      onChange={(event) => setIncludeHsaInRate(event.target.checked)}
+                    />
+                    <span>Include HSA in retirement rate</span>
+                  </label>
+                )}
               </label>
               <label className="field">
                 <span>Dependent Care FSA (Per Paycheck)</span>
@@ -658,11 +723,12 @@ function AccountLinkPicker({ accounts, linkedAccounts, onChange }) {
                   </div>
                   <label className="field">
                     <span>Type</span>
-                    <select value={link.account_kind || 'other'} onChange={(e) => updateKind(link.account_id, e.target.value)}>
-                      {RETIREMENT_ACCOUNT_KIND_OPTIONS.map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
+                    <AppSelect
+                      value={link.account_kind || 'other'}
+                      options={appSelectOptions(RETIREMENT_ACCOUNT_KIND_OPTIONS)}
+                      onChange={(value) => updateKind(link.account_id, value)}
+                      ariaLabel={`${account.name} retirement account type`}
+                    />
                   </label>
                 </div>
               </div>

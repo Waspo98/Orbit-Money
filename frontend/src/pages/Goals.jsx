@@ -626,8 +626,12 @@ function GoalChart({ goal }) {
                 <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.02" />
               </linearGradient>
             </defs>
-            <path d={area} fill={`url(#goalArea${goal.id})`} />
-            <path d={line} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={area} fill={`url(#goalArea${goal.id})`}>
+              <title>{`${goal.name}: ${formatMoney(latest?.amount || 0)} saved`}</title>
+            </path>
+            <path d={line} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+              <title>{`${goal.name} trend, latest ${formatMoney(latest?.amount || 0)} in ${formatMonth(latest?.month)}`}</title>
+            </path>
           </svg>
           <div className="networth-chart-labels">
             <span>{formatMonth(first?.month)}</span>

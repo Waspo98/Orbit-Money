@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import AppSelect from '../components/AppSelect.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import PageHero from '../components/PageHero.jsx';
@@ -60,6 +61,13 @@ function formatMoney(n) {
 function formatTransactionDate(date) {
   return formatMonthDay(date);
 }
+
+const BUDGET_SORT_OPTIONS = [
+  { value: 'pct_desc', label: '% Spent High to Low' },
+  { value: 'pct_asc', label: '% Spent Low to High' },
+  { value: 'spent_desc', label: '$ Spent High to Low' },
+  { value: 'spent_asc', label: '$ Spent Low to High' }
+];
 
 // ============================================================================
 // Main page
@@ -449,17 +457,18 @@ export default function Budgets() {
                     {data.budgeted.length}{' '}
                     {data.budgeted.length === 1 ? 'category' : 'categories'}
                   </span>
-                  <select
+                  <AppSelect
                     className="budget-sort-select"
                     value={budgetedSort}
-                    onChange={(e) => setBudgetedSort(e.target.value)}
-                    aria-label="Sort budgeted categories"
+                    options={BUDGET_SORT_OPTIONS}
+                    onChange={setBudgetedSort}
+                    ariaLabel="Sort budgeted categories"
                   >
                     <option value="pct_desc">% spent · high → low</option>
                     <option value="pct_asc">% spent · low → high</option>
                     <option value="spent_desc">$ spent · high → low</option>
                     <option value="spent_asc">$ spent · low → high</option>
-                  </select>
+                  </AppSelect>
                 </div>
               </header>
               <ul className="budget-list">
@@ -643,20 +652,23 @@ function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump })
       </button>
 
       <div className="month-nav-label-wrap">
-        <span className="month-nav-label-text">{formatMonthLabel(month)}</span>
         <span className="month-nav-caret" aria-hidden="true">▾</span>
-        <select
+        <AppSelect
           className="month-nav-select"
           value={month}
-          onChange={(e) => onJump(e.target.value)}
-          aria-label="Jump to month"
+          options={monthOptions.map((m) => ({
+            value: m,
+            label: formatMonthLabel(m)
+          }))}
+          onChange={onJump}
+          ariaLabel="Jump to month"
         >
           {monthOptions.map((m) => (
             <option key={m} value={m}>
               {formatMonthLabel(m)}
             </option>
           ))}
-        </select>
+        </AppSelect>
       </div>
 
       <button
@@ -680,6 +692,7 @@ function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump })
 
 function ProgressBar({ percent, overBudget = false, compact = false }) {
   const clamped = Math.max(0, Math.min(100, percent));
+  const label = `${Math.round(percent)}%${overBudget ? ' over budget' : ' used'}`;
   return (
     <div
       className={`budget-progress ${compact ? 'budget-progress-compact' : ''}`}
@@ -687,6 +700,7 @@ function ProgressBar({ percent, overBudget = false, compact = false }) {
       aria-valuenow={Math.round(percent)}
       aria-valuemin="0"
       aria-valuemax="100"
+      title={label}
     >
       <div
         className={`budget-progress-fill ${
@@ -797,7 +811,11 @@ function SpendingPieChart({ items, total, selectedKey, onSelect }) {
                   }
                 }}
                 onMouseEnter={() => onSelect(item.key)}
-              />
+              >
+                <title>
+                  {`${item.name}: ${formatMoney(item.amount)} (${Math.round((item.amount / total) * 100)}%)`}
+                </title>
+              </circle>
             );
           })}
           <text className="budget-pie-total-label" x="60" y="56" textAnchor="middle">
@@ -1037,11 +1055,15 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
             <form onSubmit={(e) => handleSave(e, close)}>
               <label className="field">
                 <span>Category</span>
-                <select
+                <AppSelect
                   value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  required
-                  autoFocus
+                  onChange={setCategoryId}
+                  placeholder="Pick One"
+                  ariaLabel="Budget category"
+                  options={availableCategories.map((c) => ({
+                    value: c.id,
+                    label: `${c.icon} ${c.name}`
+                  }))}
                 >
                   <option value="">(Pick one)</option>
                   {availableCategories.map((c) => (
@@ -1049,7 +1071,7 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
                       {c.icon} {c.name}
                     </option>
                   ))}
-                </select>
+                </AppSelect>
               </label>
 
               <label className="field">

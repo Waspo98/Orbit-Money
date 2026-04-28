@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import FilterSheet from '../components/FilterSheet.jsx';
+import AppSelect from '../components/AppSelect.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import PageHero from '../components/PageHero.jsx';
 import SearchField from '../components/SearchField.jsx';
@@ -166,6 +167,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   const [total, setTotal] = useState(0);
   const [grandTotal, setGrandTotal] = useState(0);
   const [monthlyTotal, setMonthlyTotal] = useState(0);
+  const [monthlyFlow, setMonthlyFlow] = useState({ income: 0, expenses: 0, net: 0 });
   const [monthCounts, setMonthCounts] = useState({});
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -214,6 +216,11 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
       setTotal(data.total);
       setGrandTotal(data.grandTotal ?? data.total);
       setMonthlyTotal(data.monthlyTotal ?? 0);
+      setMonthlyFlow({
+        income: Number(data.monthlyIncome || 0),
+        expenses: Number(data.monthlyExpenses || 0),
+        net: Number(data.monthlyNet || 0)
+      });
       setMonthCounts(
         Object.fromEntries(
           (data.monthCounts || []).map((row) => [row.month, Number(row.count) || 0])
@@ -395,14 +402,6 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     () => groupByMonth(items, monthCounts),
     [items, monthCounts]
   );
-  const visibleIncome = items
-    .filter((t) => t.amount > 0 && !t.is_transfer && !t.is_ignored)
-    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-  const visibleOutflow = items
-    .filter((t) => t.amount < 0 && !t.is_transfer && !t.is_ignored)
-    .reduce((sum, t) => sum + Math.abs(Number(t.amount || 0)), 0);
-  const visibleNet = visibleIncome - visibleOutflow;
-
   useEffect(() => {
     if (!groups.length) {
       setPinnedMonth(null);
@@ -518,9 +517,9 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         title="Transactions"
         subtitle={`${monthlyTotal.toLocaleString()} ${monthlyTotal === 1 ? 'transaction' : 'transactions'} this month`}
         stats={[
-          { label: 'Monthly income', value: formatShortAmount(visibleIncome), tone: 'good' },
-          { label: 'Monthly expenses', value: formatShortAmount(visibleOutflow), tone: 'caution' },
-          { label: 'Monthly net', value: formatAmount(visibleNet), tone: visibleNet >= 0 ? 'good' : 'caution' },
+          { label: 'Monthly income', value: formatShortAmount(monthlyFlow.income), tone: 'good' },
+          { label: 'Monthly expenses', value: formatShortAmount(monthlyFlow.expenses), tone: 'caution' },
+          { label: 'Monthly net', value: formatAmount(monthlyFlow.net), tone: monthlyFlow.net >= 0 ? 'good' : 'caution' },
           { label: 'Monthly transactions', value: monthlyTotal.toLocaleString() }
         ]}
         initialHeight={612}
@@ -556,29 +555,24 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
               </button>
               <label className="txn-sort">
                 <span className="visually-hidden">Sort</span>
-                <select
+                <AppSelect
                   value={filters.sort}
-                  onChange={(e) => setSort(e.target.value)}
-                >
-                  {SORT_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                  options={SORT_OPTIONS}
+                  onChange={setSort}
+                  ariaLabel="Sort transactions"
+                />
               </label>
               <label className="txn-page-size">
                 <span className="visually-hidden">Transactions per page</span>
-                <select
+                <AppSelect
                   value={filters.pageSize}
-                  onChange={(e) => setPageSize(e.target.value)}
-                >
-                  {PAGE_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size}>
-                      {size} / page
-                    </option>
-                  ))}
-                </select>
+                  options={PAGE_SIZE_OPTIONS.map((size) => ({
+                    value: size,
+                    label: `${size} / page`
+                  }))}
+                  onChange={setPageSize}
+                  ariaLabel="Transactions per page"
+                />
               </label>
             </div>
           </div>

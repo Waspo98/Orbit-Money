@@ -428,6 +428,19 @@ router.get('/', requireAuth, (req, res) => {
     const monthlyTotal = db
       .prepare('SELECT COUNT(*) AS c FROM transactions WHERE household_id = ? AND date >= ? AND date <= ?')
       .get(householdId, monthStart, monthEnd).c;
+    const monthlyFlow = db
+      .prepare(
+        `SELECT
+            COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
+            COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) AS expenses
+           FROM transactions
+          WHERE household_id = ?
+            AND date >= ?
+            AND date <= ?
+            AND COALESCE(edited_is_ignored, is_ignored) = 0
+            AND COALESCE(edited_is_transfer, is_transfer) = 0`
+      )
+      .get(householdId, monthStart, monthEnd);
 
     const monthCounts = db
       .prepare(
@@ -457,6 +470,9 @@ router.get('/', requireAuth, (req, res) => {
       total,
       grandTotal,
       monthlyTotal,
+      monthlyIncome: centsToDollars(monthlyFlow.income),
+      monthlyExpenses: centsToDollars(monthlyFlow.expenses),
+      monthlyNet: centsToDollars(monthlyFlow.income - monthlyFlow.expenses),
       monthCounts,
       totalPages: Math.max(1, Math.ceil(total / limit)),
       sort: sortKey in SORT_MAP ? sortKey : 'date_desc'

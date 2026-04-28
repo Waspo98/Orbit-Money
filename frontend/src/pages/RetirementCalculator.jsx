@@ -891,10 +891,18 @@ function RetirementChart({ model }) {
             </text>
           </g>
         ))}
-        <path d={area} fill="url(#retcalcArea)" />
-        <path d={targetLine} fill="none" className="retcalc-chart-target" />
-        <line x1={retirementX} y1="0" x2={retirementX} y2={height} className="retcalc-chart-retirement" />
-        <path d={line} fill="none" className="retcalc-chart-line" />
+        <path d={area} fill="url(#retcalcArea)">
+          <title>{`Projected balance at retirement: ${formatMoney(retirementPoint.amount)}`}</title>
+        </path>
+        <path d={targetLine} fill="none" className="retcalc-chart-target">
+          <title>{`Target nest egg: ${formatMoney(model.targetNestEgg)}`}</title>
+        </path>
+        <line x1={retirementX} y1="0" x2={retirementX} y2={height} className="retcalc-chart-retirement">
+          <title>{`Retirement age: ${Math.round(model.retirementAge)}`}</title>
+        </line>
+        <path d={line} fill="none" className="retcalc-chart-line">
+          <title>{`Projection through age ${Math.round(model.endAge)}`}</title>
+        </path>
       </svg>
       <div className="retcalc-chart-label-row">
         <span>Age {Math.round(model.currentAge)}</span>

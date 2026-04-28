@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import AppSelect from '../components/AppSelect.jsx';
 import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
@@ -24,6 +25,17 @@ const FREQUENCY_OPTIONS = [
   { value: 'bimonthly', label: 'Bimonthly' },
   { value: 'yearly', label: 'Yearly' },
   { value: 'custom', label: 'Custom' }
+];
+
+const FREQUENCY_UNIT_OPTIONS = [
+  { value: 'days', label: 'Days' },
+  { value: 'weeks', label: 'Weeks' },
+  { value: 'months', label: 'Months' }
+];
+
+const DIRECTION_OPTIONS = [
+  { value: 'expense', label: 'Expense' },
+  { value: 'income', label: 'Income' }
 ];
 
 const FILTERS = [
@@ -493,11 +505,11 @@ function UpcomingEditor({ item, accounts, categories, onSave, onClose }) {
 
             <label className="field">
               <span>Type</span>
-              <select value={form.kind} onChange={(event) => patch({ kind: event.target.value })}>
+              <AppSelect value={form.kind} options={KIND_OPTIONS} onChange={(value) => patch({ kind: value })} ariaLabel="Upcoming type">
                 {KIND_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
-              </select>
+              </AppSelect>
             </label>
 
             <label className="field">
@@ -520,11 +532,11 @@ function UpcomingEditor({ item, accounts, categories, onSave, onClose }) {
 
             <label className="field">
               <span>Frequency</span>
-              <select value={form.frequency_type} onChange={(event) => patch({ frequency_type: event.target.value })}>
+              <AppSelect value={form.frequency_type} options={FREQUENCY_OPTIONS} onChange={(value) => patch({ frequency_type: value })} ariaLabel="Upcoming frequency">
                 {FREQUENCY_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
-              </select>
+              </AppSelect>
             </label>
 
             {form.frequency_type === 'custom' && (
@@ -540,11 +552,11 @@ function UpcomingEditor({ item, accounts, categories, onSave, onClose }) {
                 </label>
                 <label className="field">
                   <span>Unit</span>
-                  <select value={form.frequency_unit} onChange={(event) => patch({ frequency_unit: event.target.value })}>
+                  <AppSelect value={form.frequency_unit} options={FREQUENCY_UNIT_OPTIONS} onChange={(value) => patch({ frequency_unit: value })} ariaLabel="Frequency unit">
                     <option value="days">Days</option>
                     <option value="weeks">Weeks</option>
                     <option value="months">Months</option>
-                  </select>
+                  </AppSelect>
                 </label>
               </div>
             )}
@@ -552,31 +564,37 @@ function UpcomingEditor({ item, accounts, categories, onSave, onClose }) {
             {!isIncome && (
               <label className="field">
                 <span>Direction</span>
-                <select value={form.direction} onChange={(event) => patch({ direction: event.target.value })}>
+                <AppSelect value={form.direction} options={DIRECTION_OPTIONS} onChange={(value) => patch({ direction: value })} ariaLabel="Upcoming direction">
                   <option value="expense">Expense</option>
                   <option value="income">Income</option>
-                </select>
+                </AppSelect>
               </label>
             )}
 
             <label className="field">
               <span>Category</span>
-              <select value={form.category_id} onChange={(event) => patch({ category_id: event.target.value })}>
+              <AppSelect value={form.category_id} onChange={(value) => patch({ category_id: value })} ariaLabel="Upcoming category" options={[
+                { value: '', label: 'Uncategorized' },
+                ...categories.map((category) => ({ value: category.id, label: category.name }))
+              ]}>
                 <option value="">Uncategorized</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>{category.name}</option>
                 ))}
-              </select>
+              </AppSelect>
             </label>
 
             <label className="field">
               <span>Account</span>
-              <select value={form.account_id} onChange={(event) => patch({ account_id: event.target.value })}>
+              <AppSelect value={form.account_id} onChange={(value) => patch({ account_id: value })} ariaLabel="Upcoming account" options={[
+                { value: '', label: 'Any Account' },
+                ...accounts.filter((account) => !account.is_archived).map((account) => ({ value: account.id, label: account.name }))
+              ]}>
                 <option value="">Any Account</option>
                 {accounts.filter((account) => !account.is_archived).map((account) => (
                   <option key={account.id} value={account.id}>{account.name}</option>
                 ))}
-              </select>
+              </AppSelect>
             </label>
 
             <label className="field upcoming-notes-field">

@@ -73,6 +73,12 @@ function timeGreeting(d) {
   return 'Good evening';
 }
 
+function firstNameFromDisplayName(value) {
+  const text = String(value || '').trim();
+  if (!text) return 'there';
+  return text.split(/\s+/)[0];
+}
+
 function greetingEmoji(d) {
   const hour = d.getHours();
   if (hour < 12) return '🌅';
@@ -427,6 +433,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   const [goalsData, setGoalsData] = useState(null);
   const [householdData, setHouseholdData] = useState(null);
   const [mhaData, setMhaData] = useState(null);
+  const [userName, setUserName] = useState('there');
   const [dashboardLayout, setDashboardLayout] = useState(readDashboardLayout);
   const [customizing, setCustomizing] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -448,7 +455,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
     setError('');
     try {
       const optional = (path) => api.get(path).catch(() => null);
-      const [b, t, prevBudget, txns, uncategorized, upcoming, goals, household, mha] = await Promise.all([
+      const [b, t, prevBudget, txns, uncategorized, upcoming, goals, household, mha, me] = await Promise.all([
         api.get(`/api/budgets?month=${month}`),
         api.get('/api/transactions?limit=10&page=1'),
         optional(`/api/budgets?month=${previousMonth}`),
@@ -459,7 +466,8 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
         optional('/api/upcoming'),
         optional('/api/goals?months=12'),
         optional('/api/household'),
-        optional('/api/mha')
+        optional('/api/mha'),
+        optional('/api/auth/me')
       ]);
       setBudgetData(b);
       setRecent(t.items || []);
@@ -475,6 +483,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
       setGoalsData(goals);
       setHouseholdData(household);
       setMhaData(mha);
+      setUserName(firstNameFromDisplayName(me?.displayName || me?.username || me?.email));
     } catch (err) {
       setError(err.message || 'Failed to load dashboard');
     } finally {
@@ -765,6 +774,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
         <DashboardHero
           dateLabel={formatLongDate(now)}
           greeting={timeGreeting(now)}
+          userName={userName}
         />
         <div className="empty-state">
           <div className="empty-state-icon">$</div>
@@ -799,6 +809,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
       <DashboardHero
         dateLabel={formatLongDate(now)}
         greeting={timeGreeting(now)}
+        userName={userName}
       />
 
       {error && <div className="error">{error}</div>}
@@ -841,7 +852,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   );
 }
 
-function DashboardHero({ dateLabel, greeting }) {
+function DashboardHero({ dateLabel, greeting, userName }) {
   const navigate = useNavigate();
 
   return (
@@ -849,9 +860,9 @@ function DashboardHero({ dateLabel, greeting }) {
       id="dashboard-title"
       variant="dashboard"
       kicker="Financial Orbit"
-      title="Dashboard"
-      subtitle={`${dateLabel} · ${greeting} ${greetingEmoji(new Date())}`}
-      initialHeight={420}
+      title={`${greeting}, ${userName}`}
+      subtitle={dateLabel}
+      initialHeight={320}
       statLabel="Dashboard summary"
       chrome={(hero) => (
         <div className="page-hero-chrome">
@@ -869,6 +880,7 @@ function DashboardHero({ dateLabel, greeting }) {
     />
   );
 }
+
 // ============================================================================
 // Accounts card
 // ============================================================================
@@ -876,14 +888,18 @@ function DashboardHero({ dateLabel, greeting }) {
 function AccountsCard({ totals, activeCount, loading }) {
   const rows = [];
   if (totals.cash !== 0) rows.push({ label: 'Cash', value: totals.cash });
-  if (totals.investments !== 0)
+  if (totals.investments !== 0) {
     rows.push({ label: 'Investments', value: totals.investments });
-  if (totals.credit !== 0)
+  }
+  if (totals.credit !== 0) {
     rows.push({ label: 'Credit cards', value: totals.credit, isDebt: true });
-  if (totals.loans !== 0)
+  }
+  if (totals.loans !== 0) {
     rows.push({ label: 'Loans', value: totals.loans, isDebt: true });
-  if (totals.realEstate !== 0)
+  }
+  if (totals.realEstate !== 0) {
     rows.push({ label: 'Real Estate', value: totals.realEstate });
+  }
   if (totals.other !== 0) rows.push({ label: 'Other', value: totals.other });
 
   const netPositive = totals.net >= 0;
@@ -1136,6 +1152,7 @@ function TopSpendingCard({ topSpending, totalSpent, loading }) {
                   <div className="dash-top-barwrap">
                     <div
                       className="dash-top-bar"
+                      title={`${item.category.name}: ${formatCurrency(item.spent)} (${Math.round(pct)}%)`}
                       style={{
                         width: `${Math.max(2, pct)}%`,
                         background: item.category.color || 'var(--accent)'
@@ -2633,6 +2650,7 @@ function DashboardCard({ title, action, children }) {
 
 function DashProgressBar({ percent, overBudget = false }) {
   const clamped = Math.max(0, Math.min(100, percent || 0));
+  const label = `${Math.round(percent || 0)}%${overBudget ? ' over target' : ' complete'}`;
   return (
     <div
       className="budget-progress"
@@ -2640,6 +2658,7 @@ function DashProgressBar({ percent, overBudget = false }) {
       aria-valuenow={Math.round(percent || 0)}
       aria-valuemin="0"
       aria-valuemax="100"
+      title={label}
     >
       <div
         className={`budget-progress-fill ${

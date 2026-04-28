@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import AppSelect from '../components/AppSelect.jsx';
 import PageHero from '../components/PageHero.jsx';
 import CurrencyInput, { formatCurrencyInput } from '../components/CurrencyInput.jsx';
 import PercentInput from '../components/PercentInput.jsx';
@@ -208,9 +209,17 @@ export default function HousingCalculator({ accounts = [] }) {
         <div className="housing-picker-row">
           <label className="field">
             <span>Select mortgage</span>
-            <select
+            <AppSelect
               value={values.selectedMortgageId}
-              onChange={(e) => selectMortgage(e.target.value)}
+              onChange={selectMortgage}
+              ariaLabel="Select mortgage"
+              options={[
+                { value: '', label: 'Manual Estimate' },
+                ...mortgages.map((account) => ({
+                  value: account.id,
+                  label: `${account.name}${account.institution ? ` - ${account.institution}` : ''}`
+                }))
+              ]}
             >
               <option value="">Manual estimate</option>
               {mortgages.map((account) => (
@@ -219,7 +228,7 @@ export default function HousingCalculator({ accounts = [] }) {
                   {account.institution ? ` - ${account.institution}` : ''}
                 </option>
               ))}
-            </select>
+            </AppSelect>
           </label>
           <div className="housing-picker-note">
             {mortgages.length === 0 ? (

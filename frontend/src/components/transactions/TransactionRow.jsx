@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../api.js';
+import AppSelect from '../AppSelect.jsx';
 import AnimatedModal from '../AnimatedModal.jsx';
 import DropdownMenu from '../DropdownMenu.jsx';
 import { formatCurrency, formatCurrencyOr, formatSignedCurrency } from '../../lib/formatters.js';
@@ -767,17 +768,18 @@ export function EditTransactionModal({ txn, categories, onClose, onSaved, onRese
                   </button>
                 )}
               </span>
-              <select
+              <AppSelect
                 value={categoryId || ''}
-                onChange={(event) => setCategoryId(event.target.value)}
-              >
-                <option value="">(Uncategorized)</option>
-                {categories.map((categoryOption) => (
-                  <option key={categoryOption.id} value={categoryOption.id}>
-                    {categoryOption.icon} {categoryOption.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setCategoryId}
+                ariaLabel="Transaction category"
+                options={[
+                  { value: '', label: '(Uncategorized)' },
+                  ...categories.map((categoryOption) => ({
+                    value: categoryOption.id,
+                    label: `${categoryOption.icon} ${categoryOption.name}`
+                  }))
+                ]}
+              />
             </label>
 
             <label className="field">
