@@ -2576,6 +2576,7 @@ input, textarea, select {
 /* ================== 5. PAGES — Dashboard (v16) ================== */
 
 .dashboard-view {
+  --dashboard-bg-offset: 0px;
   position: relative;
   isolation: isolate;
   max-width: none;
@@ -2595,10 +2596,12 @@ input, textarea, select {
   inset-inline: 0;
   pointer-events: none;
   z-index: -1;
+  transform: translateY(var(--dashboard-bg-offset));
+  will-change: transform;
 }
 
 .dashboard-view::before {
-  top: 300px;
+  top: 170px;
   bottom: 0;
   opacity: 0.62;
   background:
@@ -2634,18 +2637,18 @@ input, textarea, select {
     60px 40px,
     -80px 190px,
     170px 320px;
-  mask-image: linear-gradient(to bottom, transparent, #000 9%, #000 88%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 5%, #000 88%, transparent);
 }
 
 .dashboard-view::after {
-  top: 360px;
+  top: 230px;
   bottom: 0;
   opacity: 0.26;
   background:
     radial-gradient(ellipse at 8% 8%, color-mix(in srgb, var(--accent-soft) 55%, transparent), transparent 34%),
     radial-gradient(ellipse at 88% 36%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 32%);
   filter: blur(10px);
-  mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 78%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 7%, #000 78%, transparent);
 }
 
 :root[data-theme="dark"] .dashboard-view::before {

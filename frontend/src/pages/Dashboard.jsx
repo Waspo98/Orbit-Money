@@ -489,6 +489,7 @@ function retirementProjection(householdData, preferences) {
 
 export default function Dashboard({ accounts = [], categories = [], mhaTrackerEnabled = false }) {
   const navigate = useNavigate();
+  const viewRef = useRef(null);
 
   const [budgetData, setBudgetData] = useState(null);
   const [previousBudgetData, setPreviousBudgetData] = useState(null);
@@ -560,6 +561,32 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   useEffect(() => {
     loadDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || prefersReducedMotion()) return undefined;
+
+    let frameId = 0;
+    function updateBackdropDepth() {
+      frameId = 0;
+      const offset = Math.round(window.scrollY * 0.34);
+      view.style.setProperty('--dashboard-bg-offset', `${offset}px`);
+    }
+
+    function scheduleBackdropDepthUpdate() {
+      if (frameId) return;
+      frameId = window.requestAnimationFrame(updateBackdropDepth);
+    }
+
+    updateBackdropDepth();
+    window.addEventListener('scroll', scheduleBackdropDepthUpdate, { passive: true });
+    window.addEventListener('resize', scheduleBackdropDepthUpdate);
+    return () => {
+      window.removeEventListener('scroll', scheduleBackdropDepthUpdate);
+      window.removeEventListener('resize', scheduleBackdropDepthUpdate);
+      if (frameId) window.cancelAnimationFrame(frameId);
+    };
   }, []);
 
   useEffect(() => {
@@ -836,7 +863,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   const noActivity = !loading && recent.length === 0 && activeAccountCount === 0;
   if (noActivity) {
     return (
-      <div className="dashboard-view">
+      <div ref={viewRef} className="dashboard-view">
         <DashboardHero
           dateLabel={formatLongDate(now)}
           greeting={timeGreeting(now)}
@@ -871,7 +898,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   }
 
   return (
-    <div className="dashboard-view">
+    <div ref={viewRef} className="dashboard-view">
       <DashboardHero
         dateLabel={formatLongDate(now)}
         greeting={timeGreeting(now)}
