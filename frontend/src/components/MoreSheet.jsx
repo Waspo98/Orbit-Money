@@ -63,6 +63,9 @@ export default function MoreSheet({
         window.cancelAnimationFrame(enterFrameRef.current);
         enterFrameRef.current = null;
       }
+      cancelDragFrame();
+      unlockInternalScroll();
+      gestureRef.current = createGestureState();
     };
   }, [open]);
 
@@ -143,10 +146,13 @@ export default function MoreSheet({
   }
 
   function unlockInternalScroll() {
-    const scrollNode = scrollRef.current;
-    if (!scrollNode || !scrollLockRef.current.locked) return;
+    if (!scrollLockRef.current.locked) return;
 
-    scrollNode.style.overflowY = scrollLockRef.current.overflowY;
+    const scrollNode = scrollRef.current;
+    if (scrollNode) {
+      scrollNode.style.overflowY = scrollLockRef.current.overflowY;
+    }
+
     scrollLockRef.current = { locked: false, overflowY: '' };
   }
 
