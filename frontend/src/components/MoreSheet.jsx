@@ -24,6 +24,8 @@ export default function MoreSheet({
     lastY: 0,
     startScrollTop: 0,
     distance: 0,
+    lastMoveAt: 0,
+    velocityY: 0,
     dragged: false
   });
   const suppressNextClickRef = useRef(false);
@@ -86,13 +88,13 @@ export default function MoreSheet({
     scrollNode.addEventListener('touchstart', onNativeTouchStart, { passive: true });
     scrollNode.addEventListener('touchmove', onNativeTouchMove, { passive: false });
     scrollNode.addEventListener('touchend', onNativeTouchEnd, { passive: true });
-    scrollNode.addEventListener('touchcancel', resetDrag, { passive: true });
+    scrollNode.addEventListener('touchcancel', onNativeTouchEnd, { passive: true });
 
     return () => {
       scrollNode.removeEventListener('touchstart', onNativeTouchStart);
       scrollNode.removeEventListener('touchmove', onNativeTouchMove);
       scrollNode.removeEventListener('touchend', onNativeTouchEnd);
-      scrollNode.removeEventListener('touchcancel', resetDrag);
+      scrollNode.removeEventListener('touchcancel', onNativeTouchEnd);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -118,6 +120,8 @@ export default function MoreSheet({
       lastY: 0,
       startScrollTop: 0,
       distance: 0,
+      lastMoveAt: 0,
+      velocityY: 0,
       dragged: false
     };
     setDragY(0);
@@ -137,6 +141,26 @@ export default function MoreSheet({
     }, OVERLAY_ANIM_MS);
   }
 
+  function shouldCloseDrawer(distance, velocityY) {
+    const distanceThreshold = Math.min(72, window.innerHeight * 0.08);
+    return distance > distanceThreshold || velocityY > 0.35;
+  }
+
+  function finishDrawerDrag() {
+    const drag = dragRef.current;
+    const finalY = drag.distance;
+    const velocityY = drag.velocityY;
+    const dragged = drag.dragged;
+    resetDrag();
+
+    if (dragged && shouldCloseDrawer(finalY, velocityY)) {
+      maybeSuppressClick();
+      close({ animate: true });
+    } else if (dragged) {
+      maybeSuppressClick();
+    }
+  }
+
   function handlePointerDown(event) {
     if (event.pointerType === 'touch') return;
     if (event.button != null && event.button !== 0) return;
@@ -149,6 +173,8 @@ export default function MoreSheet({
       lastY: event.clientY,
       startScrollTop: scrollRef.current?.scrollTop || 0,
       distance: 0,
+      lastMoveAt: window.performance.now(),
+      velocityY: 0,
       dragged: false
     };
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -159,6 +185,11 @@ export default function MoreSheet({
     if (!drag.active || drag.pointerType === 'touch' || drag.startScrollTop > 0) return;
 
     const nextY = Math.max(0, event.clientY - drag.startY);
+    const now = window.performance.now();
+    const elapsed = Math.max(1, now - drag.lastMoveAt);
+    drag.velocityY = (event.clientY - drag.lastY) / elapsed;
+    drag.lastY = event.clientY;
+    drag.lastMoveAt = now;
     if (nextY > 6) {
       event.preventDefault();
     }
@@ -170,16 +201,7 @@ export default function MoreSheet({
     if (!drag.active || drag.pointerType === 'touch') return;
 
     event.currentTarget.releasePointerCapture?.(event.pointerId);
-    const finalY = drag.distance;
-    const dragged = drag.dragged;
-    resetDrag();
-
-    if (dragged && finalY > 96) {
-      maybeSuppressClick();
-      close({ animate: true });
-    } else if (dragged) {
-      maybeSuppressClick();
-    }
+    finishDrawerDrag();
   }
 
   function cancelPointerDrag() {
@@ -198,6 +220,8 @@ export default function MoreSheet({
       lastY: touch.clientY,
       startScrollTop: scrollRef.current?.scrollTop || 0,
       distance: 0,
+      lastMoveAt: window.performance.now(),
+      velocityY: 0,
       dragged: false
     };
   }
@@ -212,8 +236,12 @@ export default function MoreSheet({
     const nextY = touch.clientY;
     const movingDown = nextY > drag.lastY;
     const atTop = sheet.scrollTop <= 0;
+    const now = window.performance.now();
+    const elapsed = Math.max(1, now - drag.lastMoveAt);
+    drag.velocityY = (nextY - drag.lastY) / elapsed;
 
     drag.lastY = nextY;
+    drag.lastMoveAt = now;
 
     if (!drag.pulling) {
       if (!atTop || !movingDown) {
@@ -246,16 +274,7 @@ export default function MoreSheet({
     const drag = dragRef.current;
     if (!drag.active || drag.pointerType !== 'touch') return;
 
-    const finalY = drag.distance;
-    const dragged = drag.dragged;
-    resetDrag();
-
-    if (dragged && finalY > 96) {
-      maybeSuppressClick();
-      close({ animate: true });
-    } else if (dragged) {
-      maybeSuppressClick();
-    }
+    finishDrawerDrag();
   }
 
   return (

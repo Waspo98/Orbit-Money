@@ -1278,11 +1278,13 @@ input, textarea, select {
   padding: 12px 0 0;
   animation: sheetUp var(--dur-base) var(--ease-out);
   touch-action: pan-y;
+  transition: transform 180ms var(--ease-out);
   will-change: transform;
 }
 
 .more-sheet.dragging {
   cursor: grabbing;
+  transition: none;
   user-select: none;
   -webkit-user-select: none;
 }
