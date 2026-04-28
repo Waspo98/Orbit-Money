@@ -1509,9 +1509,9 @@ input, textarea, select {
 }
 
 .login-brand-lockup {
-  display: grid;
-  justify-items: start;
-  gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .login-brand-icon {
@@ -1526,7 +1526,7 @@ input, textarea, select {
 .login-title {
   display: flex;
   align-items: center;
-  margin: 0 0 4px;
+  margin: 0;
   font-family: var(--font-title);
   font-size: 1.8rem;
   font-weight: 700;
@@ -2350,6 +2350,17 @@ input, textarea, select {
 .page-hero-action-row .btn-secondary,
 .page-hero-action-row .btn-danger {
   box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
+}
+
+.page-hero :is(.btn-secondary, .btn-danger):not(.btn-primary) {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.72);
+}
+
+.page-hero :is(.btn-secondary, .btn-danger):not(.btn-primary):hover:not(:disabled) {
+  color: #ffffff;
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .page-hero-topline {
@@ -8811,6 +8822,16 @@ input, textarea, select {
   margin-top: 22px;
 }
 
+.settings-card-body > * + * {
+  margin-top: 12px;
+}
+
+.settings-card-body > .result-card + *,
+.settings-card-body > .settings-action + *,
+.settings-card-body > .status-grid + * {
+  margin-top: 12px;
+}
+
 .settings-card-collapsed {
   margin-top: 16px;
 }
@@ -9226,6 +9247,19 @@ input, textarea, select {
     transform var(--dur-fast);
 }
 
+.settings-donate-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 1.25rem;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
 .settings-donate-card:hover {
   border-color: var(--border-strong);
   background: var(--surface-hover);
@@ -9237,7 +9271,7 @@ input, textarea, select {
 
 .settings-signout-card {
   align-content: stretch;
-  gap: 14px;
+  gap: 12px;
 }
 
 .settings-signout-card .settings-action-info {

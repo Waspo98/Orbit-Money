@@ -80,7 +80,7 @@ const SETTINGS_CARD_DEFS = [
   },
   {
     id: 'import',
-    title: 'Import',
+    title: 'Import Data',
     description: 'Bring in Rocket Money data when you need to reload history.'
   },
   {
@@ -1004,7 +1004,7 @@ export default function Settings({
       <SettingsCard
         id="import"
         key="import"
-        title="Import"
+        title="Import Data"
         description="Bring in Rocket Money data when you need to reload history."
         collapsed={collapsedCards.has('import')}
         onToggle={() => toggleCardCollapsed('import')}
@@ -1240,6 +1240,7 @@ export default function Settings({
             className="settings-about-info-card settings-donate-card"
             onClick={handleDonatePlaceholder}
           >
+            <span className="settings-donate-icon" aria-hidden>☕</span>
             <strong>Donate</strong>
           </button>
 
@@ -1251,7 +1252,6 @@ export default function Settings({
           <div className="settings-about-info-card settings-signout-card">
             <div className="settings-action-info">
               <strong>Sign Out</strong>
-              <p>Ends this browser session and returns to the login screen.</p>
             </div>
             <button
               type="button"
