@@ -24,6 +24,7 @@ import Goals from './pages/Goals.jsx';
 import Upcoming from './pages/Upcoming.jsx';
 import RetirementCalculator from './pages/RetirementCalculator.jsx';
 import Household from './pages/Household.jsx';
+import BrandLogo from './components/BrandLogo.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
 import SyncErrorBanner from './components/SyncErrorBanner.jsx';
@@ -230,8 +231,8 @@ function AppShell() {
           onClick={() => navigate('/dashboard')}
           aria-label="Go to dashboard"
         >
-          <div className="brand-mark">$</div>
-          <div className="brand-name">Orbit Money</div>
+          <img src="/icon-192.png" alt="" className="brand-mark brand-mark-image" />
+          <BrandLogo />
         </button>
 
       </header>}

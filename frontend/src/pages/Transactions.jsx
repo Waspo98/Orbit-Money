@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import FilterSheet from '../components/FilterSheet.jsx';
+import BrandLogo from '../components/BrandLogo.jsx';
 import PageHero from '../components/PageHero.jsx';
 import SearchField from '../components/SearchField.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
@@ -532,8 +533,8 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
               onClick={() => navigate('/dashboard')}
               aria-label="Go to dashboard"
             >
-              <span className="brand-mark">$</span>
-              <span className="brand-name">Orbit Money</span>
+              <img src="/icon-192.png" alt="" className="brand-mark brand-mark-image" />
+              <BrandLogo tone="white" />
             </button>
           </div>
         )}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import BrandLogo from './components/BrandLogo.jsx';
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -67,7 +68,7 @@ export default function Login({ onLogin }) {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={handleSubmit}>
-        <h1 className="login-title">Orbit Money</h1>
+        <h1 className="login-title"><BrandLogo /></h1>
         <p className="login-subtitle">Welcome back.</p>
 
         {localEnabled && (

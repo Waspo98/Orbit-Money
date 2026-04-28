@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
+import BrandLogo from '../components/BrandLogo.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { APP_VERSION_LABEL } from '../version.js';
@@ -175,7 +176,7 @@ export default function Settings({
 
   async function handleSignOut() {
     const ok = await confirm(
-      'Sign out of Orbit Money on this device?',
+      'Sign out on this device?',
       {
         title: 'Sign out',
         confirmLabel: 'Sign out',
@@ -338,7 +339,7 @@ export default function Settings({
       <section className="settings-section settings-section-top">
         <div className="settings-section-header">
           <h3>Appearance</h3>
-          <p>Choose how Orbit Money looks on this device.</p>
+          <p>Choose how the app looks on this device.</p>
         </div>
 
         <div className="settings-theme-toggle" role="radiogroup" aria-label="Theme">
@@ -787,7 +788,7 @@ export default function Settings({
         <div className="settings-about-brand">
           <img src="/icon-512.png" alt="" className="settings-about-icon" />
           <div>
-            <h3 id="settings-about-title">Orbit Money</h3>
+            <h3 id="settings-about-title"><BrandLogo /></h3>
             <p>Personal finance PWA</p>
           </div>
         </div>
