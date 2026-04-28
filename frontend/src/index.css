@@ -1289,6 +1289,12 @@ input, textarea, select {
   -webkit-user-select: none;
 }
 
+.more-sheet.settling {
+  transition: transform 180ms var(--ease-in-out);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 @keyframes sheetUp {
   from { transform: translateY(100%); }
   to   { transform: translateY(0); }

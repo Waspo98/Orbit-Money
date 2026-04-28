@@ -13,6 +13,7 @@ export default function MoreSheet({
   const navigate = useNavigate();
   const [closing, setClosing] = useState(false);
   const [dragY, setDragY] = useState(0);
+  const [settling, setSettling] = useState(false);
   const timerRef = useRef(null);
   const scrollRef = useRef(null);
   const dragRef = useRef({
@@ -35,6 +36,7 @@ export default function MoreSheet({
     if (open) {
       setClosing(false);
       setDragY(0);
+      setSettling(false);
       suppressNextClickRef.current = false;
     }
   }, [open]);
@@ -124,11 +126,12 @@ export default function MoreSheet({
       velocityY: 0,
       dragged: false
     };
+    setSettling(false);
     setDragY(0);
   }
 
   function setPullDistance(value) {
-    const distance = Math.min(Math.max(value, 0), 180);
+    const distance = Math.min(Math.max(value, 0), window.innerHeight);
     dragRef.current.distance = distance;
     if (distance > 6) dragRef.current.dragged = true;
     setDragY(distance);
@@ -151,13 +154,18 @@ export default function MoreSheet({
     const finalY = drag.distance;
     const velocityY = drag.velocityY;
     const dragged = drag.dragged;
-    resetDrag();
 
     if (dragged && shouldCloseDrawer(finalY, velocityY)) {
       maybeSuppressClick();
-      close({ animate: true });
+      setSettling(true);
+      setDragY(window.innerHeight);
+      setClosing(true);
+      timerRef.current = window.setTimeout(onClose, OVERLAY_ANIM_MS);
     } else if (dragged) {
       maybeSuppressClick();
+      resetDrag();
+    } else {
+      resetDrag();
     }
   }
 
@@ -286,7 +294,7 @@ export default function MoreSheet({
       aria-label="More navigation"
     >
       <div
-        className={`more-sheet ${closing ? 'closing' : ''} ${dragY > 0 ? 'dragging' : ''}`.trim()}
+        className={`more-sheet ${closing ? 'closing' : ''} ${dragY > 0 && !settling ? 'dragging' : ''} ${settling ? 'settling' : ''}`.trim()}
         style={dragY > 0 ? { transform: `translateY(${dragY}px)` } : undefined}
         onClick={(e) => e.stopPropagation()}
         onClickCapture={(event) => {
