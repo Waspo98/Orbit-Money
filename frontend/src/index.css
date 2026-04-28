@@ -1357,11 +1357,6 @@ input, textarea, select {
   touch-action: pan-y;
 }
 
-.more-sheet.dragging .more-sheet-scroll {
-  overflow: hidden;
-  touch-action: none;
-}
-
 @media (min-width: 1080px) {
   .more-sheet-scroll {
     padding: 0 28px 28px;

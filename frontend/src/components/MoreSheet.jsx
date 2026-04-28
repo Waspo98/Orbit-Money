@@ -14,13 +14,13 @@ export default function MoreSheet({
 }) {
   const navigate = useNavigate();
   const [drawerState, setDrawerState] = useState('opening');
-  const [dragY, setDragY] = useState(0);
   const [settling, setSettling] = useState(false);
   const timerRef = useRef(null);
   const frameRef = useRef(null);
   const dragFrameRef = useRef(null);
   const dragYRef = useRef(0);
   const pendingDragYRef = useRef(0);
+  const sheetRef = useRef(null);
   const scrollRef = useRef(null);
   const dragRef = useRef({
     active: false,
@@ -45,7 +45,7 @@ export default function MoreSheet({
         timerRef.current = null;
       }
       setDrawerState('opening');
-      setDragYImmediate(0);
+      setSheetOffsetImmediate(0, { dragging: false });
       setSettling(false);
       suppressNextClickRef.current = false;
       frameRef.current = window.requestAnimationFrame(() => {
@@ -69,7 +69,7 @@ export default function MoreSheet({
       return;
     }
     setSettling(false);
-    setDragYImmediate(0);
+    setSheetOffsetImmediate(0, { dragging: false });
     setDrawerState('closing');
     timerRef.current = setTimeout(onClose, OVERLAY_ANIM_MS);
   }
@@ -153,20 +153,27 @@ export default function MoreSheet({
       dragged: false
     };
     setSettling(false);
-    setDragYImmediate(0);
+    setSheetOffsetImmediate(0, { dragging: false });
   }
 
-  function setDragYImmediate(value) {
+  function applySheetOffset(value, options = { dragging: false }) {
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    sheet.style.transform = `translateY(${value}px)`;
+    sheet.classList.toggle('dragging', Boolean(options.dragging && value > 0));
+  }
+
+  function setSheetOffsetImmediate(value, options = { dragging: false }) {
     if (dragFrameRef.current) {
       window.cancelAnimationFrame(dragFrameRef.current);
       dragFrameRef.current = null;
     }
     dragYRef.current = value;
     pendingDragYRef.current = value;
-    setDragY(value);
+    applySheetOffset(value, options);
   }
 
-  function setDragYOnFrame(value) {
+  function setSheetOffsetOnFrame(value, options = { dragging: false }) {
     if (Math.abs(value - dragYRef.current) < 0.5) return;
 
     dragYRef.current = value;
@@ -175,14 +182,14 @@ export default function MoreSheet({
 
     dragFrameRef.current = window.requestAnimationFrame(() => {
       dragFrameRef.current = null;
-      setDragY(pendingDragYRef.current);
+      applySheetOffset(pendingDragYRef.current, options);
     });
   }
 
   function resetPullDistance() {
     dragRef.current.distance = 0;
     if (dragYRef.current !== 0) {
-      setDragYImmediate(0);
+      setSheetOffsetImmediate(0, { dragging: false });
     }
   }
 
@@ -190,7 +197,7 @@ export default function MoreSheet({
     const distance = Math.min(Math.max(value, 0), window.innerHeight);
     dragRef.current.distance = distance;
     if (distance > 6) dragRef.current.dragged = true;
-    setDragYOnFrame(distance);
+    setSheetOffsetOnFrame(distance, { dragging: true });
   }
 
   function maybeSuppressClick() {
@@ -214,7 +221,7 @@ export default function MoreSheet({
     if (dragged && shouldCloseDrawer(finalY, velocityY)) {
       maybeSuppressClick();
       setSettling(true);
-      setDragYImmediate(window.innerHeight);
+      setSheetOffsetImmediate(window.innerHeight, { dragging: false });
       setDrawerState('closing');
       timerRef.current = window.setTimeout(onClose, OVERLAY_ANIM_MS);
     } else if (dragged) {
@@ -340,7 +347,7 @@ export default function MoreSheet({
   }
 
   const isClosing = drawerState === 'closing';
-  const sheetOffset = dragY > 0 ? `${dragY}px` : drawerState === 'open' ? '0px' : '100%';
+  const sheetOffset = drawerState === 'open' ? '0px' : '100%';
 
   return (
     <div
@@ -351,7 +358,8 @@ export default function MoreSheet({
       aria-label="More navigation"
     >
       <div
-        className={`more-sheet ${isClosing ? 'closing' : ''} ${dragY > 0 && !settling ? 'dragging' : ''} ${settling ? 'settling' : ''}`.trim()}
+        ref={sheetRef}
+        className={`more-sheet ${isClosing ? 'closing' : ''} ${settling ? 'settling' : ''}`.trim()}
         style={{ transform: `translateY(${sheetOffset})` }}
         onClick={(e) => e.stopPropagation()}
         onClickCapture={(event) => {
