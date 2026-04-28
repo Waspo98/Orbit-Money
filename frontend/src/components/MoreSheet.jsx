@@ -12,11 +12,18 @@ export default function MoreSheet({
 }) {
   const navigate = useNavigate();
   const [closing, setClosing] = useState(false);
+  const [dragY, setDragY] = useState(0);
   const timerRef = useRef(null);
+  const dragRef = useRef({ active: false, startY: 0, startScrollTop: 0, dragged: false });
+  const suppressNextClickRef = useRef(false);
   const visibleItems = getMoreRoutes({ mhaTrackerEnabled, navigationPreferences });
 
   useEffect(() => {
-    if (open) setClosing(false);
+    if (open) {
+      setClosing(false);
+      setDragY(0);
+      suppressNextClickRef.current = false;
+    }
   }, [open]);
 
   function close(options = { animate: true }) {
@@ -51,11 +58,59 @@ export default function MoreSheet({
   if (!open) return null;
 
   function handleItemClick(item) {
+    if (suppressNextClickRef.current) return;
     if (item.comingSoon) return;
     close({ animate: true });
     setTimeout(() => {
       navigate(item.path, { state: { transition: 'from-more' } });
     }, OVERLAY_ANIM_MS);
+  }
+
+  function handlePointerDown(event) {
+    if (event.button != null && event.button !== 0) return;
+    dragRef.current = {
+      active: true,
+      startY: event.clientY,
+      startScrollTop: event.currentTarget.scrollTop,
+      dragged: false
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function handlePointerMove(event) {
+    const drag = dragRef.current;
+    if (!drag.active || drag.startScrollTop > 0) return;
+
+    const nextY = Math.max(0, event.clientY - drag.startY);
+    if (nextY > 6) {
+      drag.dragged = true;
+      event.preventDefault();
+    }
+    setDragY(Math.min(nextY, 180));
+  }
+
+  function finishPointerDrag(event) {
+    const drag = dragRef.current;
+    if (!drag.active) return;
+
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    dragRef.current = { active: false, startY: 0, startScrollTop: 0, dragged: false };
+
+    const finalY = Math.max(0, event.clientY - drag.startY);
+    setDragY(0);
+
+    if (drag.dragged && finalY > 96) {
+      suppressNextClickRef.current = true;
+      close({ animate: true });
+      window.setTimeout(() => {
+        suppressNextClickRef.current = false;
+      }, OVERLAY_ANIM_MS);
+    }
+  }
+
+  function cancelPointerDrag() {
+    dragRef.current = { active: false, startY: 0, startScrollTop: 0, dragged: false };
+    setDragY(0);
   }
 
   return (
@@ -64,18 +119,23 @@ export default function MoreSheet({
       onClick={() => close({ animate: true })}
       role="dialog"
       aria-modal="true"
+      aria-label="More navigation"
     >
       <div
-        className={`more-sheet ${closing ? 'closing' : ''}`}
+        className={`more-sheet ${closing ? 'closing' : ''} ${dragY > 0 ? 'dragging' : ''}`.trim()}
+        style={dragY > 0 ? { transform: `translateY(${dragY}px)` } : undefined}
         onClick={(e) => e.stopPropagation()}
+        onClickCapture={(event) => {
+          if (!suppressNextClickRef.current) return;
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={finishPointerDrag}
+        onPointerCancel={cancelPointerDrag}
       >
         <div className="more-sheet-handle" aria-hidden />
-        <div className="more-sheet-header">
-          <h3>More</h3>
-          <button type="button" className="btn-ghost" onClick={() => close({ animate: true })} aria-label="Close">
-            {'\u2715'}
-          </button>
-        </div>
 
         <div className="more-grid">
           {visibleItems.map((item) => (

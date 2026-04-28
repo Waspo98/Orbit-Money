@@ -44,7 +44,7 @@ function ReorderListItemPreview({
     <Element
       ref={itemRef}
       style={style}
-      className={`selectable-list-item reorder-list-row ${leading ? 'has-leading' : 'no-leading'} ${className}`.trim()}
+      className={`selectable-list-item reorder-list-row ${leading ? 'has-leading' : 'no-leading'} ${hasSide ? 'has-side' : 'no-side'} ${className}`.trim()}
     >
       <button
         type="button"

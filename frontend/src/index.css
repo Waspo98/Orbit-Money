@@ -1276,6 +1276,13 @@ input, textarea, select {
   padding: 12px 20px
     calc(var(--bottom-tab-height) + env(safe-area-inset-bottom, 0) + 20px);
   animation: sheetUp var(--dur-base) var(--ease-out);
+  touch-action: pan-y;
+  will-change: transform;
+}
+
+.more-sheet.dragging {
+  cursor: grabbing;
+  user-select: none;
 }
 
 @keyframes sheetUp {
@@ -6027,6 +6034,14 @@ input, textarea, select {
 
 .selectable-list-item.reorder-list-row.no-leading {
   grid-template-columns: 22px minmax(0, 1fr) auto;
+}
+
+.selectable-list-item.reorder-list-row.no-side {
+  grid-template-columns: 22px 34px minmax(0, 1fr);
+}
+
+.selectable-list-item.reorder-list-row.no-leading.no-side {
+  grid-template-columns: 22px minmax(0, 1fr);
 }
 
 .reorder-list-row:hover,

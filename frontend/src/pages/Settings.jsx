@@ -1272,7 +1272,6 @@ export default function Settings({
                         handleLabel={`Move ${route.label}`}
                         title={route.label}
                         subtitle={route.description}
-                        sidePrimary={route.locked ? 'Locked' : isFeatureVisible(route) ? 'On' : 'Off'}
                         previewDisplaced={route.path === moreOverId && route.path !== moreDragId}
                       />
                     ))}
