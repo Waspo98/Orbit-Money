@@ -7,7 +7,8 @@ import { importRocketMoneyCSV } from '../services/csvImport.js';
 
 const router = express.Router();
 
-// Multer — keep file in memory. 20MB limit is ~5x Neal's ~2MB CSV, plenty.
+// Multer keeps files in memory. 20MB is enough for large Rocket Money exports
+// without writing private financial CSVs to disk.
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 }

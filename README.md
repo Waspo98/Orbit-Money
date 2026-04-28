@@ -6,24 +6,26 @@ stores data in SQLite, and runs as a Docker Compose app.
 
 ## Features
 
-- Account, transaction, budget, category, rule, savings goal, retirement calculator, household, and net worth views
-- Dashboard transaction review queue for quickly confirming or changing recent categories
+- Dashboard with configurable cards, recent transaction review, budgets, goals,
+  subscriptions, upcoming items, net worth, retirement, and mortgage snapshots
+- Account, transaction, budget, category, rule, savings goal, upcoming,
+  retirement calculator, housing calculator, household, MHA tracker, and net
+  worth screens
 - Rocket Money CSV import
-- SimpleFIN bank sync
+- SimpleFIN bank sync with encrypted access URL storage
 - Merchant logo enrichment with optional Logo.dev keys
 - Local login, optional OIDC login, or both, with household-scoped data
+- Household sharing for OIDC users by invited email
 - SQLite storage in a Docker volume
-- Installable PWA with manifest and service worker
+- Installable PWA with manifest, icons, and service worker
 
 ## Requirements
 
 - Docker and Docker Compose
 - A `.env` file based on `.env.example`
-- An existing Docker network named `web_proxy`
+- A Docker network named `web_proxy`
 
-The default Compose file keeps the current production-compatible Docker network,
-port, container name, and volume name. If you do not already have the external
-network, create it once:
+Create the external Docker network once if you do not already have it:
 
 ```powershell
 docker network create web_proxy
@@ -31,12 +33,31 @@ docker network create web_proxy
 
 ## Quick Start
 
-Copy the example environment file and replace the placeholders:
+Copy the example environment file:
 
 ```powershell
 Copy-Item .env.example .env
 notepad .env
 ```
+
+For a first local install with password login, set at least:
+
+- `AUTH_PROVIDER=local`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `SESSION_SECRET`
+
+Generate a strong `SESSION_SECRET` with:
+
+```powershell
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+-join ($bytes | ForEach-Object { $_.ToString('x2') })
+```
+
+Leave optional integrations blank until you use them. In particular, leave
+`API_KEY=` blank unless you intentionally want API-key access, and leave
+`SIMPLEFIN_ENCRYPTION_KEY=` blank until you connect SimpleFIN.
 
 Start Orbit Money:
 
@@ -49,11 +70,6 @@ Open:
 ```text
 http://localhost:5008
 ```
-
-The login page includes a small `Continue with sample data` link. It creates an
-isolated sample household for that browser/device so you can edit demo accounts,
-transactions, budgets, and rules without changing a real household. Sample
-households are removed automatically after 48 hours of inactivity.
 
 Check health:
 
@@ -79,35 +95,35 @@ Required values:
 Optional or feature-specific values:
 
 - `API_KEY` enables programmatic API access through the `X-API-Key` header.
-  Multi-user API requests may pass `X-Household-ID`; otherwise household `1`
-  is used for backward compatibility.
+  Leave it blank unless you want this access path.
 - `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, and
   `OIDC_REDIRECT_URI` are required when `AUTH_PROVIDER=oidc` or `both`.
+- `OIDC_SCOPES` defaults to `openid email profile`.
 - `OIDC_LOGIN_LABEL` customizes the OIDC login button. The default is
   `Log in with OIDC`.
 - Existing private installs that still use the old `AUTHENTIK_*` variable names
   continue to work, but new installs should use `OIDC_*`.
-- `SIMPLEFIN_ENCRYPTION_KEY` is required before SimpleFIN sync can be used.
+- `SIMPLEFIN_ENCRYPTION_KEY` is required before SimpleFIN sync can be used. It
+  must be a 64-character hex string.
 - `LOGO_DEV_PUBLISHABLE_KEY` enables merchant logo display.
-- `LOGO_DEV_SECRET_KEY` enables server-side brand search for manual logo overrides.
+- `LOGO_DEV_SECRET_KEY` enables server-side brand search for manual logo
+  overrides.
+- `ENABLE_SAMPLE_DATA=1` shows `Continue with sample data` on the login page
+  and allows temporary sample households. Leave it `0` for normal installs.
 - `SESSION_NAME` changes the session cookie name. The default is `connect.sid`.
 - `PORT` defaults to `5008`.
 - `TZ` defaults to `America/Chicago`.
 
-`SIMPLEFIN_ENCRYPTION_KEY` and `SESSION_SECRET` should be strong random values.
-`SIMPLEFIN_ENCRYPTION_KEY` must be a 64-character hex string.
+Orbit Money refuses to start with known placeholder values for required secrets.
+This is intentional: a copied `.env.example` should not accidentally become a
+public deployment with predictable credentials.
 
 ## Auth And Multi-User Data
 
-Orbit Money stores users, households, and memberships in SQLite. Existing
-single-user data is migrated into household `1` (`Neal Household`) and remains
-in the same Docker volume. The first OIDC user to sign in claims that
-legacy household so the current data follows the real owner into SSO.
-
-New OIDC users receive their own household with default app settings and category
-defaults copied from the app default tables. Those defaults are stored in SQLite
-as `app_default_settings` and `app_default_categories` so future defaults can be
-changed without rewriting existing households.
+Orbit Money stores users, households, memberships, and pending household shares
+in SQLite. Existing single-user data is migrated into household `1`. New public
+installs use the neutral default name `My Household`; existing installs only get
+renamed by migration if they still have the old default household label.
 
 For a simple self-hosted install, keep `AUTH_PROVIDER=local` and use the
 username/password login. For SSO, set `AUTH_PROVIDER=oidc`. To show both the
@@ -117,6 +133,10 @@ Authentik, Authelia, Keycloak, and similar providers should use this callback:
 ```text
 https://your-orbit-domain.example/api/auth/oidc/callback
 ```
+
+New OIDC users receive their own household with default app settings and
+categories. Household owners/admins can invite another OIDC user by email from
+Settings.
 
 ## Docker Layout
 
@@ -148,25 +168,9 @@ an existing install. SQLite data lives in the Docker volume.
 `-- README.md
 ```
 
-The repo intentionally does not track local runtime tools, local databases,
-Docker volumes, `node_modules`, or private server notes.
-
-## Beta Deployment
-
-The beta deployment is maintainer infrastructure, not a separate copy of the
-app. It lives in `deploy/beta/`, builds from this repo root, and runs a separate
-Docker container and volume:
-
-```powershell
-cmd /c scripts\deploy-beta.cmd
-```
-
-Beta is always deployed through Docker. Do not use a Vite dev server, preview
-server, or `start-beta` helper for beta; the supported beta path rebuilds and
-restarts the `orbit-money-beta` Docker container on port `5019`.
-
-See `deploy/beta/README.md` for the beta port, volume, demo-data behavior, and
-maintainer deploy script.
+The repo intentionally does not track `.env`, local runtime tools, local
+databases, Docker volume backups, `node_modules`, build output, or private
+server notes.
 
 ## Build And Verification
 
@@ -180,14 +184,6 @@ Backend syntax smoke check and automated tests:
 
 ```powershell
 cmd /c scripts\check-backend.cmd
-```
-
-Equivalent manual backend checks:
-
-```powershell
-node --check backend\src\server.js
-cd backend
-npm test
 ```
 
 Production-style Docker smoke test:
@@ -212,8 +208,22 @@ self-hosted Windows runner:
 - Pushes to `Beta` call `scripts\deploy-beta.cmd`, which delegates to
   `deploy\beta\deploy-beta.cmd`
 
-Those workflows are specific to the maintainer's server checkout and Docker
-host. Self-hosters do not need GitHub Actions to run the app.
+Those workflows use server-specific checkout paths and Docker host assumptions.
+Self-hosters do not need GitHub Actions to run the app.
+
+## Beta Deployment
+
+The beta deployment is maintainer infrastructure, not a second install path for
+normal users. It lives in `deploy/beta/`, builds from this repo root, and runs a
+separate Docker container and volume:
+
+```powershell
+cmd /c scripts\deploy-beta.cmd
+```
+
+Beta is always deployed through Docker. Do not use a Vite dev server, preview
+server, or `start-beta` helper for beta. See `deploy/beta/README.md` for the
+beta port, volume, demo-data behavior, and maintainer deploy script.
 
 ## Storage And Backups
 
@@ -228,8 +238,8 @@ values, not money.
 ## Development
 
 Docker is the supported runtime. For code validation outside Docker, install
-Node.js 20+ or provide the private `.tools` runtime used by the helper scripts.
-Local dependency folders and build output are ignored by Git.
+Node.js 20.19+ or provide the private `.tools` runtime used by the helper
+scripts. Local dependency folders and build output are ignored by Git.
 
 ## Documentation
 

@@ -4,10 +4,11 @@
 
 ## Stack
 - **Frontend:** React 18 (Vite build, client-side routing via React Router v6)
-- **Backend:** Node.js 20 + Express
+- **Backend:** Node.js 20.19+ + Express
 - **Auth:** Local session login, OIDC login, or both; `API_KEY` header for programmatic access
 - **Data:** SQLite (better-sqlite3) + Docker named volume
 - **Key dependencies:** `express`, `express-session`, `better-sqlite3`, `multer` (CSV upload), `papaparse` (CSV parsing), `@dnd-kit/core` + `@dnd-kit/sortable` (dashboard, account, navigation, and settings reorder UI)
+- **Session storage:** local `better-sqlite3` session store in `backend/src/services/sessionStore.js`
 
 ## Dockerfile
 Multi-stage build:
@@ -21,9 +22,9 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | File | Purpose |
 |---|---|
 | `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
-| `sessions.db` | Session store (separate connection, managed by `connect-sqlite3`) |
+| `sessions.db` | Session store (separate `better-sqlite3` connection) |
 
-### Database Schema (25 migrations)
+### Database Schema (26 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -52,6 +53,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `023_multi_user_households.sql` | Adds users, households, memberships, OIDC-ready ownership, household-scoped defaults, and migrates existing data to household `1` |
 | `024_household_sharing.sql` | Adds pending household shares by email for partner access |
 | `025_rename_authentik_sub_to_oidc_sub.sql` | Renames the stored OIDC subject column from Authentik-specific naming to `oidc_sub` |
+| `026_neutral_default_household_name.sql` | Renames the old default household label to `My Household` when it has not been customized |
 
 ### Key Data Model Notes
 
@@ -65,9 +67,11 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 
 **Original / edited provenance (migration 008):** Rules and manual edits never mutate the raw imported values. Each editable field has an `original_*` column (populated at import, never touched afterward) and a nullable `edited_*` column with an `edited_*_source` tag (`'user'`, `'rule:{id}'`, `'system:*'`, or NULL). Display values are computed as `COALESCE(edited_X, original_X)` at the API layer so the UI sees one logical merchant/category/flag regardless of how it got there. User edits are sticky — rules never override `source='user'`. System edits are reserved for app-owned derivations like transfer matching and are preserved during rule reapply.
 
-**Multi-user ownership:** Tenant-owned data carries `household_id`. Existing single-user data is assigned to household `1` during migration. Uniqueness that used to be global, such as category name, SimpleFIN account id, transaction external id, and app settings, is now scoped by household. New OIDC users get a household seeded from `app_default_settings` and `app_default_categories`.
+**Multi-user ownership:** Tenant-owned data carries `household_id`. Existing single-user data is assigned to household `1` during migration. Fresh installs end with the neutral default name `My Household`; existing installs are only renamed if the household still has the old default label. Uniqueness that used to be global, such as category name, SimpleFIN account id, transaction external id, and app settings, is now scoped by household. New OIDC users get a household seeded from `app_default_settings` and `app_default_categories`.
 
-**Auth modes:** `AUTH_PROVIDER=local` shows only the username/password form. `AUTH_PROVIDER=oidc` shows only the OIDC button. `AUTH_PROVIDER=both` shows both options. `OIDC_LOGIN_LABEL` controls the OIDC button text and defaults to `Log in with OIDC`.
+**Auth modes:** `AUTH_PROVIDER=local` shows only the username/password form. `AUTH_PROVIDER=oidc` shows only the OIDC button. `AUTH_PROVIDER=both` shows both options. `OIDC_LOGIN_LABEL` controls the OIDC button text and defaults to `Log in with OIDC`. `ENABLE_SAMPLE_DATA=1` exposes the sample-data login flow; it is disabled by default for normal installs.
+
+**Public-safe env defaults:** `API_KEY` is optional and should remain blank unless programmatic access is intentionally enabled. `SIMPLEFIN_ENCRYPTION_KEY` may remain blank until the user connects SimpleFIN. Startup rejects known placeholder values for required secrets so copied example files do not become predictable public deployments.
 
 **Rules:** JSON-serialized `conditions` (array of `{field, operator, value}`) and `actions` (array of `{type, value}`). Condition fields: `merchant`, `original_description`, `amount`, `account_id`, `category_id`. All condition evaluation runs against originals only, making match counts stable. Action types: `rename`, `categorize`, `mark_transfer`, `mark_ignored`. First rule (priority DESC, id ASC) to claim a given field wins; lower-priority rules skip it.
 
@@ -233,13 +237,13 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - Three-way theme toggle (☀️ / 💻 / 🌙): localStorage persistence with pre-paint script in `index.html` to avoid flash
 - Night Style (`Soft Dark` / `AMOLED Black`) also persists in `localStorage`; the selected night style applies to explicit Night mode and to System mode when the device prefers dark.
 - 40+ CSS custom properties for light/dark themes, emerald-600/500 accent
-- Inter Tight (Google Fonts) throughout — no serif fonts
+- Inter Tight (Google Fonts) for body/UI text and bundled DM Sans for titles/brand headings
 - Bottom tabs: 80px height (Material Design baseline), 5 columns
 - Dismissable sync-error banner keyed by error message text in localStorage
 - Mobile zoom suppression: `text-size-adjust: 100%` on `html` + 16px minimum font-size on editable form controls ≤767px (prevents both Android Chrome text boosting and iOS Safari focus zoom)
 
 ### PWA
-- `manifest.webmanifest` with SVG icons (regular + maskable)
+- `manifest.webmanifest` with PNG icons (regular + maskable)
 - Service worker (`sw.js`): pass-through fetch, no offline caching (satisfies install criteria only)
 - Installable on Android Chrome, desktop Chrome/Edge
 - `theme-color` meta tags for light and dark schemes
@@ -249,8 +253,9 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 ### Auth
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/auth/config` | Active auth provider, enabled login methods, OIDC login URL, and OIDC button label |
+| GET | `/api/auth/config` | Active auth provider, enabled login methods, OIDC login URL/button label, and sample-data availability |
 | POST | `/api/auth/login` | Local session login |
+| POST | `/api/auth/sample` | Create/login to a temporary sample household when `ENABLE_SAMPLE_DATA=1` |
 | GET | `/api/auth/oidc/login` | Start OIDC login |
 | GET | `/api/auth/oidc/callback` | OIDC callback |
 | POST | `/api/auth/logout` | Session logout |
@@ -272,6 +277,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 | PUT | `/api/accounts/:id` | Update (name, type, institution) |
 | POST | `/api/accounts/:id/archive` | Archive |
 | POST | `/api/accounts/:id/unarchive` | Unarchive |
+| POST | `/api/accounts/:id/records` | Add or update a dated manual balance snapshot |
 | POST | `/api/accounts/:id/merge` | Merge into target account |
 | DELETE | `/api/accounts/:id` | Delete (only if 0 transactions) |
 | POST | `/api/accounts/reorder` | Save drag-and-drop order |
@@ -292,7 +298,10 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 ### Categories
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/categories` | List all (32 seeded from Rocket Money) |
+| GET | `/api/categories` | List all categories for the household |
+| POST | `/api/categories` | Create a category |
+| PUT | `/api/categories/:id` | Update a category |
+| DELETE | `/api/categories/:id` | Delete a category when it is safe to remove |
 
 ### Budgets
 | Method | Path | Description |
@@ -312,6 +321,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 |---|---|---|
 | GET | `/api/goals?months=` | Goals, account allocation availability, history, progress, and ETA projections. |
 | POST | `/api/goals` | Create a goal with `{ name, target_amount, target_date?, kind?, allocations, stealFromOthers? }`. |
+| PUT | `/api/goals/reorder` | Persist custom goal order |
 | PUT | `/api/goals/:id` | Replace goal metadata and allocations. Can rebalance other goals when stealing is enabled. |
 | DELETE | `/api/goals/:id` | Delete a goal and its allocation rows. |
 
@@ -334,6 +344,22 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 | PUT | `/api/household/members/:id` | Update a household member, replace linked retirement accounts, and upsert a dated income snapshot. |
 | POST | `/api/household/members/:id/income-records` | Upsert a manual income/benefit snapshot for a member. |
 | DELETE | `/api/household/members/:id` | Delete a member and their income history. |
+
+### Household Sharing
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/household-sharing` | Current household users and pending shares |
+| POST | `/api/household-sharing/shares` | Invite or update a pending household share by email |
+| DELETE | `/api/household-sharing/shares/:id` | Revoke a pending share |
+| DELETE | `/api/household-sharing/users/:id` | Remove a household user when allowed by role rules |
+
+### Merchant Logos
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/merchant-logos/report` | Record whether a merchant logo loaded or failed |
+| POST | `/api/merchant-logos/ensure` | Ensure a transaction has a cache row for manual override |
+| POST | `/api/merchant-logos/search` | Search Logo.dev brand candidates when a secret key is configured |
+| POST | `/api/merchant-logos/override` | Save a manual logo URL or category-icon override |
 
 ### SimpleFIN
 | Method | Path | Description |
@@ -360,18 +386,18 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
 - `db/index.js`, `db/migrations.js`
 - `lib/`: http, localDate, money, routeParams
-- `db/migrations/001` through `021`
-- `routes/`: auth, health, import, transactions, accounts, categories, rules, simplefin, budgets, netWorth, mha, goals, household
-- `services/`: csvImport, mhaSummary, ruleMatcher (exports `loadRules`, `computeEdits`, `countMatches`, `reapplyRulesToAllTransactions`, `reapplyRulesToTransaction`, `revertEditsForRule`, `applyRulesToDraft`), simplefinClient, simplefinSync, transferMatcher
+- `db/migrations/001` through `026`
+- `routes/`: accounts, auth, budgets, categories, goals, health, household, householdSharing, import, merchantLogos, mha, netWorth, rules, simplefin, transactions, upcoming
+- `services/`: csvImport, demoSeed, householdDefaults, merchantLogos, mhaSummary, oidc, ruleMatcher, sampleHouseholds, sessionStore, simplefinClient, simplefinSync, transferMatcher
 - `test/`: Node built-in test runner coverage for backend helpers and calculation services
 
 ### Frontend (`frontend/`)
-- `index.html` (Inter Tight font, PWA manifest link, pre-paint theme script, SW registration)
-- `public/`: manifest.webmanifest, icon.svg, icon-maskable.svg, sw.js
-- `src/main.jsx`, `src/App.jsx` (BrowserRouter, passes accounts + categories to Transactions and Dashboard), `src/Login.jsx`, `src/api.js` (get/post/put/patch/del), `src/index.css` (~7000 lines)
+- `index.html` (PWA manifest link, pre-paint theme script, SW registration)
+- `public/`: manifest.webmanifest, PNG/SVG icons, splash wordmarks, sw.js
+- `src/main.jsx`, `src/App.jsx`, `src/Login.jsx`, `src/api.js`, `src/index.css`
 - `src/hooks/useTheme.js`
-- `src/components/`: AnimatedModal, AppDialog, BottomTabs, DesktopSidebar, DropdownMenu, FilterSheet, InlinePopover, MoreSheet, PageHero, SelectableListItem, SyncErrorBanner
-- `src/pages/`: Dashboard, Transactions, Budgets, Accounts, Rules, Settings, HousingCalculator, NetWorth, Household, MhaTracker, Goals, RetirementCalculator
+- `src/components/`: AnimatedModal, AppDialog, AppIcon, AppRangeSlider, AppSelect, BottomTabs, BrandLogo, CollapseIndicator, CurrencyInput, DepthPattern, DesktopSidebar, DropdownMenu, FilterSheet, InlinePopover, MoreSheet, PageHero, PercentInput, ReorderListItem, SearchField, SelectableListItem, SyncErrorBanner, rule editor primitives, transaction row primitives
+- `src/pages/`: Accounts, Budgets, Categories, Dashboard, Goals, Household, HousingCalculator, MhaTracker, NetWorth, RetirementCalculator, Rules, Settings, Transactions, Upcoming
 
 ## Known Gotchas
 - **better-sqlite3 `.iterate()` + write transaction** = "database connection is busy" — always use `.all()` instead
@@ -382,7 +408,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - **NavLink renders `<a>` elements** — need explicit `text-decoration: none; outline: none;` on all states to prevent flash-underline on tap
 - **SW needs a fetch listener** (even pass-through) to satisfy PWA install criteria in some browsers
 - **Rules with match counts** loads slowly with many rules — `withCounts=1` scans all transactions per rule. For 300+ rules × 8K+ transactions, expect 10–20 second initial load.
-- **Windows build tooling:** use Node.js 20+ on PATH or the private `.tools` runtime. `cmd /c scripts\build-frontend.cmd` runs the frontend production build from the repo root, and `cmd /c scripts\check-backend.cmd` runs the backend syntax smoke check and tests. Both helpers prefer `.tools` when it exists locally, then fall back to system Node/npm.
+- **Windows build tooling:** use Node.js 20.19+ on PATH or the private `.tools` runtime. `cmd /c scripts\build-frontend.cmd` runs the frontend production build from the repo root, and `cmd /c scripts\check-backend.cmd` runs the backend syntax smoke check and tests. Both helpers prefer `.tools` when it exists locally, then fall back to system Node/npm.
 - **Repeated page hero UI:** before adding or changing a page header, check `PageHero.jsx` first. Shared morph behavior belongs in `useMorphingPageHero`; page-specific stat/chrome content belongs in the page.
 - **Native browser dialogs:** use `useAppDialog()` instead of `alert()` / `confirm()` so confirmations animate and share the app's button styling.
 - **Button copy:** visible button labels should use Title Case for words, e.g. `+ New Category`, `Add Budget`, `Save`.
@@ -394,6 +420,5 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 ## Planned
 - **Phase 2 Budgets:** rollover (column already exists), income targets with proper direction, category groupings, spending pace
 - **Phase 2 Dashboard:** spending-over-time and net-worth charts
-- **Recurring bills / subscriptions detection**
 - **Bulk merge suggestions:** Auto-pair SimpleFIN duplicates with RM accounts by institution + last-4
-- **Mortgage calculator, credit score** (placeholders in More sheet)
+- **Credit score:** possible future manual tracker or integration

@@ -111,7 +111,7 @@ test('cleanupExpiredSampleHouseholds keeps households that include a real user',
   });
   db.prepare('INSERT INTO users (id, username, updated_at) VALUES (?, ?, ?)').run(
     13,
-    'neal',
+    'owner',
     db.prepare("SELECT datetime('now', '-49 hours') AS value").get().value
   );
   db.prepare(

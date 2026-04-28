@@ -52,7 +52,7 @@ router.get('/status', requireAuth, (req, res) => {
  * Body: { setupToken, cutoverDate }  (cutoverDate: 'YYYY-MM-DD')
  *
  * Exchanges the setup token for an access URL, encrypts it, stores it, and
- * records the cutover date. Does NOT run a sync — Neal clicks "Sync Now" or
+ * records the cutover date. Does NOT run a sync — the user clicks "Sync Now" or
  * waits for the 6 AM scheduler.
  */
 router.post('/setup', requireAuth, async (req, res) => {

@@ -34,4 +34,4 @@ docker ps --filter "name=orbit-money-beta" --format "table {{.Names}}\t{{.Status
 
 echo.
 echo Beta should be available at http://localhost:5019
-echo Point orbitbeta.overbay.app to this service/port in Cloudflare Tunnel.
+echo Point your beta hostname to this service/port if using a reverse proxy or tunnel.

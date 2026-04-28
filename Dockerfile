@@ -3,7 +3,7 @@
 # ==============================================================================
 # Build stage uses node:20-slim (Debian) because Rollup/musl hangs on Docker
 # Desktop + WSL2 with Alpine. Prod stage uses node:20-alpine for smaller image.
-# Same pattern as Lawn Tracker.
+# Debian build stage avoids Rollup/musl hangs seen on Docker Desktop + WSL2.
 # ==============================================================================
 
 # ---- Stage 1: Build frontend ----

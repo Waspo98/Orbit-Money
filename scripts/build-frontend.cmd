@@ -26,6 +26,6 @@ if exist "%NODE_DIR%\node.exe" if exist "node_modules\vite\bin\vite.js" (
   exit /b 0
 )
 
-echo npm was not found. Install Node.js 20+ or provide a private portable runtime at:
+echo npm was not found. Install Node.js 20.19+ or provide a private portable runtime at:
 echo   %NODE_DIR%
 exit /b 1

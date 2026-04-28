@@ -9,14 +9,17 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [sampleLoading, setSampleLoading] = useState(false);
-  const [authConfig, setAuthConfig] = useState({ authProvider: 'local' });
+  const [authConfig, setAuthConfig] = useState({
+    authProvider: 'local',
+    sampleDataEnabled: false
+  });
   const localEnabled = authConfig.localEnabled ?? authConfig.authProvider === 'local';
   const oidcEnabled = authConfig.oidcEnabled ?? authConfig.authProvider === 'oidc';
 
   useEffect(() => {
     api.get('/api/auth/config')
       .then(setAuthConfig)
-      .catch(() => setAuthConfig({ authProvider: 'local' }));
+      .catch(() => setAuthConfig({ authProvider: 'local', sampleDataEnabled: false }));
   }, []);
 
   useEffect(() => {
@@ -119,14 +122,16 @@ export default function Login({ onLogin }) {
           </button>
         )}
 
-        <button
-          type="button"
-          className="login-sample-link"
-          onClick={handleSampleData}
-          disabled={sampleLoading}
-        >
-          {sampleLoading ? 'Loading sample data...' : 'Continue with sample data'}
-        </button>
+        {authConfig.sampleDataEnabled && (
+          <button
+            type="button"
+            className="login-sample-link"
+            onClick={handleSampleData}
+            disabled={sampleLoading}
+          >
+            {sampleLoading ? 'Loading sample data...' : 'Continue with sample data'}
+          </button>
+        )}
       </form>
     </div>
   );

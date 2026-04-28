@@ -173,7 +173,7 @@ function currentDayOfMonth() {
 }
 
 // Account type classification - grouped so the dashboard can show a clean
-// breakdown regardless of how many individual accounts Neal has.
+// breakdown regardless of how many individual accounts the household has.
 const ASSET_TYPES = new Set(['checking', 'savings', 'cash']);
 const INVESTMENT_TYPES = new Set(['investment']);
 const CREDIT_TYPES = new Set(['credit']);

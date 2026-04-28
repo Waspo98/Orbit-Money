@@ -18,8 +18,8 @@
 - Orbit Money should feel simple, friendly, and visually clear. Accuracy is
   sacred for financial calculations, so it is acceptable to add complexity when
   correctness requires it.
-- Primary users are the household owners, currently Neal and his wife. Build as
-  if the app may eventually have public users, but do not prematurely add public
+- Primary users are household owners. Build as if the app may eventually have
+  public users, but do not prematurely add public
   SaaS complexity unless the task calls for it.
 - Prioritize visual clarity first, speed of entry second, and deep financial
   accuracy as a non-negotiable foundation beneath both.
@@ -94,7 +94,7 @@
 - Do not read `.env` unless the task requires debugging runtime config.
 - Prefer small, reversible changes.
 - Before changing auth, Docker, ports, volumes, or database storage, explain the impact first.
-- Use Node.js 20+ for local validation. The public repo does not track a
+- Use Node.js 20.19+ for local validation. The public repo does not track a
   portable Node runtime; `scripts\build-frontend.cmd` and
   `scripts\check-backend.cmd` prefer a private `.tools` runtime if one exists
   and fall back to system Node/npm.

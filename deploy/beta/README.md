@@ -7,12 +7,12 @@ This folder defines the maintainer beta Docker deployment for Orbit Money.
 - Host port: `5019`
 - Container port: `5008`
 - Docker volume: `orbitmoney-beta_orbit-money-beta-data`
-- Suggested Cloudflare hostname: `orbitbeta.overbay.app`
+- Optional reverse-proxy hostname: your own beta hostname
 
 The beta deployment builds from the repository root and uses the root `.env`
 for shared secrets. It overrides:
 
-- `AUTH_PROVIDER=local`, `ADMIN_USERNAME=admin`, and `ADMIN_PASSWORD=admin` so the seeded demo beta is easy to review.
+- `AUTH_PROVIDER=local`, `ADMIN_USERNAME=admin`, and `ADMIN_PASSWORD=admin` so the seeded demo beta is easy to review. Do not expose this beta container publicly without changing those credentials or adding external access controls.
 - `SESSION_NAME=orbit_beta.sid` so local beta and production browser sessions do not collide.
 - `SEED_DEMO_DATA=1` so a fresh beta volume starts with demo data.
 
@@ -52,7 +52,7 @@ the repository root:
 cmd /c scripts\build-frontend.cmd
 ```
 
-For Cloudflare Tunnel, point `orbitbeta.overbay.app` at:
+For a reverse proxy or Cloudflare Tunnel, point your beta hostname at:
 
 ```text
 http://localhost:5019

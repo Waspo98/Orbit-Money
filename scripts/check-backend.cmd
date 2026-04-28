@@ -15,7 +15,7 @@ if exist "%NODE_DIR%\node.exe" (
 if not defined NODE_BIN (
   where node >nul 2>nul
   if errorlevel 1 (
-    echo node was not found. Install Node.js 20+ or provide a private portable runtime at:
+    echo node was not found. Install Node.js 20.19+ or provide a private portable runtime at:
     echo   %NODE_DIR%
     exit /b 1
   )

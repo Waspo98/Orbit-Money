@@ -187,7 +187,7 @@ router.post('/', requireAuth, (req, res) => {
 
     // Sync reapply — by the time we return, transactions reflect the new
     // rule. Client code that reloads after `await api.post` gets the
-    // post-application state without a race condition. For Neal's dataset
+    // post-application state without a race condition. For larger datasets
     // (~8K transactions), this adds a second or two to the save but makes
     // the UI predictable.
     try {

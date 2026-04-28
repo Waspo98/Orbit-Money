@@ -3,6 +3,7 @@ import { config } from '../config.js';
 import { db } from '../db/index.js';
 import {
   sendBadRequest,
+  sendNotFound,
   sendOk,
   sendServerError,
   sendUnauthorized
@@ -58,7 +59,8 @@ router.get('/config', (req, res) => {
     localEnabled: localEnabled(),
     oidcEnabled: oidcEnabled(),
     oidcLoginUrl: oidcEnabled() ? '/api/auth/oidc/login' : null,
-    oidcLoginLabel: config.oidcLoginLabel
+    oidcLoginLabel: config.oidcLoginLabel,
+    sampleDataEnabled: config.sampleDataEnabled
   });
 });
 
@@ -97,7 +99,7 @@ router.post('/login', (req, res) => {
       displayName: user?.display_name || username,
       householdId: membership?.household_id || 1,
       role: membership?.role || 'owner',
-      householdName: membership?.name || 'Neal Household'
+      householdName: membership?.name || 'My Household'
     });
     return sendOk(res, { success: true, ...currentSessionPayload(req) });
   }
@@ -106,6 +108,10 @@ router.post('/login', (req, res) => {
 });
 
 router.post('/sample', (req, res) => {
+  if (!config.sampleDataEnabled) {
+    return sendNotFound(res, 'Sample data is disabled for this deployment.');
+  }
+
   const rawDeviceId = String(req.body?.deviceId || '').trim();
   if (!/^[a-zA-Z0-9_-]{16,80}$/.test(rawDeviceId)) {
     return sendBadRequest(res, 'Sample data device id is invalid.');

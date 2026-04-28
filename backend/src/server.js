@@ -1,6 +1,5 @@
 import express from 'express';
 import session from 'express-session';
-import SQLiteStoreFactory from 'connect-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -9,6 +8,7 @@ import { db, runMigrations } from './db/index.js';
 import { requireAuth } from './auth.js';
 import { startScheduler } from './scheduler.js';
 import { seedDemoData } from './services/demoSeed.js';
+import BetterSqliteSessionStore from './services/sessionStore.js';
 import authRoutes from './routes/auth.js';
 import healthRoutes from './routes/health.js';
 import importRoutes from './routes/import.js';
@@ -41,14 +41,13 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 
 // Session store: separate sessions.db file in the data volume.
-const SQLiteStore = SQLiteStoreFactory(session);
 app.use(
   session({
     name: config.sessionName,
-    store: new SQLiteStore({
+    store: new BetterSqliteSessionStore({
       db: 'sessions.db',
       dir: config.dataDir,
-      concurrentDB: true
+      wal: true
     }),
     secret: config.sessionSecret,
     resave: false,

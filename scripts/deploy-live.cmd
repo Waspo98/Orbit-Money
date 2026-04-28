@@ -34,4 +34,4 @@ docker ps --filter "name=orbit-money" --format "table {{.Names}}\t{{.Status}}\t{
 
 echo.
 echo Live should be available at http://localhost:5008
-echo Cloudflare money.overbay.app should continue pointing to this service/port.
+echo Point your production hostname to this service/port if using a reverse proxy or tunnel.

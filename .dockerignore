@@ -1,5 +1,7 @@
 node_modules
 **/node_modules
+.tools
+.tools/
 dist
 **/dist
 .git
@@ -10,8 +12,12 @@ README.md
 docs
 deploy
 data
+backups
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
+*.tgz
 *.log
 .vscode
 .idea

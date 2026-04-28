@@ -432,7 +432,7 @@ export default function Settings({
       const data = await api.post('/api/household-sharing/shares', { email });
       setSharing(data);
       setSharingEmail('');
-      setSharingMessage(`${email} can now sign in with an Overbay.App account.`);
+      setSharingMessage(`${email} can now sign in with their configured account.`);
     } catch (err) {
       setSharingError(err.message || 'Sharing failed.');
     } finally {
