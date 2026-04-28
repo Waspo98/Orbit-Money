@@ -2589,9 +2589,8 @@ input, textarea, select {
   overflow: clip;
 }
 
-.dashboard-view::before,
+.dashboard-depth-pattern,
 .dashboard-view::after {
-  content: '';
   position: absolute;
   inset-inline: 0;
   pointer-events: none;
@@ -2600,47 +2599,49 @@ input, textarea, select {
   will-change: transform;
 }
 
-.dashboard-view::before {
+.dashboard-depth-pattern {
+  --dashboard-depth-line: color-mix(in srgb, var(--accent) 22%, var(--text-muted) 78%);
+  --dashboard-depth-dot: color-mix(in srgb, var(--accent) 34%, var(--text-muted) 66%);
+  --dashboard-depth-star: color-mix(in srgb, var(--text-muted) 72%, transparent);
   top: 96px;
   bottom: 0;
   opacity: 0.62;
-  background:
-    radial-gradient(circle at 12% 14%, color-mix(in srgb, var(--accent) 45%, transparent) 0 2px, transparent 3px),
-    radial-gradient(circle at 42% 8%, color-mix(in srgb, var(--text-muted) 34%, transparent) 0 2px, transparent 3px),
-    radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--accent) 42%, transparent) 0 2px, transparent 3px),
-    radial-gradient(circle at 91% 42%, color-mix(in srgb, var(--text-muted) 28%, transparent) 0 2px, transparent 3px),
-    radial-gradient(circle at 28% 62%, color-mix(in srgb, var(--accent) 38%, transparent) 0 2px, transparent 3px),
-    radial-gradient(circle at 68% 74%, color-mix(in srgb, var(--text-muted) 32%, transparent) 0 2px, transparent 3px),
-    linear-gradient(58deg, transparent 0 10%, color-mix(in srgb, var(--accent) 20%, transparent) 10.15% 10.35%, transparent 10.55% 100%),
-    linear-gradient(122deg, transparent 0 28%, color-mix(in srgb, var(--text-muted) 18%, transparent) 28.1% 28.3%, transparent 28.5% 100%),
-    linear-gradient(152deg, transparent 0 44%, color-mix(in srgb, var(--accent) 18%, transparent) 44.1% 44.3%, transparent 44.5% 100%),
-    linear-gradient(28deg, transparent 0 63%, color-mix(in srgb, var(--text-muted) 16%, transparent) 63.1% 63.3%, transparent 63.5% 100%);
-  background-size:
-    360px 320px,
-    420px 360px,
-    380px 300px,
-    460px 380px,
-    410px 340px,
-    390px 310px,
-    430px 330px,
-    520px 390px,
-    460px 360px,
-    540px 420px;
-  background-position:
-    12px 0,
-    90px 70px,
-    0 150px,
-    130px 220px,
-    240px 360px,
-    40px 520px,
-    -110px 20px,
-    60px 40px,
-    -80px 190px,
-    170px 320px;
   mask-image: linear-gradient(to bottom, transparent, #000 5%, #000 88%, transparent);
 }
 
+.dashboard-depth-pattern svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dashboard-depth-cluster {
+  fill: var(--dashboard-depth-dot);
+  stroke: var(--dashboard-depth-line);
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dashboard-depth-cluster path {
+  fill: none;
+}
+
+.dashboard-depth-cluster-primary {
+  opacity: 0.86;
+}
+
+.dashboard-depth-cluster-secondary {
+  opacity: 0.42;
+}
+
+.dashboard-depth-stars {
+  fill: var(--dashboard-depth-star);
+  opacity: 0.72;
+}
+
 .dashboard-view::after {
+  content: '';
   top: 156px;
   bottom: 0;
   opacity: 0.26;
@@ -2651,7 +2652,7 @@ input, textarea, select {
   mask-image: linear-gradient(to bottom, transparent, #000 7%, #000 78%, transparent);
 }
 
-:root[data-theme="dark"] .dashboard-view::before {
+:root[data-theme="dark"] .dashboard-depth-pattern {
   opacity: 0.46;
 }
 
@@ -2660,7 +2661,7 @@ input, textarea, select {
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .dashboard-view::before {
+  :root:not([data-theme="light"]) .dashboard-depth-pattern {
     opacity: 0.46;
   }
 

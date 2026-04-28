@@ -570,7 +570,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
     let frameId = 0;
     function updateBackdropDepth() {
       frameId = 0;
-      const offset = Math.round(window.scrollY * 0.72);
+      const offset = Math.round(window.scrollY * 0.61);
       view.style.setProperty('--dashboard-bg-offset', `${offset}px`);
     }
 
@@ -864,6 +864,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   if (noActivity) {
     return (
       <div ref={viewRef} className="dashboard-view">
+        <DashboardDepthPattern />
         <DashboardHero
           dateLabel={formatLongDate(now)}
           greeting={timeGreeting(now)}
@@ -899,6 +900,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
 
   return (
     <div ref={viewRef} className="dashboard-view">
+      <DashboardDepthPattern />
       <DashboardHero
         dateLabel={formatLongDate(now)}
         greeting={timeGreeting(now)}
@@ -941,6 +943,72 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
           onRefresh={loadDashboard}
         />
       )}
+    </div>
+  );
+}
+
+function DashboardDepthPattern() {
+  return (
+    <div className="dashboard-depth-pattern" aria-hidden="true">
+      <svg focusable="false" role="presentation">
+        <defs>
+          <pattern
+            id="dashboard-depth-mesh"
+            width="720"
+            height="520"
+            patternUnits="userSpaceOnUse"
+          >
+            <g className="dashboard-depth-cluster dashboard-depth-cluster-primary">
+              <path d="M48 42 L76 126 L128 168 L252 226 L346 168" />
+              <path d="M76 126 L118 78 L128 168 L176 286 L252 226" />
+              <path d="M48 42 L118 78 L252 226 L404 410" />
+              <path d="M176 286 L264 352 L326 318 L404 410 L476 462" />
+              <path d="M252 226 L326 318 L346 168 L404 410" />
+              <path d="M264 352 L386 480 L476 462 L404 410" />
+              <circle cx="48" cy="42" r="5.2" />
+              <circle cx="76" cy="126" r="4.8" />
+              <circle cx="118" cy="78" r="4.2" />
+              <circle cx="128" cy="168" r="3.8" />
+              <circle cx="176" cy="286" r="5" />
+              <circle cx="252" cy="226" r="4.2" />
+              <circle cx="264" cy="352" r="4.6" />
+              <circle cx="326" cy="318" r="4.2" />
+              <circle cx="346" cy="168" r="3.8" />
+              <circle cx="386" cy="480" r="5" />
+              <circle cx="404" cy="410" r="4.8" />
+              <circle cx="476" cy="462" r="5" />
+            </g>
+
+            <g className="dashboard-depth-cluster dashboard-depth-cluster-secondary">
+              <path d="M546 62 L626 108 L668 192 L606 286 L514 250" />
+              <path d="M626 108 L514 250 L470 138 L546 62" />
+              <path d="M470 138 L438 300 L514 250 L606 286" />
+              <circle cx="546" cy="62" r="3.4" />
+              <circle cx="626" cy="108" r="4.2" />
+              <circle cx="668" cy="192" r="3.6" />
+              <circle cx="606" cy="286" r="4.4" />
+              <circle cx="514" cy="250" r="4" />
+              <circle cx="470" cy="138" r="3.2" />
+              <circle cx="438" cy="300" r="3.6" />
+            </g>
+
+            <g className="dashboard-depth-stars">
+              <circle cx="32" cy="338" r="2.2" />
+              <circle cx="96" cy="452" r="2.8" />
+              <circle cx="154" cy="36" r="2.4" />
+              <circle cx="212" cy="92" r="3" />
+              <circle cx="294" cy="58" r="2.1" />
+              <circle cx="366" cy="76" r="2.6" />
+              <circle cx="424" cy="248" r="2.2" />
+              <circle cx="504" cy="386" r="3.2" />
+              <circle cx="580" cy="446" r="2.4" />
+              <circle cx="656" cy="384" r="2" />
+              <circle cx="696" cy="48" r="2.6" />
+            </g>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#dashboard-depth-mesh)" />
+      </svg>
     </div>
   );
 }
