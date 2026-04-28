@@ -4,6 +4,8 @@ import AppIcon from './AppIcon.jsx';
 import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
 import { getMoreRoutes } from '../navigation.js';
 
+const TOUCH_PULL_START_PX = 8;
+
 export default function MoreSheet({
   open,
   onClose,
@@ -16,6 +18,9 @@ export default function MoreSheet({
   const [settling, setSettling] = useState(false);
   const timerRef = useRef(null);
   const frameRef = useRef(null);
+  const dragFrameRef = useRef(null);
+  const dragYRef = useRef(0);
+  const pendingDragYRef = useRef(0);
   const scrollRef = useRef(null);
   const dragRef = useRef({
     active: false,
@@ -40,7 +45,7 @@ export default function MoreSheet({
         timerRef.current = null;
       }
       setDrawerState('opening');
-      setDragY(0);
+      setDragYImmediate(0);
       setSettling(false);
       suppressNextClickRef.current = false;
       frameRef.current = window.requestAnimationFrame(() => {
@@ -64,7 +69,7 @@ export default function MoreSheet({
       return;
     }
     setSettling(false);
-    setDragY(0);
+    setDragYImmediate(0);
     setDrawerState('closing');
     timerRef.current = setTimeout(onClose, OVERLAY_ANIM_MS);
   }
@@ -84,6 +89,10 @@ export default function MoreSheet({
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (dragFrameRef.current) {
+        window.cancelAnimationFrame(dragFrameRef.current);
+        dragFrameRef.current = null;
+      }
     };
   }, []);
 
@@ -144,14 +153,44 @@ export default function MoreSheet({
       dragged: false
     };
     setSettling(false);
-    setDragY(0);
+    setDragYImmediate(0);
+  }
+
+  function setDragYImmediate(value) {
+    if (dragFrameRef.current) {
+      window.cancelAnimationFrame(dragFrameRef.current);
+      dragFrameRef.current = null;
+    }
+    dragYRef.current = value;
+    pendingDragYRef.current = value;
+    setDragY(value);
+  }
+
+  function setDragYOnFrame(value) {
+    if (Math.abs(value - dragYRef.current) < 0.5) return;
+
+    dragYRef.current = value;
+    pendingDragYRef.current = value;
+    if (dragFrameRef.current) return;
+
+    dragFrameRef.current = window.requestAnimationFrame(() => {
+      dragFrameRef.current = null;
+      setDragY(pendingDragYRef.current);
+    });
+  }
+
+  function resetPullDistance() {
+    dragRef.current.distance = 0;
+    if (dragYRef.current !== 0) {
+      setDragYImmediate(0);
+    }
   }
 
   function setPullDistance(value) {
     const distance = Math.min(Math.max(value, 0), window.innerHeight);
     dragRef.current.distance = distance;
     if (distance > 6) dragRef.current.dragged = true;
-    setDragY(distance);
+    setDragYOnFrame(distance);
   }
 
   function maybeSuppressClick() {
@@ -175,7 +214,7 @@ export default function MoreSheet({
     if (dragged && shouldCloseDrawer(finalY, velocityY)) {
       maybeSuppressClick();
       setSettling(true);
-      setDragY(window.innerHeight);
+      setDragYImmediate(window.innerHeight);
       setDrawerState('closing');
       timerRef.current = window.setTimeout(onClose, OVERLAY_ANIM_MS);
     } else if (dragged) {
@@ -271,14 +310,13 @@ export default function MoreSheet({
     if (!drag.pulling) {
       if (!atTop || !movingDown) {
         drag.startY = nextY;
-        drag.distance = 0;
-        setDragY(0);
+        resetPullDistance();
         return;
       }
 
-      if (event.cancelable) event.preventDefault();
       const initialPull = Math.max(0, nextY - drag.startY);
-      if (initialPull < 2) return;
+      if (initialPull < TOUCH_PULL_START_PX) return;
+      if (event.cancelable) event.preventDefault();
       drag.pulling = true;
     }
 
@@ -286,8 +324,7 @@ export default function MoreSheet({
     if (nextDistance <= 0) {
       drag.pulling = false;
       drag.startY = nextY;
-      drag.distance = 0;
-      setDragY(0);
+      resetPullDistance();
       return;
     }
 
