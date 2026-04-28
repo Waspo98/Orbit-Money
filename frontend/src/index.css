@@ -2600,12 +2600,12 @@ input, textarea, select {
 }
 
 .dashboard-depth-pattern {
-  --dashboard-depth-line: color-mix(in srgb, var(--accent) 22%, var(--text-muted) 78%);
-  --dashboard-depth-dot: color-mix(in srgb, var(--accent) 34%, var(--text-muted) 66%);
-  --dashboard-depth-star: color-mix(in srgb, var(--text-muted) 72%, transparent);
+  --dashboard-depth-line: color-mix(in srgb, var(--accent) 16%, var(--text-subtle) 84%);
+  --dashboard-depth-dot: color-mix(in srgb, var(--accent) 24%, var(--text-subtle) 76%);
+  --dashboard-depth-star: color-mix(in srgb, var(--text-subtle) 58%, transparent);
   top: 96px;
   bottom: 0;
-  opacity: 0.62;
+  opacity: 0.54;
   mask-image: linear-gradient(to bottom, transparent, #000 5%, #000 88%, transparent);
 }
 
@@ -2618,7 +2618,7 @@ input, textarea, select {
 .dashboard-depth-cluster {
   fill: var(--dashboard-depth-dot);
   stroke: var(--dashboard-depth-line);
-  stroke-width: 1.35;
+  stroke-width: 1.1;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -2628,16 +2628,16 @@ input, textarea, select {
 }
 
 .dashboard-depth-cluster-primary {
-  opacity: 0.86;
+  opacity: 0.72;
 }
 
 .dashboard-depth-cluster-secondary {
-  opacity: 0.42;
+  opacity: 0.34;
 }
 
 .dashboard-depth-stars {
   fill: var(--dashboard-depth-star);
-  opacity: 0.72;
+  opacity: 0.58;
 }
 
 .dashboard-view::after {
@@ -2653,7 +2653,7 @@ input, textarea, select {
 }
 
 :root[data-theme="dark"] .dashboard-depth-pattern {
-  opacity: 0.46;
+  opacity: 0.4;
 }
 
 :root[data-theme="dark"] .dashboard-view::after {
@@ -2662,7 +2662,7 @@ input, textarea, select {
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .dashboard-depth-pattern {
-    opacity: 0.46;
+    opacity: 0.4;
   }
 
   :root:not([data-theme="light"]) .dashboard-view::after {
