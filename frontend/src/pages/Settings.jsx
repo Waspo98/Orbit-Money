@@ -29,19 +29,19 @@ const THEME_OPTIONS = [
   {
     value: 'light',
     label: 'Day',
-    emoji: 'D',
+    emoji: '☀️',
     description: 'A bright interface for daylight use.'
   },
   {
     value: 'dark',
     label: 'Night',
-    emoji: 'N',
+    emoji: '🌙',
     description: 'A dimmer interface for low light.'
   },
   {
     value: 'system',
     label: 'System',
-    emoji: 'S',
+    emoji: '💻',
     description: 'Match this device automatically.'
   }
 ];
@@ -50,14 +50,14 @@ const DARK_VARIANT_OPTIONS = [
   {
     value: 'classic',
     label: 'Soft Dark',
-    emoji: 'D',
-    description: 'The current dark theme with lifted surfaces.'
+    emoji: '🌘',
+    description: "A gray dark theme that's gentle on the eyes."
   },
   {
     value: 'amoled',
     label: 'AMOLED Black',
-    emoji: 'B',
-    description: 'Pure black app background for night mode.'
+    emoji: '⬛',
+    description: 'A pure black background for AMOLED devices.'
   }
 ];
 
@@ -69,7 +69,7 @@ const SETTINGS_CARD_DEFS = [
   },
   {
     id: 'features',
-    title: 'Features',
+    title: 'App Features',
     description: 'Show, hide, and reorder navigation sections.'
   },
   {
@@ -96,6 +96,7 @@ const SETTINGS_CARD_DEFS = [
 
 const DEFAULT_SETTINGS_CARD_ORDER = SETTINGS_CARD_DEFS.map((card) => card.id);
 const SETTINGS_CARD_BY_ID = new Map(SETTINGS_CARD_DEFS.map((card) => [card.id, card]));
+const DEFAULT_COLLAPSED_SETTINGS_CARDS = DEFAULT_SETTINGS_CARD_ORDER.filter((id) => id !== 'about');
 
 function normalizeSettingsCardOrder(value) {
   const incoming = Array.isArray(value) ? value : [];
@@ -144,6 +145,14 @@ function todayIso() {
 
 function displayPerson(person) {
   return person?.display_name || person?.displayName || person?.email || person?.username || 'Shared user';
+}
+
+function formatPageList(routes) {
+  const names = routes.map((route) => route.label);
+  if (names.length === 0) return 'All optional pages are on.';
+  if (names.length === 1) return `${names[0]} is turned off.`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} are turned off.`;
+  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]} are turned off.`;
 }
 
 function SettingsCard({
@@ -229,7 +238,9 @@ export default function Settings({
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [importError, setImportError] = useState('');
-  const [collapsedCards, setCollapsedCards] = useState(() => new Set());
+  const [collapsedCards, setCollapsedCards] = useState(
+    () => new Set(DEFAULT_COLLAPSED_SETTINGS_CARDS)
+  );
   const [settingsCardOrder, setSettingsCardOrder] = useState(readSettingsCardOrder);
   const [settingsReorderMode, setSettingsReorderMode] = useState(false);
   const [settingsDragId, setSettingsDragId] = useState(null);
@@ -254,7 +265,8 @@ export default function Settings({
       .filter(Boolean);
   }, [normalizedNavigationPreferences]);
 
-  const visibleFeatureCount = ROUTES.filter((route) => route.nav && isFeatureVisible(route)).length;
+  const optionalFeatureRoutes = ROUTES.filter((route) => route.nav && !route.locked);
+  const turnedOffFeatureRoutes = optionalFeatureRoutes.filter((route) => !isFeatureVisible(route));
   const settingsOrder = normalizeSettingsCardOrder(settingsCardOrder);
 
   useDragInteractionLock(Boolean(settingsDragId || moreDragId));
@@ -318,6 +330,7 @@ export default function Settings({
   }
 
   function toggleCardCollapsed(id) {
+    if (id === 'about') return;
     setCollapsedCards((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -601,9 +614,14 @@ export default function Settings({
         collapsed={collapsedCards.has('appearance')}
         onToggle={() => toggleCardCollapsed('appearance')}
         collapsedContent={
-          <div className="settings-collapsed-summary">
-            <strong>{activeTheme?.label || 'System'}</strong>
-            <span>{activeDarkVariant?.label || 'Soft Dark'} after dark.</span>
+          <div className="settings-collapsed-summary settings-collapsed-summary-with-icon">
+            <span className="settings-collapsed-icon" aria-hidden>
+              {activeTheme?.emoji || '💻'}
+            </span>
+            <span>
+              <strong>{activeTheme?.label || 'System'}</strong>
+              <span>{activeDarkVariant?.label || 'Soft Dark'} after dark.</span>
+            </span>
           </div>
         }
       >
@@ -655,33 +673,46 @@ export default function Settings({
   }
 
   function renderFeaturesCard() {
-    const featureRoutes = ROUTES.filter((route) => route.nav);
+    const featureRoutes = optionalFeatureRoutes;
 
     return (
       <SettingsCard
         id="features"
         key="features"
-        title="Features"
+        title="App Features"
         description="Show, hide, and reorder navigation sections."
         collapsed={collapsedCards.has('features')}
         onToggle={() => toggleCardCollapsed('features')}
         collapsedContent={
           <div className="settings-collapsed-summary">
-            <strong>{visibleFeatureCount} Sections Visible</strong>
-            <span>Bottom tabs and locked pages stay pinned.</span>
+            <strong>{turnedOffFeatureRoutes.length} Pages Turned Off</strong>
+            <span>{formatPageList(turnedOffFeatureRoutes)}</span>
           </div>
         }
       >
+        <div className="settings-card-top-action">
+          <button
+            type="button"
+            className={moreReorderMode ? 'btn-primary btn-compact' : 'btn-secondary btn-compact'}
+            onClick={() => {
+              setMoreReorderMode((value) => !value);
+              setMoreDragId(null);
+              setMoreOverId(null);
+            }}
+          >
+            {moreReorderMode ? 'Done' : 'Reorder'}
+          </button>
+        </div>
+
         <div className="settings-theme-toggle settings-feature-toggle" role="group" aria-label="Feature visibility">
           {featureRoutes.map((route) => {
             const visible = isFeatureVisible(route);
-            const locked = !!route.locked;
-            const disabled = locked || (route.feature === 'mha' && mhaBusy);
+            const disabled = route.feature === 'mha' && mhaBusy;
             return (
               <button
                 key={route.path}
                 type="button"
-                className={`settings-theme-option settings-feature-option ${visible ? 'active' : ''} ${locked ? 'locked' : ''}`}
+                className={`settings-theme-option settings-feature-option ${visible ? 'active' : ''}`}
                 onClick={() => handleFeatureToggle(route)}
                 disabled={disabled}
                 aria-pressed={visible}
@@ -690,7 +721,7 @@ export default function Settings({
                 <span className="settings-theme-text">
                   <span className="settings-theme-label">{route.label}</span>
                   <span className="settings-theme-copy">
-                    {locked ? 'Locked' : visible ? 'On' : 'Off'}
+                    {visible ? 'On' : 'Off'}
                   </span>
                 </span>
               </button>
@@ -701,22 +732,9 @@ export default function Settings({
         {mhaError && <div className="error" style={{ marginTop: 12 }}>{mhaError}</div>}
 
         <div className="settings-subsection">
-          <div className="settings-subsection-heading settings-subsection-heading-row">
-            <div>
-              <h4>More Card Order</h4>
-              <p>Drag pages into the order they should appear in the More sheet.</p>
-            </div>
-            <button
-              type="button"
-              className={moreReorderMode ? 'btn-primary btn-compact' : 'btn-secondary btn-compact'}
-              onClick={() => {
-                setMoreReorderMode((value) => !value);
-                setMoreDragId(null);
-                setMoreOverId(null);
-              }}
-            >
-              {moreReorderMode ? 'Done' : 'Reorder'}
-            </button>
+          <div className="settings-subsection-heading">
+            <h4>More Card Order</h4>
+            <p>Drag pages into the order they should appear in the More sheet.</p>
           </div>
 
           {moreReorderMode && (
@@ -1216,31 +1234,7 @@ export default function Settings({
 
   function renderAboutCard() {
     return (
-      <SettingsCard
-        id="about"
-        key="about"
-        title="Orbit Money"
-        description="Build details, developer info, and session controls."
-        className="settings-about-section"
-        collapsed={collapsedCards.has('about')}
-        onToggle={() => toggleCardCollapsed('about')}
-        collapsedContent={
-          <div className="settings-collapsed-action">
-            <div className="settings-collapsed-summary">
-              <strong>{APP_VERSION_LABEL}</strong>
-              <span>Neal Overbay</span>
-            </div>
-            <button
-              type="button"
-              className="btn-danger"
-              onClick={handleSignOut}
-              disabled={signingOut}
-            >
-              {signingOut ? 'Signing Out...' : 'Sign Out'}
-            </button>
-          </div>
-        }
-      >
+      <section className="settings-section settings-about-section" key="about">
         <div className="settings-about-brand">
           <img src={APP_ICON_512} alt="" className="settings-about-icon" />
           <div>
@@ -1255,9 +1249,12 @@ export default function Settings({
           </div>
           <div>
             <dt>Developer</dt>
-            <dd className="settings-developer-line">
-              <span>Neal Overbay</span>
-              <button type="button" className="btn-secondary btn-compact" onClick={handleDonatePlaceholder}>
+            <dd>Neal Overbay</dd>
+          </div>
+          <div>
+            <dt>Donate</dt>
+            <dd>
+              <button type="button" className="btn-secondary btn-compact settings-donate-button" onClick={handleDonatePlaceholder}>
                 Donate
               </button>
             </dd>
@@ -1282,7 +1279,7 @@ export default function Settings({
         <div className="settings-about-footer">
           <span>Copyright 2026 Neal Overbay. All rights reserved.</span>
         </div>
-      </SettingsCard>
+      </section>
     );
   }
 

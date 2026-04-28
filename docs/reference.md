@@ -217,7 +217,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - **Desktop sidebar:** Lists every visible page directly. Primary routes remain first, and More-menu pages follow the user-controlled More order. Bottom tabs are hidden on desktop.
 - **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Savings Goals, Upcoming, Retirement Calculator, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings. Settings can hide optional frontend sections from navigation and reorder More-menu cards via `localStorage`; locked pages stay visible.
 - **Deprecated hamburger:** the old hamburger menu was removed; do not reintroduce it.
-- **Settings page:** Collapsible/reorderable cards for Appearance, Features, SimpleFIN, Rocket Money CSV import, Account, and Orbit Money build details. The Features card owns frontend-only navigation visibility, More-card order, and the existing MHA visibility control.
+- **Settings page:** Collapsible/reorderable cards for Appearance, App Features, SimpleFIN, Rocket Money CSV import, Account, and Orbit Money build details. The App Features card owns frontend-only navigation visibility, More-card order, and the existing MHA visibility control.
 - **React Router v6:** Client-side routing with browser back/forward support. All routes served via Express catch-all for deep-link support.
 
 ### UI Details
