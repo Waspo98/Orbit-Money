@@ -636,6 +636,7 @@ input, textarea, select {
   max-height: 90dvh;
   overflow-y: auto;
   animation: modalIn var(--dur-base) var(--ease-out);
+  scrollbar-gutter: stable;
 }
 
 .modal.modal-zoom {
@@ -659,10 +660,30 @@ input, textarea, select {
 }
 
 .modal-actions {
+  position: sticky;
+  bottom: -28px;
+  z-index: 5;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 24px;
+  margin: 24px -28px -28px;
+  padding: 14px 28px 18px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--surface) 78%, transparent),
+      var(--surface) 26px
+    );
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.modal-actions .btn-primary,
+.modal-actions .btn-secondary,
+.modal-actions .btn-danger {
+  min-height: 44px;
 }
 
 @keyframes backdropIn { from { opacity: 0; } to { opacity: 1; } }
@@ -9270,10 +9291,13 @@ input, textarea, select {
 .filter-sheet-actions {
   position: sticky;
   bottom: 0;
-  background: var(--surface);
-  padding-top: 12px;
-  margin-top: 8px;
+  margin: 8px 0 0;
+  padding: 12px 0 0;
   border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .filter-section {
