@@ -2601,7 +2601,7 @@ input, textarea, select {
 }
 
 .dashboard-view::before {
-  top: 170px;
+  top: 96px;
   bottom: 0;
   opacity: 0.62;
   background:
@@ -2641,7 +2641,7 @@ input, textarea, select {
 }
 
 .dashboard-view::after {
-  top: 230px;
+  top: 156px;
   bottom: 0;
   opacity: 0.26;
   background:

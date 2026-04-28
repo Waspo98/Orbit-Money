@@ -570,7 +570,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
     let frameId = 0;
     function updateBackdropDepth() {
       frameId = 0;
-      const offset = Math.round(window.scrollY * 0.34);
+      const offset = Math.round(window.scrollY * 0.17);
       view.style.setProperty('--dashboard-bg-offset', `${offset}px`);
     }
 
