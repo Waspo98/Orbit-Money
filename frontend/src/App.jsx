@@ -27,6 +27,7 @@ import Household from './pages/Household.jsx';
 import BrandLogo from './components/BrandLogo.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
+import DepthPattern from './components/DepthPattern.jsx';
 import SyncErrorBanner from './components/SyncErrorBanner.jsx';
 import MoreSheet from './components/MoreSheet.jsx';
 import { useTheme } from './hooks/useTheme.js';
@@ -274,6 +275,7 @@ function AppShell() {
       <SyncErrorBanner onOpenSettings={() => navigate('/settings')} />
 
       <main className="app-main">
+        <DepthPattern className="app-depth-pattern" />
         {lookupError ? (
           <div className="empty-state app-load-error">
             <div className="empty-state-icon">!</div>
