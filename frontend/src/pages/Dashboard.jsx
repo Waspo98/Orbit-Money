@@ -98,6 +98,71 @@ function formatWholeCurrency(amount) {
   });
 }
 
+function prefersReducedMotion() {
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function useAnimatedNumber(value, duration = 700) {
+  const target = Number(value) || 0;
+  const [displayValue, setDisplayValue] = useState(() =>
+    prefersReducedMotion() ? target : 0
+  );
+  const previousTargetRef = useRef(target);
+  const mountedRef = useRef(false);
+
+  useEffect(() => {
+    if (prefersReducedMotion()) {
+      previousTargetRef.current = target;
+      mountedRef.current = true;
+      setDisplayValue(target);
+      return undefined;
+    }
+
+    const from = mountedRef.current ? previousTargetRef.current : 0;
+    previousTargetRef.current = target;
+    mountedRef.current = true;
+
+    if (from === target) {
+      setDisplayValue(target);
+      return undefined;
+    }
+
+    let frameId = 0;
+    const startedAt = window.performance.now();
+
+    function step(now) {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(from + (target - from) * eased);
+
+      if (progress < 1) {
+        frameId = window.requestAnimationFrame(step);
+      }
+    }
+
+    frameId = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [duration, target]);
+
+  return displayValue;
+}
+
+function AnimatedMoney({
+  as: Component = 'span',
+  value,
+  formatter = formatCurrency,
+  className = ''
+}) {
+  const animatedValue = useAnimatedNumber(value);
+
+  return (
+    <Component className={className}>
+      {formatter(animatedValue)}
+    </Component>
+  );
+}
+
 function daysInCurrentMonth() {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
@@ -920,11 +985,12 @@ function AccountsCard({ totals, activeCount, loading }) {
         <>
           <div className="dash-networth">
             <div className="dash-networth-label">Net worth</div>
-            <div
+            <AnimatedMoney
+              as="div"
+              value={totals.net}
+              formatter={formatCurrency}
               className={`dash-networth-value ${netPositive ? 'income' : 'expense'}`}
-            >
-              {formatCurrency(totals.net)}
-            </div>
+            />
             <div className="subtle dash-networth-sub">
               Across {activeCount} {activeCount === 1 ? 'account' : 'accounts'}
             </div>
@@ -940,7 +1006,7 @@ function AccountsCard({ totals, activeCount, loading }) {
                       r.isDebt || r.value < 0 ? 'expense' : ''
                     }`}
                   >
-                    {formatCurrency(r.value)}
+                    <AnimatedMoney value={r.value} formatter={formatCurrency} />
                   </span>
                 </li>
               ))}
@@ -978,25 +1044,32 @@ function MonthCard({ summary, dayOfMonth, totalDays, loading }) {
           <div className="dash-month-stats">
             <div className="dash-month-stat">
               <div className="dash-month-stat-label">Income</div>
-              <div className="dash-month-stat-value income">
-                {formatCompactCurrency(summary.total_income)}
-              </div>
+              <AnimatedMoney
+                as="div"
+                value={summary.total_income}
+                formatter={formatCompactCurrency}
+                className="dash-month-stat-value income"
+              />
             </div>
             <div className="dash-month-stat">
               <div className="dash-month-stat-label">Expenses</div>
-              <div className="dash-month-stat-value expense">
-                {formatCompactCurrency(Math.abs(summary.total_expenses))}
-              </div>
+              <AnimatedMoney
+                as="div"
+                value={Math.abs(summary.total_expenses)}
+                formatter={formatCompactCurrency}
+                className="dash-month-stat-value expense"
+              />
             </div>
             <div className="dash-month-stat">
               <div className="dash-month-stat-label">Net</div>
-              <div
+              <AnimatedMoney
+                as="div"
+                value={Math.abs(summary.total_net)}
+                formatter={formatCompactCurrency}
                 className={`dash-month-stat-value ${
                   summary.total_net >= 0 ? 'income' : 'expense'
                 }`}
-              >
-                {formatCompactCurrency(Math.abs(summary.total_net))}
-              </div>
+              />
             </div>
           </div>
         </>

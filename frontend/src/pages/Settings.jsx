@@ -790,7 +790,6 @@ export default function Settings({
           <img src={APP_ICON_512} alt="" className="settings-about-icon" />
           <div>
             <h3 id="settings-about-title"><BrandLogo /></h3>
-            <p>Personal finance PWA</p>
           </div>
         </div>
 

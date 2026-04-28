@@ -1476,6 +1476,21 @@ input, textarea, select {
   box-shadow: var(--shadow-xl);
 }
 
+.login-brand-lockup {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+.login-brand-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  object-fit: cover;
+  box-shadow: 0 14px 32px rgba(10, 18, 14, 0.14);
+  animation: loginIconSettle 560ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+
 .login-title {
   display: flex;
   align-items: center;
@@ -1489,9 +1504,38 @@ input, textarea, select {
 .login-title .brand-logo {
   --brand-logo-width: 212px;
   --brand-logo-height: 50px;
+  animation: loginWordmarkReveal 520ms ease 140ms both;
 }
 
 .login-subtitle { margin: 0 0 32px; color: var(--text-muted); font-size: 0.95rem; }
+
+@keyframes loginIconSettle {
+  from {
+    opacity: 0;
+    transform: translateY(-18px) scale(1.32);
+    filter: blur(5px);
+  }
+  64% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes loginWordmarkReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 .login-card .btn-primary {
   width: 100%;
@@ -1748,6 +1792,11 @@ input, textarea, select {
   .route-transition {
     animation: none !important;
     will-change: auto;
+  }
+
+  .login-brand-icon,
+  .login-title .brand-logo {
+    animation: none !important;
   }
 }
 
@@ -2449,17 +2498,101 @@ input, textarea, select {
 /* ================== 5. PAGES — Dashboard (v16) ================== */
 
 .dashboard-view {
+  position: relative;
+  isolation: isolate;
   max-width: none;
   margin: 0 auto;
   /* Hold document height during loading/skeleton swap — see
      .budgets-view for the full rationale. Eliminates the height
      collapse that triggers mobile viewport rescaling. */
   min-height: calc(100dvh - 140px);
+  padding-bottom: 1px;
+  overflow: clip;
+}
+
+.dashboard-view::before,
+.dashboard-view::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.dashboard-view::before {
+  top: 300px;
+  bottom: 0;
+  opacity: 0.62;
+  background:
+    radial-gradient(circle at 12% 14%, color-mix(in srgb, var(--accent) 45%, transparent) 0 2px, transparent 3px),
+    radial-gradient(circle at 42% 8%, color-mix(in srgb, var(--text-muted) 34%, transparent) 0 2px, transparent 3px),
+    radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--accent) 42%, transparent) 0 2px, transparent 3px),
+    radial-gradient(circle at 91% 42%, color-mix(in srgb, var(--text-muted) 28%, transparent) 0 2px, transparent 3px),
+    radial-gradient(circle at 28% 62%, color-mix(in srgb, var(--accent) 38%, transparent) 0 2px, transparent 3px),
+    radial-gradient(circle at 68% 74%, color-mix(in srgb, var(--text-muted) 32%, transparent) 0 2px, transparent 3px),
+    linear-gradient(58deg, transparent 0 10%, color-mix(in srgb, var(--accent) 20%, transparent) 10.15% 10.35%, transparent 10.55% 100%),
+    linear-gradient(122deg, transparent 0 28%, color-mix(in srgb, var(--text-muted) 18%, transparent) 28.1% 28.3%, transparent 28.5% 100%),
+    linear-gradient(152deg, transparent 0 44%, color-mix(in srgb, var(--accent) 18%, transparent) 44.1% 44.3%, transparent 44.5% 100%),
+    linear-gradient(28deg, transparent 0 63%, color-mix(in srgb, var(--text-muted) 16%, transparent) 63.1% 63.3%, transparent 63.5% 100%);
+  background-size:
+    360px 320px,
+    420px 360px,
+    380px 300px,
+    460px 380px,
+    410px 340px,
+    390px 310px,
+    430px 330px,
+    520px 390px,
+    460px 360px,
+    540px 420px;
+  background-position:
+    12px 0,
+    90px 70px,
+    0 150px,
+    130px 220px,
+    240px 360px,
+    40px 520px,
+    -110px 20px,
+    60px 40px,
+    -80px 190px,
+    170px 320px;
+  mask-image: linear-gradient(to bottom, transparent, #000 9%, #000 88%, transparent);
+}
+
+.dashboard-view::after {
+  top: 360px;
+  bottom: 0;
+  opacity: 0.26;
+  background:
+    radial-gradient(ellipse at 8% 8%, color-mix(in srgb, var(--accent-soft) 55%, transparent), transparent 34%),
+    radial-gradient(ellipse at 88% 36%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 32%);
+  filter: blur(10px);
+  mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 78%, transparent);
+}
+
+:root[data-theme="dark"] .dashboard-view::before {
+  opacity: 0.46;
+}
+
+:root[data-theme="dark"] .dashboard-view::after {
+  opacity: 0.34;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .dashboard-view::before {
+    opacity: 0.46;
+  }
+
+  :root:not([data-theme="light"]) .dashboard-view::after {
+    opacity: 0.34;
+  }
 }
 
 .dashboard-grid,
 .dashboard-view > .empty-state,
 .dashboard-view > .error {
+  position: relative;
+  z-index: 1;
   width: calc(100% - 40px);
   max-width: 960px;
   margin-left: auto;
@@ -2981,6 +3114,8 @@ input, textarea, select {
 }
 
 .dashboard-customize-bar {
+  position: relative;
+  z-index: 1;
   width: calc(100% - 40px);
   max-width: 960px;
   margin: 16px auto 110px;
@@ -8778,21 +8913,24 @@ input, textarea, select {
   box-shadow: var(--shadow-sm);
 }
 
+.settings-about-brand > div {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+}
+
 .settings-about-brand h3 {
-  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  margin: 0;
   font-size: 1.18rem;
   font-weight: 700;
+  line-height: 1;
 }
 
 .settings-about-brand .brand-logo {
   --brand-logo-width: 166px;
   --brand-logo-height: 40px;
-}
-
-.settings-about-brand p {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.9rem;
 }
 
 .settings-about-details {
