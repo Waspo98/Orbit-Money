@@ -1352,28 +1352,42 @@ function UncategorizedCard({ data, loading }) {
 }
 
 function CategorizeRecentCard({ loading, onOpen }) {
-  return (
-    <DashboardCard title="Categorize Recent Transactions">
-      {loading ? (
+  if (loading) {
+    return (
+      <DashboardCard title="Categorize Recent Transactions">
         <CardSkeleton />
-      ) : (
-        <div className="review-launch-card">
-          <div className="review-launch-icon" aria-hidden="true">
-            ?
-          </div>
-          <div>
-            <strong>Quick category check</strong>
-            <p>
-              Review uncategorized transactions, noisy merchant names, likely transfers,
-              and category pattern changes.
-            </p>
-          </div>
-          <button type="button" className="btn-primary" onClick={onOpen}>
-            Categorize Recent Transactions
-          </button>
-        </div>
-      )}
-    </DashboardCard>
+      </DashboardCard>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="dashboard-card review-launch-card-button"
+      onClick={onOpen}
+      aria-label="Categorize recent transactions"
+    >
+      <span className="dashboard-card-header review-launch-header">
+        <h3>Categorize Recent Transactions</h3>
+        <span className="dashboard-card-link" aria-hidden="true">Open</span>
+      </span>
+      <span className="review-launch-card">
+        <span className="review-launch-graphic" aria-hidden="true">
+          <span className="review-launch-ghost-card left" />
+          <span className="review-launch-ghost-card right" />
+          <span className="review-launch-main-card">
+            <span />
+            <span />
+          </span>
+        </span>
+        <span>
+          <strong>Quick category check</strong>
+          <p>
+            Swipe through recent transactions that need a little human judgment.
+          </p>
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -1391,7 +1405,7 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
   const [funMode, setFunMode] = useState(false);
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const dragRef = useRef({ active: false, startX: 0 });
+  const dragRef = useRef({ active: false, startX: 0, readySide: null });
 
   const currentTxn = items[currentIndex] || null;
   const batchComplete = batchReviewed >= 10 || (!currentTxn && items.length > 0);
@@ -1441,6 +1455,7 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
     setCurrentIndex(0);
     setBatchReviewed(0);
     setDragX(0);
+    dragRef.current.readySide = null;
 
     try {
       if (fun) {
@@ -1469,6 +1484,7 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
     if (txn) rememberHandled(txn.id);
     setCategoryPickerOpen(false);
     setDragX(0);
+    dragRef.current.readySide = null;
     setBatchReviewed((count) => count + 1);
     setCurrentIndex((index) => index + 1);
   }
@@ -1518,19 +1534,26 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
   function onPointerDown(event) {
     if (!currentTxn || categoryPickerOpen || saving) return;
     if (event.target.closest('button, a, input, select, textarea')) return;
-    dragRef.current = { active: true, startX: event.clientX };
+    dragRef.current = { active: true, startX: event.clientX, readySide: null };
     setDragging(true);
     event.currentTarget.setPointerCapture?.(event.pointerId);
   }
 
   function onPointerMove(event) {
     if (!dragRef.current.active) return;
-    setDragX(event.clientX - dragRef.current.startX);
+    const nextX = event.clientX - dragRef.current.startX;
+    const readySide = nextX > 90 ? 'yes' : nextX < -90 ? 'no' : null;
+    if (readySide && readySide !== dragRef.current.readySide) {
+      navigator.vibrate?.(12);
+    }
+    dragRef.current.readySide = readySide;
+    setDragX(nextX);
   }
 
   function onPointerUp(event) {
     if (!dragRef.current.active) return;
     dragRef.current.active = false;
+    dragRef.current.readySide = null;
     setDragging(false);
     event.currentTarget.releasePointerCapture?.(event.pointerId);
     if (dragX > 90) handleApprove();
@@ -1564,7 +1587,7 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
       {({ close }) => (
         <>
           <div className="modal-header">
-            <h3>Categorize Recent Transactions</h3>
+            <h3>Is this category correct?</h3>
             <button type="button" className="modal-close" onClick={close} aria-label="Close">
               x
             </button>
@@ -1627,6 +1650,10 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
                 </div>
 
                 <div className="review-swipe-stage">
+                  <div className="review-swipe-track-hint" aria-hidden="true">
+                    <span>Change</span>
+                    <span>Confirm</span>
+                  </div>
                   <div
                     className={`review-swipe-card ${dragging ? 'dragging' : ''} ${cardTone}`}
                     style={{
@@ -1637,6 +1664,7 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
                     onPointerUp={onPointerUp}
                     onPointerCancel={() => {
                       dragRef.current.active = false;
+                      dragRef.current.readySide = null;
                       setDragging(false);
                       setDragX(0);
                     }}
@@ -1651,13 +1679,10 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
                   </div>
                 </div>
 
-                <div className="review-answer-actions">
-                  <button type="button" className="btn-secondary" onClick={handleReject}>
-                    No
-                  </button>
-                  <button type="button" className="btn-primary" onClick={handleApprove}>
-                    Yes
-                  </button>
+                <div className="review-swipe-hint">
+                  <span>← Change</span>
+                  <span className="review-swipe-pill" aria-hidden="true" />
+                  <span>Confirm →</span>
                 </div>
               </>
             ) : null}
@@ -1704,13 +1729,23 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
 }
 
 function ReviewTransactionCard({ txn, category, account }) {
+  const logoUrl = txn.merchant_logo?.url;
   return (
     <div className="review-card-content">
       <div className="review-card-topline">
         <span>{formatShortDate(txn.date)}</span>
         {account?.name && <span>{account.name}</span>}
       </div>
-      <strong className="review-card-merchant">{txn.merchant || 'Transaction'}</strong>
+      <div className="review-card-merchant-row">
+        <span
+          className={`review-card-logo ${logoUrl ? 'has-logo' : ''}`}
+          style={!logoUrl && category?.color ? { color: category.color } : undefined}
+          aria-hidden="true"
+        >
+          {logoUrl ? <img src={logoUrl} alt="" loading="lazy" /> : category?.icon || '?'}
+        </span>
+        <strong className="review-card-merchant">{txn.merchant || 'Transaction'}</strong>
+      </div>
       {txn.original_description && (
         <p>{txn.original_description}</p>
       )}
