@@ -258,6 +258,16 @@ export default function Settings({
       .filter(Boolean);
   }, [normalizedNavigationPreferences]);
 
+  const pageOrderRoutes = useMemo(() => {
+    const visible = [];
+    const hidden = [];
+    for (const route of moreRoutes) {
+      if (isFeatureVisible(route)) visible.push(route);
+      else hidden.push(route);
+    }
+    return [...visible, ...hidden];
+  }, [moreRoutes, mhaTrackerEnabled, normalizedNavigationPreferences]);
+
   const optionalFeatureRoutes = ROUTES.filter((route) => route.nav && !route.locked);
   const settingsOrder = normalizeSettingsCardOrder(settingsCardOrder);
 
@@ -517,11 +527,19 @@ export default function Settings({
     setMoreOverId(null);
     if (!over || active.id === over.id) return;
 
-    const oldIndex = moreRoutes.findIndex((route) => route.path === active.id);
-    const newIndex = moreRoutes.findIndex((route) => route.path === over.id);
+    const visibleRoutes = pageOrderRoutes.filter((route) => isFeatureVisible(route));
+    const hiddenRoutes = pageOrderRoutes.filter((route) => !isFeatureVisible(route));
+    const overRoute = pageOrderRoutes.find((route) => route.path === over.id);
+    const oldIndex = visibleRoutes.findIndex((route) => route.path === active.id);
+    const newIndex = overRoute && !isFeatureVisible(overRoute)
+      ? visibleRoutes.length - 1
+      : visibleRoutes.findIndex((route) => route.path === over.id);
     if (oldIndex < 0 || newIndex < 0) return;
 
-    const nextRoutes = arrayMove(moreRoutes, oldIndex, newIndex);
+    const nextRoutes = [
+      ...arrayMove(visibleRoutes, oldIndex, newIndex),
+      ...hiddenRoutes
+    ];
     updateNavigationPreferences((prefs) => ({
       ...prefs,
       moreRouteOrder: nextRoutes.map((route) => route.path)
@@ -1260,21 +1278,26 @@ export default function Settings({
                 onDragEnd={handleMoreDragEnd}
               >
                 <SortableContext
-                  items={moreRoutes.map((route) => route.path)}
+                  items={pageOrderRoutes.map((route) => route.path)}
                   strategy={verticalListSortingStrategy}
                 >
                   <div className="settings-reorder-list reorder-active reorder-drag-scope">
-                    {moreRoutes.map((route) => (
-                      <ReorderListItem
-                        key={route.path}
-                        id={route.path}
-                        leading={<AppIcon name={route.icon} className="settings-reorder-icon" />}
-                        handleLabel={`Move ${route.label}`}
-                        title={route.label}
-                        subtitle={route.description}
-                        previewDisplaced={route.path === moreOverId && route.path !== moreDragId}
-                      />
-                    ))}
+                    {pageOrderRoutes.map((route) => {
+                      const visible = isFeatureVisible(route);
+                      return (
+                        <ReorderListItem
+                          key={route.path}
+                          id={route.path}
+                          className={visible ? '' : 'settings-reorder-row-off'}
+                          disabled={!visible}
+                          leading={<AppIcon name={route.icon} className="settings-reorder-icon" />}
+                          handleLabel={`Move ${route.label}`}
+                          title={route.label}
+                          subtitle={visible ? route.description : 'Turned off'}
+                          previewDisplaced={visible && route.path === moreOverId && route.path !== moreDragId}
+                        />
+                      );
+                    })}
                   </div>
                 </SortableContext>
                 {moreDragId && <div className="drag-screen-blocker" aria-hidden="true" />}

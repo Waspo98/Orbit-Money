@@ -6066,6 +6066,15 @@ input, textarea, select {
   background: color-mix(in srgb, var(--accent-soft) 58%, var(--surface) 42%);
 }
 
+.reorder-list-row.is-disabled {
+  cursor: default;
+}
+
+.reorder-list-row.is-disabled .reorder-drag-handle {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .reorder-drag-handle {
   appearance: none;
   border: 0;
@@ -8929,6 +8938,16 @@ input, textarea, select {
 .settings-reorder-icon {
   width: 28px;
   height: 28px;
+}
+
+.settings-reorder-row-off {
+  opacity: 0.56;
+  background: var(--surface-2);
+}
+
+.settings-reorder-row-off .selectable-list-main strong,
+.settings-reorder-row-off .settings-reorder-icon {
+  color: var(--text-muted);
 }
 
 .settings-reorder-modal {

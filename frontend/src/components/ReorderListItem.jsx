@@ -33,6 +33,7 @@ function ReorderListItemPreview({
   subtitle,
   sidePrimary,
   sideSecondary,
+  disabled = false,
   style,
   itemRef,
   handleRef,
@@ -44,13 +45,14 @@ function ReorderListItemPreview({
     <Element
       ref={itemRef}
       style={style}
-      className={`selectable-list-item reorder-list-row ${leading ? 'has-leading' : 'no-leading'} ${hasSide ? 'has-side' : 'no-side'} ${className}`.trim()}
+      className={`selectable-list-item reorder-list-row ${leading ? 'has-leading' : 'no-leading'} ${hasSide ? 'has-side' : 'no-side'} ${disabled ? 'is-disabled' : ''} ${className}`.trim()}
     >
       <button
         type="button"
         ref={handleRef}
         className="drag-grip reorder-drag-handle"
         aria-label={handleLabel}
+        disabled={disabled}
         {...handleProps}
       >
         <span aria-hidden="true">⋮⋮</span>
@@ -113,6 +115,7 @@ export default function ReorderListItem({
       subtitle={subtitle}
       sidePrimary={sidePrimary}
       sideSecondary={sideSecondary}
+      disabled={disabled}
       style={style}
       itemRef={setNodeRef}
       handleRef={setActivatorNodeRef}
