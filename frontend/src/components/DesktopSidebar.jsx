@@ -4,9 +4,12 @@ import BrandLogo from './BrandLogo.jsx';
 import { getNavigationRoutes } from '../navigation.js';
 import { APP_ICON_192 } from '../brandAssets.js';
 
-export default function DesktopSidebar({ mhaTrackerEnabled = false }) {
+export default function DesktopSidebar({
+  mhaTrackerEnabled = false,
+  navigationPreferences
+}) {
   const navigate = useNavigate();
-  const links = getNavigationRoutes({ mhaTrackerEnabled });
+  const links = getNavigationRoutes({ mhaTrackerEnabled, navigationPreferences });
 
   return (
     <aside className="desktop-sidebar">

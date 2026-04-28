@@ -1,34 +1,132 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { closestCenter, DndContext } from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
 import { api } from '../api.js';
+import AppIcon from '../components/AppIcon.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
+import CollapseIndicator from '../components/CollapseIndicator.jsx';
 import PageHero from '../components/PageHero.jsx';
+import ReorderListItem, {
+  useDragInteractionLock,
+  useReorderSensors
+} from '../components/ReorderListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import {
+  ROUTES,
+  normalizeNavigationPreferences
+} from '../navigation.js';
 import { APP_VERSION_LABEL } from '../version.js';
 import { APP_ICON_512 } from '../brandAssets.js';
+
+const SIMPLEFIN_BRIDGE_URL = 'https://beta-bridge.simplefin.org/';
+const SETTINGS_CARD_ORDER_STORAGE_KEY = 'orbit-money-settings-card-order';
 
 const THEME_OPTIONS = [
   {
     value: 'light',
     label: 'Day',
-    emoji: '☀️',
+    emoji: 'D',
     description: 'A bright interface for daylight use.'
   },
   {
     value: 'dark',
     label: 'Night',
-    emoji: '🌙',
+    emoji: 'N',
     description: 'A dimmer interface for low light.'
   },
   {
     value: 'system',
     label: 'System',
-    emoji: '💻',
+    emoji: 'S',
     description: 'Match this device automatically.'
   }
 ];
 
+const DARK_VARIANT_OPTIONS = [
+  {
+    value: 'classic',
+    label: 'Soft Dark',
+    emoji: 'D',
+    description: 'The current dark theme with lifted surfaces.'
+  },
+  {
+    value: 'amoled',
+    label: 'AMOLED Black',
+    emoji: 'B',
+    description: 'Pure black app background for night mode.'
+  }
+];
+
+const SETTINGS_CARD_DEFS = [
+  {
+    id: 'appearance',
+    title: 'Appearance',
+    description: 'Choose how the app looks on this device.'
+  },
+  {
+    id: 'features',
+    title: 'Features',
+    description: 'Show, hide, and reorder navigation sections.'
+  },
+  {
+    id: 'simplefin',
+    title: 'SimpleFIN',
+    description: 'Bank connection, sync status, and bridge setup.'
+  },
+  {
+    id: 'import',
+    title: 'Import',
+    description: 'Bring in Rocket Money data when you need to reload history.'
+  },
+  {
+    id: 'account',
+    title: 'Account',
+    description: 'Household access and signed-in user details.'
+  },
+  {
+    id: 'about',
+    title: 'Orbit Money',
+    description: 'Build details, developer info, and session controls.'
+  }
+];
+
+const DEFAULT_SETTINGS_CARD_ORDER = SETTINGS_CARD_DEFS.map((card) => card.id);
+const SETTINGS_CARD_BY_ID = new Map(SETTINGS_CARD_DEFS.map((card) => [card.id, card]));
+
+function normalizeSettingsCardOrder(value) {
+  const incoming = Array.isArray(value) ? value : [];
+  return [
+    ...incoming.filter((id) => SETTINGS_CARD_BY_ID.has(id)),
+    ...DEFAULT_SETTINGS_CARD_ORDER.filter((id) => !incoming.includes(id))
+  ];
+}
+
+function readSettingsCardOrder() {
+  try {
+    return normalizeSettingsCardOrder(
+      JSON.parse(localStorage.getItem(SETTINGS_CARD_ORDER_STORAGE_KEY) || '[]')
+    );
+  } catch {
+    return DEFAULT_SETTINGS_CARD_ORDER;
+  }
+}
+
+function writeSettingsCardOrder(order) {
+  const normalized = normalizeSettingsCardOrder(order);
+  try {
+    localStorage.setItem(SETTINGS_CARD_ORDER_STORAGE_KEY, JSON.stringify(normalized));
+  } catch {
+    /* ignore */
+  }
+  return normalized;
+}
+
 function formatDateTime(iso) {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
   return d.toLocaleString(undefined, {
     dateStyle: 'medium',
@@ -48,16 +146,64 @@ function displayPerson(person) {
   return person?.display_name || person?.displayName || person?.email || person?.username || 'Shared user';
 }
 
+function SettingsCard({
+  id,
+  title,
+  description,
+  collapsed,
+  onToggle,
+  className = '',
+  collapsedContent,
+  children
+}) {
+  return (
+    <section
+      className={`settings-section settings-card ${collapsed ? 'is-collapsed' : ''} ${className}`.trim()}
+      aria-labelledby={`settings-card-${id}`}
+    >
+      <button
+        type="button"
+        className="settings-card-header-button"
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+        aria-controls={`settings-card-body-${id}`}
+      >
+        <span className="settings-section-header">
+          <h3 id={`settings-card-${id}`}>{title}</h3>
+          {description && <p>{description}</p>}
+        </span>
+        <CollapseIndicator expanded={!collapsed} className="settings-card-caret" />
+      </button>
+
+      {collapsed ? (
+        collapsedContent && (
+          <div className="settings-card-collapsed" id={`settings-card-body-${id}`}>
+            {collapsedContent}
+          </div>
+        )
+      ) : (
+        <div className="settings-card-body" id={`settings-card-body-${id}`}>
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function Settings({
   themeMode = 'system',
   onThemeChange,
+  darkVariant = 'classic',
+  onDarkVariantChange,
   onLogout,
   mhaTrackerEnabled = false,
   onMhaTrackerChange,
+  navigationPreferences,
+  onNavigationPreferencesChange,
   onImportComplete
 }) {
   const { alert, confirm, Dialog } = useAppDialog();
-  // SimpleFIN section
+
   const [status, setStatus] = useState(null);
   const [setupToken, setSetupToken] = useState('');
   const [cutoverDate, setCutoverDate] = useState(todayIso());
@@ -83,7 +229,35 @@ export default function Settings({
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [importError, setImportError] = useState('');
+  const [collapsedCards, setCollapsedCards] = useState(() => new Set());
+  const [settingsCardOrder, setSettingsCardOrder] = useState(readSettingsCardOrder);
+  const [settingsReorderMode, setSettingsReorderMode] = useState(false);
+  const [settingsDragId, setSettingsDragId] = useState(null);
+  const [settingsOverId, setSettingsOverId] = useState(null);
+  const [moreReorderMode, setMoreReorderMode] = useState(false);
+  const [moreDragId, setMoreDragId] = useState(null);
+  const [moreOverId, setMoreOverId] = useState(null);
   const fileInputRef = useRef(null);
+  const sensors = useReorderSensors();
+
+  const normalizedNavigationPreferences = useMemo(
+    () => normalizeNavigationPreferences(navigationPreferences),
+    [navigationPreferences]
+  );
+
+  const moreRoutes = useMemo(() => {
+    const moreByPath = new Map(
+      ROUTES.filter((route) => route.nav === 'more').map((route) => [route.path, route])
+    );
+    return normalizedNavigationPreferences.moreRouteOrder
+      .map((path) => moreByPath.get(path))
+      .filter(Boolean);
+  }, [normalizedNavigationPreferences]);
+
+  const visibleFeatureCount = ROUTES.filter((route) => route.nav && isFeatureVisible(route)).length;
+  const settingsOrder = normalizeSettingsCardOrder(settingsCardOrder);
+
+  useDragInteractionLock(Boolean(settingsDragId || moreDragId));
 
   async function loadStatus() {
     try {
@@ -117,6 +291,43 @@ export default function Settings({
     loadStatus();
     loadSharing();
   }, []);
+
+  function isFeatureVisible(route) {
+    if (route.feature === 'mha') return !!mhaTrackerEnabled;
+    return !normalizedNavigationPreferences.hiddenRoutePaths[route.path];
+  }
+
+  function updateNavigationPreferences(updater) {
+    onNavigationPreferencesChange?.((prev) =>
+      normalizeNavigationPreferences(
+        typeof updater === 'function'
+          ? updater(normalizeNavigationPreferences(prev))
+          : updater
+      )
+    );
+  }
+
+  function updateSettingsOrder(updater) {
+    setSettingsCardOrder((prev) => {
+      const next =
+        typeof updater === 'function'
+          ? updater(normalizeSettingsCardOrder(prev))
+          : updater;
+      return writeSettingsCardOrder(next);
+    });
+  }
+
+  function toggleCardCollapsed(id) {
+    setCollapsedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
 
   async function handleSetup(e) {
     e.preventDefault();
@@ -157,16 +368,14 @@ export default function Settings({
         destructive: true
       }
     );
-    if (!ok) {
-      return;
-    }
+    if (!ok) return;
     try {
       await api.post('/api/simplefin/disconnect');
       setSyncResult(null);
       setSyncError('');
       await loadStatus();
     } catch (err) {
-      alert(err.message || 'Disconnect failed', { title: 'Disconnect failed' });
+      alert(err.message || 'Disconnect failed', { title: 'Disconnect Failed' });
     }
   }
 
@@ -179,20 +388,22 @@ export default function Settings({
     const ok = await confirm(
       'Sign out on this device?',
       {
-        title: 'Sign out',
-        confirmLabel: 'Sign out',
+        title: 'Sign Out',
+        confirmLabel: 'Sign Out',
         destructive: true
       }
     );
-    if (!ok || !onLogout) {
-      return;
-    }
+    if (!ok || !onLogout) return;
     setSigningOut(true);
     try {
       await onLogout();
     } finally {
       setSigningOut(false);
     }
+  }
+
+  function handleDonatePlaceholder() {
+    alert('Donation link is not configured yet.', { title: 'Donate' });
   }
 
   async function handleShare(e) {
@@ -218,7 +429,7 @@ export default function Settings({
     const ok = await confirm(
       `Stop sharing with ${share.invited_email}? If they have not signed in yet, this removes their pending access.`,
       {
-        title: 'Remove share',
+        title: 'Remove Share',
         confirmLabel: 'Remove',
         destructive: true
       }
@@ -242,7 +453,7 @@ export default function Settings({
     const ok = await confirm(
       `Remove ${name} from this household? They will no longer be able to access this family's data.`,
       {
-        title: 'Remove family member',
+        title: 'Remove Family Member',
         confirmLabel: 'Remove',
         destructive: true
       }
@@ -274,6 +485,56 @@ export default function Settings({
     } finally {
       setMhaBusy(false);
     }
+  }
+
+  function handleFeatureToggle(route) {
+    if (route.locked) return;
+    if (route.feature === 'mha') {
+      handleMhaToggle();
+      return;
+    }
+
+    const visible = isFeatureVisible(route);
+    updateNavigationPreferences((prefs) => {
+      const hiddenRoutePaths = { ...prefs.hiddenRoutePaths };
+      if (visible) {
+        hiddenRoutePaths[route.path] = true;
+      } else {
+        delete hiddenRoutePaths[route.path];
+      }
+      return { ...prefs, hiddenRoutePaths };
+    });
+  }
+
+  function handleMoreDragEnd(event) {
+    const { active, over } = event;
+    setMoreDragId(null);
+    setMoreOverId(null);
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = moreRoutes.findIndex((route) => route.path === active.id);
+    const newIndex = moreRoutes.findIndex((route) => route.path === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const nextRoutes = arrayMove(moreRoutes, oldIndex, newIndex);
+    updateNavigationPreferences((prefs) => ({
+      ...prefs,
+      moreRouteOrder: nextRoutes.map((route) => route.path)
+    }));
+  }
+
+  function handleSettingsDragEnd(event) {
+    const { active, over } = event;
+    setSettingsDragId(null);
+    setSettingsOverId(null);
+    if (!over || active.id === over.id) return;
+
+    updateSettingsOrder((prev) => {
+      const oldIndex = prev.indexOf(active.id);
+      const newIndex = prev.indexOf(over.id);
+      if (oldIndex < 0 || newIndex < 0) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
   }
 
   function handleFile(f) {
@@ -327,22 +588,25 @@ export default function Settings({
     }
   }
 
-  return (
-    <div className="settings-view">
-      <PageHero
-        id="settings-title"
-        variant="settings"
-        kicker="Control Center"
-        title="Settings"
-        subtitle="Maintenance and configuration."
-      />
+  function renderAppearanceCard() {
+    const activeTheme = THEME_OPTIONS.find((option) => option.value === themeMode);
+    const activeDarkVariant = DARK_VARIANT_OPTIONS.find((option) => option.value === darkVariant);
 
-      <section className="settings-section settings-section-top">
-        <div className="settings-section-header">
-          <h3>Appearance</h3>
-          <p>Choose how the app looks on this device.</p>
-        </div>
-
+    return (
+      <SettingsCard
+        id="appearance"
+        key="appearance"
+        title="Appearance"
+        description="Choose how the app looks on this device."
+        collapsed={collapsedCards.has('appearance')}
+        onToggle={() => toggleCardCollapsed('appearance')}
+        collapsedContent={
+          <div className="settings-collapsed-summary">
+            <strong>{activeTheme?.label || 'System'}</strong>
+            <span>{activeDarkVariant?.label || 'Soft Dark'} after dark.</span>
+          </div>
+        }
+      >
         <div className="settings-theme-toggle" role="radiogroup" aria-label="Theme">
           {THEME_OPTIONS.map((option) => (
             <button
@@ -361,28 +625,180 @@ export default function Settings({
             </button>
           ))}
         </div>
-      </section>
 
-      {/* ===== SimpleFIN ===== */}
-      <section className="settings-section">
-        <div className="settings-section-header">
-          <h3>SimpleFIN</h3>
-          <p>
-            {status === null
-              ? 'Loading…'
-              : status.connected
-              ? 'Connected — syncs daily at 6 AM.'
-              : 'Not connected.'}
-          </p>
+        <div className="settings-subsection">
+          <div className="settings-subsection-heading">
+            <h4>Night Style</h4>
+            <p>Used for Night mode and for System when this device is in dark mode.</p>
+          </div>
+          <div className="settings-theme-toggle settings-theme-toggle-two" role="radiogroup" aria-label="Night style">
+            {DARK_VARIANT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`settings-theme-option ${darkVariant === option.value ? 'active' : ''}`}
+                onClick={() => onDarkVariantChange?.(option.value)}
+                role="radio"
+                aria-checked={darkVariant === option.value}
+              >
+                <span className="settings-theme-emoji" aria-hidden>{option.emoji}</span>
+                <span className="settings-theme-text">
+                  <span className="settings-theme-label">{option.label}</span>
+                  <span className="settings-theme-copy">{option.description}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </SettingsCard>
+    );
+  }
+
+  function renderFeaturesCard() {
+    const featureRoutes = ROUTES.filter((route) => route.nav);
+
+    return (
+      <SettingsCard
+        id="features"
+        key="features"
+        title="Features"
+        description="Show, hide, and reorder navigation sections."
+        collapsed={collapsedCards.has('features')}
+        onToggle={() => toggleCardCollapsed('features')}
+        collapsedContent={
+          <div className="settings-collapsed-summary">
+            <strong>{visibleFeatureCount} Sections Visible</strong>
+            <span>Bottom tabs and locked pages stay pinned.</span>
+          </div>
+        }
+      >
+        <div className="settings-theme-toggle settings-feature-toggle" role="group" aria-label="Feature visibility">
+          {featureRoutes.map((route) => {
+            const visible = isFeatureVisible(route);
+            const locked = !!route.locked;
+            const disabled = locked || (route.feature === 'mha' && mhaBusy);
+            return (
+              <button
+                key={route.path}
+                type="button"
+                className={`settings-theme-option settings-feature-option ${visible ? 'active' : ''} ${locked ? 'locked' : ''}`}
+                onClick={() => handleFeatureToggle(route)}
+                disabled={disabled}
+                aria-pressed={visible}
+              >
+                <AppIcon name={route.icon} className="settings-feature-icon" />
+                <span className="settings-theme-text">
+                  <span className="settings-theme-label">{route.label}</span>
+                  <span className="settings-theme-copy">
+                    {locked ? 'Locked' : visible ? 'On' : 'Off'}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
         </div>
 
+        {mhaError && <div className="error" style={{ marginTop: 12 }}>{mhaError}</div>}
+
+        <div className="settings-subsection">
+          <div className="settings-subsection-heading settings-subsection-heading-row">
+            <div>
+              <h4>More Card Order</h4>
+              <p>Drag pages into the order they should appear in the More sheet.</p>
+            </div>
+            <button
+              type="button"
+              className={moreReorderMode ? 'btn-primary btn-compact' : 'btn-secondary btn-compact'}
+              onClick={() => {
+                setMoreReorderMode((value) => !value);
+                setMoreDragId(null);
+                setMoreOverId(null);
+              }}
+            >
+              {moreReorderMode ? 'Done' : 'Reorder'}
+            </button>
+          </div>
+
+          {moreReorderMode && (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={(event) => setMoreDragId(event.active.id)}
+              onDragOver={(event) => setMoreOverId(event.over?.id ?? null)}
+              onDragCancel={() => {
+                setMoreDragId(null);
+                setMoreOverId(null);
+              }}
+              onDragEnd={handleMoreDragEnd}
+            >
+              <SortableContext
+                items={moreRoutes.map((route) => route.path)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="settings-reorder-list reorder-active reorder-drag-scope">
+                  {moreRoutes.map((route) => (
+                    <ReorderListItem
+                      key={route.path}
+                      id={route.path}
+                      leading={<AppIcon name={route.icon} className="settings-reorder-icon" />}
+                      handleLabel={`Move ${route.label}`}
+                      title={route.label}
+                      subtitle={route.description}
+                      sidePrimary={route.locked ? 'Locked' : isFeatureVisible(route) ? 'On' : 'Off'}
+                      previewDisplaced={route.path === moreOverId && route.path !== moreDragId}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+              {moreDragId && <div className="drag-screen-blocker" aria-hidden="true" />}
+            </DndContext>
+          )}
+        </div>
+      </SettingsCard>
+    );
+  }
+
+  function renderSimpleFinCard() {
+    const statusCopy =
+      status === null
+        ? 'Loading...'
+        : status.connected
+        ? 'Connected - syncs daily at 6 AM.'
+        : 'Not connected.';
+
+    return (
+      <SettingsCard
+        id="simplefin"
+        key="simplefin"
+        title="SimpleFIN"
+        description={statusCopy}
+        collapsed={collapsedCards.has('simplefin')}
+        onToggle={() => toggleCardCollapsed('simplefin')}
+        collapsedContent={
+          <div className="settings-collapsed-action">
+            <div className="settings-collapsed-summary">
+              <strong>{status?.connected ? 'Connected' : 'Not Connected'}</strong>
+              <span>Last sync: {formatDateTime(status?.lastSyncAt)}</span>
+            </div>
+            {status?.connected ? (
+              <button type="button" className="btn-primary" onClick={handleSync} disabled={syncBusy}>
+                {syncBusy ? 'Syncing...' : 'Sync Now'}
+              </button>
+            ) : (
+              <a className="btn-secondary settings-action-link" href={SIMPLEFIN_BRIDGE_URL} target="_blank" rel="noreferrer">
+                Open Bridge
+              </a>
+            )}
+          </div>
+        }
+      >
         {status?.connected ? (
           <>
             <div className="status-grid">
-              <div><dt>Cutover date</dt><dd>{status.cutoverDate || '—'}</dd></div>
-              <div><dt>Last sync</dt><dd>{formatDateTime(status.lastSyncAt)}</dd></div>
+              <div><dt>Cutover Date</dt><dd>{status.cutoverDate || '-'}</dd></div>
+              <div><dt>Last Sync</dt><dd>{formatDateTime(status.lastSyncAt)}</dd></div>
               <div>
-                <dt>Last status</dt>
+                <dt>Last Status</dt>
                 <dd>
                   {status.lastSync ? (() => {
                     const msg = status.lastSync.error_message || '';
@@ -401,7 +817,7 @@ export default function Settings({
                       pillLabel = 'error';
                     }
                     return <span className={`pill ${pillClass}`}>{pillLabel}</span>;
-                  })() : '—'}
+                  })() : '-'}
                 </dd>
               </div>
             </div>
@@ -414,7 +830,7 @@ export default function Settings({
 
             <div className="settings-action">
               <div className="settings-action-info">
-                <strong>Sync now</strong>
+                <strong>Sync Now</strong>
                 <p>Pulls transactions since the last successful sync.</p>
               </div>
               <button
@@ -423,8 +839,18 @@ export default function Settings({
                 onClick={handleSync}
                 disabled={syncBusy}
               >
-                {syncBusy ? (<><span className="spinner-inline" /> Syncing…</>) : 'Sync now'}
+                {syncBusy ? (<><span className="spinner-inline" /> Syncing...</>) : 'Sync Now'}
               </button>
+            </div>
+
+            <div className="settings-action">
+              <div className="settings-action-info">
+                <strong>SimpleFIN Bridge</strong>
+                <p>Open the bridge site to manage or refresh the connection.</p>
+              </div>
+              <a className="btn-secondary settings-action-link" href={SIMPLEFIN_BRIDGE_URL} target="_blank" rel="noreferrer">
+                Open Bridge
+              </a>
             </div>
 
             {syncError && <div className="error" style={{ marginTop: 16 }}>{syncError}</div>}
@@ -434,7 +860,7 @@ export default function Settings({
                 <dl className="stat-grid">
                   <div><dt>Inserted</dt><dd>{syncResult.inserted.toLocaleString()}</dd></div>
                   <div><dt>Skipped</dt><dd>{syncResult.skipped.toLocaleString()}</dd></div>
-                  <div><dt>RM removed</dt><dd>{syncResult.rmDeleted.toLocaleString()}</dd></div>
+                  <div><dt>RM Removed</dt><dd>{syncResult.rmDeleted.toLocaleString()}</dd></div>
                   <div><dt>Accounts</dt><dd>{syncResult.accountsCreated.toLocaleString()}</dd></div>
                   <div><dt>Transfers</dt><dd>{syncResult.transfersPaired.toLocaleString()}</dd></div>
                 </dl>
@@ -443,7 +869,7 @@ export default function Settings({
 
             <div className="settings-action">
               <div className="settings-action-info">
-                <strong>Sync history</strong>
+                <strong>Sync History</strong>
                 <p>Recent runs and errors.</p>
               </div>
               <button type="button" className="btn-secondary" onClick={toggleLog}>
@@ -492,7 +918,7 @@ export default function Settings({
                               </span>
                             </td>
                             <td>{row.transactions_inserted}</td>
-                            <td className="error-col">{row.error_message || '—'}</td>
+                            <td className="error-col">{row.error_message || '-'}</td>
                           </tr>
                         );
                       })}
@@ -514,17 +940,23 @@ export default function Settings({
           </>
         ) : (
           <form onSubmit={handleSetup}>
+            <div className="settings-action">
+              <div className="settings-action-info">
+                <strong>SimpleFIN Bridge</strong>
+                <p>Get a setup token from the bridge, then paste it below.</p>
+              </div>
+              <a className="btn-secondary settings-action-link" href={SIMPLEFIN_BRIDGE_URL} target="_blank" rel="noreferrer">
+                Open Bridge
+              </a>
+            </div>
+
             <p style={{ marginBottom: 20 }}>
-              Get a setup token from{' '}
-              <a href="https://beta-bridge.simplefin.org/" target="_blank" rel="noreferrer">
-                simplefin.org
-              </a>{' '}
-              and paste it below. You'll also pick a <strong>cutover date</strong> — Rocket Money
+              Paste the setup token below. You'll also pick a <strong>cutover date</strong> - Rocket Money
               data is kept for dates before it, SimpleFIN owns dates after.
             </p>
 
             <label className="field">
-              <span>Setup token</span>
+              <span>Setup Token</span>
               <textarea
                 value={setupToken}
                 onChange={(e) => setSetupToken(e.target.value)}
@@ -536,7 +968,7 @@ export default function Settings({
             </label>
 
             <label className="field">
-              <span>Cutover date</span>
+              <span>Cutover Date</span>
               <input
                 type="date"
                 value={cutoverDate}
@@ -554,18 +986,40 @@ export default function Settings({
               disabled={setupBusy || !setupToken || !cutoverDate}
               style={{ width: '100%' }}
             >
-              {setupBusy ? (<><span className="spinner-inline" /> Connecting…</>) : 'Connect'}
+              {setupBusy ? (<><span className="spinner-inline" /> Connecting...</>) : 'Connect'}
             </button>
           </form>
         )}
-      </section>
+      </SettingsCard>
+    );
+  }
 
-      <section className="settings-section">
-        <div className="settings-section-header">
-          <h3>Import</h3>
-          <p>Bring in Rocket Money data when you need to reload history.</p>
-        </div>
-
+  function renderImportCard() {
+    return (
+      <SettingsCard
+        id="import"
+        key="import"
+        title="Import"
+        description="Bring in Rocket Money data when you need to reload history."
+        collapsed={collapsedCards.has('import')}
+        onToggle={() => toggleCardCollapsed('import')}
+        collapsedContent={
+          <div className="settings-collapsed-action">
+            <div className="settings-collapsed-summary">
+              <strong>{file ? file.name : importResult ? 'Import Complete' : 'CSV Import'}</strong>
+              <span>{file ? `${(file.size / 1024).toFixed(0)} KB selected` : 'Expand to choose a file.'}</span>
+            </div>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!file || importing}
+              onClick={handleImport}
+            >
+              {importing ? 'Importing...' : 'Import'}
+            </button>
+          </div>
+        }
+      >
         {importResult ? (
           <div className="result-card">
             <dl className="stat-grid">
@@ -583,11 +1037,11 @@ export default function Settings({
 
             <div className="settings-action">
               <div className="settings-action-info">
-                <strong>Import complete</strong>
+                <strong>Import Complete</strong>
                 <p>Refresh account lookups and review the imported transactions.</p>
               </div>
               <button type="button" className="btn-primary" onClick={onImportComplete}>
-                View transactions
+                View Transactions
               </button>
             </div>
           </div>
@@ -651,53 +1105,41 @@ export default function Settings({
             </button>
           </>
         )}
-      </section>
+      </SettingsCard>
+    );
+  }
 
-      <section className="settings-section">
-        <div className="settings-section-header">
-          <h3>MHA Tracker</h3>
-          <p>Show Ministerial Housing Allowance tools when you need them.</p>
-        </div>
+  function renderAccountCard() {
+    const currentUserCopy = sharing?.currentUser
+      ? `${displayPerson(sharing.currentUser)} - ${sharing.currentUser.role}`
+      : 'Loading account details...';
 
-        <div className="settings-action">
-          <div className="settings-action-info">
-            <strong>MHA Tracker</strong>
-            <p>When off, the tracker page and transaction MHA controls are hidden.</p>
+    return (
+      <SettingsCard
+        id="account"
+        key="account"
+        title="Account"
+        description="Household access and signed-in user details."
+        collapsed={collapsedCards.has('account')}
+        onToggle={() => toggleCardCollapsed('account')}
+        collapsedContent={
+          <div className="settings-collapsed-summary">
+            <strong>Signed In</strong>
+            <span>{currentUserCopy}</span>
           </div>
-          <button
-            type="button"
-            className={`btn-secondary ${mhaTrackerEnabled ? 'btn-active' : ''}`}
-            onClick={handleMhaToggle}
-            disabled={mhaBusy}
-            aria-pressed={mhaTrackerEnabled}
-          >
-            {mhaBusy ? 'Saving...' : mhaTrackerEnabled ? 'On' : 'Off'}
-          </button>
-        </div>
-        {mhaError && <div className="error" style={{ marginTop: 12 }}>{mhaError}</div>}
-      </section>
-
-      <section className="settings-section settings-account-section">
-        <div className="settings-section-header">
-          <h3>Account</h3>
-          <p>Session controls and app build details.</p>
-        </div>
-
+        }
+      >
         <div className="settings-action">
           <div className="settings-action-info">
-            <strong>Signed in</strong>
-            <p>
-              {sharing?.currentUser
-                ? `${displayPerson(sharing.currentUser)} - ${sharing.currentUser.role}`
-                : 'Loading account details...'}
-            </p>
+            <strong>Signed In</strong>
+            <p>{currentUserCopy}</p>
           </div>
         </div>
 
         {sharing?.currentUser?.canManageSharing && (
           <form className="settings-share-form" onSubmit={handleShare}>
             <label className="field">
-              <span>Share with a partner</span>
+              <span>Share With A Partner</span>
               <input
                 type="email"
                 value={sharingEmail}
@@ -768,28 +1210,41 @@ export default function Settings({
               ))}
           </div>
         )}
+      </SettingsCard>
+    );
+  }
 
-        <div className="settings-action">
-          <div className="settings-action-info">
-            <strong>Sign out</strong>
-            <p>Ends this browser session and returns to the login screen.</p>
+  function renderAboutCard() {
+    return (
+      <SettingsCard
+        id="about"
+        key="about"
+        title="Orbit Money"
+        description="Build details, developer info, and session controls."
+        className="settings-about-section"
+        collapsed={collapsedCards.has('about')}
+        onToggle={() => toggleCardCollapsed('about')}
+        collapsedContent={
+          <div className="settings-collapsed-action">
+            <div className="settings-collapsed-summary">
+              <strong>{APP_VERSION_LABEL}</strong>
+              <span>Neal Overbay</span>
+            </div>
+            <button
+              type="button"
+              className="btn-danger"
+              onClick={handleSignOut}
+              disabled={signingOut}
+            >
+              {signingOut ? 'Signing Out...' : 'Sign Out'}
+            </button>
           </div>
-          <button
-            type="button"
-            className="btn-danger"
-            onClick={handleSignOut}
-            disabled={signingOut}
-          >
-            {signingOut ? 'Signing out...' : 'Sign out'}
-          </button>
-        </div>
-      </section>
-
-      <section className="settings-section settings-about-section" aria-labelledby="settings-about-title">
+        }
+      >
         <div className="settings-about-brand">
           <img src={APP_ICON_512} alt="" className="settings-about-icon" />
           <div>
-            <h3 id="settings-about-title"><BrandLogo /></h3>
+            <h3><BrandLogo /></h3>
           </div>
         </div>
 
@@ -800,14 +1255,129 @@ export default function Settings({
           </div>
           <div>
             <dt>Developer</dt>
-            <dd>Neal Overbay</dd>
+            <dd className="settings-developer-line">
+              <span>Neal Overbay</span>
+              <button type="button" className="btn-secondary btn-compact" onClick={handleDonatePlaceholder}>
+                Donate
+              </button>
+            </dd>
           </div>
         </dl>
 
-        <div className="settings-about-footer">
-          <span>© 2026 Neal Overbay. All rights reserved.</span>
+        <div className="settings-action settings-signout-action">
+          <div className="settings-action-info">
+            <strong>Sign Out</strong>
+            <p>Ends this browser session and returns to the login screen.</p>
+          </div>
+          <button
+            type="button"
+            className="btn-danger"
+            onClick={handleSignOut}
+            disabled={signingOut}
+          >
+            {signingOut ? 'Signing Out...' : 'Sign Out'}
+          </button>
         </div>
-      </section>
+
+        <div className="settings-about-footer">
+          <span>Copyright 2026 Neal Overbay. All rights reserved.</span>
+        </div>
+      </SettingsCard>
+    );
+  }
+
+  function renderSettingsCard(id) {
+    switch (id) {
+      case 'appearance':
+        return renderAppearanceCard();
+      case 'features':
+        return renderFeaturesCard();
+      case 'simplefin':
+        return renderSimpleFinCard();
+      case 'import':
+        return renderImportCard();
+      case 'account':
+        return renderAccountCard();
+      case 'about':
+        return renderAboutCard();
+      default:
+        return null;
+    }
+  }
+
+  return (
+    <div className="settings-view">
+      <PageHero
+        id="settings-title"
+        variant="settings"
+        kicker="Control Center"
+        title="Settings"
+        subtitle="Maintenance and configuration."
+        toolbar={
+          <div className="settings-hero-toolbar">
+            <button
+              type="button"
+              className={settingsReorderMode ? 'btn-primary' : 'btn-secondary'}
+              onClick={() => {
+                setSettingsReorderMode((value) => !value);
+                setSettingsDragId(null);
+                setSettingsOverId(null);
+              }}
+            >
+              {settingsReorderMode ? 'Done' : 'Reorder'}
+            </button>
+          </div>
+        }
+      />
+
+      {settingsReorderMode && (
+        <section className="settings-section settings-reorder-panel settings-section-top">
+          <div className="settings-section-header">
+            <h3>Settings Card Order</h3>
+            <p>Drag cards into the order you want them to appear.</p>
+          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={(event) => setSettingsDragId(event.active.id)}
+            onDragOver={(event) => setSettingsOverId(event.over?.id ?? null)}
+            onDragCancel={() => {
+              setSettingsDragId(null);
+              setSettingsOverId(null);
+            }}
+            onDragEnd={handleSettingsDragEnd}
+          >
+            <SortableContext items={settingsOrder} strategy={verticalListSortingStrategy}>
+              <div className="settings-reorder-list reorder-active reorder-drag-scope">
+                {settingsOrder.map((id) => {
+                  const card = SETTINGS_CARD_BY_ID.get(id);
+                  return (
+                    <ReorderListItem
+                      key={id}
+                      id={id}
+                      handleLabel={`Move ${card.title}`}
+                      title={card.title}
+                      subtitle={card.description}
+                      sidePrimary={collapsedCards.has(id) ? 'Collapsed' : 'Open'}
+                      previewDisplaced={id === settingsOverId && id !== settingsDragId}
+                    />
+                  );
+                })}
+              </div>
+            </SortableContext>
+            {settingsDragId && <div className="drag-screen-blocker" aria-hidden="true" />}
+          </DndContext>
+        </section>
+      )}
+
+      <div className={settingsReorderMode ? 'settings-card-stack reorder-visible' : 'settings-card-stack'}>
+        {settingsOrder.map((id, index) => (
+          <div key={id} className={index === 0 && !settingsReorderMode ? 'settings-section-top' : ''}>
+            {renderSettingsCard(id)}
+          </div>
+        ))}
+      </div>
+
       <Dialog />
     </div>
   );

@@ -4,11 +4,16 @@ import AppIcon from './AppIcon.jsx';
 import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
 import { getMoreRoutes } from '../navigation.js';
 
-export default function MoreSheet({ open, onClose, mhaTrackerEnabled = false }) {
+export default function MoreSheet({
+  open,
+  onClose,
+  mhaTrackerEnabled = false,
+  navigationPreferences
+}) {
   const navigate = useNavigate();
   const [closing, setClosing] = useState(false);
   const timerRef = useRef(null);
-  const visibleItems = getMoreRoutes({ mhaTrackerEnabled });
+  const visibleItems = getMoreRoutes({ mhaTrackerEnabled, navigationPreferences });
 
   useEffect(() => {
     if (open) setClosing(false);

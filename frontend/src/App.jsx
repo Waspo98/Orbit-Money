@@ -33,7 +33,13 @@ import { useTheme } from './hooks/useTheme.js';
 import { api } from './api.js';
 import { APP_ICON_192 } from './brandAssets.js';
 import { sortCategoriesByName } from './lib/categorySort.js';
-import { ROUTES, getNavigationRoutes, getRoute } from './navigation.js';
+import {
+  ROUTES,
+  getNavigationRoutes,
+  getRoute,
+  readNavigationPreferences,
+  writeNavigationPreferences
+} from './navigation.js';
 
 // Bottom tabs always visible. (Previously we hid them on Settings/import to
 // keep the UI focused, but with the More tab the sheet can be opened from any
@@ -64,8 +70,16 @@ function AppShell() {
   const [lookupsReady, setLookupsReady] = useState(false);
   const [lookupError, setLookupError] = useState('');
   const [mhaTrackerEnabled, setMhaTrackerEnabled] = useState(false);
+  const [navigationPreferences, setNavigationPreferencesState] = useState(
+    readNavigationPreferences
+  );
 
-  const { mode: themeMode, setMode: setThemeMode } = useTheme();
+  const {
+    mode: themeMode,
+    setMode: setThemeMode,
+    darkVariant,
+    setDarkVariant
+  } = useTheme();
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -75,8 +89,10 @@ function AppShell() {
   const hasPageHero = !!currentRoute?.hasPageHero;
   const navigationRoutes = useMemo(
     () =>
-      getNavigationRoutes({ mhaTrackerEnabled }).map((route) => route.path),
-    [mhaTrackerEnabled]
+      getNavigationRoutes({ mhaTrackerEnabled, navigationPreferences }).map(
+        (route) => route.path
+      ),
+    [mhaTrackerEnabled, navigationPreferences]
   );
   const explicitTransition =
     navigationType === 'POP' ? null : location.state?.transition;
@@ -166,6 +182,16 @@ function AppShell() {
     }
   }
 
+  function setNavigationPreferences(nextOrUpdater) {
+    setNavigationPreferencesState((prev) => {
+      const next =
+        typeof nextOrUpdater === 'function'
+          ? nextOrUpdater(prev)
+          : nextOrUpdater;
+      return writeNavigationPreferences(next);
+    });
+  }
+
   const routeElements = {
     '/dashboard': (
       <Dashboard
@@ -201,9 +227,13 @@ function AppShell() {
       <Settings
         themeMode={themeMode}
         onThemeChange={setThemeMode}
+        darkVariant={darkVariant}
+        onDarkVariantChange={setDarkVariant}
         onLogout={handleLogout}
         mhaTrackerEnabled={mhaTrackerEnabled}
         onMhaTrackerChange={setMhaTrackerEnabled}
+        navigationPreferences={navigationPreferences}
+        onNavigationPreferencesChange={setNavigationPreferences}
         onImportComplete={handleSettingsImportComplete}
       />
     )
@@ -223,7 +253,10 @@ function AppShell() {
 
   return (
     <div className={`app-shell has-sidebar ${hasPageHero ? 'has-page-hero' : ''}`}>
-      <DesktopSidebar mhaTrackerEnabled={mhaTrackerEnabled} />
+      <DesktopSidebar
+        mhaTrackerEnabled={mhaTrackerEnabled}
+        navigationPreferences={navigationPreferences}
+      />
 
       {!hasPageHero && <header className="app-header">
         <button
@@ -281,6 +314,7 @@ function AppShell() {
         open={moreOpen}
         onClose={() => setMoreOpen(false)}
         mhaTrackerEnabled={mhaTrackerEnabled}
+        navigationPreferences={navigationPreferences}
       />
     </div>
   );

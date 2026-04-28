@@ -40,6 +40,10 @@
         background: #0a1410;
       }
 
+      :root[data-dark-variant="amoled"][data-theme="dark"] body {
+        background: #000000;
+      }
+
       .initial-splash {
         min-height: 100vh;
         min-height: 100dvh;
@@ -53,6 +57,10 @@
 
       :root[data-theme="dark"] .initial-splash {
         background: #0a1410;
+      }
+
+      :root[data-dark-variant="amoled"][data-theme="dark"] .initial-splash {
+        background: #000000;
       }
 
       .initial-splash-icon {
@@ -86,6 +94,11 @@
           background: #0a1410;
         }
 
+        :root[data-dark-variant="amoled"]:not([data-theme="light"]) body,
+        :root[data-dark-variant="amoled"]:not([data-theme="light"]) .initial-splash {
+          background: #000000;
+        }
+
         :root:not([data-theme="light"]) .initial-splash-wordmark-light {
           display: none;
         }
@@ -101,6 +114,12 @@
       (function () {
         try {
           var saved = localStorage.getItem('orbit-money-theme') || 'system';
+          var darkVariant = localStorage.getItem('orbit-money-dark-variant') || 'classic';
+          if (darkVariant === 'amoled') {
+            document.documentElement.setAttribute('data-dark-variant', 'amoled');
+          } else {
+            document.documentElement.setAttribute('data-dark-variant', 'classic');
+          }
           if (saved === 'dark') {
             document.documentElement.setAttribute('data-theme', 'dark');
           } else if (saved === 'light') {

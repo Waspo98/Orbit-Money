@@ -7,7 +7,7 @@
 - **Backend:** Node.js 20 + Express
 - **Auth:** Local session login, OIDC login, or both; `API_KEY` header for programmatic access
 - **Data:** SQLite (better-sqlite3) + Docker named volume
-- **Key dependencies:** `express`, `express-session`, `better-sqlite3`, `multer` (CSV upload), `papaparse` (CSV parsing), `@dnd-kit/core` + `@dnd-kit/sortable` (accounts reorder)
+- **Key dependencies:** `express`, `express-session`, `better-sqlite3`, `multer` (CSV upload), `papaparse` (CSV parsing), `@dnd-kit/core` + `@dnd-kit/sortable` (dashboard, account, navigation, and settings reorder UI)
 
 ## Dockerfile
 Multi-stage build:
@@ -213,11 +213,11 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - **Desktop (≥ 1080px):** Left sidebar (260px) + content area, bottom tabs hidden
 
 ### Navigation
-- **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More
-- **Desktop sidebar:** Lists every page directly, in the same order as the mobile More menu, with Settings last. Bottom tabs are hidden on desktop.
-- **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Savings Goals, Upcoming, Retirement Calculator, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings last.
+- **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More. These four primary routes are locked to their original positions.
+- **Desktop sidebar:** Lists every visible page directly. Primary routes remain first, and More-menu pages follow the user-controlled More order. Bottom tabs are hidden on desktop.
+- **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Savings Goals, Upcoming, Retirement Calculator, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings. Settings can hide optional frontend sections from navigation and reorder More-menu cards via `localStorage`; locked pages stay visible.
 - **Deprecated hamburger:** the old hamburger menu was removed; do not reintroduce it.
-- **Settings page:** Appearance, MHA visibility, Rocket Money CSV import, SimpleFIN configuration/sync log, account controls, and app build details.
+- **Settings page:** Collapsible/reorderable cards for Appearance, Features, SimpleFIN, Rocket Money CSV import, Account, and Orbit Money build details. The Features card owns frontend-only navigation visibility, More-card order, and the existing MHA visibility control.
 - **React Router v6:** Client-side routing with browser back/forward support. All routes served via Express catch-all for deep-link support.
 
 ### UI Details
@@ -231,6 +231,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - `PercentInput.jsx` is the shared editable percent primitive; pair ad hoc percent formatting with `formatPercentInput` from `frontend/src/lib/formatters.js`.
 - Overlay behavior: modals, app dialogs, sheets, and full-screen popovers blur the app backdrop and lock body scroll. `DropdownMenu` stays anchored to its trigger, does not blur the page, and does not lock scroll.
 - Three-way theme toggle (☀️ / 💻 / 🌙): localStorage persistence with pre-paint script in `index.html` to avoid flash
+- Night Style (`Soft Dark` / `AMOLED Black`) also persists in `localStorage`; the selected night style applies to explicit Night mode and to System mode when the device prefers dark.
 - 40+ CSS custom properties for light/dark themes, emerald-600/500 accent
 - Inter Tight (Google Fonts) throughout — no serif fonts
 - Bottom tabs: 80px height (Material Design baseline), 5 columns

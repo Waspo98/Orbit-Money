@@ -4,6 +4,7 @@ export const ROUTES = [
     label: 'Dashboard',
     icon: 'dashboard',
     nav: 'primary',
+    locked: true,
     hasPageHero: true
   },
   {
@@ -11,6 +12,7 @@ export const ROUTES = [
     label: 'Transactions',
     icon: 'transactions',
     nav: 'primary',
+    locked: true,
     hasPageHero: true
   },
   {
@@ -18,6 +20,7 @@ export const ROUTES = [
     label: 'Budgets',
     icon: 'budgets',
     nav: 'primary',
+    locked: true,
     hasPageHero: true
   },
   {
@@ -25,6 +28,7 @@ export const ROUTES = [
     label: 'Accounts',
     icon: 'accounts',
     nav: 'primary',
+    locked: true,
     hasPageHero: true
   },
   {
@@ -33,6 +37,7 @@ export const ROUTES = [
     description: 'Automate merchant names and categories',
     icon: 'rules',
     nav: 'more',
+    locked: true,
     hasPageHero: true
   },
   {
@@ -41,6 +46,7 @@ export const ROUTES = [
     description: 'Organize spending categories',
     icon: 'categories',
     nav: 'more',
+    locked: true,
     hasPageHero: true
   },
   {
@@ -106,12 +112,76 @@ export const ROUTES = [
     description: 'Maintenance and configuration',
     icon: 'settings',
     nav: 'more',
+    locked: true,
     hasPageHero: true
   }
 ];
 
-export function isRouteVisible(route, { mhaTrackerEnabled = false } = {}) {
-  return route.feature !== 'mha' || mhaTrackerEnabled;
+export const NAVIGATION_PREFS_STORAGE_KEY = 'orbit-money-navigation-preferences';
+
+const DEFAULT_MORE_ROUTE_ORDER = ROUTES
+  .filter((route) => route.nav === 'more')
+  .map((route) => route.path);
+
+export function normalizeNavigationPreferences(value = {}) {
+  const prefs = value && typeof value === 'object' ? value : {};
+  const hiddenRoutePaths = {};
+  const routesByPath = new Map(ROUTES.map((route) => [route.path, route]));
+
+  for (const route of ROUTES) {
+    if (route.locked) continue;
+    if (prefs.hiddenRoutePaths?.[route.path] === true) {
+      hiddenRoutePaths[route.path] = true;
+    }
+  }
+
+  const incomingOrder = Array.isArray(prefs.moreRouteOrder) ? prefs.moreRouteOrder : [];
+  const moreRouteOrder = [
+    ...incomingOrder.filter((path) => routesByPath.get(path)?.nav === 'more'),
+    ...DEFAULT_MORE_ROUTE_ORDER.filter((path) => !incomingOrder.includes(path))
+  ];
+
+  return { hiddenRoutePaths, moreRouteOrder };
+}
+
+export function readNavigationPreferences() {
+  try {
+    return normalizeNavigationPreferences(
+      JSON.parse(localStorage.getItem(NAVIGATION_PREFS_STORAGE_KEY) || '{}')
+    );
+  } catch {
+    return normalizeNavigationPreferences();
+  }
+}
+
+export function writeNavigationPreferences(preferences) {
+  const normalized = normalizeNavigationPreferences(preferences);
+  try {
+    localStorage.setItem(NAVIGATION_PREFS_STORAGE_KEY, JSON.stringify(normalized));
+  } catch {
+    /* ignore */
+  }
+  return normalized;
+}
+
+export function isRouteVisible(
+  route,
+  { mhaTrackerEnabled = false, navigationPreferences } = {}
+) {
+  const prefs = normalizeNavigationPreferences(navigationPreferences);
+  if (route.feature === 'mha' && !mhaTrackerEnabled) return false;
+  if (!route.locked && prefs.hiddenRoutePaths[route.path]) return false;
+  return true;
+}
+
+function sortMoreRoutes(routes, navigationPreferences) {
+  const prefs = normalizeNavigationPreferences(navigationPreferences);
+  const order = new Map(prefs.moreRouteOrder.map((path, index) => [path, index]));
+  return [...routes].sort(
+    (a, b) =>
+      (order.get(a.path) ?? Number.MAX_SAFE_INTEGER) -
+      (order.get(b.path) ?? Number.MAX_SAFE_INTEGER)
+  );
 }
 
 export function getPrimaryRoutes(options) {
@@ -119,11 +189,17 @@ export function getPrimaryRoutes(options) {
 }
 
 export function getMoreRoutes(options) {
-  return ROUTES.filter((route) => route.nav === 'more' && isRouteVisible(route, options));
+  return sortMoreRoutes(
+    ROUTES.filter((route) => route.nav === 'more' && isRouteVisible(route, options)),
+    options?.navigationPreferences
+  );
 }
 
 export function getNavigationRoutes(options) {
-  return ROUTES.filter((route) => route.nav && isRouteVisible(route, options));
+  return [
+    ...getPrimaryRoutes(options),
+    ...getMoreRoutes(options)
+  ];
 }
 
 export function getRoute(path) {

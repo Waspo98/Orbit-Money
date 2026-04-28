@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 
 const STORAGE_KEY = 'orbit-money-theme';
+const DARK_VARIANT_STORAGE_KEY = 'orbit-money-dark-variant';
+const DARK_VARIANTS = new Set(['classic', 'amoled']);
 
 /**
  * Three-way theme state: 'light' | 'dark' | 'system'.
@@ -19,6 +21,18 @@ export function useTheme() {
       return 'system';
     }
   });
+  const [darkVariant, setDarkVariantState] = useState(() => {
+    try {
+      const saved = localStorage.getItem(DARK_VARIANT_STORAGE_KEY);
+      return DARK_VARIANTS.has(saved) ? saved : 'classic';
+    } catch {
+      return 'classic';
+    }
+  });
+
+  function setDarkVariant(value) {
+    setDarkVariantState(DARK_VARIANTS.has(value) ? value : 'classic');
+  }
 
   // Apply the mode to <html>.
   useEffect(() => {
@@ -37,5 +51,15 @@ export function useTheme() {
     }
   }, [mode]);
 
-  return { mode, setMode };
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-dark-variant', darkVariant);
+    try {
+      localStorage.setItem(DARK_VARIANT_STORAGE_KEY, darkVariant);
+    } catch {
+      /* ignore */
+    }
+  }, [darkVariant]);
+
+  return { mode, setMode, darkVariant, setDarkVariant };
 }
