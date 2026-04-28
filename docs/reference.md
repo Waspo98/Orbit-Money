@@ -187,7 +187,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Standalone More-menu page at `/upcoming` for saved bills, subscriptions, and income.
 - Supports manual entries with type, amount, next date, category, account, notes, and frequency: weekly, biweekly, twice monthly, monthly, bimonthly, yearly, or custom every X days/weeks/months.
 - Transaction rows can seed a recurring item with "Mark as recurring".
-- Suggestions are generated from recent transaction history, emphasizing income and Bills & Utilities style categories before other merchants. Suggestions can be accepted or dismissed.
+- Suggestions are generated from recent transaction history, emphasizing income and Bills & Utilities style categories before other merchants. Suggestions open in a modal from the empty state and can be accepted as a bill, subscription, or income, or dismissed.
 - Dashboard Subscriptions and Upcoming cards read from `/api/upcoming` rather than frontend-only transaction heuristics.
 - Monthly summary values normalize different frequencies to monthly equivalents.
 - Endpoints: GET `/api/upcoming`, POST `/api/upcoming`, PUT `/api/upcoming/:id`, DELETE `/api/upcoming/:id`, POST `/api/upcoming/from-transaction`, POST `/api/upcoming/suggestions/accept`, POST `/api/upcoming/suggestions/dismiss`

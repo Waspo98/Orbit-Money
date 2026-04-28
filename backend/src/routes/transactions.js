@@ -52,7 +52,8 @@ const CREDIT_PAYMENT_HINTS = [
   'card payment',
   'cc payment',
   'payment thank you',
-  'autopay payment'
+  'autopay payment',
+  'card ending'
 ];
 
 // ---------------------------------------------------------------------------
@@ -188,9 +189,17 @@ function textForReview(row) {
   return `${row.merchant || ''} ${row.original_merchant || ''} ${row.original_description || ''}`.toLowerCase();
 }
 
+function looksCreditCardPayment(row) {
+  const text = textForReview(row);
+  if (CREDIT_PAYMENT_HINTS.some((hint) => text.includes(hint))) return true;
+  return /payment\s+to\s+.+\bcard\s+ending\b/.test(text) ||
+    /\bcard\s+ending\s+(in\s+)?[#*\d]{2,}/.test(text);
+}
+
 function looksNoisyMerchant(row) {
   const merchant = String(row.merchant || '').trim();
   if (!merchant) return true;
+  if (looksCreditCardPayment(row)) return false;
   const text = textForReview(row);
   if (MERCHANT_NOISE_HINTS.some((hint) => text.includes(hint))) return true;
   if (merchant.length > 34 && /\d{3,}/.test(merchant)) return true;

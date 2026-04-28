@@ -30,8 +30,7 @@ const FILTERS = [
   { value: 'all', label: 'All' },
   { value: 'bill', label: 'Bills' },
   { value: 'subscription', label: 'Subscriptions' },
-  { value: 'income', label: 'Income' },
-  { value: 'suggestions', label: 'Suggestions' }
+  { value: 'income', label: 'Income' }
 ];
 
 function todayIso() {
@@ -137,6 +136,8 @@ export default function Upcoming({ accounts = [], categories = [] }) {
   const [filter, setFilter] = useState('all');
   const [editingItem, setEditingItem] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [suggestionKindPicker, setSuggestionKindPicker] = useState(null);
 
   async function load({ silent = false } = {}) {
     if (!silent && data == null) setLoading(true);
@@ -160,7 +161,6 @@ export default function Upcoming({ accounts = [], categories = [] }) {
   const items = data?.items || [];
   const suggestions = data?.suggestions || [];
   const filteredItems = useMemo(() => {
-    if (filter === 'suggestions') return [];
     return items.filter((item) => filter === 'all' || item.kind === filter);
   }, [items, filter]);
 
@@ -210,9 +210,14 @@ export default function Upcoming({ accounts = [], categories = [] }) {
     }
   }
 
-  async function acceptSuggestion(suggestion) {
+  async function acceptSuggestion(suggestion, kind = suggestion.kind) {
     try {
-      await api.post('/api/upcoming/suggestions/accept', suggestion);
+      await api.post('/api/upcoming/suggestions/accept', {
+        ...suggestion,
+        kind,
+        direction: kind === 'income' ? 'income' : 'expense'
+      });
+      setSuggestionKindPicker(null);
       await load({ silent: true });
     } catch (err) {
       alert(err.message || 'Could not accept suggestion.', { title: 'Suggestion failed' });
@@ -264,17 +269,11 @@ export default function Upcoming({ accounts = [], categories = [] }) {
 
         {loading ? (
           <div className="center-loading"><div className="spinner" /></div>
-        ) : filter === 'suggestions' ? (
-          <SuggestionsList
-            suggestions={suggestions}
-            onAccept={acceptSuggestion}
-            onDismiss={dismissSuggestion}
-          />
         ) : filteredItems.length === 0 ? (
           <div className="empty-state">
             <h2>No Upcoming Items</h2>
             <p>Add a bill, subscription, or income item manually, or review suggestions found from transactions.</p>
-            <button type="button" className="btn-primary" onClick={() => setFilter('suggestions')}>
+            <button type="button" className="btn-primary" onClick={() => setSuggestionsOpen(true)}>
               View Suggestions
             </button>
           </div>
@@ -302,6 +301,23 @@ export default function Upcoming({ accounts = [], categories = [] }) {
             setFormOpen(false);
             setEditingItem(null);
           }}
+        />
+      )}
+
+      {suggestionsOpen && (
+        <SuggestionsModal
+          suggestions={suggestions}
+          onAccept={(suggestion) => setSuggestionKindPicker(suggestion)}
+          onDismiss={dismissSuggestion}
+          onClose={() => setSuggestionsOpen(false)}
+        />
+      )}
+
+      {suggestionKindPicker && (
+        <SuggestionKindPicker
+          suggestion={suggestionKindPicker}
+          onChoose={(kind) => acceptSuggestion(suggestionKindPicker, kind)}
+          onClose={() => setSuggestionKindPicker(null)}
         />
       )}
 
@@ -338,6 +354,25 @@ function UpcomingItem({ item, onEdit, onDelete }) {
         </div>
       </div>
     </li>
+  );
+}
+
+function SuggestionsModal({ suggestions, onAccept, onDismiss, onClose }) {
+  return (
+    <AnimatedModal onClose={onClose} size="lg">
+      {({ close }) => (
+        <>
+          <h3>Suggestions</h3>
+          <p>Review repeating transactions Orbit found and add the ones that belong on your calendar.</p>
+          <SuggestionsList suggestions={suggestions} onAccept={onAccept} onDismiss={onDismiss} />
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={close}>
+              Done
+            </button>
+          </div>
+        </>
+      )}
+    </AnimatedModal>
   );
 }
 
@@ -382,6 +417,47 @@ function SuggestionsList({ suggestions, onAccept, onDismiss }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function SuggestionKindPicker({ suggestion, onChoose, onClose }) {
+  return (
+    <AnimatedModal onClose={onClose} size="sm" animation="zoom">
+      {() => (
+        <>
+          <h3>Add as...</h3>
+          <p className="modal-copy">{suggestion.name}</p>
+          <div className="upcoming-kind-picker">
+            {KIND_OPTIONS.map((option) => (
+              <button
+                type="button"
+                key={option.value}
+                className={`selectable-list-item upcoming-kind-option ${
+                  suggestion.kind === option.value ? 'active' : ''
+                }`}
+                onClick={() => onChoose(option.value)}
+              >
+                <span className="selectable-list-main">
+                  <strong>{option.label}</strong>
+                  <em>
+                    {option.value === 'income'
+                      ? 'Money coming in'
+                      : option.value === 'bill'
+                        ? 'A regular required payment'
+                        : 'A recurring subscription or membership'}
+                  </em>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+    </AnimatedModal>
   );
 }
 

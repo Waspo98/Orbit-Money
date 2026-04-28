@@ -3215,7 +3215,7 @@ input, textarea, select {
   user-select: none;
   transition: transform 180ms var(--ease-out), box-shadow var(--dur-fast);
   will-change: transform;
-  animation: reviewCardPop 180ms var(--ease-out);
+  animation: reviewCardPop 320ms var(--ease-out);
 }
 
 .review-swipe-card.dragging {
@@ -3494,8 +3494,18 @@ input, textarea, select {
 }
 
 @keyframes reviewCardPop {
-  0% { opacity: 0; transform: translateY(12px) scale(0.965); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% {
+    opacity: 0;
+    transform: translateY(34px) scale(0.9) rotate(-2deg);
+  }
+  62% {
+    opacity: 1;
+    transform: translateY(-6px) scale(1.018) rotate(0.6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0);
+  }
 }
 
 @keyframes reviewPickerIn {
@@ -4178,7 +4188,7 @@ input, textarea, select {
 
 .upcoming-tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -4321,6 +4331,17 @@ input, textarea, select {
 
 .upcoming-notes-field {
   grid-column: 1 / -1;
+}
+
+.upcoming-kind-picker {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+
+.upcoming-kind-option {
+  grid-template-columns: minmax(0, 1fr);
+  text-align: left;
 }
 
 @media (max-width: 640px) {
