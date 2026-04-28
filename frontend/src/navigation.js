@@ -61,7 +61,7 @@ export const ROUTES = [
     path: '/upcoming',
     label: 'Upcoming',
     description: 'Bills, subscriptions, and income',
-    icon: 'transactions',
+    icon: 'upcoming',
     nav: 'more',
     hasPageHero: true
   },
@@ -69,7 +69,7 @@ export const ROUTES = [
     path: '/retirement-calculator',
     label: 'Retirement Calculator',
     description: 'Project retirement age, savings, and income',
-    icon: 'goals',
+    icon: 'retirement',
     nav: 'more',
     hasPageHero: true
   },

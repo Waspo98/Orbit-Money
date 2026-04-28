@@ -8,9 +8,11 @@ const ICON_PATHS = {
   housing: new URL('../assets/icons/housingcalculator.svg', import.meta.url).href,
   mha: new URL('../assets/icons/mhatracker.svg', import.meta.url).href,
   networth: new URL('../assets/icons/networth.svg', import.meta.url).href,
+  retirement: new URL('../assets/icons/retirementcalculator.svg', import.meta.url).href,
   rules: new URL('../assets/icons/rules.svg', import.meta.url).href,
   settings: new URL('../assets/icons/settings.svg', import.meta.url).href,
-  transactions: new URL('../assets/icons/transactions.svg', import.meta.url).href
+  transactions: new URL('../assets/icons/transactions.svg', import.meta.url).href,
+  upcoming: new URL('../assets/icons/upcoming.svg', import.meta.url).href
 };
 
 export default function AppIcon({ name, className = '', label }) {
