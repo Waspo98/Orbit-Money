@@ -6,6 +6,7 @@ import {
   verticalListSortingStrategy
 } from '@dnd-kit/sortable';
 import { api } from '../api.js';
+import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppIcon from '../components/AppIcon.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
@@ -153,6 +154,10 @@ function formatPageList(routes) {
   if (names.length === 1) return `${names[0]} is turned off.`;
   if (names.length === 2) return `${names[0]} and ${names[1]} are turned off.`;
   return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]} are turned off.`;
+}
+
+function formatTurnedOffCount(count) {
+  return `${count} ${count === 1 ? 'Page' : 'Pages'} Turned Off`;
 }
 
 function SettingsCard({
@@ -618,8 +623,9 @@ export default function Settings({
             <span className="settings-collapsed-icon" aria-hidden>
               {activeTheme?.emoji || '💻'}
             </span>
-            <span>
+            <span className="settings-collapsed-inline-copy">
               <strong>{activeTheme?.label || 'System'}</strong>
+              <span aria-hidden="true">|</span>
               <span>{activeDarkVariant?.label || 'Soft Dark'} after dark.</span>
             </span>
           </div>
@@ -685,7 +691,7 @@ export default function Settings({
         onToggle={() => toggleCardCollapsed('features')}
         collapsedContent={
           <div className="settings-collapsed-summary">
-            <strong>{turnedOffFeatureRoutes.length} Pages Turned Off</strong>
+            <strong>{formatTurnedOffCount(turnedOffFeatureRoutes.length)}</strong>
             <span>{formatPageList(turnedOffFeatureRoutes)}</span>
           </div>
         }
@@ -1244,15 +1250,10 @@ export default function Settings({
 
         <dl className="settings-about-details">
           <div>
-            <dt>Build</dt>
-            <dd>{APP_VERSION_LABEL}</dd>
-          </div>
-          <div>
             <dt>Developer</dt>
             <dd>Neal Overbay</dd>
           </div>
           <div>
-            <dt>Donate</dt>
             <dd>
               <button type="button" className="btn-secondary btn-compact settings-donate-button" onClick={handleDonatePlaceholder}>
                 Donate
@@ -1261,19 +1262,26 @@ export default function Settings({
           </div>
         </dl>
 
-        <div className="settings-action settings-signout-action">
-          <div className="settings-action-info">
-            <strong>Sign Out</strong>
-            <p>Ends this browser session and returns to the login screen.</p>
+        <div className="settings-about-bottom-row">
+          <div className="settings-about-build">
+            <dt>Build</dt>
+            <dd>{APP_VERSION_LABEL}</dd>
           </div>
-          <button
-            type="button"
-            className="btn-danger"
-            onClick={handleSignOut}
-            disabled={signingOut}
-          >
-            {signingOut ? 'Signing Out...' : 'Sign Out'}
-          </button>
+
+          <div className="settings-action settings-signout-action">
+            <div className="settings-action-info">
+              <strong>Sign Out</strong>
+              <p>Ends this browser session and returns to the login screen.</p>
+            </div>
+            <button
+              type="button"
+              className="btn-danger"
+              onClick={handleSignOut}
+              disabled={signingOut}
+            >
+              {signingOut ? 'Signing Out...' : 'Sign Out'}
+            </button>
+          </div>
         </div>
 
         <div className="settings-about-footer">
@@ -1302,6 +1310,71 @@ export default function Settings({
     }
   }
 
+  function renderSettingsReorderModal() {
+    if (!settingsReorderMode) return null;
+    return (
+      <AnimatedModal
+        onClose={() => {
+          setSettingsReorderMode(false);
+          setSettingsDragId(null);
+          setSettingsOverId(null);
+        }}
+        size="lg"
+      >
+        {({ close }) => (
+          <>
+            <div className="modal-header">
+              <h3>Settings Card Order</h3>
+              <button type="button" className="modal-close" onClick={close} aria-label="Close">
+                x
+              </button>
+            </div>
+
+            <div className="settings-reorder-modal">
+              <p className="muted">Drag cards into the order you want them to appear.</p>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={(event) => setSettingsDragId(event.active.id)}
+                onDragOver={(event) => setSettingsOverId(event.over?.id ?? null)}
+                onDragCancel={() => {
+                  setSettingsDragId(null);
+                  setSettingsOverId(null);
+                }}
+                onDragEnd={handleSettingsDragEnd}
+              >
+                <SortableContext items={settingsOrder} strategy={verticalListSortingStrategy}>
+                  <div className="settings-reorder-list reorder-active reorder-drag-scope">
+                    {settingsOrder.map((id) => {
+                      const card = SETTINGS_CARD_BY_ID.get(id);
+                      return (
+                        <ReorderListItem
+                          key={id}
+                          id={id}
+                          handleLabel={`Move ${card.title}`}
+                          title={card.title}
+                          subtitle={card.description}
+                          previewDisplaced={id === settingsOverId && id !== settingsDragId}
+                        />
+                      );
+                    })}
+                  </div>
+                </SortableContext>
+                {settingsDragId && <div className="drag-screen-blocker" aria-hidden="true" />}
+              </DndContext>
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="btn-primary" onClick={close}>
+                Done
+              </button>
+            </div>
+          </>
+        )}
+      </AnimatedModal>
+    );
+  }
+
   return (
     <div className="settings-view">
       <PageHero
@@ -1316,56 +1389,16 @@ export default function Settings({
               type="button"
               className={settingsReorderMode ? 'btn-primary' : 'btn-secondary'}
               onClick={() => {
-                setSettingsReorderMode((value) => !value);
+                setSettingsReorderMode(true);
                 setSettingsDragId(null);
                 setSettingsOverId(null);
               }}
             >
-              {settingsReorderMode ? 'Done' : 'Reorder'}
+              Reorder
             </button>
           </div>
         }
       />
-
-      {settingsReorderMode && (
-        <section className="settings-section settings-reorder-panel settings-section-top">
-          <div className="settings-section-header">
-            <h3>Settings Card Order</h3>
-            <p>Drag cards into the order you want them to appear.</p>
-          </div>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={(event) => setSettingsDragId(event.active.id)}
-            onDragOver={(event) => setSettingsOverId(event.over?.id ?? null)}
-            onDragCancel={() => {
-              setSettingsDragId(null);
-              setSettingsOverId(null);
-            }}
-            onDragEnd={handleSettingsDragEnd}
-          >
-            <SortableContext items={settingsOrder} strategy={verticalListSortingStrategy}>
-              <div className="settings-reorder-list reorder-active reorder-drag-scope">
-                {settingsOrder.map((id) => {
-                  const card = SETTINGS_CARD_BY_ID.get(id);
-                  return (
-                    <ReorderListItem
-                      key={id}
-                      id={id}
-                      handleLabel={`Move ${card.title}`}
-                      title={card.title}
-                      subtitle={card.description}
-                      sidePrimary={collapsedCards.has(id) ? 'Collapsed' : 'Open'}
-                      previewDisplaced={id === settingsOverId && id !== settingsDragId}
-                    />
-                  );
-                })}
-              </div>
-            </SortableContext>
-            {settingsDragId && <div className="drag-screen-blocker" aria-hidden="true" />}
-          </DndContext>
-        </section>
-      )}
 
       <div className={settingsReorderMode ? 'settings-card-stack reorder-visible' : 'settings-card-stack'}>
         {settingsOrder.map((id, index) => (
@@ -1376,6 +1409,7 @@ export default function Settings({
       </div>
 
       <Dialog />
+      {renderSettingsReorderModal()}
     </div>
   );
 }

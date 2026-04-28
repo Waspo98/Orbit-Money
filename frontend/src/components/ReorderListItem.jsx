@@ -39,6 +39,7 @@ function ReorderListItemPreview({
   handleLabel,
   handleProps
 }) {
+  const hasSide = sidePrimary != null || sideSecondary != null;
   return (
     <Element
       ref={itemRef}
@@ -63,10 +64,12 @@ function ReorderListItemPreview({
         <strong>{title}</strong>
         {subtitle && <em>{subtitle}</em>}
       </span>
-      <span className="selectable-list-side">
-        <strong>{sidePrimary}</strong>
-        {sideSecondary && <em>{sideSecondary}</em>}
-      </span>
+      {hasSide && (
+        <span className="selectable-list-side">
+          {sidePrimary != null && <strong>{sidePrimary}</strong>}
+          {sideSecondary && <em>{sideSecondary}</em>}
+        </span>
+      )}
     </Element>
   );
 }
