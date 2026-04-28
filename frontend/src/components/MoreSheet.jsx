@@ -36,6 +36,7 @@ export default function MoreSheet({
   const dragFrameRef = useRef(null);
   const sheetRef = useRef(null);
   const scrollRef = useRef(null);
+  const scrollLockRef = useRef({ locked: false, overflowY: '' });
   const gestureRef = useRef(createGestureState());
   const pendingTransformRef = useRef(0);
   const pendingDraggingRef = useRef(false);
@@ -49,6 +50,7 @@ export default function MoreSheet({
     cancelDragFrame();
     gestureRef.current = createGestureState();
     suppressNextClickRef.current = false;
+    unlockInternalScroll();
     setSheetTransform(0, { dragging: false });
     setDrawerState('opening');
 
@@ -82,6 +84,7 @@ export default function MoreSheet({
     () => {
       clearCloseTimer();
       cancelDragFrame();
+      unlockInternalScroll();
     }
   ), []);
 
@@ -128,6 +131,25 @@ export default function MoreSheet({
     dragFrameRef.current = null;
   }
 
+  function lockInternalScroll() {
+    const scrollNode = scrollRef.current;
+    if (!scrollNode || scrollLockRef.current.locked) return;
+
+    scrollLockRef.current = {
+      locked: true,
+      overflowY: scrollNode.style.overflowY
+    };
+    scrollNode.style.overflowY = 'hidden';
+  }
+
+  function unlockInternalScroll() {
+    const scrollNode = scrollRef.current;
+    if (!scrollNode || !scrollLockRef.current.locked) return;
+
+    scrollNode.style.overflowY = scrollLockRef.current.overflowY;
+    scrollLockRef.current = { locked: false, overflowY: '' };
+  }
+
   function setSheetTransform(value, { dragging }) {
     const sheet = sheetRef.current;
     if (!sheet) return;
@@ -152,12 +174,14 @@ export default function MoreSheet({
     if (drawerState === 'closing') return;
 
     if (options?.animate === false) {
+      unlockInternalScroll();
       onClose();
       return;
     }
 
     gestureRef.current = createGestureState();
     cancelDragFrame();
+    unlockInternalScroll();
     setSheetTransform(0, { dragging: false });
     setDrawerState('closing');
     timerRef.current = window.setTimeout(onClose, OVERLAY_ANIM_MS);
@@ -167,6 +191,7 @@ export default function MoreSheet({
     maybeSuppressClick();
     gestureRef.current = createGestureState();
     cancelDragFrame();
+    unlockInternalScroll();
     setDrawerState('closing');
     setSheetTransform(window.innerHeight, { dragging: false });
     timerRef.current = window.setTimeout(onClose, OVERLAY_ANIM_MS);
@@ -176,6 +201,7 @@ export default function MoreSheet({
     maybeSuppressClick();
     gestureRef.current = createGestureState();
     cancelDragFrame();
+    unlockInternalScroll();
     setSheetTransform(0, { dragging: false });
   }
 
@@ -239,6 +265,7 @@ export default function MoreSheet({
 
       if (totalY < DRAG_START_PX) return;
       gesture.mode = 'sheet';
+      lockInternalScroll();
     }
 
     if (gesture.mode !== 'sheet') return;
@@ -266,6 +293,7 @@ export default function MoreSheet({
       velocityY: 0
     };
     event.currentTarget.setPointerCapture?.(event.pointerId);
+    lockInternalScroll();
   }
 
   function movePointerGesture(event) {
@@ -311,6 +339,7 @@ export default function MoreSheet({
     }
 
     gestureRef.current = createGestureState();
+    unlockInternalScroll();
   }
 
   if (!open) return null;
