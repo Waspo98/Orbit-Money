@@ -27,6 +27,7 @@ export default function MoreSheet({
     pointerId: null,
     pointerType: null,
     pulling: false,
+    startedAtTop: false,
     startY: 0,
     lastY: 0,
     startScrollTop: 0,
@@ -144,6 +145,7 @@ export default function MoreSheet({
       pointerId: null,
       pointerType: null,
       pulling: false,
+      startedAtTop: false,
       startY: 0,
       lastY: 0,
       startScrollTop: 0,
@@ -240,6 +242,7 @@ export default function MoreSheet({
       pointerId: event.pointerId,
       pointerType: event.pointerType || 'mouse',
       pulling: true,
+      startedAtTop: true,
       startY: event.clientY,
       lastY: event.clientY,
       startScrollTop: scrollRef.current?.scrollTop || 0,
@@ -287,6 +290,7 @@ export default function MoreSheet({
       pointerId: touch.identifier,
       pointerType: 'touch',
       pulling: false,
+      startedAtTop: (scrollRef.current?.scrollTop || 0) <= 0,
       startY: touch.clientY,
       lastY: touch.clientY,
       startScrollTop: scrollRef.current?.scrollTop || 0,
@@ -313,6 +317,12 @@ export default function MoreSheet({
 
     drag.lastY = nextY;
     drag.lastMoveAt = now;
+
+    if (!drag.startedAtTop) {
+      drag.startY = nextY;
+      resetPullDistance();
+      return;
+    }
 
     if (!drag.pulling) {
       if (!atTop || !movingDown) {
