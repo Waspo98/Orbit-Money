@@ -9270,12 +9270,9 @@ input, textarea, select {
 }
 
 .settings-signout-card {
-  align-content: stretch;
-  gap: 12px;
-}
-
-.settings-signout-card .settings-action-info {
-  min-width: 0;
+  align-content: center;
+  justify-items: stretch;
+  gap: 0;
 }
 
 .settings-signout-card .btn-danger {

@@ -682,12 +682,12 @@ export default function Settings({
             type="button"
             className={moreReorderMode ? 'btn-primary btn-compact' : 'btn-secondary btn-compact'}
             onClick={() => {
-              setMoreReorderMode((value) => !value);
+              setMoreReorderMode(true);
               setMoreDragId(null);
               setMoreOverId(null);
             }}
           >
-            {moreReorderMode ? 'Done' : 'Reorder'}
+            Reorder
           </button>
         </div>
 
@@ -717,48 +717,6 @@ export default function Settings({
         </div>
 
         {mhaError && <div className="error" style={{ marginTop: 12 }}>{mhaError}</div>}
-
-        <div className="settings-subsection">
-          <div className="settings-subsection-heading">
-            <h4>More Card Order</h4>
-            <p>Drag pages into the order they should appear in the More sheet.</p>
-          </div>
-
-          {moreReorderMode && (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={(event) => setMoreDragId(event.active.id)}
-              onDragOver={(event) => setMoreOverId(event.over?.id ?? null)}
-              onDragCancel={() => {
-                setMoreDragId(null);
-                setMoreOverId(null);
-              }}
-              onDragEnd={handleMoreDragEnd}
-            >
-              <SortableContext
-                items={moreRoutes.map((route) => route.path)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="settings-reorder-list reorder-active reorder-drag-scope">
-                  {moreRoutes.map((route) => (
-                    <ReorderListItem
-                      key={route.path}
-                      id={route.path}
-                      leading={<AppIcon name={route.icon} className="settings-reorder-icon" />}
-                      handleLabel={`Move ${route.label}`}
-                      title={route.label}
-                      subtitle={route.description}
-                      sidePrimary={route.locked ? 'Locked' : isFeatureVisible(route) ? 'On' : 'Off'}
-                      previewDisplaced={route.path === moreOverId && route.path !== moreDragId}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-              {moreDragId && <div className="drag-screen-blocker" aria-hidden="true" />}
-            </DndContext>
-          )}
-        </div>
       </SettingsCard>
     );
   }
@@ -1250,9 +1208,6 @@ export default function Settings({
           </div>
 
           <div className="settings-about-info-card settings-signout-card">
-            <div className="settings-action-info">
-              <strong>Sign Out</strong>
-            </div>
             <button
               type="button"
               className="btn-danger"
@@ -1268,6 +1223,73 @@ export default function Settings({
           <span>Copyright 2026 Neal Overbay. All rights reserved.</span>
         </div>
       </section>
+    );
+  }
+
+  function renderMoreReorderModal() {
+    if (!moreReorderMode) return null;
+    return (
+      <AnimatedModal
+        onClose={() => {
+          setMoreReorderMode(false);
+          setMoreDragId(null);
+          setMoreOverId(null);
+        }}
+        size="lg"
+      >
+        {({ close }) => (
+          <>
+            <div className="modal-header">
+              <h3>Page Order</h3>
+              <button type="button" className="modal-close" onClick={close} aria-label="Close">
+                x
+              </button>
+            </div>
+
+            <div className="settings-reorder-modal">
+              <p className="muted">Drag pages into the order they should appear in the More sheet.</p>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={(event) => setMoreDragId(event.active.id)}
+                onDragOver={(event) => setMoreOverId(event.over?.id ?? null)}
+                onDragCancel={() => {
+                  setMoreDragId(null);
+                  setMoreOverId(null);
+                }}
+                onDragEnd={handleMoreDragEnd}
+              >
+                <SortableContext
+                  items={moreRoutes.map((route) => route.path)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="settings-reorder-list reorder-active reorder-drag-scope">
+                    {moreRoutes.map((route) => (
+                      <ReorderListItem
+                        key={route.path}
+                        id={route.path}
+                        leading={<AppIcon name={route.icon} className="settings-reorder-icon" />}
+                        handleLabel={`Move ${route.label}`}
+                        title={route.label}
+                        subtitle={route.description}
+                        sidePrimary={route.locked ? 'Locked' : isFeatureVisible(route) ? 'On' : 'Off'}
+                        previewDisplaced={route.path === moreOverId && route.path !== moreDragId}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+                {moreDragId && <div className="drag-screen-blocker" aria-hidden="true" />}
+              </DndContext>
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="btn-primary" onClick={close}>
+                Done
+              </button>
+            </div>
+          </>
+        )}
+      </AnimatedModal>
     );
   }
 
@@ -1389,6 +1411,7 @@ export default function Settings({
       </div>
 
       <Dialog />
+      {renderMoreReorderModal()}
       {renderSettingsReorderModal()}
     </div>
   );
