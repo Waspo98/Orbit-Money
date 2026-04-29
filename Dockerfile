@@ -21,6 +21,9 @@ RUN npm run build
 FROM node:20-alpine AS prod
 WORKDIR /app
 
+LABEL org.opencontainers.image.source="https://github.com/Waspo98/Orbit-Money"
+LABEL org.opencontainers.image.description="Self-hosted personal finance tracker built as an installable PWA"
+
 # Install build tools for better-sqlite3 native compilation (removed after install).
 # sqlite runtime libs stay for the lifetime of the image.
 RUN apk add --no-cache sqlite wget \

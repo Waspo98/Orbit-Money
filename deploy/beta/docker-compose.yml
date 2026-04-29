@@ -1,5 +1,6 @@
 services:
   orbit-money-beta:
+    image: ghcr.io/waspo98/orbit-money:beta
     build:
       context: ../..
       dockerfile: Dockerfile

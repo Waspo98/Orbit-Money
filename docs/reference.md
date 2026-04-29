@@ -16,6 +16,13 @@ Multi-stage build:
 - **Stage 2 (prod):** `node:20-alpine` — requires `python3 make g++` for better-sqlite3 native compilation (removed after install)
 - Uses `--no-audit --no-fund` flags to prevent npm hangs
 
+## Docker Images
+- Public installs use `ghcr.io/waspo98/orbit-money:latest` from `docker-compose.yml`.
+- Maintainer beta uses `ghcr.io/waspo98/orbit-money:beta` from `deploy/beta/docker-compose.yml`.
+- The `main` and `Beta` GitHub Actions workflows publish their image tags before calling the self-hosted deploy scripts, so server deploys pull instead of rebuilding locally.
+- Release tags like `v0.52.0` publish matching version image tags through `publish-release-image.yml`.
+- The Compose files keep `build` definitions as a local source-build fallback, but normal update paths should use `docker compose pull` followed by `docker compose up -d`.
+
 ## Data Storage
 All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 

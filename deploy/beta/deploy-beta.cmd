@@ -27,7 +27,10 @@ if errorlevel 1 exit /b 1
 git pull --ff-only origin Beta
 if errorlevel 1 exit /b 1
 
-docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta up --build -d
+docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta pull
+if errorlevel 1 exit /b 1
+
+docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta up -d
 if errorlevel 1 exit /b 1
 
 docker ps --filter "name=orbit-money-beta" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"

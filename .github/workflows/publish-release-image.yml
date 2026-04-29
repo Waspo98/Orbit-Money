@@ -1,14 +1,9 @@
-name: Deploy Beta
+name: Publish Release Image
 
 on:
   push:
-    branches:
-      - Beta
-  workflow_dispatch:
-
-concurrency:
-  group: deploy-beta
-  cancel-in-progress: false
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -20,7 +15,7 @@ env:
 
 jobs:
   publish:
-    name: Publish beta Docker image
+    name: Publish tagged Docker image
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -42,8 +37,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=beta
-            type=sha,prefix=beta-
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -53,12 +49,3 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-  deploy:
-    name: Deploy beta Docker container
-    needs: publish
-    runs-on: [self-hosted, Windows, X64]
-    steps:
-      - name: Deploy beta on home server
-        shell: cmd
-        run: call "C:\Docker\Compose\Orbit Money\scripts\deploy-beta.cmd"

@@ -62,7 +62,8 @@ Leave optional integrations blank until you use them. In particular, leave
 Start Orbit Money:
 
 ```powershell
-docker compose up --build -d
+docker compose pull
+docker compose up -d
 ```
 
 Open:
@@ -142,6 +143,7 @@ Settings.
 
 The default Compose service uses:
 
+- Image: `ghcr.io/waspo98/orbit-money:latest`
 - Container name: `orbit-money`
 - Host/container port: `5008`
 - Docker network: external `web_proxy`
@@ -150,6 +152,17 @@ The default Compose service uses:
 
 Do not rename the service, port, network, or volume casually if you are updating
 an existing install. SQLite data lives in the Docker volume.
+
+Update an existing install with:
+
+```powershell
+git pull
+docker compose pull
+docker compose up -d
+```
+
+The Docker image is published to GitHub Container Registry. If you fork the repo
+and publish your own image, update the `image:` value in `docker-compose.yml`.
 
 ## Repository Layout
 
@@ -186,7 +199,15 @@ Backend syntax smoke check and automated tests:
 cmd /c scripts\check-backend.cmd
 ```
 
-Production-style Docker smoke test:
+Production-style Docker smoke test from the published image:
+
+```powershell
+docker compose pull
+docker compose up -d
+Invoke-RestMethod http://localhost:5008/api/health
+```
+
+Local source-build smoke test:
 
 ```powershell
 docker compose up --build -d
@@ -201,20 +222,40 @@ PWA manifest/service worker still load.
 
 ## Maintainer Deploys
 
-This repo includes optional GitHub Actions workflows for the maintainer's
-self-hosted Windows runner:
+This repo includes optional GitHub Actions workflows for GitHub Container
+Registry and the maintainer's self-hosted Windows runner:
 
-- Pushes to `main` call `scripts\deploy-live.cmd`
-- Pushes to `Beta` call `scripts\deploy-beta.cmd`, which delegates to
-  `deploy\beta\deploy-beta.cmd`
+- Pushes to `main` publish `ghcr.io/waspo98/orbit-money:latest` and `:main`,
+  then call `scripts\deploy-live.cmd`
+- Pushes to `Beta` publish `ghcr.io/waspo98/orbit-money:beta`, then call
+  `scripts\deploy-beta.cmd`, which delegates to `deploy\beta\deploy-beta.cmd`
+- Pushing a tag like `v0.52.0` publishes matching version image tags for
+  release installs
 
-Those workflows use server-specific checkout paths and Docker host assumptions.
+The deploy jobs use server-specific checkout paths and Docker host assumptions.
 Self-hosters do not need GitHub Actions to run the app.
+
+For public anonymous `docker compose pull` support, the GitHub Container
+Registry package must be public. If the first published package is private, make
+the package public from GitHub's package settings.
+
+## Releases
+
+Deploys and releases are intentionally separate. A Docker deploy pulls the
+published image and restarts the running app from a branch. A GitHub Release marks a stable,
+named version with a Git tag, release notes, and GitHub's generated source
+archives.
+
+Use releases for meaningful milestones, not every rebuild. The maintainer flow
+is semi-automatic: inspect changes since the previous tag, choose the next
+semantic version, update version labels/files when approved, write clear release
+notes, tag the release commit, push the branch and tag, then publish the GitHub
+Release. Keep the app in `0.x` until it is considered public-ready.
 
 ## Beta Deployment
 
 The beta deployment is maintainer infrastructure, not a second install path for
-normal users. It lives in `deploy/beta/`, builds from this repo root, and runs a
+normal users. It lives in `deploy/beta/`, pulls the published beta image, and runs a
 separate Docker container and volume:
 
 ```powershell

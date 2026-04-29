@@ -1,5 +1,6 @@
 services:
   orbit-money:
+    image: ghcr.io/waspo98/orbit-money:latest
     build: .
     container_name: orbit-money
     restart: unless-stopped

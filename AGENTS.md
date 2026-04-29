@@ -71,6 +71,9 @@
   `orbitmoney-beta` on host port `5019`.
 - Do not use a Vite dev server, local preview server, or `start-beta` helper for
   beta. There is intentionally no supported non-Docker beta deployment path.
+- Public Docker installs pull `ghcr.io/waspo98/orbit-money:latest`; beta pulls
+  `ghcr.io/waspo98/orbit-money:beta`. The GitHub Actions deploy workflows
+  publish the image before the self-hosted runner pulls and restarts containers.
 
 ## Versioning and releases
 - Do not bump the app version for routine rebuilds, beta deploys, live deploys,
@@ -88,6 +91,22 @@
   breaking changes. Keep the app in `0.x` until it is considered public-ready.
 - Keep visible app version labels, package versions, Git tags, and GitHub
   Releases aligned when doing an intentional release.
+- Use a semi-automatic release workflow. When the user asks to prepare a
+  release, inspect the changes since the previous Git tag/release, recommend the
+  next semantic version, explain why it is patch/minor/major, and wait for
+  approval before changing version files, tagging, or publishing a GitHub
+  Release.
+- Release notes should be written for normal users first and maintainers second:
+  summarize user-facing changes, setup/deployment impact, migrations or backup
+  cautions, dependency/security updates, and known follow-up work. Do not rely
+  only on GitHub's generated notes unless the user explicitly asks for that.
+- A Docker deploy and a GitHub Release are separate actions. Deploys may happen
+  frequently from `main` or `Beta`; releases should mark stable, named
+  milestones with a Git tag such as `v0.52.0`.
+- When publishing a release, prefer this order: confirm clean checks, update
+  version labels/files if approved, update changelog or release notes, commit,
+  tag the release commit, push the branch and tag, then create the GitHub
+  Release from that tag.
 
 ## Preferred workflow for agents
 - Inspect before editing.

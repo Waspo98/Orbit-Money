@@ -27,7 +27,10 @@ if errorlevel 1 exit /b 1
 git pull --ff-only origin main
 if errorlevel 1 exit /b 1
 
-docker compose -p orbitmoney up --build -d
+docker compose -p orbitmoney pull
+if errorlevel 1 exit /b 1
+
+docker compose -p orbitmoney up -d
 if errorlevel 1 exit /b 1
 
 docker ps --filter "name=orbit-money" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
