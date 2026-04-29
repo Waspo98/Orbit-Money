@@ -13,6 +13,9 @@ import {
   EditTransactionModal,
   TransactionRow
 } from '../components/transactions/TransactionRow.jsx';
+import RecurringItemEditor, {
+  formFromTransaction
+} from '../components/upcoming/RecurringItemEditor.jsx';
 import {
   formatCurrency,
   formatSignedCurrency
@@ -177,6 +180,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   const [expandedId, setExpandedId] = useState(null);
   const [editingTxn, setEditingTxn] = useState(null);
   const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
+  const [recurringFromTxn, setRecurringFromTxn] = useState(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const groupRefs = useRef(new Map());
   const floatingHeaderRef = useRef(null);
@@ -379,19 +383,15 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     }
   }
 
-  async function handleMarkRecurring(txn) {
-    try {
-      await api.post('/api/upcoming/from-transaction', {
-        transaction_id: txn.id
-      });
-      alert(`Added "${txn.merchant || 'transaction'}" to Upcoming.`, {
-        title: 'Recurring item saved'
-      });
-    } catch (err) {
-      alert(err.message || 'Could not create recurring item', {
-        title: 'Mark as recurring failed'
-      });
-    }
+  function handleMarkRecurring(txn) {
+    setRecurringFromTxn({
+      txn,
+      form: formFromTransaction(txn, categoryById.get(txn.category_id))
+    });
+  }
+
+  async function saveRecurringFromTxn(payload) {
+    await api.post('/api/upcoming', payload);
   }
 
   const accountById = new Map(accounts.map((a) => [a.id, a]));
@@ -736,6 +736,18 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             // scrollY and jump the user to the top of the list.
             load({ silent: true });
           }}
+        />
+      )}
+
+      {recurringFromTxn && (
+        <RecurringItemEditor
+          item={{ form: recurringFromTxn.form }}
+          title="Mark As Recurring"
+          accounts={accounts}
+          categories={categories}
+          saveLabel="Add Recurring"
+          onSave={saveRecurringFromTxn}
+          onClose={() => setRecurringFromTxn(null)}
         />
       )}
 

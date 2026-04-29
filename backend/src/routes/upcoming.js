@@ -18,8 +18,10 @@ const router = express.Router();
 const KINDS = new Set(['bill', 'subscription', 'income']);
 const FREQUENCY_TYPES = new Set(['weekly', 'biweekly', 'semimonthly', 'monthly', 'bimonthly', 'yearly', 'custom']);
 const FREQUENCY_UNITS = new Set(['days', 'weeks', 'months']);
+const AMOUNT_STRATEGIES = new Set(['fixed', 'history_average']);
 const BILL_CATEGORY_HINTS = ['bill', 'utilit', 'insurance', 'loan', 'mortgage', 'rent'];
 const INCOME_CATEGORY_HINTS = ['income', 'paycheck', 'salary', 'payroll'];
+const MAX_LOOKBACK_MONTHS = 24;
 
 function upcomingError(message, status = 400) {
   const err = new Error(message);
@@ -59,6 +61,22 @@ function addMonthsClamped(value, monthsToAdd) {
   return formatDateParts(nextYear, nextMonth, nextDay);
 }
 
+function startOfMonth(value) {
+  const { year, month } = parseDateParts(value);
+  return formatDateParts(year, month, 1);
+}
+
+function endOfMonth(value) {
+  const { year, month } = parseDateParts(value);
+  return formatDateParts(year, month, daysInMonth(year, month));
+}
+
+function clampInteger(value, min, max, fallback) {
+  const parsed = Math.trunc(Number(value));
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
 function addInterval(value, item) {
   if (!isoDate(value)) return value;
   const type = item.frequency_type || 'monthly';
@@ -78,6 +96,9 @@ function addInterval(value, item) {
 }
 
 function advanceToUpcoming(value, item) {
+  const rule = parseRecurrenceRule(item?.recurrence_rule);
+  if (rule) return findRuleDateOnOrAfter(value, rule) || value;
+
   let next = value;
   const today = formatLocalDate();
   for (let i = 0; i < 240 && next < today; i += 1) {
@@ -96,6 +117,136 @@ function daysBetween(a, b) {
   const end = new Date(Date.UTC(endParts.year, endParts.month - 1, endParts.day));
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
   return Math.round((end.getTime() - start.getTime()) / 86400000);
+}
+
+function normalizeIntegerList(values, min, max, limit) {
+  const source = Array.isArray(values) ? values : [values];
+  return Array.from(
+    new Set(
+      source
+        .map((value) => Math.trunc(Number(value)))
+        .filter((value) => Number.isFinite(value) && value >= min && value <= max)
+    )
+  )
+    .sort((a, b) => a - b)
+    .slice(0, limit);
+}
+
+function parseRecurrenceRule(value) {
+  if (!value) return null;
+
+  let raw = value;
+  if (typeof value === 'string') {
+    try {
+      raw = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+
+  if (!raw || typeof raw !== 'object') return null;
+
+  if (raw.type === 'month_days') {
+    const days = normalizeIntegerList(raw.days, 1, 31, 6);
+    return days.length ? { type: 'month_days', days } : null;
+  }
+
+  if (raw.type === 'month_weekdays') {
+    const ordinals = normalizeIntegerList(raw.ordinals, 1, 5, 5);
+    const weekdays = normalizeIntegerList(raw.weekdays, 0, 6, 7);
+    return ordinals.length && weekdays.length
+      ? { type: 'month_weekdays', ordinals, weekdays }
+      : null;
+  }
+
+  return null;
+}
+
+function normalizeRecurrenceRule(value) {
+  if (!value) return null;
+  const rule = parseRecurrenceRule(value);
+  if (!rule) throw upcomingError('recurrence_rule is invalid.');
+  return rule;
+}
+
+function recurrenceRuleToStorage(rule) {
+  return rule ? JSON.stringify(rule) : null;
+}
+
+function monthlyDatesForRule(rule, year, month) {
+  if (!rule) return [];
+
+  const monthDays = daysInMonth(year, month);
+  const dates = new Set();
+
+  if (rule.type === 'month_days') {
+    for (const day of rule.days || []) {
+      dates.add(formatDateParts(year, month, Math.min(day, monthDays)));
+    }
+  }
+
+  if (rule.type === 'month_weekdays') {
+    const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+    for (const ordinal of rule.ordinals || []) {
+      for (const weekday of rule.weekdays || []) {
+        const offset = (weekday - firstWeekday + 7) % 7;
+        const day = 1 + offset + ((ordinal - 1) * 7);
+        if (day <= monthDays) dates.add(formatDateParts(year, month, day));
+      }
+    }
+  }
+
+  return Array.from(dates).sort();
+}
+
+function datesForRuleBetween(rule, startDate, endDate) {
+  if (!rule || !isoDate(startDate) || !isoDate(endDate) || endDate < startDate) return [];
+
+  const dates = [];
+  let { year, month } = parseDateParts(startDate);
+  const endParts = parseDateParts(endDate);
+
+  for (let i = 0; i < 72; i += 1) {
+    for (const date of monthlyDatesForRule(rule, year, month)) {
+      if (date >= startDate && date <= endDate) dates.push(date);
+    }
+
+    if (year > endParts.year || (year === endParts.year && month >= endParts.month)) break;
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+
+  return dates.sort();
+}
+
+function findRuleDateOnOrAfter(value, rule) {
+  if (!isoDate(value)) return null;
+  return datesForRuleBetween(rule, value, addMonthsClamped(value, 24))[0] || null;
+}
+
+function datesForItemBetween(item, startDate, endDate) {
+  const rule = parseRecurrenceRule(item?.recurrence_rule);
+  if (rule) return datesForRuleBetween(rule, startDate, endDate);
+
+  const dates = [];
+  let next = isoDate(item?.next_date) ? item.next_date : startDate;
+  for (let i = 0; i < 240 && next < startDate; i += 1) {
+    const advanced = addInterval(next, item);
+    if (advanced === next) break;
+    next = advanced;
+  }
+
+  for (let i = 0; i < 240 && next <= endDate; i += 1) {
+    if (next >= startDate) dates.push(next);
+    const advanced = addInterval(next, item);
+    if (advanced === next) break;
+    next = advanced;
+  }
+
+  return dates;
 }
 
 function normalizeKind(value, direction = 'expense', categoryName = '') {
@@ -120,10 +271,14 @@ function normalizeBody(body, householdId) {
   const kind = normalizeKind(body?.kind, direction, category);
   const frequencyType = FREQUENCY_TYPES.has(body?.frequency_type) ? body.frequency_type : 'monthly';
   const frequencyUnit = FREQUENCY_UNITS.has(body?.frequency_unit) ? body.frequency_unit : 'months';
-  const nextDate = isoDate(body?.next_date);
+  const recurrenceRule = normalizeRecurrenceRule(body?.recurrence_rule);
+  let nextDate = isoDate(body?.next_date);
   if (!nextDate) throw upcomingError('next_date must use YYYY-MM-DD.');
+  if (recurrenceRule) nextDate = findRuleDateOnOrAfter(nextDate, recurrenceRule) || nextDate;
   const amount = Number(body?.amount);
   if (!Number.isFinite(amount)) throw upcomingError('amount must be a number.');
+  const amountStrategy = AMOUNT_STRATEGIES.has(body?.amount_strategy) ? body.amount_strategy : 'fixed';
+  const amountLookbackMonths = clampInteger(body?.amount_lookback_months, 1, MAX_LOOKBACK_MONTHS, 6);
   const categoryId = parseId(body?.category_id);
   const accountId = parseId(body?.account_id);
   const sourceTransactionId = parseId(body?.source_transaction_id);
@@ -141,6 +296,9 @@ function normalizeBody(body, householdId) {
     frequency_type: frequencyType,
     frequency_interval: Math.max(1, Math.min(365, Number(body?.frequency_interval) || 1)),
     frequency_unit: frequencyUnit,
+    recurrence_rule: recurrenceRuleToStorage(recurrenceRule),
+    amount_strategy: amountStrategy,
+    amount_lookback_months: amountLookbackMonths,
     next_date: nextDate,
     category_id: categoryId,
     account_id: accountId,
@@ -149,11 +307,104 @@ function normalizeBody(body, householdId) {
   };
 }
 
-function serializeItem(row) {
+function projectAmount(row, householdId) {
+  const fallbackCents = Math.max(0, Number(row.amount) || 0);
+  const strategy = AMOUNT_STRATEGIES.has(row.amount_strategy) ? row.amount_strategy : 'fixed';
+  const lookbackMonths = clampInteger(row.amount_lookback_months, 1, MAX_LOOKBACK_MONTHS, 6);
+  const fallback = {
+    cents: fallbackCents,
+    strategy,
+    lookback_months: lookbackMonths,
+    sample_count: 0,
+    sample_months: 0,
+    total: 0,
+    average: centsToDollars(fallbackCents),
+    fallback: true
+  };
+
+  if (strategy !== 'history_average') {
+    return {
+      ...fallback,
+      fallback: false,
+      sample_months: null,
+      average: centsToDollars(fallbackCents)
+    };
+  }
+
+  const merchant = String(row.merchant || row.name || '').trim().toLowerCase();
+  const categoryId = parseId(row.category_id);
+  if (!merchant && categoryId === null) return fallback;
+
+  const today = formatLocalDate();
+  const startDate = addMonthsClamped(today, -lookbackMonths);
+  const sampleRows = db
+    .prepare(
+      `SELECT substr(t.date, 1, 7) AS month,
+              SUM(ABS(t.amount)) AS total_cents,
+              COUNT(*) AS transaction_count
+         FROM transactions t
+        WHERE t.household_id = @household_id
+          AND COALESCE(t.edited_is_transfer, t.is_transfer) = 0
+          AND COALESCE(t.edited_is_ignored, t.is_ignored) = 0
+          AND t.date >= @start_date
+          AND t.date < @today
+          AND (
+            (@direction = 'income' AND t.amount > 0)
+            OR (@direction = 'expense' AND t.amount < 0)
+          )
+          AND (
+            (@merchant != '' AND lower(COALESCE(t.edited_merchant, t.original_merchant, '')) = @merchant)
+            OR (@merchant = '' AND @category_id IS NOT NULL AND COALESCE(t.edited_category_id, t.category_id) = @category_id)
+          )
+        GROUP BY substr(t.date, 1, 7)
+        ORDER BY month DESC`
+    )
+    .all({
+      household_id: householdId,
+      start_date: startDate,
+      today,
+      direction: row.direction === 'income' ? 'income' : 'expense',
+      merchant,
+      category_id: categoryId
+    });
+
+  if (sampleRows.length === 0) return fallback;
+
+  const totalCents = sampleRows.reduce((sum, sample) => sum + (Number(sample.total_cents) || 0), 0);
+  const sampleCount = sampleRows.reduce((sum, sample) => sum + (Number(sample.transaction_count) || 0), 0);
+  const averageCents = Math.round(totalCents / sampleRows.length);
+
+  return {
+    cents: averageCents,
+    strategy,
+    lookback_months: lookbackMonths,
+    sample_count: sampleCount,
+    sample_months: sampleRows.length,
+    total: centsToDollars(totalCents),
+    average: centsToDollars(averageCents),
+    fallback: false
+  };
+}
+
+function serializeItem(row, householdId) {
+  const projection = projectAmount(row, householdId);
   return {
     ...row,
     amount: centsToDollars(row.amount),
-    frequency_interval: Number(row.frequency_interval) || 1
+    projected_amount: centsToDollars(projection.cents),
+    recurrence_rule: parseRecurrenceRule(row.recurrence_rule),
+    amount_strategy: AMOUNT_STRATEGIES.has(row.amount_strategy) ? row.amount_strategy : 'fixed',
+    amount_lookback_months: clampInteger(row.amount_lookback_months, 1, MAX_LOOKBACK_MONTHS, 6),
+    frequency_interval: Number(row.frequency_interval) || 1,
+    projection: {
+      strategy: projection.strategy,
+      lookback_months: projection.lookback_months,
+      sample_count: projection.sample_count,
+      sample_months: projection.sample_months,
+      total: projection.total,
+      average: projection.average,
+      fallback: projection.fallback
+    }
   };
 }
 
@@ -171,7 +422,7 @@ function fetchItems(householdId) {
         ORDER BY ui.next_date ASC, ui.id ASC`
     )
     .all(householdId)
-    .map(serializeItem);
+    .map((row) => serializeItem(row, householdId));
 }
 
 function fetchDismissedKeys(householdId) {
@@ -204,6 +455,14 @@ function inferFrequency(averageInterval) {
 }
 
 function monthlyFactor(item) {
+  const recurrenceRule = parseRecurrenceRule(item?.recurrence_rule);
+  if (recurrenceRule) {
+    const today = formatLocalDate();
+    const start = startOfMonth(today);
+    const end = endOfMonth(addMonthsClamped(today, 11));
+    return datesForRuleBetween(recurrenceRule, start, end).length / 12;
+  }
+
   const type = item.frequency_type || 'monthly';
   if (type === 'weekly') return 52 / 12;
   if (type === 'biweekly') return 26 / 12;
@@ -308,16 +567,71 @@ function createItem(householdId, payload) {
     .prepare(
       `INSERT INTO upcoming_items (
          household_id, name, kind, source, merchant, amount, direction, frequency_type,
-         frequency_interval, frequency_unit, next_date, category_id, account_id,
-         source_transaction_id, notes
+         frequency_interval, frequency_unit, recurrence_rule, amount_strategy,
+         amount_lookback_months, next_date, category_id, account_id, source_transaction_id, notes
        ) VALUES (
          @household_id, @name, @kind, @source, @merchant, @amount, @direction, @frequency_type,
-         @frequency_interval, @frequency_unit, @next_date, @category_id, @account_id,
-         @source_transaction_id, @notes
+         @frequency_interval, @frequency_unit, @recurrence_rule, @amount_strategy,
+         @amount_lookback_months, @next_date, @category_id, @account_id, @source_transaction_id, @notes
        )`
     )
     .run({ household_id: householdId, ...payload });
   return result.lastInsertRowid;
+}
+
+function occurrenceFromItem(item, date) {
+  const amount = Number(item.projected_amount ?? item.amount ?? 0);
+  return {
+    id: `${item.id}:${date}`,
+    item_id: item.id,
+    name: item.name,
+    merchant: item.merchant,
+    kind: item.kind,
+    direction: item.direction,
+    amount,
+    stored_amount: Number(item.amount || 0),
+    projected_amount: Number(item.projected_amount ?? amount),
+    is_projected_amount: item.amount_strategy === 'history_average',
+    date,
+    next_date: date,
+    category_id: item.category_id,
+    category_name: item.category_name,
+    category_color: item.category_color,
+    category_icon: item.category_icon,
+    account_id: item.account_id,
+    account_name: item.account_name,
+    frequency_type: item.frequency_type,
+    frequency_interval: item.frequency_interval,
+    frequency_unit: item.frequency_unit,
+    recurrence_rule: item.recurrence_rule,
+    amount_strategy: item.amount_strategy,
+    amount_lookback_months: item.amount_lookback_months,
+    projection: item.projection
+  };
+}
+
+function buildOccurrences(items, startDate, endDate) {
+  return items
+    .flatMap((item) => (
+      datesForItemBetween(item, startDate, endDate)
+        .map((date) => occurrenceFromItem(item, date))
+    ))
+    .sort((a, b) => a.next_date.localeCompare(b.next_date) || String(a.name).localeCompare(String(b.name)));
+}
+
+function summarizeOccurrences(occurrences) {
+  const income = occurrences
+    .filter((occurrence) => occurrence.direction === 'income')
+    .reduce((sum, occurrence) => sum + Number(occurrence.amount || 0), 0);
+  const expenses = occurrences
+    .filter((occurrence) => occurrence.direction !== 'income')
+    .reduce((sum, occurrence) => sum + Number(occurrence.amount || 0), 0);
+  return {
+    income,
+    expenses,
+    net: income - expenses,
+    occurrence_count: occurrences.length
+  };
 }
 
 router.get('/', requireAuth, (req, res) => {
@@ -325,23 +639,39 @@ router.get('/', requireAuth, (req, res) => {
   try {
     const items = fetchItems(householdId);
     const suggestions = buildSuggestions(householdId);
-    const upcoming = items.slice(0, 8);
+    const today = formatLocalDate();
+    const monthEnd = endOfMonth(today);
+    const occurrenceWindowEnd = addDays(today, 62);
+    const restOfMonth = buildOccurrences(items, today, monthEnd);
+    const occurrences = buildOccurrences(items, today, occurrenceWindowEnd);
+    const cashFlow = summarizeOccurrences(restOfMonth);
+    const upcoming = occurrences.slice(0, 8);
     const monthlyExpenses = items
       .filter((item) => item.direction === 'expense')
-      .reduce((sum, item) => sum + Number(item.amount || 0) * monthlyFactor(item), 0);
+      .reduce((sum, item) => sum + Number(item.projected_amount ?? item.amount ?? 0) * monthlyFactor(item), 0);
     const monthlyIncome = items
       .filter((item) => item.direction === 'income')
-      .reduce((sum, item) => sum + Number(item.amount || 0) * monthlyFactor(item), 0);
+      .reduce((sum, item) => sum + Number(item.projected_amount ?? item.amount ?? 0) * monthlyFactor(item), 0);
 
     sendOk(res, {
       items,
       suggestions,
+      occurrences,
+      rest_of_month: restOfMonth,
       upcoming,
+      cash_flow: {
+        start_date: today,
+        end_date: monthEnd,
+        ...cashFlow
+      },
       summary: {
         active_count: items.length,
         suggestion_count: suggestions.length,
         monthly_expenses: monthlyExpenses,
-        monthly_income: monthlyIncome
+        monthly_income: monthlyIncome,
+        rest_of_month_income: cashFlow.income,
+        rest_of_month_expenses: cashFlow.expenses,
+        rest_of_month_net: cashFlow.net
       }
     });
   } catch (err) {
@@ -453,6 +783,9 @@ router.put('/:id', requireAuth, (req, res) => {
                 frequency_type = @frequency_type,
                 frequency_interval = @frequency_interval,
                 frequency_unit = @frequency_unit,
+                recurrence_rule = @recurrence_rule,
+                amount_strategy = @amount_strategy,
+                amount_lookback_months = @amount_lookback_months,
                 next_date = @next_date,
                 category_id = @category_id,
                 account_id = @account_id,

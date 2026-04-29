@@ -27,6 +27,10 @@ import {
   EditTransactionModal,
   TransactionRow
 } from '../components/transactions/TransactionRow.jsx';
+import RecurringItemEditor, {
+  formFromTransaction,
+  recurringFrequencyLabel
+} from '../components/upcoming/RecurringItemEditor.jsx';
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -411,18 +415,7 @@ function kindLabel(kind) {
 }
 
 function frequencyLabel(item) {
-  const type = item?.frequency_type;
-  if (type === 'weekly') return 'Weekly';
-  if (type === 'biweekly') return 'Biweekly';
-  if (type === 'semimonthly') return 'Twice monthly';
-  if (type === 'bimonthly') return 'Every 2 months';
-  if (type === 'yearly') return 'Yearly';
-  if (type === 'custom') {
-    const interval = Number(item.frequency_interval) || 1;
-    const unit = String(item.frequency_unit || 'days').replace(/s$/, '');
-    return `Every ${interval} ${unit}${interval === 1 ? '' : 's'}`;
-  }
-  return 'Monthly';
+  return recurringFrequencyLabel(item);
 }
 
 function ageFromBirthDate(date) {
@@ -1341,7 +1334,7 @@ function RecurringCard({ items, loading }) {
                   <span>{item.category_name || 'Uncategorized'} - {frequencyLabel(item)}</span>
                 </div>
                 <div className="dash-compact-side">
-                  <strong className="expense">{formatCurrency(item.amount)}</strong>
+                  <strong className="expense">{formatCurrency(item.projected_amount ?? item.amount)}</strong>
                   <em>Next {formatShortDate(item.next_date)}</em>
                 </div>
               </li>
@@ -2399,6 +2392,7 @@ function RecentActivityCard({
   const [expandedId, setExpandedId] = useState(null);
   const [editingTxn, setEditingTxn] = useState(null);
   const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
+  const [recurringFromTxn, setRecurringFromTxn] = useState(null);
 
   // Keep local copy in sync when parent refetches (e.g., on mount, on
   // tab-switch back to Dashboard).
@@ -2468,19 +2462,16 @@ function RecentActivityCard({
     }
   }
 
-  async function handleMarkRecurring(txn) {
-    try {
-      await api.post('/api/upcoming/from-transaction', {
-        transaction_id: txn.id
-      });
-      alert(`Added "${txn.merchant || 'transaction'}" to Upcoming.`, {
-        title: 'Recurring item saved'
-      });
-    } catch (err) {
-      alert(err.message || 'Could not create recurring item', {
-        title: 'Mark as recurring failed'
-      });
-    }
+  function handleMarkRecurring(txn) {
+    setRecurringFromTxn({
+      txn,
+      form: formFromTransaction(txn, categoryById.get(txn.category_id))
+    });
+  }
+
+  async function saveRecurringFromTxn(payload) {
+    await api.post('/api/upcoming', payload);
+    if (onRefresh) onRefresh();
   }
 
   return (
@@ -2564,6 +2555,18 @@ function RecentActivityCard({
             setNewRuleFromTxn(null);
             if (onRefresh) onRefresh();
           }}
+        />
+      )}
+
+      {recurringFromTxn && (
+        <RecurringItemEditor
+          item={{ form: recurringFromTxn.form }}
+          title="Mark As Recurring"
+          accounts={accounts}
+          categories={categories}
+          saveLabel="Add Recurring"
+          onSave={saveRecurringFromTxn}
+          onClose={() => setRecurringFromTxn(null)}
         />
       )}
 

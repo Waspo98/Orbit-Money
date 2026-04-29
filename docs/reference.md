@@ -61,6 +61,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `024_household_sharing.sql` | Adds pending household shares by email for partner access |
 | `025_rename_authentik_sub_to_oidc_sub.sql` | Renames the stored OIDC subject column from Authentik-specific naming to `oidc_sub` |
 | `026_neutral_default_household_name.sql` | Renames the old default household label to `My Household` when it has not been customized |
+| `027_upcoming_recurrence_projection.sql` | Adds Upcoming recurrence-rule metadata and history-average amount projection settings |
 
 ### Key Data Model Notes
 
@@ -102,7 +103,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 - Tap-to-expand transaction cards — grid-template-rows animated expand/contract (220ms), auto-scroll-into-view on expand (accounts for bottom tabs height)
 - Inline edit modal: merchant, category, notes (date/amount read-only — bank ground truth)
 - Transaction deletion and transfer/ignored toggles
-- "Mark as recurring" is available from the transaction row menu and expanded transaction card; it creates a monthly Upcoming item seeded from that transaction.
+- "Mark as recurring" is available from the transaction row menu and expanded transaction card; it opens the recurring-item editor seeded from that transaction before saving to Upcoming.
 - Edit provenance UI: "edited manually" / "applied by rule" badges, per-field "reset to original" buttons, inline display of the original value alongside the edited one
 
 ### Search, Filter, and Sort
@@ -196,9 +197,12 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 
 ### Upcoming
 - Standalone More-menu page at `/upcoming` for saved bills, subscriptions, and income.
-- Supports manual entries with type, amount, next date, category, account, notes, and frequency: weekly, biweekly, twice monthly, monthly, bimonthly, yearly, or custom every X days/weeks/months.
-- Transaction rows can seed a recurring item with "Mark as recurring".
-- Suggestions are generated from recent transaction history, emphasizing income and Bills & Utilities style categories before other merchants. Suggestions open in a modal from the empty state and can be accepted as a bill, subscription, or income, or dismissed.
+- Supports manual entries with type, amount, amount mode, next date, category, account, notes, and frequency: weekly, biweekly, twice monthly, monthly, bimonthly, yearly, or custom every X days/weeks/months.
+- Month-based schedules can use exact month days or weekday patterns such as first and third Friday.
+- Amount mode can stay fixed or estimate from matching transaction history over a selectable lookback window.
+- `/api/upcoming` expands saved items into projected occurrences for the rest of the current month and the next 62 days, then returns rest-of-month cash-flow totals.
+- Transaction rows can seed a recurring item with "Mark as recurring"; the shared editor opens before anything is created.
+- Suggestions are generated from recent transaction history, emphasizing income and Bills & Utilities style categories before other merchants. Suggestions can be reviewed in the recurring editor, accepted as a bill, subscription, or income, or dismissed.
 - Dashboard Subscriptions and Upcoming cards read from `/api/upcoming` rather than frontend-only transaction heuristics.
 - Monthly summary values normalize different frequencies to monthly equivalents.
 - Endpoints: GET `/api/upcoming`, POST `/api/upcoming`, PUT `/api/upcoming/:id`, DELETE `/api/upcoming/:id`, POST `/api/upcoming/from-transaction`, POST `/api/upcoming/suggestions/accept`, POST `/api/upcoming/suggestions/dismiss`
@@ -335,11 +339,11 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 ### Upcoming
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/upcoming` | Active saved items, upcoming sorted items, recurring suggestions, and monthly-equivalent summary totals |
+| GET | `/api/upcoming` | Active saved items, projected occurrences, rest-of-month cash flow, recurring suggestions, and monthly-equivalent summary totals |
 | POST | `/api/upcoming` | Create a manual item |
 | PUT | `/api/upcoming/:id` | Replace an upcoming item |
 | DELETE | `/api/upcoming/:id` | Delete an upcoming item |
-| POST | `/api/upcoming/from-transaction` | Create a monthly recurring item from `{ transaction_id }` |
+| POST | `/api/upcoming/from-transaction` | Legacy endpoint that creates a monthly recurring item from `{ transaction_id }`; current UI uses the shared editor before POST `/api/upcoming` |
 | POST | `/api/upcoming/suggestions/accept` | Accept a suggestion and create an item |
 | POST | `/api/upcoming/suggestions/dismiss` | Dismiss a suggestion key |
 

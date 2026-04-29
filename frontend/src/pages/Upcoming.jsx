@@ -1,63 +1,34 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
-import AnimatedModal from '../components/AnimatedModal.jsx';
-import AppSelect from '../components/AppSelect.jsx';
-import CurrencyInput, {
-  formatCurrencyInput,
-  parseCurrencyInput
-} from '../components/CurrencyInput.jsx';
 import PageHero from '../components/PageHero.jsx';
+import RecurringItemEditor, {
+  formFromRecurringItem,
+  formFromSuggestion,
+  kindLabel,
+  newRecurringForm,
+  recurringFrequencyLabel
+} from '../components/upcoming/RecurringItemEditor.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
-import { formatCurrency } from '../lib/formatters.js';
-import { addMonthsToLocalDate, formatLocalDate } from '../lib/localDate.js';
-
-const KIND_OPTIONS = [
-  { value: 'bill', label: 'Bill' },
-  { value: 'subscription', label: 'Subscription' },
-  { value: 'income', label: 'Income' }
-];
-
-const FREQUENCY_OPTIONS = [
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'biweekly', label: 'Biweekly' },
-  { value: 'semimonthly', label: 'Twice Monthly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'bimonthly', label: 'Bimonthly' },
-  { value: 'yearly', label: 'Yearly' },
-  { value: 'custom', label: 'Custom' }
-];
-
-const FREQUENCY_UNIT_OPTIONS = [
-  { value: 'days', label: 'Days' },
-  { value: 'weeks', label: 'Weeks' },
-  { value: 'months', label: 'Months' }
-];
-
-const DIRECTION_OPTIONS = [
-  { value: 'expense', label: 'Expense' },
-  { value: 'income', label: 'Income' }
-];
+import { formatCurrency, formatSignedCurrency } from '../lib/formatters.js';
+import { formatFullDate, formatMonthDay } from '../lib/localDate.js';
 
 const FILTERS = [
   { value: 'all', label: 'All' },
   { value: 'bill', label: 'Bills' },
   { value: 'subscription', label: 'Subscriptions' },
-  { value: 'income', label: 'Income' }
+  { value: 'income', label: 'Income' },
+  { value: 'suggested', label: 'Suggested' }
 ];
 
+const KIND_TITLES = {
+  bill: 'Bills',
+  subscription: 'Subscriptions',
+  income: 'Income'
+};
+
 function todayIso() {
-  return formatLocalDate();
-}
-
-function addOneMonthIso() {
-  return addMonthsToLocalDate(formatLocalDate(), 1);
-}
-
-function formatShortDate(value) {
-  if (!value) return '';
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function dueLabel(value) {
@@ -65,78 +36,52 @@ function dueLabel(value) {
   const today = new Date(`${todayIso()}T00:00:00`);
   if (Number.isNaN(date.getTime())) return 'Scheduled';
   const diff = Math.round((date.getTime() - today.getTime()) / 86400000);
-  if (diff < 0) return `${Math.abs(diff)} days overdue`;
+  if (diff < 0) return `${Math.abs(diff)} Days Overdue`;
   if (diff === 0) return 'Today';
   if (diff === 1) return 'Tomorrow';
-  return `${diff} days`;
+  return `${diff} Days`;
 }
 
-function kindLabel(kind) {
-  return KIND_OPTIONS.find((option) => option.value === kind)?.label || 'Item';
+function amountClass(direction) {
+  return direction === 'income' ? 'income' : 'expense';
 }
 
-function frequencyLabel(item) {
-  const type = item?.frequency_type || 'monthly';
-  if (type === 'weekly') return 'Weekly';
-  if (type === 'biweekly') return 'Biweekly';
-  if (type === 'semimonthly') return 'Twice monthly';
-  if (type === 'bimonthly') return 'Bimonthly';
-  if (type === 'yearly') return 'Yearly';
-  if (type === 'custom') {
-    const interval = Number(item.frequency_interval) || 1;
-    const unit = String(item.frequency_unit || 'days').replace(/s$/, '');
-    return `Every ${interval} ${unit}${interval === 1 ? '' : 's'}`;
+function signedAmount(direction, amount) {
+  const value = Number(amount || 0);
+  return direction === 'income'
+    ? formatSignedCurrency(Math.abs(value))
+    : `-${formatCurrency(Math.abs(value))}`;
+}
+
+function projectedLabel(item) {
+  if (item.amount_strategy !== 'history_average') return null;
+  const months = item.projection?.sample_months;
+  if (months) return `Projected from ${months} month${months === 1 ? '' : 's'}`;
+  return `Projected from ${item.amount_lookback_months || 6} months`;
+}
+
+function itemDisplayAmount(item) {
+  return Number(item.projected_amount ?? item.amount ?? 0);
+}
+
+function kindTotal(items, kind) {
+  return items
+    .filter((item) => item.kind === kind)
+    .reduce((sum, item) => sum + itemDisplayAmount(item), 0);
+}
+
+function groupByDate(occurrences) {
+  const groups = [];
+  let current = null;
+  for (const occurrence of occurrences) {
+    const key = occurrence.next_date || occurrence.date;
+    if (!current || current.key !== key) {
+      current = { key, items: [] };
+      groups.push(current);
+    }
+    current.items.push(occurrence);
   }
-  return 'Monthly';
-}
-
-function newForm() {
-  return {
-    name: '',
-    kind: 'bill',
-    amount: '',
-    direction: 'expense',
-    frequency_type: 'monthly',
-    frequency_interval: '1',
-    frequency_unit: 'months',
-    next_date: addOneMonthIso(),
-    category_id: '',
-    account_id: '',
-    notes: ''
-  };
-}
-
-function formFromItem(item) {
-  return {
-    name: item.name || '',
-    kind: item.kind || 'bill',
-    amount: formatCurrencyInput(item.amount || 0),
-    direction: item.direction || (item.kind === 'income' ? 'income' : 'expense'),
-    frequency_type: item.frequency_type || 'monthly',
-    frequency_interval: String(item.frequency_interval || 1),
-    frequency_unit: item.frequency_unit || 'months',
-    next_date: item.next_date || addOneMonthIso(),
-    category_id: item.category_id ? String(item.category_id) : '',
-    account_id: item.account_id ? String(item.account_id) : '',
-    notes: item.notes || ''
-  };
-}
-
-function payloadFromForm(form) {
-  const kind = form.kind;
-  return {
-    name: form.name.trim(),
-    kind,
-    amount: parseCurrencyInput(form.amount, 0),
-    direction: kind === 'income' ? 'income' : form.direction,
-    frequency_type: form.frequency_type,
-    frequency_interval: Number(form.frequency_interval) || 1,
-    frequency_unit: form.frequency_unit,
-    next_date: form.next_date,
-    category_id: form.category_id ? Number(form.category_id) : null,
-    account_id: form.account_id ? Number(form.account_id) : null,
-    notes: form.notes.trim() || null
-  };
+  return groups;
 }
 
 export default function Upcoming({ accounts = [], categories = [] }) {
@@ -146,10 +91,7 @@ export default function Upcoming({ accounts = [], categories = [] }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
-  const [editingItem, setEditingItem] = useState(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
-  const [suggestionKindPicker, setSuggestionKindPicker] = useState(null);
+  const [editor, setEditor] = useState(null);
 
   async function load({ silent = false } = {}) {
     if (!silent && data == null) setLoading(true);
@@ -172,44 +114,64 @@ export default function Upcoming({ accounts = [], categories = [] }) {
 
   const items = data?.items || [];
   const suggestions = data?.suggestions || [];
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => filter === 'all' || item.kind === filter);
-  }, [items, filter]);
+  const occurrences = data?.occurrences || [];
+  const restOfMonth = data?.rest_of_month || [];
+  const cashFlow = data?.cash_flow || {
+    income: 0,
+    expenses: 0,
+    net: 0,
+    occurrence_count: 0
+  };
+
+  const groupedItems = useMemo(() => ({
+    bill: items.filter((item) => item.kind === 'bill'),
+    subscription: items.filter((item) => item.kind === 'subscription'),
+    income: items.filter((item) => item.kind === 'income')
+  }), [items]);
 
   function openNew(kind = 'bill') {
-    setEditingItem({ draft: true, form: { ...newForm(), kind, direction: kind === 'income' ? 'income' : 'expense' } });
-    setFormOpen(true);
+    setEditor({
+      mode: 'create',
+      title: 'Add Recurring',
+      form: newRecurringForm({ kind, direction: kind === 'income' ? 'income' : 'expense' })
+    });
   }
 
   function openEdit(item) {
-    setEditingItem({ ...item, form: formFromItem(item) });
-    setFormOpen(true);
+    setEditor({
+      mode: 'edit',
+      id: item.id,
+      title: 'Edit Recurring',
+      form: formFromRecurringItem(item)
+    });
   }
 
-  async function saveItem(form) {
-    const payload = payloadFromForm(form);
-    if (!payload.name) {
-      alert('Name is required.', { title: 'Missing name' });
-      return;
+  function openSuggestion(suggestion) {
+    setEditor({
+      mode: 'suggestion',
+      key: suggestion.key,
+      title: 'Add Suggested Recurring',
+      form: formFromSuggestion(suggestion)
+    });
+  }
+
+  async function saveRecurring(payload) {
+    if (editor?.mode === 'edit') {
+      await api.put(`/api/upcoming/${editor.id}`, payload);
+    } else if (editor?.mode === 'suggestion') {
+      await api.post('/api/upcoming/suggestions/accept', {
+        ...payload,
+        key: editor.key
+      });
+    } else {
+      await api.post('/api/upcoming', payload);
     }
-    if (!payload.next_date) {
-      alert('Next date is required.', { title: 'Missing date' });
-      return;
-    }
-    try {
-      if (editingItem?.draft) await api.post('/api/upcoming', payload);
-      else await api.put(`/api/upcoming/${editingItem.id}`, payload);
-      setFormOpen(false);
-      setEditingItem(null);
-      await load({ silent: true });
-    } catch (err) {
-      alert(err.message || 'Could not save upcoming item.', { title: 'Save failed' });
-    }
+    await load({ silent: true });
   }
 
   async function deleteItem(item) {
     const ok = await confirm(`Delete "${item.name}" from Upcoming?`, {
-      title: 'Delete Upcoming Item',
+      title: 'Delete Recurring Item',
       confirmLabel: 'Delete',
       destructive: true
     });
@@ -218,21 +180,7 @@ export default function Upcoming({ accounts = [], categories = [] }) {
       await api.del(`/api/upcoming/${item.id}`);
       await load({ silent: true });
     } catch (err) {
-      alert(err.message || 'Could not delete upcoming item.', { title: 'Delete failed' });
-    }
-  }
-
-  async function acceptSuggestion(suggestion, kind = suggestion.kind) {
-    try {
-      await api.post('/api/upcoming/suggestions/accept', {
-        ...suggestion,
-        kind,
-        direction: kind === 'income' ? 'income' : 'expense'
-      });
-      setSuggestionKindPicker(null);
-      await load({ silent: true });
-    } catch (err) {
-      alert(err.message || 'Could not accept suggestion.', { title: 'Suggestion failed' });
+      alert(err.message || 'Could not delete recurring item.', { title: 'Delete Failed' });
     }
   }
 
@@ -241,9 +189,20 @@ export default function Upcoming({ accounts = [], categories = [] }) {
       await api.post('/api/upcoming/suggestions/dismiss', { key: suggestion.key });
       await load({ silent: true });
     } catch (err) {
-      alert(err.message || 'Could not dismiss suggestion.', { title: 'Dismiss failed' });
+      alert(err.message || 'Could not dismiss suggestion.', { title: 'Dismiss Failed' });
     }
   }
+
+  const heroStats = [
+    {
+      label: 'Rest Of Month Net',
+      value: formatSignedCurrency(cashFlow.net || 0),
+      tone: Number(cashFlow.net || 0) >= 0 ? 'good' : 'caution'
+    },
+    { label: 'Income Left', value: formatCurrency(cashFlow.income || 0), tone: 'good' },
+    { label: 'Bills And Subs', value: formatCurrency(cashFlow.expenses || 0), tone: 'caution' },
+    { label: 'Suggestions', value: String(suggestions.length) }
+  ];
 
   return (
     <div className="upcoming-view">
@@ -252,12 +211,17 @@ export default function Upcoming({ accounts = [], categories = [] }) {
         variant="upcoming"
         kicker="Money Calendar"
         title="Upcoming"
-        subtitle="Bills, subscriptions, and income in one place."
-        initialHeight={300}
+        subtitle="Projected bills, subscriptions, income, and cash flow."
+        stats={heroStats}
+        statLabel="Upcoming summary"
+        initialHeight={420}
         toolbar={
           <div className="page-hero-action-row">
+            <button type="button" className="btn-secondary" onClick={() => setFilter('suggested')}>
+              Suggestions
+            </button>
             <button type="button" className="btn-primary" onClick={() => openNew()}>
-              + Add Upcoming
+              + Add Recurring
             </button>
           </div>
         }
@@ -266,70 +230,54 @@ export default function Upcoming({ accounts = [], categories = [] }) {
       {error && <div className="error">{error}</div>}
 
       <div className={`upcoming-content ${refreshing ? 'refreshing' : ''}`}>
-        <div className="upcoming-tabs" role="tablist" aria-label="Upcoming filters">
-          {FILTERS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={filter === option.value ? 'active' : ''}
-              onClick={() => setFilter(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-
         {loading ? (
           <div className="center-loading"><div className="spinner" /></div>
-        ) : filteredItems.length === 0 ? (
-          <div className="empty-state">
-            <h2>No Upcoming Items</h2>
-            <p>Add a bill, subscription, or income item manually, or review suggestions found from transactions.</p>
-            <button type="button" className="btn-primary" onClick={() => setSuggestionsOpen(true)}>
-              View Suggestions
-            </button>
-          </div>
         ) : (
-          <ul className="upcoming-list">
-            {filteredItems.map((item) => (
-              <UpcomingItem
-                key={item.id}
-                item={item}
-                onEdit={() => openEdit(item)}
-                onDelete={() => deleteItem(item)}
-              />
-            ))}
-          </ul>
+          <>
+            <CashFlowPanel
+              cashFlow={cashFlow}
+              restOfMonth={restOfMonth}
+              occurrences={occurrences}
+            />
+
+            <div className="upcoming-tabs" role="tablist" aria-label="Upcoming filters">
+              {FILTERS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={filter === option.value ? 'active' : ''}
+                  onClick={() => setFilter(option.value)}
+                >
+                  {option.label}
+                  {option.value === 'suggested' && suggestions.length > 0 ? ` ${suggestions.length}` : ''}
+                </button>
+              ))}
+            </div>
+
+            <UpcomingPlan
+              filter={filter}
+              groupedItems={groupedItems}
+              items={items}
+              suggestions={suggestions}
+              onAdd={openNew}
+              onEdit={openEdit}
+              onDelete={deleteItem}
+              onReviewSuggestion={openSuggestion}
+              onDismissSuggestion={dismissSuggestion}
+            />
+          </>
         )}
       </div>
 
-      {formOpen && (
-        <UpcomingEditor
-          item={editingItem}
+      {editor && (
+        <RecurringItemEditor
+          item={{ form: editor.form }}
+          title={editor.title}
           accounts={accounts}
           categories={categories}
-          onSave={saveItem}
-          onClose={() => {
-            setFormOpen(false);
-            setEditingItem(null);
-          }}
-        />
-      )}
-
-      {suggestionsOpen && (
-        <SuggestionsModal
-          suggestions={suggestions}
-          onAccept={(suggestion) => setSuggestionKindPicker(suggestion)}
-          onDismiss={dismissSuggestion}
-          onClose={() => setSuggestionsOpen(false)}
-        />
-      )}
-
-      {suggestionKindPicker && (
-        <SuggestionKindPicker
-          suggestion={suggestionKindPicker}
-          onChoose={(kind) => acceptSuggestion(suggestionKindPicker, kind)}
-          onClose={() => setSuggestionKindPicker(null)}
+          saveLabel={editor.mode === 'suggestion' ? 'Add Recurring' : 'Save'}
+          onSave={saveRecurring}
+          onClose={() => setEditor(null)}
         />
       )}
 
@@ -338,285 +286,271 @@ export default function Upcoming({ accounts = [], categories = [] }) {
   );
 }
 
-function UpcomingItem({ item, onEdit, onDelete }) {
+function CashFlowPanel({ cashFlow, restOfMonth, occurrences }) {
+  const maxFlow = Math.max(Number(cashFlow.income || 0), Number(cashFlow.expenses || 0), 1);
+  const grouped = groupByDate(restOfMonth);
   return (
-    <li className={`upcoming-item upcoming-item-${item.kind}`}>
-      <div className="upcoming-date">
-        <strong>{formatShortDate(item.next_date)}</strong>
-        <span>{dueLabel(item.next_date)}</span>
-      </div>
-      <div className="upcoming-main">
-        <div>
-          <strong>{item.name}</strong>
-          <span>{kindLabel(item.kind)} - {item.category_name || 'Uncategorized'} - {frequencyLabel(item)}</span>
-        </div>
-        {item.account_name && <em>{item.account_name}</em>}
-      </div>
-      <div className="upcoming-side">
-        <strong className={item.direction === 'income' ? 'income' : 'expense'}>
-          {item.direction === 'income' ? '+' : '-'}{formatCurrency(item.amount)}
+    <section className="upcoming-cashflow-panel" aria-label="Projected cash flow">
+      <div className="upcoming-cashflow-summary">
+        <span>Rest Of Month</span>
+        <strong className={Number(cashFlow.net || 0) >= 0 ? 'income' : 'expense'}>
+          {formatSignedCurrency(cashFlow.net || 0)}
         </strong>
-        <div className="upcoming-actions">
-          <button type="button" className="dashboard-card-link dashboard-card-action-button" onClick={onEdit}>
-            Edit
-          </button>
-          <button type="button" className="dashboard-card-link dashboard-card-action-button danger-link" onClick={onDelete}>
-            Delete
+        <em>{cashFlow.occurrence_count || 0} projected transaction{cashFlow.occurrence_count === 1 ? '' : 's'}</em>
+        <div className="upcoming-cashflow-bars" aria-hidden="true">
+          <span className="income" style={{ width: `${Math.max(8, (Number(cashFlow.income || 0) / maxFlow) * 100)}%` }} />
+          <span className="expense" style={{ width: `${Math.max(8, (Number(cashFlow.expenses || 0) / maxFlow) * 100)}%` }} />
+        </div>
+        <div className="upcoming-cashflow-split">
+          <span>In {formatCurrency(cashFlow.income || 0)}</span>
+          <span>Out {formatCurrency(cashFlow.expenses || 0)}</span>
+        </div>
+      </div>
+
+      <div className="upcoming-cashflow-timeline">
+        <header>
+          <strong>Remaining Month</strong>
+          <span>{occurrences.length} scheduled in the next 62 days</span>
+        </header>
+        {grouped.length === 0 ? (
+          <div className="upcoming-mini-empty">No scheduled cash flow remains this month.</div>
+        ) : (
+          <ol>
+            {grouped.slice(0, 6).map((group) => (
+              <li key={group.key}>
+                <time dateTime={group.key}>
+                  <strong>{formatMonthDay(group.key)}</strong>
+                  <span>{dueLabel(group.key)}</span>
+                </time>
+                <div>
+                  {group.items.map((occurrence) => (
+                    <div key={occurrence.id} className="upcoming-timeline-item">
+                      <span>{occurrence.name}</span>
+                      <strong className={amountClass(occurrence.direction)}>
+                        {signedAmount(occurrence.direction, occurrence.amount)}
+                      </strong>
+                    </div>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function UpcomingPlan({
+  filter,
+  groupedItems,
+  items,
+  suggestions,
+  onAdd,
+  onEdit,
+  onDelete,
+  onReviewSuggestion,
+  onDismissSuggestion
+}) {
+  if (filter === 'suggested') {
+    return (
+      <SuggestionsPanel
+        suggestions={suggestions}
+        onReview={onReviewSuggestion}
+        onDismiss={onDismissSuggestion}
+      />
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="empty-state">
+        <h2>No Recurring Items</h2>
+        <p>Add recurring bills, subscriptions, or income to start projecting cash flow.</p>
+        <button type="button" className="btn-primary" onClick={() => onAdd()}>
+          Add Recurring
+        </button>
+      </div>
+    );
+  }
+
+  if (filter !== 'all') {
+    return (
+      <UpcomingLane
+        kind={filter}
+        items={groupedItems[filter] || []}
+        total={kindTotal(items, filter)}
+        onAdd={() => onAdd(filter)}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
+    );
+  }
+
+  return (
+    <div className="upcoming-lanes">
+      {['bill', 'subscription', 'income'].map((kind) => (
+        <UpcomingLane
+          key={kind}
+          kind={kind}
+          items={groupedItems[kind] || []}
+          total={kindTotal(items, kind)}
+          onAdd={() => onAdd(kind)}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      ))}
+      {suggestions.length > 0 && (
+        <section className="upcoming-lane upcoming-lane-suggestions">
+          <header>
+            <div>
+              <span>Suggested</span>
+              <strong>Potential recurring</strong>
+            </div>
+            <em>{suggestions.length}</em>
+          </header>
+          <SuggestionsList
+            suggestions={suggestions.slice(0, 4)}
+            onReview={onReviewSuggestion}
+            onDismiss={onDismissSuggestion}
+            compact
+          />
+        </section>
+      )}
+    </div>
+  );
+}
+
+function UpcomingLane({ kind, items, total, onAdd, onEdit, onDelete }) {
+  return (
+    <section className={`upcoming-lane upcoming-lane-${kind}`}>
+      <header>
+        <div>
+          <span>{kindLabel(kind)}</span>
+          <strong>{KIND_TITLES[kind]}</strong>
+        </div>
+        <em>{formatCurrency(total)}</em>
+      </header>
+
+      {items.length === 0 ? (
+        <div className="upcoming-mini-empty">
+          <span>No {KIND_TITLES[kind].toLowerCase()} saved.</span>
+          <button type="button" className="dashboard-card-link dashboard-card-action-button" onClick={onAdd}>
+            Add
           </button>
         </div>
+      ) : (
+        <ul className="upcoming-plan-list">
+          {items.map((item) => (
+            <RecurringRow
+              key={item.id}
+              item={item}
+              onEdit={() => onEdit(item)}
+              onDelete={() => onDelete(item)}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function RecurringRow({ item, onEdit, onDelete }) {
+  const projection = projectedLabel(item);
+  return (
+    <li className={`upcoming-plan-row upcoming-item-${item.kind}`}>
+      <button type="button" className="upcoming-plan-row-main" onClick={onEdit}>
+        <span className="upcoming-row-date">
+          <strong>{formatMonthDay(item.next_date)}</strong>
+          <em>{dueLabel(item.next_date)}</em>
+        </span>
+        <span className="upcoming-row-copy">
+          <strong>{item.name}</strong>
+          <em>
+            {item.category_name || 'Uncategorized'} - {recurringFrequencyLabel(item)}
+          </em>
+          {projection && <span className="upcoming-projection-pill">{projection}</span>}
+        </span>
+        <span className="upcoming-row-amount">
+          <strong className={amountClass(item.direction)}>
+            {signedAmount(item.direction, itemDisplayAmount(item))}
+          </strong>
+          {item.account_name && <em>{item.account_name}</em>}
+        </span>
+      </button>
+      <div className="upcoming-actions">
+        <button type="button" className="dashboard-card-link dashboard-card-action-button" onClick={onEdit}>
+          Edit
+        </button>
+        <button type="button" className="dashboard-card-link dashboard-card-action-button danger-link" onClick={onDelete}>
+          Delete
+        </button>
       </div>
     </li>
   );
 }
 
-function SuggestionsModal({ suggestions, onAccept, onDismiss, onClose }) {
+function SuggestionsPanel({ suggestions, onReview, onDismiss }) {
   return (
-    <AnimatedModal onClose={onClose} size="lg">
-      {({ close }) => (
-        <>
-          <h3>Suggestions</h3>
-          <p>Review repeating transactions Orbit found and add the ones that belong on your calendar.</p>
-          <SuggestionsList suggestions={suggestions} onAccept={onAccept} onDismiss={onDismiss} />
-          <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={close}>
-              Done
-            </button>
-          </div>
-        </>
-      )}
-    </AnimatedModal>
+    <section className="upcoming-lane upcoming-suggestions-panel">
+      <header>
+        <div>
+          <span>Suggested</span>
+          <strong>Suggested Recurring</strong>
+        </div>
+        <em>{suggestions.length}</em>
+      </header>
+      <SuggestionsList suggestions={suggestions} onReview={onReview} onDismiss={onDismiss} />
+    </section>
   );
 }
 
-function SuggestionsList({ suggestions, onAccept, onDismiss }) {
+function SuggestionsList({ suggestions, onReview, onDismiss, compact = false }) {
   if (suggestions.length === 0) {
     return (
-      <div className="empty-state">
-        <h2>No Suggestions</h2>
-        <p>Suggestions appear when income, bills, or repeating merchants show up across transaction history.</p>
+      <div className="upcoming-mini-empty">
+        <span>No suggestions right now.</span>
       </div>
     );
   }
 
   return (
-    <ul className="upcoming-list">
+    <ul className="upcoming-suggestion-list">
       {suggestions.map((suggestion) => (
-        <li key={suggestion.key} className={`upcoming-item upcoming-suggestion upcoming-item-${suggestion.kind}`}>
-          <div className="upcoming-date">
-            <strong>{formatShortDate(suggestion.next_date)}</strong>
-            <span>{suggestion.confidence}% match</span>
-          </div>
-          <div className="upcoming-main">
-            <div>
+        <li key={suggestion.key} className={`upcoming-suggestion-row upcoming-item-${suggestion.kind}`}>
+          <button type="button" className="upcoming-suggestion-main" onClick={() => onReview(suggestion)}>
+            <span className="upcoming-row-date">
+              <strong>{formatMonthDay(suggestion.next_date)}</strong>
+              <em>{suggestion.confidence}% Match</em>
+            </span>
+            <span className="upcoming-row-copy">
               <strong>{suggestion.name}</strong>
-              <span>{kindLabel(suggestion.kind)} - {suggestion.category_name || 'Uncategorized'} - {frequencyLabel(suggestion)}</span>
-            </div>
-            <em>{suggestion.transaction_count} transaction hits</em>
-          </div>
-          <div className="upcoming-side">
-            <strong className={suggestion.direction === 'income' ? 'income' : 'expense'}>
-              {suggestion.direction === 'income' ? '+' : '-'}{formatCurrency(suggestion.amount)}
-            </strong>
-            <div className="upcoming-actions">
-              <button type="button" className="dashboard-card-link dashboard-card-action-button" onClick={() => onAccept(suggestion)}>
-                Add
-              </button>
-              <button type="button" className="dashboard-card-link dashboard-card-action-button" onClick={() => onDismiss(suggestion)}>
-                Dismiss
-              </button>
-            </div>
+              <em>
+                {kindLabel(suggestion.kind)} - {suggestion.category_name || 'Uncategorized'} - {recurringFrequencyLabel(suggestion)}
+              </em>
+              {!compact && (
+                <span className="upcoming-projection-pill">
+                  {suggestion.transaction_count} transaction hit{suggestion.transaction_count === 1 ? '' : 's'}
+                </span>
+              )}
+            </span>
+            <span className="upcoming-row-amount">
+              <strong className={amountClass(suggestion.direction)}>
+                {signedAmount(suggestion.direction, suggestion.amount)}
+              </strong>
+              <em>{formatFullDate(suggestion.next_date)}</em>
+            </span>
+          </button>
+          <div className="upcoming-actions">
+            <button type="button" className="dashboard-card-link dashboard-card-action-button" onClick={() => onReview(suggestion)}>
+              Review
+            </button>
+            <button type="button" className="dashboard-card-link dashboard-card-action-button" onClick={() => onDismiss(suggestion)}>
+              Dismiss
+            </button>
           </div>
         </li>
       ))}
     </ul>
-  );
-}
-
-function SuggestionKindPicker({ suggestion, onChoose, onClose }) {
-  return (
-    <AnimatedModal onClose={onClose} size="sm" animation="zoom">
-      {() => (
-        <>
-          <h3>Add as...</h3>
-          <p className="modal-copy">{suggestion.name}</p>
-          <div className="upcoming-kind-picker">
-            {KIND_OPTIONS.map((option) => (
-              <button
-                type="button"
-                key={option.value}
-                className={`selectable-list-item upcoming-kind-option ${
-                  suggestion.kind === option.value ? 'active' : ''
-                }`}
-                onClick={() => onChoose(option.value)}
-              >
-                <span className="selectable-list-main">
-                  <strong>{option.label}</strong>
-                  <em>
-                    {option.value === 'income'
-                      ? 'Money coming in'
-                      : option.value === 'bill'
-                        ? 'A regular required payment'
-                        : 'A recurring subscription or membership'}
-                  </em>
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancel
-            </button>
-          </div>
-        </>
-      )}
-    </AnimatedModal>
-  );
-}
-
-function UpcomingEditor({ item, accounts, categories, onSave, onClose }) {
-  const [form, setForm] = useState(item?.form || newForm());
-  const isIncome = form.kind === 'income';
-
-  function patch(patchValue) {
-    setForm((prev) => {
-      const next = { ...prev, ...patchValue };
-      if (patchValue.kind === 'income') next.direction = 'income';
-      if (patchValue.kind && patchValue.kind !== 'income') next.direction = 'expense';
-      return next;
-    });
-  }
-
-  return (
-    <AnimatedModal onClose={onClose} size="lg">
-      {({ close }) => (
-        <>
-          <h3>{item?.draft ? 'Add Upcoming' : 'Edit Upcoming'}</h3>
-          <p>Save bills, subscriptions, or income manually and tune their schedule.</p>
-
-          <div className="upcoming-editor-grid">
-            <label className="field">
-              <span>Name</span>
-              <input
-                value={form.name}
-                onChange={(event) => patch({ name: event.target.value })}
-                placeholder="Mortgage, paycheck, Netflix"
-              />
-            </label>
-
-            <label className="field">
-              <span>Type</span>
-              <AppSelect value={form.kind} options={KIND_OPTIONS} onChange={(value) => patch({ kind: value })} ariaLabel="Upcoming type">
-                {KIND_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </AppSelect>
-            </label>
-
-            <label className="field">
-              <span>Amount</span>
-              <CurrencyInput
-                value={form.amount}
-                onChange={(value) => patch({ amount: value })}
-                placeholder="$0.00"
-              />
-            </label>
-
-            <label className="field">
-              <span>Next Date</span>
-              <input
-                type="date"
-                value={form.next_date}
-                onChange={(event) => patch({ next_date: event.target.value })}
-              />
-            </label>
-
-            <label className="field">
-              <span>Frequency</span>
-              <AppSelect value={form.frequency_type} options={FREQUENCY_OPTIONS} onChange={(value) => patch({ frequency_type: value })} ariaLabel="Upcoming frequency">
-                {FREQUENCY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </AppSelect>
-            </label>
-
-            {form.frequency_type === 'custom' && (
-              <div className="upcoming-custom-frequency">
-                <label className="field">
-                  <span>Every</span>
-                  <input
-                    type="number"
-                    min="1"
-                    value={form.frequency_interval}
-                    onChange={(event) => patch({ frequency_interval: event.target.value })}
-                  />
-                </label>
-                <label className="field">
-                  <span>Unit</span>
-                  <AppSelect value={form.frequency_unit} options={FREQUENCY_UNIT_OPTIONS} onChange={(value) => patch({ frequency_unit: value })} ariaLabel="Frequency unit">
-                    <option value="days">Days</option>
-                    <option value="weeks">Weeks</option>
-                    <option value="months">Months</option>
-                  </AppSelect>
-                </label>
-              </div>
-            )}
-
-            {!isIncome && (
-              <label className="field">
-                <span>Direction</span>
-                <AppSelect value={form.direction} options={DIRECTION_OPTIONS} onChange={(value) => patch({ direction: value })} ariaLabel="Upcoming direction">
-                  <option value="expense">Expense</option>
-                  <option value="income">Income</option>
-                </AppSelect>
-              </label>
-            )}
-
-            <label className="field">
-              <span>Category</span>
-              <AppSelect value={form.category_id} onChange={(value) => patch({ category_id: value })} ariaLabel="Upcoming category" options={[
-                { value: '', label: 'Uncategorized' },
-                ...categories.map((category) => ({ value: category.id, label: category.name }))
-              ]}>
-                <option value="">Uncategorized</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
-                ))}
-              </AppSelect>
-            </label>
-
-            <label className="field">
-              <span>Account</span>
-              <AppSelect value={form.account_id} onChange={(value) => patch({ account_id: value })} ariaLabel="Upcoming account" options={[
-                { value: '', label: 'Any Account' },
-                ...accounts.filter((account) => !account.is_archived).map((account) => ({ value: account.id, label: account.name }))
-              ]}>
-                <option value="">Any Account</option>
-                {accounts.filter((account) => !account.is_archived).map((account) => (
-                  <option key={account.id} value={account.id}>{account.name}</option>
-                ))}
-              </AppSelect>
-            </label>
-
-            <label className="field upcoming-notes-field">
-              <span>Notes</span>
-              <textarea
-                value={form.notes}
-                onChange={(event) => patch({ notes: event.target.value })}
-                placeholder="Optional note"
-              />
-            </label>
-          </div>
-
-          <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={close}>
-              Cancel
-            </button>
-            <button type="button" className="btn-primary" onClick={() => onSave(form)}>
-              Save
-            </button>
-          </div>
-        </>
-      )}
-    </AnimatedModal>
   );
 }
