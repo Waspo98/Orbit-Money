@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 let lockCount = 0;
 let lockSnapshot = null;
+let pageBlurCount = 0;
 
 export const OVERLAY_ANIM_MS = 180;
 
@@ -44,6 +45,25 @@ export function useBodyScrollLock(active) {
       document.body.style.right = snapshot.right;
       document.body.style.width = snapshot.width;
       window.scrollTo(0, snapshot.scrollY);
+    };
+  }, [active]);
+}
+
+export function usePageBackdropBlur(active) {
+  useEffect(() => {
+    if (!active) return undefined;
+
+    if (pageBlurCount === 0) {
+      document.body.classList.add('modal-page-blur-active');
+    }
+
+    pageBlurCount += 1;
+
+    return () => {
+      pageBlurCount = Math.max(0, pageBlurCount - 1);
+      if (pageBlurCount === 0) {
+        document.body.classList.remove('modal-page-blur-active');
+      }
     };
   }, [active]);
 }

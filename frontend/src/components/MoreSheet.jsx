@@ -51,11 +51,14 @@ export default function MoreSheet({
     gestureRef.current = createGestureState();
     suppressNextClickRef.current = false;
     unlockInternalScroll();
-    setSheetTransform(0, { dragging: false });
+    sheetRef.current?.classList.remove('dragging');
     setDrawerState('opening');
 
     enterFrameRef.current = window.requestAnimationFrame(() => {
-      setDrawerState('open');
+      enterFrameRef.current = window.requestAnimationFrame(() => {
+        enterFrameRef.current = null;
+        setDrawerState('open');
+      });
     });
 
     return () => {

@@ -1,6 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
+import {
+  OVERLAY_ANIM_MS,
+  useBodyScrollLock,
+  usePageBackdropBlur
+} from './overlayBehavior.js';
 
 /**
  * AnimatedModal — plays a slide-out animation before calling the parent's
@@ -41,6 +45,7 @@ export default function AnimatedModal({ onClose, size = 'md', animation = 'defau
   }
 
   useBodyScrollLock(true);
+  usePageBackdropBlur(true);
 
   // Escape closes.
   useEffect(() => {

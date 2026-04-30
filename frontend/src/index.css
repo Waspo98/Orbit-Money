@@ -239,6 +239,11 @@ body.login-scroll-lock {
 
 #root { min-height: 100vh; min-height: 100dvh; }
 
+body.modal-page-blur-active #root {
+  filter: blur(5px);
+  transition: filter var(--dur-base) var(--ease-out);
+}
+
 a { color: var(--accent); text-decoration: none; transition: color var(--dur-fast); }
 a:hover { color: var(--accent-hover); text-decoration: underline; }
 
@@ -9967,25 +9972,35 @@ input, textarea, select {
   font-size: 0.9rem;
 }
 
+.txn-toolbar-hero .txn-sort .app-select-trigger,
+.txn-toolbar-hero .txn-page-size .app-select-trigger {
+  grid-template-columns: minmax(0, 1fr);
+  padding-inline: 30px;
+  text-align: center;
+}
+
+.txn-toolbar-hero .txn-sort .app-select-trigger span:first-child,
+.txn-toolbar-hero .txn-page-size .app-select-trigger span:first-child {
+  justify-self: center;
+  text-align: center;
+}
+
+.txn-toolbar-hero .txn-sort .app-select-caret,
+.txn-toolbar-hero .txn-page-size .app-select-caret {
+  position: absolute;
+  right: 12px;
+}
+
 .app-select-menu-txn-sort {
   min-width: min(220px, calc(100vw - 48px));
 }
 
 .txn-sort-active .app-select-trigger {
-  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-}
-
-.txn-sort-active .app-select-trigger::after {
-  content: '';
-  position: absolute;
-  top: 8px;
-  right: 22px;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--accent);
-  box-shadow: 0 0 0 2px var(--surface);
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    var(--shadow-md);
 }
 
 .app-select-menu-txn-page-size {
@@ -10007,6 +10022,16 @@ input, textarea, select {
 
 .txn-toolbar-hero .app-select-trigger:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.txn-toolbar-hero .txn-sort-active .app-select-trigger,
+.txn-toolbar-hero .txn-sort-active .app-select-trigger:hover,
+.txn-toolbar-hero .txn-sort-active .app-select-trigger:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    var(--shadow-md);
 }
 
 .txn-toolbar-hero .txn-filter-button.btn-active {
