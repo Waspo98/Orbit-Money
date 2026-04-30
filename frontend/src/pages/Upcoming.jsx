@@ -16,8 +16,7 @@ const FILTERS = [
   { value: 'all', label: 'All' },
   { value: 'bill', label: 'Bills' },
   { value: 'subscription', label: 'Subscriptions' },
-  { value: 'income', label: 'Income' },
-  { value: 'suggested', label: 'Suggested' }
+  { value: 'income', label: 'Income' }
 ];
 
 const KIND_TITLES = {
@@ -70,6 +69,13 @@ function kindTotal(items, kind) {
     .reduce((sum, item) => sum + itemDisplayAmount(item), 0);
 }
 
+function daysBetweenDates(startDate, endDate) {
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+  return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000));
+}
+
 function groupByDate(occurrences) {
   const groups = [];
   let current = null;
@@ -114,7 +120,6 @@ export default function Upcoming({ accounts = [], categories = [] }) {
 
   const items = data?.items || [];
   const suggestions = data?.suggestions || [];
-  const occurrences = data?.occurrences || [];
   const restOfMonth = data?.rest_of_month || [];
   const cashFlow = data?.cash_flow || {
     income: 0,
@@ -127,6 +132,12 @@ export default function Upcoming({ accounts = [], categories = [] }) {
     bill: items.filter((item) => item.kind === 'bill'),
     subscription: items.filter((item) => item.kind === 'subscription'),
     income: items.filter((item) => item.kind === 'income')
+  }), [items]);
+
+  const upcomingTotals = useMemo(() => ({
+    bill: kindTotal(items, 'bill'),
+    subscription: kindTotal(items, 'subscription'),
+    income: kindTotal(items, 'income')
   }), [items]);
 
   function openNew(kind = 'bill') {
@@ -199,9 +210,9 @@ export default function Upcoming({ accounts = [], categories = [] }) {
       value: formatSignedCurrency(cashFlow.net || 0),
       tone: Number(cashFlow.net || 0) >= 0 ? 'good' : 'caution'
     },
-    { label: 'Income Left', value: formatCurrency(cashFlow.income || 0), tone: 'good' },
-    { label: 'Bills And Subs', value: formatCurrency(cashFlow.expenses || 0), tone: 'caution' },
-    { label: 'Suggestions', value: String(suggestions.length) }
+    { label: 'Upcoming Income', value: formatCurrency(upcomingTotals.income), tone: 'good' },
+    { label: 'Upcoming Bills', value: formatCurrency(upcomingTotals.bill), tone: 'caution' },
+    { label: 'Upcoming Subscriptions', value: formatCurrency(upcomingTotals.subscription), tone: 'caution' }
   ];
 
   return (
@@ -237,7 +248,6 @@ export default function Upcoming({ accounts = [], categories = [] }) {
             <CashFlowPanel
               cashFlow={cashFlow}
               restOfMonth={restOfMonth}
-              occurrences={occurrences}
             />
 
             <div className="upcoming-tabs" role="tablist" aria-label="Upcoming filters">
@@ -249,7 +259,6 @@ export default function Upcoming({ accounts = [], categories = [] }) {
                   onClick={() => setFilter(option.value)}
                 >
                   {option.label}
-                  {option.value === 'suggested' && suggestions.length > 0 ? ` ${suggestions.length}` : ''}
                 </button>
               ))}
             </div>
@@ -264,6 +273,7 @@ export default function Upcoming({ accounts = [], categories = [] }) {
               onDelete={deleteItem}
               onReviewSuggestion={openSuggestion}
               onDismissSuggestion={dismissSuggestion}
+              onViewSuggestions={() => setFilter('suggested')}
             />
           </>
         )}
@@ -286,9 +296,11 @@ export default function Upcoming({ accounts = [], categories = [] }) {
   );
 }
 
-function CashFlowPanel({ cashFlow, restOfMonth, occurrences }) {
+function CashFlowPanel({ cashFlow, restOfMonth }) {
   const maxFlow = Math.max(Number(cashFlow.income || 0), Number(cashFlow.expenses || 0), 1);
   const grouped = groupByDate(restOfMonth);
+  const daysRemaining = daysBetweenDates(cashFlow.start_date || todayIso(), cashFlow.end_date || todayIso());
+  const transactionCount = Number(cashFlow.occurrence_count || 0);
   return (
     <section className="upcoming-cashflow-panel" aria-label="Projected cash flow">
       <div className="upcoming-cashflow-summary">
@@ -309,8 +321,9 @@ function CashFlowPanel({ cashFlow, restOfMonth, occurrences }) {
 
       <div className="upcoming-cashflow-timeline">
         <header>
-          <strong>Remaining Month</strong>
-          <span>{occurrences.length} scheduled in the next 62 days</span>
+          <span>
+            {transactionCount} transaction{transactionCount === 1 ? '' : 's'} remaining in the next {daysRemaining} day{daysRemaining === 1 ? '' : 's'}
+          </span>
         </header>
         {grouped.length === 0 ? (
           <div className="upcoming-mini-empty">No scheduled cash flow remains this month.</div>
@@ -350,7 +363,8 @@ function UpcomingPlan({
   onEdit,
   onDelete,
   onReviewSuggestion,
-  onDismissSuggestion
+  onDismissSuggestion,
+  onViewSuggestions
 }) {
   if (filter === 'suggested') {
     return (
@@ -367,8 +381,8 @@ function UpcomingPlan({
       <div className="empty-state">
         <h2>No Recurring Items</h2>
         <p>Add recurring bills, subscriptions, or income to start projecting cash flow.</p>
-        <button type="button" className="btn-primary" onClick={() => onAdd()}>
-          Add Recurring
+        <button type="button" className="btn-primary" onClick={onViewSuggestions}>
+          View Suggestions
         </button>
       </div>
     );
@@ -426,7 +440,6 @@ function UpcomingLane({ kind, items, total, onAdd, onEdit, onDelete }) {
     <section className={`upcoming-lane upcoming-lane-${kind}`}>
       <header>
         <div>
-          <span>{kindLabel(kind)}</span>
           <strong>{KIND_TITLES[kind]}</strong>
         </div>
         <em>{formatCurrency(total)}</em>

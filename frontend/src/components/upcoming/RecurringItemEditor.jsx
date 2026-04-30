@@ -16,10 +16,10 @@ export const KIND_OPTIONS = [
 
 const FREQUENCY_OPTIONS = [
   { value: 'weekly', label: 'Weekly' },
-  { value: 'biweekly', label: 'Biweekly' },
-  { value: 'semimonthly', label: 'Twice Monthly' },
+  { value: 'biweekly', label: 'Every Other Week' },
+  { value: 'semimonthly', label: 'Semi-Monthly' },
   { value: 'monthly', label: 'Monthly' },
-  { value: 'bimonthly', label: 'Bimonthly' },
+  { value: 'bimonthly', label: 'Every Other Month' },
   { value: 'yearly', label: 'Yearly' },
   { value: 'custom', label: 'Custom' }
 ];
@@ -28,11 +28,6 @@ const FREQUENCY_UNIT_OPTIONS = [
   { value: 'days', label: 'Days' },
   { value: 'weeks', label: 'Weeks' },
   { value: 'months', label: 'Months' }
-];
-
-const DIRECTION_OPTIONS = [
-  { value: 'expense', label: 'Expense' },
-  { value: 'income', label: 'Income' }
 ];
 
 const AMOUNT_STRATEGY_OPTIONS = [
@@ -199,7 +194,7 @@ export function recurringFrequencyLabel(item) {
   const rule = item?.recurrence_rule;
   if (rule?.type === 'month_days') {
     const days = (rule.days || []).map((day) => ordinalLabel(day));
-    return `${item?.frequency_type === 'semimonthly' ? 'Twice monthly' : 'Monthly'} on ${joinLabels(days)}`;
+    return `${item?.frequency_type === 'semimonthly' ? 'Semi-monthly' : 'Monthly'} on ${joinLabels(days)}`;
   }
 
   if (rule?.type === 'month_weekdays') {
@@ -210,9 +205,9 @@ export function recurringFrequencyLabel(item) {
 
   const type = item?.frequency_type || 'monthly';
   if (type === 'weekly') return 'Weekly';
-  if (type === 'biweekly') return 'Biweekly';
-  if (type === 'semimonthly') return 'Twice monthly';
-  if (type === 'bimonthly') return 'Bimonthly';
+  if (type === 'biweekly') return 'Every other week';
+  if (type === 'semimonthly') return 'Semi-monthly';
+  if (type === 'bimonthly') return 'Every other month';
   if (type === 'yearly') return 'Yearly';
   if (type === 'custom') {
     const interval = Number(item.frequency_interval) || 1;
@@ -335,7 +330,7 @@ export function payloadFromRecurringForm(form) {
     merchant: String(form.merchant || form.name || '').trim(),
     kind,
     amount: parseCurrencyInput(form.amount, 0),
-    direction: kind === 'income' ? 'income' : form.direction,
+    direction: kind === 'income' ? 'income' : 'expense',
     frequency_type: form.frequency_type,
     frequency_interval: Number(form.frequency_interval) || 1,
     frequency_unit: form.frequency_unit,
@@ -364,7 +359,6 @@ export default function RecurringItemEditor({
   const [form, setForm] = useState(item?.form || item || newRecurringForm());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const isIncome = form.kind === 'income';
   const isMonthBased = ['monthly', 'semimonthly'].includes(form.frequency_type);
   const activeRule = buildRuleFromForm(form);
   const projectedNextDate = activeRule ? nextRuleDate(activeRule, todayIso()) : '';
@@ -600,18 +594,6 @@ export default function RecurringItemEditor({
                 onChange={(event) => patch({ next_date: event.target.value })}
               />
             </label>
-
-            {!isIncome && (
-              <label className="field">
-                <span>Direction</span>
-                <AppSelect
-                  value={form.direction}
-                  options={DIRECTION_OPTIONS}
-                  onChange={(value) => patch({ direction: value })}
-                  ariaLabel="Recurring direction"
-                />
-              </label>
-            )}
 
             <label className="field">
               <span>Category</span>

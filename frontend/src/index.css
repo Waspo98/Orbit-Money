@@ -4389,12 +4389,6 @@ input, textarea, select {
   min-height: calc(100dvh - 140px);
 }
 
-.page-hero-upcoming {
-  --hero-start: #102a2f;
-  --hero-mid: #115e59;
-  --hero-end: #6f7a3a;
-}
-
 .upcoming-view > .error,
 .upcoming-view > .center-loading,
 .upcoming-view > .empty-state,
@@ -4438,7 +4432,6 @@ input, textarea, select {
 }
 
 .upcoming-cashflow-summary > span,
-.upcoming-cashflow-timeline header span,
 .upcoming-lane header span {
   color: var(--text-muted);
   font-size: 0.76rem;
@@ -4446,6 +4439,20 @@ input, textarea, select {
   line-height: 1.2;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.upcoming-cashflow-timeline header span {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.page-hero-upcoming .page-hero-stat > span {
+  min-height: 1.65em;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .upcoming-cashflow-summary > strong {
@@ -4603,7 +4610,7 @@ input, textarea, select {
 
 .upcoming-tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
