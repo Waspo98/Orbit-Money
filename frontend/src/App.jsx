@@ -275,7 +275,6 @@ function AppShell() {
       <SyncErrorBanner onOpenSettings={() => navigate('/settings')} />
 
       <main className="app-main">
-        <DepthPattern className="app-depth-pattern" seedKey={location.pathname} />
         {lookupError ? (
           <div className="empty-state app-load-error">
             <div className="empty-state-icon">!</div>
@@ -294,6 +293,7 @@ function AppShell() {
             key={location.pathname}
             className={`route-transition route-transition-${routeTransition}`}
           >
+            <DepthPattern className="app-depth-pattern" seedKey={location.pathname} />
             <Routes location={location}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               {ROUTES.map((route) => (
