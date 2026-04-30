@@ -7181,19 +7181,9 @@ input, textarea, select {
 .txn-month-group { margin-bottom: 28px; }
 
 .txn-month-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 12px 0 8px;
-  background: inherit;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
-}
-
-.txn-pinned-month-header {
-  position: fixed;
+  position: sticky;
   top: 0;
-  z-index: 480;
+  z-index: 120;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -7201,8 +7191,7 @@ input, textarea, select {
   padding: 12px 0 8px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
-  pointer-events: none;
-  will-change: transform;
+  margin-bottom: 8px;
 }
 
 .txn-month-label { font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em; }
@@ -9767,35 +9756,37 @@ input, textarea, select {
 }
 
 
-/* ================== Transactions toolbar (v13) ================== */
+/* ================== Transactions toolbar (v14) ================== */
 
 .txn-toolbar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
-  margin: 8px 0 12px;
+  margin: 0;
 }
 
 .txn-toolbar-hero {
-  margin: 0;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .txn-search-field {
-  flex: 1 1 280px;
-  min-width: 220px;
+  width: 100%;
+  min-width: 0;
 }
 
 .txn-toolbar-hero .search-field-input {
-  border-color: color-mix(in srgb, var(--border) 70%, rgba(255, 255, 255, 0.18));
-  background: var(--surface);
+  min-height: 48px;
+  border-color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.96);
   color: var(--text);
-  box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
+  box-shadow:
+    0 14px 28px rgba(5, 20, 52, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
 }
 
 .txn-toolbar-hero .search-field-input::placeholder {
@@ -9847,52 +9838,90 @@ input, textarea, select {
 }
 
 .txn-toolbar-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(104px, auto) minmax(150px, 170px) minmax(110px, 128px);
   gap: 8px;
   align-items: center;
-  flex-wrap: wrap;
+  min-width: 0;
 }
 
-.txn-sort select,
-.txn-page-size select {
-  padding: 9px 10px;
-  border: 1px solid var(--border);
+.txn-toolbar-actions .app-select {
+  min-width: 0;
+}
+
+.txn-toolbar-hero .txn-filter-button,
+.txn-toolbar-hero .app-select-trigger {
+  min-height: 44px;
+  border-color: rgba(255, 255, 255, 0.78);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.96);
   color: var(--text);
+  box-shadow:
+    0 12px 24px rgba(5, 20, 52, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.txn-filter-button {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 12px;
+  white-space: nowrap;
+}
+
+.txn-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.txn-toolbar-hero .app-select-trigger {
   font-size: 0.9rem;
-  font-family: inherit;
-  cursor: pointer;
 }
 
-.txn-toolbar-hero .btn-secondary,
-.txn-toolbar-hero .txn-sort select,
-.txn-toolbar-hero .txn-page-size select {
-  border-color: color-mix(in srgb, var(--border) 70%, rgba(255, 255, 255, 0.18));
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
+.txn-sort .app-select-menu {
+  min-width: min(220px, calc(100vw - 48px));
+}
+
+.txn-page-size .app-select-menu {
+  min-width: min(140px, calc(100vw - 48px));
 }
 
 .txn-toolbar-hero .btn-secondary:hover,
-.txn-toolbar-hero .txn-sort select:hover,
-.txn-toolbar-hero .txn-page-size select:hover {
+.txn-toolbar-hero .app-select-trigger:hover,
+.txn-toolbar-hero .app-select-trigger:focus {
   background: var(--surface-hover);
+  color: var(--text);
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 
-.txn-toolbar-hero .btn-secondary.btn-active {
+.txn-toolbar-hero .btn-secondary:hover,
+.txn-toolbar-hero .app-select-trigger:hover {
+  box-shadow:
+    0 12px 24px rgba(5, 20, 52, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.txn-toolbar-hero .app-select-trigger:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.txn-toolbar-hero .txn-filter-button.btn-active {
   background: #8ff0c9;
   border-color: #8ff0c9;
   color: #06112c;
 }
 
-.txn-sort select:focus,
-.txn-page-size select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+.txn-toolbar-hero .txn-filter-button.btn-active .txn-filter-count {
+  background: #06112c;
+  color: #8ff0c9;
 }
 
 .visually-hidden {
@@ -10217,13 +10246,10 @@ input, textarea, select {
     font-size: 1.02rem;
   }
   .txn-toolbar-hero {
-    padding: 12px;
+    grid-template-columns: 1fr;
   }
   .txn-toolbar-hero .search-field-input {
     font-size: 0.9rem;
-  }
-  .txn-search-field {
-    flex: 1 1 100%;
   }
   .txn-toolbar-actions {
     width: 100%;
@@ -10231,9 +10257,8 @@ input, textarea, select {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
-  .txn-toolbar-hero .btn-secondary,
-  .txn-toolbar-hero .txn-sort select,
-  .txn-toolbar-hero .txn-page-size select {
+  .txn-filter-button,
+  .txn-toolbar-hero .app-select-trigger {
     width: 100%;
     min-width: 0;
     padding-left: 8px;

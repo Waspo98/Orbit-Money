@@ -171,7 +171,6 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   const [total, setTotal] = useState(0);
   const [grandTotal, setGrandTotal] = useState(0);
   const [monthlyTotal, setMonthlyTotal] = useState(0);
-  const [monthlyFlow, setMonthlyFlow] = useState({ income: 0, expenses: 0, net: 0 });
   const [monthCounts, setMonthCounts] = useState({});
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -182,10 +181,6 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
   const [recurringFromTxn, setRecurringFromTxn] = useState(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  const groupRefs = useRef(new Map());
-  const floatingHeaderRef = useRef(null);
-  const [pinnedMonth, setPinnedMonth] = useState(null);
-
   // Local (debounced) search input - keeps typing snappy, writes to URL
   // after a short idle window so the server request doesn't fire per
   // keystroke.
@@ -221,11 +216,6 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
       setTotal(data.total);
       setGrandTotal(data.grandTotal ?? data.total);
       setMonthlyTotal(data.monthlyTotal ?? 0);
-      setMonthlyFlow({
-        income: Number(data.monthlyIncome || 0),
-        expenses: Number(data.monthlyExpenses || 0),
-        net: Number(data.monthlyNet || 0)
-      });
       setMonthCounts(
         Object.fromEntries(
           (data.monthCounts || []).map((row) => [row.month, Number(row.count) || 0])
@@ -403,78 +393,6 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     () => groupByMonth(items, monthCounts),
     [items, monthCounts]
   );
-  useEffect(() => {
-    if (!groups.length) {
-      setPinnedMonth(null);
-      return undefined;
-    }
-
-    function updatePinnedMonth() {
-      const topOffset = 0;
-      const headerHeight =
-        floatingHeaderRef.current?.getBoundingClientRect().height || 52;
-      let activeIndex = -1;
-
-      for (let index = 0; index < groups.length; index += 1) {
-        const node = groupRefs.current.get(groups[index].id);
-        if (!node) continue;
-        const rect = node.getBoundingClientRect();
-        if (rect.top <= topOffset && rect.bottom > topOffset + headerHeight) {
-          activeIndex = index;
-        }
-      }
-
-      if (activeIndex < 0) {
-        setPinnedMonth(null);
-        return;
-      }
-
-      const group = groups[activeIndex];
-      const node = groupRefs.current.get(group.id);
-      if (!node) {
-        setPinnedMonth(null);
-        return;
-      }
-
-      const rect = node.getBoundingClientRect();
-      const nextGroup = groups[activeIndex + 1];
-      const nextNode = nextGroup ? groupRefs.current.get(nextGroup.id) : null;
-      const nextTop = nextNode?.getBoundingClientRect().top;
-      const translateY =
-        typeof nextTop === 'number'
-          ? Math.min(0, nextTop - topOffset - headerHeight)
-          : 0;
-
-      const nextPinnedMonth = {
-        key: group.id,
-        label: group.label,
-        count: group.count,
-        left: rect.left,
-        width: rect.width,
-        translateY
-      };
-
-      setPinnedMonth((prev) =>
-        prev &&
-        prev.key === nextPinnedMonth.key &&
-        prev.count === nextPinnedMonth.count &&
-        Math.abs(prev.left - nextPinnedMonth.left) < 0.5 &&
-        Math.abs(prev.width - nextPinnedMonth.width) < 0.5 &&
-        Math.abs(prev.translateY - nextPinnedMonth.translateY) < 0.5
-          ? prev
-          : nextPinnedMonth
-      );
-    }
-
-    updatePinnedMonth();
-    window.addEventListener('scroll', updatePinnedMonth, { passive: true });
-    window.addEventListener('resize', updatePinnedMonth);
-    return () => {
-      window.removeEventListener('scroll', updatePinnedMonth);
-      window.removeEventListener('resize', updatePinnedMonth);
-    };
-  }, [groups]);
-
   // Onboarding empty state - only when no filters AND nothing exists at all.
   if (!loading && grandTotal === 0 && !isFiltered) {
     return (
@@ -517,14 +435,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         kicker="Money movement"
         title="Transactions"
         subtitle={`${monthlyTotal.toLocaleString()} ${monthlyTotal === 1 ? 'transaction' : 'transactions'} this month`}
-        stats={[
-          { label: 'Monthly income', value: formatShortAmount(monthlyFlow.income), tone: 'good' },
-          { label: 'Monthly expenses', value: formatShortAmount(monthlyFlow.expenses), tone: 'caution' },
-          { label: 'Monthly net', value: formatAmount(monthlyFlow.net), tone: monthlyFlow.net >= 0 ? 'good' : 'caution' },
-          { label: 'Monthly transactions', value: monthlyTotal.toLocaleString() }
-        ]}
-        initialHeight={612}
-        statLabel="Transaction summary"
+        initialHeight={360}
         chrome={(hero) => (
           <div className="page-hero-chrome">
             <button
@@ -539,7 +450,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           </div>
         )}
         toolbar={(
-          <div className="txn-toolbar txn-toolbar-hero">
+          <div className="txn-toolbar txn-toolbar-hero" aria-label="Transaction tools">
             <SearchField
               value={searchLocal}
               onChange={setSearch}
@@ -549,54 +460,35 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             <div className="txn-toolbar-actions">
               <button
                 type="button"
-                className={`btn-secondary ${activeCount > 0 ? 'btn-active' : ''}`}
+                className={`btn-secondary txn-filter-button ${activeCount > 0 ? 'btn-active' : ''}`}
                 onClick={() => setFilterSheetOpen(true)}
               >
-                {'\u2699'} Filter{activeCount > 0 ? ` (${activeCount})` : ''}
+                <span>Filter</span>
+                {activeCount > 0 && (
+                  <span className="txn-filter-count">{activeCount}</span>
+                )}
               </button>
-              <label className="txn-sort">
-                <span className="visually-hidden">Sort</span>
-                <AppSelect
-                  value={filters.sort}
-                  options={SORT_OPTIONS}
-                  onChange={setSort}
-                  ariaLabel="Sort transactions"
-                />
-              </label>
-              <label className="txn-page-size">
-                <span className="visually-hidden">Transactions per page</span>
-                <AppSelect
-                  value={filters.pageSize}
-                  options={PAGE_SIZE_OPTIONS.map((size) => ({
-                    value: size,
-                    label: `${size} / page`
-                  }))}
-                  onChange={setPageSize}
-                  ariaLabel="Transactions per page"
-                />
-              </label>
+              <AppSelect
+                className="txn-sort"
+                value={filters.sort}
+                options={SORT_OPTIONS}
+                onChange={setSort}
+                ariaLabel="Sort transactions"
+              />
+              <AppSelect
+                className="txn-page-size"
+                value={filters.pageSize}
+                options={PAGE_SIZE_OPTIONS.map((size) => ({
+                  value: size,
+                  label: `${size} / page`
+                }))}
+                onChange={setPageSize}
+                ariaLabel="Transactions per page"
+              />
             </div>
           </div>
         )}
       />
-      {pinnedMonth && (
-        <header
-          ref={floatingHeaderRef}
-          className="txn-pinned-month-header"
-          style={{
-            left: `${pinnedMonth.left}px`,
-            width: `${pinnedMonth.width}px`,
-            transform: `translateY(${pinnedMonth.translateY}px)`
-          }}
-          aria-hidden="true"
-        >
-          <span className="txn-month-label">{pinnedMonth.label}</span>
-          <span className="txn-month-count">
-            {pinnedMonth.count}{' '}
-            {pinnedMonth.count === 1 ? 'transaction' : 'transactions'}
-          </span>
-        </header>
-      )}
       {/* ---------- Active filter pills ---------- */}
       {activeCount > 0 && (
         <ActiveFilterPills
@@ -629,10 +521,6 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             <section
               key={group.id}
               className="txn-month-group"
-              ref={(node) => {
-                if (node) groupRefs.current.set(group.id, node);
-                else groupRefs.current.delete(group.id);
-              }}
             >
               <header className="txn-month-header">
                 <span className="txn-month-label">{group.label}</span>
