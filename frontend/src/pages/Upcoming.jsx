@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
+import AnimatedModal from '../components/AnimatedModal.jsx';
 import PageHero from '../components/PageHero.jsx';
+import SearchField from '../components/SearchField.jsx';
+import SelectableListItem from '../components/SelectableListItem.jsx';
 import RecurringItemEditor, {
   formFromRecurringItem,
   formFromSuggestion,
+  formFromTransaction,
   kindLabel,
   newRecurringForm,
   recurringFrequencyLabel
@@ -14,16 +18,40 @@ import { formatFullDate, formatMonthDay } from '../lib/localDate.js';
 
 const FILTERS = [
   { value: 'all', label: 'All' },
-  { value: 'bill', label: 'Bills' },
+  { value: 'suggested', label: 'Suggestions' },
+  { value: 'income', label: 'Income' },
+  { value: 'giving', label: 'Giving' },
   { value: 'subscription', label: 'Subscriptions' },
-  { value: 'income', label: 'Income' }
+  { value: 'bill', label: 'Bills' }
 ];
+
+const LANE_ORDER = ['income', 'giving', 'subscription', 'bill'];
 
 const KIND_TITLES = {
   bill: 'Bills',
   subscription: 'Subscriptions',
-  income: 'Income'
+  income: 'Income',
+  giving: 'Giving'
 };
+
+const KIND_LABELS = {
+  bill: 'Bill',
+  subscription: 'Subscription',
+  income: 'Income',
+  giving: 'Giving'
+};
+
+const GIVING_HINTS = [
+  'charitable',
+  'charity',
+  'church',
+  'donation',
+  'donations',
+  'giving',
+  'nonprofit',
+  'non-profit',
+  'tithe'
+];
 
 function todayIso() {
   const date = new Date();
@@ -63,10 +91,32 @@ function itemDisplayAmount(item) {
   return Number(item.projected_amount ?? item.amount ?? 0);
 }
 
+function isGivingItem(item) {
+  if (item?.kind === 'giving') return true;
+  if (item?.kind === 'income' || item?.direction === 'income') return false;
+  const text = [
+    item?.category_name,
+    item?.name,
+    item?.merchant,
+    item?.notes
+  ].join(' ').toLowerCase();
+  return GIVING_HINTS.some((hint) => text.includes(hint));
+}
+
+function itemsForKind(items, kind) {
+  if (kind === 'giving') return items.filter(isGivingItem);
+  if (kind === 'bill' || kind === 'subscription') {
+    return items.filter((item) => item.kind === kind && !isGivingItem(item));
+  }
+  return items.filter((item) => item.kind === kind);
+}
+
 function kindTotal(items, kind) {
-  return items
-    .filter((item) => item.kind === kind)
-    .reduce((sum, item) => sum + itemDisplayAmount(item), 0);
+  return itemsForKind(items, kind).reduce((sum, item) => sum + itemDisplayAmount(item), 0);
+}
+
+function upcomingKindLabel(kind) {
+  return KIND_LABELS[kind] || kindLabel(kind);
 }
 
 function daysBetweenDates(startDate, endDate) {
@@ -98,6 +148,8 @@ export default function Upcoming({ accounts = [], categories = [] }) {
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
   const [editor, setEditor] = useState(null);
+  const [transactionPicker, setTransactionPicker] = useState(null);
+  const [historyItem, setHistoryItem] = useState(null);
 
   async function load({ silent = false } = {}) {
     if (!silent && data == null) setLoading(true);
@@ -129,13 +181,15 @@ export default function Upcoming({ accounts = [], categories = [] }) {
   };
 
   const groupedItems = useMemo(() => ({
-    bill: items.filter((item) => item.kind === 'bill'),
-    subscription: items.filter((item) => item.kind === 'subscription'),
-    income: items.filter((item) => item.kind === 'income')
+    bill: itemsForKind(items, 'bill'),
+    giving: itemsForKind(items, 'giving'),
+    subscription: itemsForKind(items, 'subscription'),
+    income: itemsForKind(items, 'income')
   }), [items]);
 
   const upcomingTotals = useMemo(() => ({
     bill: kindTotal(items, 'bill'),
+    giving: kindTotal(items, 'giving'),
     subscription: kindTotal(items, 'subscription'),
     income: kindTotal(items, 'income')
   }), [items]);
@@ -163,6 +217,25 @@ export default function Upcoming({ accounts = [], categories = [] }) {
       key: suggestion.key,
       title: 'Add Suggested Recurring',
       form: formFromSuggestion(suggestion)
+    });
+  }
+
+  function openTransactionPicker(kind = 'bill') {
+    setTransactionPicker({ kind });
+  }
+
+  function openTransactionReview(txn, kind = 'bill') {
+    const category = categories.find((categoryOption) => categoryOption.id === txn.category_id);
+    const reviewKind = kind === 'giving' ? 'bill' : kind;
+    setTransactionPicker(null);
+    setEditor({
+      mode: 'create',
+      title: `Review ${upcomingKindLabel(kind)}`,
+      form: {
+        ...formFromTransaction(txn, category),
+        kind: reviewKind,
+        direction: reviewKind === 'income' ? 'income' : 'expense'
+      }
     });
   }
 
@@ -267,9 +340,10 @@ export default function Upcoming({ accounts = [], categories = [] }) {
               groupedItems={groupedItems}
               items={items}
               suggestions={suggestions}
-              onAdd={openNew}
+              onAddFromTransaction={openTransactionPicker}
               onEdit={openEdit}
               onDelete={deleteItem}
+              onViewHistory={setHistoryItem}
               onReviewSuggestion={openSuggestion}
               onDismissSuggestion={dismissSuggestion}
               onViewSuggestions={() => setFilter('suggested')}
@@ -287,6 +361,30 @@ export default function Upcoming({ accounts = [], categories = [] }) {
           saveLabel={editor.mode === 'suggestion' ? 'Add Recurring' : 'Save'}
           onSave={saveRecurring}
           onClose={() => setEditor(null)}
+        />
+      )}
+
+      {transactionPicker && (
+        <TransactionPickerModal
+          kind={transactionPicker.kind}
+          accounts={accounts}
+          categories={categories}
+          onPick={(txn) => openTransactionReview(txn, transactionPicker.kind)}
+          onClose={() => setTransactionPicker(null)}
+        />
+      )}
+
+      {historyItem && (
+        <RecurringHistoryModal
+          item={historyItem}
+          accounts={accounts}
+          categories={categories}
+          onEdit={() => {
+            const item = historyItem;
+            setHistoryItem(null);
+            openEdit(item);
+          }}
+          onClose={() => setHistoryItem(null)}
         />
       )}
 
@@ -362,9 +460,10 @@ function UpcomingPlan({
   groupedItems,
   items,
   suggestions,
-  onAdd,
+  onAddFromTransaction,
   onEdit,
   onDelete,
+  onViewHistory,
   onReviewSuggestion,
   onDismissSuggestion,
   onViewSuggestions
@@ -397,26 +496,16 @@ function UpcomingPlan({
         kind={filter}
         items={groupedItems[filter] || []}
         total={kindTotal(items, filter)}
-        onAdd={() => onAdd(filter)}
+        onAdd={() => onAddFromTransaction(filter)}
         onEdit={onEdit}
         onDelete={onDelete}
+        onViewHistory={onViewHistory}
       />
     );
   }
 
   return (
     <div className="upcoming-lanes">
-      {['bill', 'subscription', 'income'].map((kind) => (
-        <UpcomingLane
-          key={kind}
-          kind={kind}
-          items={groupedItems[kind] || []}
-          total={kindTotal(items, kind)}
-          onAdd={() => onAdd(kind)}
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
-      ))}
       {suggestions.length > 0 && (
         <section className="dashboard-card upcoming-lane upcoming-lane-suggestions">
           <header className="dashboard-card-header upcoming-card-header">
@@ -433,11 +522,23 @@ function UpcomingPlan({
           </div>
         </section>
       )}
+      {LANE_ORDER.map((kind) => (
+        <UpcomingLane
+          key={kind}
+          kind={kind}
+          items={groupedItems[kind] || []}
+          total={kindTotal(items, kind)}
+          onAdd={() => onAddFromTransaction(kind)}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onViewHistory={onViewHistory}
+        />
+      ))}
     </div>
   );
 }
 
-function UpcomingLane({ kind, items, total, onAdd, onEdit, onDelete }) {
+function UpcomingLane({ kind, items, total, onAdd, onEdit, onDelete, onViewHistory }) {
   return (
     <section className={`dashboard-card upcoming-lane upcoming-lane-${kind}`}>
       <header className="dashboard-card-header upcoming-card-header">
@@ -459,6 +560,7 @@ function UpcomingLane({ kind, items, total, onAdd, onEdit, onDelete }) {
               <RecurringRow
                 key={item.id}
                 item={item}
+                onViewHistory={() => onViewHistory(item)}
                 onEdit={() => onEdit(item)}
                 onDelete={() => onDelete(item)}
               />
@@ -470,11 +572,16 @@ function UpcomingLane({ kind, items, total, onAdd, onEdit, onDelete }) {
   );
 }
 
-function RecurringRow({ item, onEdit, onDelete }) {
+function RecurringRow({ item, onViewHistory, onEdit, onDelete }) {
   const projection = projectedLabel(item);
   return (
     <li className={`selectable-list-item upcoming-plan-row upcoming-item-${item.kind}`}>
-      <button type="button" className="upcoming-plan-row-main" onClick={onEdit}>
+      <button
+        type="button"
+        className="upcoming-plan-row-main"
+        onClick={onViewHistory}
+        aria-label={`View previous transactions for ${item.name}`}
+      >
         <span className="selectable-list-leading upcoming-row-date">
           <strong>{formatMonthDay(item.next_date)}</strong>
           <em>{dueLabel(item.next_date)}</em>
@@ -502,6 +609,249 @@ function RecurringRow({ item, onEdit, onDelete }) {
         </button>
       </div>
     </li>
+  );
+}
+
+function TransactionPickerModal({ kind, accounts, categories, onPick, onClose }) {
+  const [query, setQuery] = useState('');
+  const [transactions, setTransactions] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
+  const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
+
+  useEffect(() => {
+    let active = true;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const params = new URLSearchParams({
+          page: '1',
+          limit: '100',
+          sort: 'date_desc',
+          include_ignored: '0',
+          include_transfers: '0'
+        });
+        if (kind === 'income') params.set('type', 'income');
+        if (query.trim()) params.set('q', query.trim());
+        const result = await api.get(`/api/transactions?${params.toString()}`);
+        if (!active) return;
+        setTransactions(result.items || []);
+        setTotal(Number(result.total || 0));
+      } catch (err) {
+        if (!active) return;
+        setError(err.message || 'Could not load transactions.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    }, query.trim() ? 250 : 0);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [kind, query]);
+
+  return (
+    <AnimatedModal onClose={onClose} size="lg">
+      {({ close }) => (
+        <>
+          <h3>Add {upcomingKindLabel(kind)} From Transaction</h3>
+          <p className="modal-copy">
+            {total > transactions.length
+              ? `Showing ${transactions.length} of ${total} transactions.`
+              : `${total} transaction${total === 1 ? '' : 's'} available.`}
+          </p>
+
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            placeholder="Search transactions"
+            className="upcoming-transaction-search"
+          />
+
+          <div className="upcoming-transaction-results">
+            {loading ? (
+              <div className="upcoming-transaction-state"><div className="spinner" /></div>
+            ) : error ? (
+              <div className="error">{error}</div>
+            ) : transactions.length === 0 ? (
+              <div className="upcoming-mini-empty">
+                <span>No transactions found.</span>
+              </div>
+            ) : (
+              transactions.map((txn) => (
+                <TransactionPickRow
+                  key={txn.id}
+                  txn={txn}
+                  account={accountById.get(txn.account_id)}
+                  category={categoryById.get(txn.category_id)}
+                  onClick={() => {
+                    close({ animate: true });
+                    setTimeout(() => onPick(txn), 180);
+                  }}
+                />
+              ))
+            )}
+          </div>
+
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={close}>
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+    </AnimatedModal>
+  );
+}
+
+function TransactionPickRow({ txn, account, category, onClick }) {
+  const subtitle = [
+    category ? `${category.icon} ${category.name}` : 'Uncategorized',
+    account?.name
+  ].filter(Boolean).join(' - ');
+
+  return (
+    <SelectableListItem
+      className="upcoming-transaction-row"
+      leading={formatMonthDay(txn.date)}
+      title={txn.merchant || 'Transaction'}
+      subtitle={subtitle}
+      sidePrimary={formatSignedCurrency(txn.amount)}
+      sideSecondary={formatFullDate(txn.date)}
+      onClick={onClick}
+      ariaLabel={`Use ${txn.merchant || 'transaction'} from ${formatFullDate(txn.date)}`}
+    />
+  );
+}
+
+function RecurringHistoryModal({ item, accounts, categories, onEdit, onClose }) {
+  const [transactions, setTransactions] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
+  const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
+  const searchTerm = String(item.merchant || item.name || '').trim();
+
+  useEffect(() => {
+    let active = true;
+    async function loadMatches() {
+      setLoading(true);
+      setError('');
+      try {
+        const params = new URLSearchParams({
+          page: '1',
+          limit: '50',
+          sort: 'date_desc',
+          include_ignored: '0',
+          include_transfers: '0',
+          date_to: todayIso(),
+          type: item.direction === 'income' ? 'income' : 'expense'
+        });
+        if (searchTerm) params.set('q', searchTerm);
+        else if (item.category_id) params.set('categories', String(item.category_id));
+        const result = await api.get(`/api/transactions?${params.toString()}`);
+        if (!active) return;
+        setTransactions(result.items || []);
+        setTotal(Number(result.total || 0));
+      } catch (err) {
+        if (!active) return;
+        setError(err.message || 'Could not load matching transactions.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadMatches();
+    return () => {
+      active = false;
+    };
+  }, [item.id, item.category_id, item.direction, searchTerm]);
+
+  return (
+    <AnimatedModal onClose={onClose} size="lg">
+      {({ close }) => (
+        <>
+          <h3>{item.name} History</h3>
+          <p className="modal-copy">
+            {total > transactions.length
+              ? `Showing ${transactions.length} of ${total} previous matches.`
+              : `${total} previous match${total === 1 ? '' : 'es'}.`}
+          </p>
+
+          <div className="upcoming-history-summary">
+            <span>{recurringFrequencyLabel(item)}</span>
+            <strong className={amountClass(item.direction)}>
+              {signedAmount(item.direction, itemDisplayAmount(item))}
+            </strong>
+          </div>
+
+          <div className="upcoming-history-list">
+            {loading ? (
+              <div className="upcoming-transaction-state"><div className="spinner" /></div>
+            ) : error ? (
+              <div className="error">{error}</div>
+            ) : transactions.length === 0 ? (
+              <div className="upcoming-mini-empty">
+                <span>No previous transactions matched.</span>
+              </div>
+            ) : (
+              transactions.map((txn) => (
+                <HistoryTransactionRow
+                  key={txn.id}
+                  txn={txn}
+                  account={accountById.get(txn.account_id)}
+                  category={categoryById.get(txn.category_id)}
+                />
+              ))
+            )}
+          </div>
+
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={close}>
+              Close
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                close({ animate: true });
+                setTimeout(onEdit, 180);
+              }}
+            >
+              Edit Recurring
+            </button>
+          </div>
+        </>
+      )}
+    </AnimatedModal>
+  );
+}
+
+function HistoryTransactionRow({ txn, account, category }) {
+  const subtitle = [
+    category ? `${category.icon} ${category.name}` : 'Uncategorized',
+    account?.name
+  ].filter(Boolean).join(' - ');
+
+  return (
+    <div className="selectable-list-item upcoming-history-row">
+      <span className="selectable-list-leading upcoming-history-date">
+        {formatMonthDay(txn.date)}
+      </span>
+      <span className="selectable-list-main">
+        <strong>{txn.merchant || 'Transaction'}</strong>
+        <em>{subtitle}</em>
+      </span>
+      <span className="selectable-list-side">
+        <strong className={txn.amount >= 0 ? 'income' : 'expense'}>{formatSignedCurrency(txn.amount)}</strong>
+        <em>{formatFullDate(txn.date)}</em>
+      </span>
+    </div>
   );
 }
 
