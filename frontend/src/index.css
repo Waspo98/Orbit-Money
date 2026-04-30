@@ -9895,7 +9895,7 @@ input, textarea, select {
 .txn-toolbar-hero .txn-filter-button,
 .txn-toolbar-hero .app-select-trigger {
   min-height: 44px;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text);
@@ -9923,17 +9923,22 @@ input, textarea, select {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   text-align: center;
+}
+
+.txn-control-button::after,
+.txn-toolbar-hero .txn-control-select .app-select-trigger::after {
+  content: '';
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
 }
 
 .txn-control-label,
 .txn-toolbar-hero .txn-control-select .app-select-label {
-  position: absolute;
-  left: 36px;
-  right: 36px;
-  top: 50%;
-  transform: translateY(-50%);
   min-width: 0;
+  max-width: calc(100% - 62px);
   overflow: hidden;
   text-align: center;
   text-overflow: ellipsis;
@@ -9941,12 +9946,9 @@ input, textarea, select {
 
 .txn-filter-icon,
 .txn-control-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
   width: 15px;
   height: 15px;
+  flex: 0 0 auto;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.9;
@@ -10001,17 +10003,29 @@ input, textarea, select {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-.txn-toolbar-hero .txn-control-active,
-.txn-toolbar-hero .txn-control-active:hover,
-.txn-toolbar-hero .txn-control-active:focus,
+.txn-toolbar-hero .txn-control-button.txn-control-active,
 .txn-toolbar-hero .txn-control-active .app-select-trigger,
-.txn-toolbar-hero .txn-control-active .app-select-trigger:hover,
-.txn-toolbar-hero .txn-control-active .app-select-trigger:focus {
+.txn-toolbar-hero .txn-control-button.txn-control-active:hover,
+.txn-toolbar-hero .txn-control-active .app-select-trigger:hover {
   background: var(--surface);
-  border-color: transparent;
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
   color: var(--text);
   -webkit-text-fill-color: var(--text);
-  box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
+  box-shadow: var(--shadow-md);
+}
+
+.txn-toolbar-hero .txn-control-button.txn-control-active:hover,
+.txn-toolbar-hero .txn-control-active .app-select-trigger:hover {
+  background: var(--surface-hover);
+}
+
+.txn-toolbar-hero .txn-control-button.txn-control-active:focus,
+.txn-toolbar-hero .txn-control-active .app-select-trigger:focus {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .txn-toolbar-hero .txn-control-active .txn-filter-count {
