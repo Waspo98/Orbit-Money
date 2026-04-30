@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 let lockCount = 0;
 let lockSnapshot = null;
 let pageBlurCount = 0;
+let overlayHistoryId = 0;
 
 export const OVERLAY_ANIM_MS = 180;
 
@@ -63,6 +64,47 @@ export function usePageBackdropBlur(active) {
       pageBlurCount = Math.max(0, pageBlurCount - 1);
       if (pageBlurCount === 0) {
         document.body.classList.remove('modal-page-blur-active');
+      }
+    };
+  }, [active]);
+}
+
+export function useOverlayBackDismiss(active, onDismiss) {
+  const onDismissRef = useRef(onDismiss);
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  useEffect(() => {
+    if (!active) return undefined;
+
+    const id = `orbit-overlay-${++overlayHistoryId}`;
+    let dismissedByBack = false;
+    const currentState = window.history.state;
+    const stateBase = currentState && typeof currentState === 'object'
+      ? currentState
+      : {};
+
+    window.history.pushState(
+      { ...stateBase, __orbitOverlayId: id },
+      '',
+      window.location.href
+    );
+
+    function handlePopState(event) {
+      if (event.state?.__orbitOverlayId === id) return;
+      dismissedByBack = true;
+      onDismissRef.current?.();
+    }
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (dismissedByBack) return;
+      if (window.history.state?.__orbitOverlayId === id) {
+        window.history.back();
       }
     };
   }, [active]);
