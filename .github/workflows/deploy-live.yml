@@ -25,4 +25,4 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ORBIT_PUBLISH_IMAGE: "1"
-        run: call "C:\Docker\Compose\Orbit Money\scripts\deploy-live.cmd"
+        run: call "C:\Docker\Orbit Money\scripts\deploy-live.cmd"
