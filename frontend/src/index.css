@@ -1838,11 +1838,6 @@ input, textarea, select {
   min-width: 0;
 }
 
-.route-transition > :not(.app-depth-pattern) {
-  position: relative;
-  z-index: 1;
-}
-
 @media (max-width: 1079px) {
   .app-shell.has-page-hero .app-main {
     overflow-x: clip;
