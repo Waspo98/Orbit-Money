@@ -22,6 +22,8 @@ const AMOUNT_STRATEGIES = new Set(['fixed', 'history_average']);
 const BILL_CATEGORY_HINTS = ['bill', 'utilit', 'insurance', 'loan', 'mortgage', 'rent'];
 const INCOME_CATEGORY_HINTS = ['income', 'paycheck', 'salary', 'payroll'];
 const MAX_LOOKBACK_MONTHS = 24;
+const FINAL_DAY_VALUE = -1;
+const LAST_WEEK_VALUE = -1;
 
 function upcomingError(message, status = 400) {
   const err = new Error(message);
@@ -119,16 +121,22 @@ function daysBetween(a, b) {
   return Math.round((end.getTime() - start.getTime()) / 86400000);
 }
 
-function normalizeIntegerList(values, min, max, limit) {
+function normalizeIntegerList(values, min, max, limit, extraValues = []) {
   const source = Array.isArray(values) ? values : [values];
+  const extras = new Set(extraValues.map((value) => Number(value)));
+  const sortValue = (value) => (
+    extras.has(value) && value < min
+      ? max + Math.abs(value) + 1
+      : value
+  );
   return Array.from(
     new Set(
       source
         .map((value) => Math.trunc(Number(value)))
-        .filter((value) => Number.isFinite(value) && value >= min && value <= max)
+        .filter((value) => Number.isFinite(value) && ((value >= min && value <= max) || extras.has(value)))
     )
   )
-    .sort((a, b) => a - b)
+    .sort((a, b) => sortValue(a) - sortValue(b))
     .slice(0, limit);
 }
 
@@ -147,12 +155,12 @@ function parseRecurrenceRule(value) {
   if (!raw || typeof raw !== 'object') return null;
 
   if (raw.type === 'month_days') {
-    const days = normalizeIntegerList(raw.days, 1, 31, 6);
+    const days = normalizeIntegerList(raw.days, 1, 31, 6, [FINAL_DAY_VALUE]);
     return days.length ? { type: 'month_days', days } : null;
   }
 
   if (raw.type === 'month_weekdays') {
-    const ordinals = normalizeIntegerList(raw.ordinals, 1, 5, 5);
+    const ordinals = normalizeIntegerList(raw.ordinals, 1, 5, 5, [LAST_WEEK_VALUE]);
     const weekdays = normalizeIntegerList(raw.weekdays, 0, 6, 7);
     return ordinals.length && weekdays.length
       ? { type: 'month_weekdays', ordinals, weekdays }
@@ -181,14 +189,21 @@ function monthlyDatesForRule(rule, year, month) {
 
   if (rule.type === 'month_days') {
     for (const day of rule.days || []) {
-      dates.add(formatDateParts(year, month, Math.min(day, monthDays)));
+      const dateDay = day === FINAL_DAY_VALUE ? monthDays : Math.min(day, monthDays);
+      if (dateDay >= 1) dates.add(formatDateParts(year, month, dateDay));
     }
   }
 
   if (rule.type === 'month_weekdays') {
     const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+    const lastWeekday = new Date(Date.UTC(year, month - 1, monthDays)).getUTCDay();
     for (const ordinal of rule.ordinals || []) {
       for (const weekday of rule.weekdays || []) {
+        if (ordinal === LAST_WEEK_VALUE) {
+          const offsetBack = (lastWeekday - weekday + 7) % 7;
+          dates.add(formatDateParts(year, month, monthDays - offsetBack));
+          continue;
+        }
         const offset = (weekday - firstWeekday + 7) % 7;
         const day = 1 + offset + ((ordinal - 1) * 7);
         if (day <= monthDays) dates.add(formatDateParts(year, month, day));

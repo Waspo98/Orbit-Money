@@ -41,12 +41,24 @@ const SCHEDULE_MODE_OPTIONS = [
   { value: 'month_weekdays', label: 'Weekday Pattern' }
 ];
 
+const FINAL_DAY_VALUE = -1;
+const LAST_WEEK_VALUE = -1;
+
 const ORDINAL_OPTIONS = [
   { value: '1', label: '1st' },
   { value: '2', label: '2nd' },
   { value: '3', label: '3rd' },
   { value: '4', label: '4th' },
-  { value: '5', label: '5th' }
+  { value: '5', label: '5th' },
+  { value: String(LAST_WEEK_VALUE), label: 'Last' }
+];
+
+const MONTH_DAY_OPTIONS = [
+  ...Array.from({ length: 31 }, (_, index) => {
+    const day = index + 1;
+    return { value: String(day), label: monthDayLabel(day) };
+  }),
+  { value: String(FINAL_DAY_VALUE), label: 'Final Day' }
 ];
 
 const WEEKDAY_OPTIONS = [
@@ -97,16 +109,22 @@ function addMonthsClamped(value, amount) {
   return addMonthsToLocalDate(value, amount);
 }
 
-function normalizeNumberList(values, min, max, limit) {
+function normalizeNumberList(values, min, max, limit, extraValues = []) {
   const source = Array.isArray(values) ? values : [values];
+  const extras = new Set(extraValues.map((value) => Number(value)));
+  const sortValue = (value) => (
+    extras.has(value) && value < min
+      ? max + Math.abs(value) + 1
+      : value
+  );
   return Array.from(
     new Set(
       source
         .map((value) => Math.trunc(Number(value)))
-        .filter((value) => Number.isFinite(value) && value >= min && value <= max)
+        .filter((value) => Number.isFinite(value) && ((value >= min && value <= max) || extras.has(value)))
     )
   )
-    .sort((a, b) => a - b)
+    .sort((a, b) => sortValue(a) - sortValue(b))
     .slice(0, limit);
 }
 
@@ -116,14 +134,21 @@ function monthlyDatesForRule(rule, year, month) {
 
   if (rule?.type === 'month_days') {
     for (const day of rule.days || []) {
-      dates.add(formatDateParts(year, month, Math.min(day, monthDays)));
+      const dateDay = day === FINAL_DAY_VALUE ? monthDays : Math.min(day, monthDays);
+      if (dateDay >= 1) dates.add(formatDateParts(year, month, dateDay));
     }
   }
 
   if (rule?.type === 'month_weekdays') {
     const firstWeekday = new Date(year, month - 1, 1).getDay();
+    const lastWeekday = new Date(year, month - 1, monthDays).getDay();
     for (const ordinal of rule.ordinals || []) {
       for (const weekday of rule.weekdays || []) {
+        if (ordinal === LAST_WEEK_VALUE) {
+          const offsetBack = (lastWeekday - weekday + 7) % 7;
+          dates.add(formatDateParts(year, month, monthDays - offsetBack));
+          continue;
+        }
         const offset = (weekday - firstWeekday + 7) % 7;
         const day = 1 + offset + ((ordinal - 1) * 7);
         if (day <= monthDays) dates.add(formatDateParts(year, month, day));
@@ -153,6 +178,19 @@ function ordinalLabel(value) {
   return ORDINAL_OPTIONS.find((option) => String(option.value) === String(value))?.label || `${value}`;
 }
 
+function monthDayLabel(value) {
+  const day = Number(value);
+  if (day === FINAL_DAY_VALUE) return 'Final Day';
+  const suffix = day % 10 === 1 && day % 100 !== 11
+    ? 'st'
+    : day % 10 === 2 && day % 100 !== 12
+      ? 'nd'
+      : day % 10 === 3 && day % 100 !== 13
+        ? 'rd'
+        : 'th';
+  return `${day}${suffix}`;
+}
+
 function joinLabels(values) {
   if (values.length <= 1) return values[0] || '';
   return `${values.slice(0, -1).join(', ')} and ${values[values.length - 1]}`;
@@ -167,12 +205,18 @@ function buildRuleFromForm(form) {
   if (!['monthly', 'semimonthly'].includes(form.frequency_type)) return null;
 
   if (form.schedule_mode === 'month_days') {
-    const days = normalizeNumberList([form.month_day_one, form.month_day_two], 1, 31, 6);
+    const dayValues = form.frequency_type === 'semimonthly'
+      ? [form.month_day_one, form.month_day_two]
+      : [form.month_day_one];
+    const days = normalizeNumberList(dayValues, 1, 31, 6, [FINAL_DAY_VALUE]);
     return days.length ? { type: 'month_days', days } : null;
   }
 
   if (form.schedule_mode === 'month_weekdays') {
-    const ordinals = normalizeNumberList([form.ordinal_one, form.ordinal_two], 1, 5, 5);
+    const ordinalValues = form.frequency_type === 'semimonthly'
+      ? [form.ordinal_one, form.ordinal_two]
+      : [form.ordinal_one];
+    const ordinals = normalizeNumberList(ordinalValues, 1, 5, 5, [LAST_WEEK_VALUE]);
     const weekdays = normalizeNumberList([form.weekday], 0, 6, 7);
     return ordinals.length && weekdays.length ? { type: 'month_weekdays', ordinals, weekdays } : null;
   }
@@ -193,7 +237,7 @@ export function kindLabel(kind) {
 export function recurringFrequencyLabel(item) {
   const rule = item?.recurrence_rule;
   if (rule?.type === 'month_days') {
-    const days = (rule.days || []).map((day) => ordinalLabel(day));
+    const days = (rule.days || []).map((day) => monthDayLabel(day));
     return `${item?.frequency_type === 'semimonthly' ? 'Semi-monthly' : 'Monthly'} on ${joinLabels(days)}`;
   }
 
@@ -245,6 +289,7 @@ export function newRecurringForm(overrides = {}) {
     weekday: '5',
     amount_strategy: 'fixed',
     amount_lookback_months: '6',
+    projected_amount: '',
     next_date: defaultNextDate(),
     category_id: '',
     account_id: '',
@@ -261,11 +306,14 @@ export function formFromRecurringItem(item = {}) {
   const monthDays = rule?.type === 'month_days' ? rule.days || [] : [];
   const ordinals = rule?.type === 'month_weekdays' ? rule.ordinals || [] : [];
   const weekdays = rule?.type === 'month_weekdays' ? rule.weekdays || [] : [];
+  const amountForEditor = item.amount_strategy === 'history_average' && item.projected_amount != null
+    ? item.projected_amount
+    : item.amount;
   return newRecurringForm({
     name: item.name || item.merchant || '',
     merchant: item.merchant || item.name || '',
     kind: item.kind || 'bill',
-    amount: formatCurrencyInput(item.amount || 0),
+    amount: formatCurrencyInput(amountForEditor || 0),
     direction: item.direction || (item.kind === 'income' ? 'income' : 'expense'),
     frequency_type: item.frequency_type || 'monthly',
     frequency_interval: String(item.frequency_interval || 1),
@@ -278,6 +326,7 @@ export function formFromRecurringItem(item = {}) {
     weekday: String(weekdays[0] ?? 5),
     amount_strategy: item.amount_strategy || 'fixed',
     amount_lookback_months: String(item.amount_lookback_months || 6),
+    projected_amount: item.projected_amount ?? '',
     next_date: item.next_date || defaultNextDate(),
     category_id: item.category_id ? String(item.category_id) : '',
     account_id: item.account_id ? String(item.account_id) : '',
@@ -377,11 +426,26 @@ export default function RecurringItemEditor({
       if (patchValue.frequency_type === 'semimonthly' && next.schedule_mode === 'month_days' && !next.month_day_two) {
         next.month_day_two = '15';
       }
+      if (patchValue.frequency_type === 'semimonthly' && next.schedule_mode === 'month_weekdays' && !next.ordinal_two) {
+        next.ordinal_two = '3';
+      }
+      if (patchValue.schedule_mode === 'month_weekdays' && next.frequency_type === 'semimonthly' && !next.ordinal_two) {
+        next.ordinal_two = '3';
+      }
       if (
         (patchValue.frequency_type === 'monthly' && prev.frequency_type === 'semimonthly') ||
         (patchValue.schedule_mode === 'month_days' && next.frequency_type === 'monthly' && prev.schedule_mode !== 'month_days')
       ) {
         next.month_day_two = '';
+      }
+      if (
+        (patchValue.frequency_type && patchValue.frequency_type !== 'semimonthly') ||
+        (patchValue.schedule_mode === 'month_weekdays' && next.frequency_type === 'monthly' && prev.schedule_mode !== 'month_weekdays')
+      ) {
+        next.ordinal_two = '';
+      }
+      if (patchValue.amount_strategy === 'history_average' && next.projected_amount !== '' && next.projected_amount != null) {
+        next.amount = formatCurrencyInput(next.projected_amount);
       }
 
       const scheduleChanged = Object.keys(patchValue).some((key) => SCHEDULE_KEYS.has(key));
@@ -450,21 +514,21 @@ export default function RecurringItemEditor({
             </label>
 
             <label className="field">
-              <span>Amount</span>
-              <CurrencyInput
-                value={form.amount}
-                onChange={(value) => patch({ amount: value })}
-                placeholder="$0.00"
-              />
-            </label>
-
-            <label className="field">
               <span>Amount Mode</span>
               <AppSelect
                 value={form.amount_strategy}
                 options={AMOUNT_STRATEGY_OPTIONS}
                 onChange={(value) => patch({ amount_strategy: value })}
                 ariaLabel="Amount mode"
+              />
+            </label>
+
+            <label className="field">
+              <span>Amount</span>
+              <CurrencyInput
+                value={form.amount}
+                onChange={(value) => patch({ amount: value })}
+                placeholder="$0.00"
               />
             </label>
 
@@ -529,28 +593,27 @@ export default function RecurringItemEditor({
             )}
 
             {isMonthBased && form.schedule_mode === 'month_days' && (
-              <div className="upcoming-custom-frequency">
+              <div className={`upcoming-custom-frequency ${form.frequency_type === 'semimonthly' ? '' : 'single'}`}>
                 <label className="field">
                   <span>Day</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
+                  <AppSelect
                     value={form.month_day_one}
-                    onChange={(event) => patch({ month_day_one: event.target.value })}
+                    options={MONTH_DAY_OPTIONS}
+                    onChange={(value) => patch({ month_day_one: value })}
+                    ariaLabel="Month day"
                   />
                 </label>
-                <label className="field">
-                  <span>Second Day</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={form.month_day_two}
-                    onChange={(event) => patch({ month_day_two: event.target.value })}
-                    placeholder="Optional"
-                  />
-                </label>
+                {form.frequency_type === 'semimonthly' && (
+                  <label className="field">
+                    <span>Second Day</span>
+                    <AppSelect
+                      value={form.month_day_two}
+                      options={[{ value: '', label: 'None' }, ...MONTH_DAY_OPTIONS]}
+                      onChange={(value) => patch({ month_day_two: value })}
+                      ariaLabel="Second month day"
+                    />
+                  </label>
+                )}
               </div>
             )}
 
@@ -565,15 +628,17 @@ export default function RecurringItemEditor({
                     ariaLabel="First week"
                   />
                 </label>
-                <label className="field">
-                  <span>Second Week</span>
-                  <AppSelect
-                    value={form.ordinal_two}
-                    options={[{ value: '', label: 'None' }, ...ORDINAL_OPTIONS]}
-                    onChange={(value) => patch({ ordinal_two: value })}
-                    ariaLabel="Second week"
-                  />
-                </label>
+                {form.frequency_type === 'semimonthly' && (
+                  <label className="field">
+                    <span>Second Week</span>
+                    <AppSelect
+                      value={form.ordinal_two}
+                      options={[{ value: '', label: 'None' }, ...ORDINAL_OPTIONS]}
+                      onChange={(value) => patch({ ordinal_two: value })}
+                      ariaLabel="Second week"
+                    />
+                  </label>
+                )}
                 <label className="field">
                   <span>Weekday</span>
                   <AppSelect

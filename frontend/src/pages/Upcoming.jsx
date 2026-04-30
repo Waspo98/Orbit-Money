@@ -474,8 +474,8 @@ function UpcomingLane({ kind, items, total, onAdd, onEdit, onDelete }) {
 function RecurringRow({ item, onEdit, onDelete }) {
   const projection = projectedLabel(item);
   return (
-    <li className={`upcoming-plan-row upcoming-item-${item.kind}`}>
-      <button type="button" className="selectable-list-item upcoming-plan-row-main" onClick={onEdit}>
+    <li className={`selectable-list-item upcoming-plan-row upcoming-item-${item.kind}`}>
+      <button type="button" className="upcoming-plan-row-main" onClick={onEdit}>
         <span className="selectable-list-leading upcoming-row-date">
           <strong>{formatMonthDay(item.next_date)}</strong>
           <em>{dueLabel(item.next_date)}</em>
@@ -532,8 +532,8 @@ function SuggestionsList({ suggestions, onReview, onDismiss, compact = false }) 
   return (
     <ul className="upcoming-suggestion-list">
       {suggestions.map((suggestion) => (
-        <li key={suggestion.key} className={`upcoming-suggestion-row upcoming-item-${suggestion.kind}`}>
-          <button type="button" className="selectable-list-item upcoming-suggestion-main" onClick={() => onReview(suggestion)}>
+        <li key={suggestion.key} className={`selectable-list-item upcoming-suggestion-row upcoming-item-${suggestion.kind}`}>
+          <button type="button" className="upcoming-suggestion-main" onClick={() => onReview(suggestion)}>
             <span className="selectable-list-leading upcoming-row-date">
               <strong>{formatMonthDay(suggestion.next_date)}</strong>
               <em>{suggestion.confidence}% Match</em>
