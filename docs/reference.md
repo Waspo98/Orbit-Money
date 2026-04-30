@@ -19,7 +19,7 @@ Multi-stage build:
 ## Docker Images
 - Public installs use `ghcr.io/waspo98/orbit-money:latest` from `docker-compose.yml`.
 - Maintainer beta uses `ghcr.io/waspo98/orbit-money:beta` from `deploy/beta/docker-compose.yml`.
-- The `main` and `Beta` GitHub Actions workflows publish their image tags before calling the self-hosted deploy scripts, so server deploys pull instead of rebuilding locally.
+- The `main` and `Beta` GitHub Actions workflows run the self-hosted deploy scripts with `ORBIT_PUBLISH_IMAGE=1`; those scripts publish their image tags, then pull and restart the matching Docker Compose service.
 - Release tags like `v0.52.0` publish matching version image tags through `publish-release-image.yml`.
 - The Compose files keep `build` definitions as a local source-build fallback, but normal update paths should use `docker compose pull` followed by `docker compose up -d`.
 
