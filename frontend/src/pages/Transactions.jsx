@@ -551,7 +551,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             <div className="txn-toolbar-actions">
               <button
                 type="button"
-                className={`btn-secondary txn-filter-button txn-control-button ${activeCount > 0 ? 'btn-active txn-control-active' : ''}`}
+                className={`btn-secondary txn-filter-button txn-control-button ${activeCount > 0 ? 'txn-control-active' : ''}`}
                 onClick={() => setFilterSheetOpen(true)}
               >
                 <svg
@@ -562,7 +562,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                 >
                   <path d="M4 6h16l-6 7v4.5l-4 2V13L4 6Z" />
                 </svg>
-                <span>Filter</span>
+                <span className="txn-control-label">Filter</span>
                 {activeCount > 0 && (
                   <span className="txn-filter-count">{activeCount}</span>
                 )}

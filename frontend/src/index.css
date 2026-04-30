@@ -9919,18 +9919,34 @@ input, textarea, select {
 
 .txn-control-button,
 .txn-toolbar-hero .txn-control-select .app-select-trigger {
-  display: inline-flex;
+  position: relative;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   text-align: center;
+}
+
+.txn-control-label,
+.txn-toolbar-hero .txn-control-select .app-select-label {
+  position: absolute;
+  left: 36px;
+  right: 36px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
 }
 
 .txn-filter-icon,
 .txn-control-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 15px;
   height: 15px;
-  flex: 0 0 auto;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.9;
@@ -9939,6 +9955,10 @@ input, textarea, select {
 }
 
 .txn-filter-count {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -9987,16 +10007,16 @@ input, textarea, select {
 .txn-toolbar-hero .txn-control-active .app-select-trigger,
 .txn-toolbar-hero .txn-control-active .app-select-trigger:hover,
 .txn-toolbar-hero .txn-control-active .app-select-trigger:focus {
-  background: #8ff0c9;
-  border-color: #8ff0c9;
-  color: #06112c;
-  -webkit-text-fill-color: #06112c;
-  box-shadow: var(--shadow-md);
+  background: var(--surface);
+  border-color: transparent;
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
 }
 
 .txn-toolbar-hero .txn-control-active .txn-filter-count {
-  background: #06112c;
-  color: #8ff0c9;
+  background: var(--accent);
+  color: var(--accent-text);
 }
 
 .visually-hidden {
