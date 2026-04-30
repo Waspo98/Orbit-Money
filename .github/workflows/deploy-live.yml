@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: deploy-live
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
