@@ -919,7 +919,6 @@ function DashboardHero({ dateLabel, greeting, userName }) {
       kicker="Financial Orbit"
       title="Dashboard"
       subtitle={`${dateLabel} · ${greeting}, ${userName} ${greetingEmoji(new Date())}`}
-      initialHeight={420}
       statLabel="Dashboard summary"
       chrome={(hero) => (
         <div className="page-hero-chrome">

@@ -151,7 +151,6 @@ export default function Categories({
         subtitle={`${categories.length.toLocaleString()} categor${
           categories.length === 1 ? 'y' : 'ies'
         }`}
-        initialHeight={420}
         toolbar={(
           <div className="page-hero-action-row">
             <button

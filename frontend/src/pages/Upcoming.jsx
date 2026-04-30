@@ -225,7 +225,6 @@ export default function Upcoming({ accounts = [], categories = [] }) {
         subtitle="Projected bills, subscriptions, income, and cash flow."
         stats={heroStats}
         statLabel="Upcoming summary"
-        initialHeight={420}
         toolbar={
           <div className="page-hero-action-row">
             <button type="button" className="btn-secondary" onClick={() => setFilter('suggested')}>

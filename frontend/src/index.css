@@ -2255,7 +2255,7 @@ input, textarea, select {
   right: auto;
   width: var(--hero-expanded-width);
   max-width: calc(100vw - (var(--hero-card-margin) * 2));
-  min-height: var(--hero-height, auto);
+  min-height: var(--hero-min-height, auto);
   z-index: 1;
   overflow: hidden;
   display: grid;

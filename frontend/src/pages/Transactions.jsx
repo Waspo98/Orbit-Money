@@ -526,7 +526,6 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         kicker="Money movement"
         title="Transactions"
         subtitle={`${monthlyTotal.toLocaleString()} ${monthlyTotal === 1 ? 'transaction' : 'transactions'} this month`}
-        initialHeight={360}
         chrome={(hero) => (
           <div className="page-hero-chrome">
             <button

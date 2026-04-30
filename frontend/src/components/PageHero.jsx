@@ -132,7 +132,7 @@ export default function PageHero({
   subtitle,
   stats = [],
   statsExtra,
-  initialHeight,
+  minHeight,
   collapsedHeight = 64,
   collapsedTitleTop,
   hero: controlledHero,
@@ -145,8 +145,8 @@ export default function PageHero({
   const staticTitleRef = useRef(null);
   const hero = controlledHero || {
     progress: 0,
-    height: initialHeight,
-    expandedHeight: initialHeight,
+    height: null,
+    expandedHeight: null,
     titleX: 0,
     titleY: 0,
     titleScale: 1,
@@ -154,7 +154,8 @@ export default function PageHero({
     innerRef: staticInnerRef,
     titleRef: staticTitleRef
   };
-  const heroHeight = Number.isFinite(hero.height) ? `${hero.height}px` : null;
+  const heroHeight = controlledHero && Number.isFinite(hero.height) ? `${hero.height}px` : null;
+  const heroMinHeight = !controlledHero && Number.isFinite(minHeight) ? `${minHeight}px` : null;
   const chromeContent = typeof chrome === 'function' ? chrome(hero) : chrome;
   const toolbarContent = typeof toolbar === 'function' ? toolbar(hero) : toolbar;
 
@@ -167,6 +168,7 @@ export default function PageHero({
           '--hero-progress': hero.progress,
           '--hero-content-opacity': Math.max(0, 1 - hero.progress * 1.35),
           ...(heroHeight ? { '--hero-height': heroHeight } : {}),
+          ...(heroMinHeight ? { '--hero-min-height': heroMinHeight } : {}),
           '--hero-title-x': `${hero.titleX}px`,
           '--hero-title-y': `${hero.titleY}px`,
           '--hero-title-scale': hero.titleScale,
