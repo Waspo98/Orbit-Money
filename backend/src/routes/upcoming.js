@@ -12,6 +12,7 @@ import {
 import { formatLocalDate, isValidDateOnly } from '../lib/localDate.js';
 import { centsToDollars, dollarsToCents } from '../lib/money.js';
 import { parseId, readIdParam } from '../lib/routeParams.js';
+import { summarizeHistorySamples } from '../lib/upcomingProjection.js';
 
 const router = express.Router();
 
@@ -385,9 +386,7 @@ function projectAmount(row, householdId) {
 
   if (sampleRows.length === 0) return fallback;
 
-  const totalCents = sampleRows.reduce((sum, sample) => sum + (Number(sample.total_cents) || 0), 0);
-  const sampleCount = sampleRows.reduce((sum, sample) => sum + (Number(sample.transaction_count) || 0), 0);
-  const averageCents = Math.round(totalCents / sampleRows.length);
+  const { totalCents, sampleCount, averageCents } = summarizeHistorySamples(sampleRows, fallbackCents);
 
   return {
     cents: averageCents,

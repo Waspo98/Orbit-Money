@@ -85,6 +85,8 @@ function signedAmount(direction, amount) {
 
 function projectedLabel(item) {
   if (item.amount_strategy !== 'history_average') return null;
+  const transactions = item.projection?.sample_count;
+  if (transactions) return `Projected from ${transactions} transaction${transactions === 1 ? '' : 's'}`;
   const months = item.projection?.sample_months;
   if (months) return `Projected from ${months} month${months === 1 ? '' : 's'}`;
   return `Projected from ${item.amount_lookback_months || 6} months`;
