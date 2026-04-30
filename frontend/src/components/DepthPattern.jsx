@@ -163,22 +163,59 @@ export default function DepthPattern({ className = '', seedKey = 'global' }) {
     if (!pattern || prefersReducedMotion()) return undefined;
 
     let frameId = 0;
+    let lastScrollY = -1;
+    let trackUntil = 0;
+
+    function readScrollY() {
+      return (
+        window.scrollY ||
+        document.documentElement?.scrollTop ||
+        document.body?.scrollTop ||
+        0
+      );
+    }
+
     function updateDepthOffset() {
-      frameId = 0;
-      const offset = Math.round(window.scrollY * 0.61);
+      const scrollY = readScrollY();
+      if (scrollY === lastScrollY) return;
+      lastScrollY = scrollY;
+      const offset = Math.round(scrollY * 0.61);
       pattern.style.setProperty('--depth-pattern-offset', `${offset}px`);
     }
 
-    function scheduleDepthOffsetUpdate() {
+    function trackDepthOffset(now = window.performance.now()) {
+      frameId = 0;
+      updateDepthOffset();
+      if (now < trackUntil) {
+        frameId = window.requestAnimationFrame(trackDepthOffset);
+      }
+    }
+
+    function startDepthOffsetTracking(duration = 220) {
+      trackUntil = Math.max(trackUntil, window.performance.now() + duration);
       if (frameId) return;
-      frameId = window.requestAnimationFrame(updateDepthOffset);
+      frameId = window.requestAnimationFrame(trackDepthOffset);
+    }
+
+    function scheduleDepthOffsetUpdate() {
+      startDepthOffsetTracking();
     }
 
     updateDepthOffset();
     window.addEventListener('scroll', scheduleDepthOffsetUpdate, { passive: true });
+    window.addEventListener('wheel', scheduleDepthOffsetUpdate, { passive: true });
+    window.addEventListener('touchstart', scheduleDepthOffsetUpdate, { passive: true });
+    window.addEventListener('touchmove', scheduleDepthOffsetUpdate, { passive: true });
+    window.addEventListener('touchend', scheduleDepthOffsetUpdate, { passive: true });
+    window.addEventListener('touchcancel', scheduleDepthOffsetUpdate, { passive: true });
     window.addEventListener('resize', scheduleDepthOffsetUpdate);
     return () => {
       window.removeEventListener('scroll', scheduleDepthOffsetUpdate);
+      window.removeEventListener('wheel', scheduleDepthOffsetUpdate);
+      window.removeEventListener('touchstart', scheduleDepthOffsetUpdate);
+      window.removeEventListener('touchmove', scheduleDepthOffsetUpdate);
+      window.removeEventListener('touchend', scheduleDepthOffsetUpdate);
+      window.removeEventListener('touchcancel', scheduleDepthOffsetUpdate);
       window.removeEventListener('resize', scheduleDepthOffsetUpdate);
       if (frameId) window.cancelAnimationFrame(frameId);
     };
