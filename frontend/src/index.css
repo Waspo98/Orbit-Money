@@ -2255,6 +2255,7 @@ input, textarea, select {
   right: auto;
   width: var(--hero-expanded-width);
   max-width: calc(100vw - (var(--hero-card-margin) * 2));
+  min-height: var(--hero-height, auto);
   z-index: 1;
   overflow: hidden;
   display: grid;
@@ -2269,6 +2270,11 @@ input, textarea, select {
   box-shadow:
     0 22px 52px rgba(5, 20, 52, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.page-hero-morphing {
+  height: var(--hero-height);
+  min-height: var(--hero-height);
 }
 
 .page-hero-spacer {
@@ -2410,14 +2416,16 @@ input, textarea, select {
   font-family: var(--font-title);
   color: #ffffff;
   display: inline-block;
-  width: max-content;
+  width: auto;
   font-size: 2.6rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0;
   position: relative;
-  max-width: none;
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
   z-index: 3;
   transform-origin: left top;
   transform:
@@ -4033,26 +4041,44 @@ input, textarea, select {
   touch-action: manipulation;
 }
 
-.dashboard-customize-row.dragging {
+.selectable-list-item.reorder-list-row.dashboard-customize-row {
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-style: solid;
+  background: var(--surface-2);
+}
+
+.dashboard-customize-row.dragging,
+.reorder-list-row.dashboard-customize-row.dragging {
   opacity: 0.72;
   box-shadow: var(--shadow-md);
 }
 
-.dashboard-customize-copy {
+.dashboard-customize-copy,
+.dashboard-customize-row .selectable-list-main {
   min-width: 0;
   display: grid;
   gap: 3px;
 }
 
-.dashboard-customize-copy strong {
+.dashboard-customize-copy strong,
+.dashboard-customize-row .selectable-list-main strong {
   color: var(--text);
   font-size: 0.94rem;
 }
 
-.dashboard-customize-copy span {
+.dashboard-customize-copy span,
+.dashboard-customize-row .selectable-list-main em {
   color: var(--text-muted);
   font-size: 0.8rem;
   line-height: 1.35;
+  white-space: normal;
+}
+
+.dashboard-customize-row .selectable-list-side {
+  align-items: center;
 }
 
 .dashboard-card-toggle {
@@ -4214,7 +4240,7 @@ input, textarea, select {
 }
 
 .page-hero-mha .page-hero-stats {
-  grid-template-columns: repeat(3, minmax(168px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(168px, 100%), 1fr));
 }
 
 .mha-year-stat {
@@ -4428,6 +4454,7 @@ input, textarea, select {
 
 .upcoming-cashflow-summary {
   min-width: 0;
+  container-type: inline-size;
   display: grid;
   gap: 8px;
   align-content: center;
@@ -4454,7 +4481,8 @@ input, textarea, select {
 
 .upcoming-cashflow-summary > strong {
   color: var(--text);
-  font-size: clamp(1.9rem, 8vw, 3rem);
+  font-size: 2.35rem;
+  font-size: clamp(1.9rem, 14cqw, 3rem);
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0;
@@ -4878,6 +4906,7 @@ input, textarea, select {
   flex-direction: column;
   justify-content: center;
   min-width: 0;
+  container-type: inline-size;
 }
 
 .networth-kicker {
@@ -4892,7 +4921,8 @@ input, textarea, select {
 
 .networth-total {
   color: #ffffff;
-  font-size: clamp(2.4rem, 9vw, 4.8rem);
+  font-size: 3.4rem;
+  font-size: clamp(2.4rem, 12cqw, 4.8rem);
   font-weight: 750;
   line-height: 0.95;
   letter-spacing: 0;
@@ -5768,6 +5798,7 @@ input, textarea, select {
 
 .retirement-planner-hero > div:first-child {
   min-width: 0;
+  container-type: inline-size;
   display: grid;
   gap: 5px;
 }
@@ -5783,7 +5814,8 @@ input, textarea, select {
 
 .retirement-planner-hero strong {
   color: var(--text);
-  font-size: clamp(2rem, 10vw, 3.4rem);
+  font-size: 2.6rem;
+  font-size: clamp(2rem, 12cqw, 3.4rem);
   line-height: 1;
   font-weight: 780;
   font-variant-numeric: tabular-nums;
@@ -6025,6 +6057,7 @@ input, textarea, select {
 
 .retirement-hsa-panel > div:first-child {
   min-width: 0;
+  container-type: inline-size;
   display: grid;
   gap: 4px;
 }
@@ -6039,7 +6072,8 @@ input, textarea, select {
 
 .retirement-hsa-panel > div:first-child strong {
   color: var(--text);
-  font-size: clamp(1.25rem, 6vw, 2rem);
+  font-size: 1.5rem;
+  font-size: clamp(1.25rem, 9cqw, 2rem);
   line-height: 1.05;
 }
 
@@ -7870,7 +7904,7 @@ input, textarea, select {
 }
 
 .account-group-card.collapsed .account-group-total {
-  font-size: clamp(1.2rem, 5vw, 1.48rem);
+  font-size: 1.36rem;
   transform: translateY(1px);
 }
 
@@ -8215,6 +8249,7 @@ input, textarea, select {
 
 .retcalc-answer-main {
   min-width: 0;
+  container-type: inline-size;
   display: grid;
   gap: 5px;
 }
@@ -8231,7 +8266,8 @@ input, textarea, select {
 
 .retcalc-answer-main strong {
   color: var(--text);
-  font-size: clamp(2.35rem, 11vw, 4.9rem);
+  font-size: 3.25rem;
+  font-size: clamp(2.35rem, 14cqw, 4.9rem);
   line-height: 0.95;
   font-weight: 820;
   font-variant-numeric: tabular-nums;
@@ -8314,6 +8350,7 @@ input, textarea, select {
 }
 
 .retcalc-question-answer {
+  container-type: inline-size;
   display: grid;
   gap: 4px;
   padding: 14px;
@@ -8326,7 +8363,8 @@ input, textarea, select {
 
 .retcalc-question-answer strong {
   color: var(--text);
-  font-size: clamp(1.75rem, 8vw, 2.65rem);
+  font-size: 2.15rem;
+  font-size: clamp(1.75rem, 13cqw, 2.65rem);
   line-height: 1;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -10329,7 +10367,8 @@ input, textarea, select {
   .page-hero-transactions .page-hero-stats,
   .page-hero-budgets .page-hero-stats,
   .page-hero-accounts .page-hero-stats,
-  .page-hero-networth .page-hero-stats {
+  .page-hero-networth .page-hero-stats,
+  .page-hero-mha .page-hero-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
   }
@@ -10522,15 +10561,28 @@ input, textarea, select {
 }
 
 .month-nav-select .app-select-trigger {
+  position: relative;
   min-height: 0;
-  padding: 0;
+  padding: 0 18px;
   border: 0;
   background: transparent;
   box-shadow: none;
   color: inherit;
-  justify-content: center;
   font-size: inherit;
   font-weight: 800;
+  text-align: center;
+}
+
+.month-nav-select .app-select-label {
+  justify-self: center;
+  text-align: center;
+}
+
+.month-nav-select .app-select-caret {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
 }
 
 .app-select-menu-month-nav-select {

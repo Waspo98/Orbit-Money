@@ -132,7 +132,7 @@ export default function PageHero({
   subtitle,
   stats = [],
   statsExtra,
-  initialHeight = 420,
+  initialHeight,
   collapsedHeight = 64,
   collapsedTitleTop,
   hero: controlledHero,
@@ -154,17 +154,19 @@ export default function PageHero({
     innerRef: staticInnerRef,
     titleRef: staticTitleRef
   };
+  const heroHeight = Number.isFinite(hero.height) ? `${hero.height}px` : null;
   const chromeContent = typeof chrome === 'function' ? chrome(hero) : chrome;
   const toolbarContent = typeof toolbar === 'function' ? toolbar(hero) : toolbar;
 
   return (
     <>
       <section
-        className={`page-hero page-hero-${variant} ${hasHeroStats ? '' : 'page-hero-plain'}`}
+        className={`page-hero page-hero-${variant} ${controlledHero ? 'page-hero-morphing' : ''} ${hasHeroStats ? '' : 'page-hero-plain'}`}
         aria-labelledby={id}
         style={{
           '--hero-progress': hero.progress,
           '--hero-content-opacity': Math.max(0, 1 - hero.progress * 1.35),
+          ...(heroHeight ? { '--hero-height': heroHeight } : {}),
           '--hero-title-x': `${hero.titleX}px`,
           '--hero-title-y': `${hero.titleY}px`,
           '--hero-title-scale': hero.titleScale,

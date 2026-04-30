@@ -6,10 +6,8 @@ import {
 import {
   SortableContext,
   arrayMove,
-  useSortable,
   verticalListSortingStrategy
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
@@ -18,7 +16,7 @@ import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { APP_ICON_192 } from '../brandAssets.js';
-import {
+import ReorderListItem, {
   useDragInteractionLock,
   useReorderSensors
 } from '../components/ReorderListItem.jsx';
@@ -2661,51 +2659,25 @@ function DashboardCustomizeModal({ layout, onChange, onClose }) {
 }
 
 function DashboardCustomizeRow({ id, title, description, visible, onToggle }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition
-  };
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`dashboard-customize-row ${isDragging ? 'dragging' : ''}`}
-    >
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        className="drag-grip reorder-drag-handle"
-        aria-label={`Move ${title}`}
-        {...attributes}
-        {...listeners}
-      >
-        <span aria-hidden="true">::</span>
-      </button>
-      <div className="dashboard-customize-copy">
-        <strong>{title}</strong>
-        <span>{description}</span>
-      </div>
-      <label className="toggle-switch dashboard-card-toggle">
-        <input
-          type="checkbox"
-          aria-label={`Show ${title}`}
-          checked={visible}
-          onChange={onToggle}
-        />
-        <span className="toggle-slider" aria-hidden="true" />
-      </label>
-    </div>
+    <ReorderListItem
+      id={id}
+      className="dashboard-customize-row"
+      handleLabel={`Move ${title}`}
+      title={title}
+      subtitle={description}
+      side={(
+        <label className="toggle-switch dashboard-card-toggle">
+          <input
+            type="checkbox"
+            aria-label={`Show ${title}`}
+            checked={visible}
+            onChange={onToggle}
+          />
+          <span className="toggle-slider" aria-hidden="true" />
+        </label>
+      )}
+    />
   );
 }
 
