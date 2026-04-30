@@ -235,7 +235,7 @@ export default function MoreSheet({
     close({ animate: true });
     window.setTimeout(() => {
       navigate(item.path, { state: { transition: 'from-more' } });
-    }, OVERLAY_ANIM_MS);
+    }, OVERLAY_ANIM_MS + 40);
   }
 
   function startTouchGesture(touch) {
