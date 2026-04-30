@@ -19,9 +19,20 @@ export default function AppSelect({
   const closeTimerRef = useRef(null);
   const selected = options.find((option) => String(option.value) === String(value));
   const usePageCenteredMenu = menuPlacement === 'page-center';
+  const contextualMenuClasses = className
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((name) => `app-select-menu-${name}`)
+    .join(' ');
+  const menuClassNames = [
+    'app-select-menu',
+    usePageCenteredMenu ? 'app-select-menu-page-centered' : '',
+    closing ? 'closing' : '',
+    contextualMenuClasses
+  ].filter(Boolean).join(' ');
 
   function openMenu() {
-    if (usePageCenteredMenu) setMenuPosition(null);
+    setMenuPosition(null);
     setClosing(false);
     setOpen(true);
   }
@@ -68,23 +79,53 @@ export default function AppSelect({
   }, [open, closing]);
 
   useLayoutEffect(() => {
-    if (!open || !usePageCenteredMenu) return undefined;
+    if (!open) return undefined;
 
     function positionMenu() {
       const rect = rootRef.current?.getBoundingClientRect();
-      if (!rect) return;
+      const menuRect = menuRef.current?.getBoundingClientRect();
+      if (!rect || !menuRect) return;
 
       const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-      const gutter = 20;
-      const width = Math.min(320, viewportWidth - gutter * 2);
-      const top = Math.min(rect.bottom + 8, viewportHeight - 96);
+
+      if (usePageCenteredMenu) {
+        const gutter = 20;
+        const width = Math.min(320, viewportWidth - gutter * 2);
+        const top = Math.min(rect.bottom + 8, viewportHeight - 96);
+
+        setMenuPosition({
+          top: Math.max(gutter, top),
+          left: Math.max(gutter, (viewportWidth - width) / 2),
+          width,
+          maxHeight: Math.max(120, viewportHeight - top - gutter),
+          transformOrigin: 'top center'
+        });
+        return;
+      }
+
+      const gutter = 8;
+      const gap = 6;
+      const width = Math.min(
+        viewportWidth - gutter * 2,
+        Math.max(rect.width, menuRect.width || rect.width)
+      );
+      const menuHeight = menuRect.height || 40;
+      const spaceBelow = viewportHeight - rect.bottom - gap - gutter;
+      const spaceAbove = rect.top - gap - gutter;
+      const openAbove = spaceBelow < Math.min(menuHeight, 180) && spaceAbove > spaceBelow;
+      const maxHeight = Math.max(96, openAbove ? spaceAbove : spaceBelow);
+      const top = openAbove
+        ? Math.max(gutter, rect.top - gap - Math.min(menuHeight, maxHeight))
+        : Math.min(rect.bottom + gap, viewportHeight - gutter - Math.min(menuHeight, maxHeight));
+      const left = Math.max(gutter, Math.min(rect.left, viewportWidth - width - gutter));
 
       setMenuPosition({
-        top: Math.max(gutter, top),
-        left: Math.max(gutter, (viewportWidth - width) / 2),
+        top,
+        left,
         width,
-        maxHeight: Math.max(120, viewportHeight - top - gutter)
+        maxHeight,
+        transformOrigin: openAbove ? 'bottom left' : 'top left'
       });
     }
 
@@ -95,20 +136,24 @@ export default function AppSelect({
       window.removeEventListener('resize', positionMenu);
       window.removeEventListener('scroll', positionMenu, true);
     };
-  }, [open, usePageCenteredMenu]);
+  }, [open, usePageCenteredMenu, options.length]);
 
-  const menuStyle = usePageCenteredMenu && menuPosition
+  const menuStyle = menuPosition
     ? {
       position: 'fixed',
       top: `${menuPosition.top}px`,
       left: `${menuPosition.left}px`,
       right: 'auto',
       width: `${menuPosition.width}px`,
-      maxHeight: `${menuPosition.maxHeight}px`
+      maxHeight: `${menuPosition.maxHeight}px`,
+      '--app-select-origin': menuPosition.transformOrigin
     }
-    : usePageCenteredMenu
+    : open
       ? {
         position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 'auto',
         visibility: 'hidden'
       }
     : undefined;
@@ -116,7 +161,7 @@ export default function AppSelect({
   const menu = open ? (
     <div
       ref={menuRef}
-      className={`app-select-menu ${usePageCenteredMenu ? 'app-select-menu-page-centered' : ''} ${closing ? 'closing' : ''}`.trim()}
+      className={menuClassNames}
       style={menuStyle}
       role="listbox"
     >
@@ -155,7 +200,7 @@ export default function AppSelect({
         <span className="app-select-caret" aria-hidden="true">v</span>
       </button>
 
-      {usePageCenteredMenu && menu && typeof document !== 'undefined'
+      {menu && typeof document !== 'undefined'
         ? createPortal(menu, document.body)
         : menu}
     </div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import FilterSheet from '../components/FilterSheet.jsx';
@@ -575,7 +576,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           </div>
         )}
       />
-      {pinnedMonth && (
+      {pinnedMonth && typeof document !== 'undefined' && createPortal(
         <header
           ref={floatingHeaderRef}
           className="txn-pinned-month-header"
@@ -591,7 +592,8 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             {pinnedMonth.count}{' '}
             {pinnedMonth.count === 1 ? 'transaction' : 'transactions'}
           </span>
-        </header>
+        </header>,
+        document.body
       )}
       {/* ---------- Active filter pills ---------- */}
       {activeCount > 0 && (

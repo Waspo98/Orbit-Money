@@ -508,11 +508,8 @@ input, textarea, select {
 }
 
 .app-select-menu {
-  position: absolute;
-  z-index: 40;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
+  position: fixed;
+  z-index: 600;
   display: grid;
   max-height: 240px;
   padding: 6px;
@@ -521,12 +518,12 @@ input, textarea, select {
   border-radius: var(--radius-md);
   background: var(--surface);
   box-shadow: var(--shadow-lg);
-  transform-origin: top;
+  transform-origin: var(--app-select-origin, top left);
   animation: appSelectIn 140ms var(--ease-out);
 }
 
 .app-select-menu-page-centered {
-  z-index: 140;
+  z-index: 600;
 }
 
 .app-select-menu.closing {
@@ -9846,12 +9843,10 @@ input, textarea, select {
 
 .txn-toolbar-hero .search-field-input {
   min-height: 48px;
-  border-color: rgba(255, 255, 255, 0.78);
-  background: rgba(255, 255, 255, 0.96);
-  color: var(--text);
-  box-shadow:
-    0 14px 28px rgba(5, 20, 52, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  box-shadow: var(--shadow-md);
 }
 
 .txn-toolbar-hero .search-field-input::placeholder {
@@ -9917,13 +9912,11 @@ input, textarea, select {
 .txn-toolbar-hero .txn-filter-button,
 .txn-toolbar-hero .app-select-trigger {
   min-height: 44px;
-  border-color: rgba(255, 255, 255, 0.78);
+  border-color: var(--border);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--surface);
   color: var(--text);
-  box-shadow:
-    0 12px 24px rgba(5, 20, 52, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow-md);
 }
 
 .page-hero .txn-toolbar-hero .txn-filter-button {
@@ -9956,11 +9949,11 @@ input, textarea, select {
   font-size: 0.9rem;
 }
 
-.txn-sort .app-select-menu {
+.app-select-menu-txn-sort {
   min-width: min(220px, calc(100vw - 48px));
 }
 
-.txn-page-size .app-select-menu {
+.app-select-menu-txn-page-size {
   min-width: min(140px, calc(100vw - 48px));
 }
 
@@ -9974,9 +9967,7 @@ input, textarea, select {
 
 .txn-toolbar-hero .btn-secondary:hover,
 .txn-toolbar-hero .app-select-trigger:hover {
-  box-shadow:
-    0 12px 24px rgba(5, 20, 52, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow-md);
 }
 
 .txn-toolbar-hero .app-select-trigger:focus {
@@ -10547,11 +10538,11 @@ input, textarea, select {
   font-weight: 800;
 }
 
-.month-nav-select .app-select-menu {
+.app-select-menu-month-nav-select {
   min-width: min(240px, calc(100vw - 48px));
 }
 
-.month-nav-select .app-select-menu-page-centered {
+.app-select-menu-page-centered.app-select-menu-month-nav-select {
   min-width: 0;
 }
 
