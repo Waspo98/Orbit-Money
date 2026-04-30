@@ -541,7 +541,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           </div>
         )}
         toolbar={(
-          <div className="txn-toolbar txn-toolbar-hero" aria-label="Transaction tools">
+          <div className="txn-toolbar txn-toolbar-hero" role="group" aria-label="Transaction tools">
             <SearchField
               value={searchLocal}
               onChange={setSearch}

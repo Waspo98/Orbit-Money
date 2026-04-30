@@ -9805,9 +9805,9 @@ input, textarea, select {
 
 .txn-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  align-items: stretch;
   margin: 0;
 }
 
@@ -9885,6 +9885,8 @@ input, textarea, select {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   align-items: center;
+  justify-self: start;
+  width: min(100%, 520px);
   min-width: 0;
 }
 
@@ -9920,31 +9922,37 @@ input, textarea, select {
 .txn-control-button,
 .txn-toolbar-hero .txn-control-select .app-select-trigger {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 20px;
+  column-gap: 4px;
   align-items: center;
-  justify-content: center;
   text-align: center;
 }
 
 .txn-control-label,
 .txn-toolbar-hero .txn-control-select .app-select-label {
-  position: absolute;
-  left: 36px;
-  right: 36px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: static;
+  justify-self: center;
   min-width: 0;
   overflow: hidden;
   text-align: center;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.txn-toolbar-hero .txn-control-select .app-select-trigger.has-icon.no-caret {
+  grid-template-columns: 20px minmax(0, 1fr) 20px;
+}
+
+.txn-toolbar-hero .app-select-trigger-icon {
+  width: 20px;
+  justify-content: flex-start;
 }
 
 .txn-filter-icon,
 .txn-control-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: static;
+  justify-self: start;
   width: 15px;
   height: 15px;
   fill: none;
@@ -9955,10 +9963,7 @@ input, textarea, select {
 }
 
 .txn-filter-count {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
+  justify-self: end;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -10005,6 +10010,11 @@ input, textarea, select {
 }
 
 .txn-toolbar-hero .app-select-trigger:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.txn-toolbar-hero .txn-filter-button:focus-visible {
+  outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
