@@ -181,6 +181,10 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
   const [recurringFromTxn, setRecurringFromTxn] = useState(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const groupRefs = useRef(new Map());
+  const floatingHeaderRef = useRef(null);
+  const [pinnedMonth, setPinnedMonth] = useState(null);
+
   // Local (debounced) search input - keeps typing snappy, writes to URL
   // after a short idle window so the server request doesn't fire per
   // keystroke.
@@ -393,6 +397,88 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     () => groupByMonth(items, monthCounts),
     [items, monthCounts]
   );
+
+  useEffect(() => {
+    if (!groups.length) {
+      setPinnedMonth(null);
+      return undefined;
+    }
+
+    let frameId = null;
+
+    function measurePinnedMonth() {
+      frameId = null;
+      const topOffset = 0;
+      const headerHeight =
+        floatingHeaderRef.current?.getBoundingClientRect().height || 52;
+      let activeIndex = -1;
+
+      for (let index = 0; index < groups.length; index += 1) {
+        const node = groupRefs.current.get(groups[index].id);
+        if (!node) continue;
+        const rect = node.getBoundingClientRect();
+        if (rect.top <= topOffset && rect.bottom > topOffset + headerHeight) {
+          activeIndex = index;
+        }
+      }
+
+      if (activeIndex < 0) {
+        setPinnedMonth(null);
+        return;
+      }
+
+      const group = groups[activeIndex];
+      const node = groupRefs.current.get(group.id);
+      if (!node) {
+        setPinnedMonth(null);
+        return;
+      }
+
+      const rect = node.getBoundingClientRect();
+      const nextGroup = groups[activeIndex + 1];
+      const nextNode = nextGroup ? groupRefs.current.get(nextGroup.id) : null;
+      const nextTop = nextNode?.getBoundingClientRect().top;
+      const translateY =
+        typeof nextTop === 'number'
+          ? Math.min(0, nextTop - topOffset - headerHeight)
+          : 0;
+
+      const nextPinnedMonth = {
+        key: group.id,
+        label: group.label,
+        count: group.count,
+        left: rect.left,
+        width: rect.width,
+        translateY
+      };
+
+      setPinnedMonth((prev) =>
+        prev &&
+        prev.key === nextPinnedMonth.key &&
+        prev.count === nextPinnedMonth.count &&
+        Math.abs(prev.left - nextPinnedMonth.left) < 0.5 &&
+        Math.abs(prev.width - nextPinnedMonth.width) < 0.5 &&
+        Math.abs(prev.translateY - nextPinnedMonth.translateY) < 0.5
+          ? prev
+          : nextPinnedMonth
+      );
+    }
+
+    function updatePinnedMonth() {
+      if (frameId != null) return;
+      frameId = window.requestAnimationFrame(measurePinnedMonth);
+    }
+
+    updatePinnedMonth();
+    window.addEventListener('scroll', updatePinnedMonth, { passive: true });
+    window.addEventListener('resize', updatePinnedMonth);
+    return () => {
+      if (frameId != null) window.cancelAnimationFrame(frameId);
+      window.removeEventListener('scroll', updatePinnedMonth);
+      window.removeEventListener('resize', updatePinnedMonth);
+    };
+  }, [groups]);
+
   // Onboarding empty state - only when no filters AND nothing exists at all.
   if (!loading && grandTotal === 0 && !isFiltered) {
     return (
@@ -489,6 +575,24 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           </div>
         )}
       />
+      {pinnedMonth && (
+        <header
+          ref={floatingHeaderRef}
+          className="txn-pinned-month-header"
+          style={{
+            left: `${pinnedMonth.left}px`,
+            width: `${pinnedMonth.width}px`,
+            transform: `translateY(${pinnedMonth.translateY}px)`
+          }}
+          aria-hidden="true"
+        >
+          <span className="txn-month-label">{pinnedMonth.label}</span>
+          <span className="txn-month-count">
+            {pinnedMonth.count}{' '}
+            {pinnedMonth.count === 1 ? 'transaction' : 'transactions'}
+          </span>
+        </header>
+      )}
       {/* ---------- Active filter pills ---------- */}
       {activeCount > 0 && (
         <ActiveFilterPills
@@ -521,6 +625,10 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             <section
               key={group.id}
               className="txn-month-group"
+              ref={(node) => {
+                if (node) groupRefs.current.set(group.id, node);
+                else groupRefs.current.delete(group.id);
+              }}
             >
               <header className="txn-month-header">
                 <span className="txn-month-label">{group.label}</span>

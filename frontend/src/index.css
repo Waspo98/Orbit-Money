@@ -7181,9 +7181,19 @@ input, textarea, select {
 .txn-month-group { margin-bottom: 28px; }
 
 .txn-month-header {
-  position: sticky;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px 0 8px;
+  background: inherit;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.txn-pinned-month-header {
+  position: fixed;
   top: 0;
-  z-index: 120;
+  z-index: 480;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -7191,7 +7201,8 @@ input, textarea, select {
   padding: 12px 0 8px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
+  pointer-events: none;
+  will-change: transform;
 }
 
 .txn-month-label { font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em; }
@@ -9861,6 +9872,11 @@ input, textarea, select {
     inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
 
+.page-hero .txn-toolbar-hero .txn-filter-button {
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+}
+
 .txn-filter-button {
   width: 100%;
   min-width: 0;
@@ -9917,6 +9933,7 @@ input, textarea, select {
   background: #8ff0c9;
   border-color: #8ff0c9;
   color: #06112c;
+  -webkit-text-fill-color: #06112c;
 }
 
 .txn-toolbar-hero .txn-filter-button.btn-active .txn-filter-count {
