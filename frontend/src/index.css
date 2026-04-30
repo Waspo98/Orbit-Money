@@ -4621,7 +4621,7 @@ input, textarea, select {
 
 .upcoming-lanes {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   gap: 14px;
 }
 
@@ -4664,7 +4664,16 @@ input, textarea, select {
 
 .selectable-list-item.upcoming-plan-row-main,
 .selectable-list-item.upcoming-suggestion-main {
-  grid-template-columns: 68px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.selectable-list-item.upcoming-plan-row-main {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.selectable-list-item.upcoming-suggestion-main {
+  grid-template-columns: 92px minmax(0, 1fr) minmax(128px, auto);
 }
 
 .upcoming-row-date,
@@ -4676,7 +4685,7 @@ input, textarea, select {
 }
 
 .upcoming-row-date.selectable-list-leading {
-  min-width: 68px;
+  min-width: 0;
   justify-content: start;
 }
 
@@ -4696,6 +4705,11 @@ input, textarea, select {
 }
 
 .upcoming-row-amount {
+  justify-items: start;
+  text-align: left;
+}
+
+.upcoming-suggestion-main .upcoming-row-amount {
   justify-items: end;
   text-align: right;
 }
@@ -4810,6 +4824,11 @@ input, textarea, select {
   }
 
   .upcoming-row-amount {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .upcoming-suggestion-main .upcoming-row-amount {
     justify-items: start;
     text-align: left;
   }
