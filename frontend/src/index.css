@@ -9927,8 +9927,25 @@ input, textarea, select {
 .txn-filter-button {
   width: 100%;
   min-width: 0;
+  border: 0;
   padding-inline: 12px;
   white-space: nowrap;
+}
+
+.txn-toolbar-hero .txn-filter-button:hover,
+.txn-toolbar-hero .txn-filter-button:focus {
+  border-color: transparent;
+}
+
+.txn-filter-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .txn-filter-count {

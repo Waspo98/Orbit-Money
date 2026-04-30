@@ -550,6 +550,14 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                 className={`btn-secondary txn-filter-button ${activeCount > 0 ? 'btn-active' : ''}`}
                 onClick={() => setFilterSheetOpen(true)}
               >
+                <svg
+                  className="txn-filter-icon"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path d="M4 6h16l-6 7v4.5l-4 2V13L4 6Z" />
+                </svg>
                 <span>Filter</span>
                 {activeCount > 0 && (
                   <span className="txn-filter-count">{activeCount}</span>
