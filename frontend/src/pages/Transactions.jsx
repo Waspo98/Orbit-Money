@@ -564,11 +564,12 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                 )}
               </button>
               <AppSelect
-                className="txn-sort"
+                className={`txn-sort ${filters.sort !== 'date_desc' ? 'txn-sort-active' : ''}`}
                 value={filters.sort}
                 options={SORT_OPTIONS}
                 onChange={setSort}
                 ariaLabel="Sort transactions"
+                triggerLabel="Sort"
               />
               <AppSelect
                 className="txn-page-size"

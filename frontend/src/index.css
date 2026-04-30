@@ -9963,11 +9963,29 @@ input, textarea, select {
 }
 
 .txn-toolbar-hero .app-select-trigger {
+  position: relative;
   font-size: 0.9rem;
 }
 
 .app-select-menu-txn-sort {
   min-width: min(220px, calc(100vw - 48px));
+}
+
+.txn-sort-active .app-select-trigger {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+.txn-sort-active .app-select-trigger::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 22px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
 }
 
 .app-select-menu-txn-page-size {

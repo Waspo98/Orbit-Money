@@ -9,7 +9,8 @@ export default function AppSelect({
   className = '',
   disabled = false,
   ariaLabel,
-  menuPlacement = 'default'
+  menuPlacement = 'default',
+  triggerLabel
 }) {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -196,7 +197,7 @@ export default function AppSelect({
         aria-expanded={open}
         aria-label={ariaLabel}
       >
-        <span>{selected?.label || placeholder}</span>
+        <span>{triggerLabel || selected?.label || placeholder}</span>
         <span className="app-select-caret" aria-hidden="true">v</span>
       </button>
 
