@@ -520,19 +520,6 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
 
   return (
     <div className="transactions-view">
-      {/*
-        Archived collapsed-pill transaction search:
-        collapsedHeight={104}
-        collapsedTitleTop={13}
-        collapsedContent={(
-          <SearchField
-            value={searchLocal}
-            onChange={setSearch}
-            placeholder="Search transactions"
-            compact
-          />
-        )}
-      */}
       <PageHero
         id="transactions-title"
         variant="transactions"

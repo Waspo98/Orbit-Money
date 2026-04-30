@@ -9,7 +9,8 @@ export function toNonNegativeNumber(value, fallback = 0) {
 
 export function dollarsToCents(value, fallback = 0) {
   const number = toFiniteNumber(value, fallback);
-  return Math.round((number + Math.sign(number) * Number.EPSILON) * 100);
+  const sign = Math.sign(number);
+  return sign * Math.round((Math.abs(number) + Number.EPSILON) * 100);
 }
 
 export function centsToDollars(value, fallback = 0) {

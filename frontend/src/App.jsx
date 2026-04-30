@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  Suspense,
+  lazy,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import {
   BrowserRouter,
   Routes,
@@ -10,20 +18,6 @@ import {
 } from 'react-router-dom';
 
 import Login from './Login.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import Transactions from './pages/Transactions.jsx';
-import Budgets from './pages/Budgets.jsx';
-import Accounts from './pages/Accounts.jsx';
-import Settings from './pages/Settings.jsx';
-import Rules from './pages/Rules.jsx';
-import Categories from './pages/Categories.jsx';
-import HousingCalculator from './pages/HousingCalculator.jsx';
-import NetWorth from './pages/NetWorth.jsx';
-import MhaTracker from './pages/MhaTracker.jsx';
-import Goals from './pages/Goals.jsx';
-import Upcoming from './pages/Upcoming.jsx';
-import RetirementCalculator from './pages/RetirementCalculator.jsx';
-import Household from './pages/Household.jsx';
 import BrandLogo from './components/BrandLogo.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
@@ -41,9 +35,20 @@ import {
   writeNavigationPreferences
 } from './navigation.js';
 
-// Bottom tabs always visible. (Previously we hid them on Settings/import to
-// keep the UI focused, but with the More tab the sheet can be opened from any
-// page so keeping tabs visible is fine and more consistent.)
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const Transactions = lazy(() => import('./pages/Transactions.jsx'));
+const Budgets = lazy(() => import('./pages/Budgets.jsx'));
+const Accounts = lazy(() => import('./pages/Accounts.jsx'));
+const Settings = lazy(() => import('./pages/Settings.jsx'));
+const Rules = lazy(() => import('./pages/Rules.jsx'));
+const Categories = lazy(() => import('./pages/Categories.jsx'));
+const HousingCalculator = lazy(() => import('./pages/HousingCalculator.jsx'));
+const NetWorth = lazy(() => import('./pages/NetWorth.jsx'));
+const MhaTracker = lazy(() => import('./pages/MhaTracker.jsx'));
+const Goals = lazy(() => import('./pages/Goals.jsx'));
+const Upcoming = lazy(() => import('./pages/Upcoming.jsx'));
+const RetirementCalculator = lazy(() => import('./pages/RetirementCalculator.jsx'));
+const Household = lazy(() => import('./pages/Household.jsx'));
 
 function transitionBetween(fromPath, toPath, routes) {
   const fromIndex = routes.indexOf(fromPath);
@@ -51,6 +56,14 @@ function transitionBetween(fromPath, toPath, routes) {
 
   if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return 'none';
   return toIndex > fromIndex ? 'forward' : 'back';
+}
+
+function RouteLoading() {
+  return (
+    <div className="center-loading">
+      <div className="spinner" />
+    </div>
+  );
 }
 
 export default function App() {
@@ -292,18 +305,20 @@ function AppShell() {
             key={location.pathname}
             className={`route-transition route-transition-${routeTransition}`}
           >
-            <Routes location={location}>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              {ROUTES.map((route) => (
-                <Route
-                  key={route.path}
-                  path={route.path}
-                  element={routeElements[route.path]}
-                />
-              ))}
-              <Route path="/import" element={<Navigate to="/settings" replace />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
+            <Suspense fallback={<RouteLoading />}>
+              <Routes location={location}>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                {ROUTES.map((route) => (
+                  <Route
+                    key={route.path}
+                    path={route.path}
+                    element={routeElements[route.path]}
+                  />
+                ))}
+                <Route path="/import" element={<Navigate to="/settings" replace />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </Suspense>
           </div>
         )}
       </main>

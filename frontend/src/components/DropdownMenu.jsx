@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import MoreDotsIcon from './MoreDotsIcon.jsx';
 import { OVERLAY_ANIM_MS } from './overlayBehavior.js';
 
 /**
@@ -137,7 +138,7 @@ export default function DropdownMenu({
           }
         }}
       >
-        {renderTrigger ? renderTrigger({ open }) : '⋯'}
+        {renderTrigger ? renderTrigger({ open }) : <MoreDotsIcon />}
       </button>
 
       {open && createPortal(

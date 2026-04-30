@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import AppIcon from './AppIcon.jsx';
+import MoreDotsIcon from './MoreDotsIcon.jsx';
 import { getPrimaryRoutes } from '../navigation.js';
 
 export default function BottomTabs({ onMoreClick }) {
@@ -32,7 +33,7 @@ export default function BottomTabs({ onMoreClick }) {
         onClick={onMoreClick}
         aria-label="Open more menu"
       >
-        <span className="bottom-tab-icon" aria-hidden>⋯</span>
+        <MoreDotsIcon className="bottom-tab-icon" />
         <span>More</span>
       </button>
     </nav>

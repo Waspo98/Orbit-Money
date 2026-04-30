@@ -464,12 +464,7 @@ export default function Budgets() {
                     options={BUDGET_SORT_OPTIONS}
                     onChange={setBudgetedSort}
                     ariaLabel="Sort budgeted categories"
-                  >
-                    <option value="pct_desc">% spent · high → low</option>
-                    <option value="pct_asc">% spent · low → high</option>
-                    <option value="spent_desc">$ spent · high → low</option>
-                    <option value="spent_asc">$ spent · low → high</option>
-                  </AppSelect>
+                  />
                 </div>
               </header>
               <ul className="budget-list">
@@ -630,12 +625,7 @@ export default function Budgets() {
 }
 
 // ============================================================================
-// Month navigator — arrow buttons flanking a native <select>.
-//
-// Using <select> rather than a hidden <input type="month"> because the
-// latter caused unexpected iOS zoom behavior on page load — Safari treats
-// type="month" inputs with kid-glove layout rules even when hidden. A
-// standard <select> opens a native mobile picker without touching zoom.
+// Month navigator - arrow buttons flanking the shared AppSelect primitive.
 // ============================================================================
 
 function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump }) {
@@ -653,7 +643,6 @@ function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump })
       </button>
 
       <div className="month-nav-label-wrap">
-        <span className="month-nav-caret" aria-hidden="true">▾</span>
         <AppSelect
           className="month-nav-select"
           value={month}
@@ -664,13 +653,7 @@ function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump })
           onChange={onJump}
           ariaLabel="Jump to month"
           menuPlacement="page-center"
-        >
-          {monthOptions.map((m) => (
-            <option key={m} value={m}>
-              {formatMonthLabel(m)}
-            </option>
-          ))}
-        </AppSelect>
+        />
       </div>
 
       <button
@@ -1068,14 +1051,7 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
                     value: c.id,
                     label: `${c.icon} ${c.name}`
                   }))}
-                >
-                  <option value="">(Pick one)</option>
-                  {availableCategories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.icon} {c.name}
-                    </option>
-                  ))}
-                </AppSelect>
+                />
               </label>
 
               <label className="field">

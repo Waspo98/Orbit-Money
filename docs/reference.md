@@ -31,7 +31,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
 | `sessions.db` | Session store (separate `better-sqlite3` connection) |
 
-### Database Schema (26 migrations)
+### Database Schema (27 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -160,7 +160,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 
 ### Budgets
 - **Monthly caps, global per category.** One amount per category that applies to every month. Editing `Groceries` updates the cap for every past and future month.
-- **Month navigation** via `‹ / ›` arrows plus a visible-but-transparent `<select>` overlaying a styled pill — opens the native month picker on tap. Chose `<select>` over a hidden `<input type="month">` because hidden month-type inputs caused unexpected mobile-browser zoom on page load.
+- **Month navigation** via `‹ / ›` arrows plus the shared `AppSelect` pill. The select menu is portaled and page-centered on mobile so month jumps use the same dropdown primitive as the rest of the app.
 - **Summary card:** total monthly expenses, percentage of budgeted amount, remaining/over, plus an unbudgeted-spending callout. The headline and progress math intentionally include unbudgeted expenses.
 - **Spending by Category chart:** interactive donut chart for monthly category spend. The list uses `SelectableListItem`, sorts biggest-to-smallest with Uncategorized forced last, and selected rows use the shared green active treatment.
 - **Income / Expenses / Net** three-column stat row at the top, scoped to the viewed month, excludes ignored + transfer transactions
@@ -231,14 +231,15 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More. These four primary routes are locked to their original positions.
 - **Desktop sidebar:** Lists every visible page directly. Primary routes remain first, and More-menu pages follow the user-controlled More order. Bottom tabs are hidden on desktop.
 - **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Savings Goals, Upcoming, Retirement Calculator, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings. Settings can hide optional frontend sections from navigation and reorder More-menu cards via `localStorage`; locked pages stay visible.
-- **Deprecated hamburger:** the old hamburger menu was removed; do not reintroduce it.
+- **Removed hamburger menu:** do not reintroduce a separate hamburger drawer; use Bottom Tabs, Desktop Sidebar, and More Sheet.
 - **Settings page:** Collapsible/reorderable cards for Appearance, Turn App Features On/Off, SimpleFIN, Import Data, Account, and Orbit Money build details. The feature toggle card owns frontend-only navigation visibility, More-card order, and the existing MHA visibility control.
-- **React Router v6:** Client-side routing with browser back/forward support. All routes served via Express catch-all for deep-link support.
+- **React Router v6:** Client-side routing with browser back/forward support. Page modules are lazy-loaded through `React.lazy`/`Suspense` so the authenticated app shell stays small. All routes are served via the Express catch-all for deep-link support.
 
 ### UI Details
 - `AnimatedModal` component: render-prop pattern (`{({ close }) => ...}`), 180ms slide/zoom animations via `.closing` CSS classes. Saved closes animate; canceled closes should feel immediate unless a specific flow says otherwise.
 - `PageHero` component and `useMorphingPageHero(initialHeight)` hook own the morphing sticky hero measurement logic. Reuse `PageHero` for page headers; pass `chrome` and `toolbar` slots when a page needs custom header controls.
 - `AppDialog.jsx` exposes `useAppDialog()` for modal alert/confirmation flows. Prefer it over native `alert()` / `confirm()` so mobile UX and destructive-action styling stay consistent.
+- `AppSelect.jsx` is the shared custom select primitive. Pass an `options` array (`{ value, label }`) and do not nest native `<option>` children; use `menuPlacement="page-center"` for compact month/year picker pills.
 - `frontend/src/navigation.js` owns route metadata. `BottomTabs.jsx`, `DesktopSidebar.jsx`, `MoreSheet.jsx`, `App.jsx`, and route visibility should read from it so labels, icons, route rendering, and feature gating stay aligned.
 - `SelectableListItem.jsx` is the shared two-line selectable card/row primitive. Use it for lists where one item is selected, such as goal/category pickers; selected rows use the shared green active treatment.
 - `CurrencyInput.jsx` is the shared primitive for editable dollar amounts. Use it for money text fields so values format with `$` and comma grouping while typing; pair saved values with `parseCurrencyInput`.
@@ -397,7 +398,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
 - `db/index.js`, `db/migrations.js`
 - `lib/`: http, localDate, money, routeParams
-- `db/migrations/001` through `026`
+- `db/migrations/001` through `027`
 - `routes/`: accounts, auth, budgets, categories, goals, health, household, householdSharing, import, merchantLogos, mha, netWorth, rules, simplefin, transactions, upcoming
 - `services/`: csvImport, demoSeed, householdDefaults, merchantLogos, mhaSummary, oidc, ruleMatcher, sampleHouseholds, sessionStore, simplefinClient, simplefinSync, transferMatcher
 - `test/`: Node built-in test runner coverage for backend helpers and calculation services
@@ -407,7 +408,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - `public/`: manifest.webmanifest, PNG/SVG icons, splash wordmarks, sw.js
 - `src/main.jsx`, `src/App.jsx`, `src/Login.jsx`, `src/api.js`, `src/index.css`
 - `src/hooks/useTheme.js`
-- `src/components/`: AnimatedModal, AppDialog, AppIcon, AppRangeSlider, AppSelect, BottomTabs, BrandLogo, CollapseIndicator, CurrencyInput, DepthPattern, DesktopSidebar, DropdownMenu, FilterSheet, InlinePopover, MoreSheet, PageHero, PercentInput, ReorderListItem, SearchField, SelectableListItem, SyncErrorBanner, rule editor primitives, transaction row primitives
+- `src/components/`: AnimatedModal, AppDialog, AppIcon, AppRangeSlider, AppSelect, BottomTabs, BrandLogo, CollapseIndicator, CurrencyInput, DesktopSidebar, DropdownMenu, FilterSheet, InlinePopover, MoreDotsIcon, MoreSheet, PageHero, PercentInput, ReorderListItem, SearchField, SelectableListItem, SyncErrorBanner, rule editor primitives, transaction row primitives
 - `src/pages/`: Accounts, Budgets, Categories, Dashboard, Goals, Household, HousingCalculator, MhaTracker, NetWorth, RetirementCalculator, Rules, Settings, Transactions, Upcoming
 
 ## Known Gotchas
@@ -425,7 +426,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - **Button copy:** visible button labels should use Title Case for words, e.g. `+ New Category`, `Add Budget`, `Save`.
 - **Selectable rows:** use `SelectableListItem` before creating a new selectable card/list row. Keep selected states green and compact two-line rows unless there is a strong page-specific reason.
 - **Dropdown menus:** do not lock body scroll or blur the page. Keep them positionally anchored to the trigger.
-- **Hidden `<input type="month">` triggers mobile-browser layout quirks** — use a `<select>` overlaying a styled pill instead when you want a native month picker
+- **Hidden date/month inputs can trigger mobile-browser layout quirks** — use `AppSelect` for compact month/year picker pills instead of hidden input/select overlays.
 - **Rule chaining no longer works** — since conditions match against originals only, a rule can't match on a value a higher-priority rule just renamed to. This was an intentional v12 change (match counts were broken because of the old chaining semantics). If a hand-built rule relied on chained renames, rewrite it to condition on `original_description` or the unmodified upstream value.
 
 ## Planned

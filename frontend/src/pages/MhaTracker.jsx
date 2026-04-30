@@ -560,13 +560,7 @@ function YearNav({ year, yearOptions, canGoForward, onPrev, onNext, onJump }) {
           }))}
           onChange={(value) => onJump(Number(value))}
           ariaLabel="Jump to year"
-        >
-          {yearOptions.map((option) => (
-            <option key={option} value={option}>
-              {formatYearLabel(option)}
-            </option>
-          ))}
-        </AppSelect>
+        />
       </div>
 
       <button

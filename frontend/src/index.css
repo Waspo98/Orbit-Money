@@ -8,7 +8,7 @@
  *   1. Tokens
  *   2. Base / reset
  *   3. Primitives (buttons, fields, cards, modals, dropdowns)
- *   4. Layout shells (app, sidebar, bottom tabs, hamburger)
+ *   4. Layout shells (app, sidebar, bottom tabs)
  *   5. Page-specific
  * ========================================================================== */
 
@@ -371,6 +371,14 @@ input, textarea, select {
   background: currentColor;
   mask: var(--icon-url) center / contain no-repeat;
   -webkit-mask: var(--icon-url) center / contain no-repeat;
+}
+
+.more-dots-icon {
+  display: block;
+  width: 1.25em;
+  height: 1.25em;
+  fill: currentColor;
+  flex: 0 0 auto;
 }
 
 
@@ -2141,7 +2149,7 @@ input, textarea, select {
 }
 
 
-/* ================== 4. LAYOUT — Hamburger menu ================== */
+/* ================== 4. LAYOUT - Shared menu animations ================== */
 
 @keyframes menuIn {
   from { opacity: 0; transform: scale(0.96); }
@@ -2151,79 +2159,6 @@ input, textarea, select {
   from { opacity: 1; transform: scale(1); }
   to   { opacity: 0; transform: scale(0.96); }
 }
-
-.menu-backdrop.closing {
-  animation: backdropOut var(--dur-base) var(--ease-in-out) forwards;
-}
-.menu-panel.closing {
-  animation: menuOut var(--dur-base) var(--ease-in-out) forwards;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 12px;
-  background: transparent;
-  border: none;
-  color: var(--text);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  font-size: 0.92rem;
-  text-align: left;
-  transition: background-color var(--dur-fast);
-}
-
-.menu-item:hover { background: var(--surface-hover); }
-.menu-item.destructive { color: var(--danger); }
-.menu-item-icon { width: 18px; text-align: center; font-size: 1rem; }
-
-.menu-divider { height: 1px; background: var(--border); margin: 6px 4px; }
-
-.menu-section-label {
-  padding: 8px 12px 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-subtle);
-}
-
-.theme-selector {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  padding: 4px;
-  background: var(--surface-2);
-  border-radius: var(--radius-md);
-  margin: 4px 8px 8px;
-}
-
-.theme-option {
-  padding: 8px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 0.82rem;
-  font-weight: 500;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  transition: background-color var(--dur-fast), color var(--dur-fast);
-}
-
-.theme-option-emoji { font-size: 1.1rem; }
-.theme-option:hover { color: var(--text); }
-.theme-option.active {
-  background: var(--surface);
-  color: var(--accent);
-  box-shadow: var(--shadow-sm);
-}
-
 
 /* ================== 4. LAYOUT — Sync error banner ================== */
 
@@ -4336,10 +4271,6 @@ input, textarea, select {
 .page-hero-mha .month-nav-label-wrap:focus-within {
   background: var(--surface-hover);
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-}
-
-.page-hero-mha .month-nav-caret {
-  color: var(--text-muted);
 }
 
 .mha-content {
@@ -10444,13 +10375,8 @@ input, textarea, select {
 }
 
 /* ---------- Month navigation ---------- */
-/* Select-based picker (v15). Previously used a hidden <input type="month">
-   with showPicker(), but hidden type="month" inputs in the DOM caused
-   unexpected zoom behavior on mobile — mobile browsers (both Android
-   Chrome and iOS Safari) apply their own layout heuristics to form
-   inputs that are positioned-absolute-and-invisible. A plain <select>
-   overlaying a styled pill avoids this entirely and still opens the
-   native month picker on tap. */
+/* Shared AppSelect picker. Keep month/year jumps on this primitive so mobile
+   layouts do not inherit hidden input/select focus quirks. */
 
 .month-nav {
   display: flex;
@@ -10526,8 +10452,7 @@ input, textarea, select {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 
-/* Wrap holds the visible pill styling PLUS an invisible <select> overlayed
-   on top. Tapping anywhere on the pill opens the native month picker. */
+/* Wrap holds the visible month/year picker pill and shared AppSelect trigger. */
 .month-nav-label-wrap {
   position: relative;
   flex: 1;
@@ -10571,47 +10496,9 @@ input, textarea, select {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 
-.month-nav-label-text {
-  pointer-events: none;
-}
-
-.month-nav-caret {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
-.page-hero-budgets .month-nav-caret {
-  color: var(--text-muted);
-}
-
-/* The real <select> is invisible but covers the entire pill — iOS and
-   Android both render native month-picker UI when the user taps. */
-.month-nav-select {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  font-size: 16px; /* ≥16px prevents iOS focus-zoom */
-  border: 0;
-  background: transparent;
-  appearance: none;
-  -webkit-appearance: none;
-  color: transparent;
-}
-
-.month-nav-label-wrap .month-nav-caret {
-  display: none;
-}
-
 .month-nav-label-wrap .month-nav-select.app-select {
   position: static;
-  inset: auto;
   width: 100%;
-  height: auto;
-  opacity: 1;
   color: inherit;
 }
 

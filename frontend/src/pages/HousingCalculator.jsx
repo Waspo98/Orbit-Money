@@ -220,15 +220,7 @@ export default function HousingCalculator({ accounts = [] }) {
                   label: `${account.name}${account.institution ? ` - ${account.institution}` : ''}`
                 }))
               ]}
-            >
-              <option value="">Manual estimate</option>
-              {mortgages.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                  {account.institution ? ` - ${account.institution}` : ''}
-                </option>
-              ))}
-            </AppSelect>
+            />
           </label>
           <div className="housing-picker-note">
             {mortgages.length === 0 ? (
@@ -403,21 +395,6 @@ function LoanTermField({ value, onChange }) {
         aria-label="Custom loan term in years"
       />
     </div>
-  );
-}
-
-function NumberField({ label, value, placeholder = '0', onChange }) {
-  return (
-    <label className="field housing-field">
-      <span>{label}</span>
-      <input
-        type="text"
-        inputMode="numeric"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-      />
-    </label>
   );
 }
 

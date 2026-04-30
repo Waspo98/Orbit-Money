@@ -1033,17 +1033,7 @@ function MergeAccountModal({ source, candidates, onClose, onMerged }) {
                 value: a.id,
                 label: `${a.name}${a.institution ? ` - ${a.institution}` : ''}${a.account_number_last4 ? ` ...${a.account_number_last4}` : ''}`
               }))}
-            >
-              {candidates.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                  {a.institution ? ` — ${a.institution}` : ''}
-                  {a.account_number_last4
-                    ? ` ···${a.account_number_last4}`
-                    : ''}
-                </option>
-              ))}
-            </AppSelect>
+            />
           </label>
 
           {target && (
