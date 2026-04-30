@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   OVERLAY_ANIM_MS,
   useBodyScrollLock,
+  useOverlayBackDismiss,
   usePageBackdropBlur
 } from './overlayBehavior.js';
 
@@ -46,6 +47,7 @@ export default function AnimatedModal({ onClose, size = 'md', animation = 'defau
 
   useBodyScrollLock(true);
   usePageBackdropBlur(true);
+  useOverlayBackDismiss(true, () => close({ animate: true }));
 
   // Escape closes.
   useEffect(() => {

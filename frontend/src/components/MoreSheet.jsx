@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppIcon from './AppIcon.jsx';
-import { OVERLAY_ANIM_MS, useBodyScrollLock } from './overlayBehavior.js';
+import {
+  OVERLAY_ANIM_MS,
+  useBodyScrollLock,
+  useOverlayBackDismiss
+} from './overlayBehavior.js';
 import { getMoreRoutes } from '../navigation.js';
 
 const DRAG_START_PX = 12;
@@ -85,6 +89,7 @@ export default function MoreSheet({
   }, [open]);
 
   useBodyScrollLock(open);
+  useOverlayBackDismiss(open, () => close({ animate: true }));
 
   useEffect(() => (
     () => {
