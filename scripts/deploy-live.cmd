@@ -27,6 +27,32 @@ if errorlevel 1 exit /b 1
 git pull --ff-only origin main
 if errorlevel 1 exit /b 1
 
+if "%ORBIT_PUBLISH_IMAGE%"=="1" (
+  if "%GITHUB_TOKEN%"=="" (
+    echo GITHUB_TOKEN is required to publish ghcr.io/waspo98/orbit-money from GitHub Actions.
+    exit /b 1
+  )
+
+  if "%GITHUB_ACTOR%"=="" set "GITHUB_ACTOR=github-actions"
+  if "%GITHUB_SHA%"=="" set "GITHUB_SHA=manual"
+
+  echo Publishing live Docker image to ghcr.io/waspo98/orbit-money...
+  echo %GITHUB_TOKEN% | docker login ghcr.io -u "%GITHUB_ACTOR%" --password-stdin
+  if errorlevel 1 exit /b 1
+
+  docker build -t ghcr.io/waspo98/orbit-money:latest -t ghcr.io/waspo98/orbit-money:main -t ghcr.io/waspo98/orbit-money:main-%GITHUB_SHA% .
+  if errorlevel 1 exit /b 1
+
+  docker push ghcr.io/waspo98/orbit-money:latest
+  if errorlevel 1 exit /b 1
+
+  docker push ghcr.io/waspo98/orbit-money:main
+  if errorlevel 1 exit /b 1
+
+  docker push ghcr.io/waspo98/orbit-money:main-%GITHUB_SHA%
+  if errorlevel 1 exit /b 1
+)
+
 docker compose -p orbitmoney pull
 if errorlevel 1 exit /b 1
 

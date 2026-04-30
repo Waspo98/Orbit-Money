@@ -232,8 +232,10 @@ Registry and the maintainer's self-hosted Windows runner:
 - Pushing a tag like `v0.52.0` publishes matching version image tags for
   release installs
 
-The deploy jobs use server-specific checkout paths and Docker host assumptions.
-Self-hosters do not need GitHub Actions to run the app.
+The deploy jobs run on the maintainer's self-hosted Windows runner. The deploy
+scripts publish the GHCR image when `ORBIT_PUBLISH_IMAGE=1`, then pull and
+restart the matching Docker Compose service. Self-hosters do not need GitHub
+Actions to run the app.
 
 For public anonymous `docker compose pull` support, the GitHub Container
 Registry package must be public. If the first published package is private, make
