@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import { OVERLAY_ANIM_MS } from '../components/overlayBehavior.js';
 import PageHero from '../components/PageHero.jsx';
 import SearchField from '../components/SearchField.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
@@ -52,6 +53,8 @@ const GIVING_HINTS = [
   'non-profit',
   'tithe'
 ];
+
+const MODAL_HANDOFF_DELAY_MS = OVERLAY_ANIM_MS + 80;
 
 function todayIso() {
   const date = new Date();
@@ -384,6 +387,12 @@ export default function Upcoming({ accounts = [], categories = [] }) {
             setHistoryItem(null);
             openEdit(item);
           }}
+          actionLabel={historyItem.key ? 'Review Suggestion' : 'Edit Recurring'}
+          onReviewSuggestion={historyItem.key ? () => {
+            const suggestion = historyItem;
+            setHistoryItem(null);
+            openSuggestion(suggestion);
+          } : undefined}
           onClose={() => setHistoryItem(null)}
         />
       )}
@@ -472,6 +481,7 @@ function UpcomingPlan({
     return (
       <SuggestionsPanel
         suggestions={suggestions}
+        onViewHistory={onViewHistory}
         onReview={onReviewSuggestion}
         onDismiss={onDismissSuggestion}
       />
@@ -515,6 +525,7 @@ function UpcomingPlan({
           <div className="dashboard-card-body upcoming-lane-body">
             <SuggestionsList
               suggestions={suggestions.slice(0, 4)}
+              onViewHistory={onViewHistory}
               onReview={onReviewSuggestion}
               onDismiss={onDismissSuggestion}
               compact
@@ -690,7 +701,7 @@ function TransactionPickerModal({ kind, accounts, categories, onPick, onClose })
                   category={categoryById.get(txn.category_id)}
                   onClick={() => {
                     close({ animate: true });
-                    setTimeout(() => onPick(txn), 180);
+                    setTimeout(() => onPick(txn), MODAL_HANDOFF_DELAY_MS);
                   }}
                 />
               ))
@@ -728,7 +739,15 @@ function TransactionPickRow({ txn, account, category, onClick }) {
   );
 }
 
-function RecurringHistoryModal({ item, accounts, categories, onEdit, onClose }) {
+function RecurringHistoryModal({
+  item,
+  accounts,
+  categories,
+  actionLabel = 'Edit Recurring',
+  onEdit,
+  onReviewSuggestion,
+  onClose
+}) {
   const [transactions, setTransactions] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -770,7 +789,7 @@ function RecurringHistoryModal({ item, accounts, categories, onEdit, onClose }) 
     return () => {
       active = false;
     };
-  }, [item.id, item.category_id, item.direction, searchTerm]);
+  }, [item.id, item.key, item.category_id, item.direction, searchTerm]);
 
   return (
     <AnimatedModal onClose={onClose} size="lg">
@@ -820,10 +839,10 @@ function RecurringHistoryModal({ item, accounts, categories, onEdit, onClose }) 
               className="btn-primary"
               onClick={() => {
                 close({ animate: true });
-                setTimeout(onEdit, 180);
+                setTimeout(onReviewSuggestion || onEdit, MODAL_HANDOFF_DELAY_MS);
               }}
             >
-              Edit Recurring
+              {actionLabel}
             </button>
           </div>
         </>
@@ -855,7 +874,7 @@ function HistoryTransactionRow({ txn, account, category }) {
   );
 }
 
-function SuggestionsPanel({ suggestions, onReview, onDismiss }) {
+function SuggestionsPanel({ suggestions, onViewHistory, onReview, onDismiss }) {
   return (
     <section className="dashboard-card upcoming-lane upcoming-suggestions-panel">
       <header className="dashboard-card-header upcoming-card-header">
@@ -863,13 +882,18 @@ function SuggestionsPanel({ suggestions, onReview, onDismiss }) {
         <span className="pill accent upcoming-count-pill">{suggestions.length}</span>
       </header>
       <div className="dashboard-card-body upcoming-lane-body">
-        <SuggestionsList suggestions={suggestions} onReview={onReview} onDismiss={onDismiss} />
+        <SuggestionsList
+          suggestions={suggestions}
+          onViewHistory={onViewHistory}
+          onReview={onReview}
+          onDismiss={onDismiss}
+        />
       </div>
     </section>
   );
 }
 
-function SuggestionsList({ suggestions, onReview, onDismiss, compact = false }) {
+function SuggestionsList({ suggestions, onViewHistory, onReview, onDismiss, compact = false }) {
   if (suggestions.length === 0) {
     return (
       <div className="upcoming-mini-empty">
@@ -882,7 +906,12 @@ function SuggestionsList({ suggestions, onReview, onDismiss, compact = false }) 
     <ul className="upcoming-suggestion-list">
       {suggestions.map((suggestion) => (
         <li key={suggestion.key} className={`selectable-list-item upcoming-suggestion-row upcoming-item-${suggestion.kind}`}>
-          <button type="button" className="upcoming-suggestion-main" onClick={() => onReview(suggestion)}>
+          <button
+            type="button"
+            className="upcoming-suggestion-main"
+            onClick={() => onViewHistory(suggestion)}
+            aria-label={`View previous transactions for ${suggestion.name}`}
+          >
             <span className="selectable-list-leading upcoming-row-date">
               <strong>{formatMonthDay(suggestion.next_date)}</strong>
               <em>{suggestion.confidence}% Match</em>
