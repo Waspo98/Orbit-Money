@@ -1827,11 +1827,6 @@ input, textarea, select {
   min-width: 0;
 }
 
-.app-main > :not(.app-depth-pattern) {
-  position: relative;
-  z-index: 1;
-}
-
 .route-transition {
   position: relative;
   z-index: 1;
@@ -2595,91 +2590,6 @@ input, textarea, select {
   min-height: calc(100dvh - 140px);
   padding-bottom: 1px;
   overflow: clip;
-}
-
-.depth-pattern {
-  position: absolute;
-  inset-inline: 0;
-  pointer-events: none;
-  z-index: 0;
-  transform: translateY(var(--depth-pattern-offset, 0px));
-  will-change: transform;
-}
-
-.app-depth-pattern {
-  --depth-pattern-line: color-mix(in srgb, var(--accent) 16%, var(--text-subtle) 84%);
-  --depth-pattern-dot: color-mix(in srgb, var(--accent) 24%, var(--text-subtle) 76%);
-  --depth-pattern-star: color-mix(in srgb, var(--text-subtle) 58%, transparent);
-  top: 96px;
-  bottom: 0;
-  opacity: 0.54;
-  mask-image: linear-gradient(to bottom, transparent, #000 5%, #000 88%, transparent);
-}
-
-.depth-pattern svg {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.depth-pattern-cluster {
-  fill: var(--depth-pattern-dot);
-  stroke: var(--depth-pattern-line);
-  stroke-width: 1.1;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.depth-pattern-cluster path {
-  fill: none;
-}
-
-.depth-pattern-cluster-primary {
-  opacity: 0.72;
-}
-
-.depth-pattern-cluster-secondary {
-  opacity: 0.34;
-}
-
-.depth-pattern-stars {
-  fill: var(--depth-pattern-star);
-  opacity: 0.58;
-}
-
-.depth-pattern::after {
-  content: '';
-  position: absolute;
-  inset-inline: 0;
-  z-index: 0;
-  top: 60px;
-  bottom: 0;
-  opacity: 0.26;
-  background:
-    radial-gradient(ellipse at 8% 8%, color-mix(in srgb, var(--accent-soft) 55%, transparent), transparent 34%),
-    radial-gradient(ellipse at 88% 36%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 32%);
-  filter: blur(10px);
-  mask-image: linear-gradient(to bottom, transparent, #000 7%, #000 78%, transparent);
-}
-
-:root[data-theme="dark"] .app-depth-pattern {
-  opacity: 0.4;
-}
-
-:root[data-theme="dark"] .depth-pattern::after {
-  opacity: 0.34;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .app-depth-pattern {
-    opacity: 0.4;
-  }
-
-  :root:not([data-theme="light"]) .depth-pattern::after {
-    opacity: 0.34;
-  }
 }
 
 .dashboard-grid,
