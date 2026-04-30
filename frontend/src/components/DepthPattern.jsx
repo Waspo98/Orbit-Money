@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
 const DEPTH_PATTERN_WIDTH = 1760;
 const DEPTH_PATTERN_HEIGHT = 1280;
 const DEPTH_PATTERN_ID = 'orbit-depth-mesh';
 const DEPTH_SESSION_SEED = Math.random().toString(36).slice(2);
+const DEPTH_PARALLAX_COUNTER_SPEED = 0.61;
 
 const MESH_TEMPLATE = {
   points: [
@@ -154,9 +155,32 @@ function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+function syncDepthOffset(pattern) {
+  if (typeof window === 'undefined') return;
+  const offset = Math.round(window.scrollY * DEPTH_PARALLAX_COUNTER_SPEED);
+  pattern.style.setProperty('--depth-pattern-offset', `${offset}px`);
+}
+
 export default function DepthPattern({ className = '', seedKey = 'global' }) {
   const patternRef = useRef(null);
   const { clusters, stars } = useMemo(() => createDepthPattern(seedKey), [seedKey]);
+
+  useLayoutEffect(() => {
+    const pattern = patternRef.current;
+    if (!pattern || prefersReducedMotion()) return undefined;
+
+    syncDepthOffset(pattern);
+    let secondFrameId = 0;
+    const firstFrameId = window.requestAnimationFrame(() => {
+      syncDepthOffset(pattern);
+      secondFrameId = window.requestAnimationFrame(() => syncDepthOffset(pattern));
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrameId);
+      if (secondFrameId) window.cancelAnimationFrame(secondFrameId);
+    };
+  }, [seedKey]);
 
   useEffect(() => {
     const pattern = patternRef.current;
@@ -165,8 +189,7 @@ export default function DepthPattern({ className = '', seedKey = 'global' }) {
     let frameId = 0;
     function updateDepthOffset() {
       frameId = 0;
-      const offset = Math.round(window.scrollY * 0.61);
-      pattern.style.setProperty('--depth-pattern-offset', `${offset}px`);
+      syncDepthOffset(pattern);
     }
 
     function scheduleDepthOffsetUpdate() {
@@ -182,7 +205,7 @@ export default function DepthPattern({ className = '', seedKey = 'global' }) {
       window.removeEventListener('resize', scheduleDepthOffsetUpdate);
       if (frameId) window.cancelAnimationFrame(frameId);
     };
-  }, []);
+  }, [seedKey]);
 
   return (
     <div ref={patternRef} className={`depth-pattern ${className}`} aria-hidden="true">
