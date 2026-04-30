@@ -15,6 +15,7 @@ import DropdownMenu from '../components/DropdownMenu.jsx';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppSelect from '../components/AppSelect.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
+import ExpandingSection from '../components/ExpandingSection.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
   useDragInteractionLock,
@@ -623,11 +624,13 @@ function AccountGroup({ group, children, collapsed, disabled = false, onToggle }
           <CollapseIndicator expanded={!collapsed} className="account-group-caret" />
         </span>
       </button>
-      <div className="account-group-body" aria-hidden={collapsed}>
-        <div className="account-group-body-inner">
-          {children}
-        </div>
-      </div>
+      <ExpandingSection
+        expanded={!collapsed}
+        className="account-group-body"
+        innerClassName="account-group-body-inner"
+      >
+        {children}
+      </ExpandingSection>
     </section>
   );
 }

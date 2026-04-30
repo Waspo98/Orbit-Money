@@ -10,7 +10,9 @@ export default function AppSelect({
   disabled = false,
   ariaLabel,
   menuPlacement = 'default',
-  triggerLabel
+  triggerLabel,
+  triggerIcon = null,
+  showCaret = true
 }) {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -190,15 +192,20 @@ export default function AppSelect({
     <div ref={rootRef} className={`app-select ${className}`}>
       <button
         type="button"
-        className="app-select-trigger"
+        className={`app-select-trigger ${triggerIcon ? 'has-icon' : ''} ${showCaret ? '' : 'no-caret'}`.trim()}
         onClick={() => (open ? closeMenu() : openMenu())}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
       >
-        <span>{triggerLabel || selected?.label || placeholder}</span>
-        <span className="app-select-caret" aria-hidden="true">v</span>
+        {triggerIcon && (
+          <span className="app-select-trigger-icon" aria-hidden="true">
+            {triggerIcon}
+          </span>
+        )}
+        <span className="app-select-label">{triggerLabel || selected?.label || placeholder}</span>
+        {showCaret && <span className="app-select-caret" aria-hidden="true">v</span>}
       </button>
 
       {menu && typeof document !== 'undefined'

@@ -416,6 +416,32 @@ input, textarea, select {
   background-color: color-mix(in srgb, var(--accent-soft) 42%, transparent);
 }
 
+/* ---------- Expanding sections ---------- */
+
+.expanding-section {
+  --expanding-section-duration: 220ms;
+  display: grid;
+  grid-template-rows: 0fr;
+  pointer-events: none;
+  transition: grid-template-rows var(--expanding-section-duration) var(--ease-out, ease);
+}
+
+.expanding-section.expanded {
+  grid-template-rows: 1fr;
+  pointer-events: auto;
+}
+
+.expanding-section-inner {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 160ms var(--ease-out, ease) 60ms;
+}
+
+.expanding-section.expanded > .expanding-section-inner {
+  opacity: 1;
+}
+
 /* ================== 3. PRIMITIVES — Fields ================== */
 
 .field { display: block; margin-bottom: 18px; }
@@ -486,6 +512,18 @@ input, textarea, select {
   transition: background var(--dur-fast), border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
 
+.app-select-trigger.has-icon {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.app-select-trigger.no-caret {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-select-trigger.has-icon.no-caret {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
 .app-select-trigger:hover,
 .app-select-trigger:focus {
   outline: none;
@@ -499,11 +537,19 @@ input, textarea, select {
   cursor: not-allowed;
 }
 
-.app-select-trigger span:first-child {
+.app-select-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.app-select-trigger-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  line-height: 1;
 }
 
 .app-select-caret {
@@ -9081,7 +9127,8 @@ input, textarea, select {
 }
 
 .settings-card-body {
-  margin-top: 22px;
+  margin-top: 0;
+  padding-top: 22px;
 }
 
 .settings-card-body > * + * {
@@ -9904,7 +9951,7 @@ input, textarea, select {
 
 .txn-toolbar-actions {
   display: grid;
-  grid-template-columns: minmax(104px, auto) minmax(150px, 170px) minmax(110px, 128px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -9917,10 +9964,13 @@ input, textarea, select {
 .txn-toolbar-hero .txn-filter-button,
 .txn-toolbar-hero .app-select-trigger {
   min-height: 44px;
-  border-color: var(--border);
+  border: 0;
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
   box-shadow: var(--shadow-md);
 }
 
@@ -9932,17 +9982,21 @@ input, textarea, select {
 .txn-filter-button {
   width: 100%;
   min-width: 0;
-  border: 0;
   padding-inline: 12px;
   white-space: nowrap;
 }
 
-.txn-toolbar-hero .txn-filter-button:hover,
-.txn-toolbar-hero .txn-filter-button:focus {
-  border-color: transparent;
+.txn-control-button,
+.txn-toolbar-hero .txn-control-select .app-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
 }
 
-.txn-filter-icon {
+.txn-filter-icon,
+.txn-control-icon {
   width: 15px;
   height: 15px;
   flex: 0 0 auto;
@@ -9968,39 +10022,11 @@ input, textarea, select {
 }
 
 .txn-toolbar-hero .app-select-trigger {
-  position: relative;
-  font-size: 0.9rem;
-}
-
-.txn-toolbar-hero .txn-sort .app-select-trigger,
-.txn-toolbar-hero .txn-page-size .app-select-trigger {
-  grid-template-columns: minmax(0, 1fr);
-  padding-inline: 30px;
-  text-align: center;
-}
-
-.txn-toolbar-hero .txn-sort .app-select-trigger span:first-child,
-.txn-toolbar-hero .txn-page-size .app-select-trigger span:first-child {
-  justify-self: center;
-  text-align: center;
-}
-
-.txn-toolbar-hero .txn-sort .app-select-caret,
-.txn-toolbar-hero .txn-page-size .app-select-caret {
-  position: absolute;
-  right: 12px;
+  padding-inline: 12px;
 }
 
 .app-select-menu-txn-sort {
   min-width: min(220px, calc(100vw - 48px));
-}
-
-.txn-sort-active .app-select-trigger {
-  border-color: var(--accent);
-  background: var(--surface);
-  box-shadow:
-    0 0 0 1px var(--accent),
-    var(--shadow-md);
 }
 
 .app-select-menu-txn-page-size {
@@ -10024,24 +10050,20 @@ input, textarea, select {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-.txn-toolbar-hero .txn-sort-active .app-select-trigger,
-.txn-toolbar-hero .txn-sort-active .app-select-trigger:hover,
-.txn-toolbar-hero .txn-sort-active .app-select-trigger:focus {
-  border-color: var(--accent);
-  background: var(--surface);
-  box-shadow:
-    0 0 0 1px var(--accent),
-    var(--shadow-md);
-}
-
-.txn-toolbar-hero .txn-filter-button.btn-active {
+.txn-toolbar-hero .txn-control-active,
+.txn-toolbar-hero .txn-control-active:hover,
+.txn-toolbar-hero .txn-control-active:focus,
+.txn-toolbar-hero .txn-control-active .app-select-trigger,
+.txn-toolbar-hero .txn-control-active .app-select-trigger:hover,
+.txn-toolbar-hero .txn-control-active .app-select-trigger:focus {
   background: #8ff0c9;
   border-color: #8ff0c9;
   color: #06112c;
   -webkit-text-fill-color: #06112c;
+  box-shadow: var(--shadow-md);
 }
 
-.txn-toolbar-hero .txn-filter-button.btn-active .txn-filter-count {
+.txn-toolbar-hero .txn-control-active .txn-filter-count {
   background: #06112c;
   color: #8ff0c9;
 }
@@ -10386,6 +10408,13 @@ input, textarea, select {
     padding-left: 8px;
     padding-right: 8px;
     font-size: 0.86rem;
+    font-weight: 600;
+    gap: 6px;
+  }
+  .txn-filter-icon,
+  .txn-control-icon {
+    width: 14px;
+    height: 14px;
   }
   .filter-checkbox-grid {
     grid-template-columns: 1fr;

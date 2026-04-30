@@ -10,6 +10,7 @@ import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppIcon from '../components/AppIcon.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
+import ExpandingSection from '../components/ExpandingSection.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
   useDragInteractionLock,
@@ -177,17 +178,19 @@ function SettingsCard({
         <CollapseIndicator expanded={!collapsed} className="settings-card-caret" />
       </button>
 
-      {collapsed ? (
-        collapsedContent && (
-          <div className="settings-card-collapsed" id={`settings-card-body-${id}`}>
-            {collapsedContent}
-          </div>
-        )
-      ) : (
-        <div className="settings-card-body" id={`settings-card-body-${id}`}>
-          {children}
+      {collapsed && collapsedContent && (
+        <div className="settings-card-collapsed">
+          {collapsedContent}
         </div>
       )}
+      <ExpandingSection
+        expanded={!collapsed}
+        id={`settings-card-body-${id}`}
+        className="settings-card-body-expander"
+        innerClassName="settings-card-body"
+      >
+        {children}
+      </ExpandingSection>
     </section>
   );
 }

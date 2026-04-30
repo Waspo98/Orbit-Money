@@ -39,6 +39,23 @@ const SORT_OPTIONS = [
   { value: 'merchant_asc',     label: 'Merchant A-Z' }
 ];
 
+function TransactionToolbarIcon({ type }) {
+  if (type === 'sort') {
+    return (
+      <svg className="txn-control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M6 7h12M8 12h8M10 17h4" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className="txn-control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M5 6.5h14M5 12h14M5 17.5h14" />
+      <path d="M9 4.5v4M15 10v4M11 15.5v4" />
+    </svg>
+  );
+}
+
 function monthKey(iso) {
   return iso ? iso.slice(0, 7) : '';
 }
@@ -547,7 +564,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             <div className="txn-toolbar-actions">
               <button
                 type="button"
-                className={`btn-secondary txn-filter-button ${activeCount > 0 ? 'btn-active' : ''}`}
+                className={`btn-secondary txn-filter-button txn-control-button ${activeCount > 0 ? 'btn-active txn-control-active' : ''}`}
                 onClick={() => setFilterSheetOpen(true)}
               >
                 <svg
@@ -564,15 +581,17 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                 )}
               </button>
               <AppSelect
-                className={`txn-sort ${filters.sort !== 'date_desc' ? 'txn-sort-active' : ''}`}
+                className={`txn-control-select txn-sort ${filters.sort !== 'date_desc' ? 'txn-control-active' : ''}`}
                 value={filters.sort}
                 options={SORT_OPTIONS}
                 onChange={setSort}
                 ariaLabel="Sort transactions"
                 triggerLabel="Sort"
+                triggerIcon={<TransactionToolbarIcon type="sort" />}
+                showCaret={false}
               />
               <AppSelect
-                className="txn-page-size"
+                className={`txn-control-select txn-page-size ${filters.pageSize !== DEFAULT_PAGE_SIZE ? 'txn-control-active' : ''}`}
                 value={filters.pageSize}
                 options={PAGE_SIZE_OPTIONS.map((size) => ({
                   value: size,
@@ -580,6 +599,9 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                 }))}
                 onChange={setPageSize}
                 ariaLabel="Transactions per page"
+                triggerLabel="View"
+                triggerIcon={<TransactionToolbarIcon type="view" />}
+                showCaret={false}
               />
             </div>
           </div>

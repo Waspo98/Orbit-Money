@@ -5,6 +5,7 @@ import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppSelect from '../components/AppSelect.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
+import ExpandingSection from '../components/ExpandingSection.jsx';
 import PageHero from '../components/PageHero.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
@@ -931,30 +932,32 @@ function BudgetedRow({ item, expanded, transactionsState, onToggle, onEdit, onDe
           </span>
         </div>
       </div>
-      <div className="budget-row-detail" aria-hidden={!expanded}>
-        <div className="budget-row-detail-inner">
-          <h4>Transactions</h4>
-          {transactionsState?.loading ? (
-            <p className="subtle">Loading transactions...</p>
-          ) : transactionsState?.error ? (
-            <p className="error">{transactionsState.error}</p>
-          ) : transactionsState?.items?.length ? (
-            <ul className="budget-transaction-list">
-              {transactionsState.items.map((txn) => (
-                <li key={txn.id}>
-                  <span>
-                    <strong>{txn.merchant}</strong>
-                    <em>{formatTransactionDate(txn.date)}</em>
-                  </span>
-                  <strong>{formatMoney(Math.abs(Number(txn.amount || 0)))}</strong>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="subtle">No matching transactions this month.</p>
-          )}
-        </div>
-      </div>
+      <ExpandingSection
+        expanded={expanded}
+        className="budget-row-detail"
+        innerClassName="budget-row-detail-inner"
+      >
+        <h4>Transactions</h4>
+        {transactionsState?.loading ? (
+          <p className="subtle">Loading transactions...</p>
+        ) : transactionsState?.error ? (
+          <p className="error">{transactionsState.error}</p>
+        ) : transactionsState?.items?.length ? (
+          <ul className="budget-transaction-list">
+            {transactionsState.items.map((txn) => (
+              <li key={txn.id}>
+                <span>
+                  <strong>{txn.merchant}</strong>
+                  <em>{formatTransactionDate(txn.date)}</em>
+                </span>
+                <strong>{formatMoney(Math.abs(Number(txn.amount || 0)))}</strong>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="subtle">No matching transactions this month.</p>
+        )}
+      </ExpandingSection>
     </li>
   );
 }

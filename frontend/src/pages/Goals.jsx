@@ -12,6 +12,7 @@ import {
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppRangeSlider from '../components/AppRangeSlider.jsx';
+import ExpandingSection from '../components/ExpandingSection.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
   useDragInteractionLock,
@@ -438,25 +439,27 @@ export default function Goals() {
             </header>
             <div className="dashboard-card-body">
               <GoalProgress goal={selectedGoal} />
-              <div className="goals-focus-detail" aria-hidden={focusCollapsed}>
-                <div className="goals-focus-detail-inner">
-                  <GoalChart goal={selectedGoal} />
-                  <ImaginePanel
-                    goal={selectedGoal}
-                    imagineMonthly={imagineMonthly}
-                    imaginedEta={imaginedEta}
-                    onChange={setImagineMonthly}
-                  />
-                  <div className="goals-focus-actions">
-                    <button type="button" className="btn-secondary" onClick={() => openEditGoal(selectedGoal)}>
-                      Edit goal
-                    </button>
-                    <button type="button" className="btn-danger" onClick={() => handleDelete(selectedGoal)}>
-                      Delete
-                    </button>
-                  </div>
+              <ExpandingSection
+                expanded={!focusCollapsed}
+                className="goals-focus-detail"
+                innerClassName="goals-focus-detail-inner"
+              >
+                <GoalChart goal={selectedGoal} />
+                <ImaginePanel
+                  goal={selectedGoal}
+                  imagineMonthly={imagineMonthly}
+                  imaginedEta={imaginedEta}
+                  onChange={setImagineMonthly}
+                />
+                <div className="goals-focus-actions">
+                  <button type="button" className="btn-secondary" onClick={() => openEditGoal(selectedGoal)}>
+                    Edit goal
+                  </button>
+                  <button type="button" className="btn-danger" onClick={() => handleDelete(selectedGoal)}>
+                    Delete
+                  </button>
                 </div>
-              </div>
+              </ExpandingSection>
             </div>
           </section>
 
