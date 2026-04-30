@@ -9885,8 +9885,8 @@ input, textarea, select {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   align-items: center;
-  justify-self: start;
-  width: min(100%, 520px);
+  justify-self: stretch;
+  width: 100%;
   min-width: 0;
 }
 
