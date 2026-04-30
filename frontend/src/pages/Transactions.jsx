@@ -551,7 +551,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             <div className="txn-toolbar-actions">
               <button
                 type="button"
-                className={`btn-secondary txn-filter-button txn-control-button ${activeCount > 0 ? 'txn-control-active' : ''}`}
+                className="btn-secondary txn-filter-button txn-control-button"
                 onClick={() => setFilterSheetOpen(true)}
               >
                 <svg
@@ -568,7 +568,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                 )}
               </button>
               <AppSelect
-                className={`txn-control-select txn-sort ${filters.sort !== 'date_desc' ? 'txn-control-active' : ''}`}
+                className="txn-control-select txn-sort"
                 value={filters.sort}
                 options={SORT_OPTIONS}
                 onChange={setSort}
@@ -578,7 +578,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                 showCaret={false}
               />
               <AppSelect
-                className={`txn-control-select txn-page-size ${filters.pageSize !== DEFAULT_PAGE_SIZE ? 'txn-control-active' : ''}`}
+                className="txn-control-select txn-page-size"
                 value={filters.pageSize}
                 options={PAGE_SIZE_OPTIONS.map((size) => ({
                   value: size,

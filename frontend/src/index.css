@@ -9992,6 +9992,12 @@ input, textarea, select {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 
+.txn-toolbar-hero .txn-filter-button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+}
+
 .txn-toolbar-hero .btn-secondary:hover,
 .txn-toolbar-hero .app-select-trigger:hover {
   box-shadow: var(--shadow-md);
