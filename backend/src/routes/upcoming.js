@@ -695,6 +695,31 @@ router.get('/', requireAuth, (req, res) => {
   }
 });
 
+router.post('/estimate', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  try {
+    const payload = normalizeBody({
+      ...(req.body || {}),
+      amount_strategy: 'history_average'
+    }, householdId);
+    const projection = projectAmount(payload, householdId);
+    sendOk(res, {
+      amount: centsToDollars(projection.cents),
+      projection: {
+        strategy: projection.strategy,
+        lookback_months: projection.lookback_months,
+        sample_count: projection.sample_count,
+        sample_months: projection.sample_months,
+        total: projection.total,
+        average: projection.average,
+        fallback: projection.fallback
+      }
+    });
+  } catch (err) {
+    sendRouteError(res, err);
+  }
+});
+
 router.post('/', requireAuth, (req, res) => {
   const householdId = requireHouseholdId(req);
   try {

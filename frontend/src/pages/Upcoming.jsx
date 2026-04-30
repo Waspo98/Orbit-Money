@@ -19,11 +19,11 @@ import { formatFullDate, formatMonthDay } from '../lib/localDate.js';
 
 const FILTERS = [
   { value: 'all', label: 'All' },
-  { value: 'suggested', label: 'Suggestions' },
   { value: 'income', label: 'Income' },
   { value: 'giving', label: 'Giving' },
   { value: 'subscription', label: 'Subscriptions' },
-  { value: 'bill', label: 'Bills' }
+  { value: 'bill', label: 'Bills' },
+  { value: 'suggested', label: 'Suggestions' }
 ];
 
 const LANE_ORDER = ['income', 'giving', 'subscription', 'bill'];
@@ -229,7 +229,7 @@ export default function Upcoming({ accounts = [], categories = [] }) {
 
   function openTransactionReview(txn, kind = 'bill') {
     const category = categories.find((categoryOption) => categoryOption.id === txn.category_id);
-    const reviewKind = kind === 'giving' ? 'bill' : kind;
+    const reviewKind = kind;
     setTransactionPicker(null);
     setEditor({
       mode: 'create',
@@ -516,6 +516,18 @@ function UpcomingPlan({
 
   return (
     <div className="upcoming-lanes">
+      {LANE_ORDER.map((kind) => (
+        <UpcomingLane
+          key={kind}
+          kind={kind}
+          items={groupedItems[kind] || []}
+          total={kindTotal(items, kind)}
+          onAdd={() => onAddFromTransaction(kind)}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onViewHistory={onViewHistory}
+        />
+      ))}
       {suggestions.length > 0 && (
         <section className="dashboard-card upcoming-lane upcoming-lane-suggestions">
           <header className="dashboard-card-header upcoming-card-header">
@@ -533,18 +545,6 @@ function UpcomingPlan({
           </div>
         </section>
       )}
-      {LANE_ORDER.map((kind) => (
-        <UpcomingLane
-          key={kind}
-          kind={kind}
-          items={groupedItems[kind] || []}
-          total={kindTotal(items, kind)}
-          onAdd={() => onAddFromTransaction(kind)}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onViewHistory={onViewHistory}
-        />
-      ))}
     </div>
   );
 }

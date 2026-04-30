@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { api } from '../../api.js';
 import AnimatedModal from '../AnimatedModal.jsx';
 import AppSelect from '../AppSelect.jsx';
 import CurrencyInput, {
@@ -9,9 +10,10 @@ import SelectableListItem from '../SelectableListItem.jsx';
 import { addMonthsToLocalDate, formatLocalDate } from '../../lib/localDate.js';
 
 export const KIND_OPTIONS = [
-  { value: 'bill', label: 'Bill' },
+  { value: 'income', label: 'Income' },
+  { value: 'giving', label: 'Giving' },
   { value: 'subscription', label: 'Subscription' },
-  { value: 'income', label: 'Income' }
+  { value: 'bill', label: 'Bill' }
 ];
 
 const FREQUENCY_OPTIONS = [
@@ -37,7 +39,7 @@ const AMOUNT_STRATEGY_OPTIONS = [
 
 const SCHEDULE_MODE_OPTIONS = [
   { value: 'interval', label: 'Regular Interval' },
-  { value: 'month_days', label: 'Month Days' },
+  { value: 'month_days', label: 'Day Of Month' },
   { value: 'month_weekdays', label: 'Weekday Pattern' }
 ];
 
@@ -73,6 +75,7 @@ const WEEKDAY_OPTIONS = [
 
 const WEEKDAY_NAMES = WEEKDAY_OPTIONS.map((option) => option.label);
 const BILL_HINTS = ['bill', 'utilit', 'insurance', 'loan', 'mortgage', 'rent'];
+const GIVING_HINTS = ['charitable', 'charity', 'church', 'donation', 'donations', 'giving', 'nonprofit', 'non-profit', 'tithe'];
 const INCOME_HINTS = ['income', 'paycheck', 'salary', 'payroll'];
 const SCHEDULE_KEYS = new Set([
   'frequency_type',
@@ -230,6 +233,42 @@ function scheduleModeFromRule(rule) {
   return 'interval';
 }
 
+function isGivingText(value) {
+  const text = String(value || '').toLowerCase();
+  return GIVING_HINTS.some((hint) => text.includes(hint));
+}
+
+function isGivingCategory(category) {
+  return isGivingText(category?.name);
+}
+
+function isGivingRecurringItem(item) {
+  if (item?.kind === 'giving') return true;
+  if (item?.kind === 'income' || item?.direction === 'income') return false;
+  return [
+    item?.category_name,
+    item?.name,
+    item?.merchant,
+    item?.notes
+  ].some(isGivingText);
+}
+
+function defaultGivingCategoryId(categories) {
+  const exact = categories.find((category) => String(category.name || '').toLowerCase() === 'charitable donations');
+  const fallback = exact || categories.find(isGivingCategory);
+  return fallback?.id ? String(fallback.id) : '';
+}
+
+function applyGivingDefaults(form, categories) {
+  if (form.kind !== 'giving' || form.category_id) return form;
+  const categoryId = defaultGivingCategoryId(categories);
+  return categoryId ? { ...form, category_id: categoryId } : form;
+}
+
+function storageKind(kind) {
+  return kind === 'giving' ? 'bill' : kind;
+}
+
 export function kindLabel(kind) {
   return KIND_OPTIONS.find((option) => option.value === kind)?.label || 'Item';
 }
@@ -266,6 +305,7 @@ export function inferRecurringKind(direction, category) {
   if (direction === 'income' || category?.is_income || INCOME_HINTS.some((hint) => categoryName.includes(hint))) {
     return 'income';
   }
+  if (isGivingCategory(category)) return 'giving';
   if (BILL_HINTS.some((hint) => categoryName.includes(hint))) return 'bill';
   return 'subscription';
 }
@@ -309,12 +349,13 @@ export function formFromRecurringItem(item = {}) {
   const amountForEditor = item.amount_strategy === 'history_average' && item.projected_amount != null
     ? item.projected_amount
     : item.amount;
+  const kind = isGivingRecurringItem(item) ? 'giving' : item.kind || 'bill';
   return newRecurringForm({
     name: item.name || item.merchant || '',
     merchant: item.merchant || item.name || '',
-    kind: item.kind || 'bill',
+    kind,
     amount: formatCurrencyInput(amountForEditor || 0),
-    direction: item.direction || (item.kind === 'income' ? 'income' : 'expense'),
+    direction: item.direction || (kind === 'income' ? 'income' : 'expense'),
     frequency_type: item.frequency_type || 'monthly',
     frequency_interval: String(item.frequency_interval || 1),
     frequency_unit: item.frequency_unit || 'months',
@@ -354,12 +395,14 @@ export function formFromTransaction(txn = {}, category) {
 }
 
 export function formFromSuggestion(suggestion = {}) {
+  const direction = suggestion.direction || (suggestion.kind === 'income' ? 'income' : 'expense');
+  const kind = inferRecurringKind(direction, { name: suggestion.category_name });
   return newRecurringForm({
     name: suggestion.name || suggestion.merchant || '',
     merchant: suggestion.merchant || suggestion.name || '',
-    kind: suggestion.kind || 'bill',
+    kind,
     amount: formatCurrencyInput(suggestion.amount || 0),
-    direction: suggestion.direction || (suggestion.kind === 'income' ? 'income' : 'expense'),
+    direction: kind === 'income' ? 'income' : direction,
     frequency_type: suggestion.frequency_type || 'monthly',
     frequency_interval: String(suggestion.frequency_interval || 1),
     frequency_unit: suggestion.frequency_unit || 'months',
@@ -373,11 +416,12 @@ export function formFromSuggestion(suggestion = {}) {
 
 export function payloadFromRecurringForm(form) {
   const kind = form.kind;
+  const storedKind = storageKind(kind);
   const recurrenceRule = buildRuleFromForm(form);
   return {
     name: String(form.name || '').trim(),
     merchant: String(form.merchant || form.name || '').trim(),
-    kind,
+    kind: storedKind,
     amount: parseCurrencyInput(form.amount, 0),
     direction: kind === 'income' ? 'income' : 'expense',
     frequency_type: form.frequency_type,
@@ -405,18 +449,77 @@ export default function RecurringItemEditor({
   onSave,
   onClose
 }) {
-  const [form, setForm] = useState(item?.form || item || newRecurringForm());
+  const [form, setForm] = useState(() => applyGivingDefaults(item?.form || item || newRecurringForm(), categories));
   const [saving, setSaving] = useState(false);
+  const [estimatingAmount, setEstimatingAmount] = useState(false);
   const [error, setError] = useState('');
   const isMonthBased = ['monthly', 'semimonthly'].includes(form.frequency_type);
   const activeRule = buildRuleFromForm(form);
   const projectedNextDate = activeRule ? nextRuleDate(activeRule, todayIso()) : '';
+
+  useEffect(() => {
+    setForm((prev) => applyGivingDefaults(prev, categories));
+  }, [categories]);
+
+  useEffect(() => {
+    if (form.amount_strategy !== 'history_average') {
+      setEstimatingAmount(false);
+      return undefined;
+    }
+
+    const payload = payloadFromRecurringForm(form);
+    if (!payload.name || !payload.next_date) {
+      setEstimatingAmount(false);
+      return undefined;
+    }
+
+    let active = true;
+    const timer = setTimeout(async () => {
+      setEstimatingAmount(true);
+      try {
+        const result = await api.post('/api/upcoming/estimate', payload);
+        if (!active) return;
+        const amount = Number(result.amount || 0);
+        setForm((prev) => (
+          prev.amount_strategy === 'history_average'
+            ? {
+                ...prev,
+                amount: formatCurrencyInput(amount),
+                projected_amount: amount
+              }
+            : prev
+        ));
+      } catch {
+        // Keep the last visible amount if the estimate cannot be refreshed yet.
+      } finally {
+        if (active) setEstimatingAmount(false);
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [
+    form.account_id,
+    form.amount_lookback_months,
+    form.amount_strategy,
+    form.category_id,
+    form.direction,
+    form.kind,
+    form.merchant,
+    form.name,
+    form.next_date
+  ]);
 
   function patch(patchValue) {
     setForm((prev) => {
       const next = { ...prev, ...patchValue };
       if (patchValue.kind === 'income') next.direction = 'income';
       if (patchValue.kind && patchValue.kind !== 'income') next.direction = 'expense';
+      if (patchValue.kind === 'giving' && !next.category_id) {
+        next.category_id = defaultGivingCategoryId(categories);
+      }
       if (patchValue.frequency_type && !['monthly', 'semimonthly'].includes(patchValue.frequency_type)) {
         next.schedule_mode = 'interval';
       }
@@ -494,9 +597,11 @@ export default function RecurringItemEditor({
                 subtitle={
                   option.value === 'income'
                     ? 'Money coming in'
-                    : option.value === 'bill'
-                      ? 'Required payment'
-                      : 'Subscription or membership'
+                    : option.value === 'giving'
+                      ? 'Donation or support'
+                      : option.value === 'bill'
+                        ? 'Required payment'
+                        : 'Subscription or membership'
                 }
                 onClick={() => patch({ kind: option.value })}
               />
@@ -528,7 +633,9 @@ export default function RecurringItemEditor({
               <CurrencyInput
                 value={form.amount}
                 onChange={(value) => patch({ amount: value })}
-                placeholder="$0.00"
+                placeholder={estimatingAmount ? 'Estimating...' : '$0.00'}
+                disabled={form.amount_strategy === 'history_average'}
+                aria-busy={estimatingAmount}
               />
             </label>
 
