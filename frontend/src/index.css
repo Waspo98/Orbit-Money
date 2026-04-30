@@ -9958,13 +9958,11 @@ input, textarea, select {
 }
 
 .txn-toolbar-actions .app-select {
-  width: 100%;
   min-width: 0;
 }
 
 .txn-toolbar-hero .txn-filter-button,
 .txn-toolbar-hero .app-select-trigger {
-  height: 44px;
   min-height: 44px;
   border: 0;
   border-radius: var(--radius-md);
