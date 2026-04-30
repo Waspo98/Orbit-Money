@@ -281,12 +281,8 @@ export default function Upcoming({ accounts = [], categories = [] }) {
   }
 
   const heroStats = [
-    {
-      label: 'Rest Of Month Net',
-      value: formatSignedCurrency(cashFlow.net || 0),
-      tone: Number(cashFlow.net || 0) >= 0 ? 'good' : 'caution'
-    },
     { label: 'Upcoming Income', value: formatCurrency(upcomingTotals.income), tone: 'good' },
+    { label: 'Upcoming Giving', value: formatCurrency(upcomingTotals.giving), tone: 'caution' },
     { label: 'Upcoming Bills', value: formatCurrency(upcomingTotals.bill), tone: 'caution' },
     { label: 'Upcoming Subscriptions', value: formatCurrency(upcomingTotals.subscription), tone: 'caution' }
   ];
@@ -303,9 +299,6 @@ export default function Upcoming({ accounts = [], categories = [] }) {
         statLabel="Upcoming summary"
         toolbar={
           <div className="page-hero-action-row">
-            <button type="button" className="btn-secondary" onClick={() => setFilter('suggested')}>
-              Suggestions
-            </button>
             <button type="button" className="btn-primary" onClick={() => openNew()}>
               + Add Recurring
             </button>
