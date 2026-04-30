@@ -4411,14 +4411,40 @@ input, textarea, select {
 
 .upcoming-cashflow-panel {
   display: grid;
+  gap: 14px;
+}
+
+.upcoming-card-header {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.upcoming-card-subtitle {
+  flex: 1 1 220px;
+  max-width: 360px;
+  text-align: right;
+  line-height: 1.35;
+}
+
+.upcoming-card-total {
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.upcoming-count-pill {
+  min-width: 28px;
+  justify-content: center;
+}
+
+.upcoming-cashflow-body {
+  min-width: 0;
+  display: grid;
   grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
   gap: 16px;
   align-items: stretch;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
 }
 
 .upcoming-cashflow-summary {
@@ -4431,21 +4457,13 @@ input, textarea, select {
   background: var(--surface-2);
 }
 
-.upcoming-cashflow-summary > span,
-.upcoming-lane header span {
+.upcoming-cashflow-summary > span {
   color: var(--text-muted);
   font-size: 0.76rem;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-.upcoming-cashflow-timeline header span {
-  color: var(--text-muted);
-  font-size: 0.88rem;
-  font-weight: 700;
-  line-height: 1.35;
 }
 
 .page-hero-upcoming .page-hero-stat > span {
@@ -4521,22 +4539,6 @@ input, textarea, select {
   gap: 10px;
 }
 
-.upcoming-cashflow-timeline header,
-.upcoming-lane header {
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.upcoming-cashflow-timeline header strong,
-.upcoming-lane header strong {
-  color: var(--text);
-  font-size: 1rem;
-  font-weight: 800;
-}
-
 .upcoming-cashflow-timeline ol,
 .upcoming-plan-list,
 .upcoming-suggestion-list {
@@ -4608,35 +4610,13 @@ input, textarea, select {
   white-space: nowrap;
 }
 
-.upcoming-tabs {
-  display: grid;
+.housing-segmented.upcoming-tabs {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
   box-shadow: var(--shadow-sm);
 }
 
-.upcoming-tabs button {
-  min-width: 0;
-  min-height: 42px;
-  border: 0;
-  border-right: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
+.housing-segmented.upcoming-tabs button {
   font-size: 0.84rem;
-  font-weight: 700;
-}
-
-.upcoming-tabs button:last-child {
-  border-right: 0;
-}
-
-.upcoming-tabs button:hover,
-.upcoming-tabs button.active {
-  background: var(--accent-soft);
-  color: var(--accent);
 }
 
 .upcoming-lanes {
@@ -4650,20 +4630,11 @@ input, textarea, select {
   display: grid;
   gap: 12px;
   align-content: start;
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
 }
 
-.upcoming-lane > header em {
-  color: var(--text);
-  font-size: 0.9rem;
-  font-style: normal;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+.upcoming-lane-body {
+  display: grid;
+  gap: 12px;
 }
 
 .upcoming-lane-suggestions,
@@ -4689,32 +4660,11 @@ input, textarea, select {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-  transition: border-color var(--dur-fast), background-color var(--dur-fast), transform var(--dur-fast);
 }
 
-.upcoming-plan-row:hover,
-.upcoming-suggestion-row:hover {
-  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
-  background: color-mix(in srgb, var(--accent-soft) 24%, var(--surface-2));
-}
-
-.upcoming-plan-row-main,
-.upcoming-suggestion-main {
-  appearance: none;
-  min-width: 0;
-  display: grid;
+.selectable-list-item.upcoming-plan-row-main,
+.selectable-list-item.upcoming-suggestion-main {
   grid-template-columns: 68px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
 }
 
 .upcoming-row-date,
@@ -4723,6 +4673,11 @@ input, textarea, select {
   min-width: 0;
   display: grid;
   gap: 3px;
+}
+
+.upcoming-row-date.selectable-list-leading {
+  min-width: 68px;
+  justify-content: start;
 }
 
 .upcoming-row-copy strong {
@@ -4755,13 +4710,8 @@ input, textarea, select {
 .upcoming-projection-pill {
   width: fit-content;
   max-width: 100%;
-  padding: 3px 8px;
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--accent-soft) 54%, transparent);
-  color: var(--accent);
-  font-size: 0.72rem;
-  font-weight: 750;
+  text-transform: none;
+  letter-spacing: 0;
   line-height: 1.2;
 }
 
@@ -4823,26 +4773,40 @@ input, textarea, select {
 }
 
 @media (max-width: 640px) {
-  .upcoming-cashflow-panel {
+  .upcoming-cashflow-body {
     grid-template-columns: 1fr;
   }
 
-  .upcoming-tabs {
+  .housing-segmented.upcoming-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .upcoming-tabs button:nth-child(2n) {
+  .housing-segmented.upcoming-tabs button:nth-child(2n) {
     border-right: 0;
+  }
+
+  .housing-segmented.upcoming-tabs button:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .upcoming-card-subtitle {
+    flex-basis: 100%;
+    max-width: none;
+    text-align: left;
   }
 
   .upcoming-lanes {
     grid-template-columns: 1fr;
   }
 
-  .upcoming-plan-row-main,
-  .upcoming-suggestion-main {
+  .selectable-list-item.upcoming-plan-row-main,
+  .selectable-list-item.upcoming-suggestion-main {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+
+  .upcoming-row-date.selectable-list-leading {
+    min-width: 0;
   }
 
   .upcoming-row-amount {

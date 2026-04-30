@@ -250,7 +250,7 @@ export default function Upcoming({ accounts = [], categories = [] }) {
               restOfMonth={restOfMonth}
             />
 
-            <div className="upcoming-tabs" role="tablist" aria-label="Upcoming filters">
+            <div className="housing-segmented upcoming-tabs" role="tablist" aria-label="Upcoming filters">
               {FILTERS.map((option) => (
                 <button
                   key={option.value}
@@ -302,53 +302,57 @@ function CashFlowPanel({ cashFlow, restOfMonth }) {
   const daysRemaining = daysBetweenDates(cashFlow.start_date || todayIso(), cashFlow.end_date || todayIso());
   const transactionCount = Number(cashFlow.occurrence_count || 0);
   return (
-    <section className="upcoming-cashflow-panel" aria-label="Projected cash flow">
-      <div className="upcoming-cashflow-summary">
-        <span>Rest Of Month</span>
-        <strong className={Number(cashFlow.net || 0) >= 0 ? 'income' : 'expense'}>
-          {formatSignedCurrency(cashFlow.net || 0)}
-        </strong>
-        <em>{cashFlow.occurrence_count || 0} projected transaction{cashFlow.occurrence_count === 1 ? '' : 's'}</em>
-        <div className="upcoming-cashflow-bars" aria-hidden="true">
-          <span className="income" style={{ width: `${Math.max(8, (Number(cashFlow.income || 0) / maxFlow) * 100)}%` }} />
-          <span className="expense" style={{ width: `${Math.max(8, (Number(cashFlow.expenses || 0) / maxFlow) * 100)}%` }} />
-        </div>
-        <div className="upcoming-cashflow-split">
-          <span>In {formatCurrency(cashFlow.income || 0)}</span>
-          <span>Out {formatCurrency(cashFlow.expenses || 0)}</span>
-        </div>
-      </div>
+    <section className="dashboard-card upcoming-cashflow-panel" aria-label="Projected cash flow">
+      <header className="dashboard-card-header upcoming-card-header">
+        <h3>Rest Of Month</h3>
+        <span className="muted upcoming-card-subtitle">
+          {transactionCount} transaction{transactionCount === 1 ? '' : 's'} remaining in the next {daysRemaining} day{daysRemaining === 1 ? '' : 's'}
+        </span>
+      </header>
 
-      <div className="upcoming-cashflow-timeline">
-        <header>
-          <span>
-            {transactionCount} transaction{transactionCount === 1 ? '' : 's'} remaining in the next {daysRemaining} day{daysRemaining === 1 ? '' : 's'}
-          </span>
-        </header>
-        {grouped.length === 0 ? (
-          <div className="upcoming-mini-empty">No scheduled cash flow remains this month.</div>
-        ) : (
-          <ol>
-            {grouped.slice(0, 6).map((group) => (
-              <li key={group.key}>
-                <time dateTime={group.key}>
-                  <strong>{formatMonthDay(group.key)}</strong>
-                  <span>{dueLabel(group.key)}</span>
-                </time>
-                <div>
-                  {group.items.map((occurrence) => (
-                    <div key={occurrence.id} className="upcoming-timeline-item">
-                      <span>{occurrence.name}</span>
-                      <strong className={amountClass(occurrence.direction)}>
-                        {signedAmount(occurrence.direction, occurrence.amount)}
-                      </strong>
-                    </div>
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
+      <div className="dashboard-card-body upcoming-cashflow-body">
+        <div className="upcoming-cashflow-summary">
+          <span>Projected Net</span>
+          <strong className={Number(cashFlow.net || 0) >= 0 ? 'income' : 'expense'}>
+            {formatSignedCurrency(cashFlow.net || 0)}
+          </strong>
+          <em>{cashFlow.occurrence_count || 0} projected transaction{cashFlow.occurrence_count === 1 ? '' : 's'}</em>
+          <div className="upcoming-cashflow-bars" aria-hidden="true">
+            <span className="income" style={{ width: `${Math.max(8, (Number(cashFlow.income || 0) / maxFlow) * 100)}%` }} />
+            <span className="expense" style={{ width: `${Math.max(8, (Number(cashFlow.expenses || 0) / maxFlow) * 100)}%` }} />
+          </div>
+          <div className="upcoming-cashflow-split">
+            <span>In {formatCurrency(cashFlow.income || 0)}</span>
+            <span>Out {formatCurrency(cashFlow.expenses || 0)}</span>
+          </div>
+        </div>
+
+        <div className="upcoming-cashflow-timeline">
+          {grouped.length === 0 ? (
+            <div className="upcoming-mini-empty">No scheduled cash flow remains this month.</div>
+          ) : (
+            <ol>
+              {grouped.slice(0, 6).map((group) => (
+                <li key={group.key}>
+                  <time dateTime={group.key}>
+                    <strong>{formatMonthDay(group.key)}</strong>
+                    <span>{dueLabel(group.key)}</span>
+                  </time>
+                  <div>
+                    {group.items.map((occurrence) => (
+                      <div key={occurrence.id} className="upcoming-timeline-item">
+                        <span>{occurrence.name}</span>
+                        <strong className={amountClass(occurrence.direction)}>
+                          {signedAmount(occurrence.direction, occurrence.amount)}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -415,20 +419,19 @@ function UpcomingPlan({
         />
       ))}
       {suggestions.length > 0 && (
-        <section className="upcoming-lane upcoming-lane-suggestions">
-          <header>
-            <div>
-              <span>Suggested</span>
-              <strong>Potential recurring</strong>
-            </div>
-            <em>{suggestions.length}</em>
+        <section className="dashboard-card upcoming-lane upcoming-lane-suggestions">
+          <header className="dashboard-card-header upcoming-card-header">
+            <h3>Suggested Recurring</h3>
+            <span className="pill accent upcoming-count-pill">{suggestions.length}</span>
           </header>
-          <SuggestionsList
-            suggestions={suggestions.slice(0, 4)}
-            onReview={onReviewSuggestion}
-            onDismiss={onDismissSuggestion}
-            compact
-          />
+          <div className="dashboard-card-body upcoming-lane-body">
+            <SuggestionsList
+              suggestions={suggestions.slice(0, 4)}
+              onReview={onReviewSuggestion}
+              onDismiss={onDismissSuggestion}
+              compact
+            />
+          </div>
         </section>
       )}
     </div>
@@ -437,33 +440,33 @@ function UpcomingPlan({
 
 function UpcomingLane({ kind, items, total, onAdd, onEdit, onDelete }) {
   return (
-    <section className={`upcoming-lane upcoming-lane-${kind}`}>
-      <header>
-        <div>
-          <strong>{KIND_TITLES[kind]}</strong>
-        </div>
-        <em>{formatCurrency(total)}</em>
+    <section className={`dashboard-card upcoming-lane upcoming-lane-${kind}`}>
+      <header className="dashboard-card-header upcoming-card-header">
+        <h3>{KIND_TITLES[kind]}</h3>
+        <span className="upcoming-card-total">{formatCurrency(total)}</span>
       </header>
 
-      {items.length === 0 ? (
-        <div className="upcoming-mini-empty">
-          <span>No {KIND_TITLES[kind].toLowerCase()} saved.</span>
-          <button type="button" className="dashboard-card-link dashboard-card-action-button" onClick={onAdd}>
-            Add
-          </button>
-        </div>
-      ) : (
-        <ul className="upcoming-plan-list">
-          {items.map((item) => (
-            <RecurringRow
-              key={item.id}
-              item={item}
-              onEdit={() => onEdit(item)}
-              onDelete={() => onDelete(item)}
-            />
-          ))}
-        </ul>
-      )}
+      <div className="dashboard-card-body upcoming-lane-body">
+        {items.length === 0 ? (
+          <div className="upcoming-mini-empty">
+            <span>No {KIND_TITLES[kind].toLowerCase()} saved.</span>
+            <button type="button" className="dashboard-card-link dashboard-card-action-button" onClick={onAdd}>
+              Add
+            </button>
+          </div>
+        ) : (
+          <ul className="upcoming-plan-list">
+            {items.map((item) => (
+              <RecurringRow
+                key={item.id}
+                item={item}
+                onEdit={() => onEdit(item)}
+                onDelete={() => onDelete(item)}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }
@@ -472,19 +475,19 @@ function RecurringRow({ item, onEdit, onDelete }) {
   const projection = projectedLabel(item);
   return (
     <li className={`upcoming-plan-row upcoming-item-${item.kind}`}>
-      <button type="button" className="upcoming-plan-row-main" onClick={onEdit}>
-        <span className="upcoming-row-date">
+      <button type="button" className="selectable-list-item upcoming-plan-row-main" onClick={onEdit}>
+        <span className="selectable-list-leading upcoming-row-date">
           <strong>{formatMonthDay(item.next_date)}</strong>
           <em>{dueLabel(item.next_date)}</em>
         </span>
-        <span className="upcoming-row-copy">
+        <span className="selectable-list-main upcoming-row-copy">
           <strong>{item.name}</strong>
           <em>
             {item.category_name || 'Uncategorized'} - {recurringFrequencyLabel(item)}
           </em>
-          {projection && <span className="upcoming-projection-pill">{projection}</span>}
+          {projection && <span className="pill accent upcoming-projection-pill">{projection}</span>}
         </span>
-        <span className="upcoming-row-amount">
+        <span className="selectable-list-side upcoming-row-amount">
           <strong className={amountClass(item.direction)}>
             {signedAmount(item.direction, itemDisplayAmount(item))}
           </strong>
@@ -505,15 +508,14 @@ function RecurringRow({ item, onEdit, onDelete }) {
 
 function SuggestionsPanel({ suggestions, onReview, onDismiss }) {
   return (
-    <section className="upcoming-lane upcoming-suggestions-panel">
-      <header>
-        <div>
-          <span>Suggested</span>
-          <strong>Suggested Recurring</strong>
-        </div>
-        <em>{suggestions.length}</em>
+    <section className="dashboard-card upcoming-lane upcoming-suggestions-panel">
+      <header className="dashboard-card-header upcoming-card-header">
+        <h3>Suggested Recurring</h3>
+        <span className="pill accent upcoming-count-pill">{suggestions.length}</span>
       </header>
-      <SuggestionsList suggestions={suggestions} onReview={onReview} onDismiss={onDismiss} />
+      <div className="dashboard-card-body upcoming-lane-body">
+        <SuggestionsList suggestions={suggestions} onReview={onReview} onDismiss={onDismiss} />
+      </div>
     </section>
   );
 }
@@ -531,23 +533,23 @@ function SuggestionsList({ suggestions, onReview, onDismiss, compact = false }) 
     <ul className="upcoming-suggestion-list">
       {suggestions.map((suggestion) => (
         <li key={suggestion.key} className={`upcoming-suggestion-row upcoming-item-${suggestion.kind}`}>
-          <button type="button" className="upcoming-suggestion-main" onClick={() => onReview(suggestion)}>
-            <span className="upcoming-row-date">
+          <button type="button" className="selectable-list-item upcoming-suggestion-main" onClick={() => onReview(suggestion)}>
+            <span className="selectable-list-leading upcoming-row-date">
               <strong>{formatMonthDay(suggestion.next_date)}</strong>
               <em>{suggestion.confidence}% Match</em>
             </span>
-            <span className="upcoming-row-copy">
+            <span className="selectable-list-main upcoming-row-copy">
               <strong>{suggestion.name}</strong>
               <em>
                 {kindLabel(suggestion.kind)} - {suggestion.category_name || 'Uncategorized'} - {recurringFrequencyLabel(suggestion)}
               </em>
               {!compact && (
-                <span className="upcoming-projection-pill">
+                <span className="pill accent upcoming-projection-pill">
                   {suggestion.transaction_count} transaction hit{suggestion.transaction_count === 1 ? '' : 's'}
                 </span>
               )}
             </span>
-            <span className="upcoming-row-amount">
+            <span className="selectable-list-side upcoming-row-amount">
               <strong className={amountClass(suggestion.direction)}>
                 {signedAmount(suggestion.direction, suggestion.amount)}
               </strong>
