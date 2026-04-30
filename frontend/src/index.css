@@ -2598,10 +2598,12 @@ input, textarea, select {
 }
 
 .depth-pattern {
-  position: fixed;
+  position: absolute;
   inset-inline: 0;
   pointer-events: none;
   z-index: 0;
+  transform: translateY(var(--depth-pattern-offset, 0px));
+  will-change: transform;
 }
 
 .app-depth-pattern {
