@@ -10,6 +10,7 @@ import {
 import { getMoreRoutes } from '../navigation.js';
 
 const DRAG_START_PX = 12;
+const INTERACTIVE_DRAG_START_PX = 28;
 const DRAG_CLOSE_PX = 92;
 const DRAG_CLOSE_VELOCITY = 0.55;
 
@@ -290,17 +291,15 @@ export default function MoreSheet({
     if (gesture.mode === 'scroll') return;
 
     if (gesture.mode === 'pending') {
-      if (gesture.startedOnInteractive) {
-        gesture.mode = 'scroll';
-        return;
-      }
-
       if (!gesture.startedAtTop || totalY < 0) {
         gesture.mode = 'scroll';
         return;
       }
 
-      if (totalY < DRAG_START_PX) return;
+      const dragStartPx = gesture.startedOnInteractive
+        ? INTERACTIVE_DRAG_START_PX
+        : DRAG_START_PX;
+      if (totalY < dragStartPx) return;
       gesture.mode = 'sheet';
       lockInternalScroll();
     }
