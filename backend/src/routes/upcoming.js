@@ -13,6 +13,7 @@ import { formatLocalDate } from '../lib/localDate.js';
 import { centsToDollars, dollarsToCents } from '../lib/money.js';
 import { parseId, readIdParam } from '../lib/routeParams.js';
 import { summarizeHistorySamples } from '../lib/upcomingProjection.js';
+import { scoreUpcomingSuggestion } from '../lib/upcomingSuggestionConfidence.js';
 import {
   FREQUENCY_UNITS,
   addDays,
@@ -38,8 +39,8 @@ const KINDS = new Set(['bill', 'subscription', 'income']);
 const FREQUENCY_TYPES = new Set(['weekly', 'biweekly', 'semimonthly', 'monthly', 'bimonthly', 'yearly', 'custom']);
 const AMOUNT_STRATEGIES = new Set(['fixed', 'history_average']);
 const BILL_CATEGORY_HINTS = ['bill', 'utilit', 'insurance', 'loan', 'mortgage', 'rent'];
-const INCOME_CATEGORY_HINTS = ['income', 'paycheck', 'salary', 'payroll'];
 const MAX_LOOKBACK_MONTHS = 24;
+const MIN_SUGGESTION_CONFIDENCE = 40;
 
 function upcomingError(message, status = 400) {
   const err = new Error(message);
@@ -297,13 +298,6 @@ function monthlyFactor(item) {
   return 1;
 }
 
-function suggestionPriority(categoryName, direction) {
-  const text = String(categoryName || '').toLowerCase();
-  if (direction === 'income' || INCOME_CATEGORY_HINTS.some((hint) => text.includes(hint))) return 3;
-  if (BILL_CATEGORY_HINTS.some((hint) => text.includes(hint))) return 3;
-  return 1;
-}
-
 function buildSuggestions(householdId) {
   const rows = db
     .prepare(
@@ -356,8 +350,15 @@ function buildSuggestions(householdId) {
       const frequency = inferFrequency(averageInterval);
       const nextDate = advanceToUpcoming(addInterval(latest.date, frequency), frequency);
       const amount = items.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0) / items.length;
-      const priority = suggestionPriority(latest.category_name, latest.direction);
-      if (priority < 3 && items.length < 3) return null;
+      const confidence = scoreUpcomingSuggestion({
+        categoryName: latest.category_name,
+        direction: latest.direction,
+        averageInterval,
+        transactionCount: items.length,
+        amounts: items.map((item) => item.amount),
+        latestDate: latest.date
+      });
+      if (confidence < MIN_SUGGESTION_CONFIDENCE) return null;
       return {
         key,
         name: latest.merchant,
@@ -371,7 +372,7 @@ function buildSuggestions(householdId) {
         account_id: latest.account_id,
         source_transaction_id: latest.id,
         transaction_count: items.length,
-        confidence: Math.min(95, 45 + items.length * 10 + priority * 8),
+        confidence,
         ...frequency
       };
     })
