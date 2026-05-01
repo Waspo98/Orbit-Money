@@ -18,6 +18,7 @@
 import { db } from './db/index.js';
 import { cleanupExpiredSampleHouseholds } from './services/sampleHouseholds.js';
 import { runSync } from './services/simplefinSync.js';
+import { reconcileUpcomingTransactions } from './services/upcomingReconciliation.js';
 
 const TICK_MS = 60 * 60 * 1000; // 60 minutes
 const STARTUP_WARMUP_MS = 30 * 1000;
@@ -39,6 +40,15 @@ async function tick() {
     }
   } catch (err) {
     console.error('[scheduler] Sample cleanup failed:', err.message || err);
+  }
+
+  try {
+    const result = reconcileUpcomingTransactions(db);
+    if (result.occurrences_created > 0 || result.matched > 0 || result.missed > 0) {
+      console.log('[scheduler] Upcoming reconciliation done:', result);
+    }
+  } catch (err) {
+    console.error('[scheduler] Upcoming reconciliation failed:', err.message || err);
   }
 
   const now = new Date();

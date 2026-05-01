@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { cleanupExpiredSampleHouseholds } from '../src/services/sampleHouseholds.js';
 
 const HOUSEHOLD_TABLES = [
+  'upcoming_occurrences',
   'upcoming_dismissed_suggestions',
   'upcoming_items',
   'sync_log',

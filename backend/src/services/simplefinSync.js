@@ -28,6 +28,7 @@ import { decrypt } from '../crypto.js';
 import { fetchAccounts } from './simplefinClient.js';
 import { loadRules, applyRulesToDraft } from './ruleMatcher.js';
 import { matchTransfers } from './transferMatcher.js';
+import { reconcileUpcomingTransactions } from './upcomingReconciliation.js';
 import { dollarsToCents } from '../lib/money.js';
 
 const STALE_RUN_MINUTES = 15;
@@ -382,14 +383,24 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
     // --- Step 5: Transfer matcher. ------------------------------------------
     const transfersPaired = matchTransfers(db, householdId);
 
-    // --- Step 6: Persist last_sync_at. --------------------------------------
+    // --- Step 6: Upcoming reconciliation. -----------------------------------
+    // Transaction inserts are complete, so expected occurrences can now be
+    // matched against the freshly-synced data without changing visible UI.
+    let upcomingReconciliation = null;
+    try {
+      upcomingReconciliation = reconcileUpcomingTransactions(db, { householdId });
+    } catch (err) {
+      console.error('[simplefin] Upcoming reconciliation failed:', err.message || err);
+    }
+
+    // --- Step 7: Persist last_sync_at. --------------------------------------
     db.prepare(`
       UPDATE simplefin_config
          SET last_sync_at = datetime('now'), updated_at = datetime('now')
        WHERE household_id = ?
     `).run(householdId);
 
-    // --- Step 7: Finalize log row. ------------------------------------------
+    // --- Step 8: Finalize log row. ------------------------------------------
     // SimpleFIN may have returned per-institution errors. Surface them but
     // don't fail the overall sync — partial data is still useful.
     const sfErrors = Array.isArray(payload.errors) ? payload.errors : [];
@@ -419,6 +430,7 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
       accountsCreated,
       accountsUnmatched,
       transfersPaired,
+      upcoming_reconciliation: upcomingReconciliation,
       error: errorMsg
     };
   } catch (err) {

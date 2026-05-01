@@ -62,6 +62,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `025_rename_authentik_sub_to_oidc_sub.sql` | Renames the stored OIDC subject column from Authentik-specific naming to `oidc_sub` |
 | `026_neutral_default_household_name.sql` | Renames the old default household label to `My Household` when it has not been customized |
 | `027_upcoming_recurrence_projection.sql` | Adds Upcoming recurrence-rule metadata and history-average amount projection settings |
+| `028_upcoming_occurrence_reconciliation.sql` | Adds persisted Upcoming occurrence tracking for matched and missed projected transactions |
 
 ### Key Data Model Notes
 
@@ -201,6 +202,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Month-based schedules can use exact month days or weekday patterns such as first and third Friday.
 - Amount mode can stay fixed or estimate from matching transaction history over a selectable lookback window.
 - `/api/upcoming` expands saved items into projected occurrences for the rest of the current month and the next 62 days, then returns rest-of-month cash-flow totals.
+- The backend also stores hidden occurrence reconciliation rows. A scheduler and SimpleFIN sync pass generate expected occurrences, match them to synced transactions, and mark unmatched occurrences missed after a 4-day grace window.
 - Transaction rows can seed a recurring item with "Mark as recurring"; the shared editor opens before anything is created.
 - Suggestions are generated from recent transaction history, emphasizing income and Bills & Utilities style categories before other merchants. Suggestions can be reviewed in the recurring editor, accepted as a bill, subscription, or income, or dismissed.
 - Dashboard Subscriptions and Upcoming cards read from `/api/upcoming` rather than frontend-only transaction heuristics.
@@ -397,10 +399,10 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 ### Backend (`backend/src/`)
 - `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
 - `db/index.js`, `db/migrations.js`
-- `lib/`: http, localDate, money, routeParams
-- `db/migrations/001` through `027`
+- `lib/`: http, localDate, money, routeParams, upcomingProjection, upcomingSchedule
+- `db/migrations/001` through `028`
 - `routes/`: accounts, auth, budgets, categories, goals, health, household, householdSharing, import, merchantLogos, mha, netWorth, rules, simplefin, transactions, upcoming
-- `services/`: csvImport, demoSeed, householdDefaults, merchantLogos, mhaSummary, oidc, ruleMatcher, sampleHouseholds, sessionStore, simplefinClient, simplefinSync, transferMatcher
+- `services/`: csvImport, demoSeed, householdDefaults, merchantLogos, mhaSummary, oidc, ruleMatcher, sampleHouseholds, sessionStore, simplefinClient, simplefinSync, transferMatcher, upcomingReconciliation
 - `test/`: Node built-in test runner coverage for backend helpers and calculation services
 
 ### Frontend (`frontend/`)

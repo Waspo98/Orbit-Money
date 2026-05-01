@@ -1,6 +1,7 @@
 export const SAMPLE_HOUSEHOLD_TTL_HOURS = 48;
 
 const HOUSEHOLD_DELETE_TABLES = [
+  'upcoming_occurrences',
   'upcoming_dismissed_suggestions',
   'upcoming_items',
   'sync_log',

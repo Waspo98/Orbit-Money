@@ -9,22 +9,37 @@ import {
   sendRouteError,
   sendServerError
 } from '../lib/http.js';
-import { formatLocalDate, isValidDateOnly } from '../lib/localDate.js';
+import { formatLocalDate } from '../lib/localDate.js';
 import { centsToDollars, dollarsToCents } from '../lib/money.js';
 import { parseId, readIdParam } from '../lib/routeParams.js';
 import { summarizeHistorySamples } from '../lib/upcomingProjection.js';
+import {
+  FREQUENCY_UNITS,
+  addDays,
+  addInterval,
+  addMonthsClamped,
+  advanceToUpcoming,
+  datesForItemBetween,
+  daysBetween,
+  endOfMonth,
+  findRuleDateOnOrAfter,
+  isoDate,
+  parseRecurrenceRule,
+  recurrenceRuleToStorage
+} from '../lib/upcomingSchedule.js';
+import {
+  reconcileUpcomingTransactions,
+  resetPendingUpcomingOccurrences
+} from '../services/upcomingReconciliation.js';
 
 const router = express.Router();
 
 const KINDS = new Set(['bill', 'subscription', 'income']);
 const FREQUENCY_TYPES = new Set(['weekly', 'biweekly', 'semimonthly', 'monthly', 'bimonthly', 'yearly', 'custom']);
-const FREQUENCY_UNITS = new Set(['days', 'weeks', 'months']);
 const AMOUNT_STRATEGIES = new Set(['fixed', 'history_average']);
 const BILL_CATEGORY_HINTS = ['bill', 'utilit', 'insurance', 'loan', 'mortgage', 'rent'];
 const INCOME_CATEGORY_HINTS = ['income', 'paycheck', 'salary', 'payroll'];
 const MAX_LOOKBACK_MONTHS = 24;
-const FINAL_DAY_VALUE = -1;
-const LAST_WEEK_VALUE = -1;
 
 function upcomingError(message, status = 400) {
   const err = new Error(message);
@@ -32,143 +47,10 @@ function upcomingError(message, status = 400) {
   return err;
 }
 
-function isoDate(value) {
-  return isValidDateOnly(value) ? value : null;
-}
-
-function parseDateParts(value) {
-  const [year, month, day] = value.split('-').map(Number);
-  return { year, month, day };
-}
-
-function formatDateParts(year, month, day) {
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
-
-function daysInMonth(year, month) {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
-function addDays(value, days) {
-  const { year, month, day } = parseDateParts(value);
-  const date = new Date(Date.UTC(year, month - 1, day + days));
-  return formatDateParts(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
-}
-
-function addMonthsClamped(value, monthsToAdd) {
-  const { year, month, day } = parseDateParts(value);
-  const monthIndex = (year * 12) + (month - 1) + monthsToAdd;
-  const nextYear = Math.floor(monthIndex / 12);
-  const nextMonth = (monthIndex % 12) + 1;
-  const nextDay = Math.min(day, daysInMonth(nextYear, nextMonth));
-  return formatDateParts(nextYear, nextMonth, nextDay);
-}
-
-function startOfMonth(value) {
-  const { year, month } = parseDateParts(value);
-  return formatDateParts(year, month, 1);
-}
-
-function endOfMonth(value) {
-  const { year, month } = parseDateParts(value);
-  return formatDateParts(year, month, daysInMonth(year, month));
-}
-
 function clampInteger(value, min, max, fallback) {
   const parsed = Math.trunc(Number(value));
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, parsed));
-}
-
-function addInterval(value, item) {
-  if (!isoDate(value)) return value;
-  const type = item.frequency_type || 'monthly';
-  if (type === 'weekly') return addDays(value, 7);
-  if (type === 'biweekly') return addDays(value, 14);
-  if (type === 'semimonthly') return addDays(value, 15);
-  if (type === 'bimonthly') return addMonthsClamped(value, 2);
-  if (type === 'yearly') return addMonthsClamped(value, 12);
-  else if (type === 'custom') {
-    const interval = Math.max(1, Number(item.frequency_interval) || 1);
-    const unit = FREQUENCY_UNITS.has(item.frequency_unit) ? item.frequency_unit : 'days';
-    if (unit === 'days') return addDays(value, interval);
-    if (unit === 'weeks') return addDays(value, interval * 7);
-    return addMonthsClamped(value, interval);
-  }
-  return addMonthsClamped(value, 1);
-}
-
-function advanceToUpcoming(value, item) {
-  const rule = parseRecurrenceRule(item?.recurrence_rule);
-  if (rule) return findRuleDateOnOrAfter(value, rule) || value;
-
-  let next = value;
-  const today = formatLocalDate();
-  for (let i = 0; i < 240 && next < today; i += 1) {
-    const advanced = addInterval(next, item);
-    if (advanced === next) break;
-    next = advanced;
-  }
-  return next;
-}
-
-function daysBetween(a, b) {
-  const startParts = isoDate(a) ? parseDateParts(a) : null;
-  const endParts = isoDate(b) ? parseDateParts(b) : null;
-  if (!startParts || !endParts) return null;
-  const start = new Date(Date.UTC(startParts.year, startParts.month - 1, startParts.day));
-  const end = new Date(Date.UTC(endParts.year, endParts.month - 1, endParts.day));
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
-  return Math.round((end.getTime() - start.getTime()) / 86400000);
-}
-
-function normalizeIntegerList(values, min, max, limit, extraValues = []) {
-  const source = Array.isArray(values) ? values : [values];
-  const extras = new Set(extraValues.map((value) => Number(value)));
-  const sortValue = (value) => (
-    extras.has(value) && value < min
-      ? max + Math.abs(value) + 1
-      : value
-  );
-  return Array.from(
-    new Set(
-      source
-        .map((value) => Math.trunc(Number(value)))
-        .filter((value) => Number.isFinite(value) && ((value >= min && value <= max) || extras.has(value)))
-    )
-  )
-    .sort((a, b) => sortValue(a) - sortValue(b))
-    .slice(0, limit);
-}
-
-function parseRecurrenceRule(value) {
-  if (!value) return null;
-
-  let raw = value;
-  if (typeof value === 'string') {
-    try {
-      raw = JSON.parse(value);
-    } catch {
-      return null;
-    }
-  }
-
-  if (!raw || typeof raw !== 'object') return null;
-
-  if (raw.type === 'month_days') {
-    const days = normalizeIntegerList(raw.days, 1, 31, 6, [FINAL_DAY_VALUE]);
-    return days.length ? { type: 'month_days', days } : null;
-  }
-
-  if (raw.type === 'month_weekdays') {
-    const ordinals = normalizeIntegerList(raw.ordinals, 1, 5, 5, [LAST_WEEK_VALUE]);
-    const weekdays = normalizeIntegerList(raw.weekdays, 0, 6, 7);
-    return ordinals.length && weekdays.length
-      ? { type: 'month_weekdays', ordinals, weekdays }
-      : null;
-  }
-
-  return null;
 }
 
 function normalizeRecurrenceRule(value) {
@@ -178,99 +60,21 @@ function normalizeRecurrenceRule(value) {
   return rule;
 }
 
-function recurrenceRuleToStorage(rule) {
-  return rule ? JSON.stringify(rule) : null;
-}
-
-function monthlyDatesForRule(rule, year, month) {
-  if (!rule) return [];
-
-  const monthDays = daysInMonth(year, month);
-  const dates = new Set();
-
-  if (rule.type === 'month_days') {
-    for (const day of rule.days || []) {
-      const dateDay = day === FINAL_DAY_VALUE ? monthDays : Math.min(day, monthDays);
-      if (dateDay >= 1) dates.add(formatDateParts(year, month, dateDay));
-    }
-  }
-
-  if (rule.type === 'month_weekdays') {
-    const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
-    const lastWeekday = new Date(Date.UTC(year, month - 1, monthDays)).getUTCDay();
-    for (const ordinal of rule.ordinals || []) {
-      for (const weekday of rule.weekdays || []) {
-        if (ordinal === LAST_WEEK_VALUE) {
-          const offsetBack = (lastWeekday - weekday + 7) % 7;
-          dates.add(formatDateParts(year, month, monthDays - offsetBack));
-          continue;
-        }
-        const offset = (weekday - firstWeekday + 7) % 7;
-        const day = 1 + offset + ((ordinal - 1) * 7);
-        if (day <= monthDays) dates.add(formatDateParts(year, month, day));
-      }
-    }
-  }
-
-  return Array.from(dates).sort();
-}
-
-function datesForRuleBetween(rule, startDate, endDate) {
-  if (!rule || !isoDate(startDate) || !isoDate(endDate) || endDate < startDate) return [];
-
-  const dates = [];
-  let { year, month } = parseDateParts(startDate);
-  const endParts = parseDateParts(endDate);
-
-  for (let i = 0; i < 72; i += 1) {
-    for (const date of monthlyDatesForRule(rule, year, month)) {
-      if (date >= startDate && date <= endDate) dates.push(date);
-    }
-
-    if (year > endParts.year || (year === endParts.year && month >= endParts.month)) break;
-    month += 1;
-    if (month > 12) {
-      month = 1;
-      year += 1;
-    }
-  }
-
-  return dates.sort();
-}
-
-function findRuleDateOnOrAfter(value, rule) {
-  if (!isoDate(value)) return null;
-  return datesForRuleBetween(rule, value, addMonthsClamped(value, 24))[0] || null;
-}
-
-function datesForItemBetween(item, startDate, endDate) {
-  const rule = parseRecurrenceRule(item?.recurrence_rule);
-  if (rule) return datesForRuleBetween(rule, startDate, endDate);
-
-  const dates = [];
-  let next = isoDate(item?.next_date) ? item.next_date : startDate;
-  for (let i = 0; i < 240 && next < startDate; i += 1) {
-    const advanced = addInterval(next, item);
-    if (advanced === next) break;
-    next = advanced;
-  }
-
-  for (let i = 0; i < 240 && next <= endDate; i += 1) {
-    if (next >= startDate) dates.push(next);
-    const advanced = addInterval(next, item);
-    if (advanced === next) break;
-    next = advanced;
-  }
-
-  return dates;
-}
-
 function normalizeKind(value, direction = 'expense', categoryName = '') {
   if (KINDS.has(value)) return value;
   if (direction === 'income') return 'income';
   const text = categoryName.toLowerCase();
   if (BILL_CATEGORY_HINTS.some((hint) => text.includes(hint))) return 'bill';
   return 'subscription';
+}
+
+function reconcileHouseholdUpcoming(householdId) {
+  try {
+    return reconcileUpcomingTransactions(db, { householdId });
+  } catch (err) {
+    console.error('Upcoming reconciliation failed:', err.message || err);
+    return null;
+  }
 }
 
 function validateLinkedRow(table, id, householdId, label) {
@@ -723,6 +527,7 @@ router.post('/', requireAuth, (req, res) => {
   const householdId = requireHouseholdId(req);
   try {
     const id = createItem(householdId, normalizeBody(req.body || {}, householdId));
+    reconcileHouseholdUpcoming(householdId);
     sendCreated(res, { success: true, id, items: fetchItems(householdId) });
   } catch (err) {
     sendRouteError(res, err);
@@ -764,6 +569,7 @@ router.post('/from-transaction', requireAuth, (req, res) => {
       source_transaction_id: row.id
     }, householdId);
     const itemId = createItem(householdId, payload);
+    reconcileHouseholdUpcoming(householdId);
     sendCreated(res, { success: true, id: itemId, items: fetchItems(householdId) });
   } catch (err) {
     sendRouteError(res, err);
@@ -775,6 +581,7 @@ router.post('/suggestions/accept', requireAuth, (req, res) => {
   try {
     const suggestion = normalizeBody({ ...(req.body || {}), source: 'suggestion' }, householdId);
     const id = createItem(householdId, suggestion);
+    reconcileHouseholdUpcoming(householdId);
     if (req.body?.key) {
       db.prepare(
         `INSERT INTO upcoming_dismissed_suggestions (household_id, suggestion_key)
@@ -835,6 +642,8 @@ router.put('/:id', requireAuth, (req, res) => {
       )
       .run({ id, household_id: householdId, ...payload });
     if (result.changes === 0) return sendNotFound(res, 'Upcoming item not found.');
+    resetPendingUpcomingOccurrences(db, { householdId, itemId: id });
+    reconcileHouseholdUpcoming(householdId);
     sendOk(res, { success: true, items: fetchItems(householdId) });
   } catch (err) {
     sendRouteError(res, err);

@@ -4,8 +4,24 @@ let lockCount = 0;
 let lockSnapshot = null;
 let pageBlurCount = 0;
 let overlayHistoryId = 0;
+const OVERLAY_HISTORY_KEY = '__orbitOverlayId';
 
 export const OVERLAY_ANIM_MS = 180;
+
+export function releaseCurrentOverlayHistoryEntry() {
+  const currentState = window.history.state;
+  if (
+    !currentState ||
+    typeof currentState !== 'object' ||
+    !currentState[OVERLAY_HISTORY_KEY]
+  ) {
+    return false;
+  }
+
+  const { [OVERLAY_HISTORY_KEY]: _overlayId, ...nextState } = currentState;
+  window.history.replaceState(nextState, '', window.location.href);
+  return true;
+}
 
 export function useBodyScrollLock(active) {
   useEffect(() => {
@@ -87,13 +103,13 @@ export function useOverlayBackDismiss(active, onDismiss) {
       : {};
 
     window.history.pushState(
-      { ...stateBase, __orbitOverlayId: id },
+      { ...stateBase, [OVERLAY_HISTORY_KEY]: id },
       '',
       window.location.href
     );
 
     function handlePopState(event) {
-      if (event.state?.__orbitOverlayId === id) return;
+      if (event.state?.[OVERLAY_HISTORY_KEY] === id) return;
       dismissedByBack = true;
       onDismissRef.current?.();
     }
@@ -103,7 +119,7 @@ export function useOverlayBackDismiss(active, onDismiss) {
     return () => {
       window.removeEventListener('popstate', handlePopState);
       if (dismissedByBack) return;
-      if (window.history.state?.__orbitOverlayId === id) {
+      if (window.history.state?.[OVERLAY_HISTORY_KEY] === id) {
         window.history.back();
       }
     };

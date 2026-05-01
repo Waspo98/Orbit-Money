@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AppIcon from './AppIcon.jsx';
 import {
   OVERLAY_ANIM_MS,
+  releaseCurrentOverlayHistoryEntry,
   useBodyScrollLock,
   useOverlayBackDismiss
 } from './overlayBehavior.js';
@@ -19,6 +20,7 @@ function createGestureState() {
     pointerType: null,
     pointerId: null,
     startedAtTop: false,
+    startedOnInteractive: false,
     startY: 0,
     lastY: 0,
     lastMoveAt: 0,
@@ -34,6 +36,7 @@ export default function MoreSheet({
   navigationPreferences
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [drawerState, setDrawerState] = useState('opening');
   const timerRef = useRef(null);
   const enterFrameRef = useRef(null);
@@ -105,7 +108,7 @@ export default function MoreSheet({
 
     function onTouchStart(event) {
       if (event.touches.length !== 1) return;
-      startTouchGesture(event.touches[0]);
+      startTouchGesture(event.touches[0], event.target);
     }
 
     function onTouchMove(event) {
@@ -232,20 +235,35 @@ export default function MoreSheet({
 
   function handleItemClick(item) {
     if (suppressNextClickRef.current || item.comingSoon) return;
+    const isCurrentRoute = item.path === location.pathname;
+
+    const shouldReplaceOverlayEntry = !isCurrentRoute
+      ? releaseCurrentOverlayHistoryEntry()
+      : false;
+
     close({ animate: true });
+    if (isCurrentRoute) return;
+
     window.setTimeout(() => {
-      navigate(item.path, { state: { transition: 'from-more' } });
-    }, OVERLAY_ANIM_MS + 40);
+      navigate(item.path, {
+        replace: shouldReplaceOverlayEntry,
+        state: { transition: 'from-more' }
+      });
+    }, OVERLAY_ANIM_MS);
   }
 
-  function startTouchGesture(touch) {
+  function startTouchGesture(touch, target) {
     const scrollTop = scrollRef.current?.scrollTop || 0;
+    const startedOnInteractive = Boolean(
+      target?.closest?.('button, a, input, select, textarea, [role="button"]')
+    );
     gestureRef.current = {
       active: true,
       mode: 'pending',
       pointerType: 'touch',
       pointerId: touch.identifier,
       startedAtTop: scrollTop <= 0,
+      startedOnInteractive,
       startY: touch.clientY,
       lastY: touch.clientY,
       lastMoveAt: window.performance.now(),
@@ -272,6 +290,11 @@ export default function MoreSheet({
     if (gesture.mode === 'scroll') return;
 
     if (gesture.mode === 'pending') {
+      if (gesture.startedOnInteractive) {
+        gesture.mode = 'scroll';
+        return;
+      }
+
       if (!gesture.startedAtTop || totalY < 0) {
         gesture.mode = 'scroll';
         return;
