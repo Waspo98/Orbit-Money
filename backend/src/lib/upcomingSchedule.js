@@ -211,6 +211,30 @@ export function datesForItemBetween(item, startDate, endDate) {
   return dates;
 }
 
+export function monthlyFactor(item, today = formatLocalDate()) {
+  const rule = parseRecurrenceRule(item?.recurrence_rule);
+  if (rule) {
+    const start = startOfMonth(today);
+    const end = endOfMonth(addMonthsClamped(today, 11));
+    return datesForRuleBetween(rule, start, end).length / 12;
+  }
+
+  const type = item?.frequency_type || 'monthly';
+  if (type === 'weekly') return 52 / 12;
+  if (type === 'biweekly') return 26 / 12;
+  if (type === 'semimonthly') return 2;
+  if (type === 'bimonthly') return 0.5;
+  if (type === 'yearly') return 1 / 12;
+  if (type === 'custom') {
+    const interval = Math.max(1, Number(item?.frequency_interval) || 1);
+    const unit = FREQUENCY_UNITS.has(item?.frequency_unit) ? item.frequency_unit : 'days';
+    if (unit === 'weeks') return (52 / 12) / interval;
+    if (unit === 'months') return 1 / interval;
+    return 30.4375 / interval;
+  }
+  return 1;
+}
+
 export function advanceToUpcoming(value, item) {
   const rule = parseRecurrenceRule(item?.recurrence_rule);
   if (rule) return findRuleDateOnOrAfter(value, rule) || value;

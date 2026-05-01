@@ -25,6 +25,7 @@ import {
   endOfMonth,
   findRuleDateOnOrAfter,
   isoDate,
+  monthlyFactor,
   parseRecurrenceRule,
   recurrenceRuleToStorage
 } from '../lib/upcomingSchedule.js';
@@ -271,31 +272,6 @@ function inferFrequency(averageInterval) {
   if (averageInterval >= 50 && averageInterval <= 75) return { frequency_type: 'bimonthly', frequency_interval: 2, frequency_unit: 'months' };
   if (averageInterval >= 330 && averageInterval <= 400) return { frequency_type: 'yearly', frequency_interval: 1, frequency_unit: 'months' };
   return { frequency_type: 'custom', frequency_interval: Math.round(averageInterval), frequency_unit: 'days' };
-}
-
-function monthlyFactor(item) {
-  const recurrenceRule = parseRecurrenceRule(item?.recurrence_rule);
-  if (recurrenceRule) {
-    const today = formatLocalDate();
-    const start = startOfMonth(today);
-    const end = endOfMonth(addMonthsClamped(today, 11));
-    return datesForRuleBetween(recurrenceRule, start, end).length / 12;
-  }
-
-  const type = item.frequency_type || 'monthly';
-  if (type === 'weekly') return 52 / 12;
-  if (type === 'biweekly') return 26 / 12;
-  if (type === 'semimonthly') return 2;
-  if (type === 'bimonthly') return 0.5;
-  if (type === 'yearly') return 1 / 12;
-  if (type === 'custom') {
-    const interval = Math.max(1, Number(item.frequency_interval) || 1);
-    const unit = FREQUENCY_UNITS.has(item.frequency_unit) ? item.frequency_unit : 'days';
-    if (unit === 'weeks') return (52 / 12) / interval;
-    if (unit === 'months') return 1 / interval;
-    return 30.4375 / interval;
-  }
-  return 1;
 }
 
 function buildSuggestions(householdId) {
