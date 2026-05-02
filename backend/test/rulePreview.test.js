@@ -157,3 +157,52 @@ test('previewRuleImpact shows rule conflicts but omits protected and no-op match
   assert.equal(preview.conflicts[0].fields[0].label, 'Category');
   assert.equal(preview.conflicts[0].rules[0].name, 'Streamly to Bills');
 });
+
+test('previewRuleImpact includes currently applied rows when editing a rule', () => {
+  const db = makeDb();
+  const ruleId = addRule(db, {
+    name: 'Streamly to Entertainment',
+    actions: JSON.stringify([{ type: 'categorize', value: 20 }])
+  });
+  addTransaction(db, {
+    original_merchant: 'Streamly',
+    edited_category_id: 20,
+    edited_category_id_source: `rule:${ruleId}`
+  });
+
+  const preview = previewRuleImpact(db, {
+    ruleId,
+    conditions: [{ field: 'merchant', operator: 'contains', value: 'Streamly' }],
+    actions: [{ type: 'categorize', value: 20 }]
+  });
+
+  assert.equal(preview.count, 1);
+  assert.equal(preview.willChangeCount, 1);
+  assert.equal(preview.conflictCount, 0);
+  assert.equal(preview.willChange[0].fields[0].label, 'Category');
+  assert.equal(preview.willChange[0].fields[0].applied, true);
+});
+
+test('previewRuleImpact shows rows that would change after editing a rule condition', () => {
+  const db = makeDb();
+  const ruleId = addRule(db, {
+    name: 'Streamly to Entertainment',
+    actions: JSON.stringify([{ type: 'categorize', value: 20 }])
+  });
+  addTransaction(db, {
+    original_merchant: 'Streamly',
+    edited_category_id: 20,
+    edited_category_id_source: `rule:${ruleId}`
+  });
+
+  const preview = previewRuleImpact(db, {
+    ruleId,
+    conditions: [{ field: 'merchant', operator: 'contains', value: 'Other Merchant' }],
+    actions: [{ type: 'categorize', value: 20 }]
+  });
+
+  assert.equal(preview.count, 0);
+  assert.equal(preview.willChangeCount, 1);
+  assert.equal(preview.willChange[0].fields[0].from, 20);
+  assert.equal(preview.willChange[0].fields[0].to, null);
+});

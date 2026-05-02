@@ -571,36 +571,54 @@ export function previewRuleImpact(db, draft, householdId = 1, options = {}) {
   let matchCount = 0;
 
   for (const transaction of rows) {
-    if (!evalConditions(transaction, conditions)) continue;
-    matchCount++;
-    if (!enabled || actions.length === 0) continue;
+    const matchesDraft = evalConditions(transaction, conditions);
+    if (matchesDraft) matchCount++;
 
     const actionImpacts = new Map();
-    for (const action of actions) {
-      const impact = actionImpact(action, transaction);
-      if (!impact || actionImpacts.has(impact.field)) continue;
-      actionImpacts.set(impact.field, impact);
+    if (matchesDraft && enabled && actions.length > 0) {
+      for (const action of actions) {
+        const impact = actionImpact(action, transaction);
+        if (!impact || actionImpacts.has(impact.field)) continue;
+        actionImpacts.set(impact.field, impact);
+      }
     }
-    if (actionImpacts.size === 0) continue;
 
     const { edits } = computeEdits(transaction, rulesWithDraft);
+
+    for (const [field, meta] of Object.entries(EDIT_FIELDS)) {
+      const currentSource = transaction[meta.sourceKey] ?? null;
+      const nextSource = edits[meta.sourceKey] ?? null;
+      const currentDisplay = currentDisplayValue(transaction, field);
+      const nextDisplay = displayValueFromEdits(transaction, edits, field);
+      const displayChanged = !samePreviewValue(currentDisplay, nextDisplay);
+      const ruleCurrentlyOwnsField = currentSource === proposedSource;
+      const draftWillOwnField = nextSource === proposedSource;
+
+      if (draftWillOwnField && displayChanged) {
+        addPreviewItem(willChange, transaction, {
+          field,
+          label: meta.label,
+          from: currentDisplay,
+          to: nextDisplay
+        });
+        continue;
+      }
+
+      if (!ruleId || (!ruleCurrentlyOwnsField && !draftWillOwnField)) continue;
+
+      addPreviewItem(willChange, transaction, {
+        field,
+        label: meta.label,
+        from: currentDisplay,
+        to: nextDisplay,
+        applied: !displayChanged && ruleCurrentlyOwnsField && draftWillOwnField
+      });
+    }
 
     for (const impact of actionImpacts.values()) {
       const meta = EDIT_FIELDS[impact.field];
       const nextSource = edits[meta.sourceKey] ?? null;
-      const nextDisplay = displayValueFromEdits(transaction, edits, impact.field);
-      const currentDisplay = currentDisplayValue(transaction, impact.field);
-
-      if (nextSource === proposedSource) {
-        if (!samePreviewValue(currentDisplay, nextDisplay)) {
-          addPreviewItem(willChange, transaction, {
-            ...impact,
-            from: currentDisplay,
-            to: nextDisplay
-          });
-        }
-        continue;
-      }
+      if (nextSource === proposedSource) continue;
 
       const winningRuleId = ruleSourceId(nextSource);
       if (winningRuleId === null || winningRuleId === proposedId) continue;

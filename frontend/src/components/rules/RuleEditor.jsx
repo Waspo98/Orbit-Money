@@ -39,7 +39,6 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
   const [actions, setActions] = useState(
     rule.actions?.length ? rule.actions : [{ type: 'rename', value: '' }]
   );
-  const [enabled, setEnabled] = useState(rule.enabled !== false);
   const [preview, setPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -55,7 +54,6 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
         : [{ field: 'merchant', operator: 'contains', value: '' }]
     );
     setActions(nextRule.actions?.length ? nextRule.actions : [{ type: 'rename', value: '' }]);
-    setEnabled(nextRule.enabled !== false);
     setPreview(null);
     setSaving(false);
     setError('');
@@ -81,7 +79,7 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
           ruleId: activeRule.id || null,
           conditions,
           actions,
-          enabled
+          enabled: true
         });
         setPreview(data);
       } catch {
@@ -92,7 +90,7 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
     }, 400);
 
     return () => clearTimeout(timeoutId);
-  }, [activeRule.id, conditions, actions, enabled]);
+  }, [activeRule.id, conditions, actions]);
 
   function updateCondition(index, patch) {
     setConditions((current) => current.map((condition, currentIndex) => (
@@ -167,7 +165,7 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
       name: finalName,
       conditions,
       actions,
-      enabled
+      enabled: true
     };
 
     try {
@@ -255,20 +253,12 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
             <RulePreview
               preview={preview}
               previewing={previewing}
+              editing={!!activeRule.id}
               accountById={accountById}
               categoryById={categoryById}
               onEditRule={openConflictRule}
               openingRuleId={openingRuleId}
             />
-
-            <label className="toggle-row" style={{ marginBottom: 16 }}>
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(event) => setEnabled(event.target.checked)}
-              />
-              <span>Rule enabled</span>
-            </label>
 
             {error && <div className="error">{error}</div>}
 
@@ -290,6 +280,7 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
 function RulePreview({
   preview,
   previewing,
+  editing,
   accountById,
   categoryById,
   onEditRule,
@@ -328,7 +319,7 @@ function RulePreview({
 
       {preview.willChangeCount > 0 && (
         <RulePreviewSection
-          title="Will Change"
+          title={editing ? 'Affected' : 'Will Change'}
           count={preview.willChangeCount}
           items={willChange}
           limit={preview.limit}
@@ -456,6 +447,9 @@ function RulePreviewTransaction({
 }
 
 function formatPreviewChange(field, categoryById) {
+  if (field.applied) {
+    return `${field.label} handled by this rule`;
+  }
   return `${field.label}: ${formatPreviewValue(field.field, field.from, categoryById)} to ${formatPreviewValue(field.field, field.to, categoryById)}`;
 }
 
