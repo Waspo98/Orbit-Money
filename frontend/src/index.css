@@ -1242,7 +1242,123 @@ input, textarea, select {
 
 .rule-preview strong { font-weight: 700; }
 
+.rule-preview-rich {
+  display: grid;
+  gap: 12px;
+  align-items: stretch;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.rule-preview-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-muted);
+}
+
+.rule-preview-summary strong {
+  color: var(--text);
+}
+
+.rule-preview-section {
+  display: grid;
+  gap: 8px;
+}
+
+.rule-preview-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.rule-preview-list {
+  display: grid;
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.rule-preview-transaction {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.rule-preview-transaction-row .txn-row {
+  padding: 12px 0;
+}
+
+.rule-preview-transaction-row .txn-row:hover:not(.expanded) {
+  margin: 0;
+  padding: 12px 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+.rule-preview-transaction-row .txn-row-summary {
+  cursor: default;
+}
+
+.rule-preview-fields,
+.rule-preview-conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rule-preview-field {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 5px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.rule-preview-transaction.has-conflict .rule-preview-field {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.rule-preview-conflict-actions .btn-compact {
+  max-width: 100%;
+  min-height: 36px;
+  white-space: normal;
+  text-align: center;
+}
+
+.rule-preview-more {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
 @media (max-width: 520px) {
+  .rule-preview-list {
+    max-height: 260px;
+  }
+
+  .rule-preview-transaction {
+    padding-inline: 8px;
+  }
+
   .rule-builder-grid {
     grid-template-columns: 1fr 1fr auto;
     grid-template-areas:
