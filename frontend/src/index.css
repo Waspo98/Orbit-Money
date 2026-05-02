@@ -16,6 +16,38 @@
 /* ================== 1. TOKENS ================== */
 
 @font-face {
+  font-family: 'Inter Tight';
+  src: url('./assets/fonts/InterTight-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter Tight';
+  src: url('./assets/fonts/InterTight-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter Tight';
+  src: url('./assets/fonts/InterTight-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter Tight';
+  src: url('./assets/fonts/InterTight-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: 'DM Sans';
   src: url('./assets/fonts/DMSans-VariableFont_opsz,wght.ttf') format('truetype');
   font-weight: 100 1000;

@@ -1,4 +1,5 @@
 import {
+  Component,
   Suspense,
   lazy,
   useEffect,
@@ -59,6 +60,23 @@ const Upcoming = lazy(() => import('./pages/Upcoming.jsx'));
 const RetirementCalculator = lazy(() => import('./pages/RetirementCalculator.jsx'));
 const Household = lazy(() => import('./pages/Household.jsx'));
 
+const OFFLINE_ROUTE_PRELOADS = [
+  () => import('./pages/Dashboard.jsx'),
+  () => import('./pages/Transactions.jsx'),
+  () => import('./pages/Budgets.jsx'),
+  () => import('./pages/Accounts.jsx'),
+  () => import('./pages/Settings.jsx'),
+  () => import('./pages/Rules.jsx'),
+  () => import('./pages/Categories.jsx'),
+  () => import('./pages/HousingCalculator.jsx'),
+  () => import('./pages/NetWorth.jsx'),
+  () => import('./pages/MhaTracker.jsx'),
+  () => import('./pages/Goals.jsx'),
+  () => import('./pages/Upcoming.jsx'),
+  () => import('./pages/RetirementCalculator.jsx'),
+  () => import('./pages/Household.jsx')
+];
+
 function transitionBetween(fromPath, toPath, routes) {
   const fromIndex = routes.indexOf(fromPath);
   const toIndex = routes.indexOf(toPath);
@@ -73,6 +91,40 @@ function RouteLoading() {
       <div className="spinner" />
     </div>
   );
+}
+
+class RouteErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: null });
+    }
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="empty-state app-load-error route-load-error">
+          <div className="empty-state-icon">!</div>
+          <h2>Could Not Load This Screen</h2>
+          <p>Reconnect and try again. This screen may not be cached on this device yet.</p>
+          <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
+            Retry
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 export default function App() {
@@ -97,6 +149,7 @@ function AppShell() {
   const userPreferencesRef = useRef(userPreferences);
   const isOnline = useOnlineStatus();
   const wasOnlineRef = useRef(isOnline);
+  const offlineRoutesPreloadedRef = useRef(false);
 
   const {
     mode: themeMode,
@@ -211,6 +264,20 @@ function AppShell() {
     wasOnlineRef.current = isOnline;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline, authState]);
+
+  useEffect(() => {
+    if (authState !== 'in' || !lookupsReady || !isOnline || offlineRoutesPreloadedRef.current) {
+      return;
+    }
+    offlineRoutesPreloadedRef.current = true;
+    Promise.allSettled(OFFLINE_ROUTE_PRELOADS.map((load) => load())).then((results) => {
+      const failed = results.filter((result) => result.status === 'rejected');
+      if (failed.length > 0) {
+        offlineRoutesPreloadedRef.current = false;
+        console.warn('Offline route preload failed:', failed.map((result) => result.reason));
+      }
+    });
+  }, [authState, isOnline, lookupsReady]);
 
   // Close the More sheet whenever the route changes.
   useEffect(() => {
@@ -398,20 +465,22 @@ function AppShell() {
             key={location.pathname}
             className={`route-transition route-transition-${routeTransition}`}
           >
-            <Suspense fallback={<RouteLoading />}>
-              <Routes location={location}>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                {ROUTES.map((route) => (
-                  <Route
-                    key={route.path}
-                    path={route.path}
-                    element={routeElements[route.path]}
-                  />
-                ))}
-                <Route path="/import" element={<Navigate to="/settings" replace />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Routes>
-            </Suspense>
+            <RouteErrorBoundary resetKey={location.pathname}>
+              <Suspense fallback={<RouteLoading />}>
+                <Routes location={location}>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  {ROUTES.map((route) => (
+                    <Route
+                      key={route.path}
+                      path={route.path}
+                      element={routeElements[route.path]}
+                    />
+                  ))}
+                  <Route path="/import" element={<Navigate to="/settings" replace />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Routes>
+              </Suspense>
+            </RouteErrorBoundary>
           </div>
         )}
       </main>

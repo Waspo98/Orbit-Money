@@ -45,6 +45,11 @@ source. Owner households can use cached data offline without a time limit;
 shared/member households must have validated access within the last 7 days.
 Logout clears the IndexedDB financial response cache.
 
+Route components are lazy-loaded, so `App.jsx` warms those route chunks after a
+successful online app load. Keep that preloading behavior when adding new
+offline-readable pages, otherwise a never-visited page can fail to import while
+offline.
+
 ### Database Schema (30 migrations)
 
 | Migration | Purpose |
