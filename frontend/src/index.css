@@ -7488,6 +7488,10 @@ input, textarea, select {
   will-change: transform;
 }
 
+body.modal-page-blur-active .txn-pinned-month-header {
+  z-index: 100;
+}
+
 .txn-month-label { font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em; }
 .txn-month-count { font-size: 0.82rem; color: var(--text-muted); }
 
