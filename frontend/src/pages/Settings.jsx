@@ -1329,7 +1329,7 @@ export default function Settings({
       <SettingsCard
         id="account"
         key="account"
-        title="Account"
+        title="Partner Share"
         description="Household access and signed-in user details."
       >
         <div className="settings-action">
@@ -1589,7 +1589,7 @@ export default function Settings({
     return (
       <section className="settings-section settings-hub-section settings-section-top" aria-labelledby="settings-hub-title">
         <div className="settings-section-header">
-          <h3 id="settings-hub-title">Settings Areas</h3>
+          <h3 id="settings-hub-title">Settings</h3>
           <p>Choose the kind of setting you want to change.</p>
         </div>
 

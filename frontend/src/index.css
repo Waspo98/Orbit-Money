@@ -9760,6 +9760,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
 .settings-about-brand .brand-logo {
   --brand-logo-width: 166px;
   --brand-logo-height: 40px;
+  transform: translateY(3px);
 }
 
 .settings-about-grid {
