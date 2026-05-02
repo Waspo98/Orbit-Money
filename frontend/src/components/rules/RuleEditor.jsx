@@ -304,9 +304,11 @@ function RulePreview({
   }
 
   const matchCount = Number(preview.count || 0);
+  const affected = preview.affected || preview.matches || [];
+  const affectedCount = Number(preview.affectedCount ?? affected.length);
   const willChange = preview.willChange || [];
   const conflicts = preview.conflicts || [];
-  const hasDetails = willChange.length > 0 || conflicts.length > 0;
+  const hasDetails = affected.length > 0 || willChange.length > 0 || conflicts.length > 0;
 
   return (
     <div className={`rule-preview ${hasDetails ? 'rule-preview-rich' : ''}`}>
@@ -315,30 +317,29 @@ function RulePreview({
           <strong>{matchCount.toLocaleString()}</strong> matching transaction
           {matchCount === 1 ? '' : 's'}.
         </span>
+        {preview.willChangeCount > 0 && (
+          <span>
+            <strong>{preview.willChangeCount.toLocaleString()}</strong> will change.
+          </span>
+        )}
+        {preview.conflictCount > 0 && (
+          <span>
+            <strong>{preview.conflictCount.toLocaleString()}</strong> conflict
+            {preview.conflictCount === 1 ? '' : 's'}.
+          </span>
+        )}
       </div>
 
-      {preview.willChangeCount > 0 && (
+      {affectedCount > 0 && (
         <RulePreviewSection
-          title={editing ? 'Affected' : 'Will Change'}
-          count={preview.willChangeCount}
-          items={willChange}
-          limit={preview.limit}
-          accountById={accountById}
-          categoryById={categoryById}
-        />
-      )}
-
-      {preview.conflictCount > 0 && (
-        <RulePreviewSection
-          title="Conflicts"
-          count={preview.conflictCount}
-          items={conflicts}
+          title={editing ? 'Affected Transactions' : 'Matching Transactions'}
+          count={affectedCount}
+          items={affected}
           limit={preview.limit}
           accountById={accountById}
           categoryById={categoryById}
           onEditRule={onEditRule}
           openingRuleId={openingRuleId}
-          conflict
         />
       )}
     </div>
@@ -393,9 +394,11 @@ function RulePreviewTransaction({
   conflict
 }) {
   const txn = item.transaction;
+  const fields = item.fields || [];
+  const hasConflicts = conflict || item.rules?.length > 0;
 
   return (
-    <div className={`rule-preview-transaction ${conflict ? 'has-conflict' : ''}`}>
+    <div className={`rule-preview-transaction ${hasConflicts ? 'has-conflict' : ''}`}>
       <ul className="txn-list dash-recent-txn-list rule-preview-transaction-row">
         <TransactionRow
           txn={txn}
@@ -417,17 +420,22 @@ function RulePreviewTransaction({
         />
       </ul>
 
-      <div className="rule-preview-fields">
-        {item.fields.map((field, index) => (
-          <span key={`${field.field}-${field.ruleId || ''}-${index}`} className="rule-preview-field">
-            {conflict
-              ? `${field.label} handled by ${field.ruleName}`
-              : formatPreviewChange(field, categoryById)}
-          </span>
-        ))}
-      </div>
+      {fields.length > 0 && (
+        <div className="rule-preview-fields">
+          {fields.map((field, index) => (
+            <span
+              key={`${field.field}-${field.ruleId || ''}-${index}`}
+              className={`rule-preview-field ${field.ruleName ? 'is-conflict' : ''}`}
+            >
+              {field.ruleName
+                ? `${field.label} handled by ${field.ruleName}`
+                : formatPreviewChange(field, categoryById)}
+            </span>
+          ))}
+        </div>
+      )}
 
-      {conflict && item.rules?.length > 0 && (
+      {hasConflicts && item.rules?.length > 0 && (
         <div className="rule-preview-conflict-actions">
           {item.rules.map((rule) => (
             <button

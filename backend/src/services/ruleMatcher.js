@@ -451,6 +451,18 @@ function transactionPreviewRow(row) {
   };
 }
 
+function addAffectedItem(map, transaction) {
+  const id = transaction.id;
+  if (!map.has(id)) {
+    map.set(id, {
+      transaction: transactionPreviewRow(transaction),
+      fields: [],
+      rules: []
+    });
+  }
+  return map.get(id);
+}
+
 function addPreviewItem(map, transaction, field) {
   const id = transaction.id;
   const existing = map.get(id);
@@ -477,6 +489,7 @@ function addConflictItem(map, transaction, field, rule) {
 
   if (existing) {
     existing.fields.push(fieldSummary);
+    existing.rules ||= [];
     if (!existing.rules.some((item) => item.id === ruleSummary.id)) {
       existing.rules.push(ruleSummary);
     }
@@ -491,9 +504,8 @@ function addConflictItem(map, transaction, field, rule) {
 }
 
 /**
- * Preview a draft rule without writing anything. The response intentionally
- * only exposes transactions that would visibly change and transactions where
- * another rule would win first.
+ * Preview a draft rule without writing anything. The response exposes every
+ * transaction affected by the draft, then annotates visible changes/conflicts.
  */
 export function previewRuleImpact(db, draft, householdId = 1, options = {}) {
   const limit = parseInt(options.limit, 10) || PREVIEW_LIMIT;
@@ -568,11 +580,15 @@ export function previewRuleImpact(db, draft, householdId = 1, options = {}) {
 
   const willChange = new Map();
   const conflicts = new Map();
+  const affected = new Map();
   let matchCount = 0;
 
   for (const transaction of rows) {
     const matchesDraft = evalConditions(transaction, conditions);
-    if (matchesDraft) matchCount++;
+    if (matchesDraft) {
+      matchCount++;
+      addAffectedItem(affected, transaction);
+    }
 
     const actionImpacts = new Map();
     if (matchesDraft && enabled && actions.length > 0) {
@@ -595,24 +611,28 @@ export function previewRuleImpact(db, draft, householdId = 1, options = {}) {
       const draftWillOwnField = nextSource === proposedSource;
 
       if (draftWillOwnField && displayChanged) {
-        addPreviewItem(willChange, transaction, {
+        const previewField = {
           field,
           label: meta.label,
           from: currentDisplay,
           to: nextDisplay
-        });
+        };
+        addPreviewItem(willChange, transaction, previewField);
+        addPreviewItem(affected, transaction, previewField);
         continue;
       }
 
       if (!ruleId || (!ruleCurrentlyOwnsField && !draftWillOwnField)) continue;
 
-      addPreviewItem(willChange, transaction, {
+      const previewField = {
         field,
         label: meta.label,
         from: currentDisplay,
         to: nextDisplay,
         applied: !displayChanged && ruleCurrentlyOwnsField && draftWillOwnField
-      });
+      };
+      addPreviewItem(willChange, transaction, previewField);
+      addPreviewItem(affected, transaction, previewField);
     }
 
     for (const impact of actionImpacts.values()) {
@@ -625,16 +645,20 @@ export function previewRuleImpact(db, draft, householdId = 1, options = {}) {
       const winningRule = rulesById.get(winningRuleId);
       if (!winningRule) continue;
       addConflictItem(conflicts, transaction, impact, winningRule);
+      addConflictItem(affected, transaction, impact, winningRule);
     }
   }
 
   const willChangeItems = Array.from(willChange.values());
   const conflictItems = Array.from(conflicts.values());
+  const affectedItems = Array.from(affected.values());
 
   return {
     count: matchCount,
+    affectedCount: affectedItems.length,
     willChangeCount: willChangeItems.length,
     conflictCount: conflictItems.length,
+    affected: affectedItems.slice(0, limit),
     willChange: willChangeItems.slice(0, limit),
     conflicts: conflictItems.slice(0, limit),
     limit

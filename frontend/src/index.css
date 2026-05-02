@@ -1254,7 +1254,8 @@ input, textarea, select {
 .rule-preview-summary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: 10px;
   color: var(--text-muted);
 }
@@ -1333,7 +1334,7 @@ input, textarea, select {
   line-height: 1.25;
 }
 
-.rule-preview-transaction.has-conflict .rule-preview-field {
+.rule-preview-field.is-conflict {
   background: var(--warning-bg);
   color: var(--warning-text);
 }
@@ -7486,10 +7487,14 @@ input, textarea, select {
   border-bottom: 1px solid var(--border);
   pointer-events: none;
   will-change: transform;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    visibility var(--dur-fast) var(--ease-out);
 }
 
 body.modal-page-blur-active .txn-pinned-month-header {
-  z-index: 100;
+  opacity: 0;
+  visibility: hidden;
 }
 
 .txn-month-label { font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em; }

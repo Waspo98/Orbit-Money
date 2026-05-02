@@ -125,14 +125,16 @@ test('previewRuleImpact returns visible changes for a draft rule', () => {
   });
 
   assert.equal(preview.count, 1);
+  assert.equal(preview.affectedCount, 1);
   assert.equal(preview.willChangeCount, 1);
   assert.equal(preview.conflictCount, 0);
+  assert.equal(preview.affected[0].transaction.original_merchant, 'Walmart');
   assert.equal(preview.willChange[0].fields[0].label, 'Merchant');
   assert.equal(preview.willChange[0].fields[0].from, 'Walmart');
   assert.equal(preview.willChange[0].fields[0].to, 'Walmart Supercenter');
 });
 
-test('previewRuleImpact shows rule conflicts but omits protected and no-op matches', () => {
+test('previewRuleImpact includes protected and no-op matches while annotating conflicts', () => {
   const db = makeDb();
   addRule(db, { name: 'Streamly to Bills' });
   addTransaction(db, { original_merchant: 'Streamly' });
@@ -152,10 +154,19 @@ test('previewRuleImpact shows rule conflicts but omits protected and no-op match
   });
 
   assert.equal(preview.count, 3);
+  assert.equal(preview.affectedCount, 3);
+  assert.deepEqual(
+    preview.affected.map((item) => item.transaction.original_merchant).sort(),
+    ['Streamly', 'Streamly already entertainment', 'Streamly manual']
+  );
   assert.equal(preview.willChangeCount, 0);
   assert.equal(preview.conflictCount, 1);
   assert.equal(preview.conflicts[0].fields[0].label, 'Category');
   assert.equal(preview.conflicts[0].rules[0].name, 'Streamly to Bills');
+  assert.equal(
+    preview.affected.find((item) => item.rules?.length > 0).rules[0].name,
+    'Streamly to Bills'
+  );
 });
 
 test('previewRuleImpact includes currently applied rows when editing a rule', () => {
@@ -177,8 +188,11 @@ test('previewRuleImpact includes currently applied rows when editing a rule', ()
   });
 
   assert.equal(preview.count, 1);
+  assert.equal(preview.affectedCount, 1);
   assert.equal(preview.willChangeCount, 1);
   assert.equal(preview.conflictCount, 0);
+  assert.equal(preview.affected[0].fields[0].label, 'Category');
+  assert.equal(preview.affected[0].fields[0].applied, true);
   assert.equal(preview.willChange[0].fields[0].label, 'Category');
   assert.equal(preview.willChange[0].fields[0].applied, true);
 });
@@ -202,7 +216,10 @@ test('previewRuleImpact shows rows that would change after editing a rule condit
   });
 
   assert.equal(preview.count, 0);
+  assert.equal(preview.affectedCount, 1);
   assert.equal(preview.willChangeCount, 1);
+  assert.equal(preview.affected[0].fields[0].from, 20);
+  assert.equal(preview.affected[0].fields[0].to, null);
   assert.equal(preview.willChange[0].fields[0].from, 20);
   assert.equal(preview.willChange[0].fields[0].to, null);
 });
