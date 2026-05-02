@@ -5,6 +5,7 @@ import { requireAuth, requireHouseholdId, requireHouseholdWrite } from '../auth.
 import { db } from '../db/index.js';
 import { centsToDollars } from '../lib/money.js';
 import { sendBadRequest, sendOk, sendRouteError } from '../lib/http.js';
+import { restoreOrbitBackup } from '../services/orbitBackupRestore.js';
 
 const router = express.Router();
 
@@ -27,48 +28,6 @@ const BACKUP_TABLES = [
   'household_retirement_accounts',
   'app_settings',
   'user_preferences',
-  'upcoming_items',
-  'upcoming_dismissed_suggestions',
-  'upcoming_occurrences',
-  'import_batches',
-  'import_batch_items'
-];
-
-const RESTORE_DELETE_ORDER = [
-  'upcoming_occurrences',
-  'upcoming_dismissed_suggestions',
-  'upcoming_items',
-  'import_batch_items',
-  'import_batches',
-  'simplefin_config',
-  'app_settings',
-  'user_preferences',
-  'household_retirement_accounts',
-  'household_income_records',
-  'household_members',
-  'account_balance_records',
-  'goal_account_allocations',
-  'goals',
-  'budgets',
-  'rules',
-  'transactions',
-  'categories',
-  'accounts'
-];
-
-const RESTORE_INSERT_ORDER = [
-  'accounts',
-  'categories',
-  'transactions',
-  'rules',
-  'budgets',
-  'goals',
-  'goal_account_allocations',
-  'account_balance_records',
-  'household_members',
-  'household_income_records',
-  'household_retirement_accounts',
-  'app_settings',
   'upcoming_items',
   'upcoming_dismissed_suggestions',
   'upcoming_occurrences',
@@ -192,132 +151,15 @@ function backupSummary(backup) {
   };
 }
 
-function insertRows(table, rows, householdId) {
-  if (!Array.isArray(rows) || rows.length === 0) return 0;
-  const columns = tableColumns(table);
-  const available = new Set(columns);
-  let inserted = 0;
-
-  for (const row of rows) {
-    const next = { ...row };
-    if (available.has('household_id')) next.household_id = householdId;
-    const rowColumns = columns.filter((column) => Object.prototype.hasOwnProperty.call(next, column));
-    if (rowColumns.length === 0) continue;
-    const quoted = rowColumns.map((column) => `"${column}"`).join(', ');
-    const placeholders = rowColumns.map(() => '?').join(', ');
-    const values = rowColumns.map((column) => next[column]);
-    db.prepare(`INSERT INTO ${table} (${quoted}) VALUES (${placeholders})`).run(...values);
-    inserted += 1;
+function requireSessionHouseholdOwner(req, res, next) {
+  const userId = Number(req.user?.id);
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return res.status(403).json({
+      error: 'Backup restore requires a signed-in household owner.'
+    });
   }
-
-  return inserted;
-}
-
-function restoreMemberships(backup, householdId, currentUserId) {
-  const memberships = Array.isArray(backup.memberships) ? backup.memberships : [];
-  const findUser = db.prepare(
-    `SELECT id FROM users
-      WHERE (? IS NOT NULL AND lower(email) = lower(?))
-         OR (? IS NOT NULL AND username = ?)
-      LIMIT 1`
-  );
-  const upsert = db.prepare(
-    `INSERT INTO household_memberships (household_id, user_id, role, access_level)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT(household_id, user_id) DO UPDATE SET
-       role = excluded.role,
-       access_level = excluded.access_level,
-       updated_at = datetime('now')`
-  );
-
-  let restored = 0;
-  for (const membership of memberships) {
-    const matched = findUser.get(
-      membership.email || null,
-      membership.email || null,
-      membership.username || null,
-      membership.username || null
-    );
-    if (!matched) continue;
-    if (currentUserId && matched.id === currentUserId) continue;
-    const role = membership.role === 'admin' ? 'admin' : membership.role === 'owner' ? 'admin' : 'member';
-    const accessLevel = membership.access_level === 'read' ? 'read' : 'write';
-    upsert.run(householdId, matched.id, role, accessLevel);
-    restored += 1;
-  }
-
-  if (currentUserId) {
-    db.prepare(
-      `INSERT INTO household_memberships (household_id, user_id, role, access_level)
-       VALUES (?, ?, 'owner', 'write')
-       ON CONFLICT(household_id, user_id) DO UPDATE SET
-         role = 'owner',
-         access_level = 'write',
-         updated_at = datetime('now')`
-    ).run(householdId, currentUserId);
-  }
-
-  return restored;
-}
-
-function restoreUserPreferences(backup, householdId) {
-  const rows = Array.isArray(backup.tables?.user_preferences)
-    ? backup.tables.user_preferences
-    : [];
-  if (rows.length === 0) return 0;
-
-  const userExists = db.prepare('SELECT 1 FROM users WHERE id = ?');
-  const upsert = db.prepare(
-    `INSERT INTO user_preferences (household_id, user_id, key, value_json, updated_at)
-     VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')))
-     ON CONFLICT(household_id, user_id, key) DO UPDATE SET
-       value_json = excluded.value_json,
-       updated_at = excluded.updated_at`
-  );
-
-  let restored = 0;
-  for (const row of rows) {
-    const userId = Number(row.user_id);
-    if (!Number.isInteger(userId) || userId <= 0 || !userExists.get(userId)) continue;
-    if (!row.key || typeof row.value_json !== 'string') continue;
-    upsert.run(householdId, userId, row.key, row.value_json, row.updated_at || null);
-    restored += 1;
-  }
-
-  return restored;
-}
-
-function restoreOrbitBackup(backup, householdId, currentUserId) {
-  const run = db.transaction(() => {
-    db.exec('PRAGMA defer_foreign_keys = ON');
-
-    for (const table of RESTORE_DELETE_ORDER) {
-      db.prepare(`DELETE FROM ${table} WHERE household_id = ?`).run(householdId);
-    }
-
-    db.prepare(
-      `UPDATE households
-          SET name = ?,
-              default_currency = ?,
-              updated_at = datetime('now')
-        WHERE id = ?`
-    ).run(
-      backup.household?.name || 'Orbit Household',
-      backup.household?.default_currency || 'USD',
-      householdId
-    );
-
-    const inserted = {};
-    for (const table of RESTORE_INSERT_ORDER) {
-      inserted[table] = insertRows(table, backup.tables?.[table] || [], householdId);
-    }
-    const membershipsRestored = restoreMemberships(backup, householdId, currentUserId);
-    inserted.user_preferences = restoreUserPreferences(backup, householdId);
-
-    return { inserted, membershipsRestored };
-  });
-
-  return run();
+  if (req.household?.role === 'owner') return next();
+  return res.status(403).json({ error: 'Only household owners can restore backups.' });
 }
 
 router.get('/budgeting-export', requireAuth, requireHouseholdWrite, (req, res) => {
@@ -380,7 +222,7 @@ router.get('/orbit-backup', requireAuth, requireHouseholdWrite, (req, res) => {
   }
 });
 
-router.post('/orbit-restore/preview', requireAuth, requireHouseholdWrite, upload.single('file'), (req, res) => {
+router.post('/orbit-restore/preview', requireAuth, requireSessionHouseholdOwner, upload.single('file'), (req, res) => {
   try {
     const backup = parseBackupFile(req.file);
     sendOk(res, { success: true, ...backupSummary(backup) });
@@ -389,11 +231,11 @@ router.post('/orbit-restore/preview', requireAuth, requireHouseholdWrite, upload
   }
 });
 
-router.post('/orbit-restore', requireAuth, requireHouseholdWrite, upload.single('file'), (req, res) => {
+router.post('/orbit-restore', requireAuth, requireSessionHouseholdOwner, upload.single('file'), (req, res) => {
   const householdId = requireHouseholdId(req);
   try {
     const backup = parseBackupFile(req.file);
-    const result = restoreOrbitBackup(backup, householdId, req.user?.id || null);
+    const result = restoreOrbitBackup(db, backup, householdId, req.user?.id || null);
     sendOk(res, {
       success: true,
       ...backupSummary(backup),

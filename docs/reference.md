@@ -31,7 +31,7 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
 | `sessions.db` | Session store (separate `better-sqlite3` connection) |
 
-### Database Schema (27 migrations)
+### Database Schema (30 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -79,6 +79,10 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 **Original / edited provenance (migration 008):** Rules and manual edits never mutate the raw imported values. Each editable field has an `original_*` column (populated at import, never touched afterward) and a nullable `edited_*` column with an `edited_*_source` tag (`'user'`, `'rule:{id}'`, `'system:*'`, or NULL). Display values are computed as `COALESCE(edited_X, original_X)` at the API layer so the UI sees one logical merchant/category/flag regardless of how it got there. User edits are sticky — rules never override `source='user'`. System edits are reserved for app-owned derivations like transfer matching and are preserved during rule reapply.
 
 **Multi-user ownership:** Tenant-owned data carries `household_id`. Existing single-user data is assigned to household `1` during migration. Fresh installs end with the neutral default name `My Household`; existing installs are only renamed if the household still has the old default label. Uniqueness that used to be global, such as category name, SimpleFIN account id, transaction external id, and app settings, is now scoped by household. New OIDC users get a household seeded from `app_default_settings` and `app_default_categories`.
+
+**Partner sharing:** Owners create pending email invites. OIDC login claims only unaccepted pending invites, creates the household membership once, and retires the invite; future access changes happen only on `household_memberships`.
+
+**Backup restore:** Orbit backup restore is owner-only. It replaces the active household's data, clears existing pending shares/memberships and SimpleFIN sync history for that household, then restores matching memberships from the backup while keeping the current user as owner. Restores allocate fresh row ids in the target household and remap dependent references across accounts, categories, rules, transactions, goals, income members, upcoming items, import batch history, and user preferences. SimpleFIN connection information is intentionally excluded and must be reconnected after restore.
 
 **Auth modes:** `AUTH_PROVIDER=local` shows only the username/password form. `AUTH_PROVIDER=oidc` shows only the OIDC button. `AUTH_PROVIDER=both` shows both options. `OIDC_LOGIN_LABEL` controls the OIDC button text and defaults to `Log in with OIDC`. `ENABLE_SAMPLE_DATA=1` exposes the sample-data login flow; it is disabled by default for normal installs.
 
@@ -362,12 +366,19 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 | DELETE | `/api/household/members/:id` | Delete a member and their income history. |
 
 ### Household Sharing
+Partner sharing is owner-managed. Pending invites are one-time OIDC login claims:
+when the invited user signs in, the app creates the membership and retires the
+pending share. After that, `household_memberships` is the source of truth for
+role and read/write access.
+
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/household-sharing` | Current household users and pending shares |
-| POST | `/api/household-sharing/shares` | Invite or update a pending household share by email |
-| DELETE | `/api/household-sharing/shares/:id` | Revoke a pending share |
-| DELETE | `/api/household-sharing/users/:id` | Remove a household user when allowed by role rules |
+| POST | `/api/household-sharing/shares` | Owner-only: invite or update a pending household share by email |
+| PATCH | `/api/household-sharing/shares/:id/access` | Owner-only: change a pending share's read/write access |
+| PATCH | `/api/household-sharing/users/:id/access` | Owner-only: change a non-owner member's read/write access |
+| DELETE | `/api/household-sharing/shares/:id` | Owner-only: revoke a pending share |
+| DELETE | `/api/household-sharing/users/:id` | Owner-only: remove a household user |
 
 ### Merchant Logos
 | Method | Path | Description |

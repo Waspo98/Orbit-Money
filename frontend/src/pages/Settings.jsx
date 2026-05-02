@@ -892,7 +892,7 @@ export default function Settings({
                 <p>Open the bridge site to manage or refresh the connection.</p>
               </div>
               <a className="btn-secondary settings-action-link" href={SIMPLEFIN_BRIDGE_URL} target="_blank" rel="noreferrer">
-                Open Bridge
+                Open SimpleFIN
               </a>
             </div>
 
@@ -989,13 +989,14 @@ export default function Settings({
                 <p>Get a setup token from the bridge, then paste it below.</p>
               </div>
               <a className="btn-secondary settings-action-link" href={SIMPLEFIN_BRIDGE_URL} target="_blank" rel="noreferrer">
-                Open Bridge
+                Open SimpleFIN
               </a>
             </div>
 
             <p style={{ marginBottom: 20 }}>
-              Paste the setup token below. You'll also pick a <strong>cutover date</strong> - Rocket Money
-              data is kept for dates before it, SimpleFIN owns dates after.
+              Paste your SimpleFIN setup token below. You'll also pick a{' '}
+              <strong>cutover date</strong> if you want to avoid duplicate transactions. SimpleFIN
+              will only import transactions after the cutover date.
             </p>
 
             <label className="field">

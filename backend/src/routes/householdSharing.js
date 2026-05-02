@@ -8,37 +8,26 @@ import {
   sendRouteError
 } from '../lib/http.js';
 import { readIdParam } from '../lib/routeParams.js';
+import {
+  createPendingHouseholdShare,
+  normalizeAccessLevel,
+  normalizeEmail,
+  sharingError
+} from '../services/householdSharing.js';
 
 const router = express.Router();
 
-function sharingError(message, status = 400) {
-  const err = new Error(message);
-  err.status = status;
-  return err;
-}
-
-function normalizeEmail(value) {
-  const email = String(value || '').trim().toLowerCase();
-  if (!email || email.length > 254) return null;
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
-  return email;
-}
-
-function normalizeAccessLevel(value) {
-  return value === 'read' ? 'read' : 'write';
-}
-
 function canManageSharing(req) {
-  return canWriteHousehold(req) && (req.household?.role === 'owner' || req.household?.role === 'admin');
+  return canWriteHousehold(req) && req.household?.role === 'owner';
 }
 
 function canRemoveUsers(req) {
-  return canWriteHousehold(req) && req.household?.role === 'owner';
+  return canManageSharing(req);
 }
 
 function requireShareManager(req) {
   if (!canManageSharing(req)) {
-    throw sharingError('Only household owners and admins can manage sharing.', 403);
+    throw sharingError('Only household owners can manage sharing.', 403);
   }
 }
 
@@ -77,6 +66,7 @@ function listShares(householdId) {
          LEFT JOIN users accepted ON accepted.id = hs.accepted_by_user_id
         WHERE hs.household_id = ?
           AND hs.revoked_at IS NULL
+          AND hs.accepted_at IS NULL
         ORDER BY hs.accepted_at IS NOT NULL ASC, hs.created_at DESC`
     )
     .all(householdId);
@@ -100,37 +90,6 @@ function buildPayload(req) {
   };
 }
 
-function attachExistingUserToShare(householdId, email, role, accessLevel, shareId) {
-  const user = db
-    .prepare('SELECT id FROM users WHERE lower(email) = lower(?) LIMIT 1')
-    .get(email);
-  if (!user) return;
-
-  db.prepare(
-    `INSERT INTO household_memberships (household_id, user_id, role, access_level)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT(household_id, user_id) DO UPDATE SET
-       role = CASE
-         WHEN role = 'owner' THEN role
-         WHEN excluded.role = 'admin' THEN 'admin'
-         ELSE role
-       END,
-       access_level = CASE
-         WHEN role = 'owner' THEN access_level
-         ELSE excluded.access_level
-       END,
-       updated_at = datetime('now')`
-  ).run(householdId, user.id, role, accessLevel);
-
-  db.prepare(
-    `UPDATE household_shares
-        SET accepted_by_user_id = ?,
-            accepted_at = COALESCE(accepted_at, datetime('now')),
-            updated_at = datetime('now')
-      WHERE id = ?`
-  ).run(user.id, shareId);
-}
-
 router.get('/', requireAuth, (req, res) => {
   try {
     sendOk(res, buildPayload(req));
@@ -149,37 +108,13 @@ router.post('/shares', requireAuth, (req, res) => {
       return sendBadRequest(res, 'You are already part of this household.');
     }
 
-    const role = req.body?.role === 'admin' ? 'admin' : 'member';
-    const accessLevel = normalizeAccessLevel(req.body?.accessLevel);
-    const result = db
-      .prepare(
-        `INSERT INTO household_shares (
-           household_id, invited_email, role, access_level, created_by_user_id
-         ) VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(household_id, lower(invited_email)) WHERE revoked_at IS NULL
-         DO UPDATE SET
-           role = excluded.role,
-           access_level = excluded.access_level,
-           updated_at = datetime('now')`
-      )
-      .run(householdId, email, role, accessLevel, req.user?.id || null);
-
-    const share = db
-      .prepare(
-        `SELECT id, role, access_level
-           FROM household_shares
-          WHERE household_id = ?
-            AND lower(invited_email) = lower(?)
-            AND revoked_at IS NULL`
-      )
-      .get(householdId, email);
-    attachExistingUserToShare(
+    createPendingHouseholdShare(db, {
       householdId,
       email,
-      share?.role || role,
-      share?.access_level || accessLevel,
-      share?.id || result.lastInsertRowid
-    );
+      role: req.body?.role,
+      accessLevel: req.body?.accessLevel,
+      createdByUserId: req.user?.id || null
+    });
     sendOk(res, { success: true, ...buildPayload(req) });
   } catch (err) {
     sendRouteError(res, err);
@@ -201,10 +136,11 @@ router.patch('/shares/:id/access', requireAuth, (req, res) => {
                 updated_at = datetime('now')
           WHERE id = ?
             AND household_id = ?
-            AND revoked_at IS NULL`
+            AND revoked_at IS NULL
+            AND accepted_at IS NULL`
       )
       .run(accessLevel, id, householdId);
-    if (result.changes === 0) return sendNotFound(res, 'Share was not found.');
+    if (result.changes === 0) return sendNotFound(res, 'Pending invite was not found.');
     sendOk(res, { success: true, ...buildPayload(req) });
   } catch (err) {
     sendRouteError(res, err);
@@ -265,10 +201,11 @@ router.delete('/shares/:id', requireAuth, (req, res) => {
                 updated_at = datetime('now')
           WHERE id = ?
             AND household_id = ?
-            AND revoked_at IS NULL`
+            AND revoked_at IS NULL
+            AND accepted_at IS NULL`
       )
       .run(id, householdId);
-    if (result.changes === 0) return sendNotFound(res, 'Share was not found.');
+    if (result.changes === 0) return sendNotFound(res, 'Pending invite was not found.');
     sendOk(res, { success: true, ...buildPayload(req) });
   } catch (err) {
     sendRouteError(res, err);

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { config } from '../config.js';
 import { db } from '../db/index.js';
 import { createHouseholdForUser } from './householdDefaults.js';
+import { acceptPendingHouseholdShares } from './householdSharing.js';
 
 let discoveryCache = null;
 let jwksCache = null;
@@ -139,54 +140,6 @@ function profileName(profile) {
   return profile.name || profile.preferred_username || profile.email || 'OIDC User';
 }
 
-function applyPendingHouseholdShares(userId, email) {
-  if (!email) return null;
-  const shares = db
-    .prepare(
-      `SELECT id, household_id, role, access_level
-         FROM household_shares
-        WHERE lower(invited_email) = lower(?)
-          AND revoked_at IS NULL`
-    )
-    .all(email);
-
-  const insertMembership = db.prepare(
-    `INSERT INTO household_memberships (household_id, user_id, role, access_level)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT(household_id, user_id) DO UPDATE SET
-       role = CASE
-         WHEN role = 'owner' THEN role
-         WHEN excluded.role = 'admin' THEN 'admin'
-         ELSE role
-       END,
-       access_level = CASE
-         WHEN role = 'owner' THEN access_level
-         ELSE excluded.access_level
-       END,
-       updated_at = datetime('now')`
-  );
-  const markAccepted = db.prepare(
-    `UPDATE household_shares
-        SET accepted_by_user_id = ?,
-            accepted_at = COALESCE(accepted_at, datetime('now')),
-            updated_at = datetime('now')
-      WHERE id = ?`
-  );
-
-  let preferredHouseholdId = null;
-  for (const share of shares) {
-    insertMembership.run(
-      share.household_id,
-      userId,
-      share.role || 'member',
-      share.access_level || 'write'
-    );
-    markAccepted.run(userId, share.id);
-    preferredHouseholdId = preferredHouseholdId || share.household_id;
-  }
-  return preferredHouseholdId;
-}
-
 function resolveUserAndHousehold(profile) {
   const existing = db
     .prepare('SELECT * FROM users WHERE oidc_sub = ?')
@@ -251,7 +204,7 @@ export async function completeOidcLogin(req, code, state) {
   const profile = await verifyIdToken(tokens.id_token, req.session.oidcNonce);
   const displayName = profileName(profile);
   const userId = resolveUserAndHousehold(profile);
-  const preferredHouseholdId = applyPendingHouseholdShares(userId, profile.email || null);
+  const preferredHouseholdId = acceptPendingHouseholdShares(db, userId, profile.email || null);
   const membership = defaultMembershipForUser(userId, displayName, preferredHouseholdId);
 
   delete req.session.oidcState;

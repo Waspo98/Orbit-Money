@@ -30,7 +30,11 @@
 import express from 'express';
 import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
-import { reapplyRulesToTransaction } from '../services/ruleMatcher.js';
+import {
+  applyRulesToDraft,
+  loadRules,
+  reapplyRulesToTransaction
+} from '../services/ruleMatcher.js';
 import { attachMerchantLogos } from '../services/merchantLogos.js';
 import {
   sendBadRequest,
@@ -614,24 +618,55 @@ router.post('/', requireAuth, (req, res) => {
   }
 
   try {
+    const amountCents = dollarsToCents(amountValue);
+    const description = typeof body.description === 'string' ? body.description.trim() : null;
+    const isTransfer = body.is_transfer ? 1 : 0;
+    const isIgnored = body.is_ignored ? 1 : 0;
+    const hydrated = applyRulesToDraft(
+      {
+        account_id: accountId,
+        date,
+        amount: amountCents,
+        original_merchant: merchant,
+        original_description: description,
+        original_category_id: categoryId,
+        original_is_transfer: isTransfer,
+        original_is_ignored: isIgnored
+      },
+      loadRules(db, householdId)
+    );
+
     const result = db
       .prepare(
         `INSERT INTO transactions (
            household_id, account_id, date, amount, original_merchant,
-           original_description, category_id, notes, is_transfer, is_ignored, source
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')`
+           original_description, category_id, notes, is_transfer, is_ignored,
+           edited_merchant, edited_merchant_source,
+           edited_category_id, edited_category_id_source,
+           edited_is_transfer, edited_is_transfer_source,
+           edited_is_ignored, edited_is_ignored_source,
+           source
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')`
       )
       .run(
         householdId,
         accountId,
         date,
-        dollarsToCents(amountValue),
+        amountCents,
         merchant,
-        typeof body.description === 'string' ? body.description.trim() : null,
+        description,
         categoryId,
         typeof body.notes === 'string' ? body.notes : '',
-        body.is_transfer ? 1 : 0,
-        body.is_ignored ? 1 : 0
+        isTransfer,
+        isIgnored,
+        hydrated.edited_merchant,
+        hydrated.edited_merchant_source,
+        hydrated.edited_category_id,
+        hydrated.edited_category_id_source,
+        hydrated.edited_is_transfer,
+        hydrated.edited_is_transfer_source,
+        hydrated.edited_is_ignored,
+        hydrated.edited_is_ignored_source
       );
 
     const row = db
