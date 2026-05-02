@@ -21,11 +21,14 @@ import Login from './Login.jsx';
 import BrandLogo from './components/BrandLogo.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
+import OfflineBanner from './components/OfflineBanner.jsx';
 import SyncErrorBanner from './components/SyncErrorBanner.jsx';
 import MoreSheet from './components/MoreSheet.jsx';
 import { useTheme } from './hooks/useTheme.js';
+import { useOnlineStatus } from './hooks/useOnlineStatus.js';
 import { api } from './api.js';
 import { APP_ICON_192 } from './brandAssets.js';
+import { clearOfflineFinancialCache } from './offlineCache.js';
 import { sortCategoriesByName } from './lib/categorySort.js';
 import {
   ROUTES,
@@ -82,6 +85,7 @@ export default function App() {
 
 function AppShell() {
   const [authState, setAuthState] = useState('loading');
+  const [offlineAccessMessage, setOfflineAccessMessage] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
 
   const [accounts, setAccounts] = useState([]);
@@ -91,6 +95,8 @@ function AppShell() {
   const [mhaTrackerEnabled, setMhaTrackerEnabled] = useState(false);
   const [userPreferences, setUserPreferencesState] = useState(readLocalUserPreferences);
   const userPreferencesRef = useRef(userPreferences);
+  const isOnline = useOnlineStatus();
+  const wasOnlineRef = useRef(isOnline);
 
   const {
     mode: themeMode,
@@ -139,11 +145,20 @@ function AppShell() {
     };
   }, []);
 
-  async function checkAuth() {
+  async function checkAuth({ refreshLookups = false } = {}) {
     try {
       const me = await api.get('/api/auth/me');
+      setOfflineAccessMessage('');
       setAuthState(me.authenticated ? 'in' : 'out');
-    } catch {
+      if (me.authenticated && refreshLookups) {
+        await loadLookups();
+      }
+    } catch (err) {
+      if (err?.offlineAccessExpired) {
+        setOfflineAccessMessage(err.message);
+        setAuthState('offline-expired');
+        return;
+      }
       setAuthState('out');
     }
   }
@@ -189,6 +204,14 @@ function AppShell() {
     if (authState === 'in') loadLookups();
   }, [authState]);
 
+  useEffect(() => {
+    if (!wasOnlineRef.current && isOnline) {
+      checkAuth({ refreshLookups: authState === 'in' });
+    }
+    wasOnlineRef.current = isOnline;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline, authState]);
+
   // Close the More sheet whenever the route changes.
   useEffect(() => {
     setMoreOpen(false);
@@ -198,6 +221,7 @@ function AppShell() {
     try {
       await api.post('/api/auth/logout');
     } catch { /* ignore */ }
+    await clearOfflineFinancialCache();
     setAuthState('out');
     setAccounts([]);
     setCategories([]);
@@ -310,7 +334,24 @@ function AppShell() {
   }
 
   if (authState === 'out') {
-    return <Login onLogin={() => setAuthState('in')} />;
+    return <Login onLogin={() => checkAuth()} />;
+  }
+
+  if (authState === 'offline-expired') {
+    return (
+      <div className="center-screen offline-access-expired">
+        <div className="empty-state">
+          <div className="empty-state-icon">!</div>
+          <h2>Reconnect To Verify Access</h2>
+          <p>
+            {offlineAccessMessage || 'Reconnect to verify household access before viewing cached shared data.'}
+          </p>
+          <button type="button" className="btn-primary" onClick={() => checkAuth()}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -333,7 +374,10 @@ function AppShell() {
 
       </header>}
 
-      <SyncErrorBanner onOpenSettings={() => navigate('/settings')} />
+      <div className="app-banners">
+        <OfflineBanner isOnline={isOnline} />
+        <SyncErrorBanner onOpenSettings={() => navigate('/settings')} />
+      </div>
 
       <main className="app-main">
         {lookupError ? (

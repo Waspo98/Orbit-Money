@@ -31,6 +31,20 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
 | `sessions.db` | Session store (separate `better-sqlite3` connection) |
 
+## Offline PWA Cache
+
+Offline mode is intentionally read-only. The service worker caches the app shell
+and static assets, while `frontend/src/api.js` keeps successful authenticated
+GET responses in IndexedDB through `frontend/src/offlineCache.js`. Non-GET API
+calls are blocked while offline with the read-only message shown in the app
+banner.
+
+Cached API responses are keyed by signed-in user identity, household id, and
+request path. A successful `/api/auth/me` response is the access validation
+source. Owner households can use cached data offline without a time limit;
+shared/member households must have validated access within the last 7 days.
+Logout clears the IndexedDB financial response cache.
+
 ### Database Schema (30 migrations)
 
 | Migration | Purpose |

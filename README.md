@@ -18,6 +18,7 @@ stores data in SQLite, and runs as a Docker Compose app.
 - Household sharing for OIDC users by invited email
 - SQLite storage in a Docker volume
 - Installable PWA with manifest, icons, and service worker
+- Read-only offline PWA support after a successful online load
 
 ## Requirements
 
@@ -138,6 +139,19 @@ https://your-orbit-domain.example/api/auth/oidc/callback
 New OIDC users receive their own household with default app settings and
 categories. Household owners/admins can invite another OIDC user by email from
 Settings.
+
+## Offline PWA Behavior
+
+Orbit Money caches the app shell and last successful household API reads so an
+installed PWA can reopen without internet. Offline mode is read-only: create,
+edit, delete, import, restore, SimpleFIN sync, and sharing/admin actions require
+reconnection. The app shows an offline banner while disconnected and clears
+cached household financial data when the user signs out.
+
+Cached data is scoped to the signed-in user and household. Owner households can
+use their cached data offline without a time limit. Shared/member households
+must have a successful online access validation within the last 7 days before
+cached data is shown offline.
 
 ## Docker Layout
 
