@@ -3,7 +3,13 @@ import multer from 'multer';
 import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import { sendBadRequest, sendOk } from '../lib/http.js';
-import { importRocketMoneyCSV } from '../services/csvImport.js';
+import { readIdParam } from '../lib/routeParams.js';
+import {
+  applyRocketMoneyImportBatch,
+  createRocketMoneyImportBatch,
+  importRocketMoneyCSV,
+  undoImportBatch
+} from '../services/csvImport.js';
 
 const router = express.Router();
 
@@ -34,6 +40,54 @@ router.post('/rocket-money', requireAuth, upload.single('file'), (req, res) => {
   } catch (err) {
     console.error('CSV import failed:', err);
     sendBadRequest(res, err.message || 'Import failed');
+  }
+});
+
+router.post('/rocket-money/preview', requireAuth, upload.single('file'), (req, res) => {
+  const householdId = requireHouseholdId(req);
+  if (!req.file) {
+    return sendBadRequest(res, 'No file uploaded.');
+  }
+
+  try {
+    const summary = createRocketMoneyImportBatch(
+      db,
+      req.file.buffer,
+      householdId,
+      req.file.originalname || null
+    );
+    sendOk(res, { success: true, ...summary });
+  } catch (err) {
+    console.error('CSV preview failed:', err);
+    sendBadRequest(res, err.message || 'Preview failed');
+  }
+});
+
+router.post('/rocket-money/:id/commit', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  const id = readIdParam(req, res, 'id', 'import preview');
+  if (id === null) return;
+
+  try {
+    const summary = applyRocketMoneyImportBatch(db, id, householdId);
+    sendOk(res, { success: true, ...summary });
+  } catch (err) {
+    console.error('CSV import commit failed:', err);
+    sendBadRequest(res, err.message || 'Import failed');
+  }
+});
+
+router.post('/batches/:id/undo', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  const id = readIdParam(req, res, 'id', 'import batch');
+  if (id === null) return;
+
+  try {
+    const summary = undoImportBatch(db, id, householdId);
+    sendOk(res, { success: true, ...summary });
+  } catch (err) {
+    console.error('CSV import undo failed:', err);
+    sendBadRequest(res, err.message || 'Undo failed');
   }
 });
 

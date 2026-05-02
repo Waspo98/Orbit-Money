@@ -30,7 +30,11 @@
 import express from 'express';
 import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
-import { reapplyRulesToTransaction } from '../services/ruleMatcher.js';
+import {
+  applyRulesToDraft,
+  loadRules,
+  reapplyRulesToTransaction
+} from '../services/ruleMatcher.js';
 import { attachMerchantLogos } from '../services/merchantLogos.js';
 import {
   sendBadRequest,
@@ -152,6 +156,12 @@ function isoDate(s) {
   // Accept YYYY-MM-DD only. Invalid → null.
   if (!s || typeof s !== 'string') return null;
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
+function isValidDateOnly(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 function currentMonthBounds() {
@@ -555,6 +565,119 @@ router.get('/review-queue', requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error('Review queue failed:', err);
+    sendServerError(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/transactions
+// Creates a manual transaction. Date and amount are original values because
+// the user is the source of truth for manual entries.
+// ---------------------------------------------------------------------------
+router.post('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  const body = req.body || {};
+  const accountId = parseId(body.account_id);
+  const merchant = typeof body.merchant === 'string' ? body.merchant.trim() : '';
+  const date = String(body.date || '').trim();
+  const amountValue = Number(body.amount);
+
+  if (accountId === null) {
+    return sendBadRequest(res, 'account_id is required.');
+  }
+  if (!isValidDateOnly(date)) {
+    return sendBadRequest(res, 'date must be a valid YYYY-MM-DD date.');
+  }
+  if (!Number.isFinite(amountValue) || amountValue === 0) {
+    return sendBadRequest(res, 'amount must be a non-zero number.');
+  }
+  if (!merchant) {
+    return sendBadRequest(res, 'merchant is required.');
+  }
+
+  const account = db
+    .prepare('SELECT id FROM accounts WHERE id = ? AND household_id = ? AND is_archived = 0')
+    .get(accountId, householdId);
+  if (!account) {
+    return sendBadRequest(res, 'account_id does not exist in this household.');
+  }
+
+  const categoryId = body.category_id === null || body.category_id === '' || body.category_id === undefined
+    ? null
+    : parseId(body.category_id);
+  if (categoryId === null && body.category_id !== null && body.category_id !== '' && body.category_id !== undefined) {
+    return sendBadRequest(res, 'category_id must be an integer or null.');
+  }
+  if (categoryId !== null) {
+    const category = db
+      .prepare('SELECT id FROM categories WHERE id = ? AND household_id = ?')
+      .get(categoryId, householdId);
+    if (!category) {
+      return sendBadRequest(res, 'category_id does not exist in this household.');
+    }
+  }
+
+  try {
+    const amountCents = dollarsToCents(amountValue);
+    const description = typeof body.description === 'string' ? body.description.trim() : null;
+    const isTransfer = body.is_transfer ? 1 : 0;
+    const isIgnored = body.is_ignored ? 1 : 0;
+    const hydrated = applyRulesToDraft(
+      {
+        account_id: accountId,
+        date,
+        amount: amountCents,
+        original_merchant: merchant,
+        original_description: description,
+        original_category_id: categoryId,
+        original_is_transfer: isTransfer,
+        original_is_ignored: isIgnored
+      },
+      loadRules(db, householdId)
+    );
+
+    const result = db
+      .prepare(
+        `INSERT INTO transactions (
+           household_id, account_id, date, amount, original_merchant,
+           original_description, category_id, notes, is_transfer, is_ignored,
+           edited_merchant, edited_merchant_source,
+           edited_category_id, edited_category_id_source,
+           edited_is_transfer, edited_is_transfer_source,
+           edited_is_ignored, edited_is_ignored_source,
+           source
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')`
+      )
+      .run(
+        householdId,
+        accountId,
+        date,
+        amountCents,
+        merchant,
+        description,
+        categoryId,
+        typeof body.notes === 'string' ? body.notes : '',
+        isTransfer,
+        isIgnored,
+        hydrated.edited_merchant,
+        hydrated.edited_merchant_source,
+        hydrated.edited_category_id,
+        hydrated.edited_category_id_source,
+        hydrated.edited_is_transfer,
+        hydrated.edited_is_transfer_source,
+        hydrated.edited_is_ignored,
+        hydrated.edited_is_ignored_source
+      );
+
+    const row = db
+      .prepare(`SELECT ${SELECT_COLS} FROM transactions WHERE id = ? AND household_id = ?`)
+      .get(result.lastInsertRowid, householdId);
+    sendOk(res, {
+      success: true,
+      transaction: attachMerchantLogos(db, [hydrate(row)])[0]
+    });
+  } catch (err) {
+    console.error('Create manual transaction failed:', err);
     sendServerError(res, err);
   }
 });

@@ -63,7 +63,8 @@ function sanitizeActions(actions, validCategoryIds) {
 
 /**
  * Fetch all enabled rules from the DB, parse JSON, filter out malformed ones.
- * Returns [{ id, conditions, actions }] ready for matching.
+ * Returns rules ready for matching. Extra metadata is harmless to callers that
+ * only need id/conditions/actions.
  */
 export function loadRules(db, householdId = 1) {
   const validCategoryIds = new Set(
@@ -74,7 +75,7 @@ export function loadRules(db, householdId = 1) {
   );
   const rows = db
     .prepare(
-      `SELECT id, conditions, actions
+      `SELECT id, name, conditions, actions, priority
          FROM rules
         WHERE household_id = ?
           AND enabled = 1
@@ -85,8 +86,10 @@ export function loadRules(db, householdId = 1) {
   return rows
     .map((r) => ({
       id: r.id,
+      name: r.name,
       conditions: safeJsonParse(r.conditions, null),
-      actions: sanitizeActions(safeJsonParse(r.actions, null), validCategoryIds)
+      actions: sanitizeActions(safeJsonParse(r.actions, null), validCategoryIds),
+      priority: r.priority
     }))
     .filter(
       (r) =>
@@ -322,6 +325,344 @@ export function countMatches(db, conditions, householdId = 1) {
     if (evalConditions(r, conditions)) n++;
   }
   return n;
+}
+
+const PREVIEW_LIMIT = 25;
+const PREVIEW_RULE_ID = '__preview__';
+const EDIT_FIELDS = {
+  merchant: {
+    label: 'Merchant',
+    editKey: 'edited_merchant',
+    sourceKey: 'edited_merchant_source',
+    originalKey: 'original_merchant'
+  },
+  category: {
+    label: 'Category',
+    editKey: 'edited_category_id',
+    sourceKey: 'edited_category_id_source',
+    originalKey: 'original_category_id'
+  },
+  transfer: {
+    label: 'Transfer',
+    editKey: 'edited_is_transfer',
+    sourceKey: 'edited_is_transfer_source',
+    originalKey: 'original_is_transfer'
+  },
+  ignored: {
+    label: 'Ignored',
+    editKey: 'edited_is_ignored',
+    sourceKey: 'edited_is_ignored_source',
+    originalKey: 'original_is_ignored'
+  }
+};
+
+function ruleSortId(rule) {
+  if (Number.isFinite(rule.sort_id)) return rule.sort_id;
+  const id = Number(rule.id);
+  return Number.isFinite(id) ? id : Number.MAX_SAFE_INTEGER;
+}
+
+function sortRulesForApplication(rules) {
+  return [...rules].sort((a, b) => (
+    (Number(b.priority) || 0) - (Number(a.priority) || 0) ||
+    ruleSortId(a) - ruleSortId(b)
+  ));
+}
+
+function ruleSourceId(source) {
+  if (typeof source !== 'string' || !source.startsWith('rule:')) return null;
+  const raw = source.slice('rule:'.length);
+  const id = Number(raw);
+  return Number.isFinite(id) ? id : raw;
+}
+
+function samePreviewValue(a, b) {
+  if (a === null || a === undefined || a === '') return b === null || b === undefined || b === '';
+  if (b === null || b === undefined || b === '') return false;
+  return String(a) === String(b);
+}
+
+function currentDisplayValue(transaction, field) {
+  const meta = EDIT_FIELDS[field];
+  return transaction[meta.editKey] ?? transaction[meta.originalKey] ?? null;
+}
+
+function displayValueFromEdits(transaction, edits, field) {
+  const meta = EDIT_FIELDS[field];
+  return edits[meta.editKey] ?? transaction[meta.originalKey] ?? null;
+}
+
+function actionImpact(action, transaction) {
+  if (!action || typeof action !== 'object') return null;
+
+  switch (action.type) {
+    case 'rename': {
+      if (typeof action.value !== 'string') return null;
+      if (action.value === transaction.original_merchant) return null;
+      return {
+        field: 'merchant',
+        label: EDIT_FIELDS.merchant.label,
+        to: action.value
+      };
+    }
+
+    case 'categorize': {
+      const categoryId =
+        typeof action.value === 'number' ? action.value : parseInt(action.value, 10);
+      if (!Number.isFinite(categoryId)) return null;
+      if (categoryId === transaction.original_category_id) return null;
+      return {
+        field: 'category',
+        label: EDIT_FIELDS.category.label,
+        to: categoryId
+      };
+    }
+
+    case 'mark_transfer':
+      if (transaction.original_is_transfer === 1) return null;
+      return {
+        field: 'transfer',
+        label: EDIT_FIELDS.transfer.label,
+        to: 1
+      };
+
+    case 'mark_ignored':
+      if (transaction.original_is_ignored === 1) return null;
+      return {
+        field: 'ignored',
+        label: EDIT_FIELDS.ignored.label,
+        to: 1
+      };
+
+    default:
+      return null;
+  }
+}
+
+function transactionPreviewRow(row) {
+  return {
+    ...row,
+    amount: centsToDollars(row.amount),
+    has_edits:
+      row.edited_merchant_source !== null ||
+      row.edited_category_id_source !== null ||
+      row.edited_is_transfer_source !== null ||
+      row.edited_is_ignored_source !== null
+  };
+}
+
+function addAffectedItem(map, transaction) {
+  const id = transaction.id;
+  if (!map.has(id)) {
+    map.set(id, {
+      transaction: transactionPreviewRow(transaction),
+      fields: [],
+      rules: []
+    });
+  }
+  return map.get(id);
+}
+
+function addPreviewItem(map, transaction, field) {
+  const id = transaction.id;
+  const existing = map.get(id);
+  if (existing) {
+    existing.fields.push(field);
+    return;
+  }
+
+  map.set(id, {
+    transaction: transactionPreviewRow(transaction),
+    fields: [field]
+  });
+}
+
+function addConflictItem(map, transaction, field, rule) {
+  const id = transaction.id;
+  const existing = map.get(id);
+  const ruleSummary = { id: rule.id, name: rule.name || `Rule ${rule.id}` };
+  const fieldSummary = {
+    ...field,
+    ruleId: ruleSummary.id,
+    ruleName: ruleSummary.name
+  };
+
+  if (existing) {
+    existing.fields.push(fieldSummary);
+    existing.rules ||= [];
+    if (!existing.rules.some((item) => item.id === ruleSummary.id)) {
+      existing.rules.push(ruleSummary);
+    }
+    return;
+  }
+
+  map.set(id, {
+    transaction: transactionPreviewRow(transaction),
+    fields: [fieldSummary],
+    rules: [ruleSummary]
+  });
+}
+
+/**
+ * Preview a draft rule without writing anything. The response exposes every
+ * transaction affected by the draft, then annotates visible changes/conflicts.
+ */
+export function previewRuleImpact(db, draft, householdId = 1, options = {}) {
+  const limit = parseInt(options.limit, 10) || PREVIEW_LIMIT;
+  const conditions = Array.isArray(draft?.conditions) ? draft.conditions : [];
+  const rawRuleId = draft?.ruleId;
+  const parsedRuleId =
+    rawRuleId === undefined || rawRuleId === null || rawRuleId === '' ? null : Number(rawRuleId);
+  const ruleId = Number.isInteger(parsedRuleId) && parsedRuleId > 0 ? parsedRuleId : null;
+  const enabled = draft?.enabled !== false;
+  const existingRule = ruleId
+    ? db
+      .prepare('SELECT id, name, priority FROM rules WHERE id = ? AND household_id = ?')
+      .get(ruleId, householdId)
+    : null;
+  const priority = Number.isFinite(Number(draft?.priority))
+    ? Number(draft.priority)
+    : existingRule?.priority ?? 0;
+  const validCategoryIds = new Set(
+    db
+      .prepare('SELECT id FROM categories WHERE household_id = ?')
+      .all(householdId)
+      .map((row) => row.id)
+  );
+  const actions = sanitizeActions(Array.isArray(draft?.actions) ? draft.actions : [], validCategoryIds) || [];
+  const proposedId = ruleId ?? PREVIEW_RULE_ID;
+  const proposedSource = `rule:${proposedId}`;
+  const proposedRule = {
+    id: proposedId,
+    name: existingRule?.name || 'This rule',
+    conditions,
+    actions,
+    priority,
+    sort_id: ruleId ?? Number.MAX_SAFE_INTEGER
+  };
+
+  const existingRules = loadRules(db, householdId).filter((rule) => rule.id !== ruleId);
+  const rulesById = new Map(existingRules.map((rule) => [rule.id, rule]));
+  const rulesWithDraft = enabled
+    ? sortRulesForApplication([...existingRules, proposedRule])
+    : existingRules;
+
+  const rows = db
+    .prepare(
+      `SELECT id,
+              account_id,
+              date,
+              amount,
+              COALESCE(edited_merchant, original_merchant) AS merchant,
+              COALESCE(edited_category_id, category_id) AS category_id,
+              COALESCE(edited_is_transfer, is_transfer) AS is_transfer,
+              COALESCE(edited_is_ignored, is_ignored) AS is_ignored,
+              original_merchant,
+              original_description,
+              category_id AS original_category_id,
+              is_transfer AS original_is_transfer,
+              is_ignored AS original_is_ignored,
+              edited_merchant,
+              edited_merchant_source,
+              edited_category_id,
+              edited_category_id_source,
+              edited_is_transfer,
+              edited_is_transfer_source,
+              edited_is_ignored,
+              edited_is_ignored_source,
+              notes,
+              transfer_pair_id
+         FROM transactions
+        WHERE household_id = ?
+        ORDER BY date DESC, id DESC`
+    )
+    .all(householdId);
+
+  const willChange = new Map();
+  const conflicts = new Map();
+  const affected = new Map();
+  let matchCount = 0;
+
+  for (const transaction of rows) {
+    const matchesDraft = evalConditions(transaction, conditions);
+    if (matchesDraft) {
+      matchCount++;
+      addAffectedItem(affected, transaction);
+    }
+
+    const actionImpacts = new Map();
+    if (matchesDraft && enabled && actions.length > 0) {
+      for (const action of actions) {
+        const impact = actionImpact(action, transaction);
+        if (!impact || actionImpacts.has(impact.field)) continue;
+        actionImpacts.set(impact.field, impact);
+      }
+    }
+
+    const { edits } = computeEdits(transaction, rulesWithDraft);
+
+    for (const [field, meta] of Object.entries(EDIT_FIELDS)) {
+      const currentSource = transaction[meta.sourceKey] ?? null;
+      const nextSource = edits[meta.sourceKey] ?? null;
+      const currentDisplay = currentDisplayValue(transaction, field);
+      const nextDisplay = displayValueFromEdits(transaction, edits, field);
+      const displayChanged = !samePreviewValue(currentDisplay, nextDisplay);
+      const ruleCurrentlyOwnsField = currentSource === proposedSource;
+      const draftWillOwnField = nextSource === proposedSource;
+
+      if (draftWillOwnField && displayChanged) {
+        const previewField = {
+          field,
+          label: meta.label,
+          from: currentDisplay,
+          to: nextDisplay
+        };
+        addPreviewItem(willChange, transaction, previewField);
+        addPreviewItem(affected, transaction, previewField);
+        continue;
+      }
+
+      if (!ruleId || (!ruleCurrentlyOwnsField && !draftWillOwnField)) continue;
+
+      const previewField = {
+        field,
+        label: meta.label,
+        from: currentDisplay,
+        to: nextDisplay,
+        applied: !displayChanged && ruleCurrentlyOwnsField && draftWillOwnField
+      };
+      addPreviewItem(willChange, transaction, previewField);
+      addPreviewItem(affected, transaction, previewField);
+    }
+
+    for (const impact of actionImpacts.values()) {
+      const meta = EDIT_FIELDS[impact.field];
+      const nextSource = edits[meta.sourceKey] ?? null;
+      if (nextSource === proposedSource) continue;
+
+      const winningRuleId = ruleSourceId(nextSource);
+      if (winningRuleId === null || winningRuleId === proposedId) continue;
+      const winningRule = rulesById.get(winningRuleId);
+      if (!winningRule) continue;
+      addConflictItem(conflicts, transaction, impact, winningRule);
+      addConflictItem(affected, transaction, impact, winningRule);
+    }
+  }
+
+  const willChangeItems = Array.from(willChange.values());
+  const conflictItems = Array.from(conflicts.values());
+  const affectedItems = Array.from(affected.values());
+
+  return {
+    count: matchCount,
+    affectedCount: affectedItems.length,
+    willChangeCount: willChangeItems.length,
+    conflictCount: conflictItems.length,
+    affected: affectedItems.slice(0, limit),
+    willChange: willChangeItems.slice(0, limit),
+    conflicts: conflictItems.slice(0, limit),
+    limit
+  };
 }
 
 /**

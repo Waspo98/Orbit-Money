@@ -1,22 +1,11 @@
-// =============================================================================
-// csvImport.js — Rocket Money CSV import pipeline (v12)
-// =============================================================================
-// Responsibilities:
-//   1. Parse the 15-column Rocket Money export format
-//   2. Discover unique accounts, auto-guess types, upsert
-//   3. Extract (Name → Custom Name) rename pairs, create rules
-//   4. Insert transactions with original_merchant = raw Name (NOT the RM
-//      Custom Name override) so originals are preserved forever
-//   5. After all inserts, reapply all rules — rule-owned edits get populated
-//      (edited_merchant = customName, edited_merchant_source = 'rule:{id}')
-//
-// Sign convention: RM uses positive=expense, we use negative=expense.
-// All DB work happens inside a single transaction — atomic, all-or-nothing.
-// =============================================================================
+// Rocket Money CSV import pipeline with preview, commit, and undo support.
 
 import Papa from 'papaparse';
 import crypto from 'crypto';
-import { reapplyRulesToAllTransactions } from './ruleMatcher.js';
+import {
+  reapplyRulesToAllTransactions,
+  revertEditsForRule
+} from './ruleMatcher.js';
 import { dollarsToCents } from '../lib/money.js';
 
 const REQUIRED_COLUMNS = [
@@ -52,15 +41,10 @@ function canMatchExistingAccount(acct) {
 
 function computeContentHash({ date, amountCents, originalDescription, accountKey }) {
   const input = `${date}|${amountCents}|${originalDescription}|${accountKey}`;
-  return crypto
-    .createHash('sha256')
-    .update(input)
-    .digest('hex')
-    .slice(0, 16);
+  return crypto.createHash('sha256').update(input).digest('hex').slice(0, 16);
 }
 
-export function importRocketMoneyCSV(db, csvBuffer, householdId = 1) {
-  // --- 1. Parse -------------------------------------------------------------
+function parseRocketMoneyRows(csvBuffer) {
   const csvText = csvBuffer.toString('utf-8');
   const parsed = Papa.parse(csvText, {
     header: true,
@@ -80,12 +64,32 @@ export function importRocketMoneyCSV(db, csvBuffer, householdId = 1) {
     );
   }
 
-  // --- 2. Discover accounts -------------------------------------------------
+  return { rows, parseWarnings: parsed.errors.length };
+}
+
+function readCategories(db, householdId) {
+  const categories = db
+    .prepare('SELECT id, name FROM categories WHERE household_id = ?')
+    .all(householdId);
+  const categoryIdByName = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
+  const uncategorizedId = categoryIdByName.get('uncategorized') ?? categories[0]?.id ?? null;
+  return { categoryIdByName, uncategorizedId };
+}
+
+export function buildRocketMoneyImportPreview(db, csvBuffer, householdId = 1, filename = null) {
+  const { rows, parseWarnings } = parseRocketMoneyRows(csvBuffer);
+  const { categoryIdByName, uncategorizedId } = readCategories(db, householdId);
+
   const accountsMap = new Map();
   for (const row of rows) {
     const key = accountKey(row);
-    if (accountsMap.has(key)) continue;
+    if (accountsMap.has(key)) {
+      accountsMap.get(key).rowCount += 1;
+      continue;
+    }
     accountsMap.set(key, {
+      key,
+      rowCount: 1,
       name: (row['Account Name'] || '').trim() || 'Unknown Account',
       institution: (row['Institution Name'] || '').trim() || null,
       account_number_last4: (row['Account Number'] || '').trim() || null,
@@ -93,8 +97,26 @@ export function importRocketMoneyCSV(db, csvBuffer, householdId = 1) {
     });
   }
 
-  // --- 3. Discover rename rules ---------------------------------------------
-  const rulesMap = new Map(); // Name → Custom Name
+  const findAccount = db.prepare(`
+    SELECT id, name FROM accounts
+     WHERE household_id = ?
+       AND institution IS ? AND account_number_last4 IS ?
+  `);
+
+  const accounts = Array.from(accountsMap.values()).map((acct) => {
+    const existing = canMatchExistingAccount(acct)
+      ? findAccount.get(householdId, acct.institution, acct.account_number_last4)
+      : null;
+    return {
+      ...acct,
+      existingAccountId: existing?.id || null,
+      existingAccountName: existing?.name || null,
+      willCreate: !existing
+    };
+  });
+  const accountByKey = new Map(accounts.map((acct) => [acct.key, acct]));
+
+  const rulesMap = new Map();
   for (const row of rows) {
     const customName = (row['Custom Name'] || '').trim();
     const name = (row['Name'] || '').trim();
@@ -102,35 +124,167 @@ export function importRocketMoneyCSV(db, csvBuffer, householdId = 1) {
     rulesMap.set(name, customName);
   }
 
-  // --- 4. Category lookup ---------------------------------------------------
-  const categories = db
-    .prepare('SELECT id, name FROM categories WHERE household_id = ?')
-    .all(householdId);
-  const categoryIdByName = new Map(
-    categories.map((c) => [c.name.toLowerCase(), c.id])
-  );
-  const uncategorizedId =
-    categoryIdByName.get('uncategorized') ?? categories[0]?.id ?? null;
+  const findRule = db.prepare('SELECT id FROM rules WHERE household_id = ? AND name = ?');
+  const rules = Array.from(rulesMap.entries()).map(([ruleName, customName]) => {
+    const friendlyName = `Auto: ${ruleName} -> ${customName}`;
+    const existing = findRule.get(householdId, friendlyName);
+    return {
+      ruleName,
+      customName,
+      friendlyName,
+      existingRuleId: existing?.id || null,
+      willCreate: !existing
+    };
+  });
 
-  // --- 5. Prepared statements ----------------------------------------------
+  const findExistingTxn = db.prepare(
+    `SELECT id FROM transactions
+      WHERE household_id = ?
+        AND source = 'csv_import'
+        AND external_id = ?`
+  );
+
+  const seenExternalIds = new Set();
+  const transactions = [];
+  let invalidRows = 0;
+  let duplicateRows = 0;
+
+  for (const row of rows) {
+    const key = accountKey(row);
+    const acct = accountByKey.get(key);
+    const rmAmount = parseFloat(row['Amount']);
+    const date = (row['Date'] || '').trim();
+    if (!acct || !Number.isFinite(rmAmount) || !date) {
+      invalidRows += 1;
+      continue;
+    }
+
+    const amountCents = dollarsToCents(-rmAmount);
+    const originalDescription = (row['Description'] || '').trim();
+    const externalId = computeContentHash({
+      date,
+      amountCents,
+      originalDescription,
+      accountKey: key
+    });
+    const duplicateInFile = seenExternalIds.has(externalId);
+    seenExternalIds.add(externalId);
+    const duplicateInDatabase = Boolean(findExistingTxn.get(householdId, externalId));
+    if (duplicateInFile || duplicateInDatabase) duplicateRows += 1;
+
+    const categoryName = (row['Category'] || '').trim().toLowerCase();
+    transactions.push({
+      accountKey: key,
+      date,
+      amountCents,
+      originalMerchant: (row['Name'] || '').trim() || 'Unknown',
+      originalDescription,
+      categoryId: categoryIdByName.get(categoryName) || uncategorizedId,
+      notes: (row['Note'] || '').trim() || null,
+      isIgnored: (row['Ignored From'] || '').trim() ? 1 : 0,
+      externalId,
+      duplicateInFile,
+      duplicateInDatabase
+    });
+  }
+
+  const summary = {
+    source: 'rocket_money',
+    filename,
+    totalRows: rows.length,
+    validRows: transactions.length,
+    invalidRows,
+    parseWarnings,
+    duplicateRows,
+    estimatedInserted: transactions.filter((txn) => !txn.duplicateInFile && !txn.duplicateInDatabase).length,
+    accountsFound: accounts.length,
+    accountsCreated: accounts.filter((acct) => acct.willCreate).length,
+    accountsMatched: accounts.filter((acct) => !acct.willCreate).length,
+    rulesFound: rules.length,
+    rulesCreated: rules.filter((rule) => rule.willCreate).length
+  };
+
+  return {
+    summary,
+    preview: {
+      source: 'rocket_money',
+      filename,
+      createdAt: new Date().toISOString(),
+      accounts,
+      rules,
+      transactions
+    }
+  };
+}
+
+export function createRocketMoneyImportBatch(db, csvBuffer, householdId = 1, filename = null) {
+  const { summary, preview } = buildRocketMoneyImportPreview(db, csvBuffer, householdId, filename);
+  const result = db
+    .prepare(
+      `INSERT INTO import_batches (household_id, source, filename, status, preview_json, summary_json)
+       VALUES (?, 'rocket_money', ?, 'pending', ?, ?)`
+    )
+    .run(householdId, filename, JSON.stringify(preview), JSON.stringify(summary));
+
+  return {
+    batchId: result.lastInsertRowid,
+    ...summary,
+    accounts: preview.accounts.map((acct) => ({
+      name: acct.name,
+      institution: acct.institution,
+      account_number_last4: acct.account_number_last4,
+      type: acct.type,
+      rowCount: acct.rowCount,
+      willCreate: acct.willCreate,
+      existingAccountName: acct.existingAccountName
+    })),
+    rules: preview.rules.map((rule) => ({
+      name: rule.friendlyName,
+      willCreate: rule.willCreate
+    }))
+  };
+}
+
+function recordBatchItem(db, householdId, importBatchId, tableName, rowId) {
+  db.prepare(
+    `INSERT OR IGNORE INTO import_batch_items (household_id, import_batch_id, table_name, row_id)
+     VALUES (?, ?, ?, ?)`
+  ).run(householdId, importBatchId, tableName, rowId);
+}
+
+export function applyRocketMoneyImportBatch(db, importBatchId, householdId = 1) {
+  const batch = db
+    .prepare(
+      `SELECT *
+         FROM import_batches
+        WHERE id = ?
+          AND household_id = ?`
+    )
+    .get(importBatchId, householdId);
+  if (!batch) throw new Error('Import preview was not found.');
+  if (batch.status !== 'pending') {
+    throw new Error('This import preview has already been used.');
+  }
+
+  const preview = JSON.parse(batch.preview_json || '{}');
+  const accounts = Array.isArray(preview.accounts) ? preview.accounts : [];
+  const rules = Array.isArray(preview.rules) ? preview.rules : [];
+  const transactions = Array.isArray(preview.transactions) ? preview.transactions : [];
+
   const findAccount = db.prepare(`
     SELECT id FROM accounts
-    WHERE household_id = ?
-      AND institution IS ? AND account_number_last4 IS ?
+     WHERE household_id = ?
+       AND institution IS ? AND account_number_last4 IS ?
   `);
   const insertAccount = db.prepare(`
-    INSERT INTO accounts (household_id, name, type, institution, account_number_last4, is_manual, current_balance)
-    VALUES (?, ?, ?, ?, ?, 1, 0)
+    INSERT INTO accounts (household_id, name, type, institution, account_number_last4, is_manual, current_balance, sort_order)
+    VALUES (?, ?, ?, ?, ?, 1, 0, COALESCE((SELECT MAX(sort_order) + 10 FROM accounts WHERE household_id = ?), 0))
   `);
-
   const findRule = db.prepare('SELECT id FROM rules WHERE household_id = ? AND name = ?');
   const insertRule = db.prepare(`
     INSERT INTO rules (household_id, name, conditions, actions, priority, enabled)
     VALUES (?, ?, ?, ?, 0, 1)
   `);
-
-  // Note: original_merchant holds the raw bank "Name" field. Edited values
-  // are populated by reapplying rules after all inserts (see step 7).
   const insertTxn = db.prepare(`
     INSERT OR IGNORE INTO transactions
       (account_id, date, amount, original_merchant, original_description,
@@ -138,114 +292,94 @@ export function importRocketMoneyCSV(db, csvBuffer, householdId = 1) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'csv_import', ?, ?)
   `);
 
-  // --- 6. Atomic import -----------------------------------------------------
+  const deletedRuleIds = [];
   const run = db.transaction(() => {
     let accountsCreated = 0;
     let rulesCreated = 0;
     let inserted = 0;
     let skipped = 0;
-
     const accountIdByKey = new Map();
 
-    for (const [key, acct] of accountsMap) {
+    for (const acct of accounts) {
       const existing = canMatchExistingAccount(acct)
         ? findAccount.get(householdId, acct.institution, acct.account_number_last4)
         : null;
       if (existing) {
-        accountIdByKey.set(key, existing.id);
-      } else {
-        const result = insertAccount.run(
-          householdId,
-          acct.name,
-          acct.type,
-          acct.institution,
-          acct.account_number_last4
-        );
-        accountIdByKey.set(key, result.lastInsertRowid);
-        accountsCreated++;
+        accountIdByKey.set(acct.key, existing.id);
+        continue;
       }
-    }
-
-    for (const [ruleName, customName] of rulesMap) {
-      const friendlyName = `Auto: ${ruleName} → ${customName}`;
-      if (findRule.get(householdId, friendlyName)) continue;
-      insertRule.run(
+      const result = insertAccount.run(
         householdId,
-        friendlyName,
-        JSON.stringify([
-          { field: 'merchant', operator: 'contains', value: ruleName }
-        ]),
-        JSON.stringify([{ type: 'rename', value: customName }])
-      );
-      rulesCreated++;
-    }
-
-    for (const row of rows) {
-      const key = accountKey(row);
-      const accountId = accountIdByKey.get(key);
-      if (!accountId) {
-        skipped++;
-        continue;
-      }
-
-      const rmAmount = parseFloat(row['Amount']);
-      if (!Number.isFinite(rmAmount)) {
-        skipped++;
-        continue;
-      }
-      const amount = -rmAmount;
-
-      const date = (row['Date'] || '').trim();
-      if (!date) {
-        skipped++;
-        continue;
-      }
-
-      // v12: original_merchant is the raw "Name" column. Rocket Money's
-      // Custom Name is handled via the rule we just inserted, which will
-      // populate edited_merchant on reapply below.
-      const name = (row['Name'] || '').trim();
-      const originalMerchant = name || 'Unknown';
-
-      const originalDesc = (row['Description'] || '').trim();
-      const categoryName = (row['Category'] || '').trim().toLowerCase();
-      const categoryId = categoryIdByName.get(categoryName) || uncategorizedId;
-      const notes = (row['Note'] || '').trim() || null;
-      const isIgnored = (row['Ignored From'] || '').trim() ? 1 : 0;
-
-      const amountCents = dollarsToCents(amount);
-      const contentHash = computeContentHash({
-        date,
-        amountCents,
-        originalDescription: originalDesc,
-        accountKey: key
-      });
-
-      const result = insertTxn.run(
-        accountId,
-        date,
-        amountCents,
-        originalMerchant,
-        originalDesc,
-        categoryId,
-        notes,
-        isIgnored,
-        contentHash,
+        acct.name,
+        acct.type,
+        acct.institution,
+        acct.account_number_last4,
         householdId
       );
-
-      if (result.changes === 1) inserted++;
-      else skipped++;
+      accountIdByKey.set(acct.key, result.lastInsertRowid);
+      accountsCreated += 1;
+      recordBatchItem(db, householdId, importBatchId, 'accounts', result.lastInsertRowid);
     }
 
-    return { inserted, skipped, accountsCreated, rulesCreated };
+    for (const rule of rules) {
+      if (findRule.get(householdId, rule.friendlyName)) continue;
+      const result = insertRule.run(
+        householdId,
+        rule.friendlyName,
+        JSON.stringify([{ field: 'merchant', operator: 'contains', value: rule.ruleName }]),
+        JSON.stringify([{ type: 'rename', value: rule.customName }])
+      );
+      rulesCreated += 1;
+      recordBatchItem(db, householdId, importBatchId, 'rules', result.lastInsertRowid);
+    }
+
+    for (const txn of transactions) {
+      const accountId = accountIdByKey.get(txn.accountKey);
+      if (!accountId) {
+        skipped += 1;
+        continue;
+      }
+      const result = insertTxn.run(
+        accountId,
+        txn.date,
+        txn.amountCents,
+        txn.originalMerchant,
+        txn.originalDescription,
+        txn.categoryId,
+        txn.notes,
+        txn.isIgnored ? 1 : 0,
+        txn.externalId,
+        householdId
+      );
+      if (result.changes === 1) {
+        inserted += 1;
+        recordBatchItem(db, householdId, importBatchId, 'transactions', result.lastInsertRowid);
+      } else {
+        skipped += 1;
+      }
+    }
+
+    const summary = {
+      inserted,
+      skipped,
+      accountsCreated,
+      rulesCreated,
+      totalRows: transactions.length,
+      parseWarnings: JSON.parse(batch.summary_json || '{}').parseWarnings || 0
+    };
+    db.prepare(
+      `UPDATE import_batches
+          SET status = 'applied',
+              summary_json = ?,
+              applied_at = datetime('now'),
+              updated_at = datetime('now')
+        WHERE id = ? AND household_id = ?`
+    ).run(JSON.stringify(summary), importBatchId, householdId);
+    return summary;
   });
 
   const summary = run();
 
-  // --- 7. Reapply rules post-import ----------------------------------------
-  // Populates edited_* columns for every transaction (new + existing) so the
-  // RM Custom Name mappings take effect immediately.
   let reapplyResult = { processed: 0, updated: 0 };
   try {
     reapplyResult = reapplyRulesToAllTransactions(db, householdId);
@@ -254,9 +388,105 @@ export function importRocketMoneyCSV(db, csvBuffer, householdId = 1) {
   }
 
   return {
+    batchId: importBatchId,
     ...summary,
-    totalRows: rows.length,
-    parseWarnings: parsed.errors.length,
     reapplyUpdated: reapplyResult.updated
   };
+}
+
+export function undoImportBatch(db, importBatchId, householdId = 1) {
+  const batch = db
+    .prepare(
+      `SELECT *
+         FROM import_batches
+        WHERE id = ?
+          AND household_id = ?`
+    )
+    .get(importBatchId, householdId);
+  if (!batch) throw new Error('Import batch was not found.');
+  if (batch.status !== 'applied') {
+    throw new Error('Only applied imports can be undone.');
+  }
+
+  const items = db
+    .prepare(
+      `SELECT table_name, row_id
+         FROM import_batch_items
+        WHERE household_id = ?
+          AND import_batch_id = ?
+        ORDER BY id DESC`
+    )
+    .all(householdId, importBatchId);
+
+  const idsByTable = new Map();
+  for (const item of items) {
+    if (!idsByTable.has(item.table_name)) idsByTable.set(item.table_name, []);
+    idsByTable.get(item.table_name).push(item.row_id);
+  }
+
+  const deletedRuleIds = [];
+  const run = db.transaction(() => {
+    let transactionsDeleted = 0;
+    let rulesDeleted = 0;
+    let accountsDeleted = 0;
+    let accountsKept = 0;
+
+    for (const id of idsByTable.get('transactions') || []) {
+      transactionsDeleted += db
+        .prepare('DELETE FROM transactions WHERE id = ? AND household_id = ?')
+        .run(id, householdId).changes;
+    }
+
+    for (const id of idsByTable.get('rules') || []) {
+      const changes = db
+        .prepare('DELETE FROM rules WHERE id = ? AND household_id = ?')
+        .run(id, householdId).changes;
+      if (changes) {
+        rulesDeleted += changes;
+        deletedRuleIds.push(id);
+      }
+    }
+
+    for (const id of idsByTable.get('accounts') || []) {
+      const remainingTransactions = db
+        .prepare('SELECT COUNT(*) AS count FROM transactions WHERE account_id = ? AND household_id = ?')
+        .get(id, householdId).count;
+      const remainingRecords = db
+        .prepare('SELECT COUNT(*) AS count FROM account_balance_records WHERE account_id = ? AND household_id = ?')
+        .get(id, householdId).count;
+      if (remainingTransactions || remainingRecords) {
+        accountsKept += 1;
+        continue;
+      }
+      accountsDeleted += db
+        .prepare('DELETE FROM accounts WHERE id = ? AND household_id = ?')
+        .run(id, householdId).changes;
+    }
+
+    const summary = { transactionsDeleted, rulesDeleted, accountsDeleted, accountsKept };
+    db.prepare(
+      `UPDATE import_batches
+          SET status = 'undone',
+              summary_json = ?,
+              undone_at = datetime('now'),
+              updated_at = datetime('now')
+        WHERE id = ? AND household_id = ?`
+    ).run(JSON.stringify(summary), importBatchId, householdId);
+    return summary;
+  });
+
+  const summary = run();
+  for (const ruleId of deletedRuleIds) {
+    revertEditsForRule(db, ruleId, householdId);
+  }
+
+  return {
+    batchId: importBatchId,
+    ...summary
+  };
+}
+
+export function importRocketMoneyCSV(db, csvBuffer, householdId = 1) {
+  const preview = createRocketMoneyImportBatch(db, csvBuffer, householdId, null);
+  return applyRocketMoneyImportBatch(db, preview.batchId, householdId);
 }

@@ -74,7 +74,10 @@ const BUDGET_SORT_OPTIONS = [
 // Main page
 // ============================================================================
 
-export default function Budgets() {
+export default function Budgets({
+  budgetedSortPreference = 'pct_desc',
+  onBudgetedSortPreferenceChange
+}) {
   const { alert, confirm, Dialog } = useAppDialog();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedMonth = searchParams.get('month') || currentMonth();
@@ -100,25 +103,20 @@ export default function Budgets() {
   const [expandedBudgetKey, setExpandedBudgetKey] = useState(null);
   const [budgetTransactions, setBudgetTransactions] = useState({});
 
-  // Sort order for the Budgeted section. Persisted in localStorage so a
-  // user's choice sticks across navigations without needing a URL param.
+  // Sort order for the Budgeted section. Persisted as an account preference so
+  // a user's choice sticks across browsers without needing a URL param.
   // Default matches the previous backend-sorted behavior (most over-budget
   // first = highest % spent first).
-  const [budgetedSort, setBudgetedSort] = useState(() => {
-    try {
-      return localStorage.getItem('orbit-money-budgeted-sort') || 'pct_desc';
-    } catch {
-      return 'pct_desc';
-    }
-  });
+  const [budgetedSort, setBudgetedSort] = useState(budgetedSortPreference || 'pct_desc');
 
   useEffect(() => {
-    try {
-      localStorage.setItem('orbit-money-budgeted-sort', budgetedSort);
-    } catch {
-      /* ignore */
-    }
-  }, [budgetedSort]);
+    setBudgetedSort(budgetedSortPreference || 'pct_desc');
+  }, [budgetedSortPreference]);
+
+  function updateBudgetedSort(value) {
+    setBudgetedSort(value);
+    onBudgetedSortPreferenceChange?.(value);
+  }
 
   async function load() {
     // First load: show the spinner. Subsequent loads (month changes, after
@@ -462,7 +460,7 @@ export default function Budgets() {
                     className="budget-sort-select"
                     value={budgetedSort}
                     options={BUDGET_SORT_OPTIONS}
-                    onChange={setBudgetedSort}
+                    onChange={updateBudgetedSort}
                     ariaLabel="Sort budgeted categories"
                   />
                 </div>

@@ -21,7 +21,8 @@ import { db } from '../db/index.js';
 import {
   reapplyRulesToAllTransactions,
   countMatches,
-  revertEditsForRule
+  revertEditsForRule,
+  previewRuleImpact
 } from '../services/ruleMatcher.js';
 import {
   sendBadRequest,
@@ -131,18 +132,50 @@ router.get('/:id/match-count', requireAuth, (req, res) => {
 });
 
 /**
+ * GET /api/rules/:id
+ */
+router.get('/:id', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  const id = readIdParam(req, res, 'id', 'rule');
+  if (id === null) return;
+
+  try {
+    const row = db
+      .prepare(
+        `SELECT id, name, conditions, actions, priority, enabled, created_at, updated_at
+           FROM rules
+          WHERE id = ? AND household_id = ?`
+      )
+      .get(id, householdId);
+    if (!row) return sendNotFound(res, 'Rule not found.');
+
+    sendOk(res, {
+      rule: {
+        id: row.id,
+        name: row.name,
+        conditions: safeJsonParse(row.conditions, []),
+        actions: safeJsonParse(row.actions, []),
+        priority: row.priority,
+        enabled: !!row.enabled,
+        created_at: row.created_at,
+        updated_at: row.updated_at
+      }
+    });
+  } catch (err) {
+    console.error('Fetch rule failed:', err);
+    sendServerError(res, err);
+  }
+});
+
+/**
  * POST /api/rules/preview
- * Body: { conditions, actions? }
- * Returns { count } — how many existing transactions satisfy the conditions.
- * `actions` is accepted for backward compat but ignored (match count is
- * purely condition-driven in v12).
+ * Body: { ruleId?, conditions, actions?, enabled? }
+ * Returns the condition match count plus actionable preview buckets.
  */
 router.post('/preview', requireAuth, (req, res) => {
   const householdId = requireHouseholdId(req);
-  const { conditions } = req.body || {};
   try {
-    const count = countMatches(db, conditions, householdId);
-    sendOk(res, { count });
+    sendOk(res, previewRuleImpact(db, req.body || {}, householdId));
   } catch (err) {
     console.error('Rule preview failed:', err);
     sendServerError(res, err);

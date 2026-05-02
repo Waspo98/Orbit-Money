@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { config } from '../config.js';
 import { db } from '../db/index.js';
 import { createHouseholdForUser } from './householdDefaults.js';
+import { acceptPendingHouseholdShares } from './householdSharing.js';
 
 let discoveryCache = null;
 let jwksCache = null;
@@ -139,45 +140,6 @@ function profileName(profile) {
   return profile.name || profile.preferred_username || profile.email || 'OIDC User';
 }
 
-function applyPendingHouseholdShares(userId, email) {
-  if (!email) return null;
-  const shares = db
-    .prepare(
-      `SELECT id, household_id, role
-         FROM household_shares
-        WHERE lower(invited_email) = lower(?)
-          AND revoked_at IS NULL`
-    )
-    .all(email);
-
-  const insertMembership = db.prepare(
-    `INSERT INTO household_memberships (household_id, user_id, role)
-     VALUES (?, ?, ?)
-     ON CONFLICT(household_id, user_id) DO UPDATE SET
-       role = CASE
-         WHEN role = 'owner' THEN role
-         WHEN excluded.role = 'admin' THEN 'admin'
-         ELSE role
-       END,
-       updated_at = datetime('now')`
-  );
-  const markAccepted = db.prepare(
-    `UPDATE household_shares
-        SET accepted_by_user_id = ?,
-            accepted_at = COALESCE(accepted_at, datetime('now')),
-            updated_at = datetime('now')
-      WHERE id = ?`
-  );
-
-  let preferredHouseholdId = null;
-  for (const share of shares) {
-    insertMembership.run(share.household_id, userId, share.role || 'member');
-    markAccepted.run(userId, share.id);
-    preferredHouseholdId = preferredHouseholdId || share.household_id;
-  }
-  return preferredHouseholdId;
-}
-
 function resolveUserAndHousehold(profile) {
   const existing = db
     .prepare('SELECT * FROM users WHERE oidc_sub = ?')
@@ -203,7 +165,7 @@ function defaultMembershipForUser(userId, displayName, preferredHouseholdId = nu
   if (preferredHouseholdId) {
     const preferred = db
       .prepare(
-        `SELECT hm.household_id, hm.role, h.name
+        `SELECT hm.household_id, hm.role, hm.access_level, h.name
            FROM household_memberships hm
            JOIN households h ON h.id = hm.household_id
           WHERE hm.user_id = ?
@@ -216,7 +178,7 @@ function defaultMembershipForUser(userId, displayName, preferredHouseholdId = nu
 
   const membership = db
     .prepare(
-      `SELECT hm.household_id, hm.role, h.name
+      `SELECT hm.household_id, hm.role, hm.access_level, h.name
          FROM household_memberships hm
          JOIN households h ON h.id = hm.household_id
         WHERE hm.user_id = ?
@@ -228,7 +190,7 @@ function defaultMembershipForUser(userId, displayName, preferredHouseholdId = nu
   if (membership) return membership;
   const householdId = createHouseholdForUser(db, userId, displayName);
   return db
-    .prepare('SELECT id AS household_id, name, ? AS role FROM households WHERE id = ?')
+    .prepare("SELECT id AS household_id, name, ? AS role, 'write' AS access_level FROM households WHERE id = ?")
     .get('owner', householdId);
 }
 
@@ -242,7 +204,7 @@ export async function completeOidcLogin(req, code, state) {
   const profile = await verifyIdToken(tokens.id_token, req.session.oidcNonce);
   const displayName = profileName(profile);
   const userId = resolveUserAndHousehold(profile);
-  const preferredHouseholdId = applyPendingHouseholdShares(userId, profile.email || null);
+  const preferredHouseholdId = acceptPendingHouseholdShares(db, userId, profile.email || null);
   const membership = defaultMembershipForUser(userId, displayName, preferredHouseholdId);
 
   delete req.session.oidcState;
@@ -253,6 +215,7 @@ export async function completeOidcLogin(req, code, state) {
     userId,
     householdId: membership.household_id,
     role: membership.role,
+    accessLevel: membership.access_level || 'write',
     username: profile.preferred_username || profile.email || profile.sub,
     email: profile.email || null,
     displayName,

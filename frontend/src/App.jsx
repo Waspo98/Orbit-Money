@@ -30,10 +30,16 @@ import { sortCategoriesByName } from './lib/categorySort.js';
 import {
   ROUTES,
   getNavigationRoutes,
-  getRoute,
-  readNavigationPreferences,
-  writeNavigationPreferences
+  getRoute
 } from './navigation.js';
+import {
+  USER_PREFERENCE_KEYS,
+  mergeUserPreferences,
+  missingServerPreferencePatch,
+  normalizePreferenceValue,
+  readLocalUserPreferences,
+  writeLocalPreference
+} from './userPreferences.js';
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Transactions = lazy(() => import('./pages/Transactions.jsx'));
@@ -83,9 +89,8 @@ function AppShell() {
   const [lookupsReady, setLookupsReady] = useState(false);
   const [lookupError, setLookupError] = useState('');
   const [mhaTrackerEnabled, setMhaTrackerEnabled] = useState(false);
-  const [navigationPreferences, setNavigationPreferencesState] = useState(
-    readNavigationPreferences
-  );
+  const [userPreferences, setUserPreferencesState] = useState(readLocalUserPreferences);
+  const userPreferencesRef = useRef(userPreferences);
 
   const {
     mode: themeMode,
@@ -100,6 +105,8 @@ function AppShell() {
   const previousPathRef = useRef(location.pathname);
   const currentRoute = getRoute(location.pathname);
   const hasPageHero = !!currentRoute?.hasPageHero;
+  const navigationPreferences =
+    userPreferences[USER_PREFERENCE_KEYS.navigationPreferences];
   const navigationRoutes = useMemo(
     () =>
       getNavigationRoutes({ mhaTrackerEnabled, navigationPreferences }).map(
@@ -144,15 +151,27 @@ function AppShell() {
   async function loadLookups() {
     setLookupError('');
     try {
-      const [a, c] = await Promise.all([
+      const [a, c, mha, preferenceResponse] = await Promise.all([
         api.get('/api/accounts'),
-        api.get('/api/categories')
+        api.get('/api/categories'),
+        api.get('/api/mha/settings'),
+        api.get('/api/preferences')
       ]);
-      const mha = await api.get('/api/mha/settings');
+      const localPreferences = readLocalUserPreferences();
+      const serverPreferences = preferenceResponse.preferences || {};
+      const mergedPreferences = mergeUserPreferences(serverPreferences, localPreferences);
       setAccounts(a.items);
       setCategories(sortCategoriesByName(c.items));
       setMhaTrackerEnabled(!!mha.enabled);
+      userPreferencesRef.current = mergedPreferences;
+      setUserPreferencesState(mergedPreferences);
       setLookupsReady(true);
+      const missingPreferences = missingServerPreferencePatch(serverPreferences, localPreferences);
+      if (Object.keys(missingPreferences).length > 0) {
+        api.put('/api/preferences', { preferences: missingPreferences }).catch((err) => {
+          console.warn('Preference migration failed:', err);
+        });
+      }
       return true;
     } catch (err) {
       console.error('Failed to load lookups:', err);
@@ -183,27 +202,59 @@ function AppShell() {
     setAccounts([]);
     setCategories([]);
     setMhaTrackerEnabled(false);
+    const localPreferences = readLocalUserPreferences();
+    userPreferencesRef.current = localPreferences;
+    setUserPreferencesState(localPreferences);
     setLookupsReady(false);
     setLookupError('');
     navigate('/', { replace: true });
   }
 
-  async function handleSettingsImportComplete() {
+  async function handleSettingsImportComplete(options = {}) {
     const loaded = await loadLookups();
-    if (loaded) {
+    if (loaded && !options?.stayOnSettings) {
       navigate('/transactions', { state: { transition: 'back' } });
     }
   }
 
-  function setNavigationPreferences(nextOrUpdater) {
-    setNavigationPreferencesState((prev) => {
-      const next =
-        typeof nextOrUpdater === 'function'
-          ? nextOrUpdater(prev)
-          : nextOrUpdater;
-      return writeNavigationPreferences(next);
+  function setUserPreference(key, nextOrUpdater) {
+    const prev = userPreferencesRef.current;
+    const rawValue =
+      typeof nextOrUpdater === 'function'
+        ? nextOrUpdater(prev[key], prev)
+        : nextOrUpdater;
+    const valueToSave = writeLocalPreference(key, normalizePreferenceValue(key, rawValue));
+    const next = { ...prev, [key]: valueToSave };
+    userPreferencesRef.current = next;
+    setUserPreferencesState(next);
+    api.put(`/api/preferences/${encodeURIComponent(key)}`, { value: valueToSave }).catch((err) => {
+      console.warn(`Preference save failed for ${key}:`, err);
     });
   }
+
+  function setNavigationPreferences(nextOrUpdater) {
+    setUserPreference(USER_PREFERENCE_KEYS.navigationPreferences, (prevNavigation) =>
+      typeof nextOrUpdater === 'function'
+        ? nextOrUpdater(prevNavigation)
+        : nextOrUpdater
+    );
+  }
+
+  const renderSettings = (settingsPage = 'home') => (
+    <Settings
+      themeMode={themeMode}
+      onThemeChange={setThemeMode}
+      darkVariant={darkVariant}
+      onDarkVariantChange={setDarkVariant}
+      onLogout={handleLogout}
+      mhaTrackerEnabled={mhaTrackerEnabled}
+      onMhaTrackerChange={setMhaTrackerEnabled}
+      navigationPreferences={navigationPreferences}
+      onNavigationPreferencesChange={setNavigationPreferences}
+      onImportComplete={handleSettingsImportComplete}
+      settingsPage={settingsPage}
+    />
+  );
 
   const routeElements = {
     '/dashboard': (
@@ -211,6 +262,8 @@ function AppShell() {
         accounts={accounts}
         categories={categories}
         mhaTrackerEnabled={mhaTrackerEnabled}
+        userPreferences={userPreferences}
+        onUserPreferenceChange={setUserPreference}
       />
     ),
     '/transactions': (
@@ -220,7 +273,14 @@ function AppShell() {
         mhaTrackerEnabled={mhaTrackerEnabled}
       />
     ),
-    '/budgets': <Budgets />,
+    '/budgets': (
+      <Budgets
+        budgetedSortPreference={userPreferences[USER_PREFERENCE_KEYS.budgetedSort]}
+        onBudgetedSortPreferenceChange={(value) =>
+          setUserPreference(USER_PREFERENCE_KEYS.budgetedSort, value)
+        }
+      />
+    ),
     '/accounts': <Accounts onChange={loadLookups} />,
     '/rules': <Rules />,
     '/categories': (
@@ -236,20 +296,9 @@ function AppShell() {
     '/upcoming': <Upcoming accounts={accounts} categories={categories} />,
     '/retirement-calculator': <RetirementCalculator />,
     '/mha-tracker': mhaTrackerEnabled ? <MhaTracker /> : <Navigate to="/settings" replace />,
-    '/settings': (
-      <Settings
-        themeMode={themeMode}
-        onThemeChange={setThemeMode}
-        darkVariant={darkVariant}
-        onDarkVariantChange={setDarkVariant}
-        onLogout={handleLogout}
-        mhaTrackerEnabled={mhaTrackerEnabled}
-        onMhaTrackerChange={setMhaTrackerEnabled}
-        navigationPreferences={navigationPreferences}
-        onNavigationPreferencesChange={setNavigationPreferences}
-        onImportComplete={handleSettingsImportComplete}
-      />
-    )
+    '/settings': renderSettings(),
+    '/settings/preferences': renderSettings('preferences'),
+    '/settings/data-management': renderSettings('data-management')
   };
 
   if (authState === 'loading') {

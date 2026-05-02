@@ -35,6 +35,7 @@ export function TransactionRow({
   onResetField,
   onLogoChanged,
   hideMerchantLogo = false,
+  hideActions = false,
   mhaTrackerEnabled = false
 }) {
   const isIncome = txn.amount > 0 && !txn.is_transfer;
@@ -136,7 +137,7 @@ export function TransactionRow({
         <div className={`txn-amount ${isIncome ? 'income' : ''}`}>
           {formatSignedCurrency(txn.amount)}
         </div>
-        {!expanded && (
+        {!expanded && !hideActions && (
           <div className="txn-row-menu">
             <DropdownMenu items={actionItems} ariaLabel={`Actions for ${txn.merchant}`} />
           </div>

@@ -7,6 +7,7 @@ import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
 } from '../CurrencyInput.jsx';
+import { TransactionRow } from '../transactions/TransactionRow.jsx';
 import {
   ACTION_TYPES,
   FIELD_OPTIONS,
@@ -17,8 +18,17 @@ import {
 } from './ruleDefinitions.js';
 
 export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
-  const isNew = !rule.id;
+  const [activeRule, setActiveRule] = useState(rule);
+  const isNew = !activeRule.id;
   const sortedCategories = useMemo(() => sortCategoriesByName(categories), [categories]);
+  const accountById = useMemo(
+    () => new Map(accounts.map((account) => [account.id, account])),
+    [accounts]
+  );
+  const categoryById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories]
+  );
 
   const [name, setName] = useState(rule.name || '');
   const [conditions, setConditions] = useState(
@@ -29,35 +39,58 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
   const [actions, setActions] = useState(
     rule.actions?.length ? rule.actions : [{ type: 'rename', value: '' }]
   );
-  const [enabled, setEnabled] = useState(rule.enabled !== false);
-  const [previewCount, setPreviewCount] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [openingRuleId, setOpeningRuleId] = useState(null);
   const [error, setError] = useState('');
+
+  function resetDraft(nextRule) {
+    setActiveRule(nextRule);
+    setName(nextRule.name || '');
+    setConditions(
+      nextRule.conditions?.length
+        ? nextRule.conditions
+        : [{ field: 'merchant', operator: 'contains', value: '' }]
+    );
+    setActions(nextRule.actions?.length ? nextRule.actions : [{ type: 'rename', value: '' }]);
+    setPreview(null);
+    setSaving(false);
+    setError('');
+  }
+
+  useEffect(() => {
+    resetDraft(rule);
+  }, [rule.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const isValid = conditions.every((condition) => (
       condition.value !== '' && condition.value !== undefined
     ));
     if (!isValid) {
-      setPreviewCount(null);
+      setPreview(null);
       return undefined;
     }
 
     setPreviewing(true);
     const timeoutId = setTimeout(async () => {
       try {
-        const data = await api.post('/api/rules/preview', { conditions, actions });
-        setPreviewCount(data.count);
+        const data = await api.post('/api/rules/preview', {
+          ruleId: activeRule.id || null,
+          conditions,
+          actions,
+          enabled: true
+        });
+        setPreview(data);
       } catch {
-        setPreviewCount(null);
+        setPreview(null);
       } finally {
         setPreviewing(false);
       }
     }, 400);
 
     return () => clearTimeout(timeoutId);
-  }, [conditions, actions]);
+  }, [activeRule.id, conditions, actions]);
 
   function updateCondition(index, patch) {
     setConditions((current) => current.map((condition, currentIndex) => (
@@ -132,20 +165,35 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
       name: finalName,
       conditions,
       actions,
-      enabled
+      enabled: true
     };
 
     try {
       if (isNew) {
         await api.post('/api/rules', body);
       } else {
-        await api.put(`/api/rules/${rule.id}`, body);
+        await api.put(`/api/rules/${activeRule.id}`, body);
       }
       close({ animate: true });
       setTimeout(onSaved, 180);
     } catch (err) {
       setError(err.message || 'Save failed');
       setSaving(false);
+    }
+  }
+
+  async function openConflictRule(ruleId) {
+    setOpeningRuleId(ruleId);
+    setError('');
+    try {
+      const data = await api.get(`/api/rules/${ruleId}`);
+      if (data.rule) {
+        resetDraft(data.rule);
+      }
+    } catch (err) {
+      setError(err.message || 'Could not open that rule');
+    } finally {
+      setOpeningRuleId(null);
     }
   }
 
@@ -202,30 +250,15 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
               </button>
             </div>
 
-            <div className="rule-preview">
-              {previewing ? (
-                <>
-                  <span className="spinner-inline" />
-                  <span>Previewing…</span>
-                </>
-              ) : previewCount !== null ? (
-                <span>
-                  This rule would match <strong>{previewCount.toLocaleString()}</strong> existing
-                  transaction{previewCount === 1 ? '' : 's'}.
-                </span>
-              ) : (
-                <span className="subtle">Fill in conditions to see a preview.</span>
-              )}
-            </div>
-
-            <label className="toggle-row" style={{ marginBottom: 16 }}>
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(event) => setEnabled(event.target.checked)}
-              />
-              <span>Rule enabled</span>
-            </label>
+            <RulePreview
+              preview={preview}
+              previewing={previewing}
+              editing={!!activeRule.id}
+              accountById={accountById}
+              categoryById={categoryById}
+              onEditRule={openConflictRule}
+              openingRuleId={openingRuleId}
+            />
 
             {error && <div className="error">{error}</div>}
 
@@ -242,6 +275,201 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
       )}
     </AnimatedModal>
   );
+}
+
+function RulePreview({
+  preview,
+  previewing,
+  editing,
+  accountById,
+  categoryById,
+  onEditRule,
+  openingRuleId
+}) {
+  if (previewing) {
+    return (
+      <div className="rule-preview">
+        <span className="spinner-inline" />
+        <span>Previewing...</span>
+      </div>
+    );
+  }
+
+  if (!preview) {
+    return (
+      <div className="rule-preview">
+        <span className="subtle">Fill in conditions to see a preview.</span>
+      </div>
+    );
+  }
+
+  const matchCount = Number(preview.count || 0);
+  const affected = preview.affected || preview.matches || [];
+  const affectedCount = Number(preview.affectedCount ?? affected.length);
+  const willChange = preview.willChange || [];
+  const conflicts = preview.conflicts || [];
+  const hasDetails = affected.length > 0 || willChange.length > 0 || conflicts.length > 0;
+
+  return (
+    <div className={`rule-preview ${hasDetails ? 'rule-preview-rich' : ''}`}>
+      <div className="rule-preview-summary">
+        <span>
+          <strong>{matchCount.toLocaleString()}</strong> matching transaction
+          {matchCount === 1 ? '' : 's'}.
+        </span>
+        {preview.willChangeCount > 0 && (
+          <span>
+            <strong>{preview.willChangeCount.toLocaleString()}</strong> will change.
+          </span>
+        )}
+        {preview.conflictCount > 0 && (
+          <span>
+            <strong>{preview.conflictCount.toLocaleString()}</strong> conflict
+            {preview.conflictCount === 1 ? '' : 's'}.
+          </span>
+        )}
+      </div>
+
+      {affectedCount > 0 && (
+        <RulePreviewSection
+          title={editing ? 'Affected Transactions' : 'Matching Transactions'}
+          count={affectedCount}
+          items={affected}
+          limit={preview.limit}
+          accountById={accountById}
+          categoryById={categoryById}
+          onEditRule={onEditRule}
+          openingRuleId={openingRuleId}
+        />
+      )}
+    </div>
+  );
+}
+
+function RulePreviewSection({
+  title,
+  count,
+  items,
+  limit,
+  accountById,
+  categoryById,
+  onEditRule,
+  openingRuleId,
+  conflict = false
+}) {
+  return (
+    <section className="rule-preview-section">
+      <div className="rule-preview-section-header">
+        <span>{title}</span>
+        <span>{count.toLocaleString()}</span>
+      </div>
+      <div className="rule-preview-list">
+        {items.map((item) => (
+          <RulePreviewTransaction
+            key={item.transaction.id}
+            item={item}
+            accountById={accountById}
+            categoryById={categoryById}
+            onEditRule={onEditRule}
+            openingRuleId={openingRuleId}
+            conflict={conflict}
+          />
+        ))}
+      </div>
+      {count > items.length && (
+        <div className="rule-preview-more">
+          Showing first {Math.min(limit || items.length, items.length).toLocaleString()}.
+        </div>
+      )}
+    </section>
+  );
+}
+
+function RulePreviewTransaction({
+  item,
+  accountById,
+  categoryById,
+  onEditRule,
+  openingRuleId,
+  conflict
+}) {
+  const txn = item.transaction;
+  const fields = item.fields || [];
+  const hasConflicts = conflict || item.rules?.length > 0;
+
+  return (
+    <div className={`rule-preview-transaction ${hasConflicts ? 'has-conflict' : ''}`}>
+      <ul className="txn-list dash-recent-txn-list rule-preview-transaction-row">
+        <TransactionRow
+          txn={txn}
+          expanded={false}
+          onExpand={() => {}}
+          account={accountById.get(txn.account_id)}
+          category={categoryById.get(txn.category_id)}
+          originalCategory={categoryById.get(txn.original_category_id)}
+          hideAccountInMeta={false}
+          onEdit={() => {}}
+          onCreateRule={() => {}}
+          onToggleTransfer={() => {}}
+          onToggleIgnored={() => {}}
+          onToggleMhaEligible={() => {}}
+          onDelete={() => {}}
+          onResetField={() => {}}
+          hideMerchantLogo
+          hideActions
+        />
+      </ul>
+
+      {fields.length > 0 && (
+        <div className="rule-preview-fields">
+          {fields.map((field, index) => (
+            <span
+              key={`${field.field}-${field.ruleId || ''}-${index}`}
+              className={`rule-preview-field ${field.ruleName ? 'is-conflict' : ''}`}
+            >
+              {field.ruleName
+                ? `${field.label} handled by ${field.ruleName}`
+                : formatPreviewChange(field, categoryById)}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {hasConflicts && item.rules?.length > 0 && (
+        <div className="rule-preview-conflict-actions">
+          {item.rules.map((rule) => (
+            <button
+              key={rule.id}
+              type="button"
+              className="btn-secondary btn-compact"
+              onClick={() => onEditRule(rule.id)}
+              disabled={openingRuleId === rule.id}
+            >
+              {openingRuleId === rule.id ? 'Opening...' : `Edit ${rule.name}`}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatPreviewChange(field, categoryById) {
+  if (field.applied) {
+    return `${field.label} handled by this rule`;
+  }
+  return `${field.label}: ${formatPreviewValue(field.field, field.from, categoryById)} to ${formatPreviewValue(field.field, field.to, categoryById)}`;
+}
+
+function formatPreviewValue(field, value, categoryById) {
+  if (field === 'category') {
+    if (value === null || value === undefined || value === '') return 'Uncategorized';
+    return categoryById.get(Number(value))?.name || 'Unknown category';
+  }
+  if (field === 'transfer' || field === 'ignored') {
+    return value ? 'Yes' : 'No';
+  }
+  return value || 'Blank';
 }
 
 function ConditionRow({

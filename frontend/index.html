@@ -11,10 +11,10 @@
     <title>Orbit Money</title>
 
     <!-- PWA -->
-    <link rel="manifest" href="/manifest.webmanifest?v=0.51.0-20260501a" />
-    <link rel="icon" href="/icon-192.png?v=0.51.0-20260501a" type="image/png" />
-    <link rel="icon" href="/icon.svg?v=0.51.0-20260501a" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=0.51.0-20260501a" />
+    <link rel="manifest" href="/manifest.webmanifest?v=0.6.0-20260502a" />
+    <link rel="icon" href="/icon-192.png?v=0.6.0-20260502a" type="image/png" />
+    <link rel="icon" href="/icon.svg?v=0.6.0-20260502a" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=0.6.0-20260502a" />
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -132,7 +132,7 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
           navigator.serviceWorker
-            .register('/sw.js?v=0.51.0-20260501a', { updateViaCache: 'none' })
+            .register('/sw.js?v=0.6.0-20260502a', { updateViaCache: 'none' })
             .catch(function (err) {
               console.warn('Service worker registration failed:', err);
             });
@@ -143,15 +143,15 @@
   <body>
     <div id="root">
       <div class="initial-splash" role="img" aria-label="Orbit Money">
-        <img class="initial-splash-icon" src="/icon-192.png?v=0.51.0-20260501a" alt="" />
+        <img class="initial-splash-icon" src="/icon-192.png?v=0.6.0-20260502a" alt="" />
         <img
           class="initial-splash-wordmark initial-splash-wordmark-light"
-          src="/splash-wordmark-light.svg?v=0.51.0-20260501a"
+          src="/splash-wordmark-light.svg?v=0.6.0-20260502a"
           alt=""
         />
         <img
           class="initial-splash-wordmark initial-splash-wordmark-dark"
-          src="/splash-wordmark-dark.svg?v=0.51.0-20260501a"
+          src="/splash-wordmark-dark.svg?v=0.6.0-20260502a"
           alt=""
         />
       </div>

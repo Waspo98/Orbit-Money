@@ -148,6 +148,7 @@ export default function Accounts({ onChange }) {
   const [editing, setEditing] = useState(null);
   const [merging, setMerging] = useState(null);
   const [recording, setRecording] = useState(null);
+  const [addingManual, setAddingManual] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
   const [activeDragId, setActiveDragId] = useState(null);
   const [overDragId, setOverDragId] = useState(null);
@@ -339,6 +340,17 @@ export default function Accounts({ onChange }) {
         title="Accounts"
         subtitle={`${accountTypeSummary(accounts) || 'No accounts'}${showArchived ? ' including archived' : ''}`}
         stats={accountHeroStats}
+        toolbar={!reorderMode ? (
+          <div className="page-hero-action-row">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setAddingManual(true)}
+            >
+              + Manual Account
+            </button>
+          </div>
+        ) : null}
       />
 
       <div className="accounts-toolbar accounts-page-toolbar">
@@ -410,7 +422,10 @@ export default function Accounts({ onChange }) {
         <div className="empty-state">
           <div className="empty-state-icon">⬢</div>
           <h2>No accounts yet</h2>
-          <p>Import from Rocket Money or connect SimpleFIN to add accounts.</p>
+          <p>Import from Rocket Money, connect SimpleFIN, or add a manual account.</p>
+          <button type="button" className="btn-secondary" onClick={() => setAddingManual(true)}>
+            Add Manual Account
+          </button>
         </div>
       ) : reorderMode ? (
         // Group reorder mode intentionally mirrors the simpler Goals list.
@@ -573,6 +588,18 @@ export default function Accounts({ onChange }) {
           onClose={() => setMerging(null)}
           onMerged={() => {
             setMerging(null);
+            load();
+            onChange?.();
+          }}
+        />
+      )}
+
+      {addingManual && (
+        <ManualAccountModal
+          onClose={() => setAddingManual(false)}
+          onCreated={(account) => {
+            setAddingManual(false);
+            setRecording(account);
             load();
             onChange?.();
           }}
@@ -769,6 +796,106 @@ function StaticAccountRow({
         />
       </div>
     </li>
+  );
+}
+
+// ============================================================================
+// Add manual account modal
+// ============================================================================
+
+function ManualAccountModal({ onClose, onCreated }) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState('checking');
+  const [institution, setInstitution] = useState('');
+  const [last4, setLast4] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSave(event, close) {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const result = await api.post('/api/accounts', {
+        name,
+        type,
+        institution,
+        account_number_last4: last4
+      });
+      close({ animate: true });
+      setTimeout(() => onCreated(result.account), 180);
+    } catch (err) {
+      setError(err.message || 'Create account failed');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AnimatedModal onClose={onClose}>
+      {({ close }) => (
+        <>
+          <h3>Add Manual Account</h3>
+          <p className="modal-copy">
+            Create the account first, then Orbit will open the existing account snapshot popup for its starting balance.
+          </p>
+
+          <form onSubmit={(event) => handleSave(event, close)}>
+            <label className="field">
+              <span>Name</span>
+              <input
+                type="text"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Cash Envelope"
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Type</span>
+              <AppSelect
+                value={type}
+                onChange={setType}
+                ariaLabel="Manual account type"
+                options={TYPE_OPTIONS}
+              />
+            </label>
+
+            <label className="field">
+              <span>Institution</span>
+              <input
+                type="text"
+                value={institution}
+                onChange={(event) => setInstitution(event.target.value)}
+                placeholder="Optional"
+              />
+            </label>
+
+            <label className="field">
+              <span>Last Four</span>
+              <input
+                type="text"
+                value={last4}
+                onChange={(event) => setLast4(event.target.value.replace(/\D/g, '').slice(0, 4))}
+                inputMode="numeric"
+                placeholder="Optional"
+              />
+            </label>
+
+            {error && <div className="error">{error}</div>}
+
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={close}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? 'Creating...' : 'Create Account'}
+              </button>
+            </div>
+          </form>
+        </>
+      )}
+    </AnimatedModal>
   );
 }
 

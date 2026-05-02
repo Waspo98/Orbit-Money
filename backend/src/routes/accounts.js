@@ -32,6 +32,11 @@ function previousMonthEnd(value) {
   return date.toISOString().slice(0, 10);
 }
 
+function normalizeOptionalText(value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return text || null;
+}
+
 /**
  * GET /api/accounts?includeArchived=1
  *
@@ -66,6 +71,79 @@ router.get('/', requireAuth, (req, res) => {
   } catch (err) {
     console.error('List accounts failed:', err);
     sendServerError(res, err);
+  }
+});
+
+/**
+ * POST /api/accounts
+ * Creates a user-managed account and optional first balance snapshot.
+ */
+router.post('/', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  const body = req.body || {};
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const type = typeof body.type === 'string' ? body.type : 'other';
+
+  if (!name) {
+    return sendBadRequest(res, 'name is required.');
+  }
+  if (!VALID_TYPES.includes(type)) {
+    return sendBadRequest(res, `type must be one of: ${VALID_TYPES.join(', ')}`);
+  }
+
+  const balanceDollars = body.balance === undefined || body.balance === ''
+    ? 0
+    : Number(body.balance);
+  if (!Number.isFinite(balanceDollars)) {
+    return sendBadRequest(res, 'balance must be a valid number.');
+  }
+
+  const recordDate = String(body.recordDate || '').trim();
+  if (recordDate && !isValidDateOnly(recordDate)) {
+    return sendBadRequest(res, 'recordDate must be a valid YYYY-MM-DD date.');
+  }
+
+  const balance = dollarsToCents(balanceDollars);
+
+  try {
+    const run = db.transaction(() => {
+      const result = db
+        .prepare(
+          `INSERT INTO accounts (
+             household_id, name, type, institution, account_number_last4,
+             is_manual, current_balance, sort_order
+           ) VALUES (
+             ?, ?, ?, ?, ?, 1, ?,
+             COALESCE((SELECT MAX(sort_order) + 10 FROM accounts WHERE household_id = ?), 0)
+           )`
+        )
+        .run(
+          householdId,
+          name,
+          type,
+          normalizeOptionalText(body.institution),
+          normalizeOptionalText(body.account_number_last4),
+          balance,
+          householdId
+        );
+
+      if (recordDate) {
+        db.prepare(
+          `INSERT INTO account_balance_records (household_id, account_id, record_date, balance)
+           VALUES (?, ?, ?, ?)`
+        ).run(householdId, result.lastInsertRowid, recordDate, balance);
+      }
+
+      return db
+        .prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?')
+        .get(result.lastInsertRowid, householdId);
+    });
+
+    const account = run();
+    sendOk(res, { success: true, account: serializeAccount(account) });
+  } catch (err) {
+    console.error('Create account failed:', err);
+    sendBadRequest(res, err.message || 'Create account failed.');
   }
 });
 
