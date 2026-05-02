@@ -40,13 +40,14 @@ import {
   formatMonthKeyLabel
 } from '../lib/localDate.js';
 import { sortCategoriesByName } from '../lib/categorySort.js';
+import { USER_PREFERENCE_KEYS } from '../userPreferences.js';
 
 // ============================================================================
 // Dashboard - v16
 //
 // "Where I stand right now" overview. Cards are user-configurable, stacked on
 // mobile and flowing into a responsive grid on desktop. This stays frontend
-// persisted for now and reuses existing API surfaces.
+// persisted per account and reuses existing API surfaces.
 //
 // Account-type groupings (fed into the Accounts card):
 //   Assets     = checking + savings + cash + investment + other
@@ -180,11 +181,6 @@ const ASSET_TYPES = new Set(['checking', 'savings', 'cash']);
 const INVESTMENT_TYPES = new Set(['investment']);
 const CREDIT_TYPES = new Set(['credit']);
 const LOAN_TYPES = new Set(['loan']);
-const DASHBOARD_LAYOUT_STORAGE_KEY = 'orbit-money-dashboard-layout-v2';
-const BIGGEST_TRANSACTIONS_HIDDEN_KEY = 'orbit-money-biggest-transactions-hidden-v1';
-const TRANSACTION_REVIEW_HANDLED_KEY = 'orbit-money-transaction-review-handled-v1';
-const GOAL_FOCUS_STORAGE_KEY = 'orbit-money-dashboard-goal-focus-v1';
-const RETIREMENT_PREFS_STORAGE_KEY = 'orbit-money-retirement-preferences-v1';
 const DASHBOARD_RETIREMENT_PRESETS = {
   conservative: { label: 'Conservative', annualReturn: 0.05, inflation: 0.03 },
   balanced: { label: 'Balanced', annualReturn: 0.07, inflation: 0.025 },
@@ -293,62 +289,23 @@ function normalizeDashboardLayout(saved) {
   return rows;
 }
 
-function readDashboardLayout() {
-  try {
-    return normalizeDashboardLayout(JSON.parse(localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)));
-  } catch {
-    return normalizeDashboardLayout(null);
-  }
+function normalizeIdArray(value) {
+  return Array.isArray(value)
+    ? Array.from(new Set(value.map(Number).filter(Number.isFinite))).slice(-1000)
+    : [];
 }
 
-function readHiddenBiggestTransactions() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(BIGGEST_TRANSACTIONS_HIDDEN_KEY));
-    return Array.isArray(saved) ? saved.map(Number).filter(Number.isFinite) : [];
-  } catch {
-    return [];
-  }
+function normalizeGoalFocusId(value) {
+  const id = Number(value);
+  return Number.isFinite(id) && id > 0 ? id : null;
 }
 
-function readHandledReviewIds() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(TRANSACTION_REVIEW_HANDLED_KEY));
-    return Array.isArray(saved) ? saved.map(Number).filter(Number.isFinite) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeHandledReviewIds(ids) {
-  try {
-    localStorage.setItem(
-      TRANSACTION_REVIEW_HANDLED_KEY,
-      JSON.stringify(Array.from(new Set(ids)).slice(-1000))
-    );
-  } catch {
-    /* ignore */
-  }
-}
-
-function readGoalFocusId() {
-  try {
-    const value = Number(localStorage.getItem(GOAL_FOCUS_STORAGE_KEY));
-    return Number.isFinite(value) && value > 0 ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function readRetirementPreferences() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(RETIREMENT_PREFS_STORAGE_KEY));
-    return {
-      retirementAge: Number(saved?.retirementAge) || 67,
-      presetKey: DASHBOARD_RETIREMENT_PRESETS[saved?.presetKey] ? saved.presetKey : 'balanced'
-    };
-  } catch {
-    return { retirementAge: 67, presetKey: 'balanced' };
-  }
+function normalizeRetirementPreferences(value) {
+  const prefs = value && typeof value === 'object' ? value : {};
+  return {
+    retirementAge: Number(prefs.retirementAge) || 67,
+    presetKey: DASHBOARD_RETIREMENT_PRESETS[prefs.presetKey] ? prefs.presetKey : 'balanced'
+  };
 }
 
 function groupAccountBalances(accounts) {
@@ -478,8 +435,24 @@ function retirementProjection(householdData, preferences) {
 // Main page
 // ============================================================================
 
-export default function Dashboard({ accounts = [], categories = [], mhaTrackerEnabled = false }) {
+export default function Dashboard({
+  accounts = [],
+  categories = [],
+  mhaTrackerEnabled = false,
+  userPreferences = {},
+  onUserPreferenceChange
+}) {
   const navigate = useNavigate();
+  const dashboardLayoutPreference =
+    userPreferences[USER_PREFERENCE_KEYS.dashboardLayout];
+  const hiddenBiggestPreference =
+    userPreferences[USER_PREFERENCE_KEYS.dashboardHiddenBiggestTransactions];
+  const handledReviewPreference =
+    userPreferences[USER_PREFERENCE_KEYS.dashboardHandledReviewTransactions];
+  const goalFocusPreference =
+    userPreferences[USER_PREFERENCE_KEYS.dashboardGoalFocusId];
+  const retirementPreference =
+    userPreferences[USER_PREFERENCE_KEYS.dashboardRetirement];
 
   const [budgetData, setBudgetData] = useState(null);
   const [previousBudgetData, setPreviousBudgetData] = useState(null);
@@ -491,15 +464,22 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   const [householdData, setHouseholdData] = useState(null);
   const [mhaData, setMhaData] = useState(null);
   const [userName, setUserName] = useState('there');
-  const [dashboardLayout, setDashboardLayout] = useState(readDashboardLayout);
+  const [dashboardLayout, setDashboardLayout] = useState(() =>
+    normalizeDashboardLayout(dashboardLayoutPreference)
+  );
   const [customizing, setCustomizing] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [hiddenBiggestTransactionIds, setHiddenBiggestTransactionIds] = useState(
-    readHiddenBiggestTransactions
+  const [hiddenBiggestTransactionIds, setHiddenBiggestTransactionIds] = useState(() =>
+    normalizeIdArray(hiddenBiggestPreference)
   );
-  const [goalFocusId, setGoalFocusId] = useState(readGoalFocusId);
-  const [retirementPreferences, setRetirementPreferences] = useState(
-    readRetirementPreferences
+  const [handledReviewTransactionIds, setHandledReviewTransactionIds] = useState(() =>
+    normalizeIdArray(handledReviewPreference)
+  );
+  const [goalFocusId, setGoalFocusId] = useState(() =>
+    normalizeGoalFocusId(goalFocusPreference)
+  );
+  const [retirementPreferences, setRetirementPreferences] = useState(() =>
+    normalizeRetirementPreferences(retirementPreference)
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -554,42 +534,24 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, JSON.stringify(dashboardLayout));
-    } catch {
-      /* ignore */
-    }
-  }, [dashboardLayout]);
+    setDashboardLayout(normalizeDashboardLayout(dashboardLayoutPreference));
+  }, [dashboardLayoutPreference]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(
-        BIGGEST_TRANSACTIONS_HIDDEN_KEY,
-        JSON.stringify(hiddenBiggestTransactionIds)
-      );
-    } catch {
-      /* ignore */
-    }
-  }, [hiddenBiggestTransactionIds]);
+    setHiddenBiggestTransactionIds(normalizeIdArray(hiddenBiggestPreference));
+  }, [hiddenBiggestPreference]);
 
   useEffect(() => {
-    function handleStorage(event) {
-      if (event.key === RETIREMENT_PREFS_STORAGE_KEY) {
-        setRetirementPreferences(readRetirementPreferences());
-      }
-    }
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+    setHandledReviewTransactionIds(normalizeIdArray(handledReviewPreference));
+  }, [handledReviewPreference]);
 
   useEffect(() => {
-    try {
-      if (goalFocusId) localStorage.setItem(GOAL_FOCUS_STORAGE_KEY, String(goalFocusId));
-      else localStorage.removeItem(GOAL_FOCUS_STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
-  }, [goalFocusId]);
+    setGoalFocusId(normalizeGoalFocusId(goalFocusPreference));
+  }, [goalFocusPreference]);
+
+  useEffect(() => {
+    setRetirementPreferences(normalizeRetirementPreferences(retirementPreference));
+  }, [retirementPreference]);
 
   const now = new Date();
   const totals = useMemo(() => groupAccountBalances(accounts), [accounts]);
@@ -671,26 +633,52 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
   );
   const visibleDashboardCards = dashboardLayout.filter((item) => item.visible);
 
+  function updateDashboardLayout(nextOrUpdater) {
+    const raw = typeof nextOrUpdater === 'function' ? nextOrUpdater(dashboardLayout) : nextOrUpdater;
+    const next = normalizeDashboardLayout(raw);
+    setDashboardLayout(next);
+    onUserPreferenceChange?.(USER_PREFERENCE_KEYS.dashboardLayout, next);
+  }
+
+  function updateHiddenBiggestTransactionIds(nextOrUpdater) {
+    const raw = typeof nextOrUpdater === 'function'
+      ? nextOrUpdater(hiddenBiggestTransactionIds)
+      : nextOrUpdater;
+    const next = normalizeIdArray(raw);
+    setHiddenBiggestTransactionIds(next);
+    onUserPreferenceChange?.(USER_PREFERENCE_KEYS.dashboardHiddenBiggestTransactions, next);
+  }
+
+  function updateHandledReviewTransactionIds(nextOrUpdater) {
+    const raw = typeof nextOrUpdater === 'function'
+      ? nextOrUpdater(handledReviewTransactionIds)
+      : nextOrUpdater;
+    const next = normalizeIdArray(raw);
+    setHandledReviewTransactionIds(next);
+    onUserPreferenceChange?.(USER_PREFERENCE_KEYS.dashboardHandledReviewTransactions, next);
+  }
+
+  function updateGoalFocusId(nextOrUpdater) {
+    const raw = typeof nextOrUpdater === 'function' ? nextOrUpdater(goalFocusId) : nextOrUpdater;
+    const next = normalizeGoalFocusId(raw);
+    setGoalFocusId(next);
+    onUserPreferenceChange?.(USER_PREFERENCE_KEYS.dashboardGoalFocusId, next);
+  }
+
   function hideBiggestTransaction(id) {
-    setHiddenBiggestTransactionIds((prev) =>
+    updateHiddenBiggestTransactionIds((prev) =>
       prev.includes(id) ? prev : [...prev, id]
     );
   }
 
   function resetHiddenBiggestTransactions() {
-    setHiddenBiggestTransactionIds([]);
+    updateHiddenBiggestTransactionIds([]);
   }
 
   function updateRetirementPreferences(patch) {
-    setRetirementPreferences((prev) => {
-      const next = { ...prev, ...patch };
-      try {
-        localStorage.setItem(RETIREMENT_PREFS_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
+    const next = normalizeRetirementPreferences({ ...retirementPreferences, ...patch });
+    setRetirementPreferences(next);
+    onUserPreferenceChange?.(USER_PREFERENCE_KEYS.dashboardRetirement, next);
   }
 
   function renderDashboardCard(cardId) {
@@ -781,7 +769,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
           <GoalFocusCard
             goalsData={goalsData}
             selectedGoalId={goalFocusId}
-            onSelectGoal={setGoalFocusId}
+            onSelectGoal={updateGoalFocusId}
             loading={loading && !goalsData}
           />
         );
@@ -892,7 +880,7 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
       {customizing && (
         <DashboardCustomizeModal
           layout={dashboardLayout}
-          onChange={setDashboardLayout}
+          onChange={updateDashboardLayout}
           onClose={() => setCustomizing(false)}
         />
       )}
@@ -901,6 +889,8 @@ export default function Dashboard({ accounts = [], categories = [], mhaTrackerEn
         <TransactionReviewModal
           categories={categories}
           accounts={accounts}
+          handledIds={handledReviewTransactionIds}
+          onHandledIdsChange={updateHandledReviewTransactionIds}
           onClose={() => setReviewOpen(false)}
           onRefresh={loadDashboard}
         />
@@ -1474,9 +1464,16 @@ function CategorizeRecentCard({ loading, onOpen }) {
   );
 }
 
-function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
+function TransactionReviewModal({
+  categories,
+  accounts,
+  handledIds: initialHandledIds = [],
+  onHandledIdsChange,
+  onClose,
+  onRefresh
+}) {
   const { confirm, Dialog } = useAppDialog();
-  const [handledIds, setHandledIds] = useState(readHandledReviewIds);
+  const [handledIds, setHandledIds] = useState(() => normalizeIdArray(initialHandledIds));
   const [items, setItems] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [batchReviewed, setBatchReviewed] = useState(0);
@@ -1518,8 +1515,8 @@ function TransactionReviewModal({ categories, accounts, onClose, onRefresh }) {
 
   function rememberHandled(id) {
     setHandledIds((prev) => {
-      const next = prev.includes(id) ? prev : [...prev, id];
-      writeHandledReviewIds(next);
+      const next = normalizeIdArray(prev.includes(id) ? prev : [...prev, id]);
+      onHandledIdsChange?.(next);
       return next;
     });
   }

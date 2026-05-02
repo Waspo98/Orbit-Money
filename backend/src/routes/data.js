@@ -26,6 +26,7 @@ const BACKUP_TABLES = [
   'household_income_records',
   'household_retirement_accounts',
   'app_settings',
+  'user_preferences',
   'upcoming_items',
   'upcoming_dismissed_suggestions',
   'upcoming_occurrences',
@@ -41,6 +42,7 @@ const RESTORE_DELETE_ORDER = [
   'import_batches',
   'simplefin_config',
   'app_settings',
+  'user_preferences',
   'household_retirement_accounts',
   'household_income_records',
   'household_members',
@@ -258,6 +260,33 @@ function restoreMemberships(backup, householdId, currentUserId) {
   return restored;
 }
 
+function restoreUserPreferences(backup, householdId) {
+  const rows = Array.isArray(backup.tables?.user_preferences)
+    ? backup.tables.user_preferences
+    : [];
+  if (rows.length === 0) return 0;
+
+  const userExists = db.prepare('SELECT 1 FROM users WHERE id = ?');
+  const upsert = db.prepare(
+    `INSERT INTO user_preferences (household_id, user_id, key, value_json, updated_at)
+     VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')))
+     ON CONFLICT(household_id, user_id, key) DO UPDATE SET
+       value_json = excluded.value_json,
+       updated_at = excluded.updated_at`
+  );
+
+  let restored = 0;
+  for (const row of rows) {
+    const userId = Number(row.user_id);
+    if (!Number.isInteger(userId) || userId <= 0 || !userExists.get(userId)) continue;
+    if (!row.key || typeof row.value_json !== 'string') continue;
+    upsert.run(householdId, userId, row.key, row.value_json, row.updated_at || null);
+    restored += 1;
+  }
+
+  return restored;
+}
+
 function restoreOrbitBackup(backup, householdId, currentUserId) {
   const run = db.transaction(() => {
     db.exec('PRAGMA defer_foreign_keys = ON');
@@ -283,6 +312,7 @@ function restoreOrbitBackup(backup, householdId, currentUserId) {
       inserted[table] = insertRows(table, backup.tables?.[table] || [], householdId);
     }
     const membershipsRestored = restoreMemberships(backup, householdId, currentUserId);
+    inserted.user_preferences = restoreUserPreferences(backup, householdId);
 
     return { inserted, membershipsRestored };
   });

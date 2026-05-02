@@ -598,12 +598,14 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                 triggerIcon={<TransactionToolbarIcon type="view" />}
                 showCaret={false}
               />
+            </div>
+            <div className="page-hero-action-row txn-manual-action-row">
               <button
                 type="button"
-                className="btn-secondary txn-manual-button"
+                className="btn-primary"
                 onClick={() => setManualTxnOpen(true)}
               >
-                Manual
+                + Manual Transaction
               </button>
             </div>
           </div>

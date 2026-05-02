@@ -26,6 +26,7 @@ import householdSharingRoutes from './routes/householdSharing.js';
 import merchantLogosRoutes from './routes/merchantLogos.js';
 import upcomingRoutes from './routes/upcoming.js';
 import dataRoutes from './routes/data.js';
+import preferencesRoutes from './routes/preferences.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -66,7 +67,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/health', healthRoutes);
 
 // --- Protected routes -------------------------------------------------------
-app.use('/api', requireAuth, requireWriteForUnsafeMethods);
+app.use('/api', requireAuth);
+app.use('/api/preferences', preferencesRoutes);
+app.use('/api', requireWriteForUnsafeMethods);
 app.use('/api/import', importRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/accounts', accountsRoutes);

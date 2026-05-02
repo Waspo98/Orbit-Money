@@ -26,7 +26,6 @@ import { APP_VERSION_LABEL } from '../version.js';
 import { APP_ICON_512 } from '../brandAssets.js';
 
 const SIMPLEFIN_BRIDGE_URL = 'https://beta-bridge.simplefin.org/';
-const SETTINGS_CARD_ORDER_STORAGE_KEY = 'orbit-money-settings-card-order';
 
 const THEME_OPTIONS = [
   {
@@ -114,26 +113,6 @@ function normalizeSettingsCardOrder(value) {
   ];
 }
 
-function readSettingsCardOrder() {
-  try {
-    return normalizeSettingsCardOrder(
-      JSON.parse(localStorage.getItem(SETTINGS_CARD_ORDER_STORAGE_KEY) || '[]')
-    );
-  } catch {
-    return DEFAULT_SETTINGS_CARD_ORDER;
-  }
-}
-
-function writeSettingsCardOrder(order) {
-  const normalized = normalizeSettingsCardOrder(order);
-  try {
-    localStorage.setItem(SETTINGS_CARD_ORDER_STORAGE_KEY, JSON.stringify(normalized));
-  } catch {
-    /* ignore */
-  }
-  return normalized;
-}
-
 function formatDateTime(iso) {
   if (!iso) return '-';
   const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
@@ -211,6 +190,8 @@ export default function Settings({
   onMhaTrackerChange,
   navigationPreferences,
   onNavigationPreferencesChange,
+  settingsCardOrderPreference,
+  onSettingsCardOrderPreferenceChange,
   onImportComplete
 }) {
   const { alert, confirm, Dialog } = useAppDialog();
@@ -254,7 +235,9 @@ export default function Settings({
   const [collapsedCards, setCollapsedCards] = useState(
     () => new Set(DEFAULT_COLLAPSED_SETTINGS_CARDS)
   );
-  const [settingsCardOrder, setSettingsCardOrder] = useState(readSettingsCardOrder);
+  const [settingsCardOrder, setSettingsCardOrder] = useState(() =>
+    normalizeSettingsCardOrder(settingsCardOrderPreference)
+  );
   const [settingsReorderMode, setSettingsReorderMode] = useState(false);
   const [settingsDragId, setSettingsDragId] = useState(null);
   const [settingsOverId, setSettingsOverId] = useState(null);
@@ -293,6 +276,10 @@ export default function Settings({
   const settingsOrder = normalizeSettingsCardOrder(settingsCardOrder);
 
   useDragInteractionLock(Boolean(settingsDragId || moreDragId));
+
+  useEffect(() => {
+    setSettingsCardOrder(normalizeSettingsCardOrder(settingsCardOrderPreference));
+  }, [settingsCardOrderPreference]);
 
   async function loadStatus() {
     try {
@@ -343,13 +330,13 @@ export default function Settings({
   }
 
   function updateSettingsOrder(updater) {
-    setSettingsCardOrder((prev) => {
-      const next =
-        typeof updater === 'function'
-          ? updater(normalizeSettingsCardOrder(prev))
-          : updater;
-      return writeSettingsCardOrder(next);
-    });
+    const next = normalizeSettingsCardOrder(
+      typeof updater === 'function'
+        ? updater(normalizeSettingsCardOrder(settingsCardOrder))
+        : updater
+    );
+    setSettingsCardOrder(next);
+    onSettingsCardOrderPreferenceChange?.(next);
   }
 
   function toggleCardCollapsed(id) {

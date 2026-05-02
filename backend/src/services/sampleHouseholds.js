@@ -9,6 +9,7 @@ const HOUSEHOLD_DELETE_TABLES = [
   'sync_log',
   'simplefin_config',
   'app_settings',
+  'user_preferences',
   'household_shares',
   'household_retirement_accounts',
   'household_income_records',

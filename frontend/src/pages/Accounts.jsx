@@ -340,6 +340,17 @@ export default function Accounts({ onChange }) {
         title="Accounts"
         subtitle={`${accountTypeSummary(accounts) || 'No accounts'}${showArchived ? ' including archived' : ''}`}
         stats={accountHeroStats}
+        toolbar={!reorderMode ? (
+          <div className="page-hero-action-row">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setAddingManual(true)}
+            >
+              + Manual Account
+            </button>
+          </div>
+        ) : null}
       />
 
       <div className="accounts-toolbar accounts-page-toolbar">
@@ -352,15 +363,6 @@ export default function Accounts({ onChange }) {
             />
             <span>Show archived</span>
           </label>
-        )}
-        {!reorderMode && (
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setAddingManual(true)}
-          >
-            Manual Account
-          </button>
         )}
         {accounts.length > 1 && (
           <button

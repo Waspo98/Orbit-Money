@@ -63,6 +63,8 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `026_neutral_default_household_name.sql` | Renames the old default household label to `My Household` when it has not been customized |
 | `027_upcoming_recurrence_projection.sql` | Adds Upcoming recurrence-rule metadata and history-average amount projection settings |
 | `028_upcoming_occurrence_reconciliation.sql` | Adds persisted Upcoming occurrence tracking for matched and missed projected transactions |
+| `029_permissions_import_batches.sql` | Adds household read/write permissions plus import preview and undo batch tracking |
+| `030_user_preferences.sql` | Adds account-scoped UI preferences so customization follows the user across browsers |
 
 ### Key Data Model Notes
 
@@ -185,7 +187,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Uses Household retirement inputs and linked retirement/HSA accounts as the automatic current-balance and contribution source.
 - Question modes answer "What Will We Have?", "When Can We Retire?", and "How Much To Save?" from the same projection model.
 - Assumption controls cover market return, inflation, and withdrawal rate presets; bridge checks separate HSA assets from non-HSA retirement balances before age 65.
-- Preferred retirement age and default growth estimator (Conservative, Balanced, Aggressive) persist in `localStorage` and feed the Dashboard retirement snapshot.
+- Preferred retirement age and default growth estimator (Conservative, Balanced, Aggressive) persist as account preferences and feed the Dashboard retirement snapshot.
 
 ### Household
 - Create and edit household members from the More menu after Net Worth
@@ -210,7 +212,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Endpoints: GET `/api/upcoming`, POST `/api/upcoming`, PUT `/api/upcoming/:id`, DELETE `/api/upcoming/:id`, POST `/api/upcoming/from-transaction`, POST `/api/upcoming/suggestions/accept`, POST `/api/upcoming/suggestions/dismiss`
 
 ### Dashboard
-Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column grid on foldable/tablet widths (≥640px), with Recent Activity spanning full width. The `Customize My Dashboard` button opens one modal list where every dashboard card has a visibility toggle and drag handle. Layout and dashboard-only hidden biggest transactions are persisted in `localStorage`; no dashboard-specific backend or schema is used.
+Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column grid on foldable/tablet widths (≥640px), with Recent Activity spanning full width. The `Customize My Dashboard` button opens one modal list where every dashboard card has a visibility toggle and drag handle. Layout, dashboard-only hidden biggest transactions, goal focus, retirement snapshot preferences, and review state persist through `/api/preferences` so they follow the signed-in account across browsers.
 
 - **Accounts card:** net worth (active balances plus mortgage estimated-value equity), breakdown by group (Cash = checking+savings+cash, Investments, Credit cards, Loans, Real Estate, Other). Rows with zero balance are hidden.
 - **This month card:** Day X of Y + compact Income / Expenses / Net trio
@@ -218,7 +220,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - **Top spending card:** up to 7 categories with horizontal bars scaled to the biggest spender; bars use each category's color
 - **Biggest Monthly Transactions card:** top 5 current-month expenses, excluding income, ignored rows, transfers, and credit-card-payment style rows. `Hide From Dashboard` is dashboard-only and does not set the transaction ignored flag used by budgets/reports.
 - **Subscriptions / Recurring and Upcoming cards:** read saved bills, subscriptions, and income from `/api/upcoming`. The Upcoming page owns manual entries and accepted suggestions.
-- **Categorize Recent Transactions card:** opens a swipe-style review modal that asks whether each category is correct, batches reviews in groups of 10, and lets the user change the category, create a rule, or skip the transaction. Candidates come from recent uncategorized transactions, noisy imported merchant text, and category pattern changes. Reviewed/skipped card IDs are stored in browser localStorage; category changes still use the normal transaction edit API.
+- **Categorize Recent Transactions card:** opens a swipe-style review modal that asks whether each category is correct, batches reviews in groups of 10, and lets the user change the category, create a rule, or skip the transaction. Candidates come from recent uncategorized transactions, noisy imported merchant text, and category pattern changes. Reviewed/skipped card IDs are stored as account preferences; category changes still use the normal transaction edit API.
 - **Uncategorized, Month vs Last Month, Goals Progress, Goal Focus, Retirement Snapshot, MHA Tracker Summary, Mortgage Snapshot:** reuse existing route data from Transactions, Budgets, Goals, Household, MHA, and Accounts.
 - **Recent activity card:** last 10 transactions with the shared `TransactionRow` actions
 - Shimmer skeleton loading per card
@@ -232,9 +234,9 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 ### Navigation
 - **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More. These four primary routes are locked to their original positions.
 - **Desktop sidebar:** Lists every visible page directly. Primary routes remain first, and More-menu pages follow the user-controlled More order. Bottom tabs are hidden on desktop.
-- **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Savings Goals, Upcoming, Retirement Calculator, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings. Settings can hide optional frontend sections from navigation and reorder More-menu cards via `localStorage`; locked pages stay visible.
+- **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Savings Goals, Upcoming, Retirement Calculator, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings. Settings can hide optional frontend sections from navigation and reorder More-menu cards through account preferences; locked pages stay visible.
 - **Removed hamburger menu:** do not reintroduce a separate hamburger drawer; use Bottom Tabs, Desktop Sidebar, and More Sheet.
-- **Settings page:** Collapsible/reorderable cards for Appearance, Turn App Features On/Off, SimpleFIN, Import Data, Account, and Orbit Money build details. The feature toggle card owns frontend-only navigation visibility, More-card order, and the existing MHA visibility control.
+- **Settings page:** Collapsible/reorderable cards for Appearance, Turn App Features On/Off, SimpleFIN, Import/Export, Backup/Restore, Account, and Orbit Money build details. The feature toggle card owns frontend-only navigation visibility, More-card order, and the existing MHA visibility control.
 - **React Router v6:** Client-side routing with browser back/forward support. Page modules are lazy-loaded through `React.lazy`/`Suspense` so the authenticated app shell stays small. All routes are served via the Express catch-all for deep-link support.
 
 ### UI Details
