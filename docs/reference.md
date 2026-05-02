@@ -50,6 +50,11 @@ successful online app load. Keep that preloading behavior when adding new
 offline-readable pages, otherwise a never-visited page can fail to import while
 offline.
 
+`frontend/src/offlineWarmup.js` also warms core read-only API paths shortly
+after login, including the default Transactions and Budgets requests. Keep those
+paths mechanically aligned with each page's initial `api.get(...)` call; the
+offline cache keys by exact request path.
+
 ### Database Schema (30 migrations)
 
 | Migration | Purpose |

@@ -30,6 +30,7 @@ import { useOnlineStatus } from './hooks/useOnlineStatus.js';
 import { api } from './api.js';
 import { APP_ICON_192 } from './brandAssets.js';
 import { clearOfflineFinancialCache } from './offlineCache.js';
+import { warmOfflineReadCache } from './offlineWarmup.js';
 import { sortCategoriesByName } from './lib/categorySort.js';
 import {
   ROUTES,
@@ -150,6 +151,7 @@ function AppShell() {
   const isOnline = useOnlineStatus();
   const wasOnlineRef = useRef(isOnline);
   const offlineRoutesPreloadedRef = useRef(false);
+  const offlineDataWarmupRef = useRef(false);
 
   const {
     mode: themeMode,
@@ -278,6 +280,22 @@ function AppShell() {
       }
     });
   }, [authState, isOnline, lookupsReady]);
+
+  useEffect(() => {
+    if (authState !== 'in' || !lookupsReady || !isOnline || offlineDataWarmupRef.current) {
+      return undefined;
+    }
+
+    const id = window.setTimeout(() => {
+      offlineDataWarmupRef.current = true;
+      warmOfflineReadCache({ mhaTrackerEnabled }).catch((err) => {
+        offlineDataWarmupRef.current = false;
+        console.warn('Offline read cache warmup failed:', err);
+      });
+    }, 1500);
+
+    return () => window.clearTimeout(id);
+  }, [authState, isOnline, lookupsReady, mhaTrackerEnabled]);
 
   // Close the More sheet whenever the route changes.
   useEffect(() => {
