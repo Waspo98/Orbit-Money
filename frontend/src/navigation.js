@@ -114,6 +114,22 @@ export const ROUTES = [
     nav: 'more',
     locked: true,
     hasPageHero: true
+  },
+  {
+    path: '/settings/preferences',
+    label: 'Preferences',
+    description: 'Appearance, feature visibility, and app display options',
+    icon: 'settings',
+    locked: true,
+    hasPageHero: true
+  },
+  {
+    path: '/settings/data-management',
+    label: 'Data Management',
+    description: 'Connections, sharing, imports, exports, and backups',
+    icon: 'transactions',
+    locked: true,
+    hasPageHero: true
   }
 ];
 

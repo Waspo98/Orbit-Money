@@ -9315,6 +9315,10 @@ body.modal-page-blur-active .txn-pinned-month-header {
   margin-bottom: 0;
 }
 
+.settings-card-header-static .settings-section-header {
+  margin-bottom: 0;
+}
+
 .settings-card-caret {
   flex: 0 0 auto;
   margin-top: 2px;
@@ -9323,6 +9327,24 @@ body.modal-page-blur-active .txn-pinned-month-header {
 .settings-card-body {
   margin-top: 0;
   padding-top: 22px;
+}
+
+.settings-hub-section {
+  padding: 24px;
+}
+
+.settings-hub-list {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-hub-row {
+  text-align: left;
+}
+
+.settings-hub-icon {
+  width: 22px;
+  height: 22px;
 }
 
 .settings-card-body > * + * {

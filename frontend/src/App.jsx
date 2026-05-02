@@ -240,6 +240,22 @@ function AppShell() {
     );
   }
 
+  const renderSettings = (settingsPage = 'home') => (
+    <Settings
+      themeMode={themeMode}
+      onThemeChange={setThemeMode}
+      darkVariant={darkVariant}
+      onDarkVariantChange={setDarkVariant}
+      onLogout={handleLogout}
+      mhaTrackerEnabled={mhaTrackerEnabled}
+      onMhaTrackerChange={setMhaTrackerEnabled}
+      navigationPreferences={navigationPreferences}
+      onNavigationPreferencesChange={setNavigationPreferences}
+      onImportComplete={handleSettingsImportComplete}
+      settingsPage={settingsPage}
+    />
+  );
+
   const routeElements = {
     '/dashboard': (
       <Dashboard
@@ -280,24 +296,9 @@ function AppShell() {
     '/upcoming': <Upcoming accounts={accounts} categories={categories} />,
     '/retirement-calculator': <RetirementCalculator />,
     '/mha-tracker': mhaTrackerEnabled ? <MhaTracker /> : <Navigate to="/settings" replace />,
-    '/settings': (
-      <Settings
-        themeMode={themeMode}
-        onThemeChange={setThemeMode}
-        darkVariant={darkVariant}
-        onDarkVariantChange={setDarkVariant}
-        onLogout={handleLogout}
-        mhaTrackerEnabled={mhaTrackerEnabled}
-        onMhaTrackerChange={setMhaTrackerEnabled}
-        navigationPreferences={navigationPreferences}
-        onNavigationPreferencesChange={setNavigationPreferences}
-        settingsCardOrderPreference={userPreferences[USER_PREFERENCE_KEYS.settingsCardOrder]}
-        onSettingsCardOrderPreferenceChange={(value) =>
-          setUserPreference(USER_PREFERENCE_KEYS.settingsCardOrder, value)
-        }
-        onImportComplete={handleSettingsImportComplete}
-      />
-    )
+    '/settings': renderSettings(),
+    '/settings/preferences': renderSettings('preferences'),
+    '/settings/data-management': renderSettings('data-management')
   };
 
   if (authState === 'loading') {

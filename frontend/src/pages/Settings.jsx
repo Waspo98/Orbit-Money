@@ -10,14 +10,14 @@ import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppIcon from '../components/AppIcon.jsx';
 import AppSelect from '../components/AppSelect.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
-import CollapseIndicator from '../components/CollapseIndicator.jsx';
-import ExpandingSection from '../components/ExpandingSection.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
   useDragInteractionLock,
   useReorderSensors
 } from '../components/ReorderListItem.jsx';
+import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import { useNavigate } from 'react-router-dom';
 import {
   ROUTES,
   normalizeNavigationPreferences
@@ -31,19 +31,19 @@ const THEME_OPTIONS = [
   {
     value: 'light',
     label: 'Day',
-    emoji: '☀️',
+    emoji: '\u2600\uFE0F',
     description: 'A bright interface for daylight use.'
   },
   {
     value: 'dark',
     label: 'Night',
-    emoji: '🌙',
+    emoji: '\u{1F319}',
     description: 'A dimmer interface for low light.'
   },
   {
     value: 'system',
     label: 'System',
-    emoji: '💻',
+    emoji: '\u{1F4BB}',
     description: 'Match this device automatically.'
   }
 ];
@@ -52,66 +52,16 @@ const DARK_VARIANT_OPTIONS = [
   {
     value: 'classic',
     label: 'Soft Dark',
-    emoji: '🌘',
+    emoji: '\u{1F318}',
     description: "A gray dark theme that's gentle on the eyes."
   },
   {
     value: 'amoled',
     label: 'AMOLED Black',
-    emoji: '⬛',
+    emoji: '\u2B1B',
     description: 'A pure black background for AMOLED devices.'
   }
 ];
-
-const SETTINGS_CARD_DEFS = [
-  {
-    id: 'appearance',
-    title: 'Appearance',
-    description: 'Choose how the app looks on this device.'
-  },
-  {
-    id: 'features',
-    title: 'Turn App Features On/Off',
-    description: 'Show, hide, and reorder navigation sections.'
-  },
-  {
-    id: 'simplefin',
-    title: 'SimpleFIN',
-    description: 'Bank connection, sync status, and bridge setup.'
-  },
-  {
-    id: 'import',
-    title: 'Import / Export Budgeting App Data',
-    description: 'Move financial data between Orbit Money and other budgeting apps.'
-  },
-  {
-    id: 'backup',
-    title: 'Backup / Restore Orbit Money Data',
-    description: 'Save or restore Orbit Money app data, settings, and rules.'
-  },
-  {
-    id: 'account',
-    title: 'Account',
-    description: 'Household access and signed-in user details.'
-  },
-  {
-    id: 'about',
-    title: 'Orbit Money',
-    description: 'Build details, developer info, and session controls.'
-  }
-];
-
-const DEFAULT_SETTINGS_CARD_ORDER = SETTINGS_CARD_DEFS.map((card) => card.id);
-const SETTINGS_CARD_BY_ID = new Map(SETTINGS_CARD_DEFS.map((card) => [card.id, card]));
-const DEFAULT_COLLAPSED_SETTINGS_CARDS = DEFAULT_SETTINGS_CARD_ORDER.filter((id) => id !== 'about');
-
-function normalizeSettingsCardOrder(value) {
-  const incoming = Array.isArray(value) ? value : [];
-  return [
-    ...incoming.filter((id) => SETTINGS_CARD_BY_ID.has(id)),
-    ...DEFAULT_SETTINGS_CARD_ORDER.filter((id) => !incoming.includes(id))
-  ];
-}
 
 function formatDateTime(iso) {
   if (!iso) return '-';
@@ -138,44 +88,24 @@ function SettingsCard({
   id,
   title,
   description,
-  collapsed,
-  onToggle,
   className = '',
-  collapsedContent,
   children
 }) {
   return (
     <section
-      className={`settings-section settings-card ${collapsed ? 'is-collapsed' : ''} ${className}`.trim()}
+      className={`settings-section settings-card ${className}`.trim()}
       aria-labelledby={`settings-card-${id}`}
     >
-      <button
-        type="button"
-        className="settings-card-header-button"
-        onClick={onToggle}
-        aria-expanded={!collapsed}
-        aria-controls={`settings-card-body-${id}`}
-      >
+      <div className="settings-card-header-static">
         <span className="settings-section-header">
           <h3 id={`settings-card-${id}`}>{title}</h3>
           {description && <p>{description}</p>}
         </span>
-        <CollapseIndicator expanded={!collapsed} className="settings-card-caret" />
-      </button>
+      </div>
 
-      {collapsed && collapsedContent && (
-        <div className="settings-card-collapsed">
-          {collapsedContent}
-        </div>
-      )}
-      <ExpandingSection
-        expanded={!collapsed}
-        id={`settings-card-body-${id}`}
-        className="settings-card-body-expander"
-        innerClassName="settings-card-body"
-      >
+      <div id={`settings-card-body-${id}`} className="settings-card-body">
         {children}
-      </ExpandingSection>
+      </div>
     </section>
   );
 }
@@ -190,11 +120,11 @@ export default function Settings({
   onMhaTrackerChange,
   navigationPreferences,
   onNavigationPreferencesChange,
-  settingsCardOrderPreference,
-  onSettingsCardOrderPreferenceChange,
-  onImportComplete
+  onImportComplete,
+  settingsPage = 'home'
 }) {
   const { alert, confirm, Dialog } = useAppDialog();
+  const navigate = useNavigate();
 
   const [status, setStatus] = useState(null);
   const [setupToken, setSetupToken] = useState('');
@@ -232,15 +162,6 @@ export default function Settings({
   const [restoreError, setRestoreError] = useState('');
   const [downloadBusy, setDownloadBusy] = useState('');
   const [downloadNotice, setDownloadNotice] = useState(null);
-  const [collapsedCards, setCollapsedCards] = useState(
-    () => new Set(DEFAULT_COLLAPSED_SETTINGS_CARDS)
-  );
-  const [settingsCardOrder, setSettingsCardOrder] = useState(() =>
-    normalizeSettingsCardOrder(settingsCardOrderPreference)
-  );
-  const [settingsReorderMode, setSettingsReorderMode] = useState(false);
-  const [settingsDragId, setSettingsDragId] = useState(null);
-  const [settingsOverId, setSettingsOverId] = useState(null);
   const [moreReorderMode, setMoreReorderMode] = useState(false);
   const [moreDragId, setMoreDragId] = useState(null);
   const [moreOverId, setMoreOverId] = useState(null);
@@ -273,13 +194,8 @@ export default function Settings({
   }, [moreRoutes, mhaTrackerEnabled, normalizedNavigationPreferences]);
 
   const optionalFeatureRoutes = ROUTES.filter((route) => route.nav && !route.locked);
-  const settingsOrder = normalizeSettingsCardOrder(settingsCardOrder);
 
-  useDragInteractionLock(Boolean(settingsDragId || moreDragId));
-
-  useEffect(() => {
-    setSettingsCardOrder(normalizeSettingsCardOrder(settingsCardOrderPreference));
-  }, [settingsCardOrderPreference]);
+  useDragInteractionLock(Boolean(moreDragId));
 
   async function loadStatus() {
     try {
@@ -327,29 +243,6 @@ export default function Settings({
           : updater
       )
     );
-  }
-
-  function updateSettingsOrder(updater) {
-    const next = normalizeSettingsCardOrder(
-      typeof updater === 'function'
-        ? updater(normalizeSettingsCardOrder(settingsCardOrder))
-        : updater
-    );
-    setSettingsCardOrder(next);
-    onSettingsCardOrderPreferenceChange?.(next);
-  }
-
-  function toggleCardCollapsed(id) {
-    if (id === 'about') return;
-    setCollapsedCards((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
   }
 
   async function handleSetup(e) {
@@ -575,20 +468,6 @@ export default function Settings({
       ...prefs,
       moreRouteOrder: nextRoutes.map((route) => route.path)
     }));
-  }
-
-  function handleSettingsDragEnd(event) {
-    const { active, over } = event;
-    setSettingsDragId(null);
-    setSettingsOverId(null);
-    if (!over || active.id === over.id) return;
-
-    updateSettingsOrder((prev) => {
-      const oldIndex = prev.indexOf(active.id);
-      const newIndex = prev.indexOf(over.id);
-      if (oldIndex < 0 || newIndex < 0) return prev;
-      return arrayMove(prev, oldIndex, newIndex);
-    });
   }
 
   function handleFile(f) {
@@ -833,29 +712,12 @@ export default function Settings({
   }
 
   function renderAppearanceCard() {
-    const activeTheme = THEME_OPTIONS.find((option) => option.value === themeMode);
-    const activeDarkVariant = DARK_VARIANT_OPTIONS.find((option) => option.value === darkVariant);
-
     return (
       <SettingsCard
         id="appearance"
         key="appearance"
         title="Appearance"
         description="Choose how the app looks on this device."
-        collapsed={collapsedCards.has('appearance')}
-        onToggle={() => toggleCardCollapsed('appearance')}
-        collapsedContent={
-          <div className="settings-collapsed-summary settings-collapsed-summary-with-icon">
-            <span className="settings-collapsed-icon" aria-hidden>
-              {activeTheme?.emoji || '💻'}
-            </span>
-            <span className="settings-collapsed-inline-copy">
-              <strong>{activeTheme?.label || 'System'}</strong>
-              <span aria-hidden="true">|</span>
-              <span>{activeDarkVariant?.label || 'Soft Dark'} after dark.</span>
-            </span>
-          </div>
-        }
       >
         <div className="settings-theme-toggle" role="radiogroup" aria-label="Theme">
           {THEME_OPTIONS.map((option) => (
@@ -913,8 +775,6 @@ export default function Settings({
         key="features"
         title="Turn App Features On/Off"
         description="Show, hide, and reorder navigation sections."
-        collapsed={collapsedCards.has('features')}
-        onToggle={() => toggleCardCollapsed('features')}
       >
         <div className="settings-card-top-action">
           <button
@@ -974,25 +834,6 @@ export default function Settings({
         key="simplefin"
         title="SimpleFIN"
         description={statusCopy}
-        collapsed={collapsedCards.has('simplefin')}
-        onToggle={() => toggleCardCollapsed('simplefin')}
-        collapsedContent={
-          <div className="settings-collapsed-action">
-            <div className="settings-collapsed-summary">
-              <strong>{status?.connected ? 'Connected' : 'Not Connected'}</strong>
-              <span>Last sync: {formatDateTime(status?.lastSyncAt)}</span>
-            </div>
-            {status?.connected ? (
-              <button type="button" className="btn-primary" onClick={handleSync} disabled={syncBusy}>
-                {syncBusy ? 'Syncing...' : 'Sync Now'}
-              </button>
-            ) : (
-              <a className="btn-secondary settings-action-link" href={SIMPLEFIN_BRIDGE_URL} target="_blank" rel="noreferrer">
-                Open Bridge
-              </a>
-            )}
-          </div>
-        }
       >
         {status?.connected ? (
           <>
@@ -1203,24 +1044,6 @@ export default function Settings({
         key="import"
         title="Import / Export Budgeting App Data"
         description="Move financial data between Orbit Money and other budgeting apps."
-        collapsed={collapsedCards.has('import')}
-        onToggle={() => toggleCardCollapsed('import')}
-        collapsedContent={
-          <div className="settings-collapsed-action">
-            <div className="settings-collapsed-summary">
-              <strong>{file ? file.name : importResult ? 'Import Complete' : 'Financial Data'}</strong>
-              <span>{file ? `${(file.size / 1024).toFixed(0)} KB selected` : 'Import CSV or export CSV/JSON.'}</span>
-            </div>
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={!file || importing || previewingImport}
-              onClick={importPreview ? handleImportCommit : handleImportPreview}
-            >
-              {importing ? 'Importing...' : previewingImport ? 'Previewing...' : importPreview ? 'Import' : 'Preview'}
-            </button>
-          </div>
-        }
       >
         <div className="settings-action">
           <div className="settings-action-info">
@@ -1390,31 +1213,6 @@ export default function Settings({
         key="backup"
         title="Backup / Restore Orbit Money Data"
         description="Save or restore Orbit Money app data, settings, and rules."
-        collapsed={collapsedCards.has('backup')}
-        onToggle={() => toggleCardCollapsed('backup')}
-        collapsedContent={
-          <>
-            <div className="settings-collapsed-action">
-              <div className="settings-collapsed-summary">
-                <strong>{restoreFile ? restoreFile.name : 'Orbit Backup'}</strong>
-                <span>SimpleFIN connection info is not included.</span>
-              </div>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={downloadBusy === 'Backup'}
-                onClick={() => downloadData('/api/data/orbit-backup', {
-                  label: 'Backup',
-                  scope: 'backup',
-                  fallbackFilename: 'orbit-money-backup.json'
-                })}
-              >
-                {downloadBusy === 'Backup' ? 'Backing Up...' : 'Backup'}
-              </button>
-            </div>
-            {renderDownloadNotice('backup')}
-          </>
-        }
       >
         <div className="settings-action">
           <div className="settings-action-info">
@@ -1533,14 +1331,6 @@ export default function Settings({
         key="account"
         title="Account"
         description="Household access and signed-in user details."
-        collapsed={collapsedCards.has('account')}
-        onToggle={() => toggleCardCollapsed('account')}
-        collapsedContent={
-          <div className="settings-collapsed-summary">
-            <strong>Signed In</strong>
-            <span>{currentUserCopy}</span>
-          </div>
-        }
       >
         <div className="settings-action">
           <div className="settings-action-info">
@@ -1692,7 +1482,7 @@ export default function Settings({
             className="settings-about-info-card settings-donate-card"
             onClick={handleDonatePlaceholder}
           >
-            <span className="settings-donate-icon" aria-hidden>☕</span>
+            <span className="settings-donate-icon" aria-hidden>{'\u2615'}</span>
             <strong>Donate</strong>
           </button>
 
@@ -1791,91 +1581,82 @@ export default function Settings({
     );
   }
 
-  function renderSettingsCard(id) {
-    switch (id) {
-      case 'appearance':
-        return renderAppearanceCard();
-      case 'features':
-        return renderFeaturesCard();
-      case 'simplefin':
-        return renderSimpleFinCard();
-      case 'import':
-        return renderImportCard();
-      case 'backup':
-        return renderBackupCard();
-      case 'account':
-        return renderAccountCard();
-      case 'about':
-        return renderAboutCard();
-      default:
-        return null;
-    }
+  function openSettingsPage(path) {
+    navigate(path, { state: { transition: 'forward' } });
   }
 
-  function renderSettingsReorderModal() {
-    if (!settingsReorderMode) return null;
+  function renderSettingsHub() {
     return (
-      <AnimatedModal
-        onClose={() => {
-          setSettingsReorderMode(false);
-          setSettingsDragId(null);
-          setSettingsOverId(null);
-        }}
-        size="lg"
-      >
-        {({ close }) => (
-          <>
-            <div className="modal-header">
-              <h3>Settings Card Order</h3>
-              <button type="button" className="modal-close" onClick={close} aria-label="Close">
-                x
-              </button>
-            </div>
+      <section className="settings-section settings-hub-section settings-section-top" aria-labelledby="settings-hub-title">
+        <div className="settings-section-header">
+          <h3 id="settings-hub-title">Settings Areas</h3>
+          <p>Choose the kind of setting you want to change.</p>
+        </div>
 
-            <div className="settings-reorder-modal">
-              <p className="muted">Drag cards into the order you want them to appear.</p>
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragStart={(event) => setSettingsDragId(event.active.id)}
-                onDragOver={(event) => setSettingsOverId(event.over?.id ?? null)}
-                onDragCancel={() => {
-                  setSettingsDragId(null);
-                  setSettingsOverId(null);
-                }}
-                onDragEnd={handleSettingsDragEnd}
-              >
-                <SortableContext items={settingsOrder} strategy={verticalListSortingStrategy}>
-                  <div className="settings-reorder-list reorder-active reorder-drag-scope">
-                    {settingsOrder.map((id) => {
-                      const card = SETTINGS_CARD_BY_ID.get(id);
-                      return (
-                        <ReorderListItem
-                          key={id}
-                          id={id}
-                          handleLabel={`Move ${card.title}`}
-                          title={card.title}
-                          subtitle={card.description}
-                          previewDisplaced={id === settingsOverId && id !== settingsDragId}
-                        />
-                      );
-                    })}
-                  </div>
-                </SortableContext>
-                {settingsDragId && <div className="drag-screen-blocker" aria-hidden="true" />}
-              </DndContext>
-            </div>
-
-            <div className="modal-actions">
-              <button type="button" className="btn-primary" onClick={close}>
-                Done
-              </button>
-            </div>
-          </>
-        )}
-      </AnimatedModal>
+        <div className="settings-hub-list">
+          <SelectableListItem
+            className="settings-hub-row"
+            leading={<AppIcon name="settings" className="settings-hub-icon" />}
+            title="Preferences"
+            subtitle="Appearance, feature visibility, and app display options."
+            onClick={() => openSettingsPage('/settings/preferences')}
+          />
+          <SelectableListItem
+            className="settings-hub-row"
+            leading={<AppIcon name="transactions" className="settings-hub-icon" />}
+            title="Data Management"
+            subtitle="Connections, sharing, imports, exports, and backups."
+            onClick={() => openSettingsPage('/settings/data-management')}
+          />
+        </div>
+      </section>
     );
   }
+
+  function renderSettingsContent() {
+    if (settingsPage === 'preferences') {
+      return (
+        <div className="settings-card-stack settings-section-top">
+          {renderAppearanceCard()}
+          {renderFeaturesCard()}
+        </div>
+      );
+    }
+
+    if (settingsPage === 'data-management') {
+      return (
+        <div className="settings-card-stack settings-section-top">
+          {renderSimpleFinCard()}
+          {renderAccountCard()}
+          {renderImportCard()}
+          {renderBackupCard()}
+        </div>
+      );
+    }
+
+    return (
+      <>
+        {renderSettingsHub()}
+        {renderAboutCard()}
+      </>
+    );
+  }
+
+  const pageMeta = settingsPage === 'preferences'
+    ? {
+      title: 'Preferences',
+      subtitle: 'Appearance, feature visibility, and app display options.'
+    }
+    : settingsPage === 'data-management'
+      ? {
+        title: 'Data Management',
+        subtitle: 'Connections, sharing, imports, exports, and backups.'
+      }
+      : {
+        title: 'Settings',
+        subtitle: 'Maintenance and configuration.'
+      };
+  const isSettingsSubpage = settingsPage !== 'home';
 
   return (
     <div className="settings-view">
@@ -1883,36 +1664,25 @@ export default function Settings({
         id="settings-title"
         variant="settings"
         kicker="Control Center"
-        title="Settings"
-        subtitle="Maintenance and configuration."
-        toolbar={
+        title={pageMeta.title}
+        subtitle={pageMeta.subtitle}
+        toolbar={isSettingsSubpage ? (
           <div className="settings-hero-toolbar">
             <button
               type="button"
-              className={settingsReorderMode ? 'btn-primary' : 'btn-secondary'}
-              onClick={() => {
-                setSettingsReorderMode(true);
-                setSettingsDragId(null);
-                setSettingsOverId(null);
-              }}
+              className="btn-secondary"
+              onClick={() => navigate('/settings', { state: { transition: 'back' } })}
             >
-              Reorder
+              Back To Settings
             </button>
           </div>
-        }
+        ) : null}
       />
 
-      <div className={settingsReorderMode ? 'settings-card-stack reorder-visible' : 'settings-card-stack'}>
-        {settingsOrder.map((id, index) => (
-          <div key={id} className={index === 0 && !settingsReorderMode ? 'settings-section-top' : ''}>
-            {renderSettingsCard(id)}
-          </div>
-        ))}
-      </div>
+      {renderSettingsContent()}
 
       <Dialog />
       {renderMoreReorderModal()}
-      {renderSettingsReorderModal()}
     </div>
   );
 }
