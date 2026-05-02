@@ -188,9 +188,9 @@ function AppShell() {
     navigate('/', { replace: true });
   }
 
-  async function handleSettingsImportComplete() {
+  async function handleSettingsImportComplete(options = {}) {
     const loaded = await loadLookups();
-    if (loaded) {
+    if (loaded && !options?.stayOnSettings) {
       navigate('/transactions', { state: { transition: 'back' } });
     }
   }

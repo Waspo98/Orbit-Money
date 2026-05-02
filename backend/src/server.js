@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { db, runMigrations } from './db/index.js';
-import { requireAuth } from './auth.js';
+import { requireAuth, requireWriteForUnsafeMethods } from './auth.js';
 import { startScheduler } from './scheduler.js';
 import { seedDemoData } from './services/demoSeed.js';
 import BetterSqliteSessionStore from './services/sessionStore.js';
@@ -25,6 +25,7 @@ import householdRoutes from './routes/household.js';
 import householdSharingRoutes from './routes/householdSharing.js';
 import merchantLogosRoutes from './routes/merchantLogos.js';
 import upcomingRoutes from './routes/upcoming.js';
+import dataRoutes from './routes/data.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -65,6 +66,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/health', healthRoutes);
 
 // --- Protected routes -------------------------------------------------------
+app.use('/api', requireAuth, requireWriteForUnsafeMethods);
 app.use('/api/import', importRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/accounts', accountsRoutes);
@@ -79,6 +81,7 @@ app.use('/api/household', householdRoutes);
 app.use('/api/household-sharing', householdSharingRoutes);
 app.use('/api/merchant-logos', merchantLogosRoutes);
 app.use('/api/upcoming', upcomingRoutes);
+app.use('/api/data', dataRoutes);
 
 // Any other /api/* is a 404.
 app.use('/api', requireAuth, (req, res) => {

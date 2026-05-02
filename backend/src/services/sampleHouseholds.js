@@ -4,6 +4,8 @@ const HOUSEHOLD_DELETE_TABLES = [
   'upcoming_occurrences',
   'upcoming_dismissed_suggestions',
   'upcoming_items',
+  'import_batch_items',
+  'import_batches',
   'sync_log',
   'simplefin_config',
   'app_settings',
@@ -23,6 +25,12 @@ const HOUSEHOLD_DELETE_TABLES = [
 
 function placeholders(values) {
   return values.map(() => '?').join(', ');
+}
+
+function tableExists(db, table) {
+  return Boolean(
+    db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)
+  );
 }
 
 export function touchSampleUser(db, userId) {
@@ -66,6 +74,7 @@ export function cleanupExpiredSampleHouseholds(db) {
       .map((row) => row.id);
 
     for (const table of HOUSEHOLD_DELETE_TABLES) {
+      if (!tableExists(db, table)) continue;
       const deleteRows = db.prepare(`DELETE FROM ${table} WHERE household_id = ?`);
       for (const householdId of householdIds) {
         deleteRows.run(householdId);

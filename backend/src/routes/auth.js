@@ -35,6 +35,9 @@ function setSessionIdentity(req, identity) {
   req.session.displayName = identity.displayName || identity.username;
   req.session.householdId = identity.householdId;
   req.session.householdRole = identity.role || 'owner';
+  req.session.householdAccessLevel = identity.role === 'owner'
+    ? 'write'
+    : identity.accessLevel || 'write';
   req.session.householdName = identity.householdName || null;
 }
 
@@ -48,7 +51,10 @@ function currentSessionPayload(req) {
     household: {
       id: req.session.householdId || 1,
       name: req.session.householdName || null,
-      role: req.session.householdRole || 'owner'
+      role: req.session.householdRole || 'owner',
+      accessLevel: req.session.householdRole === 'owner'
+        ? 'write'
+        : req.session.householdAccessLevel || 'write'
     }
   };
 }
@@ -83,7 +89,7 @@ router.post('/login', (req, res) => {
     const user = db.prepare('SELECT * FROM users WHERE id = 1').get();
     const membership = db
       .prepare(
-        `SELECT hm.household_id, hm.role, h.name
+        `SELECT hm.household_id, hm.role, hm.access_level, h.name
            FROM household_memberships hm
            JOIN households h ON h.id = hm.household_id
           WHERE hm.user_id = 1
@@ -99,6 +105,7 @@ router.post('/login', (req, res) => {
       displayName: user?.display_name || username,
       householdId: membership?.household_id || 1,
       role: membership?.role || 'owner',
+      accessLevel: membership?.access_level || 'write',
       householdName: membership?.name || 'My Household'
     });
     return sendOk(res, { success: true, ...currentSessionPayload(req) });
@@ -134,7 +141,7 @@ router.post('/sample', (req, res) => {
 
       let membership = db
         .prepare(
-          `SELECT hm.household_id, hm.role, h.name
+          `SELECT hm.household_id, hm.role, hm.access_level, h.name
              FROM household_memberships hm
              JOIN households h ON h.id = hm.household_id
             WHERE hm.user_id = ?
@@ -147,7 +154,7 @@ router.post('/sample', (req, res) => {
         const householdId = createHouseholdForUser(db, user.id, 'Sample Data');
         db.prepare('UPDATE households SET name = ? WHERE id = ?').run('Sample Data', householdId);
         membership = db
-          .prepare('SELECT id AS household_id, name, ? AS role FROM households WHERE id = ?')
+          .prepare("SELECT id AS household_id, name, ? AS role, 'write' AS access_level FROM households WHERE id = ?")
           .get('owner', householdId);
       }
 
@@ -164,6 +171,7 @@ router.post('/sample', (req, res) => {
       displayName,
       householdId: membership.household_id,
       role: membership.role || 'owner',
+      accessLevel: membership.access_level || 'write',
       householdName: membership.name || 'Sample Data'
     });
     return sendOk(res, { success: true, sample: true, ...currentSessionPayload(req) });
@@ -217,7 +225,7 @@ router.get('/me', (req, res) => {
     const householdId = req.session.householdId || 1;
     const membership = db
       .prepare(
-        `SELECT role
+        `SELECT role, access_level
            FROM household_memberships
           WHERE user_id = ?
             AND household_id = ?`
@@ -233,6 +241,9 @@ router.get('/me', (req, res) => {
       });
     }
     req.session.householdRole = membership.role || req.session.householdRole || 'member';
+    req.session.householdAccessLevel = membership.role === 'owner'
+      ? 'write'
+      : membership.access_level || req.session.householdAccessLevel || 'write';
     if (String(req.session.username || '').startsWith('sample:')) {
       touchSampleUser(db, req.session.userId || 1);
     }

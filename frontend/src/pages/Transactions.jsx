@@ -4,9 +4,11 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import FilterSheet from '../components/FilterSheet.jsx';
 import AppSelect from '../components/AppSelect.jsx';
+import AnimatedModal from '../components/AnimatedModal.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import PageHero from '../components/PageHero.jsx';
 import SearchField from '../components/SearchField.jsx';
+import CurrencyInput, { parseCurrencyInput } from '../components/CurrencyInput.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { APP_ICON_192 } from '../brandAssets.js';
 import { RuleEditor } from '../components/rules/RuleEditor.jsx';
@@ -69,6 +71,12 @@ function formatAmount(amount) {
 
 function formatShortAmount(amount) {
   return formatCurrency(amount, { maximumFractionDigits: 0 });
+}
+
+function todayLocalDate() {
+  const now = new Date();
+  const offsetDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().slice(0, 10);
 }
 
 function groupByMonth(items, countsByMonth = {}) {
@@ -196,6 +204,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
 
   const [expandedId, setExpandedId] = useState(null);
   const [editingTxn, setEditingTxn] = useState(null);
+  const [manualTxnOpen, setManualTxnOpen] = useState(false);
   const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
   const [recurringFromTxn, setRecurringFromTxn] = useState(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
@@ -589,6 +598,13 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                 triggerIcon={<TransactionToolbarIcon type="view" />}
                 showCaret={false}
               />
+              <button
+                type="button"
+                className="btn-secondary txn-manual-button"
+                onClick={() => setManualTxnOpen(true)}
+              >
+                Manual
+              </button>
             </div>
           </div>
         )}
@@ -723,6 +739,18 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         />
       )}
 
+      {manualTxnOpen && (
+        <ManualTransactionModal
+          accounts={accounts.filter((account) => !account.is_archived)}
+          categories={categories}
+          onClose={() => setManualTxnOpen(false)}
+          onSaved={() => {
+            setManualTxnOpen(false);
+            load({ silent: true });
+          }}
+        />
+      )}
+
       {newRuleFromTxn && (
         <RuleEditor
           rule={{
@@ -778,6 +806,162 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
 
       <Dialog />
     </div>
+  );
+}
+
+function ManualTransactionModal({ accounts, categories, onClose, onSaved }) {
+  const [accountId, setAccountId] = useState(accounts[0]?.id || '');
+  const [date, setDate] = useState(todayLocalDate());
+  const [merchant, setMerchant] = useState('');
+  const [amount, setAmount] = useState('');
+  const [direction, setDirection] = useState('expense');
+  const [categoryId, setCategoryId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isTransfer, setIsTransfer] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSave(event, close) {
+    event.preventDefault();
+    const parsedAmount = parseCurrencyInput(amount, NaN);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setError('Amount must be a positive number.');
+      return;
+    }
+    if (!accountId) {
+      setError('Choose an account.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await api.post('/api/transactions', {
+        account_id: Number(accountId),
+        date,
+        merchant,
+        amount: direction === 'expense' ? -parsedAmount : parsedAmount,
+        category_id: categoryId ? Number(categoryId) : null,
+        notes,
+        is_transfer: isTransfer
+      });
+      close({ animate: true });
+      setTimeout(onSaved, 180);
+    } catch (err) {
+      setError(err.message || 'Create transaction failed');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AnimatedModal onClose={onClose}>
+      {({ close }) => (
+        <>
+          <h3>Add Manual Transaction</h3>
+          <p className="modal-copy">
+            Use this for cash, corrections, or one-off entries that will not arrive through SimpleFIN.
+          </p>
+
+          <form onSubmit={(event) => handleSave(event, close)}>
+            <label className="field">
+              <span>Account</span>
+              <AppSelect
+                value={accountId || ''}
+                onChange={setAccountId}
+                ariaLabel="Transaction account"
+                options={accounts.map((account) => ({ value: account.id, label: account.name }))}
+              />
+            </label>
+
+            <label className="field">
+              <span>Date</span>
+              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+            </label>
+
+            <label className="field">
+              <span>Merchant</span>
+              <input
+                type="text"
+                value={merchant}
+                onChange={(event) => setMerchant(event.target.value)}
+                placeholder="Merchant or description"
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Amount</span>
+              <CurrencyInput value={amount} onChange={setAmount} placeholder="$25.00" required />
+            </label>
+
+            <div className="settings-theme-toggle settings-theme-toggle-two" role="radiogroup" aria-label="Transaction direction">
+              {[
+                { value: 'expense', label: 'Expense' },
+                { value: 'income', label: 'Income' }
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`settings-theme-option ${direction === option.value ? 'active' : ''}`}
+                  onClick={() => setDirection(option.value)}
+                  role="radio"
+                  aria-checked={direction === option.value}
+                >
+                  <span className="settings-theme-text">
+                    <span className="settings-theme-label">{option.label}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <label className="field">
+              <span>Category</span>
+              <AppSelect
+                value={categoryId || ''}
+                onChange={setCategoryId}
+                ariaLabel="Transaction category"
+                options={[
+                  { value: '', label: '(Uncategorized)' },
+                  ...categories.map((category) => ({
+                    value: category.id,
+                    label: `${category.icon} ${category.name}`
+                  }))
+                ]}
+              />
+            </label>
+
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={isTransfer}
+                onChange={(event) => setIsTransfer(event.target.checked)}
+              />
+              <span>Mark As Transfer</span>
+            </label>
+
+            <label className="field">
+              <span>Notes</span>
+              <textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Optional"
+                rows={3}
+              />
+            </label>
+
+            {error && <div className="error">{error}</div>}
+
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={close}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={saving || accounts.length === 0}>
+                {saving ? 'Adding...' : 'Add Transaction'}
+              </button>
+            </div>
+          </form>
+        </>
+      )}
+    </AnimatedModal>
   );
 }
 // ============================================================================

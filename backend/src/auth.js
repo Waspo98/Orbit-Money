@@ -16,7 +16,7 @@ export function requireAuth(req, res, next) {
   const apiKey = req.header('X-API-Key');
   if (apiKey && config.apiKey && apiKey === config.apiKey) {
     req.user = { id: null, username: 'api', display_name: 'API' };
-    req.household = { id: parseHouseholdHeader(req), role: 'owner' };
+    req.household = { id: parseHouseholdHeader(req), role: 'owner', accessLevel: 'write' };
     return next();
   }
 
@@ -24,7 +24,7 @@ export function requireAuth(req, res, next) {
     const householdId = req.session.householdId || 1;
     const membership = db
       .prepare(
-        `SELECT role
+        `SELECT role, access_level
            FROM household_memberships
           WHERE user_id = ?
             AND household_id = ?`
@@ -46,7 +46,10 @@ export function requireAuth(req, res, next) {
     };
     req.household = {
       id: householdId,
-      role: membership.role || req.session.householdRole || 'member'
+      role: membership.role || req.session.householdRole || 'member',
+      accessLevel: membership.role === 'owner'
+        ? 'write'
+        : membership.access_level || req.session.householdAccessLevel || 'write'
     };
     return next();
   }
@@ -60,4 +63,21 @@ export function requireHouseholdId(req) {
     throw new Error('Authenticated request is missing household context.');
   }
   return id;
+}
+
+export function canWriteHousehold(req) {
+  if (req.household?.role === 'owner') return true;
+  return req.household?.accessLevel !== 'read';
+}
+
+export function requireHouseholdWrite(req, res, next) {
+  if (canWriteHousehold(req)) return next();
+  return res.status(403).json({
+    error: 'This household is read-only for your account.'
+  });
+}
+
+export function requireWriteForUnsafeMethods(req, res, next) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  return requireHouseholdWrite(req, res, next);
 }

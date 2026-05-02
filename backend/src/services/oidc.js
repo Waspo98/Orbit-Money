@@ -143,7 +143,7 @@ function applyPendingHouseholdShares(userId, email) {
   if (!email) return null;
   const shares = db
     .prepare(
-      `SELECT id, household_id, role
+      `SELECT id, household_id, role, access_level
          FROM household_shares
         WHERE lower(invited_email) = lower(?)
           AND revoked_at IS NULL`
@@ -151,13 +151,17 @@ function applyPendingHouseholdShares(userId, email) {
     .all(email);
 
   const insertMembership = db.prepare(
-    `INSERT INTO household_memberships (household_id, user_id, role)
-     VALUES (?, ?, ?)
+    `INSERT INTO household_memberships (household_id, user_id, role, access_level)
+     VALUES (?, ?, ?, ?)
      ON CONFLICT(household_id, user_id) DO UPDATE SET
        role = CASE
          WHEN role = 'owner' THEN role
          WHEN excluded.role = 'admin' THEN 'admin'
          ELSE role
+       END,
+       access_level = CASE
+         WHEN role = 'owner' THEN access_level
+         ELSE excluded.access_level
        END,
        updated_at = datetime('now')`
   );
@@ -171,7 +175,12 @@ function applyPendingHouseholdShares(userId, email) {
 
   let preferredHouseholdId = null;
   for (const share of shares) {
-    insertMembership.run(share.household_id, userId, share.role || 'member');
+    insertMembership.run(
+      share.household_id,
+      userId,
+      share.role || 'member',
+      share.access_level || 'write'
+    );
     markAccepted.run(userId, share.id);
     preferredHouseholdId = preferredHouseholdId || share.household_id;
   }
@@ -203,7 +212,7 @@ function defaultMembershipForUser(userId, displayName, preferredHouseholdId = nu
   if (preferredHouseholdId) {
     const preferred = db
       .prepare(
-        `SELECT hm.household_id, hm.role, h.name
+        `SELECT hm.household_id, hm.role, hm.access_level, h.name
            FROM household_memberships hm
            JOIN households h ON h.id = hm.household_id
           WHERE hm.user_id = ?
@@ -216,7 +225,7 @@ function defaultMembershipForUser(userId, displayName, preferredHouseholdId = nu
 
   const membership = db
     .prepare(
-      `SELECT hm.household_id, hm.role, h.name
+      `SELECT hm.household_id, hm.role, hm.access_level, h.name
          FROM household_memberships hm
          JOIN households h ON h.id = hm.household_id
         WHERE hm.user_id = ?
@@ -228,7 +237,7 @@ function defaultMembershipForUser(userId, displayName, preferredHouseholdId = nu
   if (membership) return membership;
   const householdId = createHouseholdForUser(db, userId, displayName);
   return db
-    .prepare('SELECT id AS household_id, name, ? AS role FROM households WHERE id = ?')
+    .prepare("SELECT id AS household_id, name, ? AS role, 'write' AS access_level FROM households WHERE id = ?")
     .get('owner', householdId);
 }
 
@@ -253,6 +262,7 @@ export async function completeOidcLogin(req, code, state) {
     userId,
     householdId: membership.household_id,
     role: membership.role,
+    accessLevel: membership.access_level || 'write',
     username: profile.preferred_username || profile.email || profile.sub,
     email: profile.email || null,
     displayName,

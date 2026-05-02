@@ -8,6 +8,7 @@ import {
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppIcon from '../components/AppIcon.jsx';
+import AppSelect from '../components/AppSelect.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
 import ExpandingSection from '../components/ExpandingSection.jsx';
@@ -81,8 +82,13 @@ const SETTINGS_CARD_DEFS = [
   },
   {
     id: 'import',
-    title: 'Import Data',
-    description: 'Bring in Rocket Money data when you need to reload history.'
+    title: 'Import / Export Budgeting App Data',
+    description: 'Move financial data between Orbit Money and other budgeting apps.'
+  },
+  {
+    id: 'backup',
+    title: 'Backup / Restore Orbit Money Data',
+    description: 'Save or restore Orbit Money app data, settings, and rules.'
   },
   {
     id: 'account',
@@ -146,7 +152,7 @@ function todayIso() {
 }
 
 function displayPerson(person) {
-  return person?.display_name || person?.displayName || person?.email || person?.username || 'Shared user';
+  return person?.display_name || person?.displayName || person?.email || person?.invited_email || person?.username || 'Shared user';
 }
 
 function SettingsCard({
@@ -224,16 +230,25 @@ export default function Settings({
   const [signingOut, setSigningOut] = useState(false);
   const [sharing, setSharing] = useState(null);
   const [sharingEmail, setSharingEmail] = useState('');
+  const [sharingAccessLevel, setSharingAccessLevel] = useState('write');
   const [sharingBusy, setSharingBusy] = useState(false);
   const [sharingError, setSharingError] = useState('');
   const [sharingMessage, setSharingMessage] = useState('');
   const [mhaBusy, setMhaBusy] = useState(false);
   const [mhaError, setMhaError] = useState('');
   const [file, setFile] = useState(null);
+  const [restoreFile, setRestoreFile] = useState(null);
   const [dragging, setDragging] = useState(false);
+  const [restoreDragging, setRestoreDragging] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [previewingImport, setPreviewingImport] = useState(false);
+  const [importPreview, setImportPreview] = useState(null);
   const [importResult, setImportResult] = useState(null);
   const [importError, setImportError] = useState('');
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restorePreview, setRestorePreview] = useState(null);
+  const [restoreResult, setRestoreResult] = useState(null);
+  const [restoreError, setRestoreError] = useState('');
   const [collapsedCards, setCollapsedCards] = useState(
     () => new Set(DEFAULT_COLLAPSED_SETTINGS_CARDS)
   );
@@ -245,6 +260,7 @@ export default function Settings({
   const [moreDragId, setMoreDragId] = useState(null);
   const [moreOverId, setMoreOverId] = useState(null);
   const fileInputRef = useRef(null);
+  const restoreFileInputRef = useRef(null);
   const sensors = useReorderSensors();
 
   const normalizedNavigationPreferences = useMemo(
@@ -432,9 +448,13 @@ export default function Settings({
     setSharingError('');
     setSharingMessage('');
     try {
-      const data = await api.post('/api/household-sharing/shares', { email });
+      const data = await api.post('/api/household-sharing/shares', {
+        email,
+        accessLevel: sharingAccessLevel
+      });
       setSharing(data);
       setSharingEmail('');
+      setSharingAccessLevel('write');
       setSharingMessage(`${email} can now sign in with their configured account.`);
     } catch (err) {
       setSharingError(err.message || 'Sharing failed.');
@@ -486,6 +506,25 @@ export default function Settings({
       setSharingMessage(`${name} was removed from this household.`);
     } catch (err) {
       setSharingError(err.message || 'Could not remove family member.');
+    } finally {
+      setSharingBusy(false);
+    }
+  }
+
+  async function handleAccessChange(person, accessLevel, pending = false) {
+    const label = displayPerson(person);
+    setSharingBusy(true);
+    setSharingError('');
+    setSharingMessage('');
+    try {
+      const path = pending
+        ? `/api/household-sharing/shares/${person.id}/access`
+        : `/api/household-sharing/users/${person.id}/access`;
+      const data = await api.patch(path, { accessLevel });
+      setSharing(data);
+      setSharingMessage(`${label} now has ${accessLevel === 'read' ? 'read-only' : 'read and write'} access.`);
+    } catch (err) {
+      setSharingError(err.message || 'Could not update permissions.');
     } finally {
       setSharingBusy(false);
     }
@@ -575,7 +614,24 @@ export default function Settings({
     }
     setImportError('');
     setImportResult(null);
+    setImportPreview(null);
     setFile(f);
+  }
+
+  function handleRestoreFile(f) {
+    if (!f) return;
+    if (!f.name.toLowerCase().endsWith('.json')) {
+      setRestoreError('Please choose an Orbit Money backup .json file.');
+      return;
+    }
+    if (f.size > 50 * 1024 * 1024) {
+      setRestoreError('File is larger than 50 MB.');
+      return;
+    }
+    setRestoreError('');
+    setRestorePreview(null);
+    setRestoreResult(null);
+    setRestoreFile(f);
   }
 
   function handleDrop(e) {
@@ -584,17 +640,28 @@ export default function Settings({
     handleFile(e.dataTransfer.files?.[0]);
   }
 
-  async function handleImport() {
+  function handleRestoreDrop(e) {
+    e.preventDefault();
+    setRestoreDragging(false);
+    handleRestoreFile(e.dataTransfer.files?.[0]);
+  }
+
+  function downloadData(path) {
+    window.location.href = path;
+  }
+
+  async function handleImportPreview() {
     if (!file) return;
-    setImporting(true);
+    setPreviewingImport(true);
     setImportError('');
     setImportResult(null);
+    setImportPreview(null);
 
     try {
       const form = new FormData();
       form.append('file', file);
 
-      const res = await fetch('/api/import/rocket-money', {
+      const res = await fetch('/api/import/rocket-money/preview', {
         method: 'POST',
         credentials: 'same-origin',
         body: form
@@ -605,12 +672,124 @@ export default function Settings({
         throw new Error(data.error || `Import failed: ${res.status}`);
       }
 
+      setImportPreview(data);
+    } catch (err) {
+      setImportError(err.message || 'Preview failed');
+    } finally {
+      setPreviewingImport(false);
+    }
+  }
+
+  async function handleImportCommit() {
+    if (!importPreview?.batchId) return;
+    const ok = await confirm(
+      `Import ${importPreview.estimatedInserted.toLocaleString()} transactions from ${importPreview.filename || 'this CSV'}? You can undo this import from the result screen.`,
+      {
+        title: 'Import Financial Data',
+        confirmLabel: 'Import'
+      }
+    );
+    if (!ok) return;
+
+    setImporting(true);
+    setImportError('');
+    try {
+      const data = await api.post(`/api/import/rocket-money/${importPreview.batchId}/commit`);
       setImportResult(data);
       setFile(null);
+      setImportPreview(null);
+      onImportComplete?.({ stayOnSettings: true });
     } catch (err) {
       setImportError(err.message || 'Import failed');
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function handleUndoImport() {
+    if (!importResult?.batchId) return;
+    const ok = await confirm(
+      'Undo this import? Orbit will remove the transactions, rules, and newly-created accounts that came only from this import.',
+      {
+        title: 'Undo Import',
+        confirmLabel: 'Undo Import',
+        destructive: true
+      }
+    );
+    if (!ok) return;
+    setImporting(true);
+    setImportError('');
+    try {
+      const data = await api.post(`/api/import/batches/${importResult.batchId}/undo`);
+      setImportResult({ ...importResult, undone: data });
+      onImportComplete?.({ stayOnSettings: true });
+    } catch (err) {
+      setImportError(err.message || 'Undo failed');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function handleRestorePreview() {
+    if (!restoreFile) return;
+    setRestoreBusy(true);
+    setRestoreError('');
+    setRestorePreview(null);
+    setRestoreResult(null);
+    try {
+      const form = new FormData();
+      form.append('file', restoreFile);
+      const res = await fetch('/api/data/orbit-restore/preview', {
+        method: 'POST',
+        credentials: 'same-origin',
+        body: form
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Restore preview failed: ${res.status}`);
+      }
+      setRestorePreview(data);
+    } catch (err) {
+      setRestoreError(err.message || 'Restore preview failed');
+    } finally {
+      setRestoreBusy(false);
+    }
+  }
+
+  async function handleRestore() {
+    if (!restoreFile || !restorePreview) return;
+    const ok = await confirm(
+      `Restore "${restorePreview.householdName}"? This will replace the current Orbit household data. SimpleFIN connection info is not included, so you will need to generate a new SimpleFIN API key and reconnect SimpleFIN.`,
+      {
+        title: 'Restore Orbit Money Data',
+        confirmLabel: 'Restore',
+        destructive: true
+      }
+    );
+    if (!ok) return;
+    setRestoreBusy(true);
+    setRestoreError('');
+    try {
+      const form = new FormData();
+      form.append('file', restoreFile);
+      const res = await fetch('/api/data/orbit-restore', {
+        method: 'POST',
+        credentials: 'same-origin',
+        body: form
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Restore failed: ${res.status}`);
+      }
+      setRestoreResult(data);
+      setRestoreFile(null);
+      setRestorePreview(null);
+      await onImportComplete?.({ stayOnSettings: true });
+      await loadStatus();
+    } catch (err) {
+      setRestoreError(err.message || 'Restore failed');
+    } finally {
+      setRestoreBusy(false);
     }
   }
 
@@ -983,60 +1162,95 @@ export default function Settings({
       <SettingsCard
         id="import"
         key="import"
-        title="Import Data"
-        description="Bring in Rocket Money data when you need to reload history."
+        title="Import / Export Budgeting App Data"
+        description="Move financial data between Orbit Money and other budgeting apps."
         collapsed={collapsedCards.has('import')}
         onToggle={() => toggleCardCollapsed('import')}
         collapsedContent={
           <div className="settings-collapsed-action">
             <div className="settings-collapsed-summary">
-              <strong>{file ? file.name : importResult ? 'Import Complete' : 'CSV Import'}</strong>
-              <span>{file ? `${(file.size / 1024).toFixed(0)} KB selected` : 'Expand to choose a file.'}</span>
+              <strong>{file ? file.name : importResult ? 'Import Complete' : 'Financial Data'}</strong>
+              <span>{file ? `${(file.size / 1024).toFixed(0)} KB selected` : 'Import CSV or export CSV/JSON.'}</span>
             </div>
             <button
               type="button"
               className="btn-primary"
-              disabled={!file || importing}
-              onClick={handleImport}
+              disabled={!file || importing || previewingImport}
+              onClick={importPreview ? handleImportCommit : handleImportPreview}
             >
-              {importing ? 'Importing...' : 'Import'}
+              {importing ? 'Importing...' : previewingImport ? 'Previewing...' : importPreview ? 'Import' : 'Preview'}
             </button>
           </div>
         }
       >
+        <div className="settings-action">
+          <div className="settings-action-info">
+            <strong>Export For Use In A Different Budgeting App</strong>
+            <p>Download financial data only. Orbit settings, rules, auth, and SimpleFIN are not included.</p>
+          </div>
+          <div className="settings-action-buttons">
+            <button type="button" className="btn-secondary" onClick={() => downloadData('/api/data/budgeting-export?format=csv')}>
+              CSV
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => downloadData('/api/data/budgeting-export?format=json')}>
+              JSON
+            </button>
+          </div>
+        </div>
+
+        <div className="settings-subsection">
+          <div className="settings-subsection-heading">
+            <h4>Import From Rocket Money Or Other Financial App</h4>
+            <p>Preview the CSV first, then confirm the import. Applied imports can be undone.</p>
+          </div>
+        </div>
+
         {importResult ? (
           <div className="result-card">
-            <dl className="stat-grid">
-              <div><dt>Imported</dt><dd>{importResult.inserted.toLocaleString()}</dd></div>
-              <div><dt>Skipped</dt><dd>{importResult.skipped.toLocaleString()}</dd></div>
-              <div><dt>Accounts</dt><dd>{importResult.accountsCreated.toLocaleString()}</dd></div>
-              <div><dt>Rules</dt><dd>{importResult.rulesCreated.toLocaleString()}</dd></div>
-            </dl>
+            {importResult.undone ? (
+              <>
+                <dl className="stat-grid">
+                  <div><dt>Transactions Removed</dt><dd>{importResult.undone.transactionsDeleted.toLocaleString()}</dd></div>
+                  <div><dt>Rules Removed</dt><dd>{importResult.undone.rulesDeleted.toLocaleString()}</dd></div>
+                  <div><dt>Accounts Removed</dt><dd>{importResult.undone.accountsDeleted.toLocaleString()}</dd></div>
+                  <div><dt>Accounts Kept</dt><dd>{importResult.undone.accountsKept.toLocaleString()}</dd></div>
+                </dl>
+                <p className="muted" style={{ marginBottom: 0 }}>Import was undone.</p>
+              </>
+            ) : (
+              <>
+                <dl className="stat-grid">
+                  <div><dt>Imported</dt><dd>{importResult.inserted.toLocaleString()}</dd></div>
+                  <div><dt>Skipped</dt><dd>{importResult.skipped.toLocaleString()}</dd></div>
+                  <div><dt>Accounts</dt><dd>{importResult.accountsCreated.toLocaleString()}</dd></div>
+                  <div><dt>Rules</dt><dd>{importResult.rulesCreated.toLocaleString()}</dd></div>
+                </dl>
 
-            {importResult.parseWarnings > 0 && (
-              <p className="muted" style={{ marginTop: 0 }}>
-                Parser reported {importResult.parseWarnings} minor warnings - usually fine.
-              </p>
+                {importResult.parseWarnings > 0 && (
+                  <p className="muted" style={{ marginTop: 0 }}>
+                    Parser reported {importResult.parseWarnings} minor warnings - usually fine.
+                  </p>
+                )}
+
+                <div className="settings-action">
+                  <div className="settings-action-info">
+                    <strong>Import Complete</strong>
+                    <p>Review imported transactions, or undo this import if the preview missed something.</p>
+                  </div>
+                  <div className="settings-action-buttons">
+                    <button type="button" className="btn-secondary" onClick={handleUndoImport} disabled={importing}>
+                      Undo Import
+                    </button>
+                    <button type="button" className="btn-primary" onClick={onImportComplete}>
+                      View Transactions
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
-
-            <div className="settings-action">
-              <div className="settings-action-info">
-                <strong>Import Complete</strong>
-                <p>Refresh account lookups and review the imported transactions.</p>
-              </div>
-              <button type="button" className="btn-primary" onClick={onImportComplete}>
-                View Transactions
-              </button>
-            </div>
           </div>
         ) : (
           <>
-            <p style={{ marginBottom: 20 }}>
-              Export your transactions from Rocket Money as CSV, then drop the file below.
-              Accounts will be created, Custom Names preserved, and rename rules generated
-              automatically.
-            </p>
-
             <div
               className={`drop-zone ${dragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
               onDragOver={(e) => {
@@ -1071,20 +1285,38 @@ export default function Settings({
               )}
             </div>
 
+            {importPreview && (
+              <div className="result-card">
+                <dl className="stat-grid">
+                  <div><dt>Would Import</dt><dd>{importPreview.estimatedInserted.toLocaleString()}</dd></div>
+                  <div><dt>Duplicates</dt><dd>{importPreview.duplicateRows.toLocaleString()}</dd></div>
+                  <div><dt>New Accounts</dt><dd>{importPreview.accountsCreated.toLocaleString()}</dd></div>
+                  <div><dt>New Rules</dt><dd>{importPreview.rulesCreated.toLocaleString()}</dd></div>
+                </dl>
+                {importPreview.invalidRows > 0 && (
+                  <div className="warning-banner">
+                    {importPreview.invalidRows.toLocaleString()} row{importPreview.invalidRows === 1 ? '' : 's'} could not be imported.
+                  </div>
+                )}
+              </div>
+            )}
+
             {importError && <div className="error">{importError}</div>}
 
             <button
               type="button"
               className="btn-primary settings-import-button"
-              disabled={!file || importing}
-              onClick={handleImport}
+              disabled={!file || importing || previewingImport}
+              onClick={importPreview ? handleImportCommit : handleImportPreview}
             >
-              {importing ? (
+              {importing || previewingImport ? (
                 <>
-                  <span className="spinner-inline" /> Importing...
+                  <span className="spinner-inline" /> {previewingImport ? 'Previewing...' : 'Importing...'}
                 </>
-              ) : (
+              ) : importPreview ? (
                 'Import'
+              ) : (
+                'Preview Import'
               )}
             </button>
           </>
@@ -1093,9 +1325,126 @@ export default function Settings({
     );
   }
 
+  function renderBackupCard() {
+    return (
+      <SettingsCard
+        id="backup"
+        key="backup"
+        title="Backup / Restore Orbit Money Data"
+        description="Save or restore Orbit Money app data, settings, and rules."
+        collapsed={collapsedCards.has('backup')}
+        onToggle={() => toggleCardCollapsed('backup')}
+        collapsedContent={
+          <div className="settings-collapsed-action">
+            <div className="settings-collapsed-summary">
+              <strong>{restoreFile ? restoreFile.name : 'Orbit Backup'}</strong>
+              <span>SimpleFIN connection info is not included.</span>
+            </div>
+            <button type="button" className="btn-primary" onClick={() => downloadData('/api/data/orbit-backup')}>
+              Backup
+            </button>
+          </div>
+        }
+      >
+        <div className="settings-action">
+          <div className="settings-action-info">
+            <strong>Backup Orbit Money Data</strong>
+            <p>Includes Orbit data, settings, rules, and permissions. SimpleFIN connection info is excluded.</p>
+          </div>
+          <button type="button" className="btn-primary" onClick={() => downloadData('/api/data/orbit-backup')}>
+            Download Backup
+          </button>
+        </div>
+
+        <div className="warning-banner">
+          After restoring, you will need to generate a new SimpleFIN API key and reconnect SimpleFIN.
+        </div>
+
+        <div className="settings-subsection">
+          <div className="settings-subsection-heading">
+            <h4>Restore Orbit Money Data</h4>
+            <p>Preview a backup file, then replace the current household data after confirmation.</p>
+          </div>
+        </div>
+
+        <div
+          className={`drop-zone ${restoreDragging ? 'dragging' : ''} ${restoreFile ? 'has-file' : ''}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setRestoreDragging(true);
+          }}
+          onDragLeave={() => setRestoreDragging(false)}
+          onDrop={handleRestoreDrop}
+          onClick={() => restoreFileInputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+        >
+          <input
+            ref={restoreFileInputRef}
+            type="file"
+            accept=".json,application/json"
+            onChange={(e) => handleRestoreFile(e.target.files?.[0])}
+            style={{ display: 'none' }}
+          />
+          {restoreFile ? (
+            <>
+              <div className="drop-zone-icon">JSON</div>
+              <div className="drop-zone-filename">{restoreFile.name}</div>
+              <div className="subtle">{(restoreFile.size / 1024).toFixed(0)} KB - click to pick a different file</div>
+            </>
+          ) : (
+            <>
+              <div className="drop-zone-icon">JSON</div>
+              <div className="drop-zone-primary">Drop your Orbit backup here</div>
+              <div className="subtle">or click to browse</div>
+            </>
+          )}
+        </div>
+
+        {restorePreview && (
+          <div className="result-card">
+            <dl className="stat-grid">
+              <div><dt>Accounts</dt><dd>{restorePreview.accounts.toLocaleString()}</dd></div>
+              <div><dt>Transactions</dt><dd>{restorePreview.transactions.toLocaleString()}</dd></div>
+              <div><dt>Rules</dt><dd>{restorePreview.rules.toLocaleString()}</dd></div>
+              <div><dt>Goals</dt><dd>{restorePreview.goals.toLocaleString()}</dd></div>
+            </dl>
+          </div>
+        )}
+
+        {restoreResult && (
+          <div className="success-banner" style={{ marginTop: 12 }}>
+            Restore complete. Reconnect SimpleFIN with a new API key when you are ready.
+          </div>
+        )}
+
+        {restoreError && <div className="error">{restoreError}</div>}
+
+        <div className="modal-actions">
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={!restoreFile || restoreBusy}
+            onClick={handleRestorePreview}
+          >
+            {restoreBusy && !restorePreview ? 'Previewing...' : 'Preview Restore'}
+          </button>
+          <button
+            type="button"
+            className="btn-danger"
+            disabled={!restorePreview || restoreBusy}
+            onClick={handleRestore}
+          >
+            {restoreBusy && restorePreview ? 'Restoring...' : 'Restore'}
+          </button>
+        </div>
+      </SettingsCard>
+    );
+  }
+
   function renderAccountCard() {
     const currentUserCopy = sharing?.currentUser
-      ? `${displayPerson(sharing.currentUser)} - ${sharing.currentUser.role}`
+      ? `${displayPerson(sharing.currentUser)} - ${sharing.currentUser.role} - ${sharing.currentUser.accessLevel === 'read' ? 'read only' : 'read/write'}`
       : 'Loading account details...';
 
     return (
@@ -1133,6 +1482,18 @@ export default function Settings({
                 disabled={sharingBusy}
               />
             </label>
+            <label className="field">
+              <span>Permission</span>
+              <AppSelect
+                value={sharingAccessLevel}
+                onChange={setSharingAccessLevel}
+                ariaLabel="Sharing permission"
+                options={[
+                  { value: 'write', label: 'Read & Write' },
+                  { value: 'read', label: 'Read Only' }
+                ]}
+              />
+            </label>
             <button
               type="submit"
               className="btn-primary"
@@ -1156,6 +1517,21 @@ export default function Settings({
                 </div>
                 <div className="settings-share-row-actions">
                   <span className="pill accent">{user.role}</span>
+                  <span className={`pill ${user.access_level === 'read' ? 'warning' : 'success'}`}>
+                    {user.role === 'owner' || user.access_level !== 'read' ? 'read/write' : 'read only'}
+                  </span>
+                  {sharing.currentUser?.canRemoveUsers && user.id !== sharing.currentUser.id && user.role !== 'owner' && (
+                    <AppSelect
+                      className="settings-share-access-select"
+                      value={user.access_level === 'read' ? 'read' : 'write'}
+                      onChange={(value) => handleAccessChange(user, value)}
+                      ariaLabel={`Permission for ${displayPerson(user)}`}
+                      options={[
+                        { value: 'write', label: 'Read & Write' },
+                        { value: 'read', label: 'Read Only' }
+                      ]}
+                    />
+                  )}
                   {sharing.currentUser?.canRemoveUsers && user.id !== sharing.currentUser.id && (
                     <button
                       type="button"
@@ -1179,14 +1555,31 @@ export default function Settings({
                     <span>Waiting for OIDC sign in</span>
                   </div>
                   {sharing.currentUser?.canManageSharing ? (
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => handleRevokeShare(share)}
-                      disabled={sharingBusy}
-                    >
-                      Remove
-                    </button>
+                    <div className="settings-share-row-actions">
+                      <span className={`pill ${share.access_level === 'read' ? 'warning' : 'success'}`}>
+                        {share.access_level === 'read' ? 'read only' : 'read/write'}
+                      </span>
+                      {sharing.currentUser?.canRemoveUsers && (
+                        <AppSelect
+                          className="settings-share-access-select"
+                          value={share.access_level === 'read' ? 'read' : 'write'}
+                          onChange={(value) => handleAccessChange(share, value, true)}
+                          ariaLabel={`Permission for ${share.invited_email}`}
+                          options={[
+                            { value: 'write', label: 'Read & Write' },
+                            { value: 'read', label: 'Read Only' }
+                          ]}
+                        />
+                      )}
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => handleRevokeShare(share)}
+                        disabled={sharingBusy}
+                      >
+                        Remove
+                      </button>
+                    </div>
                   ) : (
                     <span className="pill warning">pending</span>
                   )}
@@ -1328,6 +1721,8 @@ export default function Settings({
         return renderSimpleFinCard();
       case 'import':
         return renderImportCard();
+      case 'backup':
+        return renderBackupCard();
       case 'account':
         return renderAccountCard();
       case 'about':

@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth, requireHouseholdId } from '../auth.js';
+import { canWriteHousehold, requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import {
   sendBadRequest,
@@ -24,12 +24,16 @@ function normalizeEmail(value) {
   return email;
 }
 
+function normalizeAccessLevel(value) {
+  return value === 'read' ? 'read' : 'write';
+}
+
 function canManageSharing(req) {
-  return req.household?.role === 'owner' || req.household?.role === 'admin';
+  return canWriteHousehold(req) && (req.household?.role === 'owner' || req.household?.role === 'admin');
 }
 
 function canRemoveUsers(req) {
-  return req.household?.role === 'owner';
+  return canWriteHousehold(req) && req.household?.role === 'owner';
 }
 
 function requireShareManager(req) {
@@ -51,7 +55,7 @@ function getHousehold(householdId) {
 function listUsers(householdId) {
   return db
     .prepare(
-      `SELECT u.id, u.email, u.display_name, u.username, hm.role, hm.created_at
+      `SELECT u.id, u.email, u.display_name, u.username, hm.role, hm.access_level, hm.created_at
          FROM household_memberships hm
          JOIN users u ON u.id = hm.user_id
         WHERE hm.household_id = ?
@@ -64,7 +68,7 @@ function listUsers(householdId) {
 function listShares(householdId) {
   return db
     .prepare(
-      `SELECT hs.id, hs.invited_email, hs.role, hs.accepted_at, hs.revoked_at,
+      `SELECT hs.id, hs.invited_email, hs.role, hs.access_level, hs.accepted_at, hs.revoked_at,
               hs.created_at, hs.updated_at,
               creator.display_name AS created_by_name,
               accepted.display_name AS accepted_by_name
@@ -87,6 +91,7 @@ function buildPayload(req) {
       email: req.user?.email || null,
       displayName: req.user?.display_name || req.user?.username || null,
       role: req.household?.role || 'member',
+      accessLevel: req.household?.role === 'owner' ? 'write' : req.household?.accessLevel || 'write',
       canManageSharing: canManageSharing(req),
       canRemoveUsers: canRemoveUsers(req)
     },
@@ -95,23 +100,27 @@ function buildPayload(req) {
   };
 }
 
-function attachExistingUserToShare(householdId, email, role, shareId) {
+function attachExistingUserToShare(householdId, email, role, accessLevel, shareId) {
   const user = db
     .prepare('SELECT id FROM users WHERE lower(email) = lower(?) LIMIT 1')
     .get(email);
   if (!user) return;
 
   db.prepare(
-    `INSERT INTO household_memberships (household_id, user_id, role)
-     VALUES (?, ?, ?)
+    `INSERT INTO household_memberships (household_id, user_id, role, access_level)
+     VALUES (?, ?, ?, ?)
      ON CONFLICT(household_id, user_id) DO UPDATE SET
        role = CASE
          WHEN role = 'owner' THEN role
          WHEN excluded.role = 'admin' THEN 'admin'
          ELSE role
        END,
+       access_level = CASE
+         WHEN role = 'owner' THEN access_level
+         ELSE excluded.access_level
+       END,
        updated_at = datetime('now')`
-  ).run(householdId, user.id, role);
+  ).run(householdId, user.id, role, accessLevel);
 
   db.prepare(
     `UPDATE household_shares
@@ -141,28 +150,101 @@ router.post('/shares', requireAuth, (req, res) => {
     }
 
     const role = req.body?.role === 'admin' ? 'admin' : 'member';
+    const accessLevel = normalizeAccessLevel(req.body?.accessLevel);
     const result = db
       .prepare(
         `INSERT INTO household_shares (
-           household_id, invited_email, role, created_by_user_id
-         ) VALUES (?, ?, ?, ?)
+           household_id, invited_email, role, access_level, created_by_user_id
+         ) VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(household_id, lower(invited_email)) WHERE revoked_at IS NULL
          DO UPDATE SET
            role = excluded.role,
+           access_level = excluded.access_level,
            updated_at = datetime('now')`
       )
-      .run(householdId, email, role, req.user?.id || null);
+      .run(householdId, email, role, accessLevel, req.user?.id || null);
 
     const share = db
       .prepare(
-        `SELECT id, role
+        `SELECT id, role, access_level
            FROM household_shares
           WHERE household_id = ?
             AND lower(invited_email) = lower(?)
             AND revoked_at IS NULL`
       )
       .get(householdId, email);
-    attachExistingUserToShare(householdId, email, share?.role || role, share?.id || result.lastInsertRowid);
+    attachExistingUserToShare(
+      householdId,
+      email,
+      share?.role || role,
+      share?.access_level || accessLevel,
+      share?.id || result.lastInsertRowid
+    );
+    sendOk(res, { success: true, ...buildPayload(req) });
+  } catch (err) {
+    sendRouteError(res, err);
+  }
+});
+
+router.patch('/shares/:id/access', requireAuth, (req, res) => {
+  const id = readIdParam(req, res, 'id', 'share');
+  if (id === null) return;
+
+  try {
+    requireUserRemover(req);
+    const householdId = requireHouseholdId(req);
+    const accessLevel = normalizeAccessLevel(req.body?.accessLevel);
+    const result = db
+      .prepare(
+        `UPDATE household_shares
+            SET access_level = ?,
+                updated_at = datetime('now')
+          WHERE id = ?
+            AND household_id = ?
+            AND revoked_at IS NULL`
+      )
+      .run(accessLevel, id, householdId);
+    if (result.changes === 0) return sendNotFound(res, 'Share was not found.');
+    sendOk(res, { success: true, ...buildPayload(req) });
+  } catch (err) {
+    sendRouteError(res, err);
+  }
+});
+
+router.patch('/users/:id/access', requireAuth, (req, res) => {
+  const id = readIdParam(req, res, 'id', 'user');
+  if (id === null) return;
+
+  try {
+    requireUserRemover(req);
+    const householdId = requireHouseholdId(req);
+    const currentUserId = Number(req.user?.id);
+    if (id === currentUserId) {
+      throw sharingError('You cannot change your own household permissions.', 400);
+    }
+
+    const membership = db
+      .prepare(
+        `SELECT role
+           FROM household_memberships
+          WHERE household_id = ?
+            AND user_id = ?`
+      )
+      .get(householdId, id);
+    if (!membership) return sendNotFound(res, 'Family member was not found.');
+    if (membership.role === 'owner') {
+      throw sharingError('Owner accounts always have read and write access.', 400);
+    }
+
+    const accessLevel = normalizeAccessLevel(req.body?.accessLevel);
+    db.prepare(
+      `UPDATE household_memberships
+          SET access_level = ?,
+              updated_at = datetime('now')
+        WHERE household_id = ?
+          AND user_id = ?`
+    ).run(accessLevel, householdId, id);
+
     sendOk(res, { success: true, ...buildPayload(req) });
   } catch (err) {
     sendRouteError(res, err);
