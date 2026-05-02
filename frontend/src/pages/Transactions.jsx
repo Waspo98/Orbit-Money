@@ -895,7 +895,7 @@ function ManualTransactionModal({ accounts, categories, onClose, onSaved }) {
               <CurrencyInput value={amount} onChange={setAmount} placeholder="$25.00" required />
             </label>
 
-            <div className="settings-theme-toggle settings-theme-toggle-two" role="radiogroup" aria-label="Transaction direction">
+            <div className="settings-theme-toggle settings-theme-toggle-two transaction-direction-toggle" role="radiogroup" aria-label="Transaction direction">
               {[
                 { value: 'expense', label: 'Expense' },
                 { value: 'income', label: 'Income' }

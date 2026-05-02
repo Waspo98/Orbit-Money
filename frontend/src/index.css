@@ -9511,6 +9511,19 @@ body.modal-page-blur-active .txn-pinned-month-header {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.transaction-direction-toggle {
+  margin-bottom: 18px;
+}
+
+.transaction-direction-toggle .settings-theme-option {
+  align-items: center;
+  min-height: 58px;
+}
+
+.transaction-direction-toggle .settings-theme-label {
+  margin-bottom: 0;
+}
+
 .settings-feature-toggle {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
@@ -9888,6 +9901,12 @@ body.modal-page-blur-active .txn-pinned-month-header {
   .settings-theme-toggle { grid-template-columns: 1fr; }
   .settings-theme-toggle-two { grid-template-columns: 1fr; }
   .settings-theme-option { min-height: auto; }
+  .transaction-direction-toggle.settings-theme-toggle-two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .transaction-direction-toggle .settings-theme-option {
+    min-height: 58px;
+  }
   .settings-about-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .settings-about-info-card { min-height: 80px; }
   .settings-developer-line { align-items: stretch; flex-direction: column; }
