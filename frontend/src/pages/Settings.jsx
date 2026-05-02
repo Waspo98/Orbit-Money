@@ -249,6 +249,8 @@ export default function Settings({
   const [restorePreview, setRestorePreview] = useState(null);
   const [restoreResult, setRestoreResult] = useState(null);
   const [restoreError, setRestoreError] = useState('');
+  const [downloadBusy, setDownloadBusy] = useState('');
+  const [downloadNotice, setDownloadNotice] = useState(null);
   const [collapsedCards, setCollapsedCards] = useState(
     () => new Set(DEFAULT_COLLAPSED_SETTINGS_CARDS)
   );
@@ -646,8 +648,58 @@ export default function Settings({
     handleRestoreFile(e.dataTransfer.files?.[0]);
   }
 
-  function downloadData(path) {
-    window.location.href = path;
+  function filenameFromDisposition(disposition, fallback) {
+    const match = /filename="([^"]+)"/i.exec(disposition || '');
+    return match?.[1] || fallback;
+  }
+
+  async function downloadData(path, { label, scope, fallbackFilename }) {
+    setDownloadBusy(label);
+    setDownloadNotice(null);
+    try {
+      const res = await fetch(path, { credentials: 'same-origin' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Download failed: ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      const filename = filenameFromDisposition(
+        res.headers.get('Content-Disposition'),
+        fallbackFilename
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setDownloadNotice({ scope, text: `${label} downloaded.` });
+    } catch (err) {
+      setDownloadNotice({
+        scope,
+        text: err.message || 'Download failed.',
+        tone: 'error'
+      });
+    } finally {
+      setDownloadBusy('');
+    }
+  }
+
+  function renderDownloadNotice(scope) {
+    if (downloadNotice?.scope !== scope) return null;
+
+    return (
+      <div
+        className={`${downloadNotice.tone === 'error' ? 'error' : 'success-banner'} settings-download-status`}
+        role="status"
+        aria-live="polite"
+      >
+        {downloadNotice.text}
+      </div>
+    );
   }
 
   async function handleImportPreview() {
@@ -1189,14 +1241,33 @@ export default function Settings({
             <p>Download financial data only. Orbit settings, rules, auth, and SimpleFIN are not included.</p>
           </div>
           <div className="settings-action-buttons">
-            <button type="button" className="btn-secondary" onClick={() => downloadData('/api/data/budgeting-export?format=csv')}>
-              CSV
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={downloadBusy === 'CSV export'}
+              onClick={() => downloadData('/api/data/budgeting-export?format=csv', {
+                label: 'CSV export',
+                scope: 'budgeting-export',
+                fallbackFilename: 'orbit-money-transactions.csv'
+              })}
+            >
+              {downloadBusy === 'CSV export' ? 'Downloading...' : 'CSV'}
             </button>
-            <button type="button" className="btn-secondary" onClick={() => downloadData('/api/data/budgeting-export?format=json')}>
-              JSON
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={downloadBusy === 'JSON export'}
+              onClick={() => downloadData('/api/data/budgeting-export?format=json', {
+                label: 'JSON export',
+                scope: 'budgeting-export',
+                fallbackFilename: 'orbit-money-financial-export.json'
+              })}
+            >
+              {downloadBusy === 'JSON export' ? 'Downloading...' : 'JSON'}
             </button>
           </div>
         </div>
+        {renderDownloadNotice('budgeting-export')}
 
         <div className="settings-subsection">
           <div className="settings-subsection-heading">
@@ -1335,15 +1406,27 @@ export default function Settings({
         collapsed={collapsedCards.has('backup')}
         onToggle={() => toggleCardCollapsed('backup')}
         collapsedContent={
-          <div className="settings-collapsed-action">
-            <div className="settings-collapsed-summary">
-              <strong>{restoreFile ? restoreFile.name : 'Orbit Backup'}</strong>
-              <span>SimpleFIN connection info is not included.</span>
+          <>
+            <div className="settings-collapsed-action">
+              <div className="settings-collapsed-summary">
+                <strong>{restoreFile ? restoreFile.name : 'Orbit Backup'}</strong>
+                <span>SimpleFIN connection info is not included.</span>
+              </div>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={downloadBusy === 'Backup'}
+                onClick={() => downloadData('/api/data/orbit-backup', {
+                  label: 'Backup',
+                  scope: 'backup',
+                  fallbackFilename: 'orbit-money-backup.json'
+                })}
+              >
+                {downloadBusy === 'Backup' ? 'Backing Up...' : 'Backup'}
+              </button>
             </div>
-            <button type="button" className="btn-primary" onClick={() => downloadData('/api/data/orbit-backup')}>
-              Backup
-            </button>
-          </div>
+            {renderDownloadNotice('backup')}
+          </>
         }
       >
         <div className="settings-action">
@@ -1351,10 +1434,20 @@ export default function Settings({
             <strong>Backup Orbit Money Data</strong>
             <p>Includes Orbit data, settings, rules, and permissions. SimpleFIN connection info is excluded.</p>
           </div>
-          <button type="button" className="btn-primary" onClick={() => downloadData('/api/data/orbit-backup')}>
-            Download Backup
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={downloadBusy === 'Backup'}
+            onClick={() => downloadData('/api/data/orbit-backup', {
+              label: 'Backup',
+              scope: 'backup',
+              fallbackFilename: 'orbit-money-backup.json'
+            })}
+          >
+            {downloadBusy === 'Backup' ? 'Backing Up...' : 'Backup'}
           </button>
         </div>
+        {renderDownloadNotice('backup')}
 
         <div className="warning-banner">
           After restoring, you will need to generate a new SimpleFIN API key and reconnect SimpleFIN.
@@ -1420,7 +1513,7 @@ export default function Settings({
 
         {restoreError && <div className="error">{restoreError}</div>}
 
-        <div className="modal-actions">
+        <div className="settings-restore-actions">
           <button
             type="button"
             className="btn-secondary"

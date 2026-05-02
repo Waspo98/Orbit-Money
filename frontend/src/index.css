@@ -9485,6 +9485,21 @@ input, textarea, select {
   white-space: nowrap;
 }
 
+.settings-download-status {
+  margin-top: 12px;
+}
+
+.settings-restore-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.settings-restore-actions > button {
+  min-height: 44px;
+}
+
 .settings-share-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(150px, 190px) auto;
@@ -9711,6 +9726,8 @@ input, textarea, select {
   .settings-action-buttons { width: 100%; justify-content: stretch; }
   .settings-action-buttons > button,
   .settings-action-buttons > a { flex: 1 1 140px; }
+  .settings-restore-actions { align-items: stretch; flex-direction: column; }
+  .settings-restore-actions > button { width: 100%; }
   .settings-collapsed-action { align-items: stretch; flex-direction: column; }
   .settings-collapsed-action > button,
   .settings-collapsed-action > a { width: 100%; justify-content: center; }
