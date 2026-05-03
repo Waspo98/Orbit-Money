@@ -161,7 +161,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Live preview: debounced (400ms) match count against existing transactions before saving
 - Enable/disable toggle per rule with optimistic UI
 - Match count displayed per rule in the list view — stable because counting is condition-only (no actions involved)
-- "Create rule from transaction" flow: pre-fills condition with `merchant contains [original merchant]`, action with `rename to [current merchant]`. Synchronous reapply on save so the Transactions page reflects the change immediately on silent refresh
+- "Create rule from transaction" flow: pre-fills condition with `merchant contains [original merchant]`, action with `rename to [current merchant]`, and carries the source transaction into the editor so added/changed conditions default to that transaction's merchant, raw description, amount, account, or category. Synchronous reapply on save so the Transactions page reflects the change immediately on silent refresh
 - Rule deletion reverts every edit whose `source = 'rule:{id}'`, then re-runs remaining rules to re-populate any fields they should claim
 - Auto-apply: creating, updating, or toggling a rule triggers a synchronous reapply — by the time the response returns, all transactions reflect settled state
 

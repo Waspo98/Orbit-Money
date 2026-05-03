@@ -17,7 +17,54 @@ import {
   summarizeCondition
 } from './ruleDefinitions.js';
 
-export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
+function numericId(value) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function conditionValueFromTransaction(field, transaction, accounts, categories) {
+  if (!transaction) {
+    if (field === 'account_id') return accounts[0]?.id ?? '';
+    if (field === 'category_id') return categories[0]?.id ?? '';
+    return '';
+  }
+
+  switch (field) {
+    case 'merchant':
+      return (transaction.original_merchant || transaction.merchant || '').trim();
+
+    case 'original_description':
+      return (transaction.original_description || '').trim();
+
+    case 'amount': {
+      const amount = Number(transaction.amount);
+      return Number.isFinite(amount) ? Math.abs(amount) : '';
+    }
+
+    case 'account_id': {
+      const accountId = numericId(transaction.account_id);
+      return accounts.some((account) => account.id === accountId)
+        ? accountId
+        : accounts[0]?.id ?? '';
+    }
+
+    case 'category_id': {
+      const categoryId = numericId(
+        transaction.original_category_id ??
+        transaction.category_id ??
+        transaction.suggested_category_id
+      );
+      return categories.some((category) => category.id === categoryId)
+        ? categoryId
+        : categories[0]?.id ?? '';
+    }
+
+    default:
+      return '';
+  }
+}
+
+export function RuleEditor({ rule, accounts, categories, sourceTransaction = null, onClose, onSaved }) {
   const [activeRule, setActiveRule] = useState(rule);
   const isNew = !activeRule.id;
   const sortedCategories = useMemo(() => sortCategoriesByName(categories), [categories]);
@@ -34,7 +81,11 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
   const [conditions, setConditions] = useState(
     rule.conditions?.length
       ? rule.conditions
-      : [{ field: 'merchant', operator: 'contains', value: '' }]
+      : [{
+        field: 'merchant',
+        operator: 'contains',
+        value: conditionValueFromTransaction('merchant', sourceTransaction, accounts, sortedCategories)
+      }]
   );
   const [actions, setActions] = useState(
     rule.actions?.length ? rule.actions : [{ type: 'rename', value: '' }]
@@ -51,7 +102,11 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
     setConditions(
       nextRule.conditions?.length
         ? nextRule.conditions
-        : [{ field: 'merchant', operator: 'contains', value: '' }]
+        : [{
+          field: 'merchant',
+          operator: 'contains',
+          value: conditionValueFromTransaction('merchant', sourceTransaction, accounts, sortedCategories)
+        }]
     );
     setActions(nextRule.actions?.length ? nextRule.actions : [{ type: 'rename', value: '' }]);
     setPreview(null);
@@ -106,18 +161,18 @@ export function RuleEditor({ rule, accounts, categories, onClose, onSaved }) {
     updateCondition(index, {
       field: nextField,
       operator,
-      value: nextField === 'account_id'
-        ? (accounts[0]?.id ?? '')
-        : nextField === 'category_id'
-          ? (sortedCategories[0]?.id ?? '')
-          : ''
+      value: conditionValueFromTransaction(nextField, sourceTransaction, accounts, sortedCategories)
     });
   }
 
   function addCondition() {
     setConditions((current) => ([
       ...current,
-      { field: 'merchant', operator: 'contains', value: '' }
+      {
+        field: 'merchant',
+        operator: 'contains',
+        value: conditionValueFromTransaction('merchant', sourceTransaction, accounts, sortedCategories)
+      }
     ]));
   }
 

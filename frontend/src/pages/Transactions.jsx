@@ -786,6 +786,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           }}
           accounts={accounts}
           categories={categories}
+          sourceTransaction={newRuleFromTxn}
           onClose={() => setNewRuleFromTxn(null)}
           onSaved={() => {
             setNewRuleFromTxn(null);

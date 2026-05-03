@@ -1865,6 +1865,7 @@ function TransactionReviewModal({
               rule={makeRuleDraft(ruleTxn)}
               accounts={accounts}
               categories={categories}
+              sourceTransaction={ruleTxn}
               onClose={() => setRuleTxn(null)}
               onSaved={() => {
                 setRuleTxn(null);
@@ -2556,6 +2557,7 @@ function RecentActivityCard({
           }}
           accounts={accounts}
           categories={categories}
+          sourceTransaction={newRuleFromTxn}
           onClose={() => setNewRuleFromTxn(null)}
           onSaved={() => {
             setNewRuleFromTxn(null);
