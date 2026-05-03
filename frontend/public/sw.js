@@ -6,17 +6,22 @@
 // handled by the frontend's scoped IndexedDB cache.
 // =============================================================================
 
-const CACHE_NAME = 'orbit-money-v0.6-offline-readonly-20260502b';
+const CACHE_NAME = 'orbit-money-v0.6-offline-readonly-20260502c';
 const APP_SHELL_URLS = [
   '/',
   '/manifest.webmanifest',
+  '/icon.svg',
   '/icon-192.png',
   '/icon-512.png',
+  '/icon-1024.png',
+  '/icon-alternate.png',
+  '/icon-maskable.svg',
   '/icon-maskable-512.png',
   '/apple-touch-icon.png',
   '/splash-wordmark-light.svg',
   '/splash-wordmark-dark.svg'
 ];
+const APP_SHELL_PATHS = new Set(APP_SHELL_URLS.filter((url) => url !== '/'));
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -72,10 +77,17 @@ async function networkFirst(request, fallbackUrl) {
 
 async function cacheFirst(request) {
   const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(request);
+  const url = new URL(request.url);
+  const isAppShellAsset = APP_SHELL_PATHS.has(url.pathname);
+  const cached =
+    await cache.match(request) ||
+    (isAppShellAsset ? await cache.match(request, { ignoreSearch: true }) : null);
   if (cached) return cached;
 
   const response = await fetch(request);
   cache.put(request, response.clone());
+  if (isAppShellAsset) {
+    cache.put(url.pathname, response.clone());
+  }
   return response;
 }
