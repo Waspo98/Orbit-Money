@@ -40,6 +40,53 @@ function safeRegex(pattern) {
   }
 }
 
+function textCandidates(values) {
+  const seen = new Set();
+  const candidates = [];
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const text = String(value);
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push(text);
+  }
+  return candidates.length ? candidates : [''];
+}
+
+function matchesAnyTextCandidate(values, operator, value) {
+  const candidates = textCandidates(values);
+  const expected = String(value);
+  const expectedLower = expected.toLowerCase();
+
+  switch (operator) {
+    case 'equals':
+      return candidates.some((actual) => actual.toLowerCase() === expectedLower);
+
+    case 'contains':
+      return candidates.some((actual) => actual.toLowerCase().includes(expectedLower));
+
+    case 'starts_with':
+      return candidates.some((actual) => actual.toLowerCase().startsWith(expectedLower));
+
+    case 'regex': {
+      const re = safeRegex(value);
+      return re ? candidates.some((actual) => re.test(actual)) : false;
+    }
+
+    case 'is':
+      // eslint-disable-next-line eqeqeq
+      return candidates.some((actual) => actual == value);
+
+    case 'is_not':
+      // eslint-disable-next-line eqeqeq
+      return candidates.every((actual) => actual != value);
+
+    default:
+      return false;
+  }
+}
+
 function parseCategoryActionValue(value) {
   const id = Number(value);
   return Number.isInteger(id) && id > 0 ? id : null;
@@ -106,11 +153,18 @@ export function loadRules(db, householdId = 1) {
 function matchesCondition(transaction, condition) {
   const { field, operator, value } = condition;
 
+  if (field === 'merchant') {
+    // SimpleFIN can provide a cleaned payee plus a fuller raw description.
+    // Check both so merchant rules survive month-to-month payee wording shifts.
+    return matchesAnyTextCandidate(
+      [transaction.original_merchant, transaction.original_description],
+      operator,
+      value
+    );
+  }
+
   let actual;
   switch (field) {
-    case 'merchant':
-      actual = transaction.original_merchant ?? '';
-      break;
     case 'original_description':
       actual = transaction.original_description ?? '';
       break;

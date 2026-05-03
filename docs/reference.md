@@ -112,7 +112,7 @@ offline cache keys by exact request path.
 
 **Public-safe env defaults:** `API_KEY` is optional and should remain blank unless programmatic access is intentionally enabled. `SIMPLEFIN_ENCRYPTION_KEY` may remain blank until the user connects SimpleFIN. Startup rejects known placeholder values for required secrets so copied example files do not become predictable public deployments.
 
-**Rules:** JSON-serialized `conditions` (array of `{field, operator, value}`) and `actions` (array of `{type, value}`). Condition fields: `merchant`, `original_description`, `amount`, `account_id`, `category_id`. All condition evaluation runs against originals only, making match counts stable. Action types: `rename`, `categorize`, `mark_transfer`, `mark_ignored`. First rule (priority DESC, id ASC) to claim a given field wins; lower-priority rules skip it.
+**Rules:** JSON-serialized `conditions` (array of `{field, operator, value}`) and `actions` (array of `{type, value}`). Condition fields: `merchant`, `original_description`, `amount`, `account_id`, `category_id`. All condition evaluation runs against originals only, making match counts stable. Merchant text conditions check both `original_merchant` and `original_description` so SimpleFIN payee cleanup does not break rules when the raw description still contains the fuller merchant name. Action types: `rename`, `categorize`, `mark_transfer`, `mark_ignored`. First rule (priority DESC, id ASC) to claim a given field wins; lower-priority rules skip it.
 
 **Account types:** `checking`, `savings`, `credit`, `investment`, `loan`, `mortgage`, `cash`, `other`.
 
