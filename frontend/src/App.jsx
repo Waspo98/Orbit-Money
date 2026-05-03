@@ -1,4 +1,5 @@
 import {
+  Component,
   Suspense,
   lazy,
   useEffect,
@@ -21,11 +22,15 @@ import Login from './Login.jsx';
 import BrandLogo from './components/BrandLogo.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
+import OfflineBanner from './components/OfflineBanner.jsx';
 import SyncErrorBanner from './components/SyncErrorBanner.jsx';
 import MoreSheet from './components/MoreSheet.jsx';
 import { useTheme } from './hooks/useTheme.js';
+import { useOnlineStatus } from './hooks/useOnlineStatus.js';
 import { api } from './api.js';
 import { APP_ICON_192 } from './brandAssets.js';
+import { clearOfflineFinancialCache } from './offlineCache.js';
+import { warmOfflineReadCache } from './offlineWarmup.js';
 import { sortCategoriesByName } from './lib/categorySort.js';
 import {
   ROUTES,
@@ -56,6 +61,23 @@ const Upcoming = lazy(() => import('./pages/Upcoming.jsx'));
 const RetirementCalculator = lazy(() => import('./pages/RetirementCalculator.jsx'));
 const Household = lazy(() => import('./pages/Household.jsx'));
 
+const OFFLINE_ROUTE_PRELOADS = [
+  () => import('./pages/Dashboard.jsx'),
+  () => import('./pages/Transactions.jsx'),
+  () => import('./pages/Budgets.jsx'),
+  () => import('./pages/Accounts.jsx'),
+  () => import('./pages/Settings.jsx'),
+  () => import('./pages/Rules.jsx'),
+  () => import('./pages/Categories.jsx'),
+  () => import('./pages/HousingCalculator.jsx'),
+  () => import('./pages/NetWorth.jsx'),
+  () => import('./pages/MhaTracker.jsx'),
+  () => import('./pages/Goals.jsx'),
+  () => import('./pages/Upcoming.jsx'),
+  () => import('./pages/RetirementCalculator.jsx'),
+  () => import('./pages/Household.jsx')
+];
+
 function transitionBetween(fromPath, toPath, routes) {
   const fromIndex = routes.indexOf(fromPath);
   const toIndex = routes.indexOf(toPath);
@@ -72,6 +94,40 @@ function RouteLoading() {
   );
 }
 
+class RouteErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: null });
+    }
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="empty-state app-load-error route-load-error">
+          <div className="empty-state-icon">!</div>
+          <h2>Could Not Load This Screen</h2>
+          <p>Reconnect and try again. This screen may not be cached on this device yet.</p>
+          <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
+            Retry
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -82,6 +138,7 @@ export default function App() {
 
 function AppShell() {
   const [authState, setAuthState] = useState('loading');
+  const [offlineAccessMessage, setOfflineAccessMessage] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
 
   const [accounts, setAccounts] = useState([]);
@@ -91,6 +148,10 @@ function AppShell() {
   const [mhaTrackerEnabled, setMhaTrackerEnabled] = useState(false);
   const [userPreferences, setUserPreferencesState] = useState(readLocalUserPreferences);
   const userPreferencesRef = useRef(userPreferences);
+  const isOnline = useOnlineStatus();
+  const wasOnlineRef = useRef(isOnline);
+  const offlineRoutesPreloadedRef = useRef(false);
+  const offlineDataWarmupRef = useRef(false);
 
   const {
     mode: themeMode,
@@ -139,11 +200,20 @@ function AppShell() {
     };
   }, []);
 
-  async function checkAuth() {
+  async function checkAuth({ refreshLookups = false } = {}) {
     try {
       const me = await api.get('/api/auth/me');
+      setOfflineAccessMessage('');
       setAuthState(me.authenticated ? 'in' : 'out');
-    } catch {
+      if (me.authenticated && refreshLookups) {
+        await loadLookups();
+      }
+    } catch (err) {
+      if (err?.offlineAccessExpired) {
+        setOfflineAccessMessage(err.message);
+        setAuthState('offline-expired');
+        return;
+      }
       setAuthState('out');
     }
   }
@@ -189,6 +259,44 @@ function AppShell() {
     if (authState === 'in') loadLookups();
   }, [authState]);
 
+  useEffect(() => {
+    if (!wasOnlineRef.current && isOnline) {
+      checkAuth({ refreshLookups: authState === 'in' });
+    }
+    wasOnlineRef.current = isOnline;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline, authState]);
+
+  useEffect(() => {
+    if (authState !== 'in' || !lookupsReady || !isOnline || offlineRoutesPreloadedRef.current) {
+      return;
+    }
+    offlineRoutesPreloadedRef.current = true;
+    Promise.allSettled(OFFLINE_ROUTE_PRELOADS.map((load) => load())).then((results) => {
+      const failed = results.filter((result) => result.status === 'rejected');
+      if (failed.length > 0) {
+        offlineRoutesPreloadedRef.current = false;
+        console.warn('Offline route preload failed:', failed.map((result) => result.reason));
+      }
+    });
+  }, [authState, isOnline, lookupsReady]);
+
+  useEffect(() => {
+    if (authState !== 'in' || !lookupsReady || !isOnline || offlineDataWarmupRef.current) {
+      return undefined;
+    }
+
+    const id = window.setTimeout(() => {
+      offlineDataWarmupRef.current = true;
+      warmOfflineReadCache({ mhaTrackerEnabled }).catch((err) => {
+        offlineDataWarmupRef.current = false;
+        console.warn('Offline read cache warmup failed:', err);
+      });
+    }, 1500);
+
+    return () => window.clearTimeout(id);
+  }, [authState, isOnline, lookupsReady, mhaTrackerEnabled]);
+
   // Close the More sheet whenever the route changes.
   useEffect(() => {
     setMoreOpen(false);
@@ -198,6 +306,7 @@ function AppShell() {
     try {
       await api.post('/api/auth/logout');
     } catch { /* ignore */ }
+    await clearOfflineFinancialCache();
     setAuthState('out');
     setAccounts([]);
     setCategories([]);
@@ -275,12 +384,13 @@ function AppShell() {
     ),
     '/budgets': (
       <Budgets
-        budgetedSortPreference={userPreferences[USER_PREFERENCE_KEYS.budgetedSort]}
-        onBudgetedSortPreferenceChange={(value) =>
+        categorySortPreference={userPreferences[USER_PREFERENCE_KEYS.budgetedSort]}
+        onCategorySortPreferenceChange={(value) =>
           setUserPreference(USER_PREFERENCE_KEYS.budgetedSort, value)
         }
       />
     ),
+    '/budget-beta': <Navigate to={`/budgets${location.search}`} replace />,
     '/accounts': <Accounts onChange={loadLookups} />,
     '/rules': <Rules />,
     '/categories': (
@@ -310,7 +420,24 @@ function AppShell() {
   }
 
   if (authState === 'out') {
-    return <Login onLogin={() => setAuthState('in')} />;
+    return <Login onLogin={() => checkAuth()} />;
+  }
+
+  if (authState === 'offline-expired') {
+    return (
+      <div className="center-screen offline-access-expired">
+        <div className="empty-state">
+          <div className="empty-state-icon">!</div>
+          <h2>Reconnect To Verify Access</h2>
+          <p>
+            {offlineAccessMessage || 'Reconnect to verify household access before viewing cached shared data.'}
+          </p>
+          <button type="button" className="btn-primary" onClick={() => checkAuth()}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -333,7 +460,10 @@ function AppShell() {
 
       </header>}
 
-      <SyncErrorBanner onOpenSettings={() => navigate('/settings')} />
+      <div className="app-banners">
+        <OfflineBanner isOnline={isOnline} />
+        <SyncErrorBanner onOpenSettings={() => navigate('/settings')} />
+      </div>
 
       <main className="app-main">
         {lookupError ? (
@@ -354,20 +484,22 @@ function AppShell() {
             key={location.pathname}
             className={`route-transition route-transition-${routeTransition}`}
           >
-            <Suspense fallback={<RouteLoading />}>
-              <Routes location={location}>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                {ROUTES.map((route) => (
-                  <Route
-                    key={route.path}
-                    path={route.path}
-                    element={routeElements[route.path]}
-                  />
-                ))}
-                <Route path="/import" element={<Navigate to="/settings" replace />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Routes>
-            </Suspense>
+            <RouteErrorBoundary resetKey={location.pathname}>
+              <Suspense fallback={<RouteLoading />}>
+                <Routes location={location}>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  {ROUTES.map((route) => (
+                    <Route
+                      key={route.path}
+                      path={route.path}
+                      element={routeElements[route.path]}
+                    />
+                  ))}
+                  <Route path="/import" element={<Navigate to="/settings" replace />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Routes>
+              </Suspense>
+            </RouteErrorBoundary>
           </div>
         )}
       </main>

@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppSelect from '../components/AppSelect.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
-import DropdownMenu from '../components/DropdownMenu.jsx';
-import ExpandingSection from '../components/ExpandingSection.jsx';
-import PageHero from '../components/PageHero.jsx';
-import SelectableListItem from '../components/SelectableListItem.jsx';
-import { useAppDialog } from '../components/AppDialog.jsx';
 import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
 } from '../components/CurrencyInput.jsx';
+import DropdownMenu from '../components/DropdownMenu.jsx';
+import ExpandingSection from '../components/ExpandingSection.jsx';
+import PageHero from '../components/PageHero.jsx';
+import { useAppDialog } from '../components/AppDialog.jsx';
 import { formatCurrency } from '../lib/formatters.js';
 import {
   addMonthsToLocalMonth,
@@ -23,128 +22,198 @@ import {
   getLocalMonthBounds
 } from '../lib/localDate.js';
 
-// ============================================================================
-// Budgets — v15
-//
-// Budgets are global per category: one amount per category, applied to
-// every month. Editing the amount for Groceries updates the cap everywhere
-// — past, present, and future.
-//
-// The Budgets page still shows data per-month (spending, progress, totals)
-// because spending is inherently monthly. Month navigation lets you flip
-// through to see how past months measured up against the same caps.
-// ============================================================================
+const CATEGORY_SORT_OPTIONS = [
+  { value: 'variance_desc', label: 'Over Budget First' },
+  { value: 'remaining_asc', label: 'Least Room Left' },
+  { value: 'spent_desc', label: 'Most Spent' },
+  { value: 'name_asc', label: 'Category A-Z' }
+];
+const CATEGORY_SORT_VALUES = new Set(CATEGORY_SORT_OPTIONS.map((option) => option.value));
+
+const MAX_MIX_ITEMS = 8;
+const MAX_TRANSACTION_PREVIEW = 6;
+
+function normalizeCategorySort(value) {
+  return CATEGORY_SORT_VALUES.has(value) ? value : 'variance_desc';
+}
 
 function currentMonth() {
   return formatLocalMonth();
 }
 
-function addMonths(m, delta) {
-  return addMonthsToLocalMonth(m, delta);
+function addMonths(month, delta) {
+  return addMonthsToLocalMonth(month, delta);
 }
 
-function monthBounds(m) {
-  return getLocalMonthBounds(m);
+function monthBounds(month) {
+  return getLocalMonthBounds(month);
 }
 
-function formatMonthLabel(m) {
-  return formatMonthKeyLabel(m);
+function formatMonthLabel(month) {
+  return formatMonthKeyLabel(month);
 }
 
-function daysLeftInMonth(m) {
-  return daysLeftInLocalMonth(m);
+function formatMoney(value) {
+  return formatCurrency(value);
 }
 
-function formatMoney(n) {
-  return formatCurrency(n);
+function asNumber(value) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function percentOf(part, total) {
+  if (!total) return 0;
+  return (part / total) * 100;
+}
+
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function formatPercent(value) {
+  return `${Math.round(value)}%`;
 }
 
 function formatTransactionDate(date) {
   return formatMonthDay(date);
 }
 
-const BUDGET_SORT_OPTIONS = [
-  { value: 'pct_desc', label: '% Spent High to Low' },
-  { value: 'pct_asc', label: '% Spent Low to High' },
-  { value: 'spent_desc', label: '$ Spent High to Low' },
-  { value: 'spent_asc', label: '$ Spent Low to High' }
-];
+function buildTransactionsHref(item, selectedMonth) {
+  const { start, end } = monthBounds(selectedMonth);
+  const categoryId = item.category.id == null ? 'uncategorized' : String(item.category.id);
+  const params = new URLSearchParams({
+    categories: categoryId,
+    date_from: start,
+    date_to: end,
+    type: 'expense',
+    include_ignored: '0',
+    include_transfers: '0',
+    sort: 'date_desc'
+  });
+  return `/transactions?${params.toString()}`;
+}
 
-// ============================================================================
-// Main page
-// ============================================================================
+function getCategoryKey(item) {
+  return item.category.id == null ? 'uncategorized' : String(item.category.id);
+}
+
+function isBudgetableCategory(item) {
+  const id = Number(item?.category?.id);
+  return Number.isInteger(id) && id > 0;
+}
+
+function getStatus(item) {
+  const amount = asNumber(item.amount);
+  const spent = asNumber(item.spent);
+  if (amount <= 0) return { label: 'No Limit', tone: 'neutral' };
+  if (spent > amount) return { label: `${formatMoney(spent - amount)} Over`, tone: 'over' };
+  const remaining = amount - spent;
+  const pct = percentOf(spent, amount);
+  return {
+    label: `${formatMoney(remaining)} Left`,
+    tone: pct >= 85 ? 'watch' : 'good'
+  };
+}
+
+function getMonthDayCount(month) {
+  const { end } = monthBounds(month);
+  const count = Number(end.slice(8, 10));
+  return Number.isFinite(count) && count > 0 ? count : null;
+}
+
+function getSpendPace(model, selectedMonth, currentMonthDaysLeft) {
+  if (model.totalBudgeted <= 0) {
+    return {
+      value: 'No Budget',
+      detail: 'Add category budgets',
+      tone: 'neutral'
+    };
+  }
+
+  if (selectedMonth < currentMonth()) {
+    return {
+      value: `${formatMoney(0)} / day`,
+      detail: 'Month complete',
+      tone: model.remaining < 0 ? 'over' : 'neutral'
+    };
+  }
+
+  const daysRemaining = selectedMonth === currentMonth()
+    ? Math.max(1, currentMonthDaysLeft ?? 1)
+    : getMonthDayCount(selectedMonth);
+
+  if (!daysRemaining) {
+    return {
+      value: `${formatMoney(0)} / day`,
+      detail: 'No days left',
+      tone: model.remaining < 0 ? 'over' : 'neutral'
+    };
+  }
+
+  if (model.remaining <= 0) {
+    return {
+      value: `${formatMoney(0)} / day`,
+      detail: `${formatMoney(Math.abs(model.remaining))} over budget`,
+      tone: 'over'
+    };
+  }
+
+  return {
+    value: `${formatMoney(model.remaining / daysRemaining)} / day`,
+    detail: `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} left`,
+    tone: 'good'
+  };
+}
 
 export default function Budgets({
-  budgetedSortPreference = 'pct_desc',
-  onBudgetedSortPreferenceChange
+  categorySortPreference = 'variance_desc',
+  onCategorySortPreferenceChange
 }) {
   const { alert, confirm, Dialog } = useAppDialog();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedMonth = searchParams.get('month') || currentMonth();
 
   const [data, setData] = useState(null);
-  // `loading` = "we have never loaded data yet" (initial spinner).
-  // `refreshing` = "a background refetch is in flight" (no spinner — keeps
-  // old content on screen so the page height doesn't collapse). Mobile
-  // browsers that watch for rapid document-height changes can latch onto a
-  // small viewport zoom when content shrinks to a spinner then grows back;
-  // keeping the old content visible during a month-change refetch avoids
-  // that layout shift entirely.
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-
   const [monthsWithActivity, setMonthsWithActivity] = useState([]);
-
+  const [categorySort, setCategorySort] = useState(() =>
+    normalizeCategorySort(categorySortPreference)
+  );
+  const [expandedKey, setExpandedKey] = useState(null);
+  const [expandedMixKey, setExpandedMixKey] = useState(null);
+  const [expandedCompactKey, setExpandedCompactKey] = useState(null);
+  const [budgetTransactions, setBudgetTransactions] = useState({});
   const [addingBudget, setAddingBudget] = useState(false);
   const [editingBudget, setEditingBudget] = useState(null);
   const [showInactive, setShowInactive] = useState(false);
-  const [selectedSpendingKey, setSelectedSpendingKey] = useState(null);
-  const [expandedBudgetKey, setExpandedBudgetKey] = useState(null);
-  const [budgetTransactions, setBudgetTransactions] = useState({});
-
-  // Sort order for the Budgeted section. Persisted as an account preference so
-  // a user's choice sticks across browsers without needing a URL param.
-  // Default matches the previous backend-sorted behavior (most over-budget
-  // first = highest % spent first).
-  const [budgetedSort, setBudgetedSort] = useState(budgetedSortPreference || 'pct_desc');
-
-  useEffect(() => {
-    setBudgetedSort(budgetedSortPreference || 'pct_desc');
-  }, [budgetedSortPreference]);
-
-  function updateBudgetedSort(value) {
-    setBudgetedSort(value);
-    onBudgetedSortPreferenceChange?.(value);
-  }
 
   async function load() {
-    // First load: show the spinner. Subsequent loads (month changes, after
-    // budget edits): silent refresh — old content stays on screen until
-    // new data arrives, so the document height never collapses.
-    const isFirstLoad = data == null;
-    if (isFirstLoad) setLoading(true);
+    const firstLoad = data == null;
+    if (firstLoad) setLoading(true);
     else setRefreshing(true);
     setError('');
     try {
-      const d = await api.get(
+      const result = await api.get(
         `/api/budgets?month=${encodeURIComponent(selectedMonth)}`
       );
-      setData(d);
+      setData(result);
     } catch (err) {
       setError(err.message || 'Failed to load budgets');
     } finally {
-      if (isFirstLoad) setLoading(false);
+      if (firstLoad) setLoading(false);
       else setRefreshing(false);
     }
   }
 
   async function loadMonths() {
     try {
-      const d = await api.get('/api/budgets/months');
-      setMonthsWithActivity(d.items || []);
+      const result = await api.get('/api/budgets/months');
+      setMonthsWithActivity(result.items || []);
     } catch {
-      /* non-fatal — arrow nav still works */
+      /* Month arrows still work without this list. */
     }
   }
 
@@ -158,134 +227,144 @@ export default function Budgets({
   }, []);
 
   useEffect(() => {
-    setExpandedBudgetKey(null);
+    setCategorySort(normalizeCategorySort(categorySortPreference));
+  }, [categorySortPreference]);
+
+  useEffect(() => {
+    setExpandedKey(null);
+    setExpandedMixKey(null);
+    setExpandedCompactKey(null);
     setBudgetTransactions({});
   }, [selectedMonth]);
 
-  function goToMonth(m) {
+  function goToMonth(month) {
     const next = new URLSearchParams(searchParams);
-    if (m === currentMonth()) next.delete('month');
-    else next.set('month', m);
+    if (month === currentMonth()) next.delete('month');
+    else next.set('month', month);
     setSearchParams(next);
   }
 
-  // --- Month picker options: months with activity + current month + 3 ahead.
-  // Sorted newest-first so the list reads naturally.
+  function updateCategorySort(value) {
+    const next = normalizeCategorySort(value);
+    setCategorySort(next);
+    onCategorySortPreferenceChange?.(next);
+  }
+
   const monthOptions = useMemo(() => {
     const set = new Set(monthsWithActivity);
     set.add(currentMonth());
-    // Forward buffer for planning future months.
     for (let i = 1; i <= 3; i++) set.add(addMonths(currentMonth(), i));
-    // Always include selectedMonth in case it's an unusual value.
     set.add(selectedMonth);
     return Array.from(set).sort((a, b) => b.localeCompare(a));
   }, [monthsWithActivity, selectedMonth]);
 
   const canGoForward = selectedMonth < addMonths(currentMonth(), 12);
   const isCurrentMonth = selectedMonth === currentMonth();
+  const daysLeft = daysLeftInLocalMonth(selectedMonth);
 
-  // --- Summary derived ---
-  const summary = data?.summary;
-  const totalMonthlySpending = summary ? Number(summary.total_expenses || 0) : 0;
-  const overallPercent =
-    summary && summary.total_budgeted > 0
-      ? (totalMonthlySpending / summary.total_budgeted) * 100
-      : null;
-  const remaining =
-    summary && summary.total_budgeted > 0
-      ? summary.total_budgeted - totalMonthlySpending
-      : null;
+  const budgetModel = useMemo(() => {
+    const summary = data?.summary || {};
+    const budgeted = data?.budgeted || [];
+    const unbudgeted = data?.unbudgeted || [];
+    const inactive = data?.inactive || [];
 
-  const daysLeft = daysLeftInMonth(selectedMonth);
+    const totalBudgeted = asNumber(summary.total_budgeted);
+    const totalExpenses = asNumber(summary.total_expenses);
+    const spentInBudgets = asNumber(summary.total_spent_in_budgets);
+    const spentUnbudgeted = asNumber(summary.total_spent_unbudgeted);
+    const totalIncome = asNumber(summary.total_income);
+    const totalNet = asNumber(summary.total_net);
+    const remaining = totalBudgeted - totalExpenses;
+    const overallPercent = percentOf(totalExpenses, totalBudgeted);
+    const budgetedPercent = percentOf(spentInBudgets, totalBudgeted);
+    const unbudgetedShare = percentOf(spentUnbudgeted, totalExpenses);
+
+    const rows = budgeted.map((item) => {
+      const amount = asNumber(item.amount);
+      const spent = asNumber(item.spent);
+      const variance = spent - amount;
+      const pct = amount > 0 ? percentOf(spent, amount) : 0;
+      return {
+        ...item,
+        amount,
+        spent,
+        variance,
+        pct,
+        remaining: amount - spent,
+        over: amount > 0 && spent > amount
+      };
+    });
+
+    const sortedRows = [...rows].sort((a, b) => {
+      switch (categorySort) {
+        case 'remaining_asc':
+          return a.remaining - b.remaining;
+        case 'spent_desc':
+          return b.spent - a.spent;
+        case 'name_asc':
+          return a.category.name.localeCompare(b.category.name);
+        case 'variance_desc':
+        default:
+          return b.variance - a.variance;
+      }
+    });
+
+    const overRows = rows.filter((item) => item.over).sort((a, b) => b.variance - a.variance);
+    const watchRows = rows
+      .filter((item) => !item.over && item.amount > 0 && item.pct >= 85)
+      .sort((a, b) => b.pct - a.pct);
+    const unbudgetedRows = [...unbudgeted]
+      .map((item) => ({ ...item, spent: asNumber(item.spent) }))
+      .sort((a, b) => b.spent - a.spent);
+
+    const notable = [
+      ...overRows.map((item) => ({ kind: 'Over Budget', tone: 'over', item })),
+      ...watchRows.map((item) => ({ kind: 'High Usage', tone: 'watch', item })),
+      ...unbudgetedRows.map((item) => ({ kind: 'Unbudgeted', tone: 'neutral', item }))
+    ].slice(0, 7);
+
+    const spendingMix = [...rows, ...unbudgetedRows]
+      .filter((item) => asNumber(item.spent) > 0)
+      .sort((a, b) => asNumber(b.spent) - asNumber(a.spent));
+
+    return {
+      budgeted,
+      inactive,
+      rows,
+      sortedRows,
+      unbudgetedRows,
+      notable,
+      spendingMix,
+      totalBudgeted,
+      totalExpenses,
+      spentInBudgets,
+      spentUnbudgeted,
+      totalIncome,
+      totalNet,
+      remaining,
+      overallPercent,
+      budgetedPercent,
+      unbudgetedShare,
+      overCount: overRows.length,
+      watchCount: watchRows.length
+    };
+  }, [data, categorySort]);
+
   const budgetSubtitle = `${isCurrentMonth ? 'This month' : formatMonthLabel(selectedMonth)}${
     daysLeft !== null
-      ? ` · ${
-          daysLeft === 0
-            ? 'last day of the month'
-            : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`
-        }`
+      ? ` · ${daysLeft === 0 ? 'last day of the month' : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`}`
       : ''
   }`;
-  const budgetHeroStats = [
-    {
-      label: 'Income',
-      value: summary ? formatMoney(summary.total_income) : '—',
-      tone: 'good'
-    },
-    {
-      label: 'Expenses',
-      value: summary ? formatMoney(summary.total_expenses) : '—',
-      tone: 'caution'
-    },
-    {
-      label: 'Net',
-      value: summary ? formatMoney(summary.total_net) : '—',
-      tone: summary && summary.total_net < 0 ? 'caution' : 'good'
-    },
-    {
-      label: 'Remaining',
-      value: remaining !== null ? formatMoney(remaining) : '—',
-      tone: remaining !== null && remaining < 0 ? 'caution' : 'good'
-    }
-  ];
 
-  const hasAnyBudgets = (data?.budgeted?.length || 0) > 0;
-  const hasAnyActivity =
-    (data?.budgeted?.length || 0) > 0 ||
-    (data?.unbudgeted?.length || 0) > 0;
-
-  // Sort the budgeted list based on the user's chosen order. Categories
-  // with no budgeted amount (amount <= 0) sort to the end regardless —
-  // their "percent" is meaningless.
-  const sortedBudgeted = useMemo(() => {
-    const list = [...(data?.budgeted || [])];
-    const percent = (i) => (i.amount > 0 ? i.spent / i.amount : -Infinity);
-    const cmpPct = (a, b) => percent(a) - percent(b);
-    const cmpSpent = (a, b) => a.spent - b.spent;
-    switch (budgetedSort) {
-      case 'pct_asc':    list.sort(cmpPct); break;
-      case 'spent_desc': list.sort((a, b) => cmpSpent(b, a)); break;
-      case 'spent_asc':  list.sort(cmpSpent); break;
-      case 'pct_desc':
-      default:           list.sort((a, b) => cmpPct(b, a)); break;
-    }
-    return list;
-  }, [data, budgetedSort]);
-
-  const spendingByCategory = useMemo(() => {
-    const rows = [
-      ...(data?.budgeted || []),
-      ...(data?.unbudgeted || [])
-    ]
-      .filter((item) => Number(item.spent) > 0)
-      .map((item) => ({
-        key: String(item.category.id),
-        name: item.category.name,
-        icon: item.category.icon,
-        color: item.category.color || 'var(--accent)',
-        amount: Number(item.spent)
-      }))
-      .sort((a, b) => {
-        const aUncategorized = a.name.toLowerCase() === 'uncategorized';
-        const bUncategorized = b.name.toLowerCase() === 'uncategorized';
-        if (aUncategorized !== bUncategorized) return aUncategorized ? 1 : -1;
-        return b.amount - a.amount;
-      });
-
-    const total = rows.reduce((sum, item) => sum + item.amount, 0);
-    return { items: rows, total };
-  }, [data]);
-
-  // --- Mutations ---
-  async function upsertBudget({ category_id, amount }) {
-    await api.put('/api/budgets', { category_id, amount });
+  async function upsertBudget(payload) {
+    await api.put('/api/budgets', payload);
     await load();
     await loadMonths();
   }
 
   async function deleteBudget(budgetId) {
     const ok = await confirm('Delete this budget? It will be removed for every month.', {
-      title: 'Delete budget',
+      title: 'Delete Budget',
       confirmLabel: 'Delete',
       destructive: true
     });
@@ -294,22 +373,22 @@ export default function Budgets({
       await api.del(`/api/budgets/${budgetId}`);
       await load();
     } catch (err) {
-      alert(err.message || 'Delete failed', { title: 'Delete failed' });
+      alert(err.message || 'Delete failed', { title: 'Delete Failed' });
     }
   }
 
   async function loadBudgetTransactions(item) {
-    const key = String(item.category.id);
+    const key = getCategoryKey(item);
     if (budgetTransactions[key]?.items || budgetTransactions[key]?.loading) return;
     setBudgetTransactions((current) => ({
       ...current,
       [key]: { loading: true, items: [], error: '' }
     }));
+
     try {
       const { start, end } = monthBounds(selectedMonth);
-      const categoryToken = item.category.id || 'uncategorized';
-      const qs = new URLSearchParams({
-        categories: String(categoryToken),
+      const params = new URLSearchParams({
+        categories: item.category.id == null ? 'uncategorized' : String(item.category.id),
         date_from: start,
         date_to: end,
         type: 'expense',
@@ -318,7 +397,7 @@ export default function Budgets({
         sort: 'date_desc',
         limit: '100'
       });
-      const result = await api.get(`/api/transactions?${qs.toString()}`);
+      const result = await api.get(`/api/transactions?${params.toString()}`);
       setBudgetTransactions((current) => ({
         ...current,
         [key]: { loading: false, items: result.items || [], error: '' }
@@ -336,20 +415,36 @@ export default function Budgets({
   }
 
   function toggleBudgetRow(item) {
-    const key = String(item.category.id);
-    setExpandedBudgetKey((current) => (current === key ? null : key));
+    const key = getCategoryKey(item);
+    setExpandedKey((current) => (current === key ? null : key));
     loadBudgetTransactions(item);
   }
 
+  function toggleSpendingMixRow(item) {
+    const key = getCategoryKey(item);
+    setExpandedMixKey((current) => (current === key ? null : key));
+    loadBudgetTransactions(item);
+  }
+
+  function toggleCompactCard(item, cardKey) {
+    setExpandedCompactKey((current) => (current === cardKey ? null : cardKey));
+    loadBudgetTransactions(item);
+  }
+
+  const allCategories = [
+    ...(data?.budgeted || []),
+    ...(data?.unbudgeted || []),
+    ...(data?.inactive || [])
+  ].map((item) => item.category);
+
   return (
-    <div className="budgets-view">
+    <div className="budget-beta-view">
       <PageHero
         id="budgets-title"
         variant="budgets"
         kicker="Budget planning"
         title="Budgets"
         subtitle={budgetSubtitle}
-        stats={budgetHeroStats}
         toolbar={(
           <MonthNav
             month={selectedMonth}
@@ -357,27 +452,10 @@ export default function Budgets({
             canGoForward={canGoForward}
             onPrev={() => goToMonth(addMonths(selectedMonth, -1))}
             onNext={() => goToMonth(addMonths(selectedMonth, 1))}
-            onJump={(m) => goToMonth(m)}
+            onJump={goToMonth}
           />
         )}
       />
-
-      <div className="view-header" hidden>
-        <div>
-          <h2>Budgets</h2>
-          <p className="muted">
-            {isCurrentMonth ? 'This month' : formatMonthLabel(selectedMonth)}
-            {daysLeft !== null && (
-              <span className="subtle">
-                {' · '}
-                {daysLeft === 0
-                  ? 'last day of the month'
-                  : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`}
-              </span>
-            )}
-          </p>
-        </div>
-      </div>
 
       {error && <div className="error">{error}</div>}
 
@@ -386,122 +464,68 @@ export default function Budgets({
           <div className="spinner" />
         </div>
       ) : (
-        <div className={`budget-content ${refreshing ? 'is-refreshing' : ''}`}>
-          {/* ---------- Budget progress summary card ---------- */}
-          {hasAnyBudgets && summary && (
-            <div className="budget-summary-card">
-              <div className="budget-summary-top">
-                <div>
-                  <div className="budget-summary-amounts">
-                    <span className="budget-summary-spent">
-                      {formatMoney(totalMonthlySpending)}
-                    </span>
-                    <span className="subtle">
-                      {' '}of {formatMoney(summary.total_budgeted)} budgeted
-                    </span>
-                  </div>
-                  <div className="subtle budget-summary-sub">
-                    {remaining >= 0
-                      ? `${formatMoney(remaining)} remaining`
-                      : `${formatMoney(-remaining)} over budget`}
-                    {summary.total_spent_unbudgeted > 0 && (
-                      <>
-                        {' · '}
-                        {formatMoney(summary.total_spent_unbudgeted)} in
-                        unbudgeted categories
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="budget-summary-percent">
-                  {overallPercent !== null
-                    ? `${Math.round(overallPercent)}%`
-                    : '—'}
-                </div>
-              </div>
-              <ProgressBar
-                percent={overallPercent ?? 0}
-                overBudget={overallPercent > 100}
-              />
-            </div>
-          )}
+        <div className={`budget-beta-content ${refreshing ? 'is-refreshing' : ''}`}>
+          <SnapshotPanel
+            model={budgetModel}
+            monthLabel={formatMonthLabel(selectedMonth)}
+            selectedMonth={selectedMonth}
+            daysLeft={daysLeft}
+            onAddBudget={() => setAddingBudget(true)}
+          />
 
-          {spendingByCategory.total > 0 && (
-            <SpendingPieChart
-              items={spendingByCategory.items}
-              total={spendingByCategory.total}
-              selectedKey={selectedSpendingKey}
-              onSelect={setSelectedSpendingKey}
+          {budgetModel.totalExpenses > 0 && (
+            <SpendingMixPanel
+              items={budgetModel.spendingMix}
+              total={budgetModel.totalExpenses}
+              selectedMonth={selectedMonth}
+              expandedKey={expandedMixKey}
+              transactionsByCategory={budgetTransactions}
+              onToggle={toggleSpendingMixRow}
             />
           )}
 
-          {/* ---------- Action row ---------- */}
-          <div className="budget-actions-row">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => setAddingBudget(true)}
-            >
-              + Add Budget
-            </button>
-          </div>
+          <NotablePanel
+            notable={budgetModel.notable}
+            selectedMonth={selectedMonth}
+            expandedKey={expandedCompactKey}
+            transactionsByCategory={budgetTransactions}
+            onToggle={toggleCompactCard}
+            onAdd={(item) =>
+              setEditingBudget({
+                ...item,
+                budget_id: null,
+                amount: null
+              })
+            }
+          />
 
-          {/* ---------- Budgeted categories ---------- */}
-          {data.budgeted.length > 0 && (
-            <section className="budget-section">
-              <header className="budget-section-header">
-                <h3>Budgeted</h3>
-                <div className="budget-section-header-right">
-                  <span className="muted">
-                    {data.budgeted.length}{' '}
-                    {data.budgeted.length === 1 ? 'category' : 'categories'}
-                  </span>
-                  <AppSelect
-                    className="budget-sort-select"
-                    value={budgetedSort}
-                    options={BUDGET_SORT_OPTIONS}
-                    onChange={updateBudgetedSort}
-                    ariaLabel="Sort budgeted categories"
-                  />
+          {budgetModel.unbudgetedRows.length > 0 && (
+            <section className="budget-beta-section budget-beta-unbudgeted-section">
+              <header className="budget-beta-section-header">
+                <div>
+                  <h3>Unbudgeted Spending</h3>
+                  <p>{formatMoney(budgetModel.spentUnbudgeted)} outside budgeted categories</p>
+                  <p className="budget-beta-helper">Tap a category to see transactions</p>
                 </div>
               </header>
-              <ul className="budget-list">
-                {sortedBudgeted.map((item) => (
-                  <BudgetedRow
-                    key={item.category.id}
+              <ul className="budget-beta-unbudgeted-list">
+                {budgetModel.unbudgetedRows.map((item) => (
+                  <UnbudgetedBetaRow
+                    key={getCategoryKey(item)}
                     item={item}
-                    expanded={expandedBudgetKey === String(item.category.id)}
-                    transactionsState={budgetTransactions[String(item.category.id)]}
-                    onToggle={() => toggleBudgetRow(item)}
-                    onEdit={() => setEditingBudget(item)}
-                    onDelete={() => deleteBudget(item.budget_id)}
-                  />
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {/* ---------- Unbudgeted with spending ---------- */}
-          {data.unbudgeted.length > 0 && (
-            <section className="budget-section">
-              <header className="budget-section-header">
-                <h3>Spent without a budget</h3>
-                <span className="muted">
-                  {data.unbudgeted.length}{' '}
-                  {data.unbudgeted.length === 1 ? 'category' : 'categories'}
-                </span>
-              </header>
-              <ul className="budget-list">
-                {data.unbudgeted.map((item) => (
-                  <UnbudgetedRow
-                    key={item.category.id}
-                    item={item}
-                    onAdd={() =>
-                      setEditingBudget({
-                        ...item,
-                        budget_id: null,
-                        amount: null
-                      })
+                    selectedMonth={selectedMonth}
+                    expanded={expandedCompactKey === `unbudgeted-${getCategoryKey(item)}`}
+                    transactionsState={budgetTransactions[getCategoryKey(item)]}
+                    onToggle={() => toggleCompactCard(item, `unbudgeted-${getCategoryKey(item)}`)}
+                    onAdd={
+                      isBudgetableCategory(item)
+                        ? () =>
+                            setEditingBudget({
+                              ...item,
+                              budget_id: null,
+                              amount: null
+                            })
+                        : null
                     }
                   />
                 ))}
@@ -509,87 +533,111 @@ export default function Budgets({
             </section>
           )}
 
-          {/* ---------- Onboarding ---------- */}
-          {!hasAnyActivity && (
-            <div className="empty-state">
-              <div className="empty-state-icon">◯</div>
-              <h2>No budgets or activity this month</h2>
-              <p>
-                Add a monthly budget for a category to start tracking progress,
-                or pick a different month.
-              </p>
+          {(budgetModel.sortedRows.length > 0 || budgetModel.inactive.length > 0) && (
+            <section className="budget-beta-section budget-beta-categories-section">
+              <header className="budget-beta-section-header">
+                <div>
+                  <h3>Budgeted Categories</h3>
+                  <p>{budgetModel.sortedRows.length} tracked categories</p>
+                  <p className="budget-beta-helper">Tap a category to see transactions</p>
+                </div>
+                <AppSelect
+                  className="budget-beta-sort"
+                  value={categorySort}
+                  options={CATEGORY_SORT_OPTIONS}
+                  onChange={updateCategorySort}
+                  ariaLabel="Sort budget categories"
+                />
+              </header>
+
+              <ul className="budget-beta-category-list">
+                {budgetModel.sortedRows.map((item) => {
+                  const key = getCategoryKey(item);
+                  return (
+                    <BudgetRow
+                      key={key}
+                      item={item}
+                      expanded={expandedKey === key}
+                      selectedMonth={selectedMonth}
+                      transactionsState={budgetTransactions[key]}
+                      onToggle={() => toggleBudgetRow(item)}
+                      onEdit={() => setEditingBudget(item)}
+                      onDelete={() => deleteBudget(item.budget_id)}
+                    />
+                  );
+                })}
+              </ul>
+
+              {budgetModel.inactive.length > 0 && (
+                <div className="budget-beta-inactive-section">
+                  <button
+                    type="button"
+                    className="budget-beta-inactive-toggle"
+                    onClick={() => setShowInactive((value) => !value)}
+                    aria-expanded={showInactive}
+                  >
+                    <CollapseIndicator
+                      expanded={showInactive}
+                      className="budget-beta-inactive-collapse"
+                      visible={false}
+                    />
+                    <span>
+                      {showInactive ? 'Hide' : 'Show'}{' '}
+                      {budgetModel.inactive.length} categor
+                      {budgetModel.inactive.length === 1 ? 'y' : 'ies'} with no activity
+                    </span>
+                  </button>
+                  {showInactive && (
+                    <ul className="budget-beta-inactive-list">
+                      {budgetModel.inactive.map((item) => (
+                        <li key={getCategoryKey(item)}>
+                          <span className="budget-beta-category-icon" style={{ color: item.category.color }}>
+                            {item.category.icon}
+                          </span>
+                          <span>{item.category.name}</span>
+                          <button
+                            type="button"
+                            className="linkish"
+                            onClick={() =>
+                              setEditingBudget({
+                                ...item,
+                                budget_id: null,
+                                amount: null
+                              })
+                            }
+                          >
+                            Add Budget
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
+          {budgetModel.rows.length === 0 && budgetModel.unbudgetedRows.length === 0 && (
+            <div className="empty-state budget-beta-empty">
+              <div className="empty-state-icon">+</div>
+              <h2>No Budget Activity Yet</h2>
+              <p>Add budgets or pick another month to start tracking category spending.</p>
               <button
                 type="button"
                 className="btn-primary"
                 onClick={() => setAddingBudget(true)}
               >
-                + Add Budget
+                Add Budget
               </button>
             </div>
-          )}
-
-          {/* ---------- Inactive (collapsible) ---------- */}
-          {data.inactive.length > 0 && hasAnyActivity && (
-            <section className="budget-section">
-              <button
-                type="button"
-                className="budget-inactive-toggle"
-                onClick={() => setShowInactive((v) => !v)}
-              >
-                <span>{showInactive ? '▾' : '▸'}</span>
-                <span>
-                  {data.inactive.length} categor
-                  {data.inactive.length === 1 ? 'y' : 'ies'} with no activity
-                </span>
-              </button>
-              {showInactive && (
-                <ul className="budget-list budget-list-compact">
-                  {data.inactive.map((item) => (
-                    <li key={item.category.id} className="budget-row inactive">
-                      <span
-                        className="budget-row-icon"
-                        style={{ color: item.category.color }}
-                      >
-                        {item.category.icon}
-                      </span>
-                      <span className="budget-row-name">
-                        {item.category.name}
-                      </span>
-                      <button
-                        type="button"
-                        className="linkish"
-                        onClick={() =>
-                          setEditingBudget({
-                            ...item,
-                            budget_id: null,
-                            amount: null
-                          })
-                        }
-                      >
-                        Add Budget
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
           )}
         </div>
       )}
 
-      {/* ---------- Modals ---------- */}
       {addingBudget && (
         <AddBudgetModal
-          existingCategoryIds={new Set(
-            [...(data?.budgeted || [])].map((x) => x.category.id)
-          )}
-          allCategories={
-            [
-              ...(data?.budgeted || []),
-              ...(data?.unbudgeted || []),
-              ...(data?.inactive || [])
-            ].map((x) => x.category)
-          }
+          existingCategoryIds={new Set((data?.budgeted || []).map((item) => item.category.id))}
+          allCategories={allCategories}
           onClose={() => setAddingBudget(false)}
           onSaved={async (payload) => {
             await upsertBudget(payload);
@@ -622,10 +670,6 @@ export default function Budgets({
   );
 }
 
-// ============================================================================
-// Month navigator - arrow buttons flanking the shared AppSelect primitive.
-// ============================================================================
-
 function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump }) {
   return (
     <div className="month-nav">
@@ -644,9 +688,9 @@ function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump })
         <AppSelect
           className="month-nav-select"
           value={month}
-          options={monthOptions.map((m) => ({
-            value: m,
-            label: formatMonthLabel(m)
+          options={monthOptions.map((item) => ({
+            value: item,
+            label: formatMonthLabel(item)
           }))}
           onChange={onJump}
           ariaLabel="Jump to month"
@@ -669,16 +713,87 @@ function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump })
   );
 }
 
-// ============================================================================
-// Progress bar
-// ============================================================================
+function SnapshotPanel({ model, monthLabel, selectedMonth, daysLeft, onAddBudget }) {
+  const remainingTone = model.remaining < 0 ? 'over' : 'good';
+  const hasBudget = model.totalBudgeted > 0;
+  const spendPace = getSpendPace(model, selectedMonth, daysLeft);
 
-function ProgressBar({ percent, overBudget = false, compact = false }) {
-  const clamped = Math.max(0, Math.min(100, percent));
-  const label = `${Math.round(percent)}%${overBudget ? ' over budget' : ' used'}`;
+  return (
+    <section className="budget-beta-snapshot" aria-labelledby="budget-beta-snapshot-title">
+      <div className={`budget-beta-snapshot-main ${remainingTone}`}>
+        <div className="budget-beta-eyebrow" id="budget-beta-snapshot-title">
+          {monthLabel} Snapshot
+        </div>
+        <div className="budget-beta-main-number">
+          {formatMoney(model.totalExpenses)}
+        </div>
+        <div className="budget-beta-main-sub">
+          spent of {formatMoney(model.totalBudgeted)} budgeted
+        </div>
+        <ProgressMeter percent={model.overallPercent} over={model.remaining < 0} size="large" />
+        <div className="budget-beta-snapshot-result">
+          {hasBudget ? (
+            model.remaining < 0
+              ? `${formatMoney(Math.abs(model.remaining))} over budget`
+              : `${formatMoney(model.remaining)} remaining`
+          ) : (
+            'No category budgets yet'
+          )}
+        </div>
+      </div>
+
+      <div className="budget-beta-snapshot-grid">
+        <SnapshotStat
+          label="Budgeted Categories"
+          value={`${formatMoney(model.spentInBudgets)} / ${formatMoney(model.totalBudgeted)}`}
+          detail={`${formatPercent(model.budgetedPercent)} used`}
+          tone={model.budgetedPercent > 100 ? 'over' : model.budgetedPercent >= 85 ? 'watch' : 'good'}
+        />
+        <SnapshotStat
+          label="Unbudgeted Spending"
+          value={formatMoney(model.spentUnbudgeted)}
+          detail={`${formatPercent(model.unbudgetedShare)} of expenses`}
+          tone={model.spentUnbudgeted > 0 ? 'watch' : 'good'}
+        />
+        <SnapshotStat
+          label="Cash Flow"
+          value={formatMoney(model.totalNet)}
+          detail={`${formatMoney(model.totalIncome)} income`}
+          tone={model.totalNet < 0 ? 'watch' : 'good'}
+        />
+        <SnapshotStat
+          label="Spend Pace"
+          value={spendPace.value}
+          detail={spendPace.detail}
+          tone={spendPace.tone}
+        />
+      </div>
+
+      <div className="budget-beta-snapshot-actions">
+        <button type="button" className="btn-primary" onClick={onAddBudget}>
+          Add Budget
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function SnapshotStat({ label, value, detail, tone }) {
+  return (
+    <div className={`budget-beta-stat ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <em>{detail}</em>
+    </div>
+  );
+}
+
+function ProgressMeter({ percent, over = false, size = 'normal' }) {
+  const clamped = clampPercent(percent);
+  const label = `${formatPercent(percent)} used`;
   return (
     <div
-      className={`budget-progress ${compact ? 'budget-progress-compact' : ''}`}
+      className={`budget-beta-progress ${size === 'large' ? 'large' : ''}`}
       role="progressbar"
       aria-valuenow={Math.round(percent)}
       aria-valuemin="0"
@@ -686,291 +801,402 @@ function ProgressBar({ percent, overBudget = false, compact = false }) {
       title={label}
     >
       <div
-        className={`budget-progress-fill ${
-          overBudget ? 'over' : percent >= 85 ? 'warning' : ''
-        }`}
+        className={`budget-beta-progress-fill ${over ? 'over' : percent >= 85 ? 'watch' : ''}`}
         style={{ width: `${clamped}%` }}
       />
     </div>
   );
 }
 
-// ============================================================================
-// Spending by category pie chart
-// ============================================================================
-
-function SpendingPieChart({ items, total, selectedKey, onSelect }) {
-  const radius = 44;
-  const strokeWidth = 18;
-  const circumference = 2 * Math.PI * radius;
-  let offset = 0;
-
-  const selected =
-    items.find((item) => item.key === selectedKey) ||
-    items[0] ||
-    null;
-  const segments = items.map((item) => {
-    const length = (item.amount / total) * circumference;
-    const segment = {
-      ...item,
-      length,
-      dashOffset: -offset,
-      active: selected?.key === item.key
-    };
-    offset += length;
-    return segment;
-  });
+function SpendingMixPanel({
+  items,
+  total,
+  selectedMonth,
+  expandedKey,
+  transactionsByCategory,
+  onToggle
+}) {
+  const visibleItems = items.slice(0, MAX_MIX_ITEMS);
+  const otherAmount = items
+    .slice(MAX_MIX_ITEMS)
+    .reduce((sum, item) => sum + asNumber(item.spent), 0);
+  const chartItems = otherAmount > 0
+    ? [
+        ...visibleItems,
+        {
+          category: { id: 'other', name: 'Other', color: 'var(--text-muted)', icon: '' },
+          spent: otherAmount
+        }
+      ]
+    : visibleItems;
 
   return (
-    <section className="budget-pie-card" aria-labelledby="budget-pie-title">
-      <div className="budget-pie-header">
+    <section className="budget-beta-section budget-beta-mix-panel">
+      <header className="budget-beta-section-header">
         <div>
-          <h3 id="budget-pie-title">Spending by Category</h3>
-          <p className="subtle">{formatMoney(total)} spent this month</p>
+          <h3>Spending Mix</h3>
+          <p>Largest category shares this month</p>
+          <p className="budget-beta-helper">Tap a category to see transactions</p>
         </div>
-        {selected && (
-          <div className="budget-pie-selected">
-            <span>{selected.icon}</span>
-            <strong>{formatMoney(selected.amount)}</strong>
-            <em>{selected.name}</em>
-          </div>
-        )}
-      </div>
+      </header>
 
-      <div className="budget-pie-body">
-        <svg
-          className="budget-pie-chart"
-          viewBox="0 0 120 120"
-          role="img"
-          aria-label="Spending by category pie chart"
-        >
-          <circle
-            className="budget-pie-track"
-            cx="60"
-            cy="60"
-            r={radius}
-            fill="none"
-            strokeWidth={strokeWidth}
-          />
-          {segments.map((item) => (
-            <circle
-              key={`${item.key}-glow`}
-              className={`budget-pie-slice-glow ${item.active ? 'active' : ''}`}
-              cx="60"
-              cy="60"
-              r={radius}
-              fill="none"
-              stroke={item.color}
-              strokeWidth={strokeWidth + 7}
-              strokeDasharray={`${item.length} ${circumference - item.length}`}
-              strokeDashoffset={item.dashOffset}
-              transform="rotate(-90 60 60)"
-              aria-hidden="true"
+      <div className="budget-beta-mix-strip" aria-label="Spending mix by category">
+        {chartItems.map((item) => {
+          const width = Math.max(2, percentOf(asNumber(item.spent), total));
+          return (
+            <span
+              key={getCategoryKey(item)}
+              style={{
+                width: `${width}%`,
+                backgroundColor: item.category.color || 'var(--accent)'
+              }}
+              title={`${item.category.name}: ${formatMoney(item.spent)}`}
             />
-          ))}
-          {segments.map((item) => {
-            return (
-              <circle
-                key={item.key}
-                className={`budget-pie-slice ${item.active ? 'active' : ''}`}
-                cx="60"
-                cy="60"
-                r={radius}
-                fill="none"
-                stroke={item.color}
-                strokeWidth={strokeWidth}
-                strokeDasharray={`${item.length} ${circumference - item.length}`}
-                strokeDashoffset={item.dashOffset}
-                transform="rotate(-90 60 60)"
-                tabIndex={0}
-                role="button"
-                aria-label={`${item.name}: ${formatMoney(item.amount)}`}
-                onClick={() => onSelect(item.key)}
-                onFocus={() => onSelect(item.key)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onSelect(item.key);
-                  }
-                }}
-                onMouseEnter={() => onSelect(item.key)}
-              >
-                <title>
-                  {`${item.name}: ${formatMoney(item.amount)} (${Math.round((item.amount / total) * 100)}%)`}
-                </title>
-              </circle>
-            );
-          })}
-          <text className="budget-pie-total-label" x="60" y="56" textAnchor="middle">
-            Total
-          </text>
-          <text className="budget-pie-total-value" x="60" y="74" textAnchor="middle">
-            {formatMoney(total)}
-          </text>
-        </svg>
-
-        <div className="budget-pie-list" role="list">
-          {items.map((item) => {
-            const active = selected?.key === item.key;
-            const percent = total > 0 ? Math.round((item.amount / total) * 100) : 0;
-            return (
-              <SelectableListItem
-                key={item.key}
-                className="budget-pie-item"
-                active={active}
-                onClick={() => onSelect(item.key)}
-                leading={(
-                  <>
-                    <span
-                      className="budget-pie-dot"
-                      style={{ backgroundColor: item.color }}
-                      aria-hidden="true"
-                    />
-                    <span aria-hidden="true">{item.icon}</span>
-                  </>
-                )}
-                title={item.name}
-                sidePrimary={formatMoney(item.amount)}
-                sideSecondary={`${percent}%`}
-                ariaLabel={`Select ${item.name}: ${formatMoney(item.amount)}`}
-              />
-            );
-          })}
-        </div>
+          );
+        })}
       </div>
+
+      <ul className="budget-beta-mix-list">
+        {visibleItems.map((item) => {
+          const key = getCategoryKey(item);
+          const share = percentOf(asNumber(item.spent), total);
+          const expanded = expandedKey === key;
+          return (
+            <li
+              key={key}
+              className={`budget-beta-mix-item ${expanded ? 'expanded' : ''}`}
+            >
+              <button
+                type="button"
+                className="budget-beta-mix-trigger"
+                onClick={() => onToggle(item)}
+                aria-expanded={expanded}
+              >
+                <span
+                  className="budget-beta-dot"
+                  style={{ backgroundColor: item.category.color || 'var(--accent)' }}
+                  aria-hidden="true"
+                />
+                <span className="budget-beta-mix-icon" aria-hidden="true">
+                  {item.category.icon}
+                </span>
+                <strong>{item.category.name}</strong>
+                <em>{formatMoney(item.spent)}</em>
+                <span className="budget-beta-mix-share">{formatPercent(share)}</span>
+                <CollapseIndicator
+                  expanded={expanded}
+                  className="budget-beta-mix-collapse"
+                  visible={false}
+                />
+              </button>
+
+              <ExpandingSection
+                expanded={expanded}
+                className="budget-beta-mix-detail"
+                innerClassName="budget-beta-mix-detail-inner"
+              >
+                <TransactionPreview
+                  item={item}
+                  selectedMonth={selectedMonth}
+                  transactionsState={transactionsByCategory[key]}
+                />
+              </ExpandingSection>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
 
-// ============================================================================
-// Budget row (has a budget)
-// ============================================================================
+function NotablePanel({
+  notable,
+  selectedMonth,
+  expandedKey,
+  transactionsByCategory,
+  onToggle,
+  onAdd
+}) {
+  return (
+    <section className="budget-beta-section budget-beta-notable">
+      <header className="budget-beta-section-header">
+        <div>
+          <h3>Notable This Month</h3>
+          <p>Overages, high usage, and spending outside the plan</p>
+          <p className="budget-beta-helper">Tap a category to see transactions</p>
+        </div>
+      </header>
 
-function BudgetedRow({ item, expanded, transactionsState, onToggle, onEdit, onDelete }) {
-  const { category, amount, spent } = item;
-  const percent = amount > 0 ? (spent / amount) * 100 : 0;
-  const overBudget = spent > amount;
-  const remaining = amount - spent;
+      {notable.length > 0 ? (
+        <ul className="budget-beta-notable-list">
+          {notable.map(({ kind, tone, item }) => {
+            const amount = asNumber(item.amount);
+            const spent = asNumber(item.spent);
+            const isUnbudgeted = kind === 'Unbudgeted';
+            const detail = isUnbudgeted
+              ? `${formatMoney(spent)} across ${item.transaction_count} ${item.transaction_count === 1 ? 'transaction' : 'transactions'}`
+              : amount > 0
+                ? `${formatMoney(spent)} of ${formatMoney(amount)}`
+                : `${formatMoney(spent)} spent`;
+            const cardKey = `notable-${kind}-${getCategoryKey(item)}`;
 
+            return (
+              <CompactTransactionCard
+                key={cardKey}
+                item={item}
+                kind={kind}
+                tone={tone}
+                detail={detail}
+                selectedMonth={selectedMonth}
+                expanded={expandedKey === cardKey}
+                transactionsState={transactionsByCategory[getCategoryKey(item)]}
+                onToggle={() => onToggle(item, cardKey)}
+                onAddBudget={isUnbudgeted && isBudgetableCategory(item) ? () => onAdd(item) : null}
+              />
+            );
+          })}
+        </ul>
+      ) : (
+        <div className="budget-beta-clear-state">
+          <strong>No notable budget exceptions.</strong>
+          <span>Budgeted categories are below high-usage thresholds and no unbudgeted spending is showing.</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function BudgetRow({
+  item,
+  expanded,
+  selectedMonth,
+  transactionsState,
+  onToggle,
+  onEdit,
+  onDelete
+}) {
+  const status = getStatus(item);
+  const percent = item.amount > 0 ? item.pct : 0;
   const menuItems = [
-    { label: 'Edit Amount', icon: '✎', onClick: onEdit },
+    { label: 'Edit Amount', onClick: onEdit },
     { divider: true },
-    { label: 'Delete', icon: '✕', destructive: true, onClick: onDelete }
+    { label: 'Delete', destructive: true, onClick: onDelete }
   ];
 
-  function handleClick(e) {
-    if (e.target.closest('button, a, input, select, textarea, [role="button"]')) return;
+  function handleClick(event) {
+    if (event.target.closest('button, a, input, select, textarea, [role="button"]')) return;
     onToggle();
   }
 
-  function handleKeyDown(e) {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    if (e.target.closest('button, a, input, select, textarea, [role="button"]')) return;
-    e.preventDefault();
+  function handleKeyDown(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.target.closest('button, a, input, select, textarea, [role="button"]')) return;
+    event.preventDefault();
     onToggle();
   }
 
   return (
     <li
-      className={`budget-row ${overBudget ? 'over-budget' : ''} ${expanded ? 'expanded' : ''}`}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
+      className={`budget-beta-row ${status.tone} ${expanded ? 'expanded' : ''}`}
       tabIndex={0}
       aria-expanded={expanded}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
     >
-      <div className="budget-row-head">
-        <div className="budget-row-main">
-          <span className="budget-row-icon" style={{ color: category.color }}>
-            {category.icon}
-          </span>
-          <span className="budget-row-name">{category.name}</span>
-          <span className="budget-row-amounts">
-            <span className="budget-row-spent">{formatMoney(spent)}</span>
-            <span className="subtle"> / {formatMoney(amount)}</span>
+      <div className="budget-beta-row-top">
+        <span className="budget-beta-category-icon" style={{ color: item.category.color }}>
+          {item.category.icon}
+        </span>
+        <div className="budget-beta-row-title">
+          <div className="budget-beta-row-title-line">
+            <strong>{item.category.name}</strong>
+            <span className={`budget-beta-chip ${status.tone}`}>{status.label}</span>
+          </div>
+          <span>
+            {formatMoney(item.spent)} spent of {formatMoney(item.amount)}
           </span>
         </div>
-        <CollapseIndicator expanded={expanded} className="budget-row-collapse-indicator" />
-        <DropdownMenu
-          items={menuItems}
-          ariaLabel={`Actions for ${category.name} budget`}
+        <CollapseIndicator
+          expanded={expanded}
+          className="budget-beta-collapse"
+          visible={false}
         />
+        <DropdownMenu items={menuItems} ariaLabel={`Actions for ${item.category.name} budget`} />
       </div>
-      <div className="budget-row-progress">
-        <ProgressBar percent={percent} overBudget={overBudget} />
-        <div className="budget-row-footnote">
-          {overBudget ? (
-            <span className="over-label">
-              {Math.round(percent)}% · {formatMoney(-remaining)} over
-            </span>
-          ) : (
-            <span className="subtle">
-              {Math.round(percent)}% · {formatMoney(remaining)} left
-            </span>
-          )}
-          <span className="subtle">
-            {item.transaction_count}{' '}
-            {item.transaction_count === 1 ? 'transaction' : 'transactions'}
+
+      <div className="budget-beta-row-meter">
+        <ProgressMeter percent={percent} over={item.over} />
+        <div className="budget-beta-row-meta">
+          <span>{formatPercent(percent)} used</span>
+          <span>
+            {item.transaction_count} {item.transaction_count === 1 ? 'transaction' : 'transactions'}
           </span>
         </div>
       </div>
+
       <ExpandingSection
         expanded={expanded}
-        className="budget-row-detail"
-        innerClassName="budget-row-detail-inner"
+        className="budget-beta-row-detail"
+        innerClassName="budget-beta-row-detail-inner"
       >
-        <h4>Transactions</h4>
-        {transactionsState?.loading ? (
-          <p className="subtle">Loading transactions...</p>
-        ) : transactionsState?.error ? (
-          <p className="error">{transactionsState.error}</p>
-        ) : transactionsState?.items?.length ? (
-          <ul className="budget-transaction-list">
-            {transactionsState.items.map((txn) => (
-              <li key={txn.id}>
-                <span>
-                  <strong>{txn.merchant}</strong>
-                  <em>{formatTransactionDate(txn.date)}</em>
-                </span>
-                <strong>{formatMoney(Math.abs(Number(txn.amount || 0)))}</strong>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="subtle">No matching transactions this month.</p>
-        )}
+        <div className="budget-beta-row-detail-head">
+          <h4>Transactions</h4>
+          <Link to={buildTransactionsHref(item, selectedMonth)}>View All</Link>
+        </div>
+        <TransactionPreview
+          item={item}
+          selectedMonth={selectedMonth}
+          transactionsState={transactionsState}
+          showViewAll={false}
+        />
       </ExpandingSection>
     </li>
   );
 }
 
-// ============================================================================
-// Unbudgeted-but-spent row
-// ============================================================================
+function CompactTransactionCard({
+  item,
+  kind,
+  tone,
+  detail,
+  selectedMonth,
+  expanded,
+  transactionsState,
+  onToggle,
+  onAddBudget
+}) {
+  function handleClick(event) {
+    if (event.target.closest('button, a, input, select, textarea, [role="button"]')) return;
+    onToggle();
+  }
 
-function UnbudgetedRow({ item, onAdd }) {
-  const { category, spent, transaction_count } = item;
+  function handleKeyDown(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.target.closest('button, a, input, select, textarea, [role="button"]')) return;
+    event.preventDefault();
+    onToggle();
+  }
+
   return (
-    <li className="budget-row unbudgeted">
-      <span className="budget-row-icon" style={{ color: category.color }}>
-        {category.icon}
-      </span>
-      <div className="budget-row-grow">
-        <div className="budget-row-name">{category.name}</div>
-        <div className="subtle" style={{ fontSize: '0.82rem' }}>
-          {formatMoney(spent)} across {transaction_count}{' '}
-          {transaction_count === 1 ? 'transaction' : 'transactions'}
+    <li
+      className={`budget-beta-compact-card ${tone} ${expanded ? 'expanded' : ''}`}
+      tabIndex={0}
+      aria-expanded={expanded}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+    >
+      <div className="budget-beta-compact-summary">
+        <span className="budget-beta-category-icon" style={{ color: item.category.color }}>
+          {item.category.icon}
+        </span>
+        <div className="budget-beta-compact-body">
+          <div className="budget-beta-compact-top">
+            <strong>{item.category.name}</strong>
+            <span className={`budget-beta-chip ${tone}`}>{kind}</span>
+            <CollapseIndicator
+              expanded={expanded}
+              className="budget-beta-compact-collapse"
+              visible={false}
+            />
+          </div>
+          <div className="budget-beta-compact-bottom">
+            <em>{detail}</em>
+            {onAddBudget && (
+              <button
+                type="button"
+                className="btn-primary btn-compact"
+                onClick={onAddBudget}
+              >
+                + Budget
+              </button>
+            )}
+          </div>
         </div>
       </div>
-      <button type="button" className="btn-secondary btn-compact" onClick={onAdd}>
-        + Budget
-      </button>
+
+      <ExpandingSection
+        expanded={expanded}
+        className="budget-beta-compact-detail"
+        innerClassName="budget-beta-compact-detail-inner"
+      >
+        <TransactionPreview
+          item={item}
+          selectedMonth={selectedMonth}
+          transactionsState={transactionsState}
+        />
+      </ExpandingSection>
     </li>
   );
 }
 
-// ============================================================================
-// Add budget modal
-// ============================================================================
+function UnbudgetedBetaRow({
+  item,
+  selectedMonth,
+  expanded,
+  transactionsState,
+  onToggle,
+  onAdd
+}) {
+  return (
+    <CompactTransactionCard
+      item={item}
+      kind="Unbudgeted"
+      tone="neutral"
+      detail={`${formatMoney(item.spent)} across ${item.transaction_count} ${
+        item.transaction_count === 1 ? 'transaction' : 'transactions'
+      }`}
+      selectedMonth={selectedMonth}
+      expanded={expanded}
+      transactionsState={transactionsState}
+      onToggle={onToggle}
+      onAddBudget={onAdd}
+    />
+  );
+}
+
+function TransactionPreview({
+  item,
+  selectedMonth,
+  transactionsState,
+  showViewAll = true
+}) {
+  return (
+    <>
+      {showViewAll && (
+        <div className="budget-beta-row-detail-head">
+          <h4>Transactions</h4>
+          <Link to={buildTransactionsHref(item, selectedMonth)}>View All</Link>
+        </div>
+      )}
+      {transactionsState?.loading ? (
+        <p className="subtle">Loading transactions...</p>
+      ) : transactionsState?.error ? (
+        <p className="error">{transactionsState.error}</p>
+      ) : transactionsState?.items?.length ? (
+        <>
+          <ul className="budget-beta-transaction-list">
+            {transactionsState.items.slice(0, MAX_TRANSACTION_PREVIEW).map((txn) => (
+              <li key={txn.id}>
+                <span>
+                  <strong>{txn.merchant}</strong>
+                  <em>{formatTransactionDate(txn.date)}</em>
+                </span>
+                <strong>{formatMoney(Math.abs(asNumber(txn.amount)))}</strong>
+              </li>
+            ))}
+          </ul>
+          {transactionsState.items.length > MAX_TRANSACTION_PREVIEW && (
+            <p className="subtle">
+              Showing {MAX_TRANSACTION_PREVIEW} of {transactionsState.items.length} transactions.
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="subtle">No matching transactions this month.</p>
+      )}
+    </>
+  );
+}
 
 function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }) {
   const [categoryId, setCategoryId] = useState('');
@@ -980,20 +1206,19 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
 
   const availableCategories = useMemo(() => {
     const seen = new Set();
-    const out = [];
-    for (const c of allCategories) {
-      if (!c || seen.has(c.id)) continue;
-      seen.add(c.id);
-      if (c.is_transfer) continue;
-      if (existingCategoryIds.has(c.id)) continue;
-      out.push(c);
+    const result = [];
+    for (const category of allCategories) {
+      if (!category || category.id == null || seen.has(category.id)) continue;
+      seen.add(category.id);
+      if (category.is_transfer) continue;
+      if (existingCategoryIds.has(category.id)) continue;
+      result.push(category);
     }
-    out.sort((a, b) => a.name.localeCompare(b.name));
-    return out;
+    return result.sort((a, b) => a.name.localeCompare(b.name));
   }, [allCategories, existingCategoryIds]);
 
-  async function handleSave(e, close) {
-    e.preventDefault();
+  async function handleSave(event, close) {
+    event.preventDefault();
     setError('');
 
     const cid = parseInt(categoryId, 10);
@@ -1001,15 +1226,16 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
       setError('Pick a category.');
       return;
     }
-    const amt = parseCurrencyInput(amount, NaN);
-    if (!Number.isFinite(amt) || amt < 0) {
+
+    const parsedAmount = parseCurrencyInput(amount, NaN);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
       setError('Enter a valid non-negative amount.');
       return;
     }
 
     setSaving(true);
     try {
-      await onSaved({ category_id: cid, amount: amt });
+      await onSaved({ category_id: cid, amount: parsedAmount });
       close({ animate: true });
     } catch (err) {
       setError(err.message || 'Save failed');
@@ -1021,15 +1247,14 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
     <AnimatedModal onClose={onClose}>
       {({ close }) => (
         <>
-          <h3>Add monthly budget</h3>
+          <h3>Add Budget</h3>
           <p className="subtle">
-            This amount will be your target for every month — past, present,
-            and future.
+            This default monthly amount applies to every month.
           </p>
 
           {availableCategories.length === 0 ? (
             <>
-              <p>Every category already has a budget.</p>
+              <p>Every spending category already has a budget.</p>
               <div className="modal-actions">
                 <button type="button" className="btn-primary" onClick={close}>
                   OK
@@ -1037,7 +1262,7 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
               </div>
             </>
           ) : (
-            <form onSubmit={(e) => handleSave(e, close)}>
+            <form onSubmit={(event) => handleSave(event, close)}>
               <label className="field">
                 <span>Category</span>
                 <AppSelect
@@ -1045,15 +1270,15 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
                   onChange={setCategoryId}
                   placeholder="Pick One"
                   ariaLabel="Budget category"
-                  options={availableCategories.map((c) => ({
-                    value: c.id,
-                    label: `${c.icon} ${c.name}`
+                  options={availableCategories.map((category) => ({
+                    value: category.id,
+                    label: `${category.icon} ${category.name}`
                   }))}
                 />
               </label>
 
               <label className="field">
-                <span>Monthly limit</span>
+                <span>Default Monthly Budget</span>
                 <CurrencyInput
                   placeholder="$0"
                   value={amount}
@@ -1069,7 +1294,7 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? 'Saving…' : 'Add Budget'}
+                  {saving ? 'Saving...' : 'Add Budget'}
                 </button>
               </div>
             </form>
@@ -1080,30 +1305,27 @@ function AddBudgetModal({ existingCategoryIds, allCategories, onClose, onSaved }
   );
 }
 
-// ============================================================================
-// Edit budget modal — amount only; edits apply to every month
-// ============================================================================
-
 function EditBudgetModal({ item, onClose, onSaved, onDelete }) {
   const [amount, setAmount] = useState(
     item.amount != null ? formatCurrencyInput(item.amount) : ''
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const isNew = !item.budget_id;
 
-  async function handleSave(e, close) {
-    e.preventDefault();
+  async function handleSave(event, close) {
+    event.preventDefault();
     setError('');
 
-    const amt = parseCurrencyInput(amount, NaN);
-    if (!Number.isFinite(amt) || amt < 0) {
+    const parsedAmount = parseCurrencyInput(amount, NaN);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
       setError('Enter a valid non-negative amount.');
       return;
     }
 
     setSaving(true);
     try {
-      await onSaved({ category_id: item.category.id, amount: amt });
+      await onSaved({ category_id: item.category.id, amount: parsedAmount });
       close({ animate: true });
     } catch (err) {
       setError(err.message || 'Save failed');
@@ -1111,28 +1333,23 @@ function EditBudgetModal({ item, onClose, onSaved, onDelete }) {
     }
   }
 
-  const isNew = !item.budget_id;
-
   return (
     <AnimatedModal onClose={onClose}>
       {({ close }) => (
         <>
           <h3>
-            {isNew ? 'Add' : 'Edit'} budget · {item.category.icon}{' '}
-            {item.category.name}
+            {isNew ? 'Add' : 'Edit'} Budget - {item.category.icon} {item.category.name}
           </h3>
           <p className="subtle">
             Applies to every month.
             {!isNew && item.spent > 0 && (
-              <>
-                {' '}Spent {formatMoney(item.spent)} this month so far.
-              </>
+              <> Spent {formatMoney(item.spent)} this month so far.</>
             )}
           </p>
 
-          <form onSubmit={(e) => handleSave(e, close)}>
+          <form onSubmit={(event) => handleSave(event, close)}>
             <label className="field">
-              <span>Monthly limit</span>
+              <span>Default Monthly Budget</span>
               <CurrencyInput
                 placeholder="$0"
                 value={amount}
@@ -1159,7 +1376,7 @@ function EditBudgetModal({ item, onClose, onSaved, onDelete }) {
                 Cancel
               </button>
               <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Saving…' : isNew ? 'Add Budget' : 'Save'}
+                {saving ? 'Saving...' : isNew ? 'Add Budget' : 'Save'}
               </button>
             </div>
           </form>

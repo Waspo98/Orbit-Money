@@ -31,6 +31,30 @@ All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 | `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
 | `sessions.db` | Session store (separate `better-sqlite3` connection) |
 
+## Offline PWA Cache
+
+Offline mode is intentionally read-only. The service worker caches the app shell
+and static assets, while `frontend/src/api.js` keeps successful authenticated
+GET responses in IndexedDB through `frontend/src/offlineCache.js`. Non-GET API
+calls are blocked while offline with the read-only message shown in the app
+banner.
+
+Cached API responses are keyed by signed-in user identity, household id, and
+request path. A successful `/api/auth/me` response is the access validation
+source. Owner households can use cached data offline without a time limit;
+shared/member households must have validated access within the last 7 days.
+Logout clears the IndexedDB financial response cache.
+
+Route components are lazy-loaded, so `App.jsx` warms those route chunks after a
+successful online app load. Keep that preloading behavior when adding new
+offline-readable pages, otherwise a never-visited page can fail to import while
+offline.
+
+`frontend/src/offlineWarmup.js` also warms core read-only API paths shortly
+after login, including the default Transactions and Budgets requests. Keep those
+paths mechanically aligned with each page's initial `api.get(...)` call; the
+offline cache keys by exact request path.
+
 ### Database Schema (30 migrations)
 
 | Migration | Purpose |
@@ -168,10 +192,10 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 ### Budgets
 - **Monthly caps, global per category.** One amount per category that applies to every month. Editing `Groceries` updates the cap for every past and future month.
 - **Month navigation** via `‹ / ›` arrows plus the shared `AppSelect` pill. The select menu is portaled and page-centered on mobile so month jumps use the same dropdown primitive as the rest of the app.
-- **Summary card:** total monthly expenses, percentage of budgeted amount, remaining/over, plus an unbudgeted-spending callout. The headline and progress math intentionally include unbudgeted expenses.
-- **Spending by Category chart:** interactive donut chart for monthly category spend. The list uses `SelectableListItem`, sorts biggest-to-smallest with Uncategorized forced last, and selected rows use the shared green active treatment.
-- **Income / Expenses / Net** three-column stat row at the top, scoped to the viewed month, excludes ignored + transfer transactions
-- **Three sections:** Budgeted (sorted most-over-budget first, expandable per-row progress cards with transaction details), Spent without a budget (quick-add CTAs), and No activity (collapsed toggle)
+- **Snapshot card:** total monthly expenses, percentage of budgeted amount, remaining/over, unbudgeted spending, cash flow, and spend pace. The headline and progress math intentionally include unbudgeted expenses.
+- **Spending mix:** expandable category-share rows with transaction previews. Rows use the shared `ExpandingSection` animation; the optional collapse chevron primitive is deliberately hidden on this page.
+- **Tracking sections:** notable budget activity, unbudgeted spending quick-add CTAs, and budgeted categories with inactive categories collapsed at the bottom of the card. True uncategorized/null-category spending appears in the unbudgeted breakdown and links to `categories=uncategorized`, but it cannot be quick-added as a budget until it has a real category.
+- **Category sort preference:** the Budgeted Categories sort menu persists through the existing `budgetedSort` user preference key.
 - Progress bars transition green → yellow (≥85%) → red (>100%)
 - Endpoints: GET `/api/budgets?month=YYYY-MM`, GET `/api/budgets/months`, PUT `/api/budgets` (upsert), DELETE `/api/budgets/:id`
 
@@ -248,6 +272,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - `PageHero` component and `useMorphingPageHero(initialHeight)` hook own the morphing sticky hero measurement logic. Reuse `PageHero` for page headers; pass `chrome` and `toolbar` slots when a page needs custom header controls.
 - `AppDialog.jsx` exposes `useAppDialog()` for modal alert/confirmation flows. Prefer it over native `alert()` / `confirm()` so mobile UX and destructive-action styling stay consistent.
 - `AppSelect.jsx` is the shared custom select primitive. Pass an `options` array (`{ value, label }`) and do not nest native `<option>` children; use `menuPlacement="page-center"` for compact month/year picker pills.
+- `ExpandingSection.jsx` owns expand/collapse animation. Pair it with `CollapseIndicator` only when the local pattern wants a visible affordance; `CollapseIndicator` supports `visible={false}` so pages can keep shared structure without showing a chevron.
 - `frontend/src/navigation.js` owns route metadata. `BottomTabs.jsx`, `DesktopSidebar.jsx`, `MoreSheet.jsx`, `App.jsx`, and route visibility should read from it so labels, icons, route rendering, and feature gating stay aligned.
 - `SelectableListItem.jsx` is the shared two-line selectable card/row primitive. Use it for lists where one item is selected, such as goal/category pickers; selected rows use the shared green active treatment.
 - `CurrencyInput.jsx` is the shared primitive for editable dollar amounts. Use it for money text fields so values format with `$` and comma grouping while typing; pair saved values with `parseCurrencyInput`.
@@ -326,7 +351,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 ### Budgets
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/budgets?month=YYYY-MM` | Monthly overview: `budgeted` / `unbudgeted` / `inactive` arrays + summary with `total_budgeted`, `total_spent_in_budgets`, `total_spent_unbudgeted`, `total_spent`, `total_income`, `total_expenses`, `total_net`. Month defaults to current month. |
+| GET | `/api/budgets?month=YYYY-MM` | Monthly overview: `budgeted` / `unbudgeted` / `inactive` arrays + summary with `total_budgeted`, `total_spent_in_budgets`, `total_spent_unbudgeted`, `total_spent`, `total_income`, `total_expenses`, `total_net`. Month defaults to current month. Null-category expense rows are returned as an unbudgeted `Uncategorized` item and summary money is summed in integer cents before serialization. |
 | GET | `/api/budgets/months` | Distinct months with transaction activity (for month picker) |
 | PUT | `/api/budgets` | Upsert `{ category_id, amount, rollover? }` — global per-category |
 | DELETE | `/api/budgets/:id` | Delete budget |

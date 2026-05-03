@@ -22,7 +22,17 @@ const RETIREMENT_PREFS_STORAGE_KEY = 'orbit-money-retirement-preferences-v1';
 const SETTINGS_CARD_ORDER_STORAGE_KEY = 'orbit-money-settings-card-order';
 const BUDGETED_SORT_STORAGE_KEY = 'orbit-money-budgeted-sort';
 
-const BUDGETED_SORT_OPTIONS = new Set(['pct_desc', 'pct_asc', 'spent_desc', 'spent_asc']);
+const BUDGETED_SORT_OPTIONS = new Set([
+  'variance_desc',
+  'remaining_asc',
+  'spent_desc',
+  'name_asc'
+]);
+const LEGACY_BUDGETED_SORT_OPTIONS = {
+  pct_desc: 'variance_desc',
+  pct_asc: 'remaining_asc',
+  spent_asc: 'name_asc'
+};
 const RETIREMENT_PRESETS = new Set(['conservative', 'balanced', 'aggressive']);
 
 function readJson(key, fallback = null) {
@@ -79,7 +89,8 @@ function normalizeRetirementPreferences(value) {
 }
 
 function normalizeBudgetedSort(value) {
-  return BUDGETED_SORT_OPTIONS.has(value) ? value : 'pct_desc';
+  if (BUDGETED_SORT_OPTIONS.has(value)) return value;
+  return LEGACY_BUDGETED_SORT_OPTIONS[value] || 'variance_desc';
 }
 
 export function normalizePreferenceValue(key, value) {
@@ -113,7 +124,7 @@ export function defaultUserPreferences() {
     [USER_PREFERENCE_KEYS.dashboardGoalFocusId]: null,
     [USER_PREFERENCE_KEYS.dashboardRetirement]: normalizeRetirementPreferences(),
     [USER_PREFERENCE_KEYS.settingsCardOrder]: [],
-    [USER_PREFERENCE_KEYS.budgetedSort]: 'pct_desc'
+    [USER_PREFERENCE_KEYS.budgetedSort]: 'variance_desc'
   };
 }
 
@@ -137,7 +148,7 @@ export function readLocalUserPreferences() {
     ),
     [USER_PREFERENCE_KEYS.settingsCardOrder]: readJson(SETTINGS_CARD_ORDER_STORAGE_KEY, []),
     [USER_PREFERENCE_KEYS.budgetedSort]: normalizeBudgetedSort(
-      readString(BUDGETED_SORT_STORAGE_KEY, 'pct_desc')
+      readString(BUDGETED_SORT_STORAGE_KEY, 'variance_desc')
     )
   };
 }

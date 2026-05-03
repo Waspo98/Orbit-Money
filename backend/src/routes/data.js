@@ -1,18 +1,15 @@
 import express from 'express';
-import multer from 'multer';
 import Papa from 'papaparse';
 import { requireAuth, requireHouseholdId, requireHouseholdWrite } from '../auth.js';
 import { db } from '../db/index.js';
 import { centsToDollars } from '../lib/money.js';
 import { sendBadRequest, sendOk, sendRouteError } from '../lib/http.js';
+import { createMemoryUpload } from '../lib/uploads.js';
 import { restoreOrbitBackup } from '../services/orbitBackupRestore.js';
 
 const router = express.Router();
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }
-});
+const upload = createMemoryUpload({ fileSizeMb: 50 });
 
 const BACKUP_TABLES = [
   'accounts',
