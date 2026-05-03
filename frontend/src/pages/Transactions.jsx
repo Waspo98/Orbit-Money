@@ -206,6 +206,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   const [editingTxn, setEditingTxn] = useState(null);
   const [manualTxnOpen, setManualTxnOpen] = useState(false);
   const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
+  const [editingRule, setEditingRule] = useState(null);
   const [recurringFromTxn, setRecurringFromTxn] = useState(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const groupRefs = useRef(new Map());
@@ -401,6 +402,16 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
       if (result?.transaction) replaceLocal(txn.id, result.transaction);
     } catch (err) {
       alert(err.message || 'Reset failed', { title: 'Reset failed' });
+    }
+  }
+
+  async function handleViewRule(ruleId) {
+    try {
+      const data = await api.get(`/api/rules/${ruleId}`);
+      if (!data?.rule) throw new Error('Rule not found.');
+      setEditingRule(data.rule);
+    } catch (err) {
+      alert(err.message || 'Could not open rule', { title: 'Could Not Open Rule' });
     }
   }
 
@@ -696,6 +707,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                     onToggleMhaEligible={() => handleToggle(t, 'mha_eligible')}
                     onDelete={() => handleDelete(t)}
                     onResetField={(field) => handleResetField(t, field)}
+                    onViewRule={handleViewRule}
                     onLogoChanged={(updated) => replaceLocal(t.id, updated)}
                     mhaTrackerEnabled={mhaTrackerEnabled}
                   />
@@ -779,6 +791,19 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             setNewRuleFromTxn(null);
             // Silent reload - avoids the spinner swap that would clamp
             // scrollY and jump the user to the top of the list.
+            load({ silent: true });
+          }}
+        />
+      )}
+
+      {editingRule && (
+        <RuleEditor
+          rule={editingRule}
+          accounts={accounts}
+          categories={categories}
+          onClose={() => setEditingRule(null)}
+          onSaved={() => {
+            setEditingRule(null);
             load({ silent: true });
           }}
         />

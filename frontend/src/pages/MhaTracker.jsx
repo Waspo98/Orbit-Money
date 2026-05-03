@@ -81,6 +81,7 @@ export default function MhaTracker() {
   const [expandedTxnId, setExpandedTxnId] = useState(null);
   const [editingTxn, setEditingTxn] = useState(null);
   const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
+  const [editingRule, setEditingRule] = useState(null);
 
   async function load({ silent = false } = {}) {
     if (!silent && data == null) setLoading(true);
@@ -256,6 +257,16 @@ export default function MhaTracker() {
       await load({ silent: true });
     } catch (err) {
       alert(err.message || 'Reset failed', { title: 'Reset failed' });
+    }
+  }
+
+  async function handleViewRule(ruleId) {
+    try {
+      const data = await api.get(`/api/rules/${ruleId}`);
+      if (!data?.rule) throw new Error('Rule not found.');
+      setEditingRule(data.rule);
+    } catch (err) {
+      alert(err.message || 'Could not open rule', { title: 'Could Not Open Rule' });
     }
   }
 
@@ -480,6 +491,7 @@ export default function MhaTracker() {
                       onToggleMhaEligible={() => handleTransactionToggle(txn, 'mha_eligible')}
                       onDelete={() => handleDeleteTransaction(txn)}
                       onResetField={(field) => handleResetTransactionField(txn, field)}
+                      onViewRule={handleViewRule}
                       onLogoChanged={(updated) => replaceLocalTransaction(txn.id, updated)}
                       hideMerchantLogo
                       mhaTrackerEnabled
@@ -524,6 +536,19 @@ export default function MhaTracker() {
               onClose={() => setNewRuleFromTxn(null)}
               onSaved={() => {
                 setNewRuleFromTxn(null);
+                load({ silent: true });
+              }}
+            />
+          )}
+
+          {editingRule && (
+            <RuleEditor
+              rule={editingRule}
+              accounts={accounts}
+              categories={categories}
+              onClose={() => setEditingRule(null)}
+              onSaved={() => {
+                setEditingRule(null);
                 load({ silent: true });
               }}
             />

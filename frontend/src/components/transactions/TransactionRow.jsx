@@ -17,6 +17,12 @@ function describeEditSource(source) {
   return 'edited';
 }
 
+function ruleIdFromEditSource(source) {
+  if (typeof source !== 'string' || !source.startsWith('rule:')) return null;
+  const id = Number(source.slice('rule:'.length));
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
 export function TransactionRow({
   txn,
   expanded,
@@ -33,6 +39,7 @@ export function TransactionRow({
   onToggleMhaEligible,
   onDelete,
   onResetField,
+  onViewRule,
   onLogoChanged,
   hideMerchantLogo = false,
   hideActions = false,
@@ -159,6 +166,7 @@ export function TransactionRow({
           onToggleMhaEligible={onToggleMhaEligible}
           onDelete={onDelete}
           onResetField={onResetField}
+          onViewRule={onViewRule}
           mhaTrackerEnabled={mhaTrackerEnabled}
         />
       </div>
@@ -508,6 +516,7 @@ function TransactionDetail({
   onToggleMhaEligible,
   onDelete,
   onResetField,
+  onViewRule,
   mhaTrackerEnabled = false
 }) {
   const merchantEdited = txn.edited_merchant_source !== null;
@@ -516,6 +525,8 @@ function TransactionDetail({
   const ignoredEdited = txn.edited_is_ignored_source !== null;
   const merchantSourceLabel = describeEditSource(txn.edited_merchant_source);
   const categorySourceLabel = describeEditSource(txn.edited_category_id_source);
+  const merchantRuleId = ruleIdFromEditSource(txn.edited_merchant_source);
+  const categoryRuleId = ruleIdFromEditSource(txn.edited_category_id_source);
   const tabProps = interactive ? {} : { tabIndex: -1 };
 
   return (
@@ -552,6 +563,17 @@ function TransactionDetail({
                 >
                   reset
                 </button>
+                {merchantRuleId && onViewRule && (
+                  <button
+                    type="button"
+                    className="linkish"
+                    onClick={() => onViewRule(merchantRuleId)}
+                    title="Open this rule in the rule editor"
+                    {...tabProps}
+                  >
+                    view rule
+                  </button>
+                )}
               </span>
             )}
           </dt>
@@ -580,6 +602,17 @@ function TransactionDetail({
                 >
                   reset
                 </button>
+                {categoryRuleId && onViewRule && (
+                  <button
+                    type="button"
+                    className="linkish"
+                    onClick={() => onViewRule(categoryRuleId)}
+                    title="Open this rule in the rule editor"
+                    {...tabProps}
+                  >
+                    view rule
+                  </button>
+                )}
               </span>
             )}
           </dt>

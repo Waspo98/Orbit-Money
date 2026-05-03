@@ -2386,6 +2386,7 @@ function RecentActivityCard({
   const [expandedId, setExpandedId] = useState(null);
   const [editingTxn, setEditingTxn] = useState(null);
   const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
+  const [editingRule, setEditingRule] = useState(null);
   const [recurringFromTxn, setRecurringFromTxn] = useState(null);
 
   // Keep local copy in sync when parent refetches (e.g., on mount, on
@@ -2456,6 +2457,16 @@ function RecentActivityCard({
     }
   }
 
+  async function handleViewRule(ruleId) {
+    try {
+      const data = await api.get(`/api/rules/${ruleId}`);
+      if (!data?.rule) throw new Error('Rule not found.');
+      setEditingRule(data.rule);
+    } catch (err) {
+      alert(err.message || 'Could not open rule', { title: 'Could Not Open Rule' });
+    }
+  }
+
   function handleMarkRecurring(txn) {
     setRecurringFromTxn({
       txn,
@@ -2504,6 +2515,7 @@ function RecentActivityCard({
                 onToggleMhaEligible={() => handleToggle(t, 'mha_eligible')}
                 onDelete={() => handleDelete(t)}
                 onResetField={(field) => handleResetField(t, field)}
+                onViewRule={handleViewRule}
                 onLogoChanged={(updated) => replaceLocal(t.id, updated)}
                 hideMerchantLogo
                 mhaTrackerEnabled={mhaTrackerEnabled}
@@ -2547,6 +2559,19 @@ function RecentActivityCard({
           onClose={() => setNewRuleFromTxn(null)}
           onSaved={() => {
             setNewRuleFromTxn(null);
+            if (onRefresh) onRefresh();
+          }}
+        />
+      )}
+
+      {editingRule && (
+        <RuleEditor
+          rule={editingRule}
+          accounts={accounts}
+          categories={categories}
+          onClose={() => setEditingRule(null)}
+          onSaved={() => {
+            setEditingRule(null);
             if (onRefresh) onRefresh();
           }}
         />
