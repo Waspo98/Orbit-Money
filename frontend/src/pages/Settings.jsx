@@ -160,6 +160,9 @@ export default function Settings({
   const [restorePreview, setRestorePreview] = useState(null);
   const [restoreResult, setRestoreResult] = useState(null);
   const [restoreError, setRestoreError] = useState('');
+  const [rulesBusy, setRulesBusy] = useState(false);
+  const [rulesResult, setRulesResult] = useState(null);
+  const [rulesError, setRulesError] = useState('');
   const [downloadBusy, setDownloadBusy] = useState('');
   const [downloadNotice, setDownloadNotice] = useState(null);
   const [moreReorderMode, setMoreReorderMode] = useState(false);
@@ -708,6 +711,34 @@ export default function Settings({
       setRestoreError(err.message || 'Restore failed');
     } finally {
       setRestoreBusy(false);
+    }
+  }
+
+  async function handleReapplyRules() {
+    const ok = await confirm(
+      'Reapply all enabled rules to every transaction? Manual edits will stay protected, but rule-owned edits may change if the matching rules changed.',
+      {
+        title: 'Reapply Rules',
+        confirmLabel: 'Reapply Rules'
+      }
+    );
+    if (!ok) return;
+
+    setRulesBusy(true);
+    setRulesError('');
+    setRulesResult(null);
+    try {
+      const data = await api.post('/api/rules/reapply-all');
+      setRulesResult(data);
+      try {
+        await onImportComplete?.({ stayOnSettings: true });
+      } catch (err) {
+        console.error('Post-rule reapply refresh failed:', err);
+      }
+    } catch (err) {
+      setRulesError(err.message || 'Could not reapply rules.');
+    } finally {
+      setRulesBusy(false);
     }
   }
 
@@ -1321,6 +1352,42 @@ export default function Settings({
     );
   }
 
+  function renderRulesCard() {
+    return (
+      <SettingsCard
+        id="rules"
+        key="rules"
+        title="Rules"
+        description="Maintain saved transaction rules and re-run them when imported data changes."
+      >
+        <div className="settings-action">
+          <div className="settings-action-info">
+            <strong>Reapply Rules</strong>
+            <p>Run every enabled rule against every transaction again. Manual edits stay protected.</p>
+          </div>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={rulesBusy}
+            onClick={handleReapplyRules}
+          >
+            {rulesBusy ? (<><span className="spinner-inline" /> Reapplying...</>) : 'Reapply Rules'}
+          </button>
+        </div>
+
+        {rulesResult && (
+          <div className="success-banner" style={{ marginTop: 12 }}>
+            Reapplied rules to {(rulesResult.processed || 0).toLocaleString()} transaction{rulesResult.processed === 1 ? '' : 's'}.
+            {' '}
+            Updated {(rulesResult.updated || 0).toLocaleString()} transaction{rulesResult.updated === 1 ? '' : 's'}.
+          </div>
+        )}
+
+        {rulesError && <div className="error" style={{ marginTop: 12 }}>{rulesError}</div>}
+      </SettingsCard>
+    );
+  }
+
   function renderAccountCard() {
     const currentUserCopy = sharing?.currentUser
       ? `${displayPerson(sharing.currentUser)} - ${sharing.currentUser.role} - ${sharing.currentUser.accessLevel === 'read' ? 'read only' : 'read/write'}`
@@ -1606,7 +1673,7 @@ export default function Settings({
             className="settings-hub-row"
             leading={<AppIcon name="transactions" className="settings-hub-icon" />}
             title="Data Management"
-            subtitle="Connections, sharing, imports, exports, and backups."
+            subtitle="Connections, sharing, rules, imports, exports, and backups."
             onClick={() => openSettingsPage('/settings/data-management')}
           />
         </div>
@@ -1629,6 +1696,7 @@ export default function Settings({
         <div className="settings-card-stack settings-section-top">
           {renderSimpleFinCard()}
           {renderAccountCard()}
+          {renderRulesCard()}
           {renderImportCard()}
           {renderBackupCard()}
         </div>
@@ -1651,7 +1719,7 @@ export default function Settings({
     : settingsPage === 'data-management'
       ? {
         title: 'Data Management',
-        subtitle: 'Connections, sharing, imports, exports, and backups.'
+        subtitle: 'Connections, sharing, rules, imports, exports, and backups.'
       }
       : {
         title: 'Settings',
