@@ -1,9 +1,9 @@
 import express from 'express';
-import multer from 'multer';
 import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import { sendBadRequest, sendOk } from '../lib/http.js';
 import { readIdParam } from '../lib/routeParams.js';
+import { createMemoryUpload } from '../lib/uploads.js';
 import {
   applyRocketMoneyImportBatch,
   createRocketMoneyImportBatch,
@@ -15,10 +15,7 @@ const router = express.Router();
 
 // Multer keeps files in memory. 20MB is enough for large Rocket Money exports
 // without writing private financial CSVs to disk.
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 }
-});
+const upload = createMemoryUpload({ fileSizeMb: 20 });
 
 /**
  * POST /api/import/rocket-money

@@ -384,12 +384,13 @@ function AppShell() {
     ),
     '/budgets': (
       <Budgets
-        budgetedSortPreference={userPreferences[USER_PREFERENCE_KEYS.budgetedSort]}
-        onBudgetedSortPreferenceChange={(value) =>
+        categorySortPreference={userPreferences[USER_PREFERENCE_KEYS.budgetedSort]}
+        onCategorySortPreferenceChange={(value) =>
           setUserPreference(USER_PREFERENCE_KEYS.budgetedSort, value)
         }
       />
     ),
+    '/budget-beta': <Navigate to={`/budgets${location.search}`} replace />,
     '/accounts': <Accounts onChange={loadLookups} />,
     '/rules': <Rules />,
     '/categories': (

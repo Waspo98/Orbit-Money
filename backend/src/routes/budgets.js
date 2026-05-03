@@ -27,8 +27,14 @@ import {
   sendOk,
   sendServerError
 } from '../lib/http.js';
-import { centsToDollars, dollarsToCents } from '../lib/money.js';
+import { dollarsToCents } from '../lib/money.js';
 import { parseId, readIdParam } from '../lib/routeParams.js';
+import {
+  UNCATEGORIZED_BUDGET_CATEGORY,
+  buildBudgetItem,
+  buildBudgetSummary,
+  serializeBudgetItem
+} from '../services/budgetOverview.js';
 
 const router = express.Router();
 
@@ -69,14 +75,15 @@ router.get('/', requireAuth, (req, res) => {
            -SUM(t.amount) AS spent,
            COUNT(*) AS n
          FROM transactions t
-         JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
+         LEFT JOIN categories c
+           ON c.id = COALESCE(t.edited_category_id, t.category_id)
+          AND c.household_id = ?
          WHERE t.household_id = ?
-           AND c.household_id = ?
            AND t.date >= ? AND t.date <= ?
            AND COALESCE(t.edited_is_ignored,  t.is_ignored)  = 0
            AND COALESCE(t.edited_is_transfer, t.is_transfer) = 0
-           AND c.is_income = 0
-           AND c.is_transfer = 0
+           AND (c.id IS NULL OR (c.is_income = 0 AND c.is_transfer = 0))
+           AND (c.id IS NOT NULL OR t.amount < 0)
          GROUP BY cat_id`
       )
       .all(householdId, householdId, start, end);
@@ -98,8 +105,8 @@ router.get('/', requireAuth, (req, res) => {
       )
       .get(householdId, start, end);
 
-    const total_income = centsToDollars(flow?.income || 0);
-    const total_expenses = centsToDollars(flow?.expenses || 0);
+    const incomeCents = flow?.income || 0;
+    const expensesCents = flow?.expenses || 0;
 
     const categories = db
       .prepare(
@@ -130,11 +137,8 @@ router.get('/', requireAuth, (req, res) => {
     for (const cat of categories) {
       const budget = budgetByCat.get(cat.id);
       const spendRow = spendByCat.get(cat.id);
-      const spent = spendRow ? centsToDollars(spendRow.spent) : 0;
-      const txnCount = spendRow ? spendRow.n : 0;
-
-      const item = {
-        category: {
+      const item = buildBudgetItem(
+        {
           id: cat.id,
           name: cat.name,
           color: cat.color,
@@ -142,19 +146,24 @@ router.get('/', requireAuth, (req, res) => {
           is_income: !!cat.is_income,
           is_transfer: !!cat.is_transfer
         },
-        budget_id: budget?.id ?? null,
-        amount: budget ? centsToDollars(budget.amount) : null,
-        rollover: budget ? (budget.rollover ? 1 : 0) : null,
-        spent,
-        transaction_count: txnCount
-      };
+        budget,
+        spendRow
+      );
 
       if (budget) {
         budgetedItems.push(item);
-      } else if (spent > 0 || txnCount > 0) {
+      } else if (item.spent > 0 || item.transaction_count > 0) {
         unbudgetedItems.push(item);
       } else {
         inactiveItems.push(item);
+      }
+    }
+
+    const uncategorizedSpend = spendByCat.get(null);
+    if (uncategorizedSpend) {
+      const item = buildBudgetItem(UNCATEGORIZED_CATEGORY, null, uncategorizedSpend);
+      if (item.spent > 0 || item.transaction_count > 0) {
+        unbudgetedItems.push(item);
       }
     }
 
@@ -168,27 +177,17 @@ router.get('/', requireAuth, (req, res) => {
       a.category.name.localeCompare(b.category.name)
     );
 
-    const total_budgeted = budgetedItems.reduce((s, i) => s + i.amount, 0);
-    const total_spent_in_budgets = budgetedItems.reduce((s, i) => s + i.spent, 0);
-    const total_spent_unbudgeted = unbudgetedItems.reduce(
-      (s, i) => s + i.spent,
-      0
-    );
-
     sendOk(res, {
       month,
-      budgeted: budgetedItems,
-      unbudgeted: unbudgetedItems,
-      inactive: inactiveItems,
-      summary: {
-        total_budgeted,
-        total_spent_in_budgets,
-        total_spent_unbudgeted,
-        total_spent: total_spent_in_budgets + total_spent_unbudgeted,
-        total_income,
-        total_expenses,
-        total_net: total_income - total_expenses
-      }
+      budgeted: budgetedItems.map(serializeBudgetItem),
+      unbudgeted: unbudgetedItems.map(serializeBudgetItem),
+      inactive: inactiveItems.map(serializeBudgetItem),
+      summary: buildBudgetSummary({
+        budgetedItems,
+        unbudgetedItems,
+        incomeCents,
+        expensesCents
+      })
     });
   } catch (err) {
     console.error('List budgets failed:', err);

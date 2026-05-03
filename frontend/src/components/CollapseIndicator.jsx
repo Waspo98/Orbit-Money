@@ -1,8 +1,11 @@
 export default function CollapseIndicator({
   expanded,
   className = '',
-  label
+  label,
+  visible = true
 }) {
+  if (!visible) return null;
+
   return (
     <span
       className={`collapse-indicator ${expanded ? 'expanded' : ''} ${className}`.trim()}

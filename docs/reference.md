@@ -192,10 +192,10 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 ### Budgets
 - **Monthly caps, global per category.** One amount per category that applies to every month. Editing `Groceries` updates the cap for every past and future month.
 - **Month navigation** via `‹ / ›` arrows plus the shared `AppSelect` pill. The select menu is portaled and page-centered on mobile so month jumps use the same dropdown primitive as the rest of the app.
-- **Summary card:** total monthly expenses, percentage of budgeted amount, remaining/over, plus an unbudgeted-spending callout. The headline and progress math intentionally include unbudgeted expenses.
-- **Spending by Category chart:** interactive donut chart for monthly category spend. The list uses `SelectableListItem`, sorts biggest-to-smallest with Uncategorized forced last, and selected rows use the shared green active treatment.
-- **Income / Expenses / Net** three-column stat row at the top, scoped to the viewed month, excludes ignored + transfer transactions
-- **Three sections:** Budgeted (sorted most-over-budget first, expandable per-row progress cards with transaction details), Spent without a budget (quick-add CTAs), and No activity (collapsed toggle)
+- **Snapshot card:** total monthly expenses, percentage of budgeted amount, remaining/over, unbudgeted spending, cash flow, and spend pace. The headline and progress math intentionally include unbudgeted expenses.
+- **Spending mix:** expandable category-share rows with transaction previews. Rows use the shared `ExpandingSection` animation; the optional collapse chevron primitive is deliberately hidden on this page.
+- **Tracking sections:** notable budget activity, unbudgeted spending quick-add CTAs, and budgeted categories with inactive categories collapsed at the bottom of the card. True uncategorized/null-category spending appears in the unbudgeted breakdown and links to `categories=uncategorized`, but it cannot be quick-added as a budget until it has a real category.
+- **Category sort preference:** the Budgeted Categories sort menu persists through the existing `budgetedSort` user preference key.
 - Progress bars transition green → yellow (≥85%) → red (>100%)
 - Endpoints: GET `/api/budgets?month=YYYY-MM`, GET `/api/budgets/months`, PUT `/api/budgets` (upsert), DELETE `/api/budgets/:id`
 
@@ -272,6 +272,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - `PageHero` component and `useMorphingPageHero(initialHeight)` hook own the morphing sticky hero measurement logic. Reuse `PageHero` for page headers; pass `chrome` and `toolbar` slots when a page needs custom header controls.
 - `AppDialog.jsx` exposes `useAppDialog()` for modal alert/confirmation flows. Prefer it over native `alert()` / `confirm()` so mobile UX and destructive-action styling stay consistent.
 - `AppSelect.jsx` is the shared custom select primitive. Pass an `options` array (`{ value, label }`) and do not nest native `<option>` children; use `menuPlacement="page-center"` for compact month/year picker pills.
+- `ExpandingSection.jsx` owns expand/collapse animation. Pair it with `CollapseIndicator` only when the local pattern wants a visible affordance; `CollapseIndicator` supports `visible={false}` so pages can keep shared structure without showing a chevron.
 - `frontend/src/navigation.js` owns route metadata. `BottomTabs.jsx`, `DesktopSidebar.jsx`, `MoreSheet.jsx`, `App.jsx`, and route visibility should read from it so labels, icons, route rendering, and feature gating stay aligned.
 - `SelectableListItem.jsx` is the shared two-line selectable card/row primitive. Use it for lists where one item is selected, such as goal/category pickers; selected rows use the shared green active treatment.
 - `CurrencyInput.jsx` is the shared primitive for editable dollar amounts. Use it for money text fields so values format with `$` and comma grouping while typing; pair saved values with `parseCurrencyInput`.
@@ -350,7 +351,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 ### Budgets
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/budgets?month=YYYY-MM` | Monthly overview: `budgeted` / `unbudgeted` / `inactive` arrays + summary with `total_budgeted`, `total_spent_in_budgets`, `total_spent_unbudgeted`, `total_spent`, `total_income`, `total_expenses`, `total_net`. Month defaults to current month. |
+| GET | `/api/budgets?month=YYYY-MM` | Monthly overview: `budgeted` / `unbudgeted` / `inactive` arrays + summary with `total_budgeted`, `total_spent_in_budgets`, `total_spent_unbudgeted`, `total_spent`, `total_income`, `total_expenses`, `total_net`. Month defaults to current month. Null-category expense rows are returned as an unbudgeted `Uncategorized` item and summary money is summed in integer cents before serialization. |
 | GET | `/api/budgets/months` | Distinct months with transaction activity (for month picker) |
 | PUT | `/api/budgets` | Upsert `{ category_id, amount, rollover? }` — global per-category |
 | DELETE | `/api/budgets/:id` | Delete budget |
