@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import AnimatedModal from './AnimatedModal.jsx';
 
 export function useAppDialog() {
@@ -32,6 +32,7 @@ export function useAppDialog() {
         confirmLabel: options.confirmLabel || 'Confirm',
         cancelLabel: options.cancelLabel || 'Cancel',
         destructive: !!options.destructive,
+        confirmDelayMs: Math.max(0, Number(options.confirmDelayMs) || 0),
         resolve
       });
     });
@@ -39,6 +40,25 @@ export function useAppDialog() {
 
   function Dialog() {
     const resultRef = useRef(false);
+    const confirmDelayMs = Math.max(0, Number(dialog?.confirmDelayMs) || 0);
+    const [confirmReady, setConfirmReady] = useState(confirmDelayMs === 0);
+
+    useEffect(() => {
+      resultRef.current = false;
+
+      if (!dialog || confirmDelayMs === 0) {
+        setConfirmReady(true);
+        return undefined;
+      }
+
+      setConfirmReady(false);
+      const timer = window.setTimeout(() => {
+        setConfirmReady(true);
+      }, confirmDelayMs);
+
+      return () => window.clearTimeout(timer);
+    }, [confirmDelayMs, dialog]);
+
     if (!dialog) return null;
 
     return (
@@ -66,8 +86,12 @@ export function useAppDialog() {
                 <button
                   type="button"
                   className={dialog.destructive ? 'btn-danger' : 'btn-primary'}
-                  onClick={() => finish(true, { animate: true })}
-                  autoFocus
+                  onClick={() => {
+                    if (!confirmReady) return;
+                    finish(true, { animate: true });
+                  }}
+                  disabled={!confirmReady}
+                  autoFocus={confirmReady}
                 >
                   {dialog.confirmLabel}
                 </button>

@@ -8,6 +8,14 @@ const OVERLAY_HISTORY_KEY = '__orbitOverlayId';
 
 export const OVERLAY_ANIM_MS = 180;
 
+export function getBodyScrollLockPosition() {
+  if (!lockSnapshot) return null;
+  return {
+    top: lockSnapshot.scrollY || 0,
+    left: lockSnapshot.scrollX || 0
+  };
+}
+
 export function releaseCurrentOverlayHistoryEntry() {
   const currentState = window.history.state;
   if (
@@ -29,8 +37,10 @@ export function useBodyScrollLock(active) {
 
     if (lockCount === 0) {
       const scrollY = window.scrollY;
+      const scrollX = window.scrollX;
       lockSnapshot = {
         scrollY,
+        scrollX,
         overflow: document.body.style.overflow,
         position: document.body.style.position,
         top: document.body.style.top,
@@ -61,7 +71,7 @@ export function useBodyScrollLock(active) {
       document.body.style.left = snapshot.left;
       document.body.style.right = snapshot.right;
       document.body.style.width = snapshot.width;
-      window.scrollTo(0, snapshot.scrollY);
+      window.scrollTo(snapshot.scrollX || 0, snapshot.scrollY || 0);
     };
   }, [active]);
 }

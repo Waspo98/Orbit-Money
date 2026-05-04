@@ -204,7 +204,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 ### Spending Trends
 - Standalone More-menu page at `/spending-trends` focused on historical change over time.
 - **Income Vs Expenses:** 3, 6, or 12 month bar chart built from non-ignored, non-transfer transactions.
-- **Category History:** category picker, month-by-month spending bars, budget reference line when a category has a monthly cap, and quick stats for average, median, highest month, over-budget count, and transaction count.
+- **Category History:** category picker, month-by-month spending bars, budget reference line when a category has a monthly cap, and quick stats for average, median, highest month, over-budget count, and transaction count. Tapping a month with transactions confirms, then opens Transactions filtered to that category and month.
 - **Top categories list:** compact category buttons sorted by total spend in the selected range so budget-setting research stays one tap away.
 - Endpoint: GET `/api/spending-trends?months=3|6|12`
 

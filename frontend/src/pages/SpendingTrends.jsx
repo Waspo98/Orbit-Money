@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import AppSelect from '../components/AppSelect.jsx';
 import BudgetAmountModal from '../components/BudgetAmountModal.jsx';
@@ -9,7 +10,10 @@ import {
   formatCurrency,
   formatSignedCurrency
 } from '../lib/formatters.js';
-import { formatMonthKeyLabel } from '../lib/localDate.js';
+import {
+  formatMonthKeyLabel,
+  getLocalMonthBounds
+} from '../lib/localDate.js';
 
 const RANGE_OPTIONS = [
   { value: '3', label: '3M', months: 3 },
@@ -97,6 +101,7 @@ function useSpendingTrends(range) {
 }
 
 export default function SpendingTrends() {
+  const navigate = useNavigate();
   const { alert, confirm, Dialog } = useAppDialog();
   const [rangeValue, setRangeValue] = useState('6');
   const [selectedCategoryKey, setSelectedCategoryKey] = useState('');
@@ -166,6 +171,34 @@ export default function SpendingTrends() {
       alert(err.message || 'Delete failed', { title: 'Delete Failed' });
       throw err;
     }
+  }
+
+  async function viewCategoryTransactions(month) {
+    if (!selectedCategory?.category || !/^\d{4}-\d{2}$/.test(String(month || ''))) return;
+
+    const category = selectedCategory.category;
+    const categoryName = category.name || 'Uncategorized';
+    const monthLabel = formatMonthWithYear(month);
+    const ok = await confirm(
+      `Do you want to view all of your ${categoryName} transactions in ${monthLabel}?`,
+      {
+        title: 'View Transactions',
+        confirmLabel: 'View Transactions',
+        confirmDelayMs: 150
+      }
+    );
+    if (!ok) return;
+
+    const { start, end } = getLocalMonthBounds(month);
+    const params = new URLSearchParams({
+      categories: category.id == null ? 'uncategorized' : String(category.id),
+      date_from: start,
+      date_to: end,
+      include_ignored: '0',
+      include_transfers: '0'
+    });
+
+    navigate(`/transactions?${params.toString()}`, { state: { transition: 'forward' } });
   }
 
   return (
@@ -245,7 +278,10 @@ export default function SpendingTrends() {
               <div className="spending-category-layout">
                 <div className="spending-category-main">
                   <CategoryStats trend={selectedCategory} rangeMonths={range.months} />
-                  <CategoryTrendChart trend={selectedCategory} />
+                  <CategoryTrendChart
+                    trend={selectedCategory}
+                    onMonthSelect={viewCategoryTransactions}
+                  />
                 </div>
                 <CategoryRankList
                   categories={categories}
@@ -520,7 +556,9 @@ function CashFlowChart({ flow }) {
   );
 }
 
-function CategoryTrendChart({ trend }) {
+function CategoryTrendChart({ trend, onMonthSelect }) {
+  const touchStartRef = useRef(null);
+  const ignoreNextClickRef = useRef(false);
   const width = 720;
   const height = 500;
   const top = 16;
@@ -544,6 +582,38 @@ function CategoryTrendChart({ trend }) {
 
   function yFor(value) {
     return top + chartHeight - (asNumber(value) / maxValue) * chartHeight;
+  }
+
+  function startTouchSelection(event, index) {
+    if (event.pointerType !== 'touch') return;
+    touchStartRef.current = {
+      index,
+      x: event.clientX,
+      y: event.clientY,
+      moved: false
+    };
+  }
+
+  function trackTouchSelection(event) {
+    if (event.pointerType !== 'touch' || !touchStartRef.current) return;
+    const dx = Math.abs(event.clientX - touchStartRef.current.x);
+    const dy = Math.abs(event.clientY - touchStartRef.current.y);
+    if (dx > 10 || dy > 10) {
+      touchStartRef.current.moved = true;
+    }
+  }
+
+  function finishTouchSelection(event, index, item) {
+    if (event.pointerType !== 'touch') return;
+    const touchStart = touchStartRef.current;
+    touchStartRef.current = null;
+    ignoreNextClickRef.current = true;
+    window.setTimeout(() => {
+      ignoreNextClickRef.current = false;
+    }, 400);
+
+    if (!touchStart || touchStart.index !== index || touchStart.moved) return;
+    onMonthSelect?.(item.month);
   }
 
   return (
@@ -584,6 +654,9 @@ function CategoryTrendChart({ trend }) {
           const center = plotLeft + band * index + band / 2;
           const barHeight = top + chartHeight - yFor(item.spent);
           const showLabel = index % labelEvery === 0 || index === months.length - 1;
+          const canViewTransactions = Number(item.transaction_count || 0) > 0 && typeof onMonthSelect === 'function';
+          const monthLabel = formatMonthWithYear(item.month);
+          const transactionLabel = `${monthLabel}: ${formatMoney(item.spent)} across ${item.transaction_count} ${item.transaction_count === 1 ? 'transaction' : 'transactions'}`;
 
           return (
             <g key={item.month}>
@@ -596,12 +669,49 @@ function CategoryTrendChart({ trend }) {
                 className={`spending-category-bar ${item.over_budget ? 'over' : ''}`}
                 style={{ '--category-color': categoryColor }}
               >
-                <title>{`${formatMonthWithYear(item.month)}: ${formatMoney(item.spent)}`}</title>
+                <title>{transactionLabel}</title>
               </rect>
               {showLabel && (
                 <text x={center} y={height - 18} textAnchor="middle" className="spending-chart-month-label">
                   {formatMonthShort(item.month)}
                 </text>
+              )}
+              {canViewTransactions && (
+                <rect
+                  x={plotLeft + band * index}
+                  y={top}
+                  width={band}
+                  height={chartHeight + 30}
+                  className="spending-chart-hitbox"
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`View ${trend.category.name} transactions for ${transactionLabel}`}
+                  onPointerMove={trackTouchSelection}
+                  onPointerDown={(event) => {
+                    startTouchSelection(event, index);
+                  }}
+                  onPointerUp={(event) => {
+                    finishTouchSelection(event, index, item);
+                  }}
+                  onPointerCancel={() => {
+                    touchStartRef.current = null;
+                    ignoreNextClickRef.current = true;
+                    window.setTimeout(() => {
+                      ignoreNextClickRef.current = false;
+                    }, 400);
+                  }}
+                  onClick={() => {
+                    if (ignoreNextClickRef.current) return;
+                    onMonthSelect(item.month);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    onMonthSelect(item.month);
+                  }}
+                >
+                  <title>{`View ${trend.category.name} transactions for ${monthLabel}`}</title>
+                </rect>
               )}
             </g>
           );

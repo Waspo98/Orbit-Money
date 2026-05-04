@@ -25,6 +25,7 @@ import DesktopSidebar from './components/DesktopSidebar.jsx';
 import OfflineBanner from './components/OfflineBanner.jsx';
 import SyncErrorBanner from './components/SyncErrorBanner.jsx';
 import MoreSheet from './components/MoreSheet.jsx';
+import { getBodyScrollLockPosition } from './components/overlayBehavior.js';
 import { useTheme } from './hooks/useTheme.js';
 import { useOnlineStatus } from './hooks/useOnlineStatus.js';
 import { api } from './api.js';
@@ -46,7 +47,7 @@ import {
   writeLocalPreference
 } from './userPreferences.js';
 
-const SCROLL_RESTORE_MAX_ATTEMPTS = 45;
+const SCROLL_RESTORE_MAX_ATTEMPTS = 240;
 const SCROLL_RESTORE_TOLERANCE = 2;
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
@@ -159,14 +160,18 @@ function useRouteScrollRestoration(location, navigationType, previousPathRef) {
   const activeKeyRef = useRef(getScrollRestorationKey(location));
   const cancelPendingScrollRef = useRef(null);
 
-  useEffect(() => {
-    function saveActiveScrollPosition() {
-      positionsRef.current.set(activeKeyRef.current, {
-        top: window.scrollY,
-        left: window.scrollX
-      });
-    }
+  function currentScrollPosition() {
+    return getBodyScrollLockPosition() || {
+      top: window.scrollY,
+      left: window.scrollX
+    };
+  }
 
+  function saveActiveScrollPosition() {
+    positionsRef.current.set(activeKeyRef.current, currentScrollPosition());
+  }
+
+  useEffect(() => {
     window.addEventListener('scroll', saveActiveScrollPosition, { passive: true });
     window.addEventListener('click', saveActiveScrollPosition, true);
     window.addEventListener('popstate', saveActiveScrollPosition);
@@ -189,6 +194,11 @@ function useRouteScrollRestoration(location, navigationType, previousPathRef) {
     const scrollKey = getScrollRestorationKey(location);
     const savedPosition = positionsRef.current.get(scrollKey);
     const pathChanged = previousPathRef.current !== location.pathname;
+
+    if (activeKeyRef.current !== scrollKey) {
+      saveActiveScrollPosition();
+    }
+
     activeKeyRef.current = scrollKey;
 
     if (navigationType === 'POP') {
