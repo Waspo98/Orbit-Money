@@ -12,6 +12,28 @@ export const UNCATEGORIZED_SPENDING_TREND_CATEGORY = {
   is_transfer: false
 };
 
+const DISPLAY_CATEGORY_ID_SQL = 'COALESCE(t.edited_category_id, t.category_id)';
+
+export function buildSpendingTrendRowsSql() {
+  return `SELECT
+           ${DISPLAY_CATEGORY_ID_SQL} AS category_id,
+           strftime('%Y-%m', t.date) AS month,
+           -SUM(t.amount) AS spent,
+           COUNT(*) AS transaction_count
+         FROM transactions t
+         LEFT JOIN categories c
+           ON c.id = ${DISPLAY_CATEGORY_ID_SQL}
+          AND c.household_id = ?
+         WHERE t.household_id = ?
+           AND t.date >= ? AND t.date <= ?
+           AND COALESCE(t.edited_is_ignored, t.is_ignored) = 0
+           AND COALESCE(t.edited_is_transfer, t.is_transfer) = 0
+           AND (c.id IS NULL OR (c.is_income = 0 AND c.is_transfer = 0))
+           AND (c.id IS NOT NULL OR t.amount < 0)
+         GROUP BY ${DISPLAY_CATEGORY_ID_SQL}, month
+         ORDER BY month`;
+}
+
 export function parseMonth(value) {
   return typeof value === 'string' && /^\d{4}-\d{2}$/.test(value) ? value : null;
 }

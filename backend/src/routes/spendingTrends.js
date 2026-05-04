@@ -7,6 +7,7 @@ import {
   buildCategoryTrend,
   buildFlowSeries,
   buildMonthKeys,
+  buildSpendingTrendRowsSql,
   buildSpendingTrendSummary,
   currentMonth,
   monthBounds,
@@ -79,25 +80,7 @@ router.get('/', (req, res) => {
     const budgetByCategory = new Map(budgets.map((budget) => [budget.category_id, budget]));
 
     const spendingRows = db
-      .prepare(
-        `SELECT
-           COALESCE(t.edited_category_id, t.category_id) AS category_id,
-           strftime('%Y-%m', t.date) AS month,
-           -SUM(t.amount) AS spent,
-           COUNT(*) AS transaction_count
-         FROM transactions t
-         LEFT JOIN categories c
-           ON c.id = COALESCE(t.edited_category_id, t.category_id)
-          AND c.household_id = ?
-         WHERE t.household_id = ?
-           AND t.date >= ? AND t.date <= ?
-           AND COALESCE(t.edited_is_ignored, t.is_ignored) = 0
-           AND COALESCE(t.edited_is_transfer, t.is_transfer) = 0
-           AND (c.id IS NULL OR (c.is_income = 0 AND c.is_transfer = 0))
-           AND (c.id IS NOT NULL OR t.amount < 0)
-         GROUP BY category_id, month
-         ORDER BY month`
-      )
+      .prepare(buildSpendingTrendRowsSql())
       .all(householdId, householdId, start, end);
 
     const spendingByCategory = new Map();
