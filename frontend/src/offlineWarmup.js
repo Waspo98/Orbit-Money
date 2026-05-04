@@ -34,6 +34,7 @@ function buildWarmupPaths({ mhaTrackerEnabled = false } = {}) {
     '/api/transactions?page=2&limit=50',
     `/api/budgets?month=${encodeURIComponent(month)}`,
     '/api/budgets/months',
+    '/api/spending-trends?months=6',
 
     // Other offline-readable pages that benefit from a first-pass snapshot.
     '/api/goals?months=24',

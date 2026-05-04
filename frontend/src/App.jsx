@@ -52,6 +52,7 @@ const SCROLL_RESTORE_TOLERANCE = 2;
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Transactions = lazy(() => import('./pages/Transactions.jsx'));
 const Budgets = lazy(() => import('./pages/Budgets.jsx'));
+const SpendingTrends = lazy(() => import('./pages/SpendingTrends.jsx'));
 const Accounts = lazy(() => import('./pages/Accounts.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const Rules = lazy(() => import('./pages/Rules.jsx'));
@@ -68,6 +69,7 @@ const OFFLINE_ROUTE_PRELOADS = [
   () => import('./pages/Dashboard.jsx'),
   () => import('./pages/Transactions.jsx'),
   () => import('./pages/Budgets.jsx'),
+  () => import('./pages/SpendingTrends.jsx'),
   () => import('./pages/Accounts.jsx'),
   () => import('./pages/Settings.jsx'),
   () => import('./pages/Rules.jsx'),
@@ -520,6 +522,7 @@ function AppShell() {
       />
     ),
     '/budget-beta': <Navigate to={`/budgets${location.search}`} replace />,
+    '/spending-trends': <SpendingTrends />,
     '/accounts': <Accounts onChange={loadLookups} />,
     '/rules': <Rules />,
     '/categories': (

@@ -11,6 +11,7 @@ const ICON_PATHS = {
   retirement: new URL('../assets/icons/retirementcalculator.svg', import.meta.url).href,
   rules: new URL('../assets/icons/rules.svg', import.meta.url).href,
   settings: new URL('../assets/icons/settings.svg', import.meta.url).href,
+  spending: new URL('../assets/icons/spendingtrends.svg', import.meta.url).href,
   transactions: new URL('../assets/icons/transactions.svg', import.meta.url).href,
   upcoming: new URL('../assets/icons/upcoming.svg', import.meta.url).href
 };

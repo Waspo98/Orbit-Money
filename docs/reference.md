@@ -122,6 +122,8 @@ offline cache keys by exact request path.
 
 **Budgets:** One row per spending `category_id` (globally applied). Transfer and income categories are excluded from budget rows and per-category spending lists; income is summarized separately in the monthly Income / Expenses / Net stat row. The `budgets` table retains the `rollover` column from migration 001 for future Phase 2 work but it's not consumed by the current UI.
 
+**Spending Trends:** Read-only historical reporting uses the same non-ignored, non-transfer transaction pool as Budgets. Income/expense flow is summarized by month, and category history is limited to spending categories plus true uncategorized expense rows.
+
 **Goals:** Goal progress is computed from `goal_account_allocations` and active asset account balances. Allocations can be fixed dollar amounts or percentages of the account balance; fixed allocations are stored as integer cents and percentage allocations remain percent values. The old `goals.current_amount` column is retained for compatibility, but the Goals API derives live progress at read time.
 
 **Household:** `household_members` stores the current profile, income, retirement, and benefit assumptions for each person. `household_income_records` stores dated snapshots so future projections can use compensation history without mutating old records. `household_retirement_accounts` links existing account rows to household members so retirement projections can compound present balances without moving or duplicating account data.
@@ -198,6 +200,13 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - **Category sort preference:** the Budgeted Categories sort menu persists through the existing `budgetedSort` user preference key.
 - Progress bars transition green → yellow (≥85%) → red (>100%)
 - Endpoints: GET `/api/budgets?month=YYYY-MM`, GET `/api/budgets/months`, PUT `/api/budgets` (upsert), DELETE `/api/budgets/:id`
+
+### Spending Trends
+- Standalone More-menu page at `/spending-trends` focused on historical change over time.
+- **Income Vs Expenses:** 6, 12, or 24 month bar chart built from non-ignored, non-transfer transactions.
+- **Category History:** category picker, month-by-month spending bars, budget reference line when a category has a monthly cap, and quick stats for average, median, highest month, over-budget count, and transaction count.
+- **Top categories list:** compact category buttons sorted by total spend in the selected range so budget-setting research stays one tap away.
+- Endpoint: GET `/api/spending-trends?months=6|12|24`
 
 ### Goals
 - Create and edit saving targets from the More menu with a three-step wizard: purpose, accounts, allocation
@@ -356,6 +365,11 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 | PUT | `/api/budgets` | Upsert `{ category_id, amount, rollover? }` — global per-category |
 | DELETE | `/api/budgets/:id` | Delete budget |
 
+### Spending Trends
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/spending-trends?months=6\|12\|24` | Read-only history range with continuous month keys, monthly income/expense/net flow, per-category spending history, budget reference amounts, and summary averages. |
+
 ### Net Worth
 | Method | Path | Description |
 |---|---|---|
@@ -439,8 +453,8 @@ role and read/write access.
 - `db/index.js`, `db/migrations.js`
 - `lib/`: http, localDate, money, routeParams, upcomingProjection, upcomingSchedule
 - `db/migrations/001` through `028`
-- `routes/`: accounts, auth, budgets, categories, goals, health, household, householdSharing, import, merchantLogos, mha, netWorth, rules, simplefin, transactions, upcoming
-- `services/`: csvImport, demoSeed, householdDefaults, merchantLogos, mhaSummary, oidc, ruleMatcher, sampleHouseholds, sessionStore, simplefinClient, simplefinSync, transferMatcher, upcomingReconciliation
+- `routes/`: accounts, auth, budgets, categories, goals, health, household, householdSharing, import, merchantLogos, mha, netWorth, rules, simplefin, spendingTrends, transactions, upcoming
+- `services/`: budgetOverview, csvImport, demoSeed, householdDefaults, merchantLogos, mhaSummary, oidc, ruleMatcher, sampleHouseholds, sessionStore, simplefinClient, simplefinSync, spendingTrends, transferMatcher, upcomingReconciliation
 - `test/`: Node built-in test runner coverage for backend helpers and calculation services
 
 ### Frontend (`frontend/`)
@@ -449,7 +463,7 @@ role and read/write access.
 - `src/main.jsx`, `src/App.jsx`, `src/Login.jsx`, `src/api.js`, `src/index.css`
 - `src/hooks/useTheme.js`
 - `src/components/`: AnimatedModal, AppDialog, AppIcon, AppRangeSlider, AppSelect, BottomTabs, BrandLogo, CollapseIndicator, CurrencyInput, DesktopSidebar, DropdownMenu, FilterSheet, InlinePopover, MoreDotsIcon, MoreSheet, PageHero, PercentInput, ReorderListItem, SearchField, SelectableListItem, SyncErrorBanner, rule editor primitives, transaction row primitives
-- `src/pages/`: Accounts, Budgets, Categories, Dashboard, Goals, Household, HousingCalculator, MhaTracker, NetWorth, RetirementCalculator, Rules, Settings, Transactions, Upcoming
+- `src/pages/`: Accounts, Budgets, Categories, Dashboard, Goals, Household, HousingCalculator, MhaTracker, NetWorth, RetirementCalculator, Rules, Settings, SpendingTrends, Transactions, Upcoming
 
 ## Known Gotchas
 - **better-sqlite3 `.iterate()` + write transaction** = "database connection is busy" — always use `.all()` instead
@@ -471,6 +485,6 @@ role and read/write access.
 
 ## Planned
 - **Phase 2 Budgets:** rollover (column already exists), income targets with proper direction, category groupings, spending pace
-- **Phase 2 Dashboard:** spending-over-time and net-worth charts
+- **Phase 2 Dashboard:** lightweight trend cards that can deep-link into Spending Trends and Net Worth
 - **Bulk merge suggestions:** Auto-pair SimpleFIN duplicates with RM accounts by institution + last-4
 - **Credit score:** possible future manual tracker or integration

@@ -8,9 +8,9 @@ stores data in SQLite, and runs as a Docker Compose app.
 
 - Dashboard with configurable cards, recent transaction review, budgets, goals,
   subscriptions, upcoming items, net worth, retirement, and mortgage snapshots
-- Account, transaction, budget, category, rule, savings goal, upcoming,
-  retirement calculator, housing calculator, household, MHA tracker, and net
-  worth screens
+- Account, transaction, budget, spending trends, category, rule, savings goal,
+  upcoming, retirement calculator, housing calculator, household, MHA tracker,
+  and net worth screens
 - Rocket Money CSV import
 - SimpleFIN bank sync with encrypted access URL storage
 - Merchant logo enrichment with optional Logo.dev keys

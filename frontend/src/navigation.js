@@ -41,6 +41,14 @@ export const ROUTES = [
     hasPageHero: true
   },
   {
+    path: '/spending-trends',
+    label: 'Spending Trends',
+    description: 'Income, expenses, and category history',
+    icon: 'spending',
+    nav: 'more',
+    hasPageHero: true
+  },
+  {
     path: '/categories',
     label: 'Category Manager',
     description: 'Organize spending categories',
