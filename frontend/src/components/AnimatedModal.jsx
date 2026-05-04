@@ -32,6 +32,7 @@ export default function AnimatedModal({ onClose, size = 'md', animation = 'defau
   const [closing, setClosing] = useState(false);
   const [closingAnimation, setClosingAnimation] = useState('default');
   const timerRef = useRef(null);
+  const modalRef = useRef(null);
 
   function close(options = { animate: true }) {
     if (closing) return;
@@ -48,6 +49,17 @@ export default function AnimatedModal({ onClose, size = 'md', animation = 'defau
   useBodyScrollLock(true);
   usePageBackdropBlur(true);
   useOverlayBackDismiss(true, () => close({ animate: true }));
+
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      modal.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   // Escape closes.
   useEffect(() => {
@@ -71,7 +83,11 @@ export default function AnimatedModal({ onClose, size = 'md', animation = 'defau
       onClick={close}
     >
       <div
+        ref={modalRef}
         className={`modal ${size === 'lg' ? 'modal-lg' : ''} ${size === 'sm' ? 'modal-sm' : ''} ${animation === 'zoom' ? 'modal-zoom' : ''} ${closing ? `closing closing-${closingAnimation}` : ''}`}
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         {typeof children === 'function' ? children({ close }) : children}

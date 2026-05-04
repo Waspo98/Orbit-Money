@@ -1,6 +1,6 @@
 import { centsToDollars } from '../lib/money.js';
 
-export const SPENDING_TREND_MONTH_OPTIONS = [6, 12, 24];
+export const SPENDING_TREND_MONTH_OPTIONS = [3, 6, 12];
 export const DEFAULT_SPENDING_TREND_MONTHS = 6;
 
 export const UNCATEGORIZED_SPENDING_TREND_CATEGORY = {

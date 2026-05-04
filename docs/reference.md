@@ -203,10 +203,10 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 
 ### Spending Trends
 - Standalone More-menu page at `/spending-trends` focused on historical change over time.
-- **Income Vs Expenses:** 6, 12, or 24 month bar chart built from non-ignored, non-transfer transactions.
+- **Income Vs Expenses:** 3, 6, or 12 month bar chart built from non-ignored, non-transfer transactions.
 - **Category History:** category picker, month-by-month spending bars, budget reference line when a category has a monthly cap, and quick stats for average, median, highest month, over-budget count, and transaction count.
 - **Top categories list:** compact category buttons sorted by total spend in the selected range so budget-setting research stays one tap away.
-- Endpoint: GET `/api/spending-trends?months=6|12|24`
+- Endpoint: GET `/api/spending-trends?months=3|6|12`
 
 ### Goals
 - Create and edit saving targets from the More menu with a three-step wizard: purpose, accounts, allocation
@@ -368,7 +368,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 ### Spending Trends
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/spending-trends?months=6\|12\|24` | Read-only history range with continuous month keys, monthly income/expense/net flow, per-category spending history, budget reference amounts, and summary averages. |
+| GET | `/api/spending-trends?months=3\|6\|12` | Read-only history range with continuous month keys, monthly income/expense/net flow, per-category spending history, budget reference amounts, and summary averages. |
 
 ### Net Worth
 | Method | Path | Description |

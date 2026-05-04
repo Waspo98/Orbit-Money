@@ -27,7 +27,7 @@ function serializeCategory(row) {
   };
 }
 
-// GET /api/spending-trends?months=6|12|24&endMonth=YYYY-MM
+// GET /api/spending-trends?months=3|6|12&endMonth=YYYY-MM
 router.get('/', (req, res) => {
   const householdId = requireHouseholdId(req);
   const monthsCount = normalizeTrendMonths(req.query.months);

@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import AppSelect from '../components/AppSelect.jsx';
+import BudgetAmountModal from '../components/BudgetAmountModal.jsx';
 import PageHero from '../components/PageHero.jsx';
+import { useAppDialog } from '../components/AppDialog.jsx';
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -10,9 +12,9 @@ import {
 import { formatMonthKeyLabel } from '../lib/localDate.js';
 
 const RANGE_OPTIONS = [
+  { value: '3', label: '3M', months: 3 },
   { value: '6', label: '6M', months: 6 },
-  { value: '12', label: '12M', months: 12 },
-  { value: '24', label: '24M', months: 24 }
+  { value: '12', label: '12M', months: 12 }
 ];
 
 function asNumber(value) {
@@ -39,6 +41,13 @@ function formatMonthShort(month) {
   return date.toLocaleDateString(undefined, { month: 'short' });
 }
 
+function formatMonthLong(month) {
+  if (!month) return '';
+  const [year, monthNumber] = month.split('-').map(Number);
+  const date = new Date(year, monthNumber - 1, 1);
+  return date.toLocaleDateString(undefined, { month: 'long' });
+}
+
 function formatMonthWithYear(month) {
   if (!month) return '';
   return formatMonthKeyLabel(month);
@@ -47,6 +56,15 @@ function formatMonthWithYear(month) {
 function percentOf(value, max) {
   if (!max) return 0;
   return (asNumber(value) / max) * 100;
+}
+
+function compactBandWidth(chartWidth, itemCount, maxBand) {
+  if (itemCount <= 0) return chartWidth;
+  return Math.min(chartWidth / itemCount, maxBand);
+}
+
+function centeredPlotLeft(left, chartWidth, band, itemCount) {
+  return left + Math.max(0, chartWidth - band * itemCount) / 2;
 }
 
 function useSpendingTrends(range) {
@@ -75,14 +93,16 @@ function useSpendingTrends(range) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range.value]);
 
-  return { data, loading, refreshing, error };
+  return { data, loading, refreshing, error, reload: load };
 }
 
 export default function SpendingTrends() {
+  const { alert, confirm, Dialog } = useAppDialog();
   const [rangeValue, setRangeValue] = useState('6');
   const [selectedCategoryKey, setSelectedCategoryKey] = useState('');
+  const [editingBudget, setEditingBudget] = useState(null);
   const range = RANGE_OPTIONS.find((option) => option.value === rangeValue) || RANGE_OPTIONS[0];
-  const { data, loading, refreshing, error } = useSpendingTrends(range);
+  const { data, loading, refreshing, error, reload } = useSpendingTrends(range);
   const categories = data?.categories || [];
   const flow = data?.flow || [];
   const summary = data?.summary || {};
@@ -111,9 +131,42 @@ export default function SpendingTrends() {
   const hasTrendData =
     flow.some((item) => asNumber(item.income) > 0 || asNumber(item.expenses) > 0) ||
     categories.some((item) => asNumber(item.total_spent) > 0);
-  const selectedCategoryAverage = selectedCategory
-    ? formatMoney(selectedCategory.average_spent)
-    : formatMoney(0);
+  const canEditSelectedBudget =
+    selectedCategory?.category?.id != null &&
+    Number.isInteger(Number(selectedCategory.category.id));
+  const selectedBudgetActionLabel = selectedCategory?.budget_id ? 'Edit Budget' : 'Add Budget';
+
+  function openSelectedBudgetModal() {
+    if (!canEditSelectedBudget || !selectedCategory) return;
+    setEditingBudget({
+      category: selectedCategory.category,
+      budget_id: selectedCategory.budget_id,
+      amount: selectedCategory.budget_amount,
+      spent: selectedCategory.months?.[selectedCategory.months.length - 1]?.spent || 0
+    });
+  }
+
+  async function upsertBudget(payload) {
+    await api.put('/api/budgets', payload);
+    await reload();
+  }
+
+  async function deleteBudget(budgetId) {
+    const ok = await confirm('Delete this budget? It will be removed for every month.', {
+      title: 'Delete Budget',
+      confirmLabel: 'Delete',
+      destructive: true
+    });
+    if (!ok) return;
+
+    try {
+      await api.del(`/api/budgets/${budgetId}`);
+      await reload();
+    } catch (err) {
+      alert(err.message || 'Delete failed', { title: 'Delete Failed' });
+      throw err;
+    }
+  }
 
   return (
     <div className="spending-trends-view">
@@ -164,28 +217,36 @@ export default function SpendingTrends() {
             <header className="dashboard-card-header spending-card-header">
               <div>
                 <h3>Category History</h3>
-                {selectedCategory && (
-                  <span className="muted">
-                    {selectedCategory.category.name} averages {selectedCategoryAverage}
-                  </span>
-                )}
               </div>
               {categoryOptions.length > 0 && (
-                <AppSelect
-                  value={selectedCategoryKey}
-                  options={categoryOptions}
-                  onChange={setSelectedCategoryKey}
-                  className="spending-category-select"
-                  ariaLabel="Choose spending category"
-                  menuPlacement="page-center"
-                />
+                <div className="spending-category-actions">
+                  <AppSelect
+                    value={selectedCategoryKey}
+                    options={categoryOptions}
+                    onChange={setSelectedCategoryKey}
+                    className="spending-category-select"
+                    ariaLabel="Choose spending category"
+                    menuPlacement="page-center"
+                  />
+                  {canEditSelectedBudget && (
+                    <button
+                      type="button"
+                      className="btn-primary spending-budget-action"
+                      onClick={openSelectedBudgetModal}
+                    >
+                      {selectedBudgetActionLabel}
+                    </button>
+                  )}
+                </div>
               )}
             </header>
 
             {selectedCategory ? (
               <div className="spending-category-layout">
-                <CategoryTrendChart trend={selectedCategory} />
-                <CategoryStats trend={selectedCategory} rangeMonths={range.months} />
+                <div className="spending-category-main">
+                  <CategoryStats trend={selectedCategory} rangeMonths={range.months} />
+                  <CategoryTrendChart trend={selectedCategory} />
+                </div>
                 <CategoryRankList
                   categories={categories}
                   selectedKey={selectedCategoryKey}
@@ -198,6 +259,28 @@ export default function SpendingTrends() {
           </section>
         </div>
       )}
+
+      {editingBudget && (
+        <BudgetAmountModal
+          item={editingBudget}
+          onClose={() => setEditingBudget(null)}
+          spendingDetail={`${formatMoney(selectedCategory?.average_spent || 0)} average over this range.`}
+          onSaved={async (payload) => {
+            await upsertBudget(payload);
+            setEditingBudget(null);
+          }}
+          onDelete={
+            editingBudget.budget_id
+              ? async () => {
+                  await deleteBudget(editingBudget.budget_id);
+                  setEditingBudget(null);
+                }
+              : null
+          }
+        />
+      )}
+
+      <Dialog />
     </div>
   );
 }
@@ -222,10 +305,13 @@ function RangeTabs({ value, onChange }) {
 }
 
 function CashFlowChart({ flow }) {
+  const [activeIndex, setActiveIndex] = useState(null);
+  const touchStartRef = useRef(null);
+  const ignoreNextClickRef = useRef(false);
   const width = 720;
-  const height = 260;
-  const top = 18;
-  const bottom = 48;
+  const height = 310;
+  const top = 12;
+  const bottom = 42;
   const left = 34;
   const right = 14;
   const chartWidth = width - left - right;
@@ -234,19 +320,78 @@ function CashFlowChart({ flow }) {
     1,
     ...flow.flatMap((item) => [asNumber(item.income), asNumber(item.expenses)])
   );
-  const band = chartWidth / Math.max(1, flow.length);
-  const barWidth = Math.max(8, Math.min(22, band * 0.22));
-  const gap = Math.max(3, Math.min(8, band * 0.08));
+  const band = compactBandWidth(
+    chartWidth,
+    flow.length,
+    flow.length <= 3 ? 126 : flow.length <= 6 ? 104 : 68
+  );
+  const plotLeft = centeredPlotLeft(left, chartWidth, band, flow.length);
+  const barWidth = Math.max(20, Math.min(48, band * 0.34));
+  const gap = Math.max(7, Math.min(14, band * 0.1));
   const gridLines = [0.25, 0.5, 0.75, 1];
-  const labelEvery = flow.length > 12 ? 3 : flow.length > 8 ? 2 : 1;
+  const labelEvery = flow.length > 12 ? 2 : 1;
+  const activeItem = activeIndex == null ? null : flow[activeIndex];
+  const activeCenter = activeIndex == null
+    ? 0
+    : plotLeft + band * activeIndex + band / 2;
+  const activeNet = activeItem
+    ? asNumber(activeItem.income) - asNumber(activeItem.expenses)
+    : 0;
+  const tooltipAlign =
+    activeCenter < width * 0.28 ? 'align-left' : activeCenter > width * 0.72 ? 'align-right' : '';
+
+  useEffect(() => {
+    setActiveIndex(null);
+    touchStartRef.current = null;
+  }, [flow]);
+
+  function startTouchSelection(event, index) {
+    if (event.pointerType !== 'touch') return;
+    touchStartRef.current = {
+      index,
+      x: event.clientX,
+      y: event.clientY,
+      moved: false
+    };
+  }
+
+  function trackTouchSelection(event) {
+    if (event.pointerType !== 'touch' || !touchStartRef.current) return;
+    const dx = Math.abs(event.clientX - touchStartRef.current.x);
+    const dy = Math.abs(event.clientY - touchStartRef.current.y);
+    if (dx > 10 || dy > 10) {
+      touchStartRef.current.moved = true;
+    }
+  }
+
+  function finishTouchSelection(event, index) {
+    if (event.pointerType !== 'touch') return;
+    const touchStart = touchStartRef.current;
+    touchStartRef.current = null;
+    ignoreNextClickRef.current = true;
+    window.setTimeout(() => {
+      ignoreNextClickRef.current = false;
+    }, 400);
+
+    if (!touchStart || touchStart.index !== index || touchStart.moved) return;
+    setActiveIndex(index);
+  }
 
   function yFor(value) {
     return top + chartHeight - (asNumber(value) / maxValue) * chartHeight;
   }
 
   return (
-    <div className="spending-chart-wrap">
-      <svg className="spending-flow-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Monthly income and expense chart">
+    <div className="spending-chart-wrap spending-flow-chart-wrap">
+      <svg
+        className={`spending-flow-chart ${activeItem ? 'has-active' : ''}`}
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label="Monthly income and expense chart"
+        onPointerLeave={(event) => {
+          if (event.pointerType !== 'touch') setActiveIndex(null);
+        }}
+      >
         {gridLines.map((line) => {
           const y = top + chartHeight - chartHeight * line;
           return (
@@ -262,10 +407,14 @@ function CashFlowChart({ flow }) {
         <line x1={left} y1={top + chartHeight} x2={width - right} y2={top + chartHeight} className="spending-chart-axis" />
 
         {flow.map((item, index) => {
-          const center = left + band * index + band / 2;
+          const center = plotLeft + band * index + band / 2;
           const incomeHeight = top + chartHeight - yFor(item.income);
           const expenseHeight = top + chartHeight - yFor(item.expenses);
           const showLabel = index % labelEvery === 0 || index === flow.length - 1;
+          const monthNet = asNumber(item.income) - asNumber(item.expenses);
+          const monthLabel = formatMonthWithYear(item.month);
+          const hitboxLabel = `${monthLabel}: income ${formatMoney(item.income)}, expenses ${formatMoney(item.expenses)}, net ${formatSignedMoney(monthNet)}`;
+          const barActiveClass = activeIndex === index ? ' is-active' : '';
 
           return (
             <g key={item.month}>
@@ -275,7 +424,7 @@ function CashFlowChart({ flow }) {
                 width={barWidth}
                 height={Math.max(2, incomeHeight)}
                 rx="4"
-                className="spending-flow-bar income"
+                className={`spending-flow-bar income${barActiveClass}`}
               >
                 <title>{`${formatMonthWithYear(item.month)} income: ${formatMoney(item.income)}`}</title>
               </rect>
@@ -285,7 +434,7 @@ function CashFlowChart({ flow }) {
                 width={barWidth}
                 height={Math.max(2, expenseHeight)}
                 rx="4"
-                className="spending-flow-bar expense"
+                className={`spending-flow-bar expense${barActiveClass}`}
               >
                 <title>{`${formatMonthWithYear(item.month)} expenses: ${formatMoney(item.expenses)}`}</title>
               </rect>
@@ -294,10 +443,75 @@ function CashFlowChart({ flow }) {
                   {formatMonthShort(item.month)}
                 </text>
               )}
+              <rect
+                x={plotLeft + band * index}
+                y={top}
+                width={band}
+                height={chartHeight + 30}
+                className="spending-chart-hitbox"
+                tabIndex={0}
+                role="button"
+                aria-label={hitboxLabel}
+                onPointerEnter={(event) => {
+                  if (event.pointerType !== 'touch') setActiveIndex(index);
+                }}
+                onPointerMove={(event) => {
+                  if (event.pointerType !== 'touch') {
+                    setActiveIndex(index);
+                    return;
+                  }
+                  trackTouchSelection(event);
+                }}
+                onPointerDown={(event) => {
+                  startTouchSelection(event, index);
+                }}
+                onPointerUp={(event) => {
+                  finishTouchSelection(event, index);
+                }}
+                onPointerCancel={() => {
+                  touchStartRef.current = null;
+                  ignoreNextClickRef.current = true;
+                  window.setTimeout(() => {
+                    ignoreNextClickRef.current = false;
+                  }, 400);
+                }}
+                onClick={() => {
+                  if (ignoreNextClickRef.current) return;
+                  setActiveIndex(index);
+                }}
+                onFocus={() => setActiveIndex(index)}
+                onBlur={() => setActiveIndex(null)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  setActiveIndex(index);
+                }}
+              />
             </g>
           );
         })}
       </svg>
+      {activeItem && (
+        <div
+          className={`spending-flow-tooltip ${tooltipAlign}`}
+          role="status"
+          style={{ '--tooltip-x': `${(activeCenter / width) * 100}%` }}
+        >
+          <strong>{formatMonthWithYear(activeItem.month)}</strong>
+          <span>
+            <em className="income">Income</em>
+            <b className="income">{formatMoney(activeItem.income)}</b>
+          </span>
+          <span>
+            <em className="expense">Expenses</em>
+            <b className="expense">{formatMoney(activeItem.expenses)}</b>
+          </span>
+          <span>
+            <em className={activeNet >= 0 ? 'income' : 'danger'}>Net</em>
+            <b className={activeNet >= 0 ? 'income' : 'danger'}>{formatSignedMoney(activeNet)}</b>
+          </span>
+        </div>
+      )}
       <div className="spending-chart-legend">
         <span><i className="income" />Income</span>
         <span><i className="expense" />Expenses</span>
@@ -308,9 +522,9 @@ function CashFlowChart({ flow }) {
 
 function CategoryTrendChart({ trend }) {
   const width = 720;
-  const height = 260;
-  const top = 20;
-  const bottom = 48;
+  const height = 500;
+  const top = 16;
+  const bottom = 42;
   const left = 34;
   const right = 18;
   const chartWidth = width - left - right;
@@ -321,8 +535,9 @@ function CategoryTrendChart({ trend }) {
     asNumber(trend.budget_amount),
     ...months.map((item) => asNumber(item.spent))
   );
-  const band = chartWidth / Math.max(1, months.length);
-  const barWidth = Math.max(12, Math.min(34, band * 0.48));
+  const band = compactBandWidth(chartWidth, months.length, months.length <= 6 ? 82 : 60);
+  const plotLeft = centeredPlotLeft(left, chartWidth, band, months.length);
+  const barWidth = Math.max(18, Math.min(46, band * 0.56));
   const labelEvery = months.length > 12 ? 3 : months.length > 8 ? 2 : 1;
   const budgetY = top + chartHeight - (asNumber(trend.budget_amount) / maxValue) * chartHeight;
   const categoryColor = trend.category?.color || 'var(--accent)';
@@ -366,7 +581,7 @@ function CategoryTrendChart({ trend }) {
         )}
 
         {months.map((item, index) => {
-          const center = left + band * index + band / 2;
+          const center = plotLeft + band * index + band / 2;
           const barHeight = top + chartHeight - yFor(item.spent);
           const showLabel = index % labelEvery === 0 || index === months.length - 1;
 
@@ -403,15 +618,13 @@ function CategoryStats({ trend, rangeMonths }) {
     ? 'No budget line'
     : `${trend.over_budget_count} of ${rangeMonths} months`;
   const highLabel = highest?.month
-    ? `${formatMoney(highest.spent)} in ${formatMonthShort(highest.month)}`
+    ? `${formatMoney(highest.spent)} in ${formatMonthLong(highest.month)}`
     : formatMoney(0);
   const stats = [
-    ['Average', formatMoney(trend.average_spent)],
-    ['Median', formatMoney(trend.median_spent)],
-    ['Highest', highLabel],
     ['Budget', budget],
+    ['Average', formatMoney(trend.average_spent)],
+    ['Highest', highLabel],
     ['Over Budget', overBudget],
-    ['Transactions', String(trend.transaction_count || 0)]
   ];
 
   return (

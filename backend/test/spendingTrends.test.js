@@ -11,11 +11,12 @@ import {
 
 test('spending trends builds a continuous month range', () => {
   assert.deepEqual(
-    buildMonthKeys({ endMonth: '2026-05', months: 6 }),
-    ['2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05']
+    buildMonthKeys({ endMonth: '2026-05', months: 3 }),
+    ['2026-03', '2026-04', '2026-05']
   );
   assert.equal(normalizeTrendMonths('7'), 6);
   assert.equal(normalizeTrendMonths('12'), 12);
+  assert.equal(normalizeTrendMonths('24'), 6);
 });
 
 test('spending trends fills missing months and keeps cash flow in cents', () => {
