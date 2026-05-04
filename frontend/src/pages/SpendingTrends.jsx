@@ -183,8 +183,7 @@ export default function SpendingTrends() {
       `Do you want to view all of your ${categoryName} transactions in ${monthLabel}?`,
       {
         title: 'View Transactions',
-        confirmLabel: 'View Transactions',
-        confirmDelayMs: 150
+        confirmLabel: 'View Transactions'
       }
     );
     if (!ok) return;
