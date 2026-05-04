@@ -28,11 +28,22 @@ import {
  * After ANIM_MS the parent's onClose fires and the modal unmounts.
  */
 
-export default function AnimatedModal({ onClose, size = 'md', animation = 'default', children }) {
+export default function AnimatedModal({
+  onClose,
+  size = 'md',
+  animation = 'default',
+  initialInteractionDelayMs = 0,
+  children
+}) {
   const [closing, setClosing] = useState(false);
   const [closingAnimation, setClosingAnimation] = useState('default');
+  const [interactionsBlocked, setInteractionsBlocked] = useState(
+    () => Math.max(0, Number(initialInteractionDelayMs) || 0) > 0
+  );
   const timerRef = useRef(null);
+  const interactionTimerRef = useRef(null);
   const modalRef = useRef(null);
+  const interactionDelayMs = Math.max(0, Number(initialInteractionDelayMs) || 0);
 
   function close(options = { animate: true }) {
     if (closing) return;
@@ -49,6 +60,28 @@ export default function AnimatedModal({ onClose, size = 'md', animation = 'defau
   useBodyScrollLock(true);
   usePageBackdropBlur(true);
   useOverlayBackDismiss(true, () => close({ animate: true }));
+
+  useEffect(() => {
+    if (interactionTimerRef.current) {
+      clearTimeout(interactionTimerRef.current);
+      interactionTimerRef.current = null;
+    }
+
+    if (interactionDelayMs === 0) {
+      setInteractionsBlocked(false);
+      return undefined;
+    }
+
+    setInteractionsBlocked(true);
+    interactionTimerRef.current = setTimeout(() => {
+      setInteractionsBlocked(false);
+      interactionTimerRef.current = null;
+    }, interactionDelayMs);
+
+    return () => {
+      if (interactionTimerRef.current) clearTimeout(interactionTimerRef.current);
+    };
+  }, [interactionDelayMs]);
 
   useEffect(() => {
     const modal = modalRef.current;
@@ -74,12 +107,26 @@ export default function AnimatedModal({ onClose, size = 'md', animation = 'defau
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (interactionTimerRef.current) clearTimeout(interactionTimerRef.current);
     };
   }, []);
+
+  function blockInitialInteraction(event) {
+    if (!interactionsBlocked) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
 
   const modal = (
     <div
       className={`modal-backdrop ${closing ? 'closing' : ''}`}
+      onPointerDownCapture={blockInitialInteraction}
+      onPointerUpCapture={blockInitialInteraction}
+      onMouseDownCapture={blockInitialInteraction}
+      onMouseUpCapture={blockInitialInteraction}
+      onTouchStartCapture={blockInitialInteraction}
+      onTouchEndCapture={blockInitialInteraction}
+      onClickCapture={blockInitialInteraction}
       onClick={close}
     >
       <div

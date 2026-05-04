@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AnimatedModal from './AnimatedModal.jsx';
 
-const APP_DIALOG_ACTION_DELAY_MS = 75;
+const APP_DIALOG_INTERACTION_DELAY_MS = 75;
+
+function normalizeInteractionDelay(options = {}) {
+  const rawDelay = options.interactionDelayMs ?? options.actionDelayMs;
+  if (rawDelay === undefined) return APP_DIALOG_INTERACTION_DELAY_MS;
+  const delay = Number(rawDelay);
+  return Number.isFinite(delay) && delay > 0 ? delay : 0;
+}
 
 export function useAppDialog() {
   const [dialog, setDialog] = useState(null);
@@ -20,7 +27,7 @@ export function useAppDialog() {
         title: options.title || 'Heads up',
         message,
         confirmLabel: options.confirmLabel || 'OK',
-        actionDelayMs: Math.max(0, Number(options.actionDelayMs) || APP_DIALOG_ACTION_DELAY_MS),
+        interactionDelayMs: normalizeInteractionDelay(options),
         resolve
       });
     });
@@ -35,7 +42,7 @@ export function useAppDialog() {
         confirmLabel: options.confirmLabel || 'Confirm',
         cancelLabel: options.cancelLabel || 'Cancel',
         destructive: !!options.destructive,
-        actionDelayMs: Math.max(0, Number(options.actionDelayMs) || APP_DIALOG_ACTION_DELAY_MS),
+        interactionDelayMs: normalizeInteractionDelay(options),
         resolve
       });
     });
@@ -43,29 +50,19 @@ export function useAppDialog() {
 
   function Dialog() {
     const resultRef = useRef(false);
-    const actionDelayMs = Math.max(0, Number(dialog?.actionDelayMs) || 0);
-    const [actionsReady, setActionsReady] = useState(actionDelayMs === 0);
 
     useEffect(() => {
       resultRef.current = false;
-
-      if (!dialog || actionDelayMs === 0) {
-        setActionsReady(true);
-        return undefined;
-      }
-
-      setActionsReady(false);
-      const timer = window.setTimeout(() => {
-        setActionsReady(true);
-      }, actionDelayMs);
-
-      return () => window.clearTimeout(timer);
-    }, [actionDelayMs, dialog]);
+    }, [dialog]);
 
     if (!dialog) return null;
 
     return (
-      <AnimatedModal onClose={() => close(resultRef.current)} size="sm">
+      <AnimatedModal
+        onClose={() => close(resultRef.current)}
+        size="sm"
+        initialInteractionDelayMs={dialog.interactionDelayMs}
+      >
         {({ close: closeModal }) => {
           function finish(result, options = {}) {
             resultRef.current = result;
@@ -82,10 +79,8 @@ export function useAppDialog() {
                     type="button"
                     className="btn-secondary"
                     onClick={() => {
-                      if (!actionsReady) return;
                       finish(false);
                     }}
-                    disabled={!actionsReady}
                   >
                     {dialog.cancelLabel}
                   </button>
@@ -94,11 +89,9 @@ export function useAppDialog() {
                   type="button"
                   className={dialog.destructive ? 'btn-danger' : 'btn-primary'}
                   onClick={() => {
-                    if (!actionsReady) return;
                     finish(true, { animate: true });
                   }}
-                  disabled={!actionsReady}
-                  autoFocus={actionsReady}
+                  autoFocus
                 >
                   {dialog.confirmLabel}
                 </button>
