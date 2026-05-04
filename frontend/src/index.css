@@ -1899,15 +1899,12 @@ input, textarea, select {
 }
 
 .app-shell.has-page-hero {
-  --hero-start: #052e24;
-  --hero-mid: #065f46;
-  --hero-end: #047857;
   grid-template-rows: auto 1fr;
 }
 
 .app-shell.has-page-hero .app-header {
   background:
-    linear-gradient(135deg, var(--hero-start) 0%, var(--hero-mid) 48%, var(--hero-end) 100%);
+    linear-gradient(135deg, #052e24 0%, #065f46 48%, #047857 100%);
   border-bottom-color: rgba(255, 255, 255, 0.1);
   color: #ffffff;
   box-shadow: none;
@@ -2454,8 +2451,9 @@ input, textarea, select {
   border: 0;
   border-radius: var(--radius-lg, 14px);
   color: #f7fbff;
+  /* PageHero variants share one app-wide palette; page-hero-* classes are for layout and content tweaks only. */
   background:
-    linear-gradient(135deg, var(--hero-start, #052e24) 0%, var(--hero-mid, #065f46) 46%, var(--hero-end, #047857) 100%);
+    linear-gradient(135deg, #052e24 0%, #065f46 46%, #047857 100%);
   box-shadow:
     0 22px 52px rgba(5, 20, 52, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
@@ -2474,12 +2472,6 @@ input, textarea, select {
 .page-hero-transactions-spacer { height: 612px; }
 .page-hero-budgets-spacer { height: 420px; }
 .page-hero-accounts-spacer { height: 420px; }
-
-.page-hero-rules {
-  --hero-start: #052e24;
-  --hero-mid: #065f46;
-  --hero-end: #047857;
-}
 
 .page-hero::before {
   content: '';
@@ -4422,12 +4414,6 @@ input, textarea, select {
   margin-right: auto;
 }
 
-.page-hero-mha {
-  --hero-start: #052e24;
-  --hero-mid: #065f46;
-  --hero-end: #047857;
-}
-
 .page-hero-mha .page-hero-stats {
   grid-template-columns: repeat(auto-fit, minmax(min(168px, 100%), 1fr));
 }
@@ -5337,12 +5323,6 @@ input, textarea, select {
   margin: 0 auto;
 }
 
-.page-hero-spending {
-  --hero-start: #06343b;
-  --hero-mid: #047857;
-  --hero-end: #0f766e;
-}
-
 .page-hero-spending .spending-range-tabs {
   width: min(260px, 100%);
   border-color: rgba(255, 255, 255, 0.18);
@@ -5357,7 +5337,7 @@ input, textarea, select {
 
 .page-hero-spending .spending-range-tabs button:hover,
 .page-hero-spending .spending-range-tabs button.active {
-  color: #06343b;
+  color: #052e24;
   background: rgba(255, 255, 255, 0.9);
 }
 
@@ -6259,12 +6239,6 @@ input, textarea, select {
 
 .goals-view {
   min-height: calc(100dvh - 140px);
-}
-
-.page-hero-goals {
-  --hero-start: #052e24;
-  --hero-mid: #065f46;
-  --hero-end: #047857;
 }
 
 .goals-view > .error,
@@ -8996,12 +8970,6 @@ body.modal-page-blur-active .txn-pinned-month-header {
 }
 
 /* ================== 5. PAGES - Retirement Calculator ================== */
-
-.page-hero-retirement {
-  --hero-start: #052e24;
-  --hero-mid: #065f46;
-  --hero-end: #047857;
-}
 
 .retirement-calculator-view {
   min-height: calc(100dvh - 140px);

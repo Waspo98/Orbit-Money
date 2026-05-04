@@ -132,6 +132,9 @@
 - Reuse `frontend/src/components/PageHero.jsx` and its exported
   `useMorphingPageHero` hook for morphing page headers; do not copy the
   scroll/resize measurement code into pages.
+- PageHero color is intentionally app-wide and static. Do not add per-page
+  `.page-hero-*` color overrides; variant classes are for layout and content
+  tweaks only.
 - Keep primary navigation data in `BottomTabs.jsx`; `DesktopSidebar.jsx`
   imports it so mobile and desktop stay in sync.
 - Use `AnimatedModal`, `DropdownMenu`, `FilterSheet`, `MoreSheet`, and
