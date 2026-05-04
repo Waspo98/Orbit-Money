@@ -46,6 +46,9 @@ import {
   writeLocalPreference
 } from './userPreferences.js';
 
+const SCROLL_RESTORE_MAX_ATTEMPTS = 45;
+const SCROLL_RESTORE_TOLERANCE = 2;
+
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Transactions = lazy(() => import('./pages/Transactions.jsx'));
 const Budgets = lazy(() => import('./pages/Budgets.jsx'));
@@ -84,6 +87,137 @@ function transitionBetween(fromPath, toPath, routes) {
 
   if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return 'none';
   return toIndex > fromIndex ? 'forward' : 'back';
+}
+
+function getScrollRestorationKey(location) {
+  return `${location.pathname}${location.search}${location.hash}`;
+}
+
+function scrollToPageTop() {
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  const frame = window.requestAnimationFrame(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  });
+
+  return () => window.cancelAnimationFrame(frame);
+}
+
+function restoreScrollPosition(position) {
+  let active = true;
+  let frame = 0;
+  let attempts = 0;
+
+  function cleanup() {
+    active = false;
+    if (frame) {
+      window.cancelAnimationFrame(frame);
+      frame = 0;
+    }
+    window.removeEventListener('wheel', abort);
+    window.removeEventListener('touchstart', abort);
+    window.removeEventListener('keydown', abort);
+  }
+
+  function abort() {
+    cleanup();
+  }
+
+  function step() {
+    if (!active) return;
+
+    attempts += 1;
+    window.scrollTo({
+      top: position.top,
+      left: position.left,
+      behavior: 'auto'
+    });
+
+    const reached =
+      Math.abs(window.scrollY - position.top) <= SCROLL_RESTORE_TOLERANCE &&
+      Math.abs(window.scrollX - position.left) <= SCROLL_RESTORE_TOLERANCE;
+
+    if (reached || attempts >= SCROLL_RESTORE_MAX_ATTEMPTS) {
+      cleanup();
+      return;
+    }
+
+    frame = window.requestAnimationFrame(step);
+  }
+
+  window.addEventListener('wheel', abort, { passive: true });
+  window.addEventListener('touchstart', abort, { passive: true });
+  window.addEventListener('keydown', abort);
+  step();
+
+  return cleanup;
+}
+
+function useRouteScrollRestoration(location, navigationType, previousPathRef) {
+  const positionsRef = useRef(new Map());
+  const activeKeyRef = useRef(getScrollRestorationKey(location));
+  const cancelPendingScrollRef = useRef(null);
+
+  useEffect(() => {
+    function saveActiveScrollPosition() {
+      positionsRef.current.set(activeKeyRef.current, {
+        top: window.scrollY,
+        left: window.scrollX
+      });
+    }
+
+    window.addEventListener('scroll', saveActiveScrollPosition, { passive: true });
+    window.addEventListener('click', saveActiveScrollPosition, true);
+    window.addEventListener('popstate', saveActiveScrollPosition);
+    window.addEventListener('pagehide', saveActiveScrollPosition);
+
+    return () => {
+      window.removeEventListener('scroll', saveActiveScrollPosition);
+      window.removeEventListener('click', saveActiveScrollPosition, true);
+      window.removeEventListener('popstate', saveActiveScrollPosition);
+      window.removeEventListener('pagehide', saveActiveScrollPosition);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (cancelPendingScrollRef.current) {
+      cancelPendingScrollRef.current();
+      cancelPendingScrollRef.current = null;
+    }
+
+    const scrollKey = getScrollRestorationKey(location);
+    const savedPosition = positionsRef.current.get(scrollKey);
+    const pathChanged = previousPathRef.current !== location.pathname;
+    activeKeyRef.current = scrollKey;
+
+    if (navigationType === 'POP') {
+      cancelPendingScrollRef.current = savedPosition
+        ? restoreScrollPosition({ ...savedPosition })
+        : scrollToPageTop();
+      return () => {
+        if (cancelPendingScrollRef.current) {
+          cancelPendingScrollRef.current();
+          cancelPendingScrollRef.current = null;
+        }
+      };
+    }
+
+    if (pathChanged) {
+      cancelPendingScrollRef.current = scrollToPageTop();
+    }
+
+    return () => {
+      if (cancelPendingScrollRef.current) {
+        cancelPendingScrollRef.current();
+        cancelPendingScrollRef.current = null;
+      }
+    };
+  }, [
+    location.hash,
+    location.pathname,
+    location.search,
+    navigationType,
+    previousPathRef
+  ]);
 }
 
 function RouteLoading() {
@@ -181,12 +315,7 @@ function AppShell() {
     explicitTransition ||
     transitionBetween(previousPathRef.current, location.pathname, navigationRoutes);
 
-  useLayoutEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-    window.requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-    });
-  }, [location.pathname]);
+  useRouteScrollRestoration(location, navigationType, previousPathRef);
 
   useEffect(() => {
     previousPathRef.current = location.pathname;
