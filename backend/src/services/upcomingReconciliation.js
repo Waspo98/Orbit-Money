@@ -1,4 +1,5 @@
 import { formatLocalDate } from '../lib/localDate.js';
+import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
 import { addDays, datesForItemBetween, daysBetween } from '../lib/upcomingSchedule.js';
 
 export const UPCOMING_RECONCILIATION_GRACE_DAYS = 4;
@@ -161,13 +162,14 @@ function ensureOccurrences(db, householdId, { today, graceDays, lookbackDays, lo
 
 function fetchMatchCandidates(db, occurrence) {
   const windowStart = addDays(occurrence.expected_date, -MATCH_EARLY_DAYS);
+  const effectiveCategoryId = effectiveCategoryIdSql('t');
   return db
     .prepare(
       `SELECT t.id,
               t.date,
               t.amount,
               t.account_id,
-              COALESCE(t.edited_category_id, t.category_id) AS category_id,
+              ${effectiveCategoryId} AS category_id,
               COALESCE(t.edited_merchant, t.original_merchant, '') AS merchant
          FROM transactions t
         WHERE t.household_id = @household_id

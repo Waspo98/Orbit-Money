@@ -1,3 +1,5 @@
+import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
+
 // =============================================================================
 // transferMatcher.js — pair opposite-sign same-day transfer transactions
 // =============================================================================
@@ -26,6 +28,7 @@
  * Returns the number of pairs created (= number of transactions updated / 2).
  */
 export function matchTransfers(db, householdId = 1) {
+  const effectiveCategoryId = effectiveCategoryIdSql('t');
   // Only consider transactions that:
   //   - display in a transfer-flagged category
   //   - aren't already paired
@@ -35,7 +38,7 @@ export function matchTransfers(db, householdId = 1) {
       `
       SELECT t.id, t.account_id, t.date, t.amount
       FROM transactions t
-      JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
+      JOIN categories c ON c.id = ${effectiveCategoryId}
       WHERE t.household_id = ?
         AND c.household_id = ?
         AND c.is_transfer = 1

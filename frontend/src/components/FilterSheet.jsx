@@ -101,6 +101,9 @@ export default function FilterSheet({
   // Draft state — seeded from URL-derived initial filters.
   const [accountIds, setAccountIds] = useState(initial.accountIds || []);
   const [categoryIds, setCategoryIds] = useState(initial.categoryIds || []);
+  const [includeUncategorizedCategory, setIncludeUncategorizedCategory] = useState(
+    initial.includeUncategorizedCategory === true
+  );
   const [dateFrom, setDateFrom] = useState(initial.dateFrom || '');
   const [dateTo, setDateTo] = useState(initial.dateTo || '');
   const [amountMin, setAmountMin] = useState(
@@ -112,6 +115,9 @@ export default function FilterSheet({
   const [type, setType] = useState(initial.type || 'all');
   const [includeIgnored, setIncludeIgnored] = useState(
     initial.includeIgnored !== false
+  );
+  const [includeTransfers, setIncludeTransfers] = useState(
+    initial.includeTransfers !== false
   );
   const [hasEdits, setHasEdits] = useState(initial.hasEdits || 'any');
 
@@ -139,12 +145,14 @@ export default function FilterSheet({
   function resetDraft() {
     setAccountIds([]);
     setCategoryIds([]);
+    setIncludeUncategorizedCategory(false);
     setDateFrom('');
     setDateTo('');
     setAmountMin('');
     setAmountMax('');
     setType('all');
     setIncludeIgnored(true);
+    setIncludeTransfers(true);
     setHasEdits('any');
   }
 
@@ -155,12 +163,14 @@ export default function FilterSheet({
     onApply({
       accountIds,
       categoryIds,
+      includeUncategorizedCategory,
       dateFrom,
       dateTo,
       amountMin: Number.isFinite(min) && min >= 0 ? min : null,
       amountMax: Number.isFinite(max) && max >= 0 ? max : null,
       type,
       includeIgnored,
+      includeTransfers,
       hasEdits
     });
     close();
@@ -299,11 +309,21 @@ export default function FilterSheet({
             <section className="filter-section">
               <h4>
                 Categories
-                {categoryIds.length > 0 && (
-                  <span className="filter-count">{categoryIds.length}</span>
+                {(categoryIds.length > 0 || includeUncategorizedCategory) && (
+                  <span className="filter-count">
+                    {categoryIds.length + (includeUncategorizedCategory ? 1 : 0)}
+                  </span>
                 )}
               </h4>
               <div className="filter-checkbox-list filter-checkbox-grid">
+                <label className="filter-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={includeUncategorizedCategory}
+                    onChange={() => setIncludeUncategorizedCategory((prev) => !prev)}
+                  />
+                  <span className="filter-checkbox-label">Uncategorized</span>
+                </label>
                 {categories.map((c) => (
                   <label key={c.id} className="filter-checkbox">
                     <input
@@ -350,6 +370,14 @@ export default function FilterSheet({
                   onChange={(e) => setIncludeIgnored(e.target.checked)}
                 />
                 <span>Include ignored transactions</span>
+              </label>
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={includeTransfers}
+                  onChange={(e) => setIncludeTransfers(e.target.checked)}
+                />
+                <span>Include transfer transactions</span>
               </label>
             </section>
           </div>

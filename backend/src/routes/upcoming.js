@@ -12,6 +12,7 @@ import {
 import { formatLocalDate } from '../lib/localDate.js';
 import { centsToDollars, dollarsToCents } from '../lib/money.js';
 import { parseId, readIdParam } from '../lib/routeParams.js';
+import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
 import { summarizeHistorySamples } from '../lib/upcomingProjection.js';
 import { scoreUpcomingSuggestion } from '../lib/upcomingSuggestionConfidence.js';
 import {
@@ -35,6 +36,7 @@ import {
 } from '../services/upcomingReconciliation.js';
 
 const router = express.Router();
+const EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL = effectiveCategoryIdSql('t');
 
 const KINDS = new Set(['bill', 'subscription', 'income']);
 const FREQUENCY_TYPES = new Set(['weekly', 'biweekly', 'semimonthly', 'monthly', 'bimonthly', 'yearly', 'custom']);
@@ -176,7 +178,7 @@ function projectAmount(row, householdId) {
           )
           AND (
             (@merchant != '' AND lower(COALESCE(t.edited_merchant, t.original_merchant, '')) = @merchant)
-            OR (@merchant = '' AND @category_id IS NOT NULL AND COALESCE(t.edited_category_id, t.category_id) = @category_id)
+            OR (@merchant = '' AND @category_id IS NOT NULL AND ${EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL} = @category_id)
           )
         GROUP BY substr(t.date, 1, 7)
         ORDER BY month DESC`
@@ -279,12 +281,12 @@ function buildSuggestions(householdId) {
     .prepare(
       `SELECT t.id, t.account_id, t.date, t.amount / 100.0 AS amount,
               COALESCE(t.edited_merchant, t.original_merchant) AS merchant,
-              COALESCE(t.edited_category_id, t.category_id) AS category_id,
+              ${EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL} AS category_id,
               COALESCE(t.edited_is_transfer, t.is_transfer) AS is_transfer,
               COALESCE(t.edited_is_ignored, t.is_ignored) AS is_ignored,
               c.name AS category_name
          FROM transactions t
-         LEFT JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
+         LEFT JOIN categories c ON c.id = ${EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL}
           AND c.household_id = t.household_id
         WHERE t.household_id = ?
           AND COALESCE(t.edited_is_transfer, t.is_transfer) = 0
@@ -520,10 +522,10 @@ router.post('/from-transaction', requireAuth, (req, res) => {
       .prepare(
         `SELECT t.id, t.account_id, t.date, t.amount / 100.0 AS amount,
                 COALESCE(t.edited_merchant, t.original_merchant) AS merchant,
-                COALESCE(t.edited_category_id, t.category_id) AS category_id,
+                ${EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL} AS category_id,
                 c.name AS category_name
            FROM transactions t
-           LEFT JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
+           LEFT JOIN categories c ON c.id = ${EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL}
             AND c.household_id = t.household_id
           WHERE t.id = ? AND t.household_id = ?`
       )

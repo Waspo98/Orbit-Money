@@ -9,6 +9,7 @@ import {
 } from '../lib/http.js';
 import { moneyFieldsToDollars } from '../lib/money.js';
 import { parseBooleanField, parseInteger, readIdParam } from '../lib/routeParams.js';
+import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
 import {
   formatMhaTransaction,
   MHA_SAVINGS_RATE,
@@ -16,6 +17,7 @@ import {
 } from '../services/mhaSummary.js';
 
 const router = express.Router();
+const EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL = effectiveCategoryIdSql('t');
 const SETTING_KEY = 'mha_tracker_enabled';
 const ACCOUNT_MONEY_FIELDS = ['current_balance'];
 
@@ -125,7 +127,7 @@ router.get('/', requireAuth, (req, res) => {
                 COALESCE(t.edited_merchant, t.original_merchant) AS merchant,
                 t.original_description,
                 t.notes,
-                COALESCE(t.edited_category_id, t.category_id) AS category_id,
+                ${EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL} AS category_id,
                 COALESCE(t.edited_is_transfer, t.is_transfer) AS is_transfer,
                 COALESCE(t.edited_is_ignored, t.is_ignored) AS is_ignored,
                 COALESCE(
@@ -147,7 +149,7 @@ router.get('/', requireAuth, (req, res) => {
                 c.icon AS category_icon
            FROM transactions t
            JOIN accounts a ON a.id = t.account_id
-           LEFT JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
+           LEFT JOIN categories c ON c.id = ${EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL}
           WHERE t.household_id = ?
             AND a.household_id = ?
             AND (c.id IS NULL OR c.household_id = ?)

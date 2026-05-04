@@ -113,6 +113,18 @@ function parseIntCsv(v) {
   return v.split(',').map((x) => parseInt(x.trim(), 10)).filter(Number.isFinite);
 }
 
+function parseCategoryCsv(v) {
+  if (!v) return { ids: [], includeUncategorized: false };
+  const tokens = v.split(',').map((x) => x.trim()).filter(Boolean);
+  return {
+    ids: tokens
+      .filter((token) => token !== 'uncategorized')
+      .map((token) => parseInt(token, 10))
+      .filter(Number.isFinite),
+    includeUncategorized: tokens.includes('uncategorized')
+  };
+}
+
 function parseFiltersFromUrl(params) {
   // Back-compat: if `accounts` is absent but `account_id` (legacy single) is
   // set, treat it as a single-item list. User actions rewrite the URL to
@@ -123,7 +135,7 @@ function parseFiltersFromUrl(params) {
     : [];
   const accountIds = explicit.length > 0 ? explicit : legacy;
 
-  const categoryIds = parseIntCsv(params.get('categories'));
+  const parsedCategories = parseCategoryCsv(params.get('categories'));
 
   const amountMin = params.get('amount_min');
   const amountMax = params.get('amount_max');
@@ -131,13 +143,15 @@ function parseFiltersFromUrl(params) {
   return {
     q: params.get('q') || '',
     accountIds,
-    categoryIds,
+    categoryIds: parsedCategories.ids,
+    includeUncategorizedCategory: parsedCategories.includeUncategorized,
     dateFrom: params.get('date_from') || '',
     dateTo: params.get('date_to') || '',
     amountMin: amountMin !== null && amountMin !== '' ? Number(amountMin) : null,
     amountMax: amountMax !== null && amountMax !== '' ? Number(amountMax) : null,
     type: params.get('type') || 'all',
     includeIgnored: params.get('include_ignored') !== '0',
+    includeTransfers: params.get('include_transfers') !== '0',
     hasEdits: params.get('has_edits') || 'any',
     sort: params.get('sort') || 'date_desc',
     pageSize: PAGE_SIZE_OPTIONS.includes(parseInt(params.get('page_size'), 10))
@@ -151,13 +165,18 @@ function filtersToSearchParams(f) {
   const p = new URLSearchParams();
   if (f.q) p.set('q', f.q);
   if (f.accountIds && f.accountIds.length) p.set('accounts', f.accountIds.join(','));
-  if (f.categoryIds && f.categoryIds.length) p.set('categories', f.categoryIds.join(','));
+  const categoryTokens = [
+    ...((f.categoryIds && f.categoryIds.length) ? f.categoryIds.map(String) : []),
+    ...(f.includeUncategorizedCategory ? ['uncategorized'] : [])
+  ];
+  if (categoryTokens.length) p.set('categories', categoryTokens.join(','));
   if (f.dateFrom) p.set('date_from', f.dateFrom);
   if (f.dateTo) p.set('date_to', f.dateTo);
   if (f.amountMin != null && f.amountMin !== '') p.set('amount_min', String(f.amountMin));
   if (f.amountMax != null && f.amountMax !== '') p.set('amount_max', String(f.amountMax));
   if (f.type && f.type !== 'all') p.set('type', f.type);
   if (f.includeIgnored === false) p.set('include_ignored', '0');
+  if (f.includeTransfers === false) p.set('include_transfers', '0');
   if (f.hasEdits && f.hasEdits !== 'any') p.set('has_edits', f.hasEdits);
   if (f.sort && f.sort !== 'date_desc') p.set('sort', f.sort);
   if (f.pageSize && f.pageSize !== DEFAULT_PAGE_SIZE) p.set('page_size', String(f.pageSize));
@@ -169,11 +188,12 @@ function countActiveFilters(f) {
   let n = 0;
   if (f.q) n++;
   if (f.accountIds.length) n++;
-  if (f.categoryIds.length) n++;
+  if (f.categoryIds.length || f.includeUncategorizedCategory) n++;
   if (f.dateFrom || f.dateTo) n++;
   if (f.amountMin != null || f.amountMax != null) n++;
   if (f.type !== 'all') n++;
   if (f.includeIgnored === false) n++;
+  if (f.includeTransfers === false) n++;
   if (f.hasEdits !== 'any') n++;
   return n;
 }
@@ -299,11 +319,15 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     switch (key) {
       case 'q': next.q = ''; setSearchLocal(''); break;
       case 'accounts': next.accountIds = []; break;
-      case 'categories': next.categoryIds = []; break;
+      case 'categories':
+        next.categoryIds = [];
+        next.includeUncategorizedCategory = false;
+        break;
       case 'date': next.dateFrom = ''; next.dateTo = ''; break;
       case 'amount': next.amountMin = null; next.amountMax = null; break;
       case 'type': next.type = 'all'; break;
       case 'ignored': next.includeIgnored = true; break;
+      case 'transfers': next.includeTransfers = true; break;
       case 'edits': next.hasEdits = 'any'; break;
       default: break;
     }
@@ -316,12 +340,14 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
       q: '',
       accountIds: [],
       categoryIds: [],
+      includeUncategorizedCategory: false,
       dateFrom: '',
       dateTo: '',
       amountMin: null,
       amountMax: null,
       type: 'all',
       includeIgnored: true,
+      includeTransfers: true,
       hasEdits: 'any',
       pageSize: filters.pageSize,
       sort: filters.sort
@@ -368,6 +394,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         [field]: nextValue
       });
       if (result?.transaction) replaceLocal(txn.id, result.transaction);
+      load({ silent: true });
     } catch (err) {
       applyLocalPatch(txn.id, { [field]: txn[field] });
       alert(err.message || 'Toggle failed', { title: 'Could not update transaction' });
@@ -400,6 +427,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         fields: [field]
       });
       if (result?.transaction) replaceLocal(txn.id, result.transaction);
+      load({ silent: true });
     } catch (err) {
       alert(err.message || 'Reset failed', { title: 'Reset failed' });
     }
@@ -748,6 +776,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           onSaved={(updated) => {
             if (updated) replaceLocal(editingTxn.id, updated);
             setEditingTxn(null);
+            if (updated) load({ silent: true });
           }}
           onReset={(field) => handleResetField(editingTxn, field)}
         />
@@ -1020,15 +1049,17 @@ function ActiveFilterPills({
     });
   }
 
-  if (filters.categoryIds.length) {
-    const names = filters.categoryIds
-      .map((id) => categoryById.get(id)?.name || `#${id}`)
-      .join(', ');
+  if (filters.categoryIds.length || filters.includeUncategorizedCategory) {
+    const categoryNames = [
+      ...filters.categoryIds.map((id) => categoryById.get(id)?.name || `#${id}`),
+      ...(filters.includeUncategorizedCategory ? ['Uncategorized'] : [])
+    ];
+    const names = categoryNames.join(', ');
     pills.push({
       key: 'categories',
-      label: filters.categoryIds.length === 1
+      label: categoryNames.length === 1
         ? names
-        : `${filters.categoryIds.length} categories`,
+        : `${categoryNames.length} categories`,
       title: names
     });
   }
@@ -1057,6 +1088,10 @@ function ActiveFilterPills({
 
   if (filters.includeIgnored === false) {
     pills.push({ key: 'ignored', label: 'Excl. ignored' });
+  }
+
+  if (filters.includeTransfers === false) {
+    pills.push({ key: 'transfers', label: 'Excl. transfers' });
   }
 
   if (filters.hasEdits !== 'any') {

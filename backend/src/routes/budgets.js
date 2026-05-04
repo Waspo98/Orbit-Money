@@ -29,6 +29,7 @@ import {
 } from '../lib/http.js';
 import { dollarsToCents } from '../lib/money.js';
 import { parseId, readIdParam } from '../lib/routeParams.js';
+import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
 import {
   UNCATEGORIZED_BUDGET_CATEGORY,
   buildBudgetItem,
@@ -37,6 +38,7 @@ import {
 } from '../services/budgetOverview.js';
 
 const router = express.Router();
+const EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL = effectiveCategoryIdSql('t');
 
 function parseMonth(s) {
   if (!s || typeof s !== 'string') return null;
@@ -71,12 +73,12 @@ router.get('/', requireAuth, (req, res) => {
     const spending = db
       .prepare(
         `SELECT
-           COALESCE(t.edited_category_id, t.category_id) AS cat_id,
+           ${EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL} AS cat_id,
            -SUM(t.amount) AS spent,
            COUNT(*) AS n
          FROM transactions t
          LEFT JOIN categories c
-           ON c.id = COALESCE(t.edited_category_id, t.category_id)
+           ON c.id = ${EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL}
           AND c.household_id = ?
          WHERE t.household_id = ?
            AND t.date >= ? AND t.date <= ?

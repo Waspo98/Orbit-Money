@@ -38,6 +38,7 @@ function makeDb() {
       edited_merchant TEXT,
       category_id INTEGER,
       edited_category_id INTEGER,
+      edited_category_id_source TEXT,
       is_transfer INTEGER NOT NULL DEFAULT 0,
       edited_is_transfer INTEGER,
       is_ignored INTEGER NOT NULL DEFAULT 0,

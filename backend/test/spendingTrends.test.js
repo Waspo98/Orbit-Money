@@ -29,6 +29,7 @@ function makeTrendQueryDb() {
       amount INTEGER NOT NULL,
       category_id INTEGER,
       edited_category_id INTEGER,
+      edited_category_id_source TEXT,
       is_ignored INTEGER NOT NULL DEFAULT 0,
       edited_is_ignored INTEGER,
       is_transfer INTEGER NOT NULL DEFAULT 0,
@@ -120,13 +121,13 @@ test('spending trends groups edited category spending by display category', () =
   const db = makeTrendQueryDb();
   const insert = db.prepare(
     `INSERT INTO transactions (
-       id, household_id, date, amount, category_id, edited_category_id,
+       id, household_id, date, amount, category_id, edited_category_id, edited_category_id_source,
        is_ignored, edited_is_ignored, is_transfer, edited_is_transfer
-     ) VALUES (?, 1, ?, ?, ?, ?, 0, NULL, 0, NULL)`
+     ) VALUES (?, 1, ?, ?, ?, ?, ?, 0, NULL, 0, NULL)`
   );
 
-  insert.run(1, '2026-04-02', -2500, 14, 7);
-  insert.run(2, '2026-04-03', -10000, 14, null);
+  insert.run(1, '2026-04-02', -2500, 14, 7, 'user');
+  insert.run(2, '2026-04-03', -10000, 14, null, null);
 
   const rows = db
     .prepare(buildSpendingTrendRowsSql())
@@ -142,5 +143,29 @@ test('spending trends groups edited category spending by display category', () =
   assert.deepEqual(rows, [
     { category_id: 7, month: '2026-04', spent: 2500, transaction_count: 1 },
     { category_id: 14, month: '2026-04', spent: 10000, transaction_count: 1 }
+  ]);
+});
+
+test('spending trends respects intentional uncategorized category edits', () => {
+  const db = makeTrendQueryDb();
+  db.prepare(
+    `INSERT INTO transactions (
+       id, household_id, date, amount, category_id, edited_category_id, edited_category_id_source,
+       is_ignored, edited_is_ignored, is_transfer, edited_is_transfer
+     ) VALUES (?, 1, ?, ?, ?, ?, ?, 0, NULL, 0, NULL)`
+  ).run(1, '2026-04-02', -2500, 14, null, 'user');
+
+  const rows = db
+    .prepare(buildSpendingTrendRowsSql())
+    .all(1, 1, '2026-04-01', '2026-04-30')
+    .map((row) => ({
+      category_id: row.category_id,
+      month: row.month,
+      spent: row.spent,
+      transaction_count: row.transaction_count
+    }));
+
+  assert.deepEqual(rows, [
+    { category_id: null, month: '2026-04', spent: 2500, transaction_count: 1 }
   ]);
 });

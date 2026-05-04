@@ -10,6 +10,12 @@ const EXPAND_ANIMATION_MS = 220;
 const EXPAND_ANIMATION_BUFFER_MS = 40;
 const reportedLogoStatuses = new Set();
 
+function normalizeNullableId(value) {
+  if (value === '' || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function describeEditSource(source) {
   if (!source) return null;
   if (source === 'user') return 'edited manually';
@@ -731,17 +737,27 @@ export function EditTransactionModal({ txn, categories, onClose, onSaved, onRese
 
   const merchantEdited = txn.edited_merchant_source !== null;
   const categoryEdited = txn.edited_category_id_source !== null;
+  const trimmedMerchant = merchant.trim();
+  const initialMerchant = (txn.merchant || '').trim();
+  const normalizedCategoryId = normalizeNullableId(categoryId);
+  const initialCategoryId = normalizeNullableId(txn.category_id);
+  const hasChanges =
+    trimmedMerchant !== initialMerchant ||
+    normalizedCategoryId !== initialCategoryId ||
+    notes !== (txn.notes || '');
 
   async function handleSave(event, close) {
     event.preventDefault();
+    if (!hasChanges) return;
     setSaving(true);
     setError('');
 
-    const patch = {
-      merchant: merchant.trim(),
-      category_id: categoryId ? Number(categoryId) : null,
-      notes
-    };
+    const patch = {};
+    if (trimmedMerchant !== initialMerchant) patch.merchant = trimmedMerchant;
+    if (normalizedCategoryId !== initialCategoryId) {
+      patch.category_id = normalizedCategoryId;
+    }
+    if (notes !== (txn.notes || '')) patch.notes = notes;
 
     try {
       const result = await api.patch(`/api/transactions/${txn.id}`, patch);
@@ -833,7 +849,7 @@ export function EditTransactionModal({ txn, categories, onClose, onSaved, onRese
               <button type="button" className="btn-secondary" onClick={close}>
                 Cancel
               </button>
-              <button type="submit" className="btn-primary" disabled={saving}>
+              <button type="submit" className="btn-primary" disabled={saving || !hasChanges}>
                 {saving ? 'Saving...' : 'Save'}
               </button>
             </div>

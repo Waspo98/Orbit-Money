@@ -49,8 +49,12 @@ import {
   parseInteger,
   readIdParam
 } from '../lib/routeParams.js';
+import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
+import { appendUserEditAssignment } from '../lib/editAssignments.js';
 
 const router = express.Router();
+const EFFECTIVE_CATEGORY_ID_SQL = effectiveCategoryIdSql();
+const TRANSACTIONS_EFFECTIVE_CATEGORY_ID_SQL = effectiveCategoryIdSql('transactions');
 const CREDIT_PAYMENT_HINTS = [
   'credit card payment',
   'card payment',
@@ -61,9 +65,9 @@ const CREDIT_PAYMENT_HINTS = [
 ];
 
 // ---------------------------------------------------------------------------
-// SELECT projection used by every read endpoint. Returns both the
-// COALESCE'd display values (what the UI renders) and the raw originals +
-// edit metadata (so the UI can show "edited" annotations and reset links).
+// SELECT projection used by every read endpoint. Returns both the display
+// values (what the UI renders) and the raw originals + edit metadata (so the UI
+// can show "edited" annotations and reset links).
 // ---------------------------------------------------------------------------
 const SELECT_COLS = `
   id,
@@ -71,7 +75,7 @@ const SELECT_COLS = `
   date,
   amount,
   COALESCE(edited_merchant,    original_merchant)    AS merchant,
-  COALESCE(edited_category_id, category_id)          AS category_id,
+  ${EFFECTIVE_CATEGORY_ID_SQL}                       AS category_id,
   COALESCE(edited_is_transfer, is_transfer)          AS is_transfer,
   COALESCE(edited_is_ignored,  is_ignored)           AS is_ignored,
   original_merchant,
@@ -92,12 +96,12 @@ const SELECT_COLS = `
     CASE
       WHEN (SELECT mha_default_ignored
               FROM categories c
-             WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)) = 1
+              WHERE c.id = ${TRANSACTIONS_EFFECTIVE_CATEGORY_ID_SQL}) = 1
       THEN 0
       WHEN (SELECT mha_default_eligible FROM accounts a WHERE a.id = transactions.account_id) = 1
         OR (SELECT mha_default_eligible
               FROM categories c
-             WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)) = 1
+              WHERE c.id = ${TRANSACTIONS_EFFECTIVE_CATEGORY_ID_SQL}) = 1
       THEN 1
       ELSE 0
     END
@@ -293,14 +297,14 @@ function buildFilterWhere(q, householdId) {
     const parts = [];
     if (catIds.length > 0) {
       parts.push(
-        `COALESCE(edited_category_id, category_id) IN (${catIds
+        `${EFFECTIVE_CATEGORY_ID_SQL} IN (${catIds
           .map(() => '?')
           .join(',')})`
       );
       args.push(...catIds);
     }
     if (includeUncategorized) {
-      parts.push('COALESCE(edited_category_id, category_id) IS NULL');
+      parts.push(`${EFFECTIVE_CATEGORY_ID_SQL} IS NULL`);
     }
     wheres.push(`(${parts.join(' OR ')})`);
   }
@@ -374,7 +378,7 @@ function buildFilterWhere(q, householdId) {
     const categoryExpr = `LOWER(COALESCE((
       SELECT c.name
         FROM categories c
-       WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)
+        WHERE c.id = ${TRANSACTIONS_EFFECTIVE_CATEGORY_ID_SQL}
     ), ''))`;
     const parts = [];
     for (const hint of CREDIT_PAYMENT_HINTS) {
@@ -705,9 +709,8 @@ router.get('/:id', requireAuth, (req, res) => {
 
 // ---------------------------------------------------------------------------
 // PATCH /api/transactions/:id
-// Writes edits into the edited_* columns with source='user'. If a value
-// equals the original, the edit is cleared and any matching rule can
-// re-claim the field.
+// Writes edits into the edited_* columns with source='user'. The reset endpoint
+// is the path that clears an edit and lets matching rules re-claim the field.
 // ---------------------------------------------------------------------------
 router.patch('/:id', requireAuth, (req, res) => {
   const householdId = requireHouseholdId(req);
@@ -721,15 +724,19 @@ router.patch('/:id', requireAuth, (req, res) => {
                 category_id   AS original_category_id,
                 is_transfer   AS original_is_transfer,
                 is_ignored    AS original_is_ignored,
+                edited_merchant_source,
+                edited_category_id_source,
+                edited_is_transfer_source,
+                edited_is_ignored_source,
                 CASE
                   WHEN (SELECT mha_default_ignored
                           FROM categories c
-                         WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)) = 1
+                          WHERE c.id = ${TRANSACTIONS_EFFECTIVE_CATEGORY_ID_SQL}) = 1
                   THEN 0
                   WHEN (SELECT mha_default_eligible FROM accounts a WHERE a.id = transactions.account_id) = 1
                     OR (SELECT mha_default_eligible
                           FROM categories c
-                         WHERE c.id = COALESCE(transactions.edited_category_id, transactions.category_id)) = 1
+                          WHERE c.id = ${TRANSACTIONS_EFFECTIVE_CATEGORY_ID_SQL}) = 1
                   THEN 1
                   ELSE 0
                 END AS default_mha_eligible
@@ -748,14 +755,15 @@ router.patch('/:id', requireAuth, (req, res) => {
         return sendBadRequest(res, 'merchant cannot be empty.');
       }
       const trimmed = body.merchant.trim();
-      if (trimmed === existing.original_merchant) {
-        sets.push('edited_merchant = NULL');
-        sets.push('edited_merchant_source = NULL');
-      } else {
-        sets.push('edited_merchant = ?');
-        values.push(trimmed);
-        sets.push("edited_merchant_source = 'user'");
-      }
+      appendUserEditAssignment({
+        sets,
+        values,
+        editColumn: 'edited_merchant',
+        sourceColumn: 'edited_merchant_source',
+        value: trimmed,
+        originalValue: existing.original_merchant,
+        existingSource: existing.edited_merchant_source
+      });
     }
 
     if (body.category_id !== undefined) {
@@ -771,38 +779,41 @@ router.patch('/:id', requireAuth, (req, res) => {
           return sendBadRequest(res, 'category_id does not exist in this household.');
         }
       }
-      if (cid === existing.original_category_id) {
-        sets.push('edited_category_id = NULL');
-        sets.push('edited_category_id_source = NULL');
-      } else {
-        sets.push('edited_category_id = ?');
-        values.push(cid);
-        sets.push("edited_category_id_source = 'user'");
-      }
+      appendUserEditAssignment({
+        sets,
+        values,
+        editColumn: 'edited_category_id',
+        sourceColumn: 'edited_category_id_source',
+        value: cid,
+        originalValue: existing.original_category_id,
+        existingSource: existing.edited_category_id_source
+      });
     }
 
     if (body.is_transfer !== undefined) {
       const flag = body.is_transfer ? 1 : 0;
-      if (flag === existing.original_is_transfer) {
-        sets.push('edited_is_transfer = NULL');
-        sets.push('edited_is_transfer_source = NULL');
-      } else {
-        sets.push('edited_is_transfer = ?');
-        values.push(flag);
-        sets.push("edited_is_transfer_source = 'user'");
-      }
+      appendUserEditAssignment({
+        sets,
+        values,
+        editColumn: 'edited_is_transfer',
+        sourceColumn: 'edited_is_transfer_source',
+        value: flag,
+        originalValue: existing.original_is_transfer,
+        existingSource: existing.edited_is_transfer_source
+      });
     }
 
     if (body.is_ignored !== undefined) {
       const flag = body.is_ignored ? 1 : 0;
-      if (flag === existing.original_is_ignored) {
-        sets.push('edited_is_ignored = NULL');
-        sets.push('edited_is_ignored_source = NULL');
-      } else {
-        sets.push('edited_is_ignored = ?');
-        values.push(flag);
-        sets.push("edited_is_ignored_source = 'user'");
-      }
+      appendUserEditAssignment({
+        sets,
+        values,
+        editColumn: 'edited_is_ignored',
+        sourceColumn: 'edited_is_ignored_source',
+        value: flag,
+        originalValue: existing.original_is_ignored,
+        existingSource: existing.edited_is_ignored_source
+      });
     }
 
     if (body.mha_eligible !== undefined) {
@@ -831,20 +842,6 @@ router.patch('/:id', requireAuth, (req, res) => {
     values.push(id, householdId);
 
     db.prepare(`UPDATE transactions SET ${sets.join(', ')} WHERE id = ? AND household_id = ?`).run(...values);
-
-    const anyCleared =
-      (body.merchant !== undefined && body.merchant.trim() === existing.original_merchant) ||
-      (body.category_id !== undefined &&
-        (body.category_id === null ? null : parseId(body.category_id)) ===
-          existing.original_category_id) ||
-      (body.is_transfer !== undefined &&
-        (body.is_transfer ? 1 : 0) === existing.original_is_transfer) ||
-      (body.is_ignored !== undefined &&
-        (body.is_ignored ? 1 : 0) === existing.original_is_ignored);
-
-    if (anyCleared) {
-      reapplyRulesToTransaction(db, id, householdId);
-    }
 
     const updated = db
       .prepare(`SELECT ${SELECT_COLS} FROM transactions WHERE id = ? AND household_id = ?`)

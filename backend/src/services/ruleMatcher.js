@@ -17,12 +17,12 @@
 //      FIRST rule (in that order) to target a given field wins — lower-
 //      priority rules skip fields already claimed by higher-priority ones.
 //
-//   5. Display value = COALESCE(edited_X, original_X), computed at the API
-//      layer. Callers see one "merchant"/"category_id"/etc., regardless of
-//      whether it's a rule, a user edit, or the original bank value.
+//   5. Display values are computed at the API layer. Category display uses the
+//      edit source too because NULL is a valid manual category choice.
 // =============================================================================
 
 import { centsToDollars } from '../lib/money.js';
+import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
 
 function safeJsonParse(s, fallback) {
   try {
@@ -562,6 +562,7 @@ function addConflictItem(map, transaction, field, rule) {
  * transaction affected by the draft, then annotates visible changes/conflicts.
  */
 export function previewRuleImpact(db, draft, householdId = 1, options = {}) {
+  const effectiveCategoryId = effectiveCategoryIdSql();
   const limit = parseInt(options.limit, 10) || PREVIEW_LIMIT;
   const conditions = Array.isArray(draft?.conditions) ? draft.conditions : [];
   const rawRuleId = draft?.ruleId;
@@ -608,7 +609,7 @@ export function previewRuleImpact(db, draft, householdId = 1, options = {}) {
               date,
               amount,
               COALESCE(edited_merchant, original_merchant) AS merchant,
-              COALESCE(edited_category_id, category_id) AS category_id,
+              ${effectiveCategoryId} AS category_id,
               COALESCE(edited_is_transfer, is_transfer) AS is_transfer,
               COALESCE(edited_is_ignored, is_ignored) AS is_ignored,
               original_merchant,

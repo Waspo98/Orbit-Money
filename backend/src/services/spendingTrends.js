@@ -1,4 +1,5 @@
 import { centsToDollars } from '../lib/money.js';
+import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
 
 export const SPENDING_TREND_MONTH_OPTIONS = [3, 6, 12];
 export const DEFAULT_SPENDING_TREND_MONTHS = 6;
@@ -12,7 +13,7 @@ export const UNCATEGORIZED_SPENDING_TREND_CATEGORY = {
   is_transfer: false
 };
 
-const DISPLAY_CATEGORY_ID_SQL = 'COALESCE(t.edited_category_id, t.category_id)';
+const DISPLAY_CATEGORY_ID_SQL = effectiveCategoryIdSql('t');
 
 export function buildSpendingTrendRowsSql() {
   return `SELECT

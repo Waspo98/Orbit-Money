@@ -4,10 +4,12 @@ import { requireAuth, requireHouseholdId, requireHouseholdWrite } from '../auth.
 import { db } from '../db/index.js';
 import { centsToDollars } from '../lib/money.js';
 import { sendBadRequest, sendOk, sendRouteError } from '../lib/http.js';
+import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
 import { createMemoryUpload } from '../lib/uploads.js';
 import { restoreOrbitBackup } from '../services/orbitBackupRestore.js';
 
 const router = express.Router();
+const EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL = effectiveCategoryIdSql('t');
 
 const upload = createMemoryUpload({ fileSizeMb: 50 });
 
@@ -180,7 +182,7 @@ router.get('/budgeting-export', requireAuth, requireHouseholdWrite, (req, res) =
                   c.name AS category
              FROM transactions t
              LEFT JOIN accounts a ON a.id = t.account_id AND a.household_id = t.household_id
-             LEFT JOIN categories c ON c.id = COALESCE(t.edited_category_id, t.category_id)
+              LEFT JOIN categories c ON c.id = ${EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL}
             WHERE t.household_id = ?
             ORDER BY t.date DESC, t.id DESC`
         )

@@ -9,8 +9,10 @@ import {
   sendServerError
 } from '../lib/http.js';
 import { readIdParam } from '../lib/routeParams.js';
+import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
 
 const router = express.Router();
+const EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL = effectiveCategoryIdSql('t');
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 function normalizeName(value) {
@@ -94,7 +96,7 @@ router.get('/', requireAuth, (req, res) => {
                COUNT(DISTINCT b.id) AS budget_count
           FROM categories c
           LEFT JOIN transactions t
-            ON COALESCE(t.edited_category_id, t.category_id) = c.id
+             ON ${EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL} = c.id
            AND t.household_id = ?
           LEFT JOIN budgets b
             ON b.category_id = c.id
@@ -232,7 +234,7 @@ router.put('/:id', requireAuth, (req, res) => {
                COUNT(DISTINCT b.id) AS budget_count
           FROM categories c
           LEFT JOIN transactions t
-            ON COALESCE(t.edited_category_id, t.category_id) = c.id
+             ON ${EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL} = c.id
            AND t.household_id = ?
           LEFT JOIN budgets b
             ON b.category_id = c.id
