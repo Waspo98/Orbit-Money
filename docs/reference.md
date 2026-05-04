@@ -20,7 +20,7 @@ Multi-stage build:
 - Public installs use `ghcr.io/waspo98/orbit-money:latest` from `docker-compose.yml`.
 - Maintainer beta uses `ghcr.io/waspo98/orbit-money:beta` from `deploy/beta/docker-compose.yml`.
 - The `main` and `Beta` GitHub Actions workflows run the self-hosted deploy scripts with `ORBIT_PUBLISH_IMAGE=1`; those scripts publish their image tags, then pull and restart the matching Docker Compose service.
-- Release tags like `v0.52.0` publish matching version image tags through `publish-release-image.yml`.
+- Release tags like `v0.62.0` publish matching version image tags through `publish-release-image.yml`.
 - The Compose files keep `build` definitions as a local source-build fallback, but normal update paths should use `docker compose pull` followed by `docker compose up -d`.
 
 ## Data Storage
@@ -298,7 +298,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 
 ### PWA
 - `manifest.webmanifest` with PNG icons (regular + maskable)
-- Service worker (`sw.js`): pass-through fetch, no offline caching (satisfies install criteria only)
+- Service worker (`sw.js`): caches the app shell and static assets for read-only offline launch; API reads are cached in IndexedDB by `frontend/src/api.js` and `frontend/src/offlineCache.js`
 - Installable on Android Chrome, desktop Chrome/Edge
 - `theme-color` meta tags for light and dark schemes
 
@@ -452,7 +452,7 @@ role and read/write access.
 - `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
 - `db/index.js`, `db/migrations.js`
 - `lib/`: http, localDate, money, routeParams, upcomingProjection, upcomingSchedule
-- `db/migrations/001` through `028`
+- `db/migrations/001` through `030`
 - `routes/`: accounts, auth, budgets, categories, goals, health, household, householdSharing, import, merchantLogos, mha, netWorth, rules, simplefin, spendingTrends, transactions, upcoming
 - `services/`: budgetOverview, csvImport, demoSeed, householdDefaults, merchantLogos, mhaSummary, oidc, ruleMatcher, sampleHouseholds, sessionStore, simplefinClient, simplefinSync, spendingTrends, transferMatcher, upcomingReconciliation
 - `test/`: Node built-in test runner coverage for backend helpers and calculation services

@@ -1,13 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  DndContext,
-  closestCenter
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  arrayMove,
-  verticalListSortingStrategy
-} from '@dnd-kit/sortable';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
@@ -16,10 +7,18 @@ import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { APP_ICON_192 } from '../brandAssets.js';
-import ReorderListItem, {
-  useDragInteractionLock,
-  useReorderSensors
-} from '../components/ReorderListItem.jsx';
+import DashboardCard, {
+  CardSkeleton,
+  DashProgressBar
+} from '../components/dashboard/DashboardCard.jsx';
+import DashboardCustomizeModal from '../components/dashboard/DashboardCustomizeModal.jsx';
+import {
+  DASHBOARD_RETIREMENT_PRESETS,
+  normalizeDashboardLayout,
+  normalizeGoalFocusId,
+  normalizeIdArray,
+  normalizeRetirementPreferences
+} from '../components/dashboard/dashboardConfig.js';
 import { RuleEditor } from '../components/rules/RuleEditor.jsx';
 import {
   EditTransactionModal,
@@ -181,132 +180,6 @@ const ASSET_TYPES = new Set(['checking', 'savings', 'cash']);
 const INVESTMENT_TYPES = new Set(['investment']);
 const CREDIT_TYPES = new Set(['credit']);
 const LOAN_TYPES = new Set(['loan']);
-const DASHBOARD_RETIREMENT_PRESETS = {
-  conservative: { label: 'Conservative', annualReturn: 0.05, inflation: 0.03 },
-  balanced: { label: 'Balanced', annualReturn: 0.07, inflation: 0.025 },
-  aggressive: { label: 'Aggressive', annualReturn: 0.085, inflation: 0.0225 }
-};
-
-const DASHBOARD_CARD_DEFS = [
-  {
-    id: 'accounts',
-    title: 'Accounts',
-    description: 'Net worth and account balance groups.'
-  },
-  {
-    id: 'top-spending',
-    title: 'Top Spending',
-    description: 'Largest spending categories this month.'
-  },
-  {
-    id: 'this-month',
-    title: 'This Month',
-    description: 'Income, expenses, and net cash flow.'
-  },
-  {
-    id: 'budget-pulse',
-    title: 'Budget Pulse',
-    description: 'Budget usage, pace, and categories to watch.'
-  },
-  {
-    id: 'biggest-transactions',
-    title: 'Biggest Monthly Transactions',
-    description: 'Top 5 current-month expense transactions with dashboard-only hiding.'
-  },
-  {
-    id: 'subscriptions',
-    title: 'Subscriptions / Recurring',
-    description: 'Saved subscription items from Upcoming.'
-  },
-  {
-    id: 'uncategorized',
-    title: 'Uncategorized Transactions',
-    description: 'Recent transactions that need a category.'
-  },
-  {
-    id: 'categorize-recent',
-    title: 'Categorize Recent Transactions',
-    description: 'Swipe through transactions that need a quick category check.'
-  },
-  {
-    id: 'month-comparison',
-    title: 'Month vs Last Month',
-    description: 'Spending, income, and net change.'
-  },
-  {
-    id: 'goals-progress',
-    title: 'Goals Progress',
-    description: 'Overall progress across active goals.'
-  },
-  {
-    id: 'goal-focus',
-    title: 'Goal Focus',
-    description: 'One goal that deserves attention.'
-  },
-  {
-    id: 'retirement',
-    title: 'Retirement Snapshot',
-    description: 'Linked retirement balance and contributions.'
-  },
-  {
-    id: 'mha',
-    title: 'MHA Tracker Summary',
-    description: 'Year-to-date MHA eligible spending.'
-  },
-  {
-    id: 'upcoming',
-    title: 'Upcoming',
-    description: 'Saved bills, subscriptions, and income.'
-  },
-  {
-    id: 'mortgage',
-    title: 'Mortgage Snapshot',
-    description: 'Home value, balance, and equity.'
-  },
-  {
-    id: 'recent-activity',
-    title: 'Recent Transactions',
-    description: 'Latest activity with full transaction actions.'
-  }
-];
-
-const DEFAULT_DASHBOARD_CARD_IDS = DASHBOARD_CARD_DEFS.map((card) => card.id);
-
-function normalizeDashboardLayout(saved) {
-  const fallback = DEFAULT_DASHBOARD_CARD_IDS.map((id) => ({ id, visible: true }));
-  if (!Array.isArray(saved)) return fallback;
-
-  const known = new Set(DEFAULT_DASHBOARD_CARD_IDS);
-  const rows = [];
-  for (const item of saved) {
-    const id = typeof item === 'string' ? item : item?.id;
-    if (!known.has(id) || rows.some((row) => row.id === id)) continue;
-    rows.push({ id, visible: item?.visible !== false });
-  }
-  for (const id of DEFAULT_DASHBOARD_CARD_IDS) {
-    if (!rows.some((row) => row.id === id)) rows.push({ id, visible: true });
-  }
-  return rows;
-}
-
-function normalizeIdArray(value) {
-  return Array.isArray(value)
-    ? Array.from(new Set(value.map(Number).filter(Number.isFinite))).slice(-1000)
-    : [];
-}
-
-function normalizeGoalFocusId(value) {
-  const id = Number(value);
-  return Number.isFinite(id) && id > 0 ? id : null;
-}
-
-function normalizeRetirementPreferences(value) {
-  const prefs = value && typeof value === 'object' ? value : {};
-  return {
-    retirementAge: Number(prefs.retirementAge) || 67,
-    presetKey: DASHBOARD_RETIREMENT_PRESETS[prefs.presetKey] ? prefs.presetKey : 'balanced'
-  };
-}
 
 function groupAccountBalances(accounts) {
   let cash = 0;
@@ -503,7 +376,7 @@ export default function Dashboard({
         optional('/api/upcoming'),
         optional('/api/goals?months=12'),
         optional('/api/household'),
-        optional('/api/mha'),
+        mhaTrackerEnabled ? optional('/api/mha') : Promise.resolve({ enabled: false }),
         optional('/api/auth/me')
       ]);
       setBudgetData(b);
@@ -2593,161 +2466,5 @@ function RecentActivityCard({
 
       <Dialog />
     </>
-  );
-}
-
-// ============================================================================
-// Customize dashboard modal
-// ============================================================================
-
-function DashboardCustomizeModal({ layout, onChange, onClose }) {
-  const sensors = useReorderSensors();
-  const [draggingId, setDraggingId] = useState(null);
-  useDragInteractionLock(!!draggingId);
-
-  function toggleCard(id) {
-    onChange((prev) =>
-      normalizeDashboardLayout(prev).map((item) =>
-        item.id === id ? { ...item, visible: !item.visible } : item
-      )
-    );
-  }
-
-  function handleDragEnd(event) {
-    const { active, over } = event;
-    setDraggingId(null);
-    if (!over || active.id === over.id) return;
-    onChange((prev) => {
-      const normalized = normalizeDashboardLayout(prev);
-      const oldIndex = normalized.findIndex((item) => item.id === active.id);
-      const newIndex = normalized.findIndex((item) => item.id === over.id);
-      if (oldIndex < 0 || newIndex < 0) return normalized;
-      return arrayMove(normalized, oldIndex, newIndex);
-    });
-  }
-
-  const normalizedLayout = normalizeDashboardLayout(layout);
-  const cardById = new Map(DASHBOARD_CARD_DEFS.map((card) => [card.id, card]));
-
-  return (
-    <AnimatedModal onClose={onClose} size="lg">
-      {({ close }) => (
-        <>
-          <div className="modal-header">
-            <h3>Customize My Dashboard</h3>
-            <button type="button" className="modal-close" onClick={close} aria-label="Close">
-              x
-            </button>
-          </div>
-          <div className="dashboard-customize-modal">
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={(event) => setDraggingId(event.active.id)}
-              onDragCancel={() => setDraggingId(null)}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={normalizedLayout.map((item) => item.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="dashboard-customize-list">
-                  {normalizedLayout.map((item) => {
-                    const card = cardById.get(item.id);
-                    if (!card) return null;
-                    return (
-                      <DashboardCustomizeRow
-                        key={item.id}
-                        id={item.id}
-                        title={card.title}
-                        description={card.description}
-                        visible={item.visible}
-                        onToggle={() => toggleCard(item.id)}
-                      />
-                    );
-                  })}
-                </div>
-              </SortableContext>
-            </DndContext>
-          </div>
-          <div className="modal-actions">
-            <button type="button" className="btn-primary" onClick={close}>
-              Done
-            </button>
-          </div>
-        </>
-      )}
-    </AnimatedModal>
-  );
-}
-
-function DashboardCustomizeRow({ id, title, description, visible, onToggle }) {
-  return (
-    <ReorderListItem
-      id={id}
-      className="dashboard-customize-row"
-      handleLabel={`Move ${title}`}
-      title={title}
-      subtitle={description}
-      side={(
-        <label className="toggle-switch dashboard-card-toggle">
-          <input
-            type="checkbox"
-            aria-label={`Show ${title}`}
-            checked={visible}
-            onChange={onToggle}
-          />
-          <span className="toggle-slider" aria-hidden="true" />
-        </label>
-      )}
-    />
-  );
-}
-
-// ============================================================================
-// Shared card wrapper + progress bar + skeleton
-// ============================================================================
-
-function DashboardCard({ title, action, children }) {
-  return (
-    <section className="dashboard-card">
-      <header className="dashboard-card-header">
-        <h3>{title}</h3>
-        {action}
-      </header>
-      <div className="dashboard-card-body">{children}</div>
-    </section>
-  );
-}
-
-function DashProgressBar({ percent, overBudget = false }) {
-  const clamped = Math.max(0, Math.min(100, percent || 0));
-  const label = `${Math.round(percent || 0)}%${overBudget ? ' over target' : ' complete'}`;
-  return (
-    <div
-      className="budget-progress"
-      role="progressbar"
-      aria-valuenow={Math.round(percent || 0)}
-      aria-valuemin="0"
-      aria-valuemax="100"
-      title={label}
-    >
-      <div
-        className={`budget-progress-fill ${
-          overBudget ? 'over' : percent >= 85 ? 'warning' : ''
-        }`}
-        style={{ width: `${clamped}%` }}
-      />
-    </div>
-  );
-}
-
-function CardSkeleton() {
-  return (
-    <div className="dash-skeleton">
-      <div className="dash-skeleton-line wide" />
-      <div className="dash-skeleton-line" />
-      <div className="dash-skeleton-line short" />
-    </div>
   );
 }

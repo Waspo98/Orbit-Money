@@ -103,7 +103,7 @@
   only on GitHub's generated notes unless the user explicitly asks for that.
 - A Docker deploy and a GitHub Release are separate actions. Deploys may happen
   frequently from `main` or `Beta`; releases should mark stable, named
-  milestones with a Git tag such as `v0.52.0`.
+  milestones with a Git tag such as `v0.62.0`.
 - When publishing a release, prefer this order: confirm clean checks, update
   version labels/files if approved, update changelog or release notes, commit,
   tag the release commit, push the branch and tag, then create the GitHub

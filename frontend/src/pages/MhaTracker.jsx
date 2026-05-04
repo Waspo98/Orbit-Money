@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
-import AppSelect from '../components/AppSelect.jsx';
 import PageHero from '../components/PageHero.jsx';
+import PeriodNav from '../components/PeriodNav.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { TransactionRow, EditTransactionModal } from '../components/transactions/TransactionRow.jsx';
@@ -320,13 +320,20 @@ export default function MhaTracker() {
         statsExtra={(
           <div className="page-hero-stat mha-year-stat">
             <span>Year</span>
-            <YearNav
-              year={selectedYear}
-              yearOptions={yearOptions}
+            <PeriodNav
+              className="year-nav"
+              value={selectedYear}
+              options={yearOptions.map((option) => ({
+                value: option,
+                label: formatYearLabel(option)
+              }))}
               canGoForward={canGoForward}
               onPrev={() => goToYear(selectedYear - 1)}
               onNext={() => goToYear(selectedYear + 1)}
-              onJump={goToYear}
+              onJump={(value) => goToYear(Number(value))}
+              previousLabel="Previous year"
+              nextLabel="Next year"
+              jumpLabel="Jump to year"
             />
           </div>
         )}
@@ -558,48 +565,6 @@ export default function MhaTracker() {
           <Dialog />
         </div>
       )}
-    </div>
-  );
-}
-
-function YearNav({ year, yearOptions, canGoForward, onPrev, onNext, onJump }) {
-  return (
-    <div className="month-nav year-nav">
-      <button
-        type="button"
-        className="btn-icon month-nav-arrow"
-        onClick={onPrev}
-        aria-label="Previous year"
-      >
-        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-          <path d="M14.5 6.5 9 12l5.5 5.5" />
-        </svg>
-      </button>
-
-      <div className="month-nav-label-wrap">
-        <AppSelect
-          className="month-nav-select"
-          value={year}
-          options={yearOptions.map((option) => ({
-            value: option,
-            label: formatYearLabel(option)
-          }))}
-          onChange={(value) => onJump(Number(value))}
-          ariaLabel="Jump to year"
-        />
-      </div>
-
-      <button
-        type="button"
-        className="btn-icon month-nav-arrow"
-        onClick={onNext}
-        disabled={!canGoForward}
-        aria-label="Next year"
-      >
-        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-          <path d="m9.5 6.5L15 12l-5.5 5.5" />
-        </svg>
-      </button>
     </div>
   );
 }

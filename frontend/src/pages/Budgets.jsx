@@ -11,6 +11,7 @@ import CurrencyInput, {
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import ExpandingSection from '../components/ExpandingSection.jsx';
 import PageHero from '../components/PageHero.jsx';
+import PeriodNav from '../components/PeriodNav.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { formatCurrency } from '../lib/formatters.js';
 import {
@@ -445,13 +446,20 @@ export default function Budgets({
         title="Budgets"
         subtitle={budgetSubtitle}
         toolbar={(
-          <MonthNav
-            month={selectedMonth}
-            monthOptions={monthOptions}
+          <PeriodNav
+            value={selectedMonth}
+            options={monthOptions.map((item) => ({
+              value: item,
+              label: formatMonthLabel(item)
+            }))}
             canGoForward={canGoForward}
             onPrev={() => goToMonth(addMonths(selectedMonth, -1))}
             onNext={() => goToMonth(addMonths(selectedMonth, 1))}
             onJump={goToMonth}
+            previousLabel="Previous month"
+            nextLabel="Next month"
+            jumpLabel="Jump to month"
+            menuPlacement="page-center"
           />
         )}
       />
@@ -665,48 +673,6 @@ export default function Budgets({
       )}
 
       <Dialog />
-    </div>
-  );
-}
-function MonthNav({ month, monthOptions, canGoForward, onPrev, onNext, onJump }) {
-  return (
-    <div className="month-nav">
-      <button
-        type="button"
-        className="btn-icon month-nav-arrow"
-        onClick={onPrev}
-        aria-label="Previous month"
-      >
-        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-          <path d="M14.5 6.5 9 12l5.5 5.5" />
-        </svg>
-      </button>
-
-      <div className="month-nav-label-wrap">
-        <AppSelect
-          className="month-nav-select"
-          value={month}
-          options={monthOptions.map((item) => ({
-            value: item,
-            label: formatMonthLabel(item)
-          }))}
-          onChange={onJump}
-          ariaLabel="Jump to month"
-          menuPlacement="page-center"
-        />
-      </div>
-
-      <button
-        type="button"
-        className="btn-icon month-nav-arrow"
-        onClick={onNext}
-        disabled={!canGoForward}
-        aria-label="Next month"
-      >
-        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-          <path d="m9.5 6.5L15 12l-5.5 5.5" />
-        </svg>
-      </button>
     </div>
   );
 }
