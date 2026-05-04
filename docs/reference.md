@@ -249,7 +249,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Endpoints: GET `/api/upcoming`, POST `/api/upcoming`, PUT `/api/upcoming/:id`, DELETE `/api/upcoming/:id`, POST `/api/upcoming/from-transaction`, POST `/api/upcoming/suggestions/accept`, POST `/api/upcoming/suggestions/dismiss`
 
 ### Dashboard
-Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column grid on foldable/tablet widths (≥640px), with Recent Activity spanning full width. The `Customize My Dashboard` button opens one modal list where every dashboard card has a visibility toggle and drag handle. Layout, dashboard-only hidden biggest transactions, goal focus, retirement snapshot preferences, and review state persist through `/api/preferences` so they follow the signed-in account across browsers.
+Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column grid on foldable/tablet widths (>=640px), with each card able to span one or two wide-screen columns. The `Customize Dashboard` button opens one modal list where every dashboard card has a visibility toggle, drag handle, and icon-based wide-screen width control. Layout, dashboard-only hidden biggest transactions, goal focus, retirement snapshot preferences, and review state persist through `/api/preferences` so they follow the signed-in account across browsers.
 
 - **Accounts card:** net worth (active balances plus mortgage estimated-value equity), breakdown by group (Cash = checking+savings+cash, Investments, Credit cards, Loans, Real Estate, Other). Rows with zero balance are hidden.
 - **This month card:** Day X of Y + compact Income / Expenses / Net trio

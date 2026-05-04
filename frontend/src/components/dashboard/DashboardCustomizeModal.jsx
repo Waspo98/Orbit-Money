@@ -31,6 +31,14 @@ export default function DashboardCustomizeModal({ layout, onChange, onClose }) {
     );
   }
 
+  function updateCardWideSpan(id, wideSpan) {
+    onChange((prev) =>
+      normalizeDashboardLayout(prev).map((item) =>
+        item.id === id ? { ...item, wideSpan } : item
+      )
+    );
+  }
+
   function handleDragEnd(event) {
     const { active, over } = event;
     setDraggingId(null);
@@ -49,13 +57,14 @@ export default function DashboardCustomizeModal({ layout, onChange, onClose }) {
     () => new Map(DASHBOARD_CARD_DEFS.map((card) => [card.id, card])),
     []
   );
+  const standardPlacementById = getDashboardStandardPlacementById(normalizedLayout);
 
   return (
     <AnimatedModal onClose={onClose} size="lg">
       {({ close }) => (
         <>
           <div className="modal-header">
-            <h3>Customize My Dashboard</h3>
+            <h3>Customize Dashboard</h3>
             <button type="button" className="modal-close" onClick={close} aria-label="Close">
               x
             </button>
@@ -83,7 +92,10 @@ export default function DashboardCustomizeModal({ layout, onChange, onClose }) {
                         title={card.title}
                         description={card.description}
                         visible={item.visible}
+                        wideSpan={item.wideSpan}
+                        standardPlacement={standardPlacementById.get(item.id) || 'left'}
                         onToggle={() => toggleCard(item.id)}
+                        onWideSpanChange={(wideSpan) => updateCardWideSpan(item.id, wideSpan)}
                       />
                     );
                   })}
@@ -102,7 +114,18 @@ export default function DashboardCustomizeModal({ layout, onChange, onClose }) {
   );
 }
 
-function DashboardCustomizeRow({ id, title, description, visible, onToggle }) {
+function DashboardCustomizeRow({
+  id,
+  title,
+  description,
+  visible,
+  wideSpan,
+  standardPlacement,
+  onToggle,
+  onWideSpanChange
+}) {
+  const placementLabel = standardPlacement === 'right' ? 'right side' : 'left side';
+
   return (
     <ReorderListItem
       id={id}
@@ -111,16 +134,70 @@ function DashboardCustomizeRow({ id, title, description, visible, onToggle }) {
       title={title}
       subtitle={description}
       side={(
-        <label className="toggle-switch dashboard-card-toggle">
-          <input
-            type="checkbox"
-            aria-label={`Show ${title}`}
-            checked={visible}
-            onChange={onToggle}
-          />
-          <span className="toggle-slider" aria-hidden="true" />
-        </label>
+        <span className="dashboard-customize-controls">
+          <span
+            className="dashboard-column-picker"
+            role="group"
+            aria-label={`${title} width on wider screens`}
+          >
+            <button
+              type="button"
+              className={wideSpan === 1 ? 'active' : ''}
+              aria-label={`Use standard width for ${title}, previewed on the ${placementLabel}`}
+              aria-pressed={wideSpan === 1}
+              title={`Standard Width (${placementLabel})`}
+              onClick={() => onWideSpanChange(1)}
+            >
+              <span
+                className={`dashboard-width-icon dashboard-width-icon-standard dashboard-width-icon-${standardPlacement}`}
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              className={wideSpan === 2 ? 'active' : ''}
+              aria-label={`Use wide width for ${title}`}
+              aria-pressed={wideSpan === 2}
+              title="Wide Width"
+              onClick={() => onWideSpanChange(2)}
+            >
+              <span
+                className="dashboard-width-icon dashboard-width-icon-wide"
+                aria-hidden="true"
+              />
+            </button>
+          </span>
+          <label className="toggle-switch dashboard-card-toggle">
+            <input
+              type="checkbox"
+              aria-label={`Show ${title}`}
+              checked={visible}
+              onChange={onToggle}
+            />
+            <span className="toggle-slider" aria-hidden="true" />
+          </label>
+        </span>
       )}
     />
   );
+}
+
+function getDashboardStandardPlacementById(layout) {
+  const placements = new Map();
+  let filledColumns = 0;
+
+  for (const item of layout) {
+    const standardPlacement = filledColumns === 0 ? 'left' : 'right';
+    placements.set(item.id, standardPlacement);
+
+    if (!item.visible) continue;
+
+    if (item.wideSpan === 2) {
+      filledColumns = 0;
+    } else {
+      filledColumns = standardPlacement === 'left' ? 1 : 0;
+    }
+  }
+
+  return placements;
 }

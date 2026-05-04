@@ -3284,7 +3284,7 @@ input, textarea, select {
 }
 
 @media (min-width: 640px) {
-  .dashboard-card-slot-recent-activity {
+  .dashboard-card-slot-span-2 {
     grid-column: 1 / -1;
   }
 }
@@ -4260,6 +4260,101 @@ input, textarea, select {
 
 .dashboard-customize-row .selectable-list-side {
   align-items: center;
+}
+
+.dashboard-customize-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-column-picker {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .dashboard-column-picker {
+    display: inline-grid;
+    grid-template-columns: repeat(2, 1fr);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
+
+  .dashboard-column-picker button {
+    width: 44px;
+    min-height: 34px;
+    border: 0;
+    border-right: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color var(--dur-fast), color var(--dur-fast);
+  }
+
+  .dashboard-column-picker button:last-child {
+    border-right: 0;
+  }
+
+  .dashboard-column-picker button:hover,
+  .dashboard-column-picker button.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .dashboard-column-picker button:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+}
+
+.dashboard-width-icon {
+  position: relative;
+  display: block;
+  width: 28px;
+  height: 18px;
+  margin: 0 auto;
+  border: 1.5px solid currentColor;
+  border-radius: 5px;
+  opacity: 0.92;
+}
+
+.dashboard-width-icon::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  border-left: 1px solid currentColor;
+  opacity: 0.36;
+}
+
+.dashboard-width-icon::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  border-radius: 3px;
+  background: currentColor;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.dashboard-width-icon-standard::after {
+  width: calc(50% - 5px);
+  transform: translateX(0);
+}
+
+.dashboard-width-icon-standard.dashboard-width-icon-right::after {
+  transform: translateX(calc(100% + 4px));
+}
+
+.dashboard-width-icon-wide::after {
+  right: 3px;
 }
 
 .dashboard-card-toggle {

@@ -88,9 +88,23 @@ export const DASHBOARD_CARD_DEFS = [
 ];
 
 const DEFAULT_DASHBOARD_CARD_IDS = DASHBOARD_CARD_DEFS.map((card) => card.id);
+const DEFAULT_DASHBOARD_CARD_WIDE_SPANS = {
+  'recent-activity': 2
+};
+
+function normalizeDashboardCardWideSpan(id, value) {
+  const fallback = DEFAULT_DASHBOARD_CARD_WIDE_SPANS[id] || 1;
+  const span = Number(value);
+  if (span === 1 || span === 2) return span;
+  return fallback;
+}
 
 export function normalizeDashboardLayout(saved) {
-  const fallback = DEFAULT_DASHBOARD_CARD_IDS.map((id) => ({ id, visible: true }));
+  const fallback = DEFAULT_DASHBOARD_CARD_IDS.map((id) => ({
+    id,
+    visible: true,
+    wideSpan: DEFAULT_DASHBOARD_CARD_WIDE_SPANS[id] || 1
+  }));
   if (!Array.isArray(saved)) return fallback;
 
   const known = new Set(DEFAULT_DASHBOARD_CARD_IDS);
@@ -98,10 +112,20 @@ export function normalizeDashboardLayout(saved) {
   for (const item of saved) {
     const id = typeof item === 'string' ? item : item?.id;
     if (!known.has(id) || rows.some((row) => row.id === id)) continue;
-    rows.push({ id, visible: item?.visible !== false });
+    rows.push({
+      id,
+      visible: item?.visible !== false,
+      wideSpan: normalizeDashboardCardWideSpan(id, item?.wideSpan)
+    });
   }
   for (const id of DEFAULT_DASHBOARD_CARD_IDS) {
-    if (!rows.some((row) => row.id === id)) rows.push({ id, visible: true });
+    if (!rows.some((row) => row.id === id)) {
+      rows.push({
+        id,
+        visible: true,
+        wideSpan: DEFAULT_DASHBOARD_CARD_WIDE_SPANS[id] || 1
+      });
+    }
   }
   return rows;
 }

@@ -734,7 +734,10 @@ export default function Dashboard({
 
       <div className="dashboard-grid">
         {visibleDashboardCards.map((item) => (
-          <div key={item.id} className={`dashboard-card-slot dashboard-card-slot-${item.id}`}>
+          <div
+            key={item.id}
+            className={`dashboard-card-slot dashboard-card-slot-${item.id} dashboard-card-slot-span-${item.wideSpan}`}
+          >
             {renderDashboardCard(item.id)}
           </div>
         ))}
@@ -746,7 +749,7 @@ export default function Dashboard({
           className="btn-secondary"
           onClick={() => setCustomizing(true)}
         >
-          Customize My Dashboard
+          Customize Dashboard
         </button>
       </div>
 
