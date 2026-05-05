@@ -706,7 +706,7 @@ function SnapshotPanel({ model, monthLabel, selectedMonth, daysLeft, onAddBudget
         </div>
       </div>
 
-      <div className="budget-beta-snapshot-grid">
+      <div className="metric-grid budget-beta-snapshot-grid">
         <SnapshotStat
           label="Budgeted Categories"
           value={`${formatMoney(model.spentInBudgets)} / ${formatMoney(model.totalBudgeted)}`}
@@ -744,7 +744,7 @@ function SnapshotPanel({ model, monthLabel, selectedMonth, daysLeft, onAddBudget
 
 function SnapshotStat({ label, value, detail, tone }) {
   return (
-    <div className={`budget-beta-stat ${tone}`}>
+    <div className={`metric-card budget-beta-stat ${tone}`}>
       <span>{label}</span>
       <strong>{value}</strong>
       <em>{detail}</em>

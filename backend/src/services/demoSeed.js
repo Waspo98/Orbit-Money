@@ -1,4 +1,5 @@
 import { dollarsToCents } from '../lib/money.js';
+import { MHA_TAX_PROFILE_KEY } from './mhaTaxEstimate.js';
 import { reapplyRulesToAllTransactions } from './ruleMatcher.js';
 
 const ACCOUNT_SEED = [
@@ -86,62 +87,101 @@ const ACCOUNT_SEED = [
   }
 ];
 
-const TXN_SEED = [
-  ['checking', -86.42, 'WAL-MART SUPERCENTER #5402', 'Groceries', 1],
-  ['credit', -14.99, 'Streamly', 'Entertainment', 2],
-  ['checking', -52.18, 'MCDONALDS F3421', 'Dining & Drinks', 3],
-  ['checking', 3150.0, 'Acme Design Payroll', 'Income', 4],
-  ['credit', -37.7, 'PORTILLOS HOT DOGS 12', 'Dining & Drinks', 5],
-  ['checking', -118.22, 'Electric Utility Co.', 'Bills & Utilities', 6],
-  ['credit', -64.5, 'TARGET T-2201', 'Shopping', 7],
-  ['checking', -24.0, 'Downtown Parking', 'Auto & Transport', 8],
-  ['savings', 500.0, 'Transfer from Checking', 'Internal Transfers', 9],
-  ['checking', -500.0, 'Transfer to Savings', 'Internal Transfers', 9],
-  ['credit', -42.13, 'Pet Pantry', 'Pets', 10],
-  ['checking', -18.75, 'City Pharmacy', 'Health & Wellness', 11],
-  ['credit', -93.2, 'WALMART GROCERY', 'Groceries', 12],
-  ['checking', -9.99, 'WENDYS APP', 'Dining & Drinks', 13],
-  ['credit', -128.64, 'OLD NAVY 4421', 'Shopping', 14],
-  ['checking', -68.0, 'Mobile Wireless', 'Bills & Utilities', 15],
-  ['checking', 245.0, 'Side Project Client', 'Income', 16],
-  ['credit', -22.4, 'JIMMY JOHNS #1904', 'Dining & Drinks', 17],
-  ['checking', -33.25, 'Community Books', 'Books', 18],
-  ['credit', -74.3, 'WENDYS #1187', 'Dining & Drinks', 19],
-  ['checking', -121.44, 'Water Utility', 'Bills & Utilities', 20],
-  ['credit', -16.0, 'Yoga Studio', 'Health & Wellness', 21],
-  ['checking', -38.9, 'CULVERS OF MADISON', 'Dining & Drinks', 22],
-  ['credit', -210.15, 'Weekend Hotel', 'Travel', 23],
-  ['checking', -72.55, 'TARGET.COM', 'Shopping', 24],
-  ['credit', -44.99, 'OLD NAVY ONLINE', 'Shopping', 25],
-  ['checking', -29.5, 'Laundromat Plus', 'Personal Care', 26],
-  ['checking', 3150.0, 'Acme Design Payroll', 'Income', 27],
-  ['credit', -58.62, 'Garden Supply', 'Home Improvement', 28],
-  ['checking', -19.0, 'Bus Pass', 'Auto & Transport', 29],
-  ['credit', -39.8, 'MCDONALDS MOBILE ORDER', 'Dining & Drinks', 30],
-  ['savings', 250.0, 'Transfer from Checking', 'Savings Transfer', 31],
-  ['checking', -250.0, 'Transfer to Savings', 'Savings Transfer', 31],
-  ['credit', -83.47, 'WALMART.COM', 'Shopping', 32],
-  ['checking', -12.0, 'CULVERS #330', 'Dining & Drinks', 33],
-  ['credit', -31.49, 'Office Depot', 'Office Supplies', 34],
-  ['checking', -96.0, 'Internet Provider', 'Bills & Utilities', 35],
-  ['credit', -27.65, 'Pet Pantry', 'Pets', 36],
-  ['checking', -15.25, 'Charity Roundup', 'Charitable Donations', 37],
-  ['credit', -46.11, 'PORTILLOS DRIVE THRU', 'Dining & Drinks', 38],
-  ['checking', -140.0, 'Medical Clinic', 'Health & Wellness', 39],
-  ['credit', -67.88, 'TARGET STORE 0874', 'Shopping', 40],
-  ['checking', -110.0, 'Credit Card Payment', 'Credit Card Payment', 41],
-  ['credit', 110.0, 'Payment Thank You', 'Credit Card Payment', 41],
-  ['credit', -23.99, 'PhotoCloud', 'Software', 42],
-  ['checking', 180.0, 'Marketplace Sale', 'Income', 43],
-  ['credit', -54.76, 'OLDNAVY.COM', 'Shopping', 44],
-  ['checking', -88.1, 'Gas & Heat Utility', 'Bills & Utilities', 45],
-  ['credit', -36.42, 'JIMMY JOHN SANDWICHES', 'Dining & Drinks', 46],
-  ['checking', -102.7, 'WAL-MART NEIGHBORHOOD MARKET', 'Groceries', 47],
-  ['credit', -19.84, 'WENDYS MOBILE', 'Dining & Drinks', 48],
-  ['checking', -28.67, 'CULVERS BUTTERBURGER', 'Dining & Drinks', 49],
-  ['credit', -82.13, 'OLD NAVY STORE 0912', 'Shopping', 50],
-  ['checking', -17.45, 'MCDONALDS #9081', 'Dining & Drinks', 51],
-  ['credit', -47.28, 'TARGET GROCERY', 'Groceries', 52]
+const DEMO_HOUSEHOLD_MEMBERS = [
+  {
+    name: 'Jordan Brooks',
+    role: 'adult',
+    birthDate: '1987-06-14',
+    employmentStatus: 'employed',
+    employer: 'Grace Harbor Church',
+    jobTitle: 'Associate Pastor',
+    grossIncomeAnnual: 72000,
+    netPayPerPeriod: 2125,
+    payFrequency: 'biweekly',
+    payPeriodsPerYear: 26,
+    retirementAccountType: '403b',
+    employeeContributionPercent: 8,
+    employerMatchPercent: 50,
+    employerMatchLimitPercent: 6,
+    healthPremiumPerMonth: 380,
+    hsaContributionAnnual: 2400,
+    dependentCareFsaAnnual: 0,
+    otherBenefitsAnnual: 600,
+    notes: 'Sample ministry income for MHA and household tax testing.'
+  },
+  {
+    name: 'Taylor Brooks',
+    role: 'adult',
+    birthDate: '1989-10-03',
+    employmentStatus: 'employed',
+    employer: 'Northstar Health',
+    jobTitle: 'Clinical Operations Manager',
+    grossIncomeAnnual: 110000,
+    netPayPerPeriod: 3200,
+    payFrequency: 'biweekly',
+    payPeriodsPerYear: 26,
+    retirementAccountType: '401k',
+    employeeContributionPercent: 6,
+    employerMatchPercent: 100,
+    employerMatchLimitPercent: 4,
+    healthPremiumPerMonth: 0,
+    hsaContributionAnnual: 1200,
+    dependentCareFsaAnnual: 2500,
+    otherBenefitsAnnual: 0,
+    notes: 'Sample spouse income to exercise household bracket estimates.'
+  }
+];
+
+const DEMO_MHA_TAX_PROFILE = {
+  mode: 'household',
+  simpleFederalRate: 22,
+  simpleStateRate: 4.95,
+  filingStatus: 'married_joint',
+  state: 'IL',
+  deductionMode: 'standard',
+  itemizedDeduction: 0,
+  taxableIncomeOverride: null,
+  stateRateOverride: null
+};
+
+const MHA_ELIGIBLE_CATEGORY_NAMES = [
+  'Bills & Utilities',
+  'Home & Garden',
+  'Loan Payment',
+  'Taxes'
+];
+
+const MONTHLY_TXN_TEMPLATE = [
+  { key: 'payroll-ministry', accountKey: 'checking', amount: 6000, variance: 0, merchant: 'Grace Harbor Church Payroll', categoryName: 'Income', day: 1 },
+  { key: 'payroll-spouse', accountKey: 'checking', amount: 9166.67, variance: 0, merchant: 'Northstar Health Payroll', categoryName: 'Income', day: 1 },
+  { key: 'mortgage', accountKey: 'checking', amount: -1950, variance: 0, merchant: 'Home Mortgage ACH', categoryName: 'Loan Payment', day: 2, note: 'Sample MHA housing cost.' },
+  { key: 'electric', accountKey: 'checking', amount: -178.4, variance: 13, merchant: 'Electric Utility Co.', categoryName: 'Bills & Utilities', day: 5, note: 'Sample MHA utility cost.' },
+  { key: 'gas', accountKey: 'checking', amount: -82.1, variance: 9, merchant: 'Gas & Heat Utility', categoryName: 'Bills & Utilities', day: 6, note: 'Sample MHA utility cost.' },
+  { key: 'internet', accountKey: 'credit', amount: -96, variance: 0, merchant: 'Fiber Internet Provider', categoryName: 'Bills & Utilities', day: 7, note: 'Sample MHA utility cost.' },
+  { key: 'mobile', accountKey: 'credit', amount: -68, variance: 0, merchant: 'Mobile Wireless', categoryName: 'Bills & Utilities', day: 8 },
+  { key: 'walmart-grocery', accountKey: 'credit', amount: -142.35, variance: 18, merchant: 'WAL-MART SUPERCENTER #5402', categoryName: 'Groceries', day: 9 },
+  { key: 'target-shop', accountKey: 'credit', amount: -86.2, variance: 12, merchant: 'TARGET T-2201', categoryName: 'Shopping', day: 11 },
+  { key: 'portillos', accountKey: 'credit', amount: -42.8, variance: 5, merchant: 'PORTILLOS HOT DOGS 12', categoryName: 'Dining & Drinks', day: 13 },
+  { key: 'fuel', accountKey: 'checking', amount: -118.45, variance: 10, merchant: 'Lakeside Fuel Stop', categoryName: 'Auto & Transport', day: 14 },
+  { key: 'savings-out', accountKey: 'checking', amount: -500, variance: 0, merchant: 'Transfer to Savings', categoryName: 'Internal Transfers', day: 15 },
+  { key: 'savings-in', accountKey: 'savings', amount: 500, variance: 0, merchant: 'Transfer from Checking', categoryName: 'Internal Transfers', day: 15 },
+  { key: 'giving', accountKey: 'checking', amount: -420, variance: 0, merchant: 'Grace Harbor Giving', categoryName: 'Charitable Donations', day: 18 },
+  { key: 'streaming', accountKey: 'credit', amount: -17.99, variance: 0, merchant: 'Streamly', categoryName: 'Entertainment & Rec.', day: 19 },
+  { key: 'software', accountKey: 'credit', amount: -24.99, variance: 0, merchant: 'PhotoCloud', categoryName: 'Software & Tech', day: 20 },
+  { key: 'pet', accountKey: 'credit', amount: -38.5, variance: 6, merchant: 'Pet Pantry', categoryName: 'Pets', day: 22 },
+  { key: 'water', accountKey: 'checking', amount: -121.44, variance: 8, merchant: 'Water Utility', categoryName: 'Bills & Utilities', day: 24, note: 'Sample MHA utility cost.' },
+  { key: 'home-garden', accountKey: 'credit', amount: -95.75, variance: 14, merchant: 'Garden Supply', categoryName: 'Home & Garden', day: 25, note: 'Sample MHA home expense.' },
+  { key: 'card-payment-out', accountKey: 'checking', amount: -1550, variance: 0, merchant: 'Northstar Card Payment', categoryName: 'Credit Card Payment', day: 27 },
+  { key: 'card-payment-in', accountKey: 'credit', amount: 1550, variance: 0, merchant: 'Payment Thank You', categoryName: 'Credit Card Payment', day: 27 }
+];
+
+const OCCASIONAL_TXN_TEMPLATE = [
+  { monthsAgo: [1, 4, 7, 10], key: 'home-repair', accountKey: 'checking', amount: -360, merchant: 'Home Repair Co.', categoryName: 'Home & Garden', day: 16, note: 'Sample MHA repair cost.' },
+  { monthsAgo: [2, 8], key: 'property-tax', accountKey: 'checking', amount: -2850, merchant: 'County Property Tax', categoryName: 'Taxes', day: 12, note: 'Sample MHA property tax cost.' },
+  { monthsAgo: [3, 9], key: 'insurance', accountKey: 'checking', amount: -740, merchant: 'Homeowners Insurance', categoryName: 'Bills & Utilities', day: 10, note: 'Sample MHA housing cost.' },
+  { monthsAgo: [5], key: 'vacation', accountKey: 'travel-credit', amount: -860, merchant: 'Weekend Hotel', categoryName: 'Travel & Vacation', day: 21 },
+  { monthsAgo: [6], key: 'medical', accountKey: 'checking', amount: -240, merchant: 'Medical Clinic', categoryName: 'Medical', day: 17 },
+  { monthsAgo: [0, 6], key: 'marketplace', accountKey: 'checking', amount: 180, merchant: 'Marketplace Sale', categoryName: 'Venmo/Marketplace', day: 23 }
 ];
 
 const DEMO_RULE_SEED = [
@@ -159,18 +199,79 @@ const BUDGET_SEED = [
   ['Groceries', 650],
   ['Dining & Drinks', 260],
   ['Bills & Utilities', 480],
-  ['Entertainment', 180],
+  ['Entertainment & Rec.', 180],
   ['Auto & Transport', 220],
   ['Shopping', 240],
   ['Health & Wellness', 200],
-  ['Pets', 90]
+  ['Home & Garden', 300],
+  ['Pets', 90],
+  ['Software & Tech', 50],
+  ['Travel & Vacation', 175]
 ];
 
-function isoDaysAgo(daysAgo) {
-  const d = new Date();
-  d.setHours(12, 0, 0, 0);
-  d.setDate(d.getDate() - daysAgo);
-  return d.toISOString().slice(0, 10);
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function isoDate(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function monthStart(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1, 12, 0, 0, 0);
+}
+
+function addMonths(date, offset) {
+  return new Date(date.getFullYear(), date.getMonth() + offset, 1, 12, 0, 0, 0);
+}
+
+function lastCompletedMonthStart(now = new Date()) {
+  return addMonths(monthStart(now), -1);
+}
+
+function dateInMonth(month, day) {
+  const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  return isoDate(new Date(month.getFullYear(), month.getMonth(), Math.min(day, lastDay), 12, 0, 0, 0));
+}
+
+function variedAmount(baseAmount, monthIndex, variance = 0) {
+  if (!variance) return baseAmount;
+  return Math.round((baseAmount + (((monthIndex % 5) - 2) * variance)) * 100) / 100;
+}
+
+export function buildDemoTransactions(now = new Date()) {
+  const endMonth = lastCompletedMonthStart(now);
+  const transactions = [];
+
+  for (let monthsAgo = 0; monthsAgo < 12; monthsAgo += 1) {
+    const month = addMonths(endMonth, -monthsAgo);
+    const monthKey = `${month.getFullYear()}${pad2(month.getMonth() + 1)}`;
+    const monthIndex = 11 - monthsAgo;
+    const templates = [
+      ...MONTHLY_TXN_TEMPLATE,
+      ...OCCASIONAL_TXN_TEMPLATE.filter((item) => item.monthsAgo.includes(monthsAgo))
+    ];
+
+    templates.forEach((item, templateIndex) => {
+      transactions.push({
+        accountKey: item.accountKey,
+        amount: variedAmount(item.amount, monthIndex, item.variance),
+        merchant: item.merchant,
+        categoryName: item.categoryName,
+        date: dateInMonth(month, item.day),
+        originalDescription: `${item.merchant} demo transaction ${monthKey}`,
+        note: item.note || null,
+        sortKey: `${monthKey}-${pad2(item.day)}-${pad2(templateIndex)}`
+      });
+    });
+  }
+
+  return transactions
+    .sort((a, b) => b.sortKey.localeCompare(a.sortKey))
+    .map((transaction, index) => ({
+      ...transaction,
+      externalId: `demo-txn-${String(index + 1).padStart(3, '0')}`
+    }));
 }
 
 function loadCategoryMap(db, householdId = 1) {
@@ -230,6 +331,187 @@ function upsertDemoAccounts(db, householdId = 1) {
   return accountIds;
 }
 
+function putDemoSetting(db, householdId, key, value, { overwrite = true } = {}) {
+  if (!overwrite) {
+    db.prepare(
+      `INSERT OR IGNORE INTO app_settings (household_id, key, value, updated_at)
+       VALUES (?, ?, ?, datetime('now'))`
+    ).run(householdId, key, value);
+    return;
+  }
+
+  db.prepare(
+    `INSERT INTO app_settings (household_id, key, value, updated_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(household_id, key) DO UPDATE SET
+       value = excluded.value,
+       updated_at = datetime('now')`
+  ).run(householdId, key, value);
+}
+
+function upsertDemoMhaSettings(db, categories, householdId = 1) {
+  putDemoSetting(db, householdId, 'mha_tracker_enabled', '1');
+  putDemoSetting(db, householdId, MHA_TAX_PROFILE_KEY, JSON.stringify(DEMO_MHA_TAX_PROFILE), {
+    overwrite: false
+  });
+
+  const markCategory = db.prepare(
+    `UPDATE categories
+        SET mha_default_eligible = 1,
+            mha_default_ignored = 0
+      WHERE household_id = ?
+        AND name = ?`
+  );
+
+  for (const categoryName of MHA_ELIGIBLE_CATEGORY_NAMES) {
+    if (categories.has(categoryName)) {
+      markCategory.run(householdId, categoryName);
+      const category = categories.get(categoryName);
+      categories.set(categoryName, {
+        ...category,
+        mha_default_eligible: 1,
+        mha_default_ignored: 0
+      });
+    }
+  }
+}
+
+function upsertDemoHouseholdMembers(db, accountIds, householdId = 1, options = {}) {
+  const effectiveDate = isoDate(addMonths(lastCompletedMonthStart(options.now), -11));
+  const findMember = db.prepare(
+    'SELECT id FROM household_members WHERE household_id = ? AND name = ?'
+  );
+  const insertMember = db.prepare(`
+    INSERT INTO household_members (
+      household_id, name, role, birth_date, employment_status, employer, job_title,
+      gross_income_annual, net_pay_per_period, pay_frequency, pay_periods_per_year,
+      retirement_account_type, employee_contribution_percent, employee_contribution_annual,
+      employer_match_percent, employer_match_limit_percent, employer_match_annual_cap,
+      health_premium_per_month, hsa_contribution_annual, dependent_care_fsa_annual,
+      other_benefits_annual, notes
+    ) VALUES (
+      @household_id, @name, @role, @birth_date, @employment_status, @employer, @job_title,
+      @gross_income_annual, @net_pay_per_period, @pay_frequency, @pay_periods_per_year,
+      @retirement_account_type, @employee_contribution_percent, @employee_contribution_annual,
+      @employer_match_percent, @employer_match_limit_percent, @employer_match_annual_cap,
+      @health_premium_per_month, @hsa_contribution_annual, @dependent_care_fsa_annual,
+      @other_benefits_annual, @notes
+    )
+  `);
+  const updateMember = db.prepare(`
+    UPDATE household_members
+       SET role = @role,
+           birth_date = @birth_date,
+           employment_status = @employment_status,
+           employer = @employer,
+           job_title = @job_title,
+           gross_income_annual = @gross_income_annual,
+           net_pay_per_period = @net_pay_per_period,
+           pay_frequency = @pay_frequency,
+           pay_periods_per_year = @pay_periods_per_year,
+           retirement_account_type = @retirement_account_type,
+           employee_contribution_percent = @employee_contribution_percent,
+           employee_contribution_annual = @employee_contribution_annual,
+           employer_match_percent = @employer_match_percent,
+           employer_match_limit_percent = @employer_match_limit_percent,
+           employer_match_annual_cap = @employer_match_annual_cap,
+           health_premium_per_month = @health_premium_per_month,
+           hsa_contribution_annual = @hsa_contribution_annual,
+           dependent_care_fsa_annual = @dependent_care_fsa_annual,
+           other_benefits_annual = @other_benefits_annual,
+           notes = @notes,
+           updated_at = datetime('now')
+     WHERE id = @id
+       AND household_id = @household_id
+  `);
+  const upsertIncomeRecord = db.prepare(`
+    INSERT INTO household_income_records (
+      household_id, member_id, effective_date, gross_income_annual, net_pay_per_period,
+      pay_frequency, pay_periods_per_year, employee_contribution_percent,
+      employee_contribution_annual, employer_match_percent,
+      employer_match_limit_percent, employer_match_annual_cap,
+      health_premium_per_month, hsa_contribution_annual,
+      dependent_care_fsa_annual, other_benefits_annual, source, notes
+    ) VALUES (
+      @household_id, @member_id, @effective_date, @gross_income_annual, @net_pay_per_period,
+      @pay_frequency, @pay_periods_per_year, @employee_contribution_percent,
+      @employee_contribution_annual, @employer_match_percent,
+      @employer_match_limit_percent, @employer_match_annual_cap,
+      @health_premium_per_month, @hsa_contribution_annual,
+      @dependent_care_fsa_annual, @other_benefits_annual, 'sample', @notes
+    )
+    ON CONFLICT(member_id, effective_date) DO UPDATE SET
+      gross_income_annual = excluded.gross_income_annual,
+      net_pay_per_period = excluded.net_pay_per_period,
+      pay_frequency = excluded.pay_frequency,
+      pay_periods_per_year = excluded.pay_periods_per_year,
+      employee_contribution_percent = excluded.employee_contribution_percent,
+      employee_contribution_annual = excluded.employee_contribution_annual,
+      employer_match_percent = excluded.employer_match_percent,
+      employer_match_limit_percent = excluded.employer_match_limit_percent,
+      employer_match_annual_cap = excluded.employer_match_annual_cap,
+      health_premium_per_month = excluded.health_premium_per_month,
+      hsa_contribution_annual = excluded.hsa_contribution_annual,
+      dependent_care_fsa_annual = excluded.dependent_care_fsa_annual,
+      other_benefits_annual = excluded.other_benefits_annual,
+      source = excluded.source,
+      notes = excluded.notes,
+      updated_at = datetime('now')
+  `);
+  const linkRetirementAccount = db.prepare(`
+    INSERT INTO household_retirement_accounts (household_id, member_id, account_id, account_kind)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(member_id, account_id) DO UPDATE SET
+      household_id = excluded.household_id,
+      account_kind = excluded.account_kind,
+      updated_at = datetime('now')
+  `);
+
+  let changed = 0;
+  for (const member of DEMO_HOUSEHOLD_MEMBERS) {
+    const row = {
+      household_id: householdId,
+      name: member.name,
+      role: member.role,
+      birth_date: member.birthDate,
+      employment_status: member.employmentStatus,
+      employer: member.employer,
+      job_title: member.jobTitle,
+      gross_income_annual: dollarsToCents(member.grossIncomeAnnual),
+      net_pay_per_period: dollarsToCents(member.netPayPerPeriod),
+      pay_frequency: member.payFrequency,
+      pay_periods_per_year: member.payPeriodsPerYear,
+      retirement_account_type: member.retirementAccountType,
+      employee_contribution_percent: member.employeeContributionPercent,
+      employee_contribution_annual: 0,
+      employer_match_percent: member.employerMatchPercent,
+      employer_match_limit_percent: member.employerMatchLimitPercent,
+      employer_match_annual_cap: 0,
+      health_premium_per_month: dollarsToCents(member.healthPremiumPerMonth),
+      hsa_contribution_annual: dollarsToCents(member.hsaContributionAnnual),
+      dependent_care_fsa_annual: dollarsToCents(member.dependentCareFsaAnnual),
+      other_benefits_annual: dollarsToCents(member.otherBenefitsAnnual),
+      notes: member.notes
+    };
+    const existing = findMember.get(householdId, member.name);
+    const memberId = existing
+      ? (updateMember.run({ ...row, id: existing.id }), existing.id)
+      : insertMember.run(row).lastInsertRowid;
+
+    upsertIncomeRecord.run({
+      ...row,
+      member_id: memberId,
+      effective_date: effectiveDate
+    });
+
+    if (accountIds.investment) {
+      linkRetirementAccount.run(householdId, memberId, accountIds.investment, member.retirementAccountType);
+    }
+    changed++;
+  }
+  return changed;
+}
+
 function upsertDemoRules(db, categories, householdId = 1) {
   const findRule = db.prepare('SELECT id FROM rules WHERE household_id = ? AND name = ?');
   const insertRule = db.prepare(`
@@ -270,7 +552,7 @@ function upsertDemoRules(db, categories, householdId = 1) {
   return changed;
 }
 
-function refreshExistingDemoData(db, categories, householdId = 1) {
+function refreshExistingDemoData(db, categories, householdId = 1, options = {}) {
   const hasDemoTransactions = db
     .prepare("SELECT COUNT(*) AS c FROM transactions WHERE household_id = ? AND external_id LIKE 'demo-txn-%'")
     .get(householdId).c > 0;
@@ -280,6 +562,7 @@ function refreshExistingDemoData(db, categories, householdId = 1) {
   }
 
   const accountIds = upsertDemoAccounts(db, householdId);
+  const transactions = buildDemoTransactions(options.now);
   const uncategorized = categories.get('Uncategorized');
   const updateTxn = db.prepare(`
     UPDATE transactions
@@ -307,23 +590,24 @@ function refreshExistingDemoData(db, categories, householdId = 1) {
 
   const run = db.transaction(() => {
     let changed = 0;
-    TXN_SEED.forEach(([accountKey, amount, merchant, categoryName, daysAgo], index) => {
-      const category = categories.get(categoryName) || uncategorized || null;
+    upsertDemoHouseholdMembers(db, accountIds, householdId, options);
+    upsertDemoMhaSettings(db, categories, householdId);
+    transactions.forEach((transaction, index) => {
+      const category = categories.get(transaction.categoryName) || uncategorized || null;
       const isTransfer = category?.is_transfer ? 1 : 0;
-      const externalId = `demo-txn-${String(index + 1).padStart(3, '0')}`;
       const params = [
-        accountIds[accountKey],
-        isoDaysAgo(daysAgo),
-        dollarsToCents(amount),
-        merchant,
-        `${merchant} demo transaction`,
+        accountIds[transaction.accountKey],
+        transaction.date,
+        dollarsToCents(transaction.amount),
+        transaction.merchant,
+        transaction.originalDescription,
         category?.id ?? null,
-        index % 9 === 0 ? 'Demo note for showcase mode.' : null,
+        transaction.note,
         isTransfer,
-        externalId,
+        transaction.externalId,
         householdId
       ];
-      if (findTxn.get(householdId, externalId)) {
+      if (findTxn.get(householdId, transaction.externalId)) {
         updateTxn.run(...params);
       } else {
         insertTxn.run(...params);
@@ -332,7 +616,12 @@ function refreshExistingDemoData(db, categories, householdId = 1) {
     });
 
     const rules = upsertDemoRules(db, categories, householdId);
-    return { transactions: changed, rules, accounts: Object.keys(accountIds).length };
+    return {
+      transactions: changed,
+      rules,
+      accounts: Object.keys(accountIds).length,
+      householdMembers: DEMO_HOUSEHOLD_MEMBERS.length
+    };
   });
 
   const result = run();
@@ -340,7 +629,7 @@ function refreshExistingDemoData(db, categories, householdId = 1) {
   return { refreshed: true, ...result };
 }
 
-export function seedDemoDataForHousehold(db, householdId = 1) {
+export function seedDemoDataForHousehold(db, householdId = 1, options = {}) {
   const existing = db
     .prepare(
       `SELECT
@@ -352,7 +641,7 @@ export function seedDemoDataForHousehold(db, householdId = 1) {
   const categories = loadCategoryMap(db, householdId);
 
   if (existing.accounts > 0 || existing.transactions > 0) {
-    const refreshed = refreshExistingDemoData(db, categories, householdId);
+    const refreshed = refreshExistingDemoData(db, categories, householdId, options);
     if (refreshed.refreshed) {
       console.log(`Demo seed: refreshed ${refreshed.transactions} showcase transactions and ${refreshed.rules} rules.`);
       return { seeded: false, ...refreshed };
@@ -378,21 +667,24 @@ export function seedDemoDataForHousehold(db, householdId = 1) {
 
   const run = db.transaction(() => {
     const accountIds = upsertDemoAccounts(db, householdId);
+    const transactions = buildDemoTransactions(options.now);
+    const householdMembers = upsertDemoHouseholdMembers(db, accountIds, householdId, options);
+    upsertDemoMhaSettings(db, categories, householdId);
 
     let inserted = 0;
-    TXN_SEED.forEach(([accountKey, amount, merchant, categoryName, daysAgo], index) => {
-      const category = categories.get(categoryName) || uncategorized || null;
+    transactions.forEach((transaction) => {
+      const category = categories.get(transaction.categoryName) || uncategorized || null;
       const isTransfer = category?.is_transfer ? 1 : 0;
       insertTxn.run(
-        accountIds[accountKey],
-        isoDaysAgo(daysAgo),
-        dollarsToCents(amount),
-        merchant,
-        `${merchant} demo transaction`,
+        accountIds[transaction.accountKey],
+        transaction.date,
+        dollarsToCents(transaction.amount),
+        transaction.merchant,
+        transaction.originalDescription,
         category?.id ?? null,
-        index % 9 === 0 ? 'Demo note for showcase mode.' : null,
+        transaction.note,
         isTransfer,
-        `demo-txn-${String(index + 1).padStart(3, '0')}`,
+        transaction.externalId,
         householdId
       );
       inserted++;
@@ -405,15 +697,21 @@ export function seedDemoDataForHousehold(db, householdId = 1) {
       if (category) insertBudget.run(householdId, category.id, dollarsToCents(amount));
     }
 
-    return { inserted, rulesCreated };
+    return { inserted, rulesCreated, householdMembers };
   });
 
   const result = run();
   reapplyRulesToAllTransactions(db, householdId);
   console.log(
-    `Demo seed: created ${ACCOUNT_SEED.length} accounts, ${result.inserted} transactions, and ${result.rulesCreated} rules.`
+    `Demo seed: created ${ACCOUNT_SEED.length} accounts, ${result.householdMembers} household members, ${result.inserted} transactions, and ${result.rulesCreated} rules.`
   );
-  return { seeded: true, accounts: ACCOUNT_SEED.length, transactions: result.inserted, rules: result.rulesCreated };
+  return {
+    seeded: true,
+    accounts: ACCOUNT_SEED.length,
+    householdMembers: result.householdMembers,
+    transactions: result.inserted,
+    rules: result.rulesCreated
+  };
 }
 
 export function seedDemoData(db) {

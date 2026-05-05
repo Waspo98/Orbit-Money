@@ -868,7 +868,7 @@ export default function Settings({
       >
         {status?.connected ? (
           <>
-            <div className="status-grid">
+            <div className="metric-grid status-grid">
               <div><dt>Cutover Date</dt><dd>{status.cutoverDate || '-'}</dd></div>
               <div><dt>Last Sync</dt><dd>{formatDateTime(status.lastSyncAt)}</dd></div>
               <div>
@@ -931,7 +931,7 @@ export default function Settings({
 
             {syncResult && (
               <div className={`result-card ${syncResult.status === 'error' ? 'error-tone' : ''}`}>
-                <dl className="stat-grid">
+                <dl className="metric-grid stat-grid">
                   <div><dt>Inserted</dt><dd>{syncResult.inserted.toLocaleString()}</dd></div>
                   <div><dt>Skipped</dt><dd>{syncResult.skipped.toLocaleString()}</dd></div>
                   <div><dt>RM Removed</dt><dd>{syncResult.rmDeleted.toLocaleString()}</dd></div>
@@ -1122,7 +1122,7 @@ export default function Settings({
           <div className="result-card">
             {importResult.undone ? (
               <>
-                <dl className="stat-grid">
+                <dl className="metric-grid stat-grid">
                   <div><dt>Transactions Removed</dt><dd>{importResult.undone.transactionsDeleted.toLocaleString()}</dd></div>
                   <div><dt>Rules Removed</dt><dd>{importResult.undone.rulesDeleted.toLocaleString()}</dd></div>
                   <div><dt>Accounts Removed</dt><dd>{importResult.undone.accountsDeleted.toLocaleString()}</dd></div>
@@ -1132,7 +1132,7 @@ export default function Settings({
               </>
             ) : (
               <>
-                <dl className="stat-grid">
+                <dl className="metric-grid stat-grid">
                   <div><dt>Imported</dt><dd>{importResult.inserted.toLocaleString()}</dd></div>
                   <div><dt>Skipped</dt><dd>{importResult.skipped.toLocaleString()}</dd></div>
                   <div><dt>Accounts</dt><dd>{importResult.accountsCreated.toLocaleString()}</dd></div>
@@ -1200,7 +1200,7 @@ export default function Settings({
 
             {importPreview && (
               <div className="result-card">
-                <dl className="stat-grid">
+                <dl className="metric-grid stat-grid">
                   <div><dt>Would Import</dt><dd>{importPreview.estimatedInserted.toLocaleString()}</dd></div>
                   <div><dt>Duplicates</dt><dd>{importPreview.duplicateRows.toLocaleString()}</dd></div>
                   <div><dt>New Accounts</dt><dd>{importPreview.accountsCreated.toLocaleString()}</dd></div>
@@ -1313,7 +1313,7 @@ export default function Settings({
 
         {restorePreview && (
           <div className="result-card">
-            <dl className="stat-grid">
+            <dl className="metric-grid stat-grid">
               <div><dt>Accounts</dt><dd>{restorePreview.accounts.toLocaleString()}</dd></div>
               <div><dt>Transactions</dt><dd>{restorePreview.transactions.toLocaleString()}</dd></div>
               <div><dt>Rules</dt><dd>{restorePreview.rules.toLocaleString()}</dd></div>

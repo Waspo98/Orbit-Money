@@ -15,19 +15,56 @@ import {
   MHA_SAVINGS_RATE,
   summarizeMhaTransactions
 } from '../services/mhaSummary.js';
+import {
+  estimateMhaTaxSavings,
+  MHA_TAX_PROFILE_KEY,
+  normalizeMhaTaxProfile,
+  parseMhaTaxProfile,
+  taxDataMeta,
+  taxReferencePayload
+} from '../services/mhaTaxEstimate.js';
 
 const router = express.Router();
 const EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL = effectiveCategoryIdSql('t');
 const SETTING_KEY = 'mha_tracker_enabled';
 const ACCOUNT_MONEY_FIELDS = ['current_balance'];
 
+function getSetting(householdId, key) {
+  return db.prepare('SELECT value FROM app_settings WHERE household_id = ? AND key = ?').get(householdId, key)?.value;
+}
+
+function putSetting(householdId, key, value) {
+  db.prepare(
+    `INSERT INTO app_settings (household_id, key, value, updated_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(household_id, key) DO UPDATE SET
+       value = excluded.value,
+       updated_at = datetime('now')`
+  ).run(householdId, key, value);
+}
+
 function boolFlag(value) {
   return value ? 1 : 0;
 }
 
 function getEnabled(householdId) {
-  const row = db.prepare('SELECT value FROM app_settings WHERE household_id = ? AND key = ?').get(householdId, SETTING_KEY);
-  return row?.value === '1';
+  return getSetting(householdId, SETTING_KEY) === '1';
+}
+
+function getTaxProfile(householdId) {
+  return parseMhaTaxProfile(getSetting(householdId, MHA_TAX_PROFILE_KEY));
+}
+
+function getHouseholdTaxMembers(householdId) {
+  return db
+    .prepare(
+      `SELECT gross_income_annual, employee_contribution_percent, employee_contribution_annual,
+              health_premium_per_month, hsa_contribution_annual,
+              dependent_care_fsa_annual, other_benefits_annual
+         FROM household_members
+        WHERE household_id = ?`
+    )
+    .all(householdId);
 }
 
 function currentYear() {
@@ -78,16 +115,25 @@ router.put('/settings', requireAuth, (req, res) => {
 
   try {
     const value = enabled ? '1' : '0';
-    db.prepare(
-      `INSERT INTO app_settings (household_id, key, value, updated_at)
-       VALUES (?, ?, ?, datetime('now'))
-       ON CONFLICT(household_id, key) DO UPDATE SET
-         value = excluded.value,
-         updated_at = datetime('now')`
-    ).run(householdId, SETTING_KEY, value);
+    putSetting(householdId, SETTING_KEY, value);
     sendOk(res, { enabled });
   } catch (err) {
     console.error('Update MHA settings failed:', err);
+    sendServerError(res, err);
+  }
+});
+
+router.put('/tax-profile', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  try {
+    const profile = normalizeMhaTaxProfile(req.body || {});
+    putSetting(householdId, MHA_TAX_PROFILE_KEY, JSON.stringify(profile));
+    sendOk(res, {
+      taxProfile: profile,
+      taxReference: taxReferencePayload()
+    });
+  } catch (err) {
+    console.error('Update MHA tax profile failed:', err);
     sendServerError(res, err);
   }
 });
@@ -172,11 +218,26 @@ router.get('/', requireAuth, (req, res) => {
       )
       .all(householdId, householdId, householdId, startDate, endDate)
       .map(formatMhaTransaction);
-    const summary = summarizeMhaTransactions(transactions, MHA_SAVINGS_RATE);
+    const baseSummary = summarizeMhaTransactions(transactions, MHA_SAVINGS_RATE);
+    const taxProfile = getTaxProfile(householdId);
+    const taxEstimate = estimateMhaTaxSavings({
+      transactionTotal: baseSummary.transactionTotal,
+      profile: taxProfile,
+      householdMembers: getHouseholdTaxMembers(householdId)
+    });
+    const summary = {
+      ...baseSummary,
+      savings: taxEstimate.savings,
+      savingsRate: taxEstimate.effectiveRate
+    };
 
     sendOk(res, {
       enabled: getEnabled(householdId),
-      savingsRate: MHA_SAVINGS_RATE,
+      savingsRate: taxEstimate.effectiveRate,
+      taxProfile,
+      taxEstimate,
+      taxReference: taxReferencePayload(),
+      taxDataMeta: taxDataMeta(),
       year,
       years: getYears(householdId),
       accounts,

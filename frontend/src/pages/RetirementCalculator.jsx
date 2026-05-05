@@ -586,7 +586,7 @@ export default function RetirementCalculator() {
               <h3>Projection</h3>
             </header>
             <RetirementChart model={model} />
-            <div className="retcalc-metric-grid retcalc-chart-summary">
+            <div className="metric-grid retcalc-metric-grid retcalc-chart-summary">
               <Metric label="Required Monthly" value={`${formatMoney(model.requiredMonthly)}/mo`} detail={model.savingsGap > 0 ? `${formatMoney(model.savingsGap)}/mo gap` : 'Current pace clears target'} tone={model.savingsGap > 0 ? 'expense' : 'income'} />
               <Metric label="Income at Retirement" value={`${formatMoney(model.projectedAnnualIncome)}/yr`} detail={`${formatPercent(model.withdrawalRate * 100)} withdrawal`} />
               <Metric label="Earliest Target Age" value={model.earliest ? String(model.earliest) : 'After 95'} detail={`${formatPercent(model.savingsRate)} savings rate`} />
@@ -608,7 +608,7 @@ export default function RetirementCalculator() {
             retirement savings, because non-HSA money usually needs to cover general living expenses until HSA access
             is simpler.
           </p>
-          <div className="retcalc-bridge-editor">
+          <div className="metric-grid retcalc-bridge-editor">
             <Metric label="Current HSA Inputs" value={formatMoney(model.hsaBalance)} detail={`${formatMoney(model.hsaMonthlyForProjection)}/mo HSA contributions`} />
             <Metric label="HSA in Top Number" value={formatMoney(model.projectedHsaAtRetirement)} detail="Projected HSA portion at retirement" />
             <Metric label="Non-HSA at Retirement" value={formatMoney(model.nonHsaAtRetirement)} detail="Used for the pre-65 bridge check" />
@@ -654,7 +654,7 @@ export default function RetirementCalculator() {
             <p className="subtle">Link retirement accounts from Household to include balances here.</p>
           ) : (
             <>
-              <div className="retcalc-account-total">
+              <div className="metric-grid retcalc-account-total">
                 <Metric label="Total Tracked" value={formatMoney(model.currentBalance)} detail={`${model.accounts.length} linked accounts`} />
                 <Metric label="HSA Portion" value={formatMoney(model.hsaBalance)} detail={`${formatMoney(model.hsaAnnual)}/yr HSA contributions`} tone={model.hsaBalance > 0 || model.hsaAnnual > 0 ? 'income' : ''} />
               </div>
@@ -825,7 +825,7 @@ function PercentLever({ label, value, numericValue, min, max, step, onChange, on
 
 function Metric({ label, value, detail, tone = '' }) {
   return (
-    <div className={`retcalc-metric ${tone}`.trim()}>
+    <div className={`metric-card retcalc-metric ${tone}`.trim()}>
       <span>{label}</span>
       <strong>{value}</strong>
       <em>{detail}</em>

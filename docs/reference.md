@@ -181,6 +181,10 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 
 ### MHA Tracker
 - Eligible transaction totals exclude transactions whose displayed state is ignored or transfer. Eligibility can still come from account defaults, category defaults, or transaction overrides, but ignored/transfer rows are filtered out before summary totals and savings are computed.
+- MHA savings use a per-household tax profile stored in `app_settings` under `mha_tax_profile`. Simple mode uses only the manual federal and state percentages entered by the user.
+- Household estimate mode uses the bundled current-year federal brackets and standard deductions, subtracts household pre-tax paycheck contributions, and supports standard vs itemized deductions.
+- State auto-estimates intentionally cover no-tax and single-rate ordinary income states only. Graduated-rate states do not auto-estimate state savings yet.
+- Bundled tax data exposes source, reviewed, and review-after metadata so the UI can show freshness and stale-data warnings instead of silently using old tables.
 
 ### Accounts
 - Full CRUD + merge (reassigns all transactions to target, deletes source) + archive/unarchive
@@ -314,6 +318,8 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 | GET | `/api/auth/oidc/callback` | OIDC callback |
 | POST | `/api/auth/logout` | Session logout |
 | GET | `/api/auth/me` | Check auth status |
+
+Sample households are seeded with two adult household members, MHA enabled, a household-mode MHA tax profile, MHA-eligible housing categories, and a rolling 12 complete months of demo transactions ending with the last completed month at first login.
 
 ### Transactions
 | Method | Path | Description |
@@ -454,7 +460,7 @@ role and read/write access.
 - `lib/`: http, localDate, money, routeParams, upcomingProjection, upcomingSchedule
 - `db/migrations/001` through `030`
 - `routes/`: accounts, auth, budgets, categories, goals, health, household, householdSharing, import, merchantLogos, mha, netWorth, rules, simplefin, spendingTrends, transactions, upcoming
-- `services/`: budgetOverview, csvImport, demoSeed, householdDefaults, merchantLogos, mhaSummary, oidc, ruleMatcher, sampleHouseholds, sessionStore, simplefinClient, simplefinSync, spendingTrends, transferMatcher, upcomingReconciliation
+- `services/`: budgetOverview, csvImport, demoSeed, householdDefaults, merchantLogos, mhaSummary, mhaTaxEstimate, oidc, ruleMatcher, sampleHouseholds, sessionStore, simplefinClient, simplefinSync, spendingTrends, taxData2026, transferMatcher, upcomingReconciliation
 - `test/`: Node built-in test runner coverage for backend helpers and calculation services
 
 ### Frontend (`frontend/`)

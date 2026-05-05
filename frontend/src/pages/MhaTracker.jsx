@@ -1,13 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
+import AnimatedModal from '../components/AnimatedModal.jsx';
+import AppSelect from '../components/AppSelect.jsx';
+import CurrencyInput, {
+  formatCurrencyInput,
+  parseCurrencyInput
+} from '../components/CurrencyInput.jsx';
 import PageHero from '../components/PageHero.jsx';
 import PeriodNav from '../components/PeriodNav.jsx';
+import PercentInput from '../components/PercentInput.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { TransactionRow, EditTransactionModal } from '../components/transactions/TransactionRow.jsx';
 import { RuleEditor } from '../components/rules/RuleEditor.jsx';
-import { formatCurrency } from '../lib/formatters.js';
+import {
+  formatCurrency,
+  formatPercent,
+  formatPercentInput,
+  parsePercentInput
+} from '../lib/formatters.js';
 
 const ACCOUNT_TYPE_LABELS = {
   checking: 'Checking',
@@ -20,8 +32,17 @@ const ACCOUNT_TYPE_LABELS = {
   other: 'Other'
 };
 
+const DEDUCTION_OPTIONS = [
+  { value: 'standard', label: 'Standard Deduction' },
+  { value: 'itemized', label: 'Itemized Deduction' }
+];
+
 function formatMoney(amount, digits = 2) {
   return formatCurrency(amount, { maximumFractionDigits: digits });
+}
+
+function formatRate(rate) {
+  return formatPercent(Number(rate || 0) * 100, { maximumFractionDigits: 2 });
 }
 
 function currentYear() {
@@ -35,6 +56,57 @@ function parseYearParam(value) {
 
 function formatYearLabel(year) {
   return String(year || currentYear());
+}
+
+function daysInYear(year) {
+  return new Date(year, 1, 29).getMonth() === 1 ? 366 : 365;
+}
+
+function dayOfYear(date) {
+  const start = new Date(date.getFullYear(), 0, 1);
+  return Math.floor((date - start) / 86400000) + 1;
+}
+
+function annualizeSavings(savings, year) {
+  const selectedYear = Number(year);
+  const today = new Date();
+  const value = Number(savings || 0);
+  if (!Number.isFinite(selectedYear) || selectedYear < today.getFullYear()) return value;
+  if (selectedYear > today.getFullYear()) return value;
+  return value * (daysInYear(selectedYear) / Math.max(1, dayOfYear(today)));
+}
+
+function appSelectOptions(options) {
+  return (options || []).map((option) => ({
+    value: option.value ?? option.code,
+    label: option.label ?? option.name
+  }));
+}
+
+function toTaxDraft(profile) {
+  return {
+    mode: profile?.mode || 'simple',
+    simpleFederalRate: formatPercentInput(profile?.simpleFederalRate ?? 22),
+    simpleStateRate: formatPercentInput(profile?.simpleStateRate ?? 4.95),
+    filingStatus: profile?.filingStatus || 'married_joint',
+    state: profile?.state || 'IL',
+    deductionMode: profile?.deductionMode || 'standard',
+    itemizedDeduction: profile?.itemizedDeduction ? formatCurrencyInput(profile.itemizedDeduction) : ''
+  };
+}
+
+function draftToPayload(draft) {
+  return {
+    mode: draft.mode,
+    simpleFederalRate: parsePercentInput(draft.simpleFederalRate),
+    simpleStateRate: parsePercentInput(draft.simpleStateRate),
+    filingStatus: draft.filingStatus,
+    state: draft.state,
+    deductionMode: draft.deductionMode,
+    itemizedDeduction: parseCurrencyInput(draft.itemizedDeduction),
+    taxableIncomeOverride: null,
+    stateRateOverride: null
+  };
 }
 
 function categoryTypeLabel(category) {
@@ -82,6 +154,7 @@ export default function MhaTracker() {
   const [editingTxn, setEditingTxn] = useState(null);
   const [newRuleFromTxn, setNewRuleFromTxn] = useState(null);
   const [editingRule, setEditingRule] = useState(null);
+  const [editingTaxProfile, setEditingTaxProfile] = useState(false);
 
   async function load({ silent = false } = {}) {
     if (!silent && data == null) setLoading(true);
@@ -271,6 +344,9 @@ export default function MhaTracker() {
   }
 
   const summary = data?.summary || {};
+  const taxProfile = data?.taxProfile || {};
+  const taxEstimate = data?.taxEstimate || {};
+  const taxReference = data?.taxReference || {};
   const years = data?.years || [selectedYear];
   const accounts = data?.accounts || [];
   const categories = data?.categories || [];
@@ -313,13 +389,9 @@ export default function MhaTracker() {
         kicker="Ministerial Housing Allowance"
         title="MHA Tracker"
         subtitle="Calculate Projected MHA Tax Savings"
-        stats={[
-          { label: 'MHA Eligible Total', value: formatMoney(summary.transactionTotal), tone: 'good' },
-          { label: 'MHA Savings', value: formatMoney(summary.savings), tone: 'good' }
-        ]}
+        stats={[]}
         statsExtra={(
           <div className="page-hero-stat mha-year-stat">
-            <span>Year</span>
             <PeriodNav
               className="year-nav"
               value={selectedYear}
@@ -348,20 +420,29 @@ export default function MhaTracker() {
         </div>
       ) : (
         <div className={`mha-content ${refreshing ? 'refreshing' : ''}`}>
-          <section className="dashboard-card mha-picker-card">
-            <header className="dashboard-card-header">
-              <h3>Auto-include accounts</h3>
+          <MhaDashboard
+            summary={summary}
+            taxProfile={taxProfile}
+            taxEstimate={taxEstimate}
+            year={selectedYear}
+            onEdit={() => setEditingTaxProfile(true)}
+          />
+
+          <MhaCard
+            title="Auto-Include Accounts"
+            className="mha-picker-card mha-accounts-card"
+            action={
               <button
                 type="button"
-                className="dashboard-card-link button-link"
+                className="dashboard-card-link dashboard-card-action-button"
                 onClick={() => setAccountsExpanded((value) => !value)}
               >
-                {accountsExpanded ? 'Show selected' : 'Show all'} ({enabledAccounts.length})
+                {accountsExpanded ? 'Show Selected' : 'Show All'} ({enabledAccounts.length})
               </button>
-            </header>
-            <div className="dashboard-card-body">
+            }
+          >
               {visibleAccounts.length === 0 ? (
-                <p className="muted" style={{ margin: 0 }}>
+                <p className="subtle dash-card-note">
                   No accounts selected.
                 </p>
               ) : (
@@ -386,23 +467,23 @@ export default function MhaTracker() {
                   ))}
                 </div>
               )}
-            </div>
-          </section>
+          </MhaCard>
 
-          <section className="dashboard-card mha-picker-card">
-            <header className="dashboard-card-header">
-              <h3>Auto-include categories</h3>
+          <MhaCard
+            title="Auto-Include Categories"
+            className="mha-picker-card"
+            action={
               <button
                 type="button"
-                className="dashboard-card-link button-link"
+                className="dashboard-card-link dashboard-card-action-button"
                 onClick={() => setCategoriesExpanded((value) => !value)}
               >
-                {categoriesExpanded ? 'Show selected' : 'Show all'} ({enabledCategories.length})
+                {categoriesExpanded ? 'Show Selected' : 'Show All'} ({enabledCategories.length})
               </button>
-            </header>
-            <div className="dashboard-card-body">
+            }
+          >
               {visibleCategories.length === 0 ? (
-                <p className="muted" style={{ margin: 0 }}>
+                <p className="subtle dash-card-note">
                   No categories selected.
                 </p>
               ) : (
@@ -425,23 +506,23 @@ export default function MhaTracker() {
                   ))}
                 </div>
               )}
-            </div>
-          </section>
+          </MhaCard>
 
-          <section className="dashboard-card mha-picker-card">
-            <header className="dashboard-card-header">
-              <h3>Auto-ignore categories</h3>
+          <MhaCard
+            title="Auto-Ignore Categories"
+            className="mha-picker-card"
+            action={
               <button
                 type="button"
-                className="dashboard-card-link button-link"
+                className="dashboard-card-link dashboard-card-action-button"
                 onClick={() => setIgnoredCategoriesExpanded((value) => !value)}
               >
-                {ignoredCategoriesExpanded ? 'Show ignored' : 'Show all'} ({ignoredCategories.length})
+                {ignoredCategoriesExpanded ? 'Show Ignored' : 'Show All'} ({ignoredCategories.length})
               </button>
-            </header>
-            <div className="dashboard-card-body">
+            }
+          >
               {visibleIgnoredCategories.length === 0 ? (
-                <p className="muted" style={{ margin: 0 }}>
+                <p className="subtle dash-card-note">
                   No categories ignored.
                 </p>
               ) : (
@@ -464,19 +545,19 @@ export default function MhaTracker() {
                   ))}
                 </div>
               )}
-            </div>
-          </section>
+          </MhaCard>
 
-          <section className="dashboard-card mha-transactions-card">
-            <header className="dashboard-card-header">
-              <h3>MHA-eligible transactions</h3>
+          <MhaCard
+            title="MHA-Eligible Transactions"
+            className="mha-transactions-card"
+            action={
               <span className="dashboard-card-link">
                 {Number(summary.transactionCount || 0).toLocaleString()} in {selectedYear}
               </span>
-            </header>
-            <div className="dashboard-card-body">
+            }
+          >
               {transactions.length === 0 ? (
-                <p className="muted" style={{ margin: 0 }}>
+                <p className="subtle dash-card-note">
                   No MHA-eligible transactions yet.
                 </p>
               ) : (
@@ -506,8 +587,19 @@ export default function MhaTracker() {
                   ))}
                 </ul>
               )}
-            </div>
-          </section>
+          </MhaCard>
+
+          {editingTaxProfile && (
+            <TaxProfileModal
+              profile={taxProfile}
+              reference={taxReference}
+              onClose={() => setEditingTaxProfile(false)}
+              onSaved={() => {
+                setEditingTaxProfile(false);
+                load({ silent: true });
+              }}
+            />
+          )}
 
           {editingTxn && (
             <EditTransactionModal
@@ -566,5 +658,235 @@ export default function MhaTracker() {
         </div>
       )}
     </div>
+  );
+}
+
+function MhaCard({ title, action, className = '', children }) {
+  const cardClassName = ['dashboard-card', className].filter(Boolean).join(' ');
+
+  return (
+    <section className={cardClassName}>
+      <header className="dashboard-card-header">
+        <h3>{title}</h3>
+        {action}
+      </header>
+      <div className="dashboard-card-body">{children}</div>
+    </section>
+  );
+}
+
+function MhaDashboard({ summary, taxProfile, taxEstimate, year, onEdit }) {
+  const household = taxEstimate?.household || null;
+  const taxableIncome = household ? formatMoney(household.taxableIncome, 0) : 'Not Estimated';
+  const taxableIncomeReduction = household
+    ? Number(household.pretaxContributions || 0) + Number(household.deduction || 0)
+    : 0;
+  const taxableIncomeCalc = household
+    ? `${formatMoney(household.grossIncome, 0)} - ${formatMoney(taxableIncomeReduction, 0)}`
+    : null;
+  const editLabel = taxProfile?.mode === 'household' ? 'Edit Mode (Advanced)' : 'Edit Mode (Simple)';
+  const stateNeedsReview = taxEstimate?.stateRateConfidence === 'needs_review';
+  const projectedAnnualSavings = annualizeSavings(summary.savings, year);
+
+  return (
+    <MhaCard
+      title="MHA Dashboard"
+      className="mha-dashboard-card"
+      action={
+        <button
+          type="button"
+          className="dashboard-card-link dashboard-card-action-button"
+          onClick={onEdit}
+        >
+          {editLabel}
+        </button>
+      }
+    >
+      <div className="metric-grid mha-dashboard-grid">
+        <div className="metric-card mha-dashboard-metric mha-dashboard-savings mha-dashboard-current-savings">
+          <span>Current Savings</span>
+          <strong>{formatMoney(summary.savings)}</strong>
+        </div>
+        <div className="metric-card mha-dashboard-metric">
+          <span>Eligible Spending</span>
+          <strong>{formatMoney(summary.transactionTotal)}</strong>
+          <em>{Number(summary.transactionCount || 0).toLocaleString()} Transactions</em>
+        </div>
+        <div className="metric-card mha-dashboard-metric">
+          <span>Taxable Income</span>
+          <strong>{taxableIncome}</strong>
+          {taxableIncomeCalc && <em>{taxableIncomeCalc}</em>}
+          {!household && <em>Simple Mode</em>}
+        </div>
+        <div className="metric-card mha-dashboard-metric mha-dashboard-savings">
+          <span>Projected Annual Savings</span>
+          <strong>{formatMoney(projectedAnnualSavings)}</strong>
+          <em>Based on Current Rate</em>
+        </div>
+        <div className="metric-card mha-dashboard-metric">
+          <span>Federal Tax Savings</span>
+          <strong>{formatMoney(taxEstimate?.federalSavings)}</strong>
+          <em>Federal - {formatRate(taxEstimate?.federalRate)}</em>
+        </div>
+        <div className="metric-card mha-dashboard-metric">
+          <span>State Tax Savings</span>
+          <strong>{formatMoney(taxEstimate?.stateSavings)}</strong>
+          <em>State - {formatRate(taxEstimate?.stateRate)}</em>
+          {stateNeedsReview && (
+            <small>State savings are not auto-estimated for graduated-rate states yet.</small>
+          )}
+        </div>
+      </div>
+    </MhaCard>
+  );
+}
+
+function TaxProfileModal({ profile, reference, onClose, onSaved }) {
+  const [draft, setDraft] = useState(() => toTaxDraft(profile));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const filingStatuses = reference?.filingStatuses || [];
+  const selectedFiling = filingStatuses.find((option) => option.value === draft.filingStatus);
+  const standardDeduction = selectedFiling?.standardDeduction || 0;
+
+  function update(key, value) {
+    setDraft((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function save(close) {
+    setSaving(true);
+    setError('');
+    try {
+      await api.put('/api/mha/tax-profile', draftToPayload(draft));
+      close({ animation: 'zoom' });
+      setTimeout(onSaved, 180);
+    } catch (err) {
+      setError(err.message || 'Could not save tax assumptions');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AnimatedModal onClose={onClose} size="lg" animation="zoom">
+      {({ close }) => (
+        <div className="mha-tax-modal">
+          <h3>MHA Tax Assumptions</h3>
+
+          <div className="segmented-control mha-tax-mode-tabs" role="tablist" aria-label="MHA tax mode">
+            <button
+              type="button"
+              role="tab"
+              className={draft.mode === 'simple' ? 'active' : ''}
+              aria-selected={draft.mode === 'simple'}
+              onClick={() => update('mode', 'simple')}
+            >
+              Simple
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className={draft.mode === 'household' ? 'active' : ''}
+              aria-selected={draft.mode === 'household'}
+              onClick={() => update('mode', 'household')}
+            >
+              Estimate From Household
+            </button>
+          </div>
+
+          {draft.mode === 'simple' ? (
+            <div className="household-form-section">
+              <h4>Manual Rates</h4>
+              <div className="goal-form-grid">
+                <label className="field">
+                  <span>Federal Rate</span>
+                  <PercentInput
+                    value={draft.simpleFederalRate}
+                    onChange={(value) => update('simpleFederalRate', value)}
+                    placeholder="22%"
+                  />
+                </label>
+                <label className="field">
+                  <span>State Income Rate</span>
+                  <PercentInput
+                    value={draft.simpleStateRate}
+                    onChange={(value) => update('simpleStateRate', value)}
+                    placeholder="4.95%"
+                  />
+                </label>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="household-form-section">
+                <h4>Household</h4>
+                <div className="goal-form-grid">
+                  <label className="field">
+                    <span>Filing Status</span>
+                    <AppSelect
+                      value={draft.filingStatus}
+                      options={appSelectOptions(filingStatuses)}
+                      onChange={(value) => update('filingStatus', value)}
+                      ariaLabel="Filing status"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>State</span>
+                    <AppSelect
+                      value={draft.state}
+                      options={appSelectOptions(reference?.states || [])}
+                      onChange={(value) => update('state', value)}
+                      ariaLabel="State"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="household-form-section">
+                <h4>Deductions</h4>
+                <div className="goal-form-grid">
+                  <label className="field">
+                    <span>Deduction Method</span>
+                    <AppSelect
+                      value={draft.deductionMode}
+                      options={DEDUCTION_OPTIONS}
+                      onChange={(value) => update('deductionMode', value)}
+                      ariaLabel="Deduction method"
+                    />
+                  </label>
+                  <div className="mha-tax-standard-note">
+                    <span>Standard Deduction</span>
+                    <strong>{formatMoney(standardDeduction, 0)}</strong>
+                    <em>{selectedFiling?.label || 'Selected Filing Status'}</em>
+                  </div>
+                  {draft.deductionMode === 'itemized' && (
+                    <label className="field">
+                      <span>Itemized Deduction Amount</span>
+                      <CurrencyInput
+                        value={draft.itemizedDeduction}
+                        onChange={(value) => update('itemizedDeduction', value)}
+                        placeholder="$32,200"
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              <p className="subtle dash-card-note">
+                Household mode assumes listed paycheck contributions are pre-tax.
+              </p>
+            </>
+          )}
+
+          {error && <div className="error">{error}</div>}
+
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={close}>Cancel</button>
+            <button type="button" className="btn-primary" onClick={() => save(close)} disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
+    </AnimatedModal>
   );
 }
