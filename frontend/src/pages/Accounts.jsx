@@ -75,16 +75,6 @@ function pluralTypeLabel(type, count) {
   return `${label}${count === 1 ? '' : 's'}`;
 }
 
-function accountTypeSummary(accounts) {
-  const counts = new Map();
-  accounts.forEach((account) => {
-    counts.set(account.type, (counts.get(account.type) || 0) + 1);
-  });
-  return Array.from(counts.entries())
-    .map(([type, count]) => `${count} ${pluralTypeLabel(type, count)}`)
-    .join(' | ');
-}
-
 function buildAccountGroups(accounts) {
   const groupsByType = new Map();
   const orderedTypes = [];
@@ -267,6 +257,13 @@ export default function Accounts({ onChange }) {
   const investmentsBalance = activeAccounts
     .filter((account) => account.type === 'investment')
     .reduce((total, account) => total + (Number(account.current_balance) || 0), 0);
+  const netWorth = activeAccounts.reduce(
+    (total, account) => total + (Number(account.current_balance) || 0),
+    0
+  );
+  const accountCountLabel = `${activeAccounts.length.toLocaleString()} ${
+    activeAccounts.length === 1 ? 'Account' : 'Accounts'
+  }`;
   const accountHeroStats = [
     {
       label: 'Cash',
@@ -338,19 +335,12 @@ export default function Accounts({ onChange }) {
         variant="accounts"
         kicker="Your Money's Home Base"
         title="Accounts"
-        subtitle={`${accountTypeSummary(accounts) || 'No accounts'}${showArchived ? ' including archived' : ''}`}
+        subtitle={
+          loading
+            ? 'Loading accounts...'
+            : `${formatCurrency(netWorth)} Net Worth across ${accountCountLabel}`
+        }
         stats={accountHeroStats}
-        toolbar={!reorderMode ? (
-          <div className="page-hero-action-row">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => setAddingManual(true)}
-            >
-              + Manual Account
-            </button>
-          </div>
-        ) : null}
       />
 
       <div className="accounts-toolbar accounts-page-toolbar">
@@ -372,6 +362,15 @@ export default function Accounts({ onChange }) {
             onClick={toggleReorderMode}
           >
             {reorderMode ? 'Done' : 'Reorder Groups'}
+          </button>
+        )}
+        {!reorderMode && (
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setAddingManual(true)}
+          >
+            + Manual Account
           </button>
         )}
       </div>

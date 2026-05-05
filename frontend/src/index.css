@@ -3204,6 +3204,38 @@ input, textarea, select {
   margin: 0 0 16px;
 }
 
+@media (max-width: 560px) {
+  .accounts-page-toolbar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    align-items: center;
+  }
+
+  .accounts-page-toolbar .toggle-row,
+  .accounts-page-toolbar .btn-secondary,
+  .accounts-page-toolbar .btn-primary {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    justify-content: center;
+    padding-inline: 6px;
+    font-size: 0.76rem;
+  }
+
+  .accounts-page-toolbar .toggle-row {
+    gap: 5px;
+    text-align: center;
+  }
+
+  .accounts-page-toolbar .toggle-row span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 /* Single column on mobile/tablet; a 2-column grid on wide screens. Cards
    keep a min height so a sparse card doesn't look forlorn beside a packed
    one. */
