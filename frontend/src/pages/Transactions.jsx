@@ -229,6 +229,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   const [editingRule, setEditingRule] = useState(null);
   const [recurringFromTxn, setRecurringFromTxn] = useState(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [simpleFinSyncState, setSimpleFinSyncState] = useState('idle');
   const groupRefs = useRef(new Map());
   const floatingHeaderRef = useRef(null);
   const [pinnedMonth, setPinnedMonth] = useState(null);
@@ -238,6 +239,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   // keystroke.
   const [searchLocal, setSearchLocal] = useState(filters.q);
   const searchDebounceRef = useRef(null);
+  const syncResetRef = useRef(null);
 
   // Keep the local input in sync if the URL changes from elsewhere
   // (e.g., a filter pill dismissal clears q).
@@ -285,6 +287,10 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  useEffect(() => () => {
+    if (syncResetRef.current) window.clearTimeout(syncResetRef.current);
+  }, []);
 
   // ---------- URL writers ----------
   function commitFilters(next, opts = {}) {
@@ -454,8 +460,28 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     await api.post('/api/upcoming', payload);
   }
 
+  async function handleSimpleFinSync() {
+    if (simpleFinSyncState === 'syncing') return;
+    if (syncResetRef.current) window.clearTimeout(syncResetRef.current);
+
+    setSimpleFinSyncState('syncing');
+    try {
+      await api.post('/api/simplefin/sync');
+      await load({ silent: true });
+      setSimpleFinSyncState('success');
+      syncResetRef.current = window.setTimeout(() => {
+        setSimpleFinSyncState('idle');
+        syncResetRef.current = null;
+      }, 2200);
+    } catch (err) {
+      setSimpleFinSyncState('idle');
+      alert(err.message || 'SimpleFIN sync failed', { title: 'SimpleFIN Sync Failed' });
+    }
+  }
+
   const accountById = new Map(accounts.map((a) => [a.id, a]));
   const categoryById = new Map(categories.map((c) => [c.id, c]));
+  const hasSimpleFinAccount = accounts.some((account) => account.simplefin_account_id);
 
   const activeCount = countActiveFilters(filters);
   const isFiltered = activeCount > 0;
@@ -638,18 +664,33 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                 showCaret={false}
               />
             </div>
-            <div className="page-hero-action-row txn-manual-action-row">
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => setManualTxnOpen(true)}
-              >
-                + Manual Transaction
-              </button>
-            </div>
           </div>
         )}
       />
+      <div className="txn-page-actions" role="group" aria-label="Transaction actions">
+        {hasSimpleFinAccount && (
+          <button
+            type="button"
+            className={`btn-secondary txn-sync-button ${simpleFinSyncState === 'success' ? 'success' : ''}`.trim()}
+            onClick={handleSimpleFinSync}
+            disabled={simpleFinSyncState === 'syncing'}
+          >
+            {simpleFinSyncState === 'syncing' && <span className="spinner-inline" />}
+            {simpleFinSyncState === 'syncing'
+              ? 'Syncing'
+              : simpleFinSyncState === 'success'
+                ? 'Synced'
+                : 'SimpleFIN Sync'}
+          </button>
+        )}
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => setManualTxnOpen(true)}
+        >
+          + Manual Transaction
+        </button>
+      </div>
       {pinnedMonth && typeof document !== 'undefined' && createPortal(
         <header
           ref={floatingHeaderRef}

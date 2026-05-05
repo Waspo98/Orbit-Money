@@ -2785,6 +2785,7 @@ input, textarea, select {
 .transactions-view > .error,
 .transactions-view > .center-loading,
 .transactions-view > .empty-state,
+.transactions-view > .txn-page-actions,
 .transactions-view > .txn-month-group,
 .transactions-view > .pagination {
   width: calc(100% - 40px);
@@ -11158,6 +11159,36 @@ body.modal-page-blur-active .txn-pinned-month-header {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
+.txn-page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  margin-bottom: 22px;
+}
+
+.txn-page-actions .btn-primary,
+.txn-page-actions .btn-secondary {
+  min-height: 44px;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+}
+
+.txn-sync-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.txn-sync-button.success {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -11506,6 +11537,14 @@ body.modal-page-blur-active .txn-pinned-month-header {
   .txn-control-icon {
     width: 14px;
     height: 14px;
+  }
+  .txn-page-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  }
+  .txn-page-actions .btn-primary,
+  .txn-page-actions .btn-secondary {
+    width: 100%;
   }
   .filter-checkbox-grid {
     grid-template-columns: 1fr;
