@@ -708,13 +708,13 @@ function SnapshotPanel({ model, monthLabel, selectedMonth, daysLeft, onAddBudget
 
       <div className="metric-grid budget-beta-snapshot-grid">
         <SnapshotStat
-          label="Budgeted Categories"
+          label="Budgeted"
           value={`${formatMoney(model.spentInBudgets)} / ${formatMoney(model.totalBudgeted)}`}
           detail={`${formatPercent(model.budgetedPercent)} used`}
           tone={model.budgetedPercent > 100 ? 'over' : model.budgetedPercent >= 85 ? 'watch' : 'good'}
         />
         <SnapshotStat
-          label="Unbudgeted Spending"
+          label="Unbudgeted"
           value={formatMoney(model.spentUnbudgeted)}
           detail={`${formatPercent(model.unbudgetedShare)} of expenses`}
           tone={model.spentUnbudgeted > 0 ? 'watch' : 'good'}

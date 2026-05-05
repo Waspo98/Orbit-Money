@@ -719,7 +719,7 @@ function MhaDashboard({ summary, taxProfile, taxEstimate, year, onEdit }) {
           {!household && <em>Simple Mode</em>}
         </div>
         <div className="metric-card mha-dashboard-metric mha-dashboard-savings">
-          <span>Projected Annual Savings</span>
+          <span>Annual Savings</span>
           <strong>{formatMoney(projectedAnnualSavings)}</strong>
           <em>Based on Current Rate</em>
         </div>
