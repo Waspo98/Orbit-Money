@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
+import EmptyState from '../components/EmptyState.jsx';
 import PageHero from '../components/PageHero.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
+import SignalRow from '../components/SignalRow.jsx';
 import {
   formatCurrency,
   formatSignedCurrency
@@ -184,22 +186,23 @@ export default function NetWorth() {
         stats={netWorthStats}
       />
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error app-page-width">{error}</div>}
 
       {loading ? (
-        <div className="center-loading">
+        <div className="center-loading app-page-width">
           <div className="spinner" />
         </div>
       ) : !data || summary.accountCount === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">$</div>
-          <h2>No net worth yet</h2>
-          <p>Add or import accounts to start tracking assets, debts, and progress.</p>
-          <Link to="/accounts" className="btn-primary">Manage accounts</Link>
-        </div>
+        <EmptyState
+          className="app-page-width"
+          icon="$"
+          title="No net worth yet"
+          description="Add or import accounts to start tracking assets, debts, and progress."
+          action={<Link to="/accounts" className="btn-primary">Manage accounts</Link>}
+        />
       ) : (
         <>
-          <div className="networth-grid">
+          <div className="networth-grid app-page-width">
             <section className="dashboard-card networth-trend-card">
               <header className="dashboard-card-header">
                 <h3>Net worth over time</h3>
@@ -254,7 +257,7 @@ export default function NetWorth() {
                   label="Largest liability"
                   value={largestDebt ? largestDebt.name : 'None yet'}
                   detail={largestDebt ? formatMoney(largestDebt.contribution) : formatMoney(0)}
-                  danger={!!largestDebt}
+                  detailClassName={largestDebt ? 'expense' : ''}
                 />
                 <SignalRow
                   label="Tracked accounts"
@@ -350,18 +353,6 @@ function AllocationBar({ items, total }) {
           title={`${item.label}: ${formatMoney(item.value)}`}
         />
       ))}
-    </div>
-  );
-}
-
-function SignalRow({ label, value, detail, danger = false }) {
-  return (
-    <div className="networth-signal-row">
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-      <em className={danger ? 'expense' : ''}>{detail}</em>
     </div>
   );
 }

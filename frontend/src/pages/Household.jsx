@@ -6,10 +6,13 @@ import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
 } from '../components/CurrencyInput.jsx';
+import EmptyState from '../components/EmptyState.jsx';
+import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import PercentInput from '../components/PercentInput.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import AppIcon from '../components/AppIcon.jsx';
+import SignalRow from '../components/SignalRow.jsx';
 import {
   formatCurrency,
   formatPercent,
@@ -90,10 +93,6 @@ function perPaycheckToMonthly(value, payFrequency) {
 
 function labelFor(options, value) {
   return options.find(([key]) => key === value)?.[1] || value || 'Not set';
-}
-
-function appSelectOptions(options) {
-  return options.map(([value, label]) => ({ value, label }));
 }
 
 function readHsaRetirementRateMemberIds() {
@@ -273,29 +272,30 @@ export default function Household() {
         subtitle="Track net pay, employer benefits, retirement inputs, and compensation history."
       />
 
-      <div className="page-action-row household-page-actions" role="group" aria-label="Household actions">
+      <PageActionRow className="household-page-actions" label="Household actions">
         <button type="button" className="btn-primary" onClick={() => setEditingMember({ mode: 'new' })}>
           + New Member
         </button>
-      </div>
+      </PageActionRow>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error app-page-width">{error}</div>}
 
       {loading ? (
-        <div className="center-loading">
+        <div className="center-loading app-page-width">
           <div className="spinner" />
         </div>
       ) : members.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">
-            <AppIcon name="household" />
-          </div>
-          <h2>No household details yet</h2>
-          <p>Add each adult or child whose income, benefits, or retirement inputs should influence future planning.</p>
-          <button type="button" className="btn-primary" onClick={() => setEditingMember({ mode: 'new' })}>
-            + New Member
-          </button>
-        </div>
+        <EmptyState
+          className="app-page-width"
+          icon={<AppIcon name="household" />}
+          title="No household details yet"
+          description="Add each adult or child whose income, benefits, or retirement inputs should influence future planning."
+          action={(
+            <button type="button" className="btn-primary" onClick={() => setEditingMember({ mode: 'new' })}>
+              + New Member
+            </button>
+          )}
+        />
       ) : (
         <div className="household-grid app-page-width">
           <section className="dashboard-card household-members-card">
@@ -376,18 +376,6 @@ export default function Household() {
       )}
 
       <Dialog />
-    </div>
-  );
-}
-
-function SignalRow({ label, value, detail }) {
-  return (
-    <div className="networth-signal-row">
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-      <em>{detail}</em>
     </div>
   );
 }
@@ -507,7 +495,7 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
                 <span>Role</span>
                 <AppSelect
                   value={draft.role}
-                  options={appSelectOptions(ROLE_OPTIONS)}
+                  options={ROLE_OPTIONS}
                   onChange={(value) => update('role', value)}
                   ariaLabel="Household role"
                 />
@@ -520,7 +508,7 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
                 <span>Status</span>
                 <AppSelect
                   value={draft.employment_status}
-                  options={appSelectOptions(EMPLOYMENT_OPTIONS)}
+                  options={EMPLOYMENT_OPTIONS}
                   onChange={(value) => update('employment_status', value)}
                   ariaLabel="Employment status"
                 />
@@ -551,7 +539,7 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
                 <span>Pay Frequency</span>
                 <AppSelect
                   value={draft.pay_frequency}
-                  options={appSelectOptions(PAY_FREQUENCY_OPTIONS)}
+                  options={PAY_FREQUENCY_OPTIONS}
                   onChange={(value) => update('pay_frequency', value)}
                   ariaLabel="Pay frequency"
                 />
@@ -566,7 +554,7 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
                 <span>Account Type</span>
                 <AppSelect
                   value={draft.retirement_account_type}
-                  options={appSelectOptions(RETIREMENT_OPTIONS)}
+                  options={RETIREMENT_OPTIONS}
                   onChange={(value) => update('retirement_account_type', value)}
                   ariaLabel="Retirement account type"
                 />
@@ -724,7 +712,7 @@ function AccountLinkPicker({ accounts, linkedAccounts, onChange }) {
                     <span>Type</span>
                     <AppSelect
                       value={link.account_kind || 'other'}
-                      options={appSelectOptions(RETIREMENT_ACCOUNT_KIND_OPTIONS)}
+                      options={RETIREMENT_ACCOUNT_KIND_OPTIONS}
                       onChange={(value) => updateKind(link.account_id, value)}
                       ariaLabel={`${account.name} retirement account type`}
                     />

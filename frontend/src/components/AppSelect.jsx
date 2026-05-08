@@ -1,9 +1,22 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+
+export function normalizeAppSelectOption(option) {
+  if (Array.isArray(option)) {
+    const [value, label = value] = option;
+    return { value, label };
+  }
+  if (option && typeof option === 'object') {
+    const value = option.value ?? option.code ?? option.id;
+    const label = option.label ?? option.name ?? value;
+    return { ...option, value, label };
+  }
+  return { value: option, label: String(option) };
+}
 
 export default function AppSelect({
   value,
-  options,
+  options = [],
   onChange,
   placeholder = 'Choose',
   className = '',
@@ -20,7 +33,11 @@ export default function AppSelect({
   const rootRef = useRef(null);
   const menuRef = useRef(null);
   const closeTimerRef = useRef(null);
-  const selected = options.find((option) => String(option.value) === String(value));
+  const normalizedOptions = useMemo(
+    () => (options || []).map(normalizeAppSelectOption),
+    [options]
+  );
+  const selected = normalizedOptions.find((option) => String(option.value) === String(value));
   const usePageCenteredMenu = menuPlacement === 'page-center';
   const contextualMenuClasses = className
     .split(/\s+/)
@@ -139,7 +156,7 @@ export default function AppSelect({
       window.removeEventListener('resize', positionMenu);
       window.removeEventListener('scroll', positionMenu, true);
     };
-  }, [open, usePageCenteredMenu, options.length]);
+  }, [open, usePageCenteredMenu, normalizedOptions.length]);
 
   const menuStyle = menuPosition
     ? {
@@ -168,7 +185,7 @@ export default function AppSelect({
       style={menuStyle}
       role="listbox"
     >
-      {options.map((option) => (
+      {normalizedOptions.map((option) => (
         <button
           type="button"
           key={option.value}
@@ -178,7 +195,7 @@ export default function AppSelect({
           role="option"
           aria-selected={String(option.value) === String(value)}
           onClick={() => {
-            onChange(option.value);
+            onChange(option.value, option);
             closeMenu();
           }}
         >

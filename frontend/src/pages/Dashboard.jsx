@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
@@ -694,30 +695,30 @@ export default function Dashboard({
           greeting={timeGreeting(now)}
           userName={userName}
         />
-        <div className="empty-state">
-          <div className="empty-state-icon">$</div>
-          <h2>Nothing to show yet</h2>
-          <p>
-            Import your Rocket Money history or connect SimpleFIN to start
-            seeing a dashboard.
-          </p>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => navigate('/settings')}
-            >
-              Import from Rocket Money
-            </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => navigate('/settings')}
-            >
-              Connect SimpleFIN
-            </button>
-          </div>
-        </div>
+        <EmptyState
+          className="app-page-width"
+          icon="$"
+          title="Nothing to show yet"
+          description="Import your Rocket Money history or connect SimpleFIN to start seeing a dashboard."
+          action={(
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => navigate('/settings')}
+              >
+                Import from Rocket Money
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => navigate('/settings')}
+              >
+                Connect SimpleFIN
+              </button>
+            </div>
+          )}
+        />
       </div>
     );
   }
@@ -730,9 +731,9 @@ export default function Dashboard({
         userName={userName}
       />
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error app-page-width">{error}</div>}
 
-      <div className="dashboard-grid">
+      <div className="dashboard-grid app-page-width">
         {visibleDashboardCards.map((item) => (
           <div
             key={item.id}
@@ -743,7 +744,7 @@ export default function Dashboard({
         ))}
       </div>
 
-      <div className="dashboard-customize-bar">
+      <div className="dashboard-customize-bar app-page-width">
         <button
           type="button"
           className="btn-secondary"

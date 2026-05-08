@@ -6,8 +6,11 @@ import FilterSheet from '../components/FilterSheet.jsx';
 import AppSelect from '../components/AppSelect.jsx';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
+import EmptyState from '../components/EmptyState.jsx';
+import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import SearchField from '../components/SearchField.jsx';
+import SegmentedControl from '../components/SegmentedControl.jsx';
 import CurrencyInput, { parseCurrencyInput } from '../components/CurrencyInput.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { APP_ICON_192 } from '../brandAssets.js';
@@ -574,21 +577,20 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   // Onboarding empty state - only when no filters AND nothing exists at all.
   if (!loading && grandTotal === 0 && !isFiltered) {
     return (
-      <div className="empty-state">
-        <div className="empty-state-icon">$</div>
-        <h2>No transactions yet</h2>
-        <p>
-          Import your Rocket Money export to bring over your full history,
-          preserve your custom merchant names, and generate rename rules.
-        </p>
+      <EmptyState
+        icon="$"
+        title="No transactions yet"
+        description="Import your Rocket Money export to bring over your full history, preserve your custom merchant names, and generate rename rules."
+        action={(
           <button
             type="button"
             className="btn-primary"
             onClick={() => navigate('/settings')}
           >
             Import from Rocket Money
-        </button>
-      </div>
+          </button>
+        )}
+      />
     );
   }
 
@@ -667,7 +669,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           </div>
         )}
       />
-      <div className="page-action-row txn-page-actions" role="group" aria-label="Transaction actions">
+      <PageActionRow className="txn-page-actions" label="Transaction actions">
         {hasSimpleFinAccount && (
           <button
             type="button"
@@ -690,7 +692,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         >
           + Manual Transaction
         </button>
-      </div>
+      </PageActionRow>
       {pinnedMonth && typeof document !== 'undefined' && createPortal(
         <header
           ref={floatingHeaderRef}
@@ -721,27 +723,30 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         />
       )}
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error app-page-width">{error}</div>}
 
       {loading ? (
-        <div className="center-loading">
+        <div className="center-loading app-page-width">
           <div className="spinner" />
         </div>
       ) : total === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">$</div>
-          <h2>No transactions match your filters</h2>
-          <p>Try widening the date range or removing some criteria.</p>
-          <button type="button" className="btn-secondary" onClick={clearAllFilters}>
-            Clear all filters
-          </button>
-        </div>
+        <EmptyState
+          className="app-page-width"
+          icon="$"
+          title="No transactions match your filters"
+          description="Try widening the date range or removing some criteria."
+          action={(
+            <button type="button" className="btn-secondary" onClick={clearAllFilters}>
+              Clear all filters
+            </button>
+          )}
+        />
       ) : (
         <>
           {groups.map((group) => (
             <section
               key={group.id}
-              className="txn-month-group"
+              className="txn-month-group app-page-width"
               ref={(node) => {
                 if (node) groupRefs.current.set(group.id, node);
                 else groupRefs.current.delete(group.id);
@@ -785,7 +790,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             </section>
           ))}
 
-          <div className="pagination">
+          <div className="pagination app-page-width">
             <button
               type="button"
               className="btn-secondary"
@@ -991,25 +996,18 @@ function ManualTransactionModal({ accounts, categories, onClose, onSaved }) {
               <CurrencyInput value={amount} onChange={setAmount} placeholder="$25.00" required />
             </label>
 
-            <div className="settings-theme-toggle settings-theme-toggle-two transaction-direction-toggle" role="radiogroup" aria-label="Transaction direction">
-              {[
+            <SegmentedControl
+              className="transaction-direction-toggle"
+              role="radiogroup"
+              buttonRole="radio"
+              ariaLabel="Transaction direction"
+              value={direction}
+              onChange={setDirection}
+              options={[
                 { value: 'expense', label: 'Expense' },
                 { value: 'income', label: 'Income' }
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`settings-theme-option ${direction === option.value ? 'active' : ''}`}
-                  onClick={() => setDirection(option.value)}
-                  role="radio"
-                  aria-checked={direction === option.value}
-                >
-                  <span className="settings-theme-text">
-                    <span className="settings-theme-label">{option.label}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
+              ]}
+            />
 
             <label className="field">
               <span>Category</span>
@@ -1143,7 +1141,7 @@ function ActiveFilterPills({
   }
 
   return (
-    <div className="active-pills-row">
+    <div className="active-pills-row app-page-width">
       {pills.map((p) => (
         <button
           key={p.key}

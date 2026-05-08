@@ -413,7 +413,7 @@ export default function RetirementCalculator() {
           title="Retirement Calculator"
           subtitle="Project household retirement balances, savings pace, income needs, and HSA bridge risk."
         />
-        <div className="center-loading">
+        <div className="center-loading app-page-width">
           <div className="spinner" />
         </div>
       </div>
@@ -431,7 +431,7 @@ export default function RetirementCalculator() {
         stats={heroStats}
       />
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error app-page-width">{error}</div>}
 
       <div className="retcalc-sticky-summary" aria-label="Retirement summary">
         <span>Age {Math.round(model.retirementAge)}</span>
@@ -439,7 +439,7 @@ export default function RetirementCalculator() {
         <em className={model.gap >= 0 ? 'income' : 'expense'}>{Math.round(model.readiness)}% Ready</em>
       </div>
 
-      <section className="dashboard-card retcalc-workbench-card">
+      <section className="dashboard-card retcalc-workbench-card app-page-width">
         <div className="retcalc-workbench-top">
           <div className="retcalc-answer-main">
             <span className="retcalc-eyebrow">At age {Math.round(model.retirementAge)}</span>
@@ -592,7 +592,7 @@ export default function RetirementCalculator() {
         </div>
       </section>
 
-      <div className="retcalc-audit-list">
+      <div className="retcalc-audit-list app-page-width">
         <AuditSection
           title="How HSA Counts"
           summary={`${formatMoney(model.projectedHsaAtRetirement)} projected HSA portion`}

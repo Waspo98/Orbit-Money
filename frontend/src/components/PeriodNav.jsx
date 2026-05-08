@@ -2,6 +2,8 @@ import AppSelect from './AppSelect.jsx';
 
 export default function PeriodNav({
   className = '',
+  variant,
+  size,
   value,
   options,
   onPrev,
@@ -13,13 +15,18 @@ export default function PeriodNav({
   jumpLabel = 'Jump to period',
   menuPlacement = 'default'
 }) {
-  const classes = ['month-nav', className].filter(Boolean).join(' ');
+  const classes = [
+    'period-nav',
+    variant ? `period-nav-${variant}` : '',
+    size ? `period-nav-${size}` : '',
+    className
+  ].filter(Boolean).join(' ');
 
   return (
     <div className={classes}>
       <button
         type="button"
-        className="btn-icon month-nav-arrow"
+        className="btn-icon period-nav-arrow"
         onClick={onPrev}
         aria-label={previousLabel}
       >
@@ -28,9 +35,9 @@ export default function PeriodNav({
         </svg>
       </button>
 
-      <div className="month-nav-label-wrap">
+      <div className="period-nav-label-wrap">
         <AppSelect
-          className="month-nav-select"
+          className="period-nav-select"
           value={value}
           options={options}
           onChange={onJump}
@@ -41,7 +48,7 @@ export default function PeriodNav({
 
       <button
         type="button"
-        className="btn-icon month-nav-arrow"
+        className="btn-icon period-nav-arrow"
         onClick={onNext}
         disabled={!canGoForward}
         aria-label={nextLabel}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import AppSelect from '../components/AppSelect.jsx';
 import BudgetAmountModal from '../components/BudgetAmountModal.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import SegmentedControl from '../components/SegmentedControl.jsx';
@@ -202,7 +203,7 @@ export default function SpendingTrends() {
   }
 
   return (
-    <div className="spending-trends-view">
+    <div className="spending-trends-view app-page-width">
       <PageHero
         id="spending-trends-title"
         variant="spending"
@@ -224,11 +225,11 @@ export default function SpendingTrends() {
           <div className="spinner" />
         </div>
       ) : !data || !hasTrendData ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">$</div>
-          <h2>No Spending Trends Yet</h2>
-          <p>Import or add transactions to see income, expenses, and category history over time.</p>
-        </div>
+        <EmptyState
+          icon="$"
+          title="No Spending Trends Yet"
+          description="Import or add transactions to see income, expenses, and category history over time."
+        />
       ) : (
         <div className={`spending-trends-content ${refreshing ? 'is-refreshing' : ''}`}>
           <section className="dashboard-card spending-flow-card">

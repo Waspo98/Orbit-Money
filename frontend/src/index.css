@@ -115,6 +115,9 @@
   --app-max-width:     1080px;
   --app-page-max-width: 960px;
   --app-page-gutter:   20px;
+  --app-page-action-gap: 14px;
+  --app-page-content-gap: 22px;
+  --app-page-bottom-space: 110px;
   --sidebar-width:     260px;
   --bottom-tab-height: 80px;  /* Material Design bottom nav baseline */
   --header-height:     56px;
@@ -988,12 +991,10 @@ input, textarea, select {
 /* ================== 5. PAGES — Rules ================== */
 
 .rules-view {
-  width: calc(100% - 40px);
-  max-width: 960px;
-  margin: 0 auto;
   min-height: calc(100dvh - 140px);
 }
 
+.page-toolbar,
 .rules-toolbar {
   margin-bottom: 20px;
 }
@@ -2054,6 +2055,7 @@ input, textarea, select {
   max-width: var(--app-page-max-width);
   margin-left: auto;
   margin-right: auto;
+  box-sizing: border-box;
 }
 
 .route-transition {
@@ -2433,10 +2435,10 @@ input, textarea, select {
   --hero-progress: 0;
   --hero-content-opacity: 1;
   --hero-available-width: calc(100vw - var(--hero-edge-left));
-  --hero-card-margin: 20px;
+  --hero-card-margin: var(--app-page-gutter);
   --hero-collapsed-width: clamp(232px, 33.333vw, 520px);
   --hero-edge-left: 0px;
-  --hero-expanded-width: min(960px, calc(var(--hero-available-width) - (var(--hero-card-margin) * 2)));
+  --hero-expanded-width: min(var(--app-page-max-width), calc(var(--hero-available-width) - (var(--hero-card-margin) * 2)));
   --hero-expanded-left: calc(
     var(--hero-edge-left) +
     ((var(--hero-available-width) - var(--hero-expanded-width)) / 2)
@@ -2502,7 +2504,7 @@ input, textarea, select {
 
 .page-hero-inner {
   width: 100%;
-  max-width: 960px;
+  max-width: var(--app-page-max-width);
   margin: 0 auto;
   display: grid;
   gap: 22px;
@@ -2574,7 +2576,7 @@ input, textarea, select {
 .page-action-row {
   width: var(--page-action-row-width, calc(100% - (var(--app-page-gutter) * 2)));
   max-width: var(--page-action-row-max-width, var(--app-page-max-width));
-  margin: 14px auto 22px;
+  margin: var(--app-page-action-gap) auto var(--app-page-content-gap);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -2693,7 +2695,7 @@ input, textarea, select {
 .page-hero-stats,
 .categories-hero-toolbar,
 .txn-toolbar-hero,
-.page-hero-budgets .month-nav {
+.period-nav-hero {
   opacity: var(--hero-content-opacity);
   transform: translateY(0);
 }
@@ -2701,7 +2703,7 @@ input, textarea, select {
 .page-hero-stats,
 .categories-hero-toolbar,
 .txn-toolbar-hero,
-.page-hero-budgets .month-nav {
+.period-nav-hero {
   pointer-events: auto;
 }
 
@@ -2711,36 +2713,25 @@ input, textarea, select {
   gap: 10px;
 }
 
-.page-hero-dashboard .page-hero-stats,
-.page-hero-transactions .page-hero-stats,
-.page-hero-budgets .page-hero-stats,
-.page-hero-accounts .page-hero-stats {
+.page-hero-stats-count-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.page-hero-stats-count-2 {
+  grid-template-columns: repeat(2, minmax(112px, 1fr));
+}
+
+.page-hero-stats-count-3 {
+  grid-template-columns: repeat(3, minmax(112px, 1fr));
+}
+
+.page-hero-stats-count-4 {
   grid-template-columns: repeat(4, minmax(112px, 1fr));
 }
 
-.page-hero-transactions .page-hero-stats {
+.page-hero-topline,
+.page-hero-main {
   width: 100%;
-  align-self: stretch;
-  justify-self: stretch;
-}
-
-.page-hero-dashboard .page-hero-topline,
-.page-hero-dashboard .page-hero-main,
-.page-hero-transactions .page-hero-topline,
-.page-hero-transactions .page-hero-main,
-.page-hero-budgets .page-hero-topline,
-.page-hero-budgets .page-hero-main,
-.page-hero-accounts .page-hero-topline,
-.page-hero-accounts .page-hero-main {
-  width: 100%;
-}
-
-.page-hero-budgets {
-  --hero-expanded-width: min(960px, calc(var(--hero-available-width) - (var(--hero-card-margin) * 2)));
-}
-
-.page-hero-networth .page-hero-stats {
-  grid-template-columns: repeat(4, minmax(112px, 1fr));
 }
 
 .page-hero-stat {
@@ -2788,6 +2779,11 @@ input, textarea, select {
 .page-hero-stat.warn > strong { color: #ffe28a; }
 .page-hero-stat.caution > strong { color: #ffb3a8; }
 
+.page-hero-period-stat {
+  display: grid;
+  gap: 8px;
+}
+
 .empty-state {
   background: var(--surface);
   padding: 72px 32px;
@@ -2822,8 +2818,8 @@ input, textarea, select {
 .dashboard-view > .error {
   position: relative;
   z-index: 1;
-  width: calc(100% - 40px);
-  max-width: 960px;
+  width: calc(100% - (var(--app-page-gutter) * 2));
+  max-width: var(--app-page-max-width);
   margin-left: auto;
   margin-right: auto;
 }
@@ -2841,8 +2837,8 @@ input, textarea, select {
 .transactions-view > .txn-page-actions,
 .transactions-view > .txn-month-group,
 .transactions-view > .pagination {
-  width: calc(100% - 40px);
-  max-width: 960px;
+  width: calc(100% - (var(--app-page-gutter) * 2));
+  max-width: var(--app-page-max-width);
   margin-left: auto;
   margin-right: auto;
 }
@@ -2852,9 +2848,6 @@ input, textarea, select {
 }
 
 .accounts-view {
-  width: calc(100% - 40px);
-  max-width: 960px;
-  margin: 0 auto;
   min-height: calc(100dvh - 140px);
 }
 
@@ -2867,19 +2860,6 @@ input, textarea, select {
 .categories-header {
   align-items: flex-end;
   margin-bottom: 18px;
-}
-
-.categories-content {
-  width: calc(100% - 40px);
-  max-width: 960px;
-  margin: 0 auto;
-}
-
-.categories-toolbar {
-  width: calc(100% - 40px);
-  max-width: 960px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .categories-hero-toolbar {
@@ -3210,7 +3190,6 @@ input, textarea, select {
 
 @media (max-width: 760px) {
   .categories-content {
-    width: calc(100% - 40px);
     margin-top: 14px;
   }
 
@@ -3254,7 +3233,7 @@ input, textarea, select {
 
 .accounts-page-toolbar {
   justify-content: flex-end;
-  margin: 14px 0 16px;
+  margin: var(--app-page-action-gap) 0 var(--app-page-content-gap);
 }
 
 @media (max-width: 560px) {
@@ -3420,9 +3399,9 @@ input, textarea, select {
 .dashboard-customize-bar {
   position: relative;
   z-index: 1;
-  width: calc(100% - 40px);
-  max-width: 960px;
-  margin: 16px auto 110px;
+  width: calc(100% - (var(--app-page-gutter) * 2));
+  max-width: var(--app-page-max-width);
+  margin: 16px auto var(--app-page-bottom-space);
   display: flex;
   justify-content: center;
 }
@@ -4666,8 +4645,8 @@ input, textarea, select {
 .networth-view > .center-loading,
 .networth-view > .empty-state,
 .networth-grid {
-  width: calc(100% - 40px);
-  max-width: 960px;
+  width: calc(100% - (var(--app-page-gutter) * 2));
+  max-width: var(--app-page-max-width);
   margin-left: auto;
   margin-right: auto;
 }
@@ -4681,70 +4660,10 @@ input, textarea, select {
 .mha-view > .error,
 .mha-view > .center-loading,
 .mha-content {
-  width: calc(100% - 40px);
-  max-width: 960px;
+  width: calc(100% - (var(--app-page-gutter) * 2));
+  max-width: var(--app-page-max-width);
   margin-left: auto;
   margin-right: auto;
-}
-
-.page-hero-mha .page-hero-stats {
-  grid-template-columns: repeat(auto-fit, minmax(min(168px, 100%), 1fr));
-}
-
-.mha-year-stat {
-  display: grid;
-  gap: 8px;
-}
-
-.page-hero-mha .month-nav {
-  margin: 0;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.mha-year-stat .month-nav {
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.mha-year-stat .month-nav-arrow {
-  width: 34px;
-  height: 34px;
-}
-
-.mha-year-stat .month-nav-label-wrap {
-  min-height: 34px;
-  padding: 6px 12px;
-}
-
-.app-shell.has-page-hero .page-hero-mha .month-nav-arrow {
-  border-color: color-mix(in srgb, var(--border) 70%, rgba(255, 255, 255, 0.18));
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
-}
-
-.app-shell.has-page-hero .page-hero-mha .month-nav-arrow:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--text);
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-}
-
-.page-hero-mha .month-nav-label-wrap {
-  border-color: color-mix(in srgb, var(--border) 70%, rgba(255, 255, 255, 0.18));
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
-}
-
-.page-hero-mha .month-nav-label-wrap:hover,
-.page-hero-mha .month-nav-label-wrap:focus-within {
-  background: var(--surface-hover);
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 
 .mha-content {
@@ -4918,14 +4837,6 @@ input, textarea, select {
     grid-template-columns: 1fr;
   }
 
-  .page-hero-mha .page-hero-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .mha-year-stat {
-    grid-column: 1 / -1;
-  }
-
   .mha-transaction-row {
     align-items: stretch;
     flex-direction: column;
@@ -5019,13 +4930,6 @@ input, textarea, select {
   line-height: 1.2;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-.page-hero-upcoming .page-hero-stat > span {
-  min-height: 1.65em;
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
 }
 
 .upcoming-cashflow-summary > strong {
@@ -5691,10 +5595,7 @@ input, textarea, select {
 }
 
 .spending-trends-view {
-  width: calc(100% - 40px);
-  max-width: 960px;
   min-height: calc(100dvh - 140px);
-  margin: 0 auto;
 }
 
 .page-hero-spending .spending-range-tabs {
@@ -6351,15 +6252,15 @@ input, textarea, select {
 .household-view > .empty-state {
   width: calc(100% - (var(--app-page-gutter) * 2));
   max-width: var(--app-page-max-width);
-  margin: 18px auto 110px;
+  margin: 0 auto var(--app-page-bottom-space);
 }
 
 .household-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 14px;
-  margin-top: 18px;
-  margin-bottom: 110px;
+  margin-top: 0;
+  margin-bottom: var(--app-page-bottom-space);
 }
 
 @media (min-width: 760px) {
@@ -6542,11 +6443,11 @@ input, textarea, select {
   .household-view > .error,
   .household-view > .center-loading,
   .household-view > .empty-state {
-    margin-top: 14px;
+    margin-top: 0;
   }
 
   .household-grid {
-    margin-top: 14px;
+    margin-top: 0;
   }
 
   .household-member-top,
@@ -6623,8 +6524,8 @@ input, textarea, select {
 .goals-view > .center-loading,
 .goals-view > .empty-state,
 .goals-grid {
-  width: calc(100% - 40px);
-  max-width: 960px;
+  width: calc(100% - (var(--app-page-gutter) * 2));
+  max-width: var(--app-page-max-width);
   margin-left: auto;
   margin-right: auto;
 }
@@ -9308,9 +9209,6 @@ body.modal-page-blur-active .txn-pinned-month-header {
 /* ================== 5. PAGES - Housing Calculator ================== */
 
 .housing-view {
-  width: calc(100% - 40px);
-  max-width: 960px;
-  margin: 0 auto;
   min-height: calc(100dvh - 140px);
 }
 
@@ -9357,7 +9255,8 @@ body.modal-page-blur-active .txn-pinned-month-header {
 .retirement-calculator-view > .center-loading,
 .retcalc-workbench-card,
 .retcalc-audit-list {
-  width: min(1120px, calc(100% - 32px));
+  width: calc(100% - (var(--app-page-gutter) * 2));
+  max-width: var(--app-page-max-width);
   margin-left: auto;
   margin-right: auto;
 }
@@ -9902,7 +9801,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
     position: sticky;
     top: 0;
     z-index: 12;
-    width: min(100% - 24px, 680px);
+    width: min(calc(100% - (var(--app-page-gutter) * 2)), 680px);
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
@@ -9989,13 +9888,6 @@ body.modal-page-blur-active .txn-pinned-month-header {
 }
 
 @media (max-width: 460px) {
-  .retirement-calculator-view > .error,
-  .retirement-calculator-view > .center-loading,
-  .retcalc-workbench-card,
-  .retcalc-audit-list {
-    width: min(100% - 24px, 680px);
-  }
-
   .retcalc-workbench-card {
     padding: 14px;
   }
@@ -10083,6 +9975,15 @@ body.modal-page-blur-active .txn-pinned-month-header {
   padding: 8px 10px;
   line-height: 1.15;
   white-space: normal;
+}
+
+.segmented-control.transaction-direction-toggle {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.segmented-control.transaction-direction-toggle button {
+  min-height: 48px;
 }
 
 @media (max-width: 720px) {
@@ -10201,9 +10102,6 @@ body.modal-page-blur-active .txn-pinned-month-header {
 /* ================== 5. PAGES — Settings ================== */
 
 .settings-view {
-  width: calc(100% - 40px);
-  max-width: 960px;
-  margin: 0 auto;
   min-height: calc(100dvh - 140px);
 }
 
@@ -10216,7 +10114,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   box-shadow: var(--shadow-sm);
 }
 
-.settings-section-top { margin-top: 4px; }
+.settings-section-top { margin-top: 0; }
 
 .settings-section-header { margin-bottom: 22px; }
 .settings-section-header h3 { margin: 0 0 4px; font-size: 1.2rem; font-weight: 600; }
@@ -10438,6 +10336,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   gap: 14px;
 }
 
+.choice-card-group,
 .settings-theme-toggle {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -10448,27 +10347,16 @@ body.modal-page-blur-active .txn-pinned-month-header {
   border-radius: var(--radius-md);
 }
 
+.choice-card-group-two,
 .settings-theme-toggle-two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.transaction-direction-toggle {
-  margin-bottom: 18px;
-}
-
-.transaction-direction-toggle .settings-theme-option {
-  align-items: center;
-  min-height: 58px;
-}
-
-.transaction-direction-toggle .settings-theme-label {
-  margin-bottom: 0;
 }
 
 .settings-feature-toggle {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
+.choice-card,
 .settings-theme-option {
   min-height: 92px;
   padding: 14px;
@@ -10488,11 +10376,13 @@ body.modal-page-blur-active .txn-pinned-month-header {
     box-shadow var(--dur-fast);
 }
 
+.choice-card:hover,
 .settings-theme-option:hover {
   color: var(--text);
   background: var(--surface-3);
 }
 
+.choice-card.active,
 .settings-theme-option.active {
   color: var(--text);
   background: var(--surface);
@@ -10500,14 +10390,17 @@ body.modal-page-blur-active .txn-pinned-month-header {
   box-shadow: var(--shadow-sm);
 }
 
+.choice-card:disabled,
 .settings-theme-option:disabled {
   cursor: default;
 }
 
+.choice-card.locked,
 .settings-theme-option.locked {
   opacity: 0.86;
 }
 
+.choice-card:not(.active):not(.locked),
 .settings-theme-option:not(.active):not(.locked) {
   border-color: var(--border);
 }
@@ -10527,6 +10420,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   flex: 0 0 auto;
 }
 
+.choice-card-icon,
 .settings-theme-emoji {
   width: 32px;
   height: 32px;
@@ -10539,8 +10433,10 @@ body.modal-page-blur-active .txn-pinned-month-header {
   font-size: 1.1rem;
 }
 
+.choice-card-text,
 .settings-theme-text { min-width: 0; }
 
+.choice-card-label,
 .settings-theme-label {
   display: block;
   margin-bottom: 6px;
@@ -10549,6 +10445,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   font-size: 0.98rem;
 }
 
+.choice-card-copy,
 .settings-theme-copy {
   display: block;
   color: var(--text-muted);
@@ -10839,15 +10736,12 @@ body.modal-page-blur-active .txn-pinned-month-header {
   .settings-share-row > button { width: 100%; }
   .settings-share-row-actions { align-items: stretch; flex-direction: column; }
   .settings-share-row-actions > button { width: 100%; }
+  .choice-card-group,
   .settings-theme-toggle { grid-template-columns: 1fr; }
+  .choice-card-group-two,
   .settings-theme-toggle-two { grid-template-columns: 1fr; }
+  .choice-card,
   .settings-theme-option { min-height: auto; }
-  .transaction-direction-toggle.settings-theme-toggle-two {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .transaction-direction-toggle .settings-theme-option {
-    min-height: 58px;
-  }
   .settings-about-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .settings-about-info-card { min-height: 80px; }
   .settings-developer-line { align-items: stretch; flex-direction: column; }
@@ -11297,8 +11191,8 @@ body.modal-page-blur-active .txn-pinned-month-header {
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 14px;
-  margin-bottom: 22px;
+  margin-top: var(--app-page-action-gap);
+  margin-bottom: var(--app-page-content-gap);
 }
 
 .txn-page-actions .btn-primary,
@@ -11627,13 +11521,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   .page-hero p {
     font-size: 0.92rem;
   }
-  .page-hero-stats,
-  .page-hero-dashboard .page-hero-stats,
-  .page-hero-transactions .page-hero-stats,
-  .page-hero-budgets .page-hero-stats,
-  .page-hero-accounts .page-hero-stats,
-  .page-hero-networth .page-hero-stats,
-  .page-hero-mha .page-hero-stats {
+  .page-hero-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
   }
@@ -11687,8 +11575,8 @@ body.modal-page-blur-active .txn-pinned-month-header {
 /* ================== Budgets (v14) ================== */
 
 .budgets-view {
-  width: calc(100% - 40px);
-  max-width: 960px;
+  width: calc(100% - (var(--app-page-gutter) * 2));
+  max-width: var(--app-page-max-width);
   margin: 0 auto;
   /* Keep the document at full height even while loading. A large
      height-collapse (content → tiny spinner → content) was re-triggering
@@ -11705,11 +11593,11 @@ body.modal-page-blur-active .txn-pinned-month-header {
   }
 }
 
-/* ---------- Month navigation ---------- */
+/* ---------- Period navigation ---------- */
 /* Shared AppSelect picker. Keep month/year jumps on this primitive so mobile
    layouts do not inherit hidden input/select focus quirks. */
 
-.month-nav {
+.period-nav {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -11717,7 +11605,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   min-width: 0;
 }
 
-.page-hero-budgets .month-nav {
+.period-nav-hero {
   margin: 0;
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -11726,7 +11614,14 @@ body.modal-page-blur-active .txn-pinned-month-header {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.month-nav-arrow {
+.period-nav-compact {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.period-nav-arrow {
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -11747,7 +11642,12 @@ body.modal-page-blur-active .txn-pinned-month-header {
   -webkit-tap-highlight-color: transparent;
 }
 
-.month-nav-arrow svg {
+.period-nav-compact .period-nav-arrow {
+  width: 34px;
+  height: 34px;
+}
+
+.period-nav-arrow svg {
   width: 22px;
   height: 22px;
   display: block;
@@ -11758,17 +11658,17 @@ body.modal-page-blur-active .txn-pinned-month-header {
   fill: none;
 }
 
-.month-nav-arrow:hover:not(:disabled) {
+.period-nav-arrow:hover:not(:disabled) {
   background: var(--surface-hover);
   border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
 }
 
-.month-nav-arrow:disabled {
+.period-nav-arrow:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.app-shell.has-page-hero .page-hero-budgets .month-nav-arrow {
+.app-shell.has-page-hero .period-nav-hero .period-nav-arrow {
   border-color: color-mix(in srgb, var(--border) 70%, rgba(255, 255, 255, 0.18));
   background: var(--surface);
   color: var(--text);
@@ -11777,14 +11677,14 @@ body.modal-page-blur-active .txn-pinned-month-header {
   font-weight: 800;
 }
 
-.app-shell.has-page-hero .page-hero-budgets .month-nav-arrow:hover:not(:disabled) {
+.app-shell.has-page-hero .period-nav-hero .period-nav-arrow:hover:not(:disabled) {
   background: var(--surface-hover);
   color: var(--text);
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 
 /* Wrap holds the visible month/year picker pill and shared AppSelect trigger. */
-.month-nav-label-wrap {
+.period-nav-label-wrap {
   position: relative;
   flex: 1;
   min-width: 0;
@@ -11807,13 +11707,18 @@ body.modal-page-blur-active .txn-pinned-month-header {
   -webkit-tap-highlight-color: transparent;
 }
 
-.month-nav-label-wrap:hover,
-.month-nav-label-wrap:focus-within {
+.period-nav-label-wrap:hover,
+.period-nav-label-wrap:focus-within {
   background: var(--surface-hover);
   border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
 }
 
-.page-hero-budgets .month-nav-label-wrap {
+.period-nav-compact .period-nav-label-wrap {
+  min-height: 34px;
+  padding: 6px 12px;
+}
+
+.period-nav-hero .period-nav-label-wrap {
   border-color: color-mix(in srgb, var(--border) 70%, rgba(255, 255, 255, 0.18));
   border-radius: 999px;
   background: var(--surface);
@@ -11821,19 +11726,19 @@ body.modal-page-blur-active .txn-pinned-month-header {
   box-shadow: 0 10px 24px rgba(5, 20, 52, 0.12);
 }
 
-.page-hero-budgets .month-nav-label-wrap:hover,
-.page-hero-budgets .month-nav-label-wrap:focus-within {
+.period-nav-hero .period-nav-label-wrap:hover,
+.period-nav-hero .period-nav-label-wrap:focus-within {
   background: var(--surface-hover);
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 
-.month-nav-label-wrap .month-nav-select.app-select {
+.period-nav-label-wrap .period-nav-select.app-select {
   position: static;
   width: 100%;
   color: inherit;
 }
 
-.month-nav-select .app-select-trigger {
+.period-nav-select .app-select-trigger {
   position: relative;
   min-height: 0;
   padding: 0 18px;
@@ -11846,23 +11751,23 @@ body.modal-page-blur-active .txn-pinned-month-header {
   text-align: center;
 }
 
-.month-nav-select .app-select-label {
+.period-nav-select .app-select-label {
   justify-self: center;
   text-align: center;
 }
 
-.month-nav-select .app-select-caret {
+.period-nav-select .app-select-caret {
   position: absolute;
   top: 50%;
   right: 0;
   transform: translateY(-50%);
 }
 
-.app-select-menu-month-nav-select {
+.app-select-menu-period-nav-select {
   min-width: min(240px, calc(100vw - 48px));
 }
 
-.app-select-menu-page-centered.app-select-menu-month-nav-select {
+.app-select-menu-page-centered.app-select-menu-period-nav-select {
   min-width: 0;
 }
 

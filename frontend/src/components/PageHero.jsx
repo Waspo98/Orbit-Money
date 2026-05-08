@@ -158,6 +158,8 @@ export default function PageHero({
   const heroMinHeight = !controlledHero && Number.isFinite(minHeight) ? `${minHeight}px` : null;
   const chromeContent = typeof chrome === 'function' ? chrome(hero) : chrome;
   const toolbarContent = typeof toolbar === 'function' ? toolbar(hero) : toolbar;
+  const statCount = stats.length + (statsExtra ? 1 : 0);
+  const statsClassName = `page-hero-stats page-hero-stats-count-${Math.min(statCount, 4)}`;
 
   return (
     <>
@@ -186,7 +188,7 @@ export default function PageHero({
               </div>
 
               {hasHeroStats && (
-                <div className="page-hero-stats" aria-label={statLabel || `${title} summary`}>
+                <div className={statsClassName} aria-label={statLabel || `${title} summary`}>
                   {stats.map((stat) => (
                     <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
                       <span>{stat.label}</span>

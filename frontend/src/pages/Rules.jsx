@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import EmptyState from '../components/EmptyState.jsx';
+import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
-import SearchField from '../components/SearchField.jsx';
+import { PageSearchToolbar } from '../components/PageToolbar.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { RuleEditor } from '../components/rules/RuleEditor.jsx';
 import { summarizeAction, summarizeCondition } from '../components/rules/ruleDefinitions.js';
@@ -84,7 +86,7 @@ export default function Rules() {
   }, [rules, search]);
 
   return (
-    <div className="rules-view">
+    <div className="rules-view app-page-width">
       <PageHero
         id="rules-title"
         variant="rules"
@@ -93,7 +95,7 @@ export default function Rules() {
         subtitle={`${rules.length.toLocaleString()} rule${rules.length === 1 ? '' : 's'}`}
       />
 
-      <div className="page-action-row rules-page-actions" role="group" aria-label="Rule actions">
+      <PageActionRow className="rules-page-actions" label="Rule actions">
         <button
           type="button"
           className="btn-primary"
@@ -101,32 +103,30 @@ export default function Rules() {
         >
           + New Rule
         </button>
-      </div>
+      </PageActionRow>
 
       {error && <div className="error">{error}</div>}
 
-      <div className="rules-toolbar">
-        <SearchField
-          value={search}
-          onChange={setSearch}
-          placeholder="Search rules by name, merchant, or category..."
-        />
-      </div>
+      <PageSearchToolbar
+        value={search}
+        onChange={setSearch}
+        placeholder="Search rules by name, merchant, or category..."
+      />
 
       {loading ? (
         <div className="center-loading">
           <div className="spinner" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">⊙</div>
-          <h2>{search ? 'No matching rules' : 'No rules yet'}</h2>
-          <p>
-            {search
+        <EmptyState
+          icon="R"
+          title={search ? 'No matching rules' : 'No rules yet'}
+          description={
+            search
               ? 'Try a different search term.'
-              : 'Create a rule to automatically rename, categorize, or ignore transactions.'}
-          </p>
-          {!search && (
+              : 'Create a rule to automatically rename, categorize, or ignore transactions.'
+          }
+          action={!search && (
             <button
               type="button"
               className="btn-primary"
@@ -135,7 +135,7 @@ export default function Rules() {
               + New Rule
             </button>
           )}
-        </div>
+        />
       ) : (
         <ul className="rules-list">
           {filtered.map((rule) => (

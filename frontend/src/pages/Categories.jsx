@@ -4,9 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import InlinePopover from '../components/InlinePopover.jsx';
+import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
-import SearchField from '../components/SearchField.jsx';
+import { PageSearchToolbar } from '../components/PageToolbar.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 
 const COLOR_PRESETS = [
@@ -153,7 +155,7 @@ export default function Categories({
         }`}
       />
 
-      <div className="page-action-row categories-page-actions" role="group" aria-label="Category actions">
+      <PageActionRow className="categories-page-actions" label="Category actions">
         <button
           type="button"
           className="btn-primary"
@@ -161,18 +163,17 @@ export default function Categories({
         >
           + New Category
         </button>
-      </div>
+      </PageActionRow>
 
-      <div className="rules-toolbar categories-toolbar">
-        <SearchField
-          value={search}
-          onChange={setSearch}
-          placeholder="Search categories..."
-          className="categories-search"
-        />
-      </div>
+      <PageSearchToolbar
+        className="categories-toolbar app-page-width"
+        searchClassName="categories-search"
+        value={search}
+        onChange={setSearch}
+        placeholder="Search categories..."
+      />
 
-      <div className="categories-content">
+      <div className="categories-content app-page-width">
         {error && <div className="error">{error}</div>}
 
         {loading ? (
@@ -180,15 +181,15 @@ export default function Categories({
             <div className="spinner" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state-icon">#</div>
-            <h2>{search ? 'No matching categories' : 'No categories yet'}</h2>
-            <p>
-              {search
+          <EmptyState
+            icon="#"
+            title={search ? 'No matching categories' : 'No categories yet'}
+            description={
+              search
                 ? 'Try a different search term.'
-                : 'Add categories to organize transactions, budgets, and rules.'}
-            </p>
-            {!search && (
+                : 'Add categories to organize transactions, budgets, and rules.'
+            }
+            action={!search && (
               <button
                 type="button"
                 className="btn-primary"
@@ -197,7 +198,7 @@ export default function Categories({
                 + New Category
               </button>
             )}
-          </div>
+          />
         ) : (
           <ul className="category-list">
             {filtered.map((category) => (

@@ -12,13 +12,16 @@ import {
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppRangeSlider from '../components/AppRangeSlider.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import ExpandingSection from '../components/ExpandingSection.jsx';
+import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
   useDragInteractionLock,
   useReorderSensors
 } from '../components/ReorderListItem.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
+import SignalRow from '../components/SignalRow.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import CurrencyInput, {
   formatCurrencyInput,
@@ -393,34 +396,36 @@ export default function Goals() {
         subtitle="Connect asset accounts, allocate savings, and project when each target lands."
       />
 
-      <div className="page-action-row goals-page-actions" role="group" aria-label="Goal actions">
+      <PageActionRow className="goals-page-actions" label="Goal actions">
         <button type="button" className="btn-primary" onClick={openNewGoal}>
           + New Goal
         </button>
-      </div>
+      </PageActionRow>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error app-page-width">{error}</div>}
 
       {loading ? (
-        <div className="center-loading">
+        <div className="center-loading app-page-width">
           <div className="spinner" />
         </div>
       ) : accounts.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">$</div>
-          <h2>No asset accounts yet</h2>
-          <p>Add a checking, savings, investment, cash, or other asset account before creating goals.</p>
-          <Link to="/accounts" className="btn-primary">Manage accounts</Link>
-        </div>
+        <EmptyState
+          className="app-page-width"
+          icon="$"
+          title="No asset accounts yet"
+          description="Add a checking, savings, investment, cash, or other asset account before creating goals."
+          action={<Link to="/accounts" className="btn-primary">Manage accounts</Link>}
+        />
       ) : goals.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">G</div>
-          <h2>No savings goals yet</h2>
-          <p>Create a saving target and connect the accounts that should count toward it.</p>
-          <button type="button" className="btn-primary" onClick={openNewGoal}>+ New Goal</button>
-        </div>
+        <EmptyState
+          className="app-page-width"
+          icon="G"
+          title="No savings goals yet"
+          description="Create a saving target and connect the accounts that should count toward it."
+          action={<button type="button" className="btn-primary" onClick={openNewGoal}>+ New Goal</button>}
+        />
       ) : (
-        <div className="goals-grid">
+        <div className="goals-grid app-page-width">
           <section
             className={`dashboard-card goals-focus-card ${focusCollapsed ? 'collapsed' : ''}`}
             onClick={toggleFocusCard}
@@ -678,18 +683,6 @@ function ImaginePanel({ goal, imagineMonthly, imaginedEta, onChange }) {
           aria-label="Extra monthly savings amount"
         />
       </div>
-    </div>
-  );
-}
-
-function SignalRow({ label, value, detail, compactDetail = null, className = '' }) {
-  return (
-    <div className={`networth-signal-row ${className}`}>
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-      {detail && <em data-compact-detail={compactDetail ?? detail}>{detail}</em>}
     </div>
   );
 }

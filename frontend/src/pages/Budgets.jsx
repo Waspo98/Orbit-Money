@@ -5,11 +5,13 @@ import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppSelect from '../components/AppSelect.jsx';
 import BudgetAmountModal from '../components/BudgetAmountModal.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import CurrencyInput, {
   parseCurrencyInput
 } from '../components/CurrencyInput.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import ExpandingSection from '../components/ExpandingSection.jsx';
+import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import PeriodNav from '../components/PeriodNav.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
@@ -447,6 +449,7 @@ export default function Budgets({
         subtitle={budgetSubtitle}
         toolbar={(
           <PeriodNav
+            variant="hero"
             value={selectedMonth}
             options={monthOptions.map((item) => ({
               value: item,
@@ -464,11 +467,11 @@ export default function Budgets({
         )}
       />
 
-      <div className="page-action-row budget-page-actions" role="group" aria-label="Budget actions">
+      <PageActionRow className="budget-page-actions" label="Budget actions">
         <button type="button" className="btn-primary" onClick={() => setAddingBudget(true)}>
           Add Budget
         </button>
-      </div>
+      </PageActionRow>
 
       {error && <div className="error">{error}</div>}
 
@@ -630,18 +633,21 @@ export default function Budgets({
           )}
 
           {budgetModel.rows.length === 0 && budgetModel.unbudgetedRows.length === 0 && (
-            <div className="empty-state budget-beta-empty">
-              <div className="empty-state-icon">+</div>
-              <h2>No Budget Activity Yet</h2>
-              <p>Add budgets or pick another month to start tracking category spending.</p>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => setAddingBudget(true)}
-              >
-                Add Budget
-              </button>
-            </div>
+            <EmptyState
+              className="budget-beta-empty"
+              icon="+"
+              title="No Budget Activity Yet"
+              description="Add budgets or pick another month to start tracking category spending."
+              action={(
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setAddingBudget(true)}
+                >
+                  Add Budget
+                </button>
+              )}
+            />
           )}
         </div>
       )}

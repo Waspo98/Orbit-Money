@@ -194,7 +194,7 @@ export default function HousingCalculator({ accounts = [] }) {
   }
 
   return (
-    <div className="housing-view">
+    <div className="housing-view app-page-width">
       <PageHero
         id="housing-title"
         variant="housing"

@@ -10,6 +10,7 @@ import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppIcon from '../components/AppIcon.jsx';
 import AppSelect from '../components/AppSelect.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
+import ChoiceCardGroup from '../components/ChoiceCardGroup.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
   useDragInteractionLock,
@@ -750,48 +751,29 @@ export default function Settings({
         title="Appearance"
         description="Choose how the app looks on this device."
       >
-        <div className="settings-theme-toggle" role="radiogroup" aria-label="Theme">
-          {THEME_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`settings-theme-option ${themeMode === option.value ? 'active' : ''}`}
-              onClick={() => onThemeChange?.(option.value)}
-              role="radio"
-              aria-checked={themeMode === option.value}
-            >
-              <span className="settings-theme-emoji" aria-hidden>{option.emoji}</span>
-              <span className="settings-theme-text">
-                <span className="settings-theme-label">{option.label}</span>
-                <span className="settings-theme-copy">{option.description}</span>
-              </span>
-            </button>
-          ))}
-        </div>
+        <ChoiceCardGroup
+          className="settings-theme-toggle"
+          optionClassName="settings-theme-option"
+          options={THEME_OPTIONS}
+          value={themeMode}
+          onChange={(nextValue) => onThemeChange?.(nextValue)}
+          ariaLabel="Theme"
+        />
 
         <div className="settings-subsection">
           <div className="settings-subsection-heading">
             <h4>Night Style</h4>
             <p>Used for Night mode and for System when this device is in dark mode.</p>
           </div>
-          <div className="settings-theme-toggle settings-theme-toggle-two" role="radiogroup" aria-label="Night style">
-            {DARK_VARIANT_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={`settings-theme-option ${darkVariant === option.value ? 'active' : ''}`}
-                onClick={() => onDarkVariantChange?.(option.value)}
-                role="radio"
-                aria-checked={darkVariant === option.value}
-              >
-                <span className="settings-theme-emoji" aria-hidden>{option.emoji}</span>
-                <span className="settings-theme-text">
-                  <span className="settings-theme-label">{option.label}</span>
-                  <span className="settings-theme-copy">{option.description}</span>
-                </span>
-              </button>
-            ))}
-          </div>
+          <ChoiceCardGroup
+            className="settings-theme-toggle"
+            optionClassName="settings-theme-option"
+            columns={2}
+            options={DARK_VARIANT_OPTIONS}
+            value={darkVariant}
+            onChange={(nextValue) => onDarkVariantChange?.(nextValue)}
+            ariaLabel="Night style"
+          />
         </div>
       </SettingsCard>
     );
@@ -821,30 +803,21 @@ export default function Settings({
           </button>
         </div>
 
-        <div className="settings-theme-toggle settings-feature-toggle" role="group" aria-label="Feature visibility">
-          {featureRoutes.map((route) => {
-            const visible = isFeatureVisible(route);
-            const disabled = route.feature === 'mha' && mhaBusy;
-            return (
-              <button
-                key={route.path}
-                type="button"
-                className={`settings-theme-option settings-feature-option ${visible ? 'active' : ''}`}
-                onClick={() => handleFeatureToggle(route)}
-                disabled={disabled}
-                aria-pressed={visible}
-              >
-                <AppIcon name={route.icon} className="settings-feature-icon" />
-                <span className="settings-theme-text">
-                  <span className="settings-theme-label">{route.label}</span>
-                  <span className="settings-theme-copy">
-                    {visible ? 'On' : 'Off'}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <ChoiceCardGroup
+          type="toggle"
+          className="settings-theme-toggle settings-feature-toggle"
+          optionClassName="settings-theme-option"
+          options={featureRoutes}
+          onChange={(path, route) => handleFeatureToggle(route)}
+          ariaLabel="Feature visibility"
+          getOptionValue={(route) => route.path}
+          getOptionLabel={(route) => route.label}
+          getOptionDescription={(route) => (isFeatureVisible(route) ? 'On' : 'Off')}
+          getOptionClassName={() => 'settings-feature-option'}
+          getOptionDisabled={(route) => route.feature === 'mha' && mhaBusy}
+          isOptionActive={isFeatureVisible}
+          renderIcon={(route) => <AppIcon name={route.icon} className="settings-feature-icon" />}
+        />
 
         {mhaError && <div className="error" style={{ marginTop: 12 }}>{mhaError}</div>}
       </SettingsCard>
@@ -1728,7 +1701,7 @@ export default function Settings({
   const isSettingsSubpage = settingsPage !== 'home';
 
   return (
-    <div className="settings-view">
+    <div className="settings-view app-page-width">
       <PageHero
         id="settings-title"
         variant="settings"

@@ -15,7 +15,9 @@ import DropdownMenu from '../components/DropdownMenu.jsx';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppSelect from '../components/AppSelect.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import ExpandingSection from '../components/ExpandingSection.jsx';
+import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
   useDragInteractionLock,
@@ -338,7 +340,7 @@ export default function Accounts({ onChange }) {
   }
 
   return (
-    <div className={`accounts-view ${reorderMode ? 'reorder-mode' : ''} ${activeDragId ? 'dragging-active' : ''}`}>
+    <div className={`accounts-view app-page-width ${reorderMode ? 'reorder-mode' : ''} ${activeDragId ? 'dragging-active' : ''}`}>
       <PageHero
         id="accounts-title"
         variant="accounts"
@@ -352,7 +354,7 @@ export default function Accounts({ onChange }) {
         stats={accountHeroStats}
       />
 
-      <div className="page-action-row accounts-toolbar accounts-page-toolbar" role="group" aria-label="Account actions">
+      <PageActionRow className="accounts-toolbar accounts-page-toolbar" label="Account actions">
         {!reorderMode && (
           <label className="toggle-row">
             <input
@@ -382,7 +384,7 @@ export default function Accounts({ onChange }) {
             + Manual Account
           </button>
         )}
-      </div>
+      </PageActionRow>
 
       <div className="view-header" hidden>
         <div>
@@ -427,14 +429,16 @@ export default function Accounts({ onChange }) {
           <div className="spinner" />
         </div>
       ) : accounts.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">⬢</div>
-          <h2>No accounts yet</h2>
-          <p>Import from Rocket Money, connect SimpleFIN, or add a manual account.</p>
-          <button type="button" className="btn-secondary" onClick={() => setAddingManual(true)}>
-            Add Manual Account
-          </button>
-        </div>
+        <EmptyState
+          icon="$"
+          title="No accounts yet"
+          description="Import from Rocket Money, connect SimpleFIN, or add a manual account."
+          action={(
+            <button type="button" className="btn-secondary" onClick={() => setAddingManual(true)}>
+              Add Manual Account
+            </button>
+          )}
+        />
       ) : reorderMode ? (
         // Group reorder mode intentionally mirrors the simpler Goals list.
         <DndContext

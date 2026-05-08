@@ -16,6 +16,7 @@ export default function SegmentedControl({
     ? role === 'tablist' ? 'tab' : undefined
     : buttonRole;
   const usesTabs = resolvedButtonRole === 'tab';
+  const usesRadio = resolvedButtonRole === 'radio';
 
   return (
     <div className={classes} role={role || undefined} aria-label={ariaLabel}>
@@ -33,7 +34,8 @@ export default function SegmentedControl({
             role={resolvedButtonRole}
             className={active ? 'active' : ''}
             aria-selected={usesTabs ? active : undefined}
-            aria-pressed={!usesTabs ? active : undefined}
+            aria-checked={usesRadio ? active : undefined}
+            aria-pressed={!usesTabs && !usesRadio ? active : undefined}
             disabled={disabled}
             onClick={() => {
               if (!disabled) onChange?.(optionValue, option);

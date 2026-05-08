@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import { OVERLAY_ANIM_MS } from '../components/overlayBehavior.js';
+import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import SearchField from '../components/SearchField.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
@@ -302,13 +304,13 @@ export default function Upcoming({ accounts = [], categories = [] }) {
         statLabel="Upcoming summary"
       />
 
-      <div className="page-action-row upcoming-page-actions" role="group" aria-label="Upcoming actions">
+      <PageActionRow className="upcoming-page-actions" label="Upcoming actions">
         <button type="button" className="btn-primary" onClick={() => openNew()}>
           + Add Recurring
         </button>
-      </div>
+      </PageActionRow>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error app-page-width">{error}</div>}
 
       <div className={`upcoming-content app-page-width ${refreshing ? 'refreshing' : ''}`}>
         {loading ? (
@@ -480,13 +482,15 @@ function UpcomingPlan({
 
   if (items.length === 0) {
     return (
-      <div className="empty-state">
-        <h2>No Recurring Items</h2>
-        <p>Add recurring bills, subscriptions, or income to start projecting cash flow.</p>
-        <button type="button" className="btn-primary" onClick={onViewSuggestions}>
-          View Suggestions
-        </button>
-      </div>
+      <EmptyState
+        title="No Recurring Items"
+        description="Add recurring bills, subscriptions, or income to start projecting cash flow."
+        action={(
+          <button type="button" className="btn-primary" onClick={onViewSuggestions}>
+            View Suggestions
+          </button>
+        )}
+      />
     );
   }
 

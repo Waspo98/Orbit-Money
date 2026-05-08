@@ -77,13 +77,6 @@ function annualizeSavings(savings, year) {
   return value * (daysInYear(selectedYear) / Math.max(1, dayOfYear(today)));
 }
 
-function appSelectOptions(options) {
-  return (options || []).map((option) => ({
-    value: option.value ?? option.code,
-    label: option.label ?? option.name
-  }));
-}
-
 function toTaxDraft(profile) {
   return {
     mode: profile?.mode || 'simple',
@@ -392,9 +385,10 @@ export default function MhaTracker() {
         subtitle="Calculate Projected MHA Tax Savings"
         stats={[]}
         statsExtra={(
-          <div className="page-hero-stat mha-year-stat">
+          <div className="page-hero-stat page-hero-period-stat">
             <PeriodNav
-              className="year-nav"
+              variant="hero"
+              size="compact"
               value={selectedYear}
               options={yearOptions.map((option) => ({
                 value: option,
@@ -413,14 +407,14 @@ export default function MhaTracker() {
         statLabel="MHA summary"
       />
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error app-page-width">{error}</div>}
 
       {loading ? (
-        <div className="center-loading">
+        <div className="center-loading app-page-width">
           <div className="spinner" />
         </div>
       ) : (
-        <div className={`mha-content ${refreshing ? 'refreshing' : ''}`}>
+        <div className={`mha-content app-page-width ${refreshing ? 'refreshing' : ''}`}>
           <MhaDashboard
             summary={summary}
             taxProfile={taxProfile}
@@ -815,7 +809,7 @@ function TaxProfileModal({ profile, reference, onClose, onSaved }) {
                     <span>Filing Status</span>
                     <AppSelect
                       value={draft.filingStatus}
-                      options={appSelectOptions(filingStatuses)}
+                      options={filingStatuses}
                       onChange={(value) => update('filingStatus', value)}
                       ariaLabel="Filing status"
                     />
@@ -824,7 +818,7 @@ function TaxProfileModal({ profile, reference, onClose, onSaved }) {
                     <span>State</span>
                     <AppSelect
                       value={draft.state}
-                      options={appSelectOptions(reference?.states || [])}
+                      options={reference?.states || []}
                       onChange={(value) => update('state', value)}
                       ariaLabel="State"
                     />
