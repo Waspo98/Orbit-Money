@@ -91,18 +91,17 @@ export default function Rules() {
         kicker="Automation"
         title="Rules"
         subtitle={`${rules.length.toLocaleString()} rule${rules.length === 1 ? '' : 's'}`}
-        toolbar={(
-          <div className="page-hero-action-row">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => setEditing({})}
-            >
-              + New rule
-            </button>
-          </div>
-        )}
       />
+
+      <div className="page-action-row rules-page-actions" role="group" aria-label="Rule actions">
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => setEditing({})}
+        >
+          + New Rule
+        </button>
+      </div>
 
       {error && <div className="error">{error}</div>}
 
@@ -133,7 +132,7 @@ export default function Rules() {
               className="btn-primary"
               onClick={() => setEditing({})}
             >
-              + New rule
+              + New Rule
             </button>
           )}
         </div>

@@ -438,7 +438,7 @@ export default function Budgets({
   ].map((item) => item.category);
 
   return (
-    <div className="budget-beta-view">
+    <div className="budget-beta-view app-page-width">
       <PageHero
         id="budgets-title"
         variant="budgets"
@@ -464,6 +464,12 @@ export default function Budgets({
         )}
       />
 
+      <div className="page-action-row budget-page-actions" role="group" aria-label="Budget actions">
+        <button type="button" className="btn-primary" onClick={() => setAddingBudget(true)}>
+          Add Budget
+        </button>
+      </div>
+
       {error && <div className="error">{error}</div>}
 
       {loading ? (
@@ -477,7 +483,6 @@ export default function Budgets({
             monthLabel={formatMonthLabel(selectedMonth)}
             selectedMonth={selectedMonth}
             daysLeft={daysLeft}
-            onAddBudget={() => setAddingBudget(true)}
           />
 
           {budgetModel.totalExpenses > 0 && (
@@ -677,7 +682,7 @@ export default function Budgets({
   );
 }
 
-function SnapshotPanel({ model, monthLabel, selectedMonth, daysLeft, onAddBudget }) {
+function SnapshotPanel({ model, monthLabel, selectedMonth, daysLeft }) {
   const remainingTone = model.remaining < 0 ? 'over' : 'good';
   const hasBudget = model.totalBudgeted > 0;
   const spendPace = getSpendPace(model, selectedMonth, daysLeft);
@@ -731,12 +736,6 @@ function SnapshotPanel({ model, monthLabel, selectedMonth, daysLeft, onAddBudget
           detail={spendPace.detail}
           tone={spendPace.tone}
         />
-      </div>
-
-      <div className="budget-beta-snapshot-actions">
-        <button type="button" className="btn-primary" onClick={onAddBudget}>
-          Add Budget
-        </button>
       </div>
     </section>
   );

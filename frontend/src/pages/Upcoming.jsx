@@ -5,6 +5,7 @@ import { OVERLAY_ANIM_MS } from '../components/overlayBehavior.js';
 import PageHero from '../components/PageHero.jsx';
 import SearchField from '../components/SearchField.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
+import SegmentedControl from '../components/SegmentedControl.jsx';
 import RecurringItemEditor, {
   formFromRecurringItem,
   formFromSuggestion,
@@ -299,18 +300,17 @@ export default function Upcoming({ accounts = [], categories = [] }) {
         subtitle="Projected bills, subscriptions, income, and cash flow."
         stats={heroStats}
         statLabel="Upcoming summary"
-        toolbar={
-          <div className="page-hero-action-row">
-            <button type="button" className="btn-primary" onClick={() => openNew()}>
-              + Add Recurring
-            </button>
-          </div>
-        }
       />
+
+      <div className="page-action-row upcoming-page-actions" role="group" aria-label="Upcoming actions">
+        <button type="button" className="btn-primary" onClick={() => openNew()}>
+          + Add Recurring
+        </button>
+      </div>
 
       {error && <div className="error">{error}</div>}
 
-      <div className={`upcoming-content ${refreshing ? 'refreshing' : ''}`}>
+      <div className={`upcoming-content app-page-width ${refreshing ? 'refreshing' : ''}`}>
         {loading ? (
           <div className="center-loading"><div className="spinner" /></div>
         ) : (
@@ -320,18 +320,13 @@ export default function Upcoming({ accounts = [], categories = [] }) {
               restOfMonth={restOfMonth}
             />
 
-            <div className="housing-segmented upcoming-tabs" role="tablist" aria-label="Upcoming filters">
-              {FILTERS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={filter === option.value ? 'active' : ''}
-                  onClick={() => setFilter(option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              className="upcoming-tabs"
+              options={FILTERS}
+              value={filter}
+              onChange={setFilter}
+              ariaLabel="Upcoming filters"
+            />
 
             <UpcomingPlan
               filter={filter}

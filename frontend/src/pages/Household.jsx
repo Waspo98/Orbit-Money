@@ -271,14 +271,13 @@ export default function Household() {
         kicker="Income And Benefits"
         title="Household"
         subtitle="Track net pay, employer benefits, retirement inputs, and compensation history."
-        toolbar={(
-          <div className="page-hero-action-row">
-            <button type="button" className="btn-primary" onClick={() => setEditingMember({ mode: 'new' })}>
-              + New Member
-            </button>
-          </div>
-        )}
       />
+
+      <div className="page-action-row household-page-actions" role="group" aria-label="Household actions">
+        <button type="button" className="btn-primary" onClick={() => setEditingMember({ mode: 'new' })}>
+          + New Member
+        </button>
+      </div>
 
       {error && <div className="error">{error}</div>}
 
@@ -298,7 +297,7 @@ export default function Household() {
           </button>
         </div>
       ) : (
-        <div className="household-grid">
+        <div className="household-grid app-page-width">
           <section className="dashboard-card household-members-card">
             <header className="dashboard-card-header">
               <h3>Members</h3>

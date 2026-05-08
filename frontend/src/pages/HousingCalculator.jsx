@@ -3,6 +3,7 @@ import AppSelect from '../components/AppSelect.jsx';
 import PageHero from '../components/PageHero.jsx';
 import CurrencyInput, { formatCurrencyInput } from '../components/CurrencyInput.jsx';
 import PercentInput from '../components/PercentInput.jsx';
+import SegmentedControl from '../components/SegmentedControl.jsx';
 import { formatCurrency } from '../lib/formatters.js';
 
 function formatMoney(amount) {
@@ -359,32 +360,24 @@ function LoanTermField({ value, onChange }) {
   return (
     <div className="field housing-field housing-loan-term">
       <span>Loan Term (Years)</span>
-      <div className="housing-segmented" role="group" aria-label="Loan term">
-        <button
-          type="button"
-          className={value === '30' ? 'active' : ''}
-          onClick={() => choosePreset('30')}
-        >
-          30
-        </button>
-        <button
-          type="button"
-          className={value === '15' ? 'active' : ''}
-          onClick={() => choosePreset('15')}
-        >
-          15
-        </button>
-        <button
-          type="button"
-          className={showCustom ? 'active' : ''}
-          onClick={() => {
+      <SegmentedControl
+        role="group"
+        ariaLabel="Loan term"
+        options={[
+          { value: '30', label: '30' },
+          { value: '15', label: '15' },
+          { value: 'custom', label: 'Custom' }
+        ]}
+        value={showCustom ? 'custom' : value}
+        onChange={(nextValue) => {
+          if (nextValue === 'custom') {
             setCustomOpen(true);
             if (value === '30' || value === '15') onChange('');
-          }}
-        >
-          Custom
-        </button>
-      </div>
+            return;
+          }
+          choosePreset(nextValue);
+        }}
+      />
       <input
         className={`housing-custom-term ${showCustom ? 'visible' : ''}`}
         type="text"

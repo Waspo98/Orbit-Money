@@ -6,6 +6,7 @@ import AppRangeSlider from '../components/AppRangeSlider.jsx';
 import CurrencyInput, { formatCurrencyInput, parseCurrencyInput } from '../components/CurrencyInput.jsx';
 import PageHero from '../components/PageHero.jsx';
 import PercentInput from '../components/PercentInput.jsx';
+import SegmentedControl from '../components/SegmentedControl.jsx';
 import { formatCurrency, formatPercent, parsePercentInput } from '../lib/formatters.js';
 
 const ACCOUNT_KIND_LABELS = {
@@ -462,22 +463,17 @@ export default function RetirementCalculator() {
                 Edit Assumptions
               </button>
             </div>
-            <div className="housing-segmented retcalc-mode-tabs" role="tablist" aria-label="Retirement calculator question">
-              {[
-                ['have', 'What Will We Have?'],
-                ['when', 'When Can We Retire?'],
-                ['save', 'How Much To Save?']
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={mode === key ? 'active' : ''}
-                  onClick={() => setMode(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              className="retcalc-mode-tabs"
+              ariaLabel="Retirement calculator question"
+              options={[
+                { value: 'have', label: 'What Will We Have?' },
+                { value: 'when', label: 'When Can We Retire?' },
+                { value: 'save', label: 'How Much To Save?' }
+              ]}
+              value={mode}
+              onChange={setMode}
+            />
 
             {mode === 'have' && (
               <div className="retcalc-lever-stack">

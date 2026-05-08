@@ -11,6 +11,7 @@ import PageHero from '../components/PageHero.jsx';
 import PeriodNav from '../components/PeriodNav.jsx';
 import PercentInput from '../components/PercentInput.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
+import SegmentedControl from '../components/SegmentedControl.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { TransactionRow, EditTransactionModal } from '../components/transactions/TransactionRow.jsx';
 import { RuleEditor } from '../components/rules/RuleEditor.jsx';
@@ -772,26 +773,16 @@ function TaxProfileModal({ profile, reference, onClose, onSaved }) {
         <div className="mha-tax-modal">
           <h3>MHA Tax Assumptions</h3>
 
-          <div className="segmented-control mha-tax-mode-tabs" role="tablist" aria-label="MHA tax mode">
-            <button
-              type="button"
-              role="tab"
-              className={draft.mode === 'simple' ? 'active' : ''}
-              aria-selected={draft.mode === 'simple'}
-              onClick={() => update('mode', 'simple')}
-            >
-              Simple
-            </button>
-            <button
-              type="button"
-              role="tab"
-              className={draft.mode === 'household' ? 'active' : ''}
-              aria-selected={draft.mode === 'household'}
-              onClick={() => update('mode', 'household')}
-            >
-              Estimate From Household
-            </button>
-          </div>
+          <SegmentedControl
+            className="mha-tax-mode-tabs"
+            ariaLabel="MHA tax mode"
+            options={[
+              { value: 'simple', label: 'Simple' },
+              { value: 'household', label: 'Estimate From Household' }
+            ]}
+            value={draft.mode}
+            onChange={(nextMode) => update('mode', nextMode)}
+          />
 
           {draft.mode === 'simple' ? (
             <div className="household-form-section">

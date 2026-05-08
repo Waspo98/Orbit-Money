@@ -1924,9 +1924,16 @@ function MonthComparisonCard({ month, previousMonth, summary, previousSummary, l
             return (
               <div key={row.label} className="dash-month-compare-row">
                 <span>{row.label}</span>
-                <strong>{formatWholeCurrency(current)}</strong>
-                <strong>{formatWholeCurrency(previous)}</strong>
+                <strong>
+                  <span className="dash-month-compare-value-label">{formatShortMonth(month)}</span>
+                  {formatWholeCurrency(current)}
+                </strong>
+                <strong>
+                  <span className="dash-month-compare-value-label">{formatShortMonth(previousMonth)}</span>
+                  {formatWholeCurrency(previous)}
+                </strong>
                 <em className={delta < 0 ? 'income' : delta > 0 ? 'expense' : ''}>
+                  <span className="dash-month-compare-value-label">Change</span>
                   {delta === 0 ? 'No change' : `${delta > 0 ? '+' : ''}${formatWholeCurrency(delta)}`}
                 </em>
               </div>

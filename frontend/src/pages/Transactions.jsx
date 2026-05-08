@@ -667,7 +667,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           </div>
         )}
       />
-      <div className="txn-page-actions" role="group" aria-label="Transaction actions">
+      <div className="page-action-row txn-page-actions" role="group" aria-label="Transaction actions">
         {hasSimpleFinAccount && (
           <button
             type="button"

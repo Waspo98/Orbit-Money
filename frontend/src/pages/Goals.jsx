@@ -391,14 +391,13 @@ export default function Goals() {
         kicker="Saving Targets"
         title="Savings Goals"
         subtitle="Connect asset accounts, allocate savings, and project when each target lands."
-        toolbar={(
-          <div className="page-hero-action-row">
-            <button type="button" className="btn-primary" onClick={openNewGoal}>
-              + New Goal
-            </button>
-          </div>
-        )}
       />
+
+      <div className="page-action-row goals-page-actions" role="group" aria-label="Goal actions">
+        <button type="button" className="btn-primary" onClick={openNewGoal}>
+          + New Goal
+        </button>
+      </div>
 
       {error && <div className="error">{error}</div>}
 

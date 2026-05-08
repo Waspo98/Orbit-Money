@@ -151,18 +151,17 @@ export default function Categories({
         subtitle={`${categories.length.toLocaleString()} categor${
           categories.length === 1 ? 'y' : 'ies'
         }`}
-        toolbar={(
-          <div className="page-hero-action-row">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => setEditing({})}
-            >
-              + New Category
-            </button>
-          </div>
-        )}
       />
+
+      <div className="page-action-row categories-page-actions" role="group" aria-label="Category actions">
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => setEditing({})}
+        >
+          + New Category
+        </button>
+      </div>
 
       <div className="rules-toolbar categories-toolbar">
         <SearchField

@@ -5,6 +5,7 @@ import AppSelect from '../components/AppSelect.jsx';
 import BudgetAmountModal from '../components/BudgetAmountModal.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import SegmentedControl from '../components/SegmentedControl.jsx';
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -322,20 +323,13 @@ export default function SpendingTrends() {
 
 function RangeTabs({ value, onChange }) {
   return (
-    <div className="housing-segmented spending-range-tabs" role="tablist" aria-label="Spending trend range">
-      {RANGE_OPTIONS.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          className={value === option.value ? 'active' : ''}
-          onClick={() => onChange(option.value)}
-          role="tab"
-          aria-selected={value === option.value}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      className="spending-range-tabs"
+      options={RANGE_OPTIONS}
+      value={value}
+      onChange={onChange}
+      ariaLabel="Spending trend range"
+    />
   );
 }
 

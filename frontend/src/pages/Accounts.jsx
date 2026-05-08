@@ -120,6 +120,15 @@ function groupTypeFromSortable(id) {
   return text.startsWith('group-') ? text.slice('group-'.length) : null;
 }
 
+function accountNetWorthContribution(account) {
+  const balance = Number(account.current_balance) || 0;
+  if (account.type === 'mortgage') {
+    const estimatedValue = Number(account.estimated_value) || 0;
+    return estimatedValue - Math.abs(balance);
+  }
+  return balance;
+}
+
 function findAccountGroup(groups, accountId) {
   return groups.find((group) => group.items.some((account) => account.id === accountId));
 }
@@ -258,7 +267,7 @@ export default function Accounts({ onChange }) {
     .filter((account) => account.type === 'investment')
     .reduce((total, account) => total + (Number(account.current_balance) || 0), 0);
   const netWorth = activeAccounts.reduce(
-    (total, account) => total + (Number(account.current_balance) || 0),
+    (total, account) => total + accountNetWorthContribution(account),
     0
   );
   const accountCountLabel = `${activeAccounts.length.toLocaleString()} ${
@@ -343,7 +352,7 @@ export default function Accounts({ onChange }) {
         stats={accountHeroStats}
       />
 
-      <div className="accounts-toolbar accounts-page-toolbar">
+      <div className="page-action-row accounts-toolbar accounts-page-toolbar" role="group" aria-label="Account actions">
         {!reorderMode && (
           <label className="toggle-row">
             <input
