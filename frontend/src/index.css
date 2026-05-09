@@ -1510,10 +1510,17 @@ input, textarea, select {
 /* ================== Switch toggle ================== */
 
 .switch {
+  --switch-width: 40px;
+  --switch-height: 22px;
+  --switch-thumb-size: 18px;
+  --switch-thumb-offset: 2px;
+  /* Keep the switch's layout slot stable; checked state only moves the thumb. */
   position: relative;
   display: inline-block;
-  width: 40px;
-  height: 22px;
+  width: var(--switch-width);
+  min-width: var(--switch-width);
+  height: var(--switch-height);
+  flex: 0 0 var(--switch-width);
   flex-shrink: 0;
 }
 
@@ -1536,10 +1543,10 @@ input, textarea, select {
 .switch-track::before {
   content: '';
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 18px;
-  height: 18px;
+  top: var(--switch-thumb-offset);
+  left: var(--switch-thumb-offset);
+  width: var(--switch-thumb-size);
+  height: var(--switch-thumb-size);
   background: #fff;
   border-radius: 50%;
   box-shadow: var(--shadow-sm);
@@ -1551,7 +1558,12 @@ input, textarea, select {
 }
 
 .switch input:checked + .switch-track::before {
-  transform: translateX(18px);
+  transform: translateX(calc(var(--switch-width) - var(--switch-thumb-size) - var(--switch-thumb-offset) - var(--switch-thumb-offset)));
+}
+
+.switch input:disabled + .switch-track {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .switch input:focus-visible + .switch-track {
@@ -10578,15 +10590,18 @@ body.modal-page-blur-active .txn-pinned-month-header {
 
 .notification-status-row {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: flex-start;
+  justify-content: stretch;
 }
 
 .notification-status-main {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  justify-self: stretch;
 }
 
 .notification-preference-row {
@@ -10608,6 +10623,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
 
 .notification-switch {
   margin-top: 1px;
+  margin-left: auto;
 }
 
 .notification-privacy-row {
@@ -10625,6 +10641,25 @@ body.modal-page-blur-active .txn-pinned-month-header {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.notification-toggle-heading .settings-action-info {
+  flex: 1 1 auto;
+}
+
+.notification-toggle-heading .notification-switch {
+  flex: 0 0 auto;
+}
+
+.notification-status-main .settings-action-buttons {
+  width: 100%;
+  justify-content: stretch;
+}
+
+.notification-status-main .settings-action-buttons > button {
+  flex: 1 1 100%;
 }
 
 .notification-account-picker {
@@ -10638,10 +10673,6 @@ body.modal-page-blur-active .txn-pinned-month-header {
 .notification-types-note {
   margin-top: 0;
   margin-bottom: 12px;
-}
-
-#settings-card-body-notification-types {
-  padding-top: 8px;
 }
 
 .notification-editor-form {
@@ -10969,9 +11000,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   .settings-action > button { width: 100%; }
   .settings-action > a { width: 100%; justify-content: center; }
   .notification-preference-row,
-  .notification-toggle-heading,
-  .notification-status-main { flex-direction: row; align-items: center; }
-  .notification-status-main { align-items: flex-start; flex-wrap: wrap; }
+  .notification-toggle-heading { flex-direction: row; align-items: center; }
   .settings-action-buttons { width: 100%; justify-content: stretch; }
   .settings-action-buttons > button,
   .settings-action-buttons > a { flex: 1 1 140px; }

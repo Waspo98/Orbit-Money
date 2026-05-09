@@ -1103,16 +1103,14 @@ export default function Settings({
       >
         <div className="settings-action notification-status-row">
           <div className="notification-status-main">
-            <span className="notification-toggle-heading">
+            <label className="notification-toggle-heading">
               <span className="settings-action-info">
                 <strong>Push Notifications</strong>
                 <p>
                   {notificationBusy && !prefs.enabled
                     ? 'Enabling...'
                     : pushSupported
-                      ? `${permissionLabel(notificationPermission)}${
-                          activeDeviceCount > 0 ? ` - ${activeDeviceCount} active device${activeDeviceCount === 1 ? '' : 's'}` : ''
-                        }`
+                      ? permissionLabel(notificationPermission)
                       : 'This browser does not support web push notifications.'}
                 </p>
               </span>
@@ -1126,41 +1124,45 @@ export default function Settings({
                 />
                 <span className="switch-track" />
               </span>
-            </span>
-            <div className="settings-action-buttons">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={sendTestNotification}
-                disabled={notificationBusy || !prefs.enabled || activeDeviceCount === 0}
-              >
-                Send Test
-              </button>
-            </div>
+            </label>
+            {prefs.enabled && (
+              <div className="settings-action-buttons">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={sendTestNotification}
+                  disabled={notificationBusy || activeDeviceCount === 0}
+                >
+                  Send Test
+                </button>
+              </div>
+            )}
           </div>
 
-          <label className="notification-privacy-row">
-            <span className="notification-toggle-heading">
-              <span className="settings-action-info">
-                <strong>Show Dollar Amounts</strong>
-                <p>{prefs.showAmounts ? 'Amounts can appear in notification text.' : 'Amounts stay hidden on lock-screen alerts.'}</p>
+          {prefs.enabled && (
+            <label className="notification-privacy-row">
+              <span className="notification-toggle-heading">
+                <span className="settings-action-info">
+                  <strong>Show Dollar Amounts</strong>
+                  <p>{prefs.showAmounts ? 'Amounts can appear in notification text.' : 'Amounts stay hidden on lock-screen alerts.'}</p>
+                </span>
+                <span className="switch notification-switch">
+                  <input
+                    type="checkbox"
+                    aria-label="Show Dollar Amounts In Notifications"
+                    checked={prefs.showAmounts}
+                    onChange={(event) =>
+                      updateNotificationPreferences((current) => ({
+                        ...current,
+                        showAmounts: event.target.checked
+                      }))
+                    }
+                  />
+                  <span className="switch-track" />
+                </span>
               </span>
-              <span className="switch notification-switch">
-                <input
-                  type="checkbox"
-                  aria-label="Show Dollar Amounts In Notifications"
-                  checked={prefs.showAmounts}
-                  onChange={(event) =>
-                    updateNotificationPreferences((current) => ({
-                      ...current,
-                      showAmounts: event.target.checked
-                    }))
-                  }
-                />
-                <span className="switch-track" />
-              </span>
-            </span>
-          </label>
+            </label>
+          )}
         </div>
 
         {!serverConfigured && (
@@ -1170,20 +1172,20 @@ export default function Settings({
         )}
         {notificationError && <div className="error">{notificationError}</div>}
         {notificationMessage && <div className="success-banner">{notificationMessage}</div>}
+        {prefs.enabled && renderNotificationTypesSection()}
       </SettingsCard>
     );
   }
 
-  function renderNotificationTypesCard() {
+  function renderNotificationTypesSection() {
     const prefs = normalizedNotificationPreferences;
     const selectedAccountCount = prefs.accountSnapshots.accountIds.length;
 
     return (
-      <SettingsCard
-        id="notification-types"
-        key="notification-types"
-        title="Notification Types"
-      >
+      <div className="settings-subsection notification-types-section">
+        <div className="settings-subsection-heading">
+          <h4>Notification Types</h4>
+        </div>
         <TapIndicatorText className="notification-types-note">
           Tap a notification type to customize.
         </TapIndicatorText>
@@ -1218,7 +1220,7 @@ export default function Settings({
           onCheckedChange={(enabled) => updateNotificationSection('accountSnapshots', { enabled })}
           onCustomize={() => setNotificationEditor('accountSnapshots')}
         />
-      </SettingsCard>
+      </div>
     );
   }
 
@@ -2247,7 +2249,6 @@ export default function Settings({
         <div className="settings-card-stack settings-section-top">
           {renderAppearanceCard()}
           {renderNotificationsCard()}
-          {renderNotificationTypesCard()}
           {renderFeaturesCard()}
         </div>
       );
