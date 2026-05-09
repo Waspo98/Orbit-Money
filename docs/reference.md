@@ -23,6 +23,7 @@ Multi-stage build:
 - Manual maintainer deploys still try to pull GHCR first, but fall back to building the same Compose service locally when the registry pull is denied or otherwise fails.
 - Release tags like `v0.62.0` publish matching version image tags through `publish-release-image.yml`.
 - The Compose files keep `build` definitions as a local source-build fallback; normal update paths prefer `docker compose pull`, then build locally only when the pull fails.
+- If a public GHCR image returns `error from registry: denied`, run `docker logout ghcr.io` to clear stale Docker credentials and retry the pull anonymously.
 
 ## Data Storage
 All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:

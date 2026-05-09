@@ -272,6 +272,15 @@ the package public from GitHub's package settings. If GHCR still returns
 `denied`, Docker may be sending stale local registry credentials; the deploy
 scripts will fall back to a local Docker build in that case.
 
+If the package is public but a manual deploy still logs
+`error from registry: denied`, clear Docker's saved GHCR login and retry the
+pull so Docker uses anonymous public access:
+
+```bat
+docker logout ghcr.io
+docker compose pull
+```
+
 ## Releases
 
 Deploys and releases are intentionally separate. A Docker deploy pulls the

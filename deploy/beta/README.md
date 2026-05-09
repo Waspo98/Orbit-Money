@@ -45,6 +45,15 @@ docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta up -d
 
 The build command only runs when the image pull fails.
 
+If the GHCR package is public but the pull fails with
+`error from registry: denied`, Docker may be sending stale saved GHCR
+credentials. Clear the saved login and retry the beta pull:
+
+```bat
+docker logout ghcr.io
+docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta pull
+```
+
 After startup, test locally:
 
 ```text
