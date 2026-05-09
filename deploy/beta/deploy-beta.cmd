@@ -50,10 +50,18 @@ if "%ORBIT_PUBLISH_IMAGE%"=="1" (
   if errorlevel 1 exit /b 1
 )
 
-docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta pull
-if errorlevel 1 exit /b 1
+set "COMPOSE_CMD=docker compose -f deploy\beta\docker-compose.yml -p orbitmoney-beta"
 
-docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta up -d
+%COMPOSE_CMD% pull
+if errorlevel 1 (
+  echo.
+  echo Docker image pull failed. Building orbit-money-beta locally from the checked-out Beta branch instead.
+  echo This usually means GHCR denied the pull, often because Docker has stale registry credentials or the package is not publicly readable.
+  %COMPOSE_CMD% build orbit-money-beta
+  if errorlevel 1 exit /b 1
+)
+
+%COMPOSE_CMD% up -d
 if errorlevel 1 exit /b 1
 
 docker ps --filter "name=orbit-money-beta" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"

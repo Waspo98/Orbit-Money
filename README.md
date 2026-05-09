@@ -261,12 +261,16 @@ Registry and the maintainer's self-hosted Windows runner:
 
 The deploy jobs run on the maintainer's self-hosted Windows runner. The deploy
 scripts publish the GHCR image when `ORBIT_PUBLISH_IMAGE=1`, then pull and
-restart the matching Docker Compose service. Self-hosters do not need GitHub
-Actions to run the app.
+restart the matching Docker Compose service. If a manual deploy cannot pull the
+published image, the scripts print the pull failure and build the same Compose
+service locally before restarting it. Self-hosters do not need GitHub Actions to
+run the app.
 
 For public anonymous `docker compose pull` support, the GitHub Container
 Registry package must be public. If the first published package is private, make
-the package public from GitHub's package settings.
+the package public from GitHub's package settings. If GHCR still returns
+`denied`, Docker may be sending stale local registry credentials; the deploy
+scripts will fall back to a local Docker build in that case.
 
 ## Releases
 

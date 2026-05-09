@@ -11,7 +11,9 @@ This folder defines the maintainer beta Docker deployment for Orbit Money.
 - Optional reverse-proxy hostname: your own beta hostname
 
 The beta deployment pulls the published beta image and uses the root `.env` for
-shared secrets. It overrides:
+shared secrets. If the pull fails, the deploy script prints the pull error,
+builds the beta Compose service locally from the checked-out `Beta` branch, and
+then restarts the container. It overrides:
 
 - `AUTH_PROVIDER=local`, `ADMIN_USERNAME=admin`, and `ADMIN_PASSWORD=admin` so the seeded demo beta is easy to review. Do not expose this beta container publicly without changing those credentials or adding external access controls.
 - `SESSION_NAME=orbit_beta.sid` so local beta and production browser sessions do not collide.
@@ -37,8 +39,11 @@ That script ultimately runs:
 
 ```bat
 docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta pull
+docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta build orbit-money-beta
 docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta up -d
 ```
+
+The build command only runs when the image pull fails.
 
 After startup, test locally:
 
