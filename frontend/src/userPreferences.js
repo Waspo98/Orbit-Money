@@ -11,7 +11,8 @@ export const USER_PREFERENCE_KEYS = {
   dashboardGoalFocusId: 'dashboardGoalFocusId',
   dashboardRetirement: 'dashboardRetirement',
   settingsCardOrder: 'settingsCardOrder',
-  budgetedSort: 'budgetedSort'
+  budgetedSort: 'budgetedSort',
+  notificationPreferences: 'notificationPreferences'
 };
 
 const DASHBOARD_LAYOUT_STORAGE_KEY = 'orbit-money-dashboard-layout-v2';
@@ -21,6 +22,7 @@ const GOAL_FOCUS_STORAGE_KEY = 'orbit-money-dashboard-goal-focus-v1';
 const RETIREMENT_PREFS_STORAGE_KEY = 'orbit-money-retirement-preferences-v1';
 const SETTINGS_CARD_ORDER_STORAGE_KEY = 'orbit-money-settings-card-order';
 const BUDGETED_SORT_STORAGE_KEY = 'orbit-money-budgeted-sort';
+const NOTIFICATION_PREFS_STORAGE_KEY = 'orbit-money-notification-preferences-v1';
 
 const BUDGETED_SORT_OPTIONS = new Set([
   'variance_desc',
@@ -34,6 +36,10 @@ const LEGACY_BUDGETED_SORT_OPTIONS = {
   spent_asc: 'name_asc'
 };
 const RETIREMENT_PRESETS = new Set(['conservative', 'balanced', 'aggressive']);
+const WEEK_DAYS = new Set([0, 1, 2, 3, 4, 5, 6]);
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const INCOME_TIMING_MODES = new Set(['after_sync', 'scheduled']);
+const SNAPSHOT_CADENCES = new Set(['monthly', 'quarterly']);
 
 function readJson(key, fallback = null) {
   try {
@@ -93,6 +99,105 @@ function normalizeBudgetedSort(value) {
   return LEGACY_BUDGETED_SORT_OPTIONS[value] || 'variance_desc';
 }
 
+function normalizeTime(value, fallback = '09:00') {
+  return TIME_RE.test(String(value || '')) ? String(value) : fallback;
+}
+
+function normalizeWeekDay(value, fallback = 1) {
+  const day = Number(value);
+  return WEEK_DAYS.has(day) ? day : fallback;
+}
+
+function normalizeIncomeTiming(value, fallback = 'after_sync') {
+  if (value === 'default' || value === 'custom') return 'scheduled';
+  return INCOME_TIMING_MODES.has(value) ? value : fallback;
+}
+
+function normalizeNotificationSectionTime(section, defaultTime, fallback = '09:00') {
+  if (section?.timeMode === 'default' || section?.timing === 'default') {
+    return normalizeTime(defaultTime, fallback);
+  }
+  return normalizeTime(section?.time, normalizeTime(defaultTime, fallback));
+}
+
+function normalizeNotificationAccountIds(value) {
+  return Array.isArray(value)
+    ? Array.from(new Set(value.map(Number).filter((id) => Number.isInteger(id) && id > 0))).slice(0, 200)
+    : [];
+}
+
+export function defaultNotificationPreferences() {
+  return {
+    enabled: false,
+    showAmounts: false,
+    defaultTime: '09:00',
+    weeklySnapshot: {
+      enabled: true,
+      dayOfWeek: 1,
+      time: '09:00'
+    },
+    income: {
+      enabled: true,
+      timing: 'after_sync',
+      time: '09:00'
+    },
+    syncIssues: {
+      enabled: true
+    },
+    accountSnapshots: {
+      enabled: false,
+      accountIds: [],
+      cadence: 'monthly',
+      dayOfMonth: 1,
+      time: '09:00'
+    }
+  };
+}
+
+export function normalizeNotificationPreferences(value = {}) {
+  const defaults = defaultNotificationPreferences();
+  const prefs = value && typeof value === 'object' ? value : {};
+  const weekly = prefs.weeklySnapshot && typeof prefs.weeklySnapshot === 'object'
+    ? prefs.weeklySnapshot
+    : {};
+  const income = prefs.income && typeof prefs.income === 'object' ? prefs.income : {};
+  const syncIssues = prefs.syncIssues && typeof prefs.syncIssues === 'object'
+    ? prefs.syncIssues
+    : {};
+  const snapshots = prefs.accountSnapshots && typeof prefs.accountSnapshots === 'object'
+    ? prefs.accountSnapshots
+    : {};
+  const defaultTime = normalizeTime(prefs.defaultTime, defaults.defaultTime);
+
+  return {
+    enabled: prefs.enabled === true,
+    showAmounts: prefs.showAmounts === true,
+    defaultTime,
+    weeklySnapshot: {
+      enabled: weekly.enabled !== false,
+      dayOfWeek: normalizeWeekDay(weekly.dayOfWeek, defaults.weeklySnapshot.dayOfWeek),
+      time: normalizeNotificationSectionTime(weekly, defaultTime, defaults.weeklySnapshot.time)
+    },
+    income: {
+      enabled: income.enabled !== false,
+      timing: normalizeIncomeTiming(income.timing, defaults.income.timing),
+      time: normalizeNotificationSectionTime(income, defaultTime, defaults.income.time)
+    },
+    syncIssues: {
+      enabled: syncIssues.enabled !== false
+    },
+    accountSnapshots: {
+      enabled: snapshots.enabled === true,
+      accountIds: normalizeNotificationAccountIds(snapshots.accountIds),
+      cadence: SNAPSHOT_CADENCES.has(snapshots.cadence)
+        ? snapshots.cadence
+        : defaults.accountSnapshots.cadence,
+      dayOfMonth: Math.max(1, Math.min(28, Math.trunc(Number(snapshots.dayOfMonth) || 1))),
+      time: normalizeNotificationSectionTime(snapshots, defaultTime, defaults.accountSnapshots.time)
+    }
+  };
+}
+
 export function normalizePreferenceValue(key, value) {
   switch (key) {
     case USER_PREFERENCE_KEYS.navigationPreferences:
@@ -110,6 +215,8 @@ export function normalizePreferenceValue(key, value) {
       return Array.isArray(value) ? value : [];
     case USER_PREFERENCE_KEYS.budgetedSort:
       return normalizeBudgetedSort(value);
+    case USER_PREFERENCE_KEYS.notificationPreferences:
+      return normalizeNotificationPreferences(value);
     default:
       return value ?? null;
   }
@@ -124,7 +231,8 @@ export function defaultUserPreferences() {
     [USER_PREFERENCE_KEYS.dashboardGoalFocusId]: null,
     [USER_PREFERENCE_KEYS.dashboardRetirement]: normalizeRetirementPreferences(),
     [USER_PREFERENCE_KEYS.settingsCardOrder]: [],
-    [USER_PREFERENCE_KEYS.budgetedSort]: 'variance_desc'
+    [USER_PREFERENCE_KEYS.budgetedSort]: 'variance_desc',
+    [USER_PREFERENCE_KEYS.notificationPreferences]: defaultNotificationPreferences()
   };
 }
 
@@ -149,6 +257,9 @@ export function readLocalUserPreferences() {
     [USER_PREFERENCE_KEYS.settingsCardOrder]: readJson(SETTINGS_CARD_ORDER_STORAGE_KEY, []),
     [USER_PREFERENCE_KEYS.budgetedSort]: normalizeBudgetedSort(
       readString(BUDGETED_SORT_STORAGE_KEY, 'variance_desc')
+    ),
+    [USER_PREFERENCE_KEYS.notificationPreferences]: normalizeNotificationPreferences(
+      readJson(NOTIFICATION_PREFS_STORAGE_KEY, {})
     )
   };
 }
@@ -202,6 +313,9 @@ export function writeLocalPreference(key, value) {
       break;
     case USER_PREFERENCE_KEYS.budgetedSort:
       writeString(BUDGETED_SORT_STORAGE_KEY, normalized);
+      break;
+    case USER_PREFERENCE_KEYS.notificationPreferences:
+      writeJson(NOTIFICATION_PREFS_STORAGE_KEY, normalized);
       break;
     default:
       break;

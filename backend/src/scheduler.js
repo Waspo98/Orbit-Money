@@ -1,24 +1,25 @@
 // =============================================================================
-// scheduler.js — tiny hourly tick that triggers the 6 AM daily sync.
+// scheduler.js - tiny hourly tick for background household jobs.
 // =============================================================================
 // Design goals:
 //   - No new npm dependency (no node-cron)
-//   - Survives container restarts — idempotence based on DB state
-//   - Doesn't run if SimpleFIN isn't configured
-//   - Only runs once per local day, regardless of how many times we tick
+//   - Survives container restarts - idempotence based on DB state
+//   - Runs background household work from one simple hourly loop
+//   - Only runs the daily sync once per local day, regardless of tick count
 //
 // The check runs every 60 minutes (plus once at startup after a 30s warmup).
 // Each tick:
-//   - if local time hour < 6, skip
-//   - if sync_enabled=0, skip
-//   - if last sync success was today, skip
-//   - otherwise, trigger a 'scheduled' sync
+//   - cleans up expired sample households
+//   - reconciles upcoming transaction occurrences
+//   - sends due scheduled push notifications
+//   - triggers the SimpleFIN scheduled sync after 6 AM local if it has not run today
 // =============================================================================
 
 import { db } from './db/index.js';
 import { cleanupExpiredSampleHouseholds } from './services/sampleHouseholds.js';
 import { runSync } from './services/simplefinSync.js';
 import { reconcileUpcomingTransactions } from './services/upcomingReconciliation.js';
+import { runScheduledNotificationChecks } from './services/notifications.js';
 
 const TICK_MS = 60 * 60 * 1000; // 60 minutes
 const STARTUP_WARMUP_MS = 30 * 1000;
@@ -49,6 +50,15 @@ async function tick() {
     }
   } catch (err) {
     console.error('[scheduler] Upcoming reconciliation failed:', err.message || err);
+  }
+
+  try {
+    const result = await runScheduledNotificationChecks();
+    if (result.sent > 0) {
+      console.log('[scheduler] Notifications sent:', result);
+    }
+  } catch (err) {
+    console.error('[scheduler] Notification check failed:', err.message || err);
   }
 
   const now = new Date();

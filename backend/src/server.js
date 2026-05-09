@@ -28,6 +28,7 @@ import merchantLogosRoutes from './routes/merchantLogos.js';
 import upcomingRoutes from './routes/upcoming.js';
 import dataRoutes from './routes/data.js';
 import preferencesRoutes from './routes/preferences.js';
+import notificationsRoutes from './routes/notifications.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -70,6 +71,7 @@ app.use('/api/health', healthRoutes);
 // --- Protected routes -------------------------------------------------------
 app.use('/api', requireAuth);
 app.use('/api/preferences', preferencesRoutes);
+app.use('/api/notifications', notificationsRoutes);
 app.use('/api', requireWriteForUnsafeMethods);
 app.use('/api/import', importRoutes);
 app.use('/api/transactions', transactionsRoutes);

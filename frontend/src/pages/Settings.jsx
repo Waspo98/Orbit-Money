@@ -18,7 +18,10 @@ import ReorderListItem, {
 } from '../components/ReorderListItem.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  normalizeNotificationPreferences
+} from '../userPreferences.js';
 import {
   ROUTES,
   normalizeNavigationPreferences
@@ -64,6 +67,26 @@ const DARK_VARIANT_OPTIONS = [
   }
 ];
 
+const WEEKDAY_OPTIONS = [
+  { value: 0, label: 'Sunday' },
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' }
+];
+
+const SNAPSHOT_CADENCE_OPTIONS = [
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' }
+];
+
+const INCOME_TIMING_OPTIONS = [
+  { value: 'after_sync', label: 'After Sync' },
+  { value: 'scheduled', label: 'Scheduled Time' }
+];
+
 function formatDateTime(iso) {
   if (!iso) return '-';
   const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
@@ -83,6 +106,32 @@ function todayIso() {
 
 function displayPerson(person) {
   return person?.display_name || person?.displayName || person?.email || person?.invited_email || person?.username || 'Shared user';
+}
+
+function canUsePushNotifications() {
+  return (
+    typeof window !== 'undefined' &&
+    'Notification' in window &&
+    'serviceWorker' in navigator &&
+    'PushManager' in window
+  );
+}
+
+function urlBase64ToUint8Array(value) {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) {
+    output[i] = raw.charCodeAt(i);
+  }
+  return output;
+}
+
+function permissionLabel(permission) {
+  if (permission === 'granted') return 'Enabled On This Device';
+  if (permission === 'denied') return 'Blocked In Browser';
+  return 'Not Enabled On This Device';
 }
 
 function SettingsCard({
@@ -111,6 +160,91 @@ function SettingsCard({
   );
 }
 
+function NotificationPreferenceRow({
+  title,
+  description,
+  checked,
+  onCheckedChange,
+  children
+}) {
+  return (
+    <div className="settings-action notification-preference-row">
+      <div className="notification-toggle-copy">
+        <label className="switch notification-switch" title={checked ? 'On' : 'Off'}>
+          <input
+            type="checkbox"
+            aria-label={`${checked ? 'Turn Off' : 'Turn On'} ${title}`}
+            checked={checked}
+            onChange={(event) => onCheckedChange?.(event.target.checked)}
+          />
+          <span className="switch-track" />
+        </label>
+        <span className="settings-action-info">
+          <strong>{title}</strong>
+          <p>{description}</p>
+        </span>
+      </div>
+      {children && <div className="notification-row-controls">{children}</div>}
+    </div>
+  );
+}
+
+function SnapshotAccountPickerModal({
+  accounts,
+  selectedIds,
+  onChange,
+  onClose
+}) {
+  const selected = new Set(selectedIds);
+
+  function toggleAccount(accountId) {
+    const next = new Set(selected);
+    if (next.has(accountId)) next.delete(accountId);
+    else next.add(accountId);
+    onChange(Array.from(next));
+  }
+
+  return (
+    <AnimatedModal onClose={onClose} size="lg">
+      {({ close }) => (
+        <>
+          <h3>Select Snapshot Accounts</h3>
+          <p className="modal-copy">
+            Pick the accounts that should remind you to add manual balance snapshots.
+          </p>
+
+          <div className="notification-account-picker">
+            {accounts.length === 0 ? (
+              <p className="subtle">No active accounts are available.</p>
+            ) : accounts.map((account) => (
+              <SelectableListItem
+                key={account.id}
+                active={selected.has(account.id)}
+                leading={account.type === 'investment' ? '$' : account.name.slice(0, 1).toUpperCase()}
+                title={account.name}
+                subtitle={[
+                  account.institution,
+                  account.account_number_last4 ? `...${account.account_number_last4}` : null
+                ].filter(Boolean).join(' - ') || 'Manual snapshot reminders'}
+                sidePrimary={selected.has(account.id) ? 'On' : 'Off'}
+                sideSecondary={account.simplefin_account_id ? 'SimpleFIN' : 'Manual'}
+                onClick={() => toggleAccount(account.id)}
+                ariaLabel={`${selected.has(account.id) ? 'Disable' : 'Enable'} snapshot reminders for ${account.name}`}
+              />
+            ))}
+          </div>
+
+          <div className="modal-actions">
+            <button type="button" className="btn-primary" onClick={close}>
+              Done
+            </button>
+          </div>
+        </>
+      )}
+    </AnimatedModal>
+  );
+}
+
 export default function Settings({
   themeMode = 'system',
   onThemeChange,
@@ -121,11 +255,15 @@ export default function Settings({
   onMhaTrackerChange,
   navigationPreferences,
   onNavigationPreferencesChange,
+  notificationPreferences,
+  onNotificationPreferencesChange,
+  accounts = [],
   onImportComplete,
   settingsPage = 'home'
 }) {
   const { alert, confirm, Dialog } = useAppDialog();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [status, setStatus] = useState(null);
   const [setupToken, setSetupToken] = useState('');
@@ -146,6 +284,7 @@ export default function Settings({
   const [sharingBusy, setSharingBusy] = useState(false);
   const [sharingError, setSharingError] = useState('');
   const [sharingMessage, setSharingMessage] = useState('');
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   const [mhaBusy, setMhaBusy] = useState(false);
   const [mhaError, setMhaError] = useState('');
   const [file, setFile] = useState(null);
@@ -169,6 +308,14 @@ export default function Settings({
   const [moreReorderMode, setMoreReorderMode] = useState(false);
   const [moreDragId, setMoreDragId] = useState(null);
   const [moreOverId, setMoreOverId] = useState(null);
+  const [notificationConfig, setNotificationConfig] = useState(null);
+  const [notificationPermission, setNotificationPermission] = useState(() =>
+    canUsePushNotifications() ? Notification.permission : 'unsupported'
+  );
+  const [notificationBusy, setNotificationBusy] = useState(false);
+  const [notificationError, setNotificationError] = useState('');
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [snapshotPickerOpen, setSnapshotPickerOpen] = useState(false);
   const fileInputRef = useRef(null);
   const restoreFileInputRef = useRef(null);
   const sensors = useReorderSensors();
@@ -176,6 +323,10 @@ export default function Settings({
   const normalizedNavigationPreferences = useMemo(
     () => normalizeNavigationPreferences(navigationPreferences),
     [navigationPreferences]
+  );
+  const normalizedNotificationPreferences = useMemo(
+    () => normalizeNotificationPreferences(notificationPreferences),
+    [notificationPreferences]
   );
 
   const moreRoutes = useMemo(() => {
@@ -234,6 +385,42 @@ export default function Settings({
     loadSharing();
   }, []);
 
+  useEffect(() => {
+    if (settingsPage !== 'preferences') return;
+    api.get('/api/notifications/config')
+      .then(setNotificationConfig)
+      .catch((err) => {
+        console.warn('Notification config failed:', err);
+        setNotificationConfig({ configured: false, subscriptions: { activeCount: 0 } });
+      });
+  }, [settingsPage]);
+
+  useEffect(() => {
+    if (settingsPage !== 'preferences') return;
+    if (searchParams.get('notificationPanel') !== 'snapshot-reminders') return;
+    const accountId = Number(searchParams.get('accountId'));
+    if (Number.isInteger(accountId) && accountId > 0) {
+      updateNotificationPreferences((current) => {
+        const ids = current.accountSnapshots.accountIds.includes(accountId)
+          ? current.accountSnapshots.accountIds
+          : [...current.accountSnapshots.accountIds, accountId];
+        return {
+          ...current,
+          accountSnapshots: {
+            ...current.accountSnapshots,
+            accountIds: ids,
+            enabled: true
+          }
+        };
+      });
+    }
+    setSnapshotPickerOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('notificationPanel');
+    next.delete('accountId');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, settingsPage]);
+
   function isFeatureVisible(route) {
     if (route.feature === 'mha') return !!mhaTrackerEnabled;
     return !normalizedNavigationPreferences.hiddenRoutePaths[route.path];
@@ -247,6 +434,97 @@ export default function Settings({
           : updater
       )
     );
+  }
+
+  function updateNotificationPreferences(updater) {
+    onNotificationPreferencesChange?.((prev) =>
+      normalizeNotificationPreferences(
+        typeof updater === 'function'
+          ? updater(normalizeNotificationPreferences(prev))
+          : updater
+      )
+    );
+  }
+
+  async function enablePushNotifications() {
+    setNotificationBusy(true);
+    setNotificationError('');
+    setNotificationMessage('');
+    try {
+      if (!canUsePushNotifications()) {
+        throw new Error('This browser does not support web push notifications.');
+      }
+      const config = notificationConfig || await api.get('/api/notifications/config');
+      setNotificationConfig(config);
+      if (!config.configured || !config.vapidPublicKey) {
+        throw new Error('Web Push keys are not configured on the server yet.');
+      }
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission !== 'granted') {
+        throw new Error('Notifications were not allowed for this browser.');
+      }
+      const registration = await navigator.serviceWorker.ready;
+      const existing = await registration.pushManager.getSubscription();
+      const subscription = existing || await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(config.vapidPublicKey)
+      });
+      const result = await api.post('/api/notifications/subscriptions', {
+        subscription: subscription.toJSON()
+      });
+      setNotificationConfig((current) => ({
+        ...(current || config),
+        subscriptions: result.subscriptions
+      }));
+      updateNotificationPreferences((prefs) => ({ ...prefs, enabled: true }));
+      setNotificationMessage('Notifications are enabled on this device.');
+    } catch (err) {
+      setNotificationError(err.message || 'Could not enable notifications.');
+    } finally {
+      setNotificationBusy(false);
+    }
+  }
+
+  async function disableDevicePush() {
+    setNotificationBusy(true);
+    setNotificationError('');
+    setNotificationMessage('');
+    try {
+      if (!canUsePushNotifications()) return;
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) {
+        await api.post('/api/notifications/subscriptions/remove', {
+          endpoint: subscription.endpoint
+        });
+        await subscription.unsubscribe();
+      }
+      const config = await api.get('/api/notifications/config');
+      setNotificationConfig(config);
+      setNotificationMessage('This device was removed from push notifications.');
+    } catch (err) {
+      setNotificationError(err.message || 'Could not remove this device.');
+    } finally {
+      setNotificationBusy(false);
+    }
+  }
+
+  async function sendTestNotification() {
+    setNotificationBusy(true);
+    setNotificationError('');
+    setNotificationMessage('');
+    try {
+      const result = await api.post('/api/notifications/test');
+      if (!result.success) {
+        throw new Error('No active push subscription was available for this device.');
+      }
+      setNotificationMessage('Test notification sent.');
+    } catch (err) {
+      setNotificationError(err.message || 'Could not send test notification.');
+    } finally {
+      setNotificationBusy(false);
+    }
   }
 
   async function handleSetup(e) {
@@ -342,6 +620,7 @@ export default function Settings({
       setSharingEmail('');
       setSharingAccessLevel('write');
       setSharingMessage(`${email} can now sign in with their configured account.`);
+      setShareModalOpen(false);
     } catch (err) {
       setSharingError(err.message || 'Sharing failed.');
     } finally {
@@ -556,6 +835,23 @@ export default function Settings({
     } finally {
       setDownloadBusy('');
     }
+  }
+
+  async function handleBackupDownload() {
+    const ok = await confirm(
+      'Orbit backups include app data, settings, rules, and permissions, but SimpleFIN connection info is excluded. After restoring, you will need to generate a new SimpleFIN API key and reconnect SimpleFIN.',
+      {
+        title: 'Backup Orbit Money Data',
+        confirmLabel: 'Backup'
+      }
+    );
+    if (!ok) return;
+
+    await downloadData('/api/data/orbit-backup', {
+      label: 'Backup',
+      scope: 'backup',
+      fallbackFilename: 'orbit-money-backup.json'
+    });
   }
 
   function renderDownloadNotice(scope) {
@@ -779,6 +1075,214 @@ export default function Settings({
     );
   }
 
+  function renderNotificationsCard() {
+    const prefs = normalizedNotificationPreferences;
+    const activeDeviceCount = Number(notificationConfig?.subscriptions?.activeCount || 0);
+    const pushSupported = canUsePushNotifications();
+    const serverConfigured = notificationConfig?.configured !== false;
+    const selectedAccountCount = prefs.accountSnapshots.accountIds.length;
+
+    function updateSection(section, patch) {
+      updateNotificationPreferences((current) => ({
+        ...current,
+        [section]: {
+          ...current[section],
+          ...patch
+        }
+      }));
+    }
+
+    return (
+      <SettingsCard
+        id="notifications"
+        key="notifications"
+        title="Notifications"
+        description="Choose which Orbit updates can reach this device."
+      >
+        <div className="settings-action notification-status-row">
+          <div className="notification-status-main">
+            <div className="settings-action-info">
+              <strong>Push Notifications</strong>
+              <p>
+                {pushSupported
+                  ? `${permissionLabel(notificationPermission)}${
+                      activeDeviceCount > 0 ? ` - ${activeDeviceCount} active device${activeDeviceCount === 1 ? '' : 's'}` : ''
+                    }`
+                  : 'This browser does not support web push notifications.'}
+              </p>
+            </div>
+            <div className="settings-action-buttons">
+              {prefs.enabled ? (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => updateNotificationPreferences((current) => ({ ...current, enabled: false }))}
+                  disabled={notificationBusy}
+                >
+                  Turn Off
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={enablePushNotifications}
+                  disabled={notificationBusy || !pushSupported || !serverConfigured}
+                >
+                  {notificationBusy ? 'Enabling...' : 'Enable Notifications'}
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={sendTestNotification}
+                disabled={notificationBusy || !prefs.enabled || activeDeviceCount === 0}
+              >
+                Send Test
+              </button>
+              {activeDeviceCount > 0 && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={disableDevicePush}
+                  disabled={notificationBusy}
+                >
+                  Remove Device
+                </button>
+              )}
+            </div>
+          </div>
+
+          <label className="notification-privacy-row">
+            <span className="settings-action-info">
+              <strong>Show Dollar Amounts</strong>
+              <p>{prefs.showAmounts ? 'Amounts can appear in notification text.' : 'Amounts stay hidden on lock-screen alerts.'}</p>
+            </span>
+            <span className="notification-privacy-control">
+              <span>{prefs.showAmounts ? 'Showing' : 'Hidden'}</span>
+              <span className="switch notification-switch">
+                <input
+                  type="checkbox"
+                  aria-label="Show Dollar Amounts In Notifications"
+                  checked={prefs.showAmounts}
+                  onChange={(event) =>
+                    updateNotificationPreferences((current) => ({
+                      ...current,
+                      showAmounts: event.target.checked
+                    }))
+                  }
+                />
+                <span className="switch-track" />
+              </span>
+            </span>
+          </label>
+        </div>
+
+        {!serverConfigured && (
+          <div className="warning-banner">
+            Web Push keys are not configured yet. Add VAPID keys on the server before enabling notifications.
+          </div>
+        )}
+        {notificationError && <div className="error">{notificationError}</div>}
+        {notificationMessage && <div className="success-banner">{notificationMessage}</div>}
+
+        <NotificationPreferenceRow
+          title="Weekly Snapshot"
+          description="A calm weekly summary of budgets, upcoming items, and transactions to review."
+          checked={prefs.weeklySnapshot.enabled}
+          onCheckedChange={(enabled) => updateSection('weeklySnapshot', { enabled })}
+        >
+          <div className="notification-inline-controls">
+            <AppSelect
+              value={prefs.weeklySnapshot.dayOfWeek}
+              options={WEEKDAY_OPTIONS}
+              onChange={(value) => updateSection('weeklySnapshot', { dayOfWeek: Number(value) })}
+              ariaLabel="Weekly snapshot day"
+            />
+            <input
+              type="time"
+              className="notification-time-input"
+              value={prefs.weeklySnapshot.time}
+              onChange={(event) => updateSection('weeklySnapshot', { time: event.target.value })}
+              aria-label="Weekly snapshot time"
+            />
+          </div>
+        </NotificationPreferenceRow>
+
+        <NotificationPreferenceRow
+          title="Income Notifications"
+          description="A cheerful heads-up when income lands after SimpleFIN sync."
+          checked={prefs.income.enabled}
+          onCheckedChange={(enabled) => updateSection('income', { enabled })}
+        >
+          <div className="notification-inline-controls">
+            <AppSelect
+              value={prefs.income.timing}
+              options={INCOME_TIMING_OPTIONS}
+              onChange={(value) => updateSection('income', { timing: value })}
+              ariaLabel="Income notification timing"
+            />
+            {prefs.income.timing === 'scheduled' && (
+              <input
+                type="time"
+                className="notification-time-input"
+                value={prefs.income.time}
+                onChange={(event) => updateSection('income', { time: event.target.value })}
+                aria-label="Income notification time"
+              />
+            )}
+          </div>
+        </NotificationPreferenceRow>
+
+        <NotificationPreferenceRow
+          title="Sync Issues"
+          description="Immediate alerts when SimpleFIN has trouble or only partially syncs."
+          checked={prefs.syncIssues.enabled}
+          onCheckedChange={(enabled) => updateSection('syncIssues', { enabled })}
+        />
+
+        <NotificationPreferenceRow
+          title="Account Snapshot Reminders"
+          description={`${selectedAccountCount} selected account${selectedAccountCount === 1 ? '' : 's'} for manual balance reminders.`}
+          checked={prefs.accountSnapshots.enabled}
+          onCheckedChange={(enabled) => updateSection('accountSnapshots', { enabled })}
+        >
+          <div className="notification-inline-controls">
+            <AppSelect
+              value={prefs.accountSnapshots.cadence}
+              options={SNAPSHOT_CADENCE_OPTIONS}
+              onChange={(value) => updateSection('accountSnapshots', { cadence: value })}
+              ariaLabel="Snapshot reminder cadence"
+            />
+            <label className="notification-day-field">
+              <span>Day</span>
+              <input
+                type="number"
+                min="1"
+                max="28"
+                value={prefs.accountSnapshots.dayOfMonth}
+                onChange={(event) => updateSection('accountSnapshots', { dayOfMonth: Number(event.target.value) })}
+              />
+            </label>
+            <input
+              type="time"
+              className="notification-time-input"
+              value={prefs.accountSnapshots.time}
+              onChange={(event) => updateSection('accountSnapshots', { time: event.target.value })}
+              aria-label="Snapshot reminder time"
+            />
+            <button
+              type="button"
+              className="btn-secondary btn-compact"
+              onClick={() => setSnapshotPickerOpen(true)}
+            >
+              Select Accounts
+            </button>
+          </div>
+        </NotificationPreferenceRow>
+      </SettingsCard>
+    );
+  }
+
   function renderFeaturesCard() {
     const featureRoutes = optionalFeatureRoutes;
 
@@ -841,8 +1345,36 @@ export default function Settings({
       >
         {status?.connected ? (
           <>
-            <div className="metric-grid status-grid">
-              <div><dt>Cutover Date</dt><dd>{status.cutoverDate || '-'}</dd></div>
+            <div className="settings-action simplefin-sync-now-action">
+              <div className="settings-action-info">
+                <strong>Sync Now</strong>
+                <p>Pulls transactions since the last successful sync.</p>
+              </div>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleSync}
+                disabled={syncBusy}
+              >
+                {syncBusy ? (<><span className="spinner-inline" /> Syncing...</>) : 'Sync Now'}
+              </button>
+            </div>
+
+            {syncError && <div className="error" style={{ marginTop: 16 }}>{syncError}</div>}
+
+            {syncResult && (
+              <div className={`result-card ${syncResult.status === 'error' ? 'error-tone' : ''}`}>
+                <dl className="metric-grid stat-grid">
+                  <div><dt>Inserted</dt><dd>{syncResult.inserted.toLocaleString()}</dd></div>
+                  <div><dt>Skipped</dt><dd>{syncResult.skipped.toLocaleString()}</dd></div>
+                  <div><dt>RM Removed</dt><dd>{syncResult.rmDeleted.toLocaleString()}</dd></div>
+                  <div><dt>Accounts</dt><dd>{syncResult.accountsCreated.toLocaleString()}</dd></div>
+                  <div><dt>Transfers</dt><dd>{syncResult.transfersPaired.toLocaleString()}</dd></div>
+                </dl>
+              </div>
+            )}
+
+            <div className="metric-grid status-grid simplefin-status-grid">
               <div><dt>Last Sync</dt><dd>{formatDateTime(status.lastSyncAt)}</dd></div>
               <div>
                 <dt>Last Status</dt>
@@ -867,6 +1399,20 @@ export default function Settings({
                   })() : '-'}
                 </dd>
               </div>
+              <div className="simplefin-grid-action">
+                <dt>SimpleFIN Bridge</dt>
+                <dd>Manage or refresh the connection.</dd>
+                <a className="btn-secondary btn-compact settings-action-link" href={SIMPLEFIN_BRIDGE_URL} target="_blank" rel="noreferrer">
+                  Open
+                </a>
+              </div>
+              <div className="simplefin-grid-action">
+                <dt>Sync History</dt>
+                <dd>Recent runs and errors.</dd>
+                <button type="button" className="btn-secondary btn-compact" onClick={toggleLog}>
+                  {showLog ? 'Hide' : 'Show'}
+                </button>
+              </div>
             </div>
 
             {status.lastSync?.error_message && (
@@ -874,55 +1420,6 @@ export default function Settings({
                 <strong>Last sync had an issue:</strong> {status.lastSync.error_message}
               </div>
             )}
-
-            <div className="settings-action">
-              <div className="settings-action-info">
-                <strong>Sync Now</strong>
-                <p>Pulls transactions since the last successful sync.</p>
-              </div>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={handleSync}
-                disabled={syncBusy}
-              >
-                {syncBusy ? (<><span className="spinner-inline" /> Syncing...</>) : 'Sync Now'}
-              </button>
-            </div>
-
-            <div className="settings-action">
-              <div className="settings-action-info">
-                <strong>SimpleFIN Bridge</strong>
-                <p>Open the bridge site to manage or refresh the connection.</p>
-              </div>
-              <a className="btn-secondary settings-action-link" href={SIMPLEFIN_BRIDGE_URL} target="_blank" rel="noreferrer">
-                Open SimpleFIN
-              </a>
-            </div>
-
-            {syncError && <div className="error" style={{ marginTop: 16 }}>{syncError}</div>}
-
-            {syncResult && (
-              <div className={`result-card ${syncResult.status === 'error' ? 'error-tone' : ''}`}>
-                <dl className="metric-grid stat-grid">
-                  <div><dt>Inserted</dt><dd>{syncResult.inserted.toLocaleString()}</dd></div>
-                  <div><dt>Skipped</dt><dd>{syncResult.skipped.toLocaleString()}</dd></div>
-                  <div><dt>RM Removed</dt><dd>{syncResult.rmDeleted.toLocaleString()}</dd></div>
-                  <div><dt>Accounts</dt><dd>{syncResult.accountsCreated.toLocaleString()}</dd></div>
-                  <div><dt>Transfers</dt><dd>{syncResult.transfersPaired.toLocaleString()}</dd></div>
-                </dl>
-              </div>
-            )}
-
-            <div className="settings-action">
-              <div className="settings-action-info">
-                <strong>Sync History</strong>
-                <p>Recent runs and errors.</p>
-              </div>
-              <button type="button" className="btn-secondary" onClick={toggleLog}>
-                {showLog ? 'Hide' : 'Show'}
-              </button>
-            </div>
 
             {showLog && (
               <div className="sync-log-table">
@@ -1050,7 +1547,7 @@ export default function Settings({
         title="Import / Export Budgeting App Data"
         description="Move financial data between Orbit Money and other budgeting apps."
       >
-        <div className="settings-action">
+        <div className="settings-action settings-flow-card">
           <div className="settings-action-info">
             <strong>Export For Use In A Different Budgeting App</strong>
             <p>Download financial data only. Orbit settings, rules, auth, and SimpleFIN are not included.</p>
@@ -1081,132 +1578,132 @@ export default function Settings({
               {downloadBusy === 'JSON export' ? 'Downloading...' : 'JSON'}
             </button>
           </div>
+          {renderDownloadNotice('budgeting-export')}
         </div>
-        {renderDownloadNotice('budgeting-export')}
 
-        <div className="settings-subsection">
-          <div className="settings-subsection-heading">
-            <h4>Import From Rocket Money Or Other Financial App</h4>
+        <div className="settings-action settings-flow-card">
+          <div className="settings-action-info">
+            <strong>Import From Rocket Money Or Other Financial App</strong>
             <p>Preview the CSV first, then confirm the import. Applied imports can be undone.</p>
           </div>
-        </div>
 
-        {importResult ? (
-          <div className="result-card">
-            {importResult.undone ? (
-              <>
-                <dl className="metric-grid stat-grid">
-                  <div><dt>Transactions Removed</dt><dd>{importResult.undone.transactionsDeleted.toLocaleString()}</dd></div>
-                  <div><dt>Rules Removed</dt><dd>{importResult.undone.rulesDeleted.toLocaleString()}</dd></div>
-                  <div><dt>Accounts Removed</dt><dd>{importResult.undone.accountsDeleted.toLocaleString()}</dd></div>
-                  <div><dt>Accounts Kept</dt><dd>{importResult.undone.accountsKept.toLocaleString()}</dd></div>
-                </dl>
-                <p className="muted" style={{ marginBottom: 0 }}>Import was undone.</p>
-              </>
-            ) : (
-              <>
-                <dl className="metric-grid stat-grid">
-                  <div><dt>Imported</dt><dd>{importResult.inserted.toLocaleString()}</dd></div>
-                  <div><dt>Skipped</dt><dd>{importResult.skipped.toLocaleString()}</dd></div>
-                  <div><dt>Accounts</dt><dd>{importResult.accountsCreated.toLocaleString()}</dd></div>
-                  <div><dt>Rules</dt><dd>{importResult.rulesCreated.toLocaleString()}</dd></div>
-                </dl>
-
-                {importResult.parseWarnings > 0 && (
-                  <p className="muted" style={{ marginTop: 0 }}>
-                    Parser reported {importResult.parseWarnings} minor warnings - usually fine.
-                  </p>
-                )}
-
-                <div className="settings-action">
-                  <div className="settings-action-info">
-                    <strong>Import Complete</strong>
-                    <p>Review imported transactions, or undo this import if the preview missed something.</p>
-                  </div>
-                  <div className="settings-action-buttons">
-                    <button type="button" className="btn-secondary" onClick={handleUndoImport} disabled={importing}>
-                      Undo Import
-                    </button>
-                    <button type="button" className="btn-primary" onClick={onImportComplete}>
-                      View Transactions
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
-          <>
-            <div
-              className={`drop-zone ${dragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              role="button"
-              tabIndex={0}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(e) => handleFile(e.target.files?.[0])}
-                style={{ display: 'none' }}
-              />
-              {file ? (
+          {importResult ? (
+            <div className="result-card">
+              {importResult.undone ? (
                 <>
-                  <div className="drop-zone-icon">OK</div>
-                  <div className="drop-zone-filename">{file.name}</div>
-                  <div className="subtle">{(file.size / 1024).toFixed(0)} KB - click to pick a different file</div>
+                  <dl className="metric-grid stat-grid">
+                    <div><dt>Transactions Removed</dt><dd>{importResult.undone.transactionsDeleted.toLocaleString()}</dd></div>
+                    <div><dt>Rules Removed</dt><dd>{importResult.undone.rulesDeleted.toLocaleString()}</dd></div>
+                    <div><dt>Accounts Removed</dt><dd>{importResult.undone.accountsDeleted.toLocaleString()}</dd></div>
+                    <div><dt>Accounts Kept</dt><dd>{importResult.undone.accountsKept.toLocaleString()}</dd></div>
+                  </dl>
+                  <p className="muted" style={{ marginBottom: 0 }}>Import was undone.</p>
                 </>
               ) : (
                 <>
-                  <div className="drop-zone-icon">CSV</div>
-                  <div className="drop-zone-primary">Drop your CSV here</div>
-                  <div className="subtle">or click to browse</div>
+                  <dl className="metric-grid stat-grid">
+                    <div><dt>Imported</dt><dd>{importResult.inserted.toLocaleString()}</dd></div>
+                    <div><dt>Skipped</dt><dd>{importResult.skipped.toLocaleString()}</dd></div>
+                    <div><dt>Accounts</dt><dd>{importResult.accountsCreated.toLocaleString()}</dd></div>
+                    <div><dt>Rules</dt><dd>{importResult.rulesCreated.toLocaleString()}</dd></div>
+                  </dl>
+
+                  {importResult.parseWarnings > 0 && (
+                    <p className="muted" style={{ marginTop: 0 }}>
+                      Parser reported {importResult.parseWarnings} minor warnings - usually fine.
+                    </p>
+                  )}
+
+                  <div className="settings-action settings-nested-action">
+                    <div className="settings-action-info">
+                      <strong>Import Complete</strong>
+                      <p>Review imported transactions, or undo this import if the preview missed something.</p>
+                    </div>
+                    <div className="settings-action-buttons">
+                      <button type="button" className="btn-secondary" onClick={handleUndoImport} disabled={importing}>
+                        Undo Import
+                      </button>
+                      <button type="button" className="btn-primary" onClick={onImportComplete}>
+                        View Transactions
+                      </button>
+                    </div>
+                  </div>
                 </>
               )}
             </div>
-
-            {importPreview && (
-              <div className="result-card">
-                <dl className="metric-grid stat-grid">
-                  <div><dt>Would Import</dt><dd>{importPreview.estimatedInserted.toLocaleString()}</dd></div>
-                  <div><dt>Duplicates</dt><dd>{importPreview.duplicateRows.toLocaleString()}</dd></div>
-                  <div><dt>New Accounts</dt><dd>{importPreview.accountsCreated.toLocaleString()}</dd></div>
-                  <div><dt>New Rules</dt><dd>{importPreview.rulesCreated.toLocaleString()}</dd></div>
-                </dl>
-                {importPreview.invalidRows > 0 && (
-                  <div className="warning-banner">
-                    {importPreview.invalidRows.toLocaleString()} row{importPreview.invalidRows === 1 ? '' : 's'} could not be imported.
-                  </div>
+          ) : (
+            <>
+              <div
+                className={`drop-zone ${dragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => handleFile(e.target.files?.[0])}
+                  style={{ display: 'none' }}
+                />
+                {file ? (
+                  <>
+                    <div className="drop-zone-icon">OK</div>
+                    <div className="drop-zone-filename">{file.name}</div>
+                    <div className="subtle">{(file.size / 1024).toFixed(0)} KB - click to pick a different file</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="drop-zone-icon">CSV</div>
+                    <div className="drop-zone-primary">Drop your CSV here</div>
+                    <div className="subtle">or click to browse</div>
+                  </>
                 )}
               </div>
-            )}
 
-            {importError && <div className="error">{importError}</div>}
-
-            <button
-              type="button"
-              className="btn-primary settings-import-button"
-              disabled={!file || importing || previewingImport}
-              onClick={importPreview ? handleImportCommit : handleImportPreview}
-            >
-              {importing || previewingImport ? (
-                <>
-                  <span className="spinner-inline" /> {previewingImport ? 'Previewing...' : 'Importing...'}
-                </>
-              ) : importPreview ? (
-                'Import'
-              ) : (
-                'Preview Import'
+              {importPreview && (
+                <div className="result-card">
+                  <dl className="metric-grid stat-grid">
+                    <div><dt>Would Import</dt><dd>{importPreview.estimatedInserted.toLocaleString()}</dd></div>
+                    <div><dt>Duplicates</dt><dd>{importPreview.duplicateRows.toLocaleString()}</dd></div>
+                    <div><dt>New Accounts</dt><dd>{importPreview.accountsCreated.toLocaleString()}</dd></div>
+                    <div><dt>New Rules</dt><dd>{importPreview.rulesCreated.toLocaleString()}</dd></div>
+                  </dl>
+                  {importPreview.invalidRows > 0 && (
+                    <div className="warning-banner">
+                      {importPreview.invalidRows.toLocaleString()} row{importPreview.invalidRows === 1 ? '' : 's'} could not be imported.
+                    </div>
+                  )}
+                </div>
               )}
-            </button>
-          </>
-        )}
+
+              {importError && <div className="error">{importError}</div>}
+
+              <button
+                type="button"
+                className="btn-primary settings-import-button"
+                disabled={!file || importing || previewingImport}
+                onClick={importPreview ? handleImportCommit : handleImportPreview}
+              >
+                {importing || previewingImport ? (
+                  <>
+                    <span className="spinner-inline" /> {previewingImport ? 'Previewing...' : 'Importing...'}
+                  </>
+                ) : importPreview ? (
+                  'Import'
+                ) : (
+                  'Preview Import'
+                )}
+              </button>
+            </>
+          )}
+        </div>
       </SettingsCard>
     );
   }
@@ -1219,7 +1716,7 @@ export default function Settings({
         title="Backup / Restore Orbit Money Data"
         description="Save or restore Orbit Money app data, settings, and rules."
       >
-        <div className="settings-action">
+        <div className="settings-action settings-flow-card">
           <div className="settings-action-info">
             <strong>Backup Orbit Money Data</strong>
             <p>Includes Orbit data, settings, rules, and permissions. SimpleFIN connection info is excluded.</p>
@@ -1228,98 +1725,90 @@ export default function Settings({
             type="button"
             className="btn-primary"
             disabled={downloadBusy === 'Backup'}
-            onClick={() => downloadData('/api/data/orbit-backup', {
-              label: 'Backup',
-              scope: 'backup',
-              fallbackFilename: 'orbit-money-backup.json'
-            })}
+            onClick={handleBackupDownload}
           >
             {downloadBusy === 'Backup' ? 'Backing Up...' : 'Backup'}
           </button>
-        </div>
-        {renderDownloadNotice('backup')}
-
-        <div className="warning-banner">
-          After restoring, you will need to generate a new SimpleFIN API key and reconnect SimpleFIN.
+          {renderDownloadNotice('backup')}
         </div>
 
-        <div className="settings-subsection">
-          <div className="settings-subsection-heading">
-            <h4>Restore Orbit Money Data</h4>
+        <div className="settings-action settings-flow-card">
+          <div className="settings-action-info">
+            <strong>Restore Orbit Money Data</strong>
             <p>Preview a backup file, then replace the current household data after confirmation.</p>
           </div>
-        </div>
 
-        <div
-          className={`drop-zone ${restoreDragging ? 'dragging' : ''} ${restoreFile ? 'has-file' : ''}`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setRestoreDragging(true);
-          }}
-          onDragLeave={() => setRestoreDragging(false)}
-          onDrop={handleRestoreDrop}
-          onClick={() => restoreFileInputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-        >
-          <input
-            ref={restoreFileInputRef}
-            type="file"
-            accept=".json,application/json"
-            onChange={(e) => handleRestoreFile(e.target.files?.[0])}
-            style={{ display: 'none' }}
-          />
-          {restoreFile ? (
-            <>
-              <div className="drop-zone-icon">JSON</div>
-              <div className="drop-zone-filename">{restoreFile.name}</div>
-              <div className="subtle">{(restoreFile.size / 1024).toFixed(0)} KB - click to pick a different file</div>
-            </>
-          ) : (
-            <>
-              <div className="drop-zone-icon">JSON</div>
-              <div className="drop-zone-primary">Drop your Orbit backup here</div>
-              <div className="subtle">or click to browse</div>
-            </>
+          <div
+            className={`drop-zone ${restoreDragging ? 'dragging' : ''} ${restoreFile ? 'has-file' : ''}`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setRestoreDragging(true);
+            }}
+            onDragLeave={() => setRestoreDragging(false)}
+            onDrop={handleRestoreDrop}
+            onClick={() => restoreFileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+          >
+            <input
+              ref={restoreFileInputRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={(e) => handleRestoreFile(e.target.files?.[0])}
+              style={{ display: 'none' }}
+            />
+            {restoreFile ? (
+              <>
+                <div className="drop-zone-icon">JSON</div>
+                <div className="drop-zone-filename">{restoreFile.name}</div>
+                <div className="subtle">{(restoreFile.size / 1024).toFixed(0)} KB - click to pick a different file</div>
+              </>
+            ) : (
+              <>
+                <div className="drop-zone-icon">JSON</div>
+                <div className="drop-zone-primary">Drop your Orbit backup here</div>
+                <div className="subtle">or click to browse</div>
+              </>
+            )}
+          </div>
+
+          {restorePreview && (
+            <div className="result-card">
+              <dl className="metric-grid stat-grid">
+                <div><dt>Accounts</dt><dd>{restorePreview.accounts.toLocaleString()}</dd></div>
+                <div><dt>Transactions</dt><dd>{restorePreview.transactions.toLocaleString()}</dd></div>
+                <div><dt>Rules</dt><dd>{restorePreview.rules.toLocaleString()}</dd></div>
+                <div><dt>Goals</dt><dd>{restorePreview.goals.toLocaleString()}</dd></div>
+              </dl>
+            </div>
           )}
-        </div>
 
-        {restorePreview && (
-          <div className="result-card">
-            <dl className="metric-grid stat-grid">
-              <div><dt>Accounts</dt><dd>{restorePreview.accounts.toLocaleString()}</dd></div>
-              <div><dt>Transactions</dt><dd>{restorePreview.transactions.toLocaleString()}</dd></div>
-              <div><dt>Rules</dt><dd>{restorePreview.rules.toLocaleString()}</dd></div>
-              <div><dt>Goals</dt><dd>{restorePreview.goals.toLocaleString()}</dd></div>
-            </dl>
+          {restoreResult && (
+            <div className="success-banner">
+              Restore complete. Reconnect SimpleFIN with a new API key when you are ready.
+            </div>
+          )}
+
+          {restoreError && <div className="error">{restoreError}</div>}
+
+          <div className="settings-restore-actions">
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={!restoreFile || restoreBusy}
+              onClick={handleRestorePreview}
+            >
+              {restoreBusy && !restorePreview ? 'Previewing...' : 'Preview Restore'}
+            </button>
+            <button
+              type="button"
+              className="btn-danger"
+              disabled={!restorePreview || restoreBusy}
+              onClick={handleRestore}
+            >
+              {restoreBusy && restorePreview ? 'Restoring...' : 'Restore'}
+            </button>
           </div>
-        )}
-
-        {restoreResult && (
-          <div className="success-banner" style={{ marginTop: 12 }}>
-            Restore complete. Reconnect SimpleFIN with a new API key when you are ready.
-          </div>
-        )}
-
-        {restoreError && <div className="error">{restoreError}</div>}
-
-        <div className="settings-restore-actions">
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={!restoreFile || restoreBusy}
-            onClick={handleRestorePreview}
-          >
-            {restoreBusy && !restorePreview ? 'Previewing...' : 'Preview Restore'}
-          </button>
-          <button
-            type="button"
-            className="btn-danger"
-            disabled={!restorePreview || restoreBusy}
-            onClick={handleRestore}
-          >
-            {restoreBusy && restorePreview ? 'Restoring...' : 'Restore'}
-          </button>
         </div>
       </SettingsCard>
     );
@@ -1362,10 +1851,6 @@ export default function Settings({
   }
 
   function renderAccountCard() {
-    const currentUserCopy = sharing?.currentUser
-      ? `${displayPerson(sharing.currentUser)} - ${sharing.currentUser.role} - ${sharing.currentUser.accessLevel === 'read' ? 'read only' : 'read/write'}`
-      : 'Loading account details...';
-
     return (
       <SettingsCard
         id="account"
@@ -1373,51 +1858,6 @@ export default function Settings({
         title="Partner Share"
         description="Household access and signed-in user details."
       >
-        <div className="settings-action">
-          <div className="settings-action-info">
-            <strong>Signed In</strong>
-            <p>{currentUserCopy}</p>
-          </div>
-        </div>
-
-        {sharing?.currentUser?.canManageSharing && (
-          <form className="settings-share-form" onSubmit={handleShare}>
-            <label className="field">
-              <span>Share With A Partner</span>
-              <input
-                type="email"
-                value={sharingEmail}
-                onChange={(e) => setSharingEmail(e.target.value)}
-                placeholder="partner@example.com"
-                autoComplete="email"
-                disabled={sharingBusy}
-              />
-            </label>
-            <label className="field">
-              <span>Permission</span>
-              <AppSelect
-                value={sharingAccessLevel}
-                onChange={setSharingAccessLevel}
-                ariaLabel="Sharing permission"
-                options={[
-                  { value: 'write', label: 'Read & Write' },
-                  { value: 'read', label: 'Read Only' }
-                ]}
-              />
-            </label>
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={sharingBusy || !sharingEmail.trim()}
-            >
-              {sharingBusy ? 'Sharing...' : 'Share'}
-            </button>
-          </form>
-        )}
-
-        {sharingError && <div className="error" style={{ marginTop: 12 }}>{sharingError}</div>}
-        {sharingMessage && <div className="success-banner" style={{ marginTop: 12 }}>{sharingMessage}</div>}
-
         {sharing && (
           <div className="settings-share-list" aria-label="Household access">
             {sharing.users.map((user) => (
@@ -1498,7 +1938,83 @@ export default function Settings({
               ))}
           </div>
         )}
+
+        {!shareModalOpen && sharingError && <div className="error" style={{ marginTop: 12 }}>{sharingError}</div>}
+        {sharingMessage && <div className="success-banner" style={{ marginTop: 12 }}>{sharingMessage}</div>}
+
+        {sharing?.currentUser?.canManageSharing && (
+          <div className="settings-share-footer">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                setSharingError('');
+                setSharingMessage('');
+                setShareModalOpen(true);
+              }}
+            >
+              Share With A Partner
+            </button>
+          </div>
+        )}
       </SettingsCard>
+    );
+  }
+
+  function renderShareModal() {
+    if (!shareModalOpen) return null;
+
+    return (
+      <AnimatedModal onClose={() => setShareModalOpen(false)} size="sm">
+        {({ close }) => (
+          <>
+            <div className="modal-header">
+              <h3>Share With A Partner</h3>
+              <button type="button" className="modal-close" onClick={close} aria-label="Close">
+                x
+              </button>
+            </div>
+            <form className="settings-share-modal-form" onSubmit={handleShare}>
+              <label className="field">
+                <span>Email</span>
+                <input
+                  type="email"
+                  value={sharingEmail}
+                  onChange={(e) => setSharingEmail(e.target.value)}
+                  placeholder="partner@example.com"
+                  autoComplete="email"
+                  disabled={sharingBusy}
+                />
+              </label>
+              <label className="field">
+                <span>Permission</span>
+                <AppSelect
+                  value={sharingAccessLevel}
+                  onChange={setSharingAccessLevel}
+                  ariaLabel="Sharing permission"
+                  options={[
+                    { value: 'write', label: 'Read & Write' },
+                    { value: 'read', label: 'Read Only' }
+                  ]}
+                />
+              </label>
+              {sharingError && <div className="error">{sharingError}</div>}
+              <div className="modal-actions">
+                <button type="button" className="btn-secondary" onClick={close}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={sharingBusy || !sharingEmail.trim()}
+                >
+                  {sharingBusy ? 'Sharing...' : 'Share'}
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+      </AnimatedModal>
     );
   }
 
@@ -1639,7 +2155,7 @@ export default function Settings({
             className="settings-hub-row"
             leading={<AppIcon name="settings" className="settings-hub-icon" />}
             title="Preferences"
-            subtitle="Appearance, feature visibility, and app display options."
+            subtitle="Appearance, notifications, and app display options."
             onClick={() => openSettingsPage('/settings/preferences')}
           />
           <SelectableListItem
@@ -1659,6 +2175,7 @@ export default function Settings({
       return (
         <div className="settings-card-stack settings-section-top">
           {renderAppearanceCard()}
+          {renderNotificationsCard()}
           {renderFeaturesCard()}
         </div>
       );
@@ -1687,7 +2204,7 @@ export default function Settings({
   const pageMeta = settingsPage === 'preferences'
     ? {
       title: 'Preferences',
-      subtitle: 'Appearance, feature visibility, and app display options.'
+      subtitle: 'Appearance, notifications, and app display options.'
     }
     : settingsPage === 'data-management'
       ? {
@@ -1723,6 +2240,25 @@ export default function Settings({
 
       {renderSettingsContent()}
 
+      {snapshotPickerOpen && (
+        <SnapshotAccountPickerModal
+          accounts={accounts}
+          selectedIds={normalizedNotificationPreferences.accountSnapshots.accountIds}
+          onChange={(accountIds) =>
+            updateNotificationPreferences((current) => ({
+              ...current,
+              accountSnapshots: {
+                ...current.accountSnapshots,
+                accountIds,
+                enabled: accountIds.length > 0 ? true : current.accountSnapshots.enabled
+              }
+            }))
+          }
+          onClose={() => setSnapshotPickerOpen(false)}
+        />
+      )}
+
+      {renderShareModal()}
       <Dialog />
       {renderMoreReorderModal()}
     </div>

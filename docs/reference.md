@@ -89,6 +89,7 @@ offline cache keys by exact request path.
 | `028_upcoming_occurrence_reconciliation.sql` | Adds persisted Upcoming occurrence tracking for matched and missed projected transactions |
 | `029_permissions_import_batches.sql` | Adds household read/write permissions plus import preview and undo batch tracking |
 | `030_user_preferences.sql` | Adds account-scoped UI preferences so customization follows the user across browsers |
+| `031_push_notifications.sql` | Adds browser push subscriptions and per-user delivery history for deduped notifications |
 
 ### Key Data Model Notes
 
@@ -116,7 +117,7 @@ offline cache keys by exact request path.
 
 **Account types:** `checking`, `savings`, `credit`, `investment`, `loan`, `mortgage`, `cash`, `other`.
 
-**Account balance records:** `account_balance_records` stores dated balance snapshots for accounts that need manual history outside SimpleFIN. Adding a record upserts by `(account_id, record_date)` and updates `accounts.current_balance` when that record is the newest snapshot for the account. Net Worth history uses the latest snapshot on or before each month when one exists, then falls back to transaction-derived balances.
+**Account balance records:** `account_balance_records` stores dated balance snapshots for accounts that need manual history outside SimpleFIN. Adding a record upserts by `(account_id, record_date)` and updates `accounts.current_balance` when that record is the newest snapshot for the account. Net Worth history uses the latest snapshot on or before each month when one exists, then falls back to transaction-derived balances. Push snapshot reminders can target selected accounts and deep-link to `/accounts?action=add-snapshot&accountId=...`.
 
 **Overlap strategy (SimpleFIN + Rocket Money):** cutover date approach — RM owns transactions before cutover, SimpleFIN owns after. Pre-cutover RM transactions are deleted during sync if SimpleFIN provides the same period.
 
@@ -277,7 +278,7 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - **Desktop sidebar:** Lists every visible page directly. Primary routes remain first, and More-menu pages follow the user-controlled More order. Bottom tabs are hidden on desktop.
 - **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Savings Goals, Upcoming, Retirement Calculator, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings. Settings can hide optional frontend sections from navigation and reorder More-menu cards through account preferences; locked pages stay visible.
 - **Removed hamburger menu:** do not reintroduce a separate hamburger drawer; use Bottom Tabs, Desktop Sidebar, and More Sheet.
-- **Settings page:** Collapsible/reorderable cards for Appearance, Turn App Features On/Off, SimpleFIN, Rules maintenance, Import/Export, Backup/Restore, Account, and Orbit Money build details. The Data Management section includes a Reapply Rules action that reruns every enabled rule against every transaction while preserving manual edits. The feature toggle card owns frontend-only navigation visibility, More-card order, and the existing MHA visibility control.
+- **Settings page:** Collapsible/reorderable cards for Appearance, Notifications, Turn App Features On/Off, SimpleFIN, Rules maintenance, Import/Export, Backup/Restore, Account, and Orbit Money build details. The Notifications card owns device push enablement, privacy, default timing, weekly snapshots, income alerts, sync issues, and account snapshot reminders. The Data Management section includes a Reapply Rules action that reruns every enabled rule against every transaction while preserving manual edits. The feature toggle card owns frontend-only navigation visibility, More-card order, and the existing MHA visibility control.
 - **React Router v6:** Client-side routing with browser back/forward support. Page modules are lazy-loaded through `React.lazy`/`Suspense` so the authenticated app shell stays small. All routes are served via the Express catch-all for deep-link support.
 
 ### UI Details
@@ -302,9 +303,16 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 
 ### PWA
 - `manifest.webmanifest` with PNG icons (regular + maskable)
-- Service worker (`sw.js`): caches the app shell and static assets for read-only offline launch; API reads are cached in IndexedDB by `frontend/src/api.js` and `frontend/src/offlineCache.js`
+- Service worker (`sw.js`): caches the app shell and static assets for read-only offline launch; API reads are cached in IndexedDB by `frontend/src/api.js` and `frontend/src/offlineCache.js`; push events display notifications with a dedicated Android-friendly badge icon, and notification clicks focus/open the target app route
 - Installable on Android Chrome, desktop Chrome/Edge
 - `theme-color` meta tags for light and dark schemes
+
+### Push Notifications
+- Requires `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`, and `WEB_PUSH_SUBJECT` VAPID environment variables.
+- Subscriptions are stored per household/user/device in `push_subscriptions`; sent-notification dedupe is stored in `notification_delivery_log`.
+- Notification preferences persist under the `notificationPreferences` user preference key and default to privacy-first copy with dollar amounts hidden.
+- Supported categories: weekly snapshot, income arrivals, SimpleFIN sync issues, and selected-account manual snapshot reminders.
+- Backend delivery is scheduler-driven: scheduled checks honor the configured time, while SimpleFIN sync issues and after-sync income alerts can fire immediately after sync.
 
 ## API Endpoints
 
@@ -320,6 +328,14 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 | GET | `/api/auth/me` | Check auth status |
 
 Sample households are seeded with two adult household members, MHA enabled, a household-mode MHA tax profile, MHA-eligible housing categories, and a rolling 12 complete months of demo transactions ending with the last completed month at first login.
+
+### Notifications
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/notifications/config` | Web Push runtime config, VAPID public key when configured, and current device subscription count |
+| POST | `/api/notifications/subscriptions` | Save or refresh a browser push subscription for the signed-in user |
+| POST | `/api/notifications/subscriptions/remove` | Disable a browser push subscription endpoint for the signed-in user |
+| POST | `/api/notifications/test` | Send a test notification to the current user's active subscriptions |
 
 ### Transactions
 | Method | Path | Description |

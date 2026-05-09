@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   DndContext,
   closestCenter
@@ -141,6 +141,7 @@ function findAccountGroup(groups, accountId) {
 
 export default function Accounts({ onChange }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { alert, confirm, Dialog } = useAppDialog();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -182,6 +183,19 @@ export default function Accounts({ onChange }) {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showArchived]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (searchParams.get('action') !== 'add-snapshot') return;
+    const accountId = Number(searchParams.get('accountId'));
+    const account = accounts.find((item) => item.id === accountId);
+    if (!account) return;
+    setRecording(account);
+    const next = new URLSearchParams(searchParams);
+    next.delete('action');
+    next.delete('accountId');
+    setSearchParams(next, { replace: true });
+  }, [accounts, loading, searchParams, setSearchParams]);
 
   useDragInteractionLock(Boolean(activeDragId));
 
@@ -255,6 +269,10 @@ export default function Accounts({ onChange }) {
 
   function viewTransactions(accountId) {
     navigate(`/transactions?account_id=${accountId}`);
+  }
+
+  function manageSnapshotReminder(accountId) {
+    navigate(`/settings/preferences?notificationPanel=snapshot-reminders&accountId=${accountId}`);
   }
 
   const activeAccounts = accounts.filter((account) => !account.is_archived);
@@ -570,6 +588,7 @@ export default function Accounts({ onChange }) {
                       onArchive={() => handleArchive(a.id, !!a.is_archived)}
                       onDelete={() => handleDelete(a)}
                       onViewTransactions={() => viewTransactions(a.id)}
+                      onManageSnapshotReminder={() => manageSnapshotReminder(a.id)}
                     />
                   ))}
                 </ul>
@@ -725,11 +744,13 @@ function StaticAccountRow({
   onMerge,
   onArchive,
   onDelete,
-  onViewTransactions
+  onViewTransactions,
+  onManageSnapshotReminder
 }) {
   const canDelete = account.transaction_count === 0;
   const menuItems = [
     { label: 'Add Record', icon: '+', onClick: onAddRecord },
+    { label: 'Snapshot Reminder', icon: '!', onClick: onManageSnapshotReminder },
     { label: 'Edit', icon: '✎', onClick: onEdit },
     {
       label: 'Merge',

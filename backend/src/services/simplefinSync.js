@@ -29,6 +29,10 @@ import { fetchAccounts } from './simplefinClient.js';
 import { loadRules, applyRulesToDraft } from './ruleMatcher.js';
 import { matchTransfers } from './transferMatcher.js';
 import { reconcileUpcomingTransactions } from './upcomingReconciliation.js';
+import {
+  notifySyncIssue,
+  sendIncomeNotificationsForTransactions
+} from './notifications.js';
 import { dollarsToCents } from '../lib/money.js';
 
 const STALE_RUN_MINUTES = 15;
@@ -268,6 +272,12 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
       db
         .prepare(`SELECT id FROM categories WHERE household_id = ? AND lower(name) = 'uncategorized'`)
         .get(householdId)?.id ?? null;
+    const incomeCategoryIds = new Set(
+      db
+        .prepare('SELECT id FROM categories WHERE household_id = ? AND is_income = 1')
+        .all(householdId)
+        .map((row) => row.id)
+    );
 
     // v12: original_merchant holds the raw bank merchant name. Rule-driven
     // edits (if any) are pre-populated into the edited_* columns via
@@ -300,6 +310,7 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
 
     let inserted = 0;
     let skipped = 0;
+    const insertedIncomeTransactionIds = [];
 
     const insertRun = db.transaction(() => {
       for (const sf of payload.accounts) {
@@ -362,6 +373,10 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
           );
           if (result.changes === 1) {
             inserted++;
+            const effectiveCategoryId = hydrated.edited_category_id ?? categoriesUncat;
+            if (amountCents > 0 && incomeCategoryIds.has(effectiveCategoryId)) {
+              insertedIncomeTransactionIds.push(result.lastInsertRowid);
+            }
           } else {
             repairEpochTxn.run(
               accountId,
@@ -422,6 +437,29 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
       householdId
     );
 
+    if (finalStatus === 'error') {
+      try {
+        await notifySyncIssue({
+          householdId,
+          logId,
+          message: errorMsg,
+          partial: true
+        });
+      } catch (err) {
+        console.error('[simplefin] Sync issue notification failed:', err.message || err);
+      }
+    }
+
+    try {
+      await sendIncomeNotificationsForTransactions({
+        householdId,
+        transactionIds: insertedIncomeTransactionIds,
+        timing: 'after_sync'
+      });
+    } catch (err) {
+      console.error('[simplefin] Income notification failed:', err.message || err);
+    }
+
     return {
       status: finalStatus,
       inserted,
@@ -435,6 +473,16 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
     };
   } catch (err) {
     markLog.run('error', 0, 0, 0, 0, 0, 0, err.message || String(err), logId, householdId);
+    try {
+      await notifySyncIssue({
+        householdId,
+        logId,
+        message: err.message || String(err),
+        partial: false
+      });
+    } catch (notifyErr) {
+      console.error('[simplefin] Sync issue notification failed:', notifyErr.message || notifyErr);
+    }
     throw err;
   }
 }

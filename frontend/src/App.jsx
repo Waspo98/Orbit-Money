@@ -501,6 +501,11 @@ function AppShell() {
       onMhaTrackerChange={setMhaTrackerEnabled}
       navigationPreferences={navigationPreferences}
       onNavigationPreferencesChange={setNavigationPreferences}
+      notificationPreferences={userPreferences[USER_PREFERENCE_KEYS.notificationPreferences]}
+      onNotificationPreferencesChange={(value) =>
+        setUserPreference(USER_PREFERENCE_KEYS.notificationPreferences, value)
+      }
+      accounts={accounts}
       onImportComplete={handleSettingsImportComplete}
       settingsPage={settingsPage}
     />

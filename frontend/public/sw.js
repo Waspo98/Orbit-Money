@@ -17,6 +17,7 @@ const APP_SHELL_URLS = [
   '/icon-alternate.png',
   '/icon-maskable.svg',
   '/icon-maskable-512.png',
+  '/notification-badge-96.png',
   '/apple-touch-icon.png',
   '/splash-wordmark-light.svg',
   '/splash-wordmark-dark.svg'
@@ -58,6 +59,61 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(cacheFirst(request));
 });
+
+self.addEventListener('push', (event) => {
+  const payload = readPushPayload(event);
+  const title = payload.title || 'Orbit Money';
+  const options = {
+    body: payload.body || 'Orbit has an update for you.',
+    tag: payload.tag || 'orbit-money',
+    badge: '/notification-badge-96.png',
+    icon: '/icon-192.png',
+    data: {
+      url: payload.data?.url || payload.url || '/dashboard',
+      type: payload.data?.type || payload.type || 'general'
+    }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = new URL(event.notification.data?.url || '/dashboard', self.location.origin).href;
+
+  event.waitUntil((async () => {
+    const clientsList = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    });
+
+    for (const client of clientsList) {
+      const clientUrl = new URL(client.url);
+      if (clientUrl.origin === self.location.origin && 'focus' in client) {
+        if ('navigate' in client) {
+          await client.navigate(targetUrl);
+        }
+        return client.focus();
+      }
+    }
+
+    if (self.clients.openWindow) {
+      return self.clients.openWindow(targetUrl);
+    }
+    return null;
+  })());
+});
+
+function readPushPayload(event) {
+  if (!event.data) return {};
+  try {
+    return event.data.json();
+  } catch {
+    return {
+      body: event.data.text()
+    };
+  }
+}
 
 async function networkFirst(request, fallbackUrl) {
   const cache = await caches.open(CACHE_NAME);

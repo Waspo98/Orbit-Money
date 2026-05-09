@@ -1771,13 +1771,17 @@ input, textarea, select {
 .login-brand-lockup {
   display: flex;
   align-items: center;
-  gap: 14px;
+  justify-content: flex-start;
+  gap: clamp(8px, 2.5vw, 10px);
+  width: 100%;
+  min-height: 94px;
+  margin-bottom: 26px;
 }
 
 .login-brand-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  width: clamp(48px, 13.5vw, 54px);
+  height: clamp(48px, 13.5vw, 54px);
+  border-radius: 16px;
   object-fit: cover;
   box-shadow: 0 14px 32px rgba(10, 18, 14, 0.14);
   animation: loginIconSettle 560ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
@@ -1794,12 +1798,10 @@ input, textarea, select {
 }
 
 .login-title .brand-logo {
-  --brand-logo-width: 212px;
-  --brand-logo-height: 50px;
+  --brand-logo-width: clamp(132px, 42vw, 176px);
+  --brand-logo-height: calc(var(--brand-logo-width) * 0.23295);
   animation: loginWordmarkReveal 520ms ease 140ms both;
 }
-
-.login-subtitle { margin: 0 0 32px; color: var(--text-muted); font-size: 0.95rem; }
 
 @keyframes loginIconSettle {
   from {
@@ -10470,12 +10472,157 @@ body.modal-page-blur-active .txn-pinned-month-header {
 .settings-action-info strong { display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.96rem; }
 .settings-action-info p { margin: 0; color: var(--text-muted); font-size: 0.88rem; }
 
+.notification-status-row {
+  display: grid;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.notification-status-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.notification-preference-row {
+  align-items: flex-start;
+}
+
+.notification-toggle-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.notification-switch {
+  margin-top: 1px;
+}
+
+.notification-privacy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.notification-privacy-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.notification-row-controls {
+  flex: 0 1 380px;
+  min-width: min(100%, 260px);
+}
+
+.notification-inline-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.notification-inline-controls .app-select {
+  min-width: 150px;
+}
+
+.notification-time-input {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.notification-day-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.notification-day-field input {
+  width: 72px;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.notification-account-picker {
+  display: grid;
+  gap: 10px;
+  max-height: min(60vh, 540px);
+  overflow: auto;
+  padding: 2px;
+}
+
 .settings-action-buttons {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.settings-flow-card {
+  display: grid;
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 16px;
+}
+
+.settings-flow-card .settings-action-info {
+  width: 100%;
+}
+
+.settings-flow-card .settings-action-buttons {
+  justify-content: stretch;
+}
+
+.settings-flow-card .settings-action-buttons > button,
+.settings-flow-card > .btn-primary,
+.settings-flow-card .settings-import-button {
+  flex: 1 1 150px;
+  min-height: 44px;
+}
+
+.settings-flow-card .settings-download-status,
+.settings-flow-card .result-card,
+.settings-flow-card .success-banner,
+.settings-flow-card .error {
+  margin-top: 0;
+}
+
+.settings-flow-card .drop-zone {
+  margin-bottom: 0;
+}
+
+.settings-flow-card .settings-restore-actions {
+  margin-top: 0;
+}
+
+.settings-nested-action {
+  margin-top: 14px;
+  margin-bottom: 0;
+  background: var(--surface);
 }
 
 .settings-action-link {
@@ -10560,6 +10707,27 @@ body.modal-page-blur-active .txn-pinned-month-header {
   color: var(--text-muted);
   font-size: 0.84rem;
   overflow-wrap: anywhere;
+}
+
+.settings-share-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-share-footer .btn-primary {
+  min-height: 44px;
+}
+
+.settings-share-modal-form {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-share-modal-form .field,
+.settings-share-modal-form .error {
+  margin-bottom: 0;
 }
 
 .settings-import-button {
@@ -10722,6 +10890,15 @@ body.modal-page-blur-active .txn-pinned-month-header {
   .settings-action { flex-direction: column; align-items: stretch; }
   .settings-action > button { width: 100%; }
   .settings-action > a { width: 100%; justify-content: center; }
+  .notification-preference-row { gap: 14px; }
+  .notification-status-main,
+  .notification-privacy-row { align-items: stretch; flex-direction: column; }
+  .notification-privacy-control { justify-content: space-between; }
+  .notification-row-controls { flex-basis: auto; min-width: 0; }
+  .notification-inline-controls { justify-content: stretch; }
+  .notification-inline-controls > *,
+  .notification-inline-controls .app-select,
+  .notification-inline-controls > button { flex: 1 1 150px; }
   .settings-action-buttons { width: 100%; justify-content: stretch; }
   .settings-action-buttons > button,
   .settings-action-buttons > a { flex: 1 1 140px; }
@@ -10736,6 +10913,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   .settings-share-row > button { width: 100%; }
   .settings-share-row-actions { align-items: stretch; flex-direction: column; }
   .settings-share-row-actions > button { width: 100%; }
+  .settings-share-footer .btn-primary { width: 100%; }
   .choice-card-group,
   .settings-theme-toggle { grid-template-columns: 1fr; }
   .choice-card-group-two,
@@ -10779,6 +10957,27 @@ body.modal-page-blur-active .txn-pinned-month-header {
 }
 
 .status-grid dd { margin: 0; font-size: 0.95rem; font-weight: 500; color: var(--text); }
+
+.simplefin-status-grid {
+  margin-bottom: 0;
+}
+
+.simplefin-grid-action {
+  gap: 9px;
+}
+
+.simplefin-grid-action dd {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.simplefin-grid-action .btn-secondary {
+  width: 100%;
+  min-height: 36px;
+  margin-top: 2px;
+}
 
 .sync-log-table {
   margin-top: 16px;

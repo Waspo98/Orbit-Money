@@ -76,7 +76,6 @@ export default function Login({ onLogin }) {
           <img src={APP_ICON_192} alt="" className="login-brand-icon" />
           <h1 className="login-title"><BrandLogo className="login-brand-logo" /></h1>
         </div>
-        <p className="login-subtitle">Welcome back.</p>
 
         {localEnabled && (
           <>

@@ -126,7 +126,7 @@ export const ROUTES = [
   {
     path: '/settings/preferences',
     label: 'Preferences',
-    description: 'Appearance, feature visibility, and app display options',
+    description: 'Appearance, notifications, and app display options',
     icon: 'settings',
     locked: true,
     hasPageHero: true

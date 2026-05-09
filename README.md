@@ -110,6 +110,10 @@ Optional or feature-specific values:
 - `LOGO_DEV_PUBLISHABLE_KEY` enables merchant logo display.
 - `LOGO_DEV_SECRET_KEY` enables server-side brand search for manual logo
   overrides.
+- `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`, and `WEB_PUSH_SUBJECT` enable
+  installable-PWA push notifications. Generate VAPID keys with
+  `npx web-push generate-vapid-keys`; `WEB_PUSH_SUBJECT` should be a contact
+  URL or mailto address such as `mailto:you@example.com`.
 - `ENABLE_SAMPLE_DATA=1` shows `Continue with sample data` on the login page
   and allows temporary sample households. Leave it `0` for normal installs.
 - `SESSION_NAME` changes the session cookie name. The default is `connect.sid`.
@@ -152,6 +156,15 @@ Cached data is scoped to the signed-in user and household. Owner households can
 use their cached data offline without a time limit. Shared/member households
 must have a successful online access validation within the last 7 days before
 cached data is shown offline.
+
+## Push Notifications
+
+When Web Push keys are configured, Preferences can enable push notifications for
+weekly snapshots, income arrivals, SimpleFIN sync issues, and manual account
+snapshot reminders. The backend scheduler decides when notifications are due,
+then the installed PWA service worker displays them even when Orbit is not open.
+Notification clicks deep-link back into Orbit, including directly opening the
+Add Record popup for account snapshot reminders.
 
 ## Docker Layout
 
