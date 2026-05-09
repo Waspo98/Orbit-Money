@@ -177,18 +177,6 @@ export function upsertPushSubscription({
   ).run(householdId, userId, endpoint, p256dh, auth, expirationTime, userAgent);
 }
 
-export function removePushSubscription({ householdId, userId, endpoint }) {
-  if (!endpoint) return;
-  db.prepare(
-    `UPDATE push_subscriptions
-        SET disabled_at = datetime('now'),
-            updated_at = datetime('now')
-      WHERE household_id = ?
-        AND user_id = ?
-        AND endpoint = ?`
-  ).run(householdId, userId, endpoint);
-}
-
 export function subscriptionSummary(householdId, userId) {
   const activeCount = db
     .prepare(

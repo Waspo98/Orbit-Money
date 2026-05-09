@@ -334,7 +334,6 @@ Sample households are seeded with two adult household members, MHA enabled, a ho
 |---|---|---|
 | GET | `/api/notifications/config` | Web Push runtime config, VAPID public key when configured, and current device subscription count |
 | POST | `/api/notifications/subscriptions` | Save or refresh a browser push subscription for the signed-in user |
-| POST | `/api/notifications/subscriptions/remove` | Disable a browser push subscription endpoint for the signed-in user |
 | POST | `/api/notifications/test` | Send a test notification to the current user's active subscriptions |
 
 ### Transactions

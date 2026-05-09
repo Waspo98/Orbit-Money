@@ -165,26 +165,41 @@ function NotificationPreferenceRow({
   description,
   checked,
   onCheckedChange,
-  children
+  onCustomize
 }) {
+  function handleKeyDown(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onCustomize?.();
+  }
+
   return (
-    <div className="settings-action notification-preference-row">
-      <div className="notification-toggle-copy">
-        <label className="switch notification-switch" title={checked ? 'On' : 'Off'}>
-          <input
-            type="checkbox"
-            aria-label={`${checked ? 'Turn Off' : 'Turn On'} ${title}`}
-            checked={checked}
-            onChange={(event) => onCheckedChange?.(event.target.checked)}
-          />
-          <span className="switch-track" />
-        </label>
-        <span className="settings-action-info">
-          <strong>{title}</strong>
-          <p>{description}</p>
-        </span>
-      </div>
-      {children && <div className="notification-row-controls">{children}</div>}
+    <div
+      className="settings-action notification-preference-row"
+      role="button"
+      tabIndex={0}
+      onClick={onCustomize}
+      onKeyDown={handleKeyDown}
+      aria-label={`${title}. Tap to customize timing.`}
+    >
+      <span className="settings-action-info">
+        <strong>{title}</strong>
+        <p>{description}</p>
+      </span>
+      <label
+        className="switch notification-switch"
+        title={checked ? 'On' : 'Off'}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
+        <input
+          type="checkbox"
+          aria-label={`${checked ? 'Turn Off' : 'Turn On'} ${title}`}
+          checked={checked}
+          onChange={(event) => onCheckedChange?.(event.target.checked)}
+        />
+        <span className="switch-track" />
+      </label>
     </div>
   );
 }
@@ -315,6 +330,7 @@ export default function Settings({
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [notificationError, setNotificationError] = useState('');
   const [notificationMessage, setNotificationMessage] = useState('');
+  const [notificationEditor, setNotificationEditor] = useState(null);
   const [snapshotPickerOpen, setSnapshotPickerOpen] = useState(false);
   const fileInputRef = useRef(null);
   const restoreFileInputRef = useRef(null);
@@ -446,6 +462,16 @@ export default function Settings({
     );
   }
 
+  function updateNotificationSection(section, patch) {
+    updateNotificationPreferences((current) => ({
+      ...current,
+      [section]: {
+        ...current[section],
+        ...patch
+      }
+    }));
+  }
+
   async function enablePushNotifications() {
     setNotificationBusy(true);
     setNotificationError('');
@@ -481,30 +507,6 @@ export default function Settings({
       setNotificationMessage('Notifications are enabled on this device.');
     } catch (err) {
       setNotificationError(err.message || 'Could not enable notifications.');
-    } finally {
-      setNotificationBusy(false);
-    }
-  }
-
-  async function disableDevicePush() {
-    setNotificationBusy(true);
-    setNotificationError('');
-    setNotificationMessage('');
-    try {
-      if (!canUsePushNotifications()) return;
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      if (subscription) {
-        await api.post('/api/notifications/subscriptions/remove', {
-          endpoint: subscription.endpoint
-        });
-        await subscription.unsubscribe();
-      }
-      const config = await api.get('/api/notifications/config');
-      setNotificationConfig(config);
-      setNotificationMessage('This device was removed from push notifications.');
-    } catch (err) {
-      setNotificationError(err.message || 'Could not remove this device.');
     } finally {
       setNotificationBusy(false);
     }
@@ -1080,17 +1082,6 @@ export default function Settings({
     const activeDeviceCount = Number(notificationConfig?.subscriptions?.activeCount || 0);
     const pushSupported = canUsePushNotifications();
     const serverConfigured = notificationConfig?.configured !== false;
-    const selectedAccountCount = prefs.accountSnapshots.accountIds.length;
-
-    function updateSection(section, patch) {
-      updateNotificationPreferences((current) => ({
-        ...current,
-        [section]: {
-          ...current[section],
-          ...patch
-        }
-      }));
-    }
 
     return (
       <SettingsCard
@@ -1115,7 +1106,7 @@ export default function Settings({
               {prefs.enabled ? (
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="btn-danger"
                   onClick={() => updateNotificationPreferences((current) => ({ ...current, enabled: false }))}
                   disabled={notificationBusy}
                 >
@@ -1139,26 +1130,15 @@ export default function Settings({
               >
                 Send Test
               </button>
-              {activeDeviceCount > 0 && (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={disableDevicePush}
-                  disabled={notificationBusy}
-                >
-                  Remove Device
-                </button>
-              )}
             </div>
           </div>
 
           <label className="notification-privacy-row">
-            <span className="settings-action-info">
-              <strong>Show Dollar Amounts</strong>
-              <p>{prefs.showAmounts ? 'Amounts can appear in notification text.' : 'Amounts stay hidden on lock-screen alerts.'}</p>
-            </span>
-            <span className="notification-privacy-control">
-              <span>{prefs.showAmounts ? 'Showing' : 'Hidden'}</span>
+            <span className="notification-privacy-heading">
+              <span className="settings-action-info">
+                <strong>Show Dollar Amounts</strong>
+                <p>{prefs.showAmounts ? 'Amounts can appear in notification text.' : 'Amounts stay hidden on lock-screen alerts.'}</p>
+              </span>
               <span className="switch notification-switch">
                 <input
                   type="checkbox"
@@ -1184,102 +1164,194 @@ export default function Settings({
         )}
         {notificationError && <div className="error">{notificationError}</div>}
         {notificationMessage && <div className="success-banner">{notificationMessage}</div>}
+      </SettingsCard>
+    );
+  }
 
+  function renderNotificationTypesCard() {
+    const prefs = normalizedNotificationPreferences;
+    const selectedAccountCount = prefs.accountSnapshots.accountIds.length;
+
+    return (
+      <SettingsCard
+        id="notification-types"
+        key="notification-types"
+        title="Notification Types"
+      >
+        <div className="info-banner notification-types-note">
+          Tap a notification type to customize timing.
+        </div>
         <NotificationPreferenceRow
           title="Weekly Snapshot"
           description="A calm weekly summary of budgets, upcoming items, and transactions to review."
           checked={prefs.weeklySnapshot.enabled}
-          onCheckedChange={(enabled) => updateSection('weeklySnapshot', { enabled })}
-        >
-          <div className="notification-inline-controls">
-            <AppSelect
-              value={prefs.weeklySnapshot.dayOfWeek}
-              options={WEEKDAY_OPTIONS}
-              onChange={(value) => updateSection('weeklySnapshot', { dayOfWeek: Number(value) })}
-              ariaLabel="Weekly snapshot day"
-            />
-            <input
-              type="time"
-              className="notification-time-input"
-              value={prefs.weeklySnapshot.time}
-              onChange={(event) => updateSection('weeklySnapshot', { time: event.target.value })}
-              aria-label="Weekly snapshot time"
-            />
-          </div>
-        </NotificationPreferenceRow>
+          onCheckedChange={(enabled) => updateNotificationSection('weeklySnapshot', { enabled })}
+          onCustomize={() => setNotificationEditor('weeklySnapshot')}
+        />
 
         <NotificationPreferenceRow
           title="Income Notifications"
           description="A cheerful heads-up when income lands after SimpleFIN sync."
           checked={prefs.income.enabled}
-          onCheckedChange={(enabled) => updateSection('income', { enabled })}
-        >
-          <div className="notification-inline-controls">
-            <AppSelect
-              value={prefs.income.timing}
-              options={INCOME_TIMING_OPTIONS}
-              onChange={(value) => updateSection('income', { timing: value })}
-              ariaLabel="Income notification timing"
-            />
-            {prefs.income.timing === 'scheduled' && (
-              <input
-                type="time"
-                className="notification-time-input"
-                value={prefs.income.time}
-                onChange={(event) => updateSection('income', { time: event.target.value })}
-                aria-label="Income notification time"
-              />
-            )}
-          </div>
-        </NotificationPreferenceRow>
+          onCheckedChange={(enabled) => updateNotificationSection('income', { enabled })}
+          onCustomize={() => setNotificationEditor('income')}
+        />
 
         <NotificationPreferenceRow
           title="Sync Issues"
           description="Immediate alerts when SimpleFIN has trouble or only partially syncs."
           checked={prefs.syncIssues.enabled}
-          onCheckedChange={(enabled) => updateSection('syncIssues', { enabled })}
+          onCheckedChange={(enabled) => updateNotificationSection('syncIssues', { enabled })}
+          onCustomize={() => setNotificationEditor('syncIssues')}
         />
 
         <NotificationPreferenceRow
           title="Account Snapshot Reminders"
           description={`${selectedAccountCount} selected account${selectedAccountCount === 1 ? '' : 's'} for manual balance reminders.`}
           checked={prefs.accountSnapshots.enabled}
-          onCheckedChange={(enabled) => updateSection('accountSnapshots', { enabled })}
-        >
-          <div className="notification-inline-controls">
-            <AppSelect
-              value={prefs.accountSnapshots.cadence}
-              options={SNAPSHOT_CADENCE_OPTIONS}
-              onChange={(value) => updateSection('accountSnapshots', { cadence: value })}
-              ariaLabel="Snapshot reminder cadence"
-            />
-            <label className="notification-day-field">
-              <span>Day</span>
-              <input
-                type="number"
-                min="1"
-                max="28"
-                value={prefs.accountSnapshots.dayOfMonth}
-                onChange={(event) => updateSection('accountSnapshots', { dayOfMonth: Number(event.target.value) })}
-              />
-            </label>
-            <input
-              type="time"
-              className="notification-time-input"
-              value={prefs.accountSnapshots.time}
-              onChange={(event) => updateSection('accountSnapshots', { time: event.target.value })}
-              aria-label="Snapshot reminder time"
-            />
-            <button
-              type="button"
-              className="btn-secondary btn-compact"
-              onClick={() => setSnapshotPickerOpen(true)}
-            >
-              Select Accounts
-            </button>
-          </div>
-        </NotificationPreferenceRow>
+          onCheckedChange={(enabled) => updateNotificationSection('accountSnapshots', { enabled })}
+          onCustomize={() => setNotificationEditor('accountSnapshots')}
+        />
       </SettingsCard>
+    );
+  }
+
+  function renderNotificationEditorModal() {
+    const prefs = normalizedNotificationPreferences;
+    if (!notificationEditor) return null;
+
+    const copy = {
+      weeklySnapshot: {
+        title: 'Weekly Snapshot',
+        description: 'Choose when Orbit sends your weekly money review.'
+      },
+      income: {
+        title: 'Income Notifications',
+        description: 'Choose whether income alerts send after sync or at a scheduled time.'
+      },
+      syncIssues: {
+        title: 'Sync Issues',
+        description: 'Sync issue alerts send right away when SimpleFIN reports a problem.'
+      },
+      accountSnapshots: {
+        title: 'Account Snapshot Reminders',
+        description: 'Choose when Orbit reminds you to update manual account snapshots.'
+      }
+    }[notificationEditor];
+
+    return (
+      <AnimatedModal onClose={() => setNotificationEditor(null)} size="sm">
+        {({ close }) => (
+          <>
+            <div className="modal-header">
+              <h3>{copy.title}</h3>
+              <button type="button" className="modal-close" onClick={close} aria-label="Close">
+                x
+              </button>
+            </div>
+            <div className="notification-editor-form">
+              <p className="modal-copy">{copy.description}</p>
+
+              {notificationEditor === 'weeklySnapshot' && (
+                <>
+                  <label className="field">
+                    <span>Day</span>
+                    <AppSelect
+                      value={prefs.weeklySnapshot.dayOfWeek}
+                      options={WEEKDAY_OPTIONS}
+                      onChange={(value) => updateNotificationSection('weeklySnapshot', { dayOfWeek: Number(value) })}
+                      ariaLabel="Weekly snapshot day"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Time</span>
+                    <input
+                      type="time"
+                      value={prefs.weeklySnapshot.time}
+                      onChange={(event) => updateNotificationSection('weeklySnapshot', { time: event.target.value })}
+                    />
+                  </label>
+                </>
+              )}
+
+              {notificationEditor === 'income' && (
+                <>
+                  <label className="field">
+                    <span>Timing</span>
+                    <AppSelect
+                      value={prefs.income.timing}
+                      options={INCOME_TIMING_OPTIONS}
+                      onChange={(value) => updateNotificationSection('income', { timing: value })}
+                      ariaLabel="Income notification timing"
+                    />
+                  </label>
+                  {prefs.income.timing === 'scheduled' && (
+                    <label className="field">
+                      <span>Time</span>
+                      <input
+                        type="time"
+                        value={prefs.income.time}
+                        onChange={(event) => updateNotificationSection('income', { time: event.target.value })}
+                      />
+                    </label>
+                  )}
+                </>
+              )}
+
+              {notificationEditor === 'syncIssues' && (
+                <div className="info-banner notification-editor-note">
+                  Sync issue notifications are immediate, so there is no schedule to adjust.
+                </div>
+              )}
+
+              {notificationEditor === 'accountSnapshots' && (
+                <>
+                  <label className="field">
+                    <span>Cadence</span>
+                    <AppSelect
+                      value={prefs.accountSnapshots.cadence}
+                      options={SNAPSHOT_CADENCE_OPTIONS}
+                      onChange={(value) => updateNotificationSection('accountSnapshots', { cadence: value })}
+                      ariaLabel="Snapshot reminder cadence"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Day Of Month</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="28"
+                      value={prefs.accountSnapshots.dayOfMonth}
+                      onChange={(event) => updateNotificationSection('accountSnapshots', { dayOfMonth: Number(event.target.value) })}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Time</span>
+                    <input
+                      type="time"
+                      value={prefs.accountSnapshots.time}
+                      onChange={(event) => updateNotificationSection('accountSnapshots', { time: event.target.value })}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setSnapshotPickerOpen(true)}
+                  >
+                    Select Accounts
+                  </button>
+                </>
+              )}
+
+              <div className="modal-actions">
+                <button type="button" className="btn-primary" onClick={close}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </AnimatedModal>
     );
   }
 
@@ -2176,6 +2248,7 @@ export default function Settings({
         <div className="settings-card-stack settings-section-top">
           {renderAppearanceCard()}
           {renderNotificationsCard()}
+          {renderNotificationTypesCard()}
           {renderFeaturesCard()}
         </div>
       );
@@ -2240,6 +2313,7 @@ export default function Settings({
 
       {renderSettingsContent()}
 
+      {renderNotificationEditorModal()}
       {snapshotPickerOpen && (
         <SnapshotAccountPickerModal
           accounts={accounts}

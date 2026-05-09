@@ -10486,15 +10486,20 @@ body.modal-page-blur-active .txn-pinned-month-header {
 }
 
 .notification-preference-row {
-  align-items: flex-start;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color var(--dur-fast), border-color var(--dur-fast), transform var(--dur-fast);
 }
 
-.notification-toggle-copy {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
+.notification-preference-row:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.notification-preference-row:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-ring);
+  outline: none;
 }
 
 .notification-switch {
@@ -10510,60 +10515,12 @@ body.modal-page-blur-active .txn-pinned-month-header {
   border-top: 1px solid var(--border);
 }
 
-.notification-privacy-control {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-  white-space: nowrap;
-}
-
-.notification-row-controls {
-  flex: 0 1 380px;
-  min-width: min(100%, 260px);
-}
-
-.notification-inline-controls {
+.notification-privacy-heading {
+  width: 100%;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.notification-inline-controls .app-select {
-  min-width: 150px;
-}
-
-.notification-time-input {
-  min-height: 42px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-}
-
-.notification-day-field {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 0.88rem;
-}
-
-.notification-day-field input {
-  width: 72px;
-  min-height: 42px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
+  justify-content: space-between;
+  gap: 14px;
 }
 
 .notification-account-picker {
@@ -10572,6 +10529,25 @@ body.modal-page-blur-active .txn-pinned-month-header {
   max-height: min(60vh, 540px);
   overflow: auto;
   padding: 2px;
+}
+
+.notification-types-note {
+  margin-bottom: 12px;
+}
+
+.notification-editor-form {
+  display: grid;
+  gap: 14px;
+}
+
+.notification-editor-form .modal-copy,
+.notification-editor-form .field,
+.notification-editor-form .info-banner {
+  margin-bottom: 0;
+}
+
+.notification-editor-form > .btn-secondary {
+  width: 100%;
 }
 
 .settings-action-buttons {
@@ -10890,15 +10866,10 @@ body.modal-page-blur-active .txn-pinned-month-header {
   .settings-action { flex-direction: column; align-items: stretch; }
   .settings-action > button { width: 100%; }
   .settings-action > a { width: 100%; justify-content: center; }
-  .notification-preference-row { gap: 14px; }
-  .notification-status-main,
-  .notification-privacy-row { align-items: stretch; flex-direction: column; }
-  .notification-privacy-control { justify-content: space-between; }
-  .notification-row-controls { flex-basis: auto; min-width: 0; }
-  .notification-inline-controls { justify-content: stretch; }
-  .notification-inline-controls > *,
-  .notification-inline-controls .app-select,
-  .notification-inline-controls > button { flex: 1 1 150px; }
+  .notification-preference-row,
+  .notification-privacy-heading,
+  .notification-status-main { flex-direction: row; align-items: center; }
+  .notification-status-main { align-items: flex-start; flex-wrap: wrap; }
   .settings-action-buttons { width: 100%; justify-content: stretch; }
   .settings-action-buttons > button,
   .settings-action-buttons > a { flex: 1 1 140px; }

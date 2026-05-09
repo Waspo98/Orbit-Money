@@ -2,7 +2,6 @@ import express from 'express';
 import { requireHouseholdId } from '../auth.js';
 import {
   getNotificationRuntimeConfig,
-  removePushSubscription,
   sendNotificationToUser,
   subscriptionSummary,
   upsertPushSubscription
@@ -68,21 +67,6 @@ router.post('/subscriptions', (req, res) => {
     });
   } catch (err) {
     sendBadRequest(res, err.message || 'Could not save push subscription.');
-  }
-});
-
-router.post('/subscriptions/remove', (req, res) => {
-  try {
-    const householdId = requireHouseholdId(req);
-    const userId = requireUserId(req);
-    const endpoint = String(req.body?.endpoint || '').trim();
-    removePushSubscription({ householdId, userId, endpoint });
-    sendOk(res, {
-      success: true,
-      subscriptions: subscriptionSummary(householdId, userId)
-    });
-  } catch (err) {
-    sendBadRequest(res, err.message || 'Could not remove push subscription.');
   }
 });
 
