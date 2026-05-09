@@ -368,21 +368,23 @@ function RulePreview({
   return (
     <div className={`rule-preview ${hasDetails ? 'rule-preview-rich' : ''}`}>
       <div className="rule-preview-summary">
-        <span>
+        <span className="rule-preview-summary-primary">
           <strong>{matchCount.toLocaleString()}</strong> matching transaction
           {matchCount === 1 ? '' : 's'}.
         </span>
-        {preview.willChangeCount > 0 && (
-          <span>
-            <strong>{preview.willChangeCount.toLocaleString()}</strong> will change.
-          </span>
-        )}
-        {preview.conflictCount > 0 && (
-          <span>
-            <strong>{preview.conflictCount.toLocaleString()}</strong> conflict
-            {preview.conflictCount === 1 ? '' : 's'}.
-          </span>
-        )}
+        <span className="rule-preview-summary-details">
+          {preview.willChangeCount > 0 && (
+            <span>
+              <strong>{preview.willChangeCount.toLocaleString()}</strong> will change.
+            </span>
+          )}
+          {preview.conflictCount > 0 && (
+            <span>
+              <strong>{preview.conflictCount.toLocaleString()}</strong> conflict
+              {preview.conflictCount === 1 ? '' : 's'}.
+            </span>
+          )}
+        </span>
       </div>
 
       {affectedCount > 0 && (
@@ -542,8 +544,9 @@ function ConditionRow({
   return (
     <div className="rule-row-builder">
       {index > 0 && <div className="rule-and-label">and</div>}
-      <div className="rule-builder-grid">
+      <div className={`rule-builder-grid rule-condition-grid ${onRemove ? 'has-remove' : 'no-remove'}`}>
         <AppSelect
+          className="form-control-select rule-field-control"
           value={condition.field}
           options={FIELD_OPTIONS}
           onChange={onFieldChange}
@@ -551,6 +554,7 @@ function ConditionRow({
         />
 
         <AppSelect
+          className="form-control-select rule-operator-control"
           value={condition.operator}
           options={operators.map((operator) => ({
             value: operator,
@@ -560,8 +564,10 @@ function ConditionRow({
           ariaLabel="Condition operator"
         />
 
+        <div className="rule-value-line">
         {condition.field === 'account_id' ? (
           <AppSelect
+            className="form-control-select rule-value-control"
             value={condition.value || ''}
             options={accounts.map((account) => ({
               value: account.id,
@@ -572,6 +578,7 @@ function ConditionRow({
           />
         ) : condition.field === 'category_id' ? (
           <AppSelect
+            className="form-control-select rule-value-control"
             value={condition.value || ''}
             options={categories.map((category) => ({
               value: category.id,
@@ -581,8 +588,9 @@ function ConditionRow({
             ariaLabel="Condition category"
           />
         ) : condition.operator === 'between' ? (
-          <div className="rule-between">
+          <div className="rule-value-control rule-between">
             <CurrencyInput
+              className="form-control-input"
               allowNegative
               value={Array.isArray(condition.value) ? formatCurrencyInput(condition.value[0] ?? '', { allowNegative: true }) : ''}
               onChange={(value) => {
@@ -594,6 +602,7 @@ function ConditionRow({
             />
             <span>and</span>
             <CurrencyInput
+              className="form-control-input"
               allowNegative
               value={Array.isArray(condition.value) ? formatCurrencyInput(condition.value[1] ?? '', { allowNegative: true }) : ''}
               onChange={(value) => {
@@ -606,6 +615,7 @@ function ConditionRow({
           </div>
         ) : type === 'number' ? (
           <CurrencyInput
+            className="form-control-input rule-value-control"
             allowNegative
             value={formatCurrencyInput(condition.value ?? '', { allowNegative: true })}
             onChange={(value) => onUpdate({ value: value ? parseCurrencyInput(value, 0) : '' })}
@@ -613,6 +623,7 @@ function ConditionRow({
           />
         ) : (
           <input
+            className="form-control-input rule-value-control"
             type="text"
             value={condition.value ?? ''}
             onChange={(event) => onUpdate({ value: event.target.value })}
@@ -627,9 +638,10 @@ function ConditionRow({
             onClick={onRemove}
             aria-label="Remove condition"
           >
-            ×
+            x
           </button>
         )}
+        </div>
       </div>
     </div>
   );
@@ -640,8 +652,9 @@ function ActionRow({ action, categories, onTypeChange, onUpdate, onRemove }) {
 
   return (
     <div className="rule-row-builder">
-      <div className="rule-builder-grid">
+      <div className={`rule-builder-grid rule-action-grid ${onRemove ? 'has-remove' : 'no-remove'}`}>
         <AppSelect
+          className="form-control-select rule-field-control"
           value={action.type}
           options={ACTION_TYPES}
           onChange={onTypeChange}
@@ -651,7 +664,7 @@ function ActionRow({ action, categories, onTypeChange, onUpdate, onRemove }) {
         {needsValue ? (
           action.type === 'categorize' ? (
             <AppSelect
-              className="rule-select-span-2"
+              className="form-control-select rule-value-control"
               value={action.value || ''}
               options={categories.map((category) => ({
                 value: category.id,
@@ -662,15 +675,15 @@ function ActionRow({ action, categories, onTypeChange, onUpdate, onRemove }) {
             />
           ) : (
             <input
+              className="form-control-input rule-value-control"
               type="text"
               value={action.value || ''}
               onChange={(event) => onUpdate({ value: event.target.value })}
               placeholder="New merchant name"
-              style={{ gridColumn: 'span 2' }}
             />
           )
         ) : (
-          <span className="subtle" style={{ gridColumn: 'span 2', alignSelf: 'center' }}>
+          <span className="subtle rule-value-control">
             (no value needed)
           </span>
         )}
@@ -682,7 +695,7 @@ function ActionRow({ action, categories, onTypeChange, onUpdate, onRemove }) {
             onClick={onRemove}
             aria-label="Remove action"
           >
-            ×
+            x
           </button>
         )}
       </div>

@@ -1,4 +1,4 @@
-export const BRAND_ASSET_VERSION = '0.62.0-20260504a';
+export const BRAND_ASSET_VERSION = '0.7.0-20260509a';
 
 export function brandAsset(path) {
   return `${path}?v=${BRAND_ASSET_VERSION}`;

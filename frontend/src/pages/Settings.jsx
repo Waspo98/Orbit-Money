@@ -16,7 +16,9 @@ import ReorderListItem, {
   useDragInteractionLock,
   useReorderSensors
 } from '../components/ReorderListItem.jsx';
+import OptionalNumberInput from '../components/OptionalNumberInput.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
+import TapIndicatorText from '../components/TapIndicatorText.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -180,7 +182,7 @@ function NotificationPreferenceRow({
       tabIndex={0}
       onClick={onCustomize}
       onKeyDown={handleKeyDown}
-      aria-label={`${title}. Tap to customize timing.`}
+      aria-label={`${title}. Tap to customize.`}
     >
       <span className="settings-action-info">
         <strong>{title}</strong>
@@ -287,7 +289,6 @@ export default function Settings({
   const [setupBusy, setSetupBusy] = useState(false);
 
   const [syncBusy, setSyncBusy] = useState(false);
-  const [syncResult, setSyncResult] = useState(null);
   const [syncError, setSyncError] = useState('');
 
   const [syncLog, setSyncLog] = useState([]);
@@ -472,6 +473,14 @@ export default function Settings({
     }));
   }
 
+  function handlePushNotificationsToggle(checked) {
+    if (checked) {
+      enablePushNotifications();
+      return;
+    }
+    updateNotificationPreferences((current) => ({ ...current, enabled: false }));
+  }
+
   async function enablePushNotifications() {
     setNotificationBusy(true);
     setNotificationError('');
@@ -547,10 +556,13 @@ export default function Settings({
   async function handleSync() {
     setSyncBusy(true);
     setSyncError('');
-    setSyncResult(null);
     try {
       const data = await api.post('/api/simplefin/sync');
-      setSyncResult(data);
+      const inserted = Number(data.inserted || 0);
+      await alert(
+        `Inserted ${inserted.toLocaleString()} transaction${inserted === 1 ? '' : 's'}.`,
+        { title: data.status === 'error' ? 'Sync Finished With Issues' : 'Sync Complete' }
+      );
       await loadStatus();
     } catch (err) {
       setSyncError(err.message || 'Sync failed');
@@ -571,7 +583,6 @@ export default function Settings({
     if (!ok) return;
     try {
       await api.post('/api/simplefin/disconnect');
-      setSyncResult(null);
       setSyncError('');
       await loadStatus();
     } catch (err) {
@@ -1092,36 +1103,31 @@ export default function Settings({
       >
         <div className="settings-action notification-status-row">
           <div className="notification-status-main">
-            <div className="settings-action-info">
-              <strong>Push Notifications</strong>
-              <p>
-                {pushSupported
-                  ? `${permissionLabel(notificationPermission)}${
-                      activeDeviceCount > 0 ? ` - ${activeDeviceCount} active device${activeDeviceCount === 1 ? '' : 's'}` : ''
-                    }`
-                  : 'This browser does not support web push notifications.'}
-              </p>
-            </div>
+            <span className="notification-toggle-heading">
+              <span className="settings-action-info">
+                <strong>Push Notifications</strong>
+                <p>
+                  {notificationBusy && !prefs.enabled
+                    ? 'Enabling...'
+                    : pushSupported
+                      ? `${permissionLabel(notificationPermission)}${
+                          activeDeviceCount > 0 ? ` - ${activeDeviceCount} active device${activeDeviceCount === 1 ? '' : 's'}` : ''
+                        }`
+                      : 'This browser does not support web push notifications.'}
+                </p>
+              </span>
+              <span className="switch notification-switch">
+                <input
+                  type="checkbox"
+                  aria-label="Push Notifications"
+                  checked={prefs.enabled}
+                  disabled={notificationBusy || (!prefs.enabled && (!pushSupported || !serverConfigured))}
+                  onChange={(event) => handlePushNotificationsToggle(event.target.checked)}
+                />
+                <span className="switch-track" />
+              </span>
+            </span>
             <div className="settings-action-buttons">
-              {prefs.enabled ? (
-                <button
-                  type="button"
-                  className="btn-danger"
-                  onClick={() => updateNotificationPreferences((current) => ({ ...current, enabled: false }))}
-                  disabled={notificationBusy}
-                >
-                  Turn Off
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={enablePushNotifications}
-                  disabled={notificationBusy || !pushSupported || !serverConfigured}
-                >
-                  {notificationBusy ? 'Enabling...' : 'Enable Notifications'}
-                </button>
-              )}
               <button
                 type="button"
                 className="btn-secondary"
@@ -1134,7 +1140,7 @@ export default function Settings({
           </div>
 
           <label className="notification-privacy-row">
-            <span className="notification-privacy-heading">
+            <span className="notification-toggle-heading">
               <span className="settings-action-info">
                 <strong>Show Dollar Amounts</strong>
                 <p>{prefs.showAmounts ? 'Amounts can appear in notification text.' : 'Amounts stay hidden on lock-screen alerts.'}</p>
@@ -1178,9 +1184,9 @@ export default function Settings({
         key="notification-types"
         title="Notification Types"
       >
-        <div className="info-banner notification-types-note">
-          Tap a notification type to customize timing.
-        </div>
+        <TapIndicatorText className="notification-types-note">
+          Tap a notification type to customize.
+        </TapIndicatorText>
         <NotificationPreferenceRow
           title="Weekly Snapshot"
           description="A calm weekly summary of budgets, upcoming items, and transactions to review."
@@ -1231,7 +1237,7 @@ export default function Settings({
       },
       syncIssues: {
         title: 'Sync Issues',
-        description: 'Sync issue alerts send right away when SimpleFIN reports a problem.'
+        description: ''
       },
       accountSnapshots: {
         title: 'Account Snapshot Reminders',
@@ -1250,13 +1256,14 @@ export default function Settings({
               </button>
             </div>
             <div className="notification-editor-form">
-              <p className="modal-copy">{copy.description}</p>
+              {copy.description && <p className="modal-copy">{copy.description}</p>}
 
               {notificationEditor === 'weeklySnapshot' && (
                 <>
                   <label className="field">
                     <span>Day</span>
                     <AppSelect
+                      className="form-control-select"
                       value={prefs.weeklySnapshot.dayOfWeek}
                       options={WEEKDAY_OPTIONS}
                       onChange={(value) => updateNotificationSection('weeklySnapshot', { dayOfWeek: Number(value) })}
@@ -1266,6 +1273,7 @@ export default function Settings({
                   <label className="field">
                     <span>Time</span>
                     <input
+                      className="form-control-input"
                       type="time"
                       value={prefs.weeklySnapshot.time}
                       onChange={(event) => updateNotificationSection('weeklySnapshot', { time: event.target.value })}
@@ -1279,6 +1287,7 @@ export default function Settings({
                   <label className="field">
                     <span>Timing</span>
                     <AppSelect
+                      className="form-control-select"
                       value={prefs.income.timing}
                       options={INCOME_TIMING_OPTIONS}
                       onChange={(value) => updateNotificationSection('income', { timing: value })}
@@ -1289,6 +1298,7 @@ export default function Settings({
                     <label className="field">
                       <span>Time</span>
                       <input
+                        className="form-control-input"
                         type="time"
                         value={prefs.income.time}
                         onChange={(event) => updateNotificationSection('income', { time: event.target.value })}
@@ -1309,6 +1319,7 @@ export default function Settings({
                   <label className="field">
                     <span>Cadence</span>
                     <AppSelect
+                      className="form-control-select"
                       value={prefs.accountSnapshots.cadence}
                       options={SNAPSHOT_CADENCE_OPTIONS}
                       onChange={(value) => updateNotificationSection('accountSnapshots', { cadence: value })}
@@ -1317,17 +1328,20 @@ export default function Settings({
                   </label>
                   <label className="field">
                     <span>Day Of Month</span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="28"
+                    <OptionalNumberInput
+                      className="form-control-input"
+                      min={1}
+                      max={28}
+                      fallback={1}
                       value={prefs.accountSnapshots.dayOfMonth}
-                      onChange={(event) => updateNotificationSection('accountSnapshots', { dayOfMonth: Number(event.target.value) })}
+                      onChange={(dayOfMonth) => updateNotificationSection('accountSnapshots', { dayOfMonth })}
+                      aria-label="Snapshot reminder day of month"
                     />
                   </label>
                   <label className="field">
                     <span>Time</span>
                     <input
+                      className="form-control-input"
                       type="time"
                       value={prefs.accountSnapshots.time}
                       onChange={(event) => updateNotificationSection('accountSnapshots', { time: event.target.value })}
@@ -1417,34 +1431,18 @@ export default function Settings({
       >
         {status?.connected ? (
           <>
-            <div className="settings-action simplefin-sync-now-action">
-              <div className="settings-action-info">
-                <strong>Sync Now</strong>
-                <p>Pulls transactions since the last successful sync.</p>
-              </div>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={handleSync}
-                disabled={syncBusy}
-              >
-                {syncBusy ? (<><span className="spinner-inline" /> Syncing...</>) : 'Sync Now'}
-              </button>
-            </div>
+            <button
+              type="button"
+              className="btn-primary settings-card-action-button simplefin-sync-now-button"
+              onClick={handleSync}
+              disabled={syncBusy}
+            >
+              {syncBusy ? (<><span className="spinner-inline" /> Syncing...</>) : 'Sync Now'}
+            </button>
+
+            <div className="settings-card-separator" aria-hidden="true" />
 
             {syncError && <div className="error" style={{ marginTop: 16 }}>{syncError}</div>}
-
-            {syncResult && (
-              <div className={`result-card ${syncResult.status === 'error' ? 'error-tone' : ''}`}>
-                <dl className="metric-grid stat-grid">
-                  <div><dt>Inserted</dt><dd>{syncResult.inserted.toLocaleString()}</dd></div>
-                  <div><dt>Skipped</dt><dd>{syncResult.skipped.toLocaleString()}</dd></div>
-                  <div><dt>RM Removed</dt><dd>{syncResult.rmDeleted.toLocaleString()}</dd></div>
-                  <div><dt>Accounts</dt><dd>{syncResult.accountsCreated.toLocaleString()}</dd></div>
-                  <div><dt>Transfers</dt><dd>{syncResult.transfersPaired.toLocaleString()}</dd></div>
-                </dl>
-              </div>
-            )}
 
             <div className="metric-grid status-grid simplefin-status-grid">
               <div><dt>Last Sync</dt><dd>{formatDateTime(status.lastSyncAt)}</dd></div>
@@ -1544,12 +1542,12 @@ export default function Settings({
               </div>
             )}
 
-            <div className="settings-action">
-              <div className="settings-action-info">
-                <strong>Disconnect</strong>
-                <p>Transactions and accounts stay. Sync stops until you reconnect.</p>
-              </div>
-              <button type="button" className="btn-danger" onClick={handleDisconnect}>
+            <div className="settings-separated-action">
+              <button
+                type="button"
+                className="btn-danger settings-card-action-button simplefin-disconnect-button"
+                onClick={handleDisconnect}
+              >
                 Disconnect
               </button>
             </div>
@@ -1929,6 +1927,7 @@ export default function Settings({
         key="account"
         title="Partner Share"
         description="Household access and signed-in user details."
+        className="settings-account-card"
       >
         {sharing && (
           <div className="settings-share-list" aria-label="Household access">
@@ -2015,7 +2014,7 @@ export default function Settings({
         {sharingMessage && <div className="success-banner" style={{ marginTop: 12 }}>{sharingMessage}</div>}
 
         {sharing?.currentUser?.canManageSharing && (
-          <div className="settings-share-footer">
+          <div className="settings-separated-action settings-share-footer">
             <button
               type="button"
               className="btn-primary"

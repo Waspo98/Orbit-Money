@@ -256,7 +256,7 @@ Registry and the maintainer's self-hosted Windows runner:
   then call `scripts\deploy-live.cmd`
 - Pushes to `Beta` publish `ghcr.io/waspo98/orbit-money:beta`, then call
   `scripts\deploy-beta.cmd`, which delegates to `deploy\beta\deploy-beta.cmd`
-- Pushing a tag like `v0.62.0` publishes matching version image tags for
+- Pushing a tag like `v0.7.0` publishes matching version image tags for
   release installs
 
 The deploy jobs run on the maintainer's self-hosted Windows runner. The deploy

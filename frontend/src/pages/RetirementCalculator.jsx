@@ -775,6 +775,25 @@ function SliderLever({ label, value, display, min, max, step = 1, onChange }) {
 }
 
 function MoneyLever({ label, value, suffix = '/mo', max, step = 50, linkTo, linkLabel, onChange }) {
+  const formattedValue = formatCurrencyInput(value);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(formattedValue);
+
+  useEffect(() => {
+    if (!editing) setDraft(formattedValue);
+  }, [editing, formattedValue]);
+
+  function commitDraft() {
+    setEditing(false);
+    if (!String(draft || '').trim()) {
+      setDraft(formattedValue);
+      return;
+    }
+    const formattedDraft = formatCurrencyInput(draft);
+    setDraft(formattedDraft);
+    onChange(formattedDraft);
+  }
+
   return (
     <div className="retcalc-lever">
       <span className="retcalc-lever-label">
@@ -792,8 +811,16 @@ function MoneyLever({ label, value, suffix = '/mo', max, step = 50, linkTo, link
         aria-label={label}
       />
       <CurrencyInput
-        value={formatCurrencyInput(value)}
-        onChange={onChange}
+        value={editing ? draft : formattedValue}
+        onFocus={() => {
+          setEditing(true);
+          setDraft(formattedValue);
+        }}
+        onChange={(nextValue) => {
+          setDraft(nextValue);
+          if (String(nextValue || '').trim()) onChange(nextValue);
+        }}
+        onBlur={commitDraft}
         aria-label={label}
       />
     </div>

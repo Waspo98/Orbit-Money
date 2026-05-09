@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DndContext,
@@ -654,9 +654,27 @@ function GoalChart({ goal }) {
 }
 
 function ImaginePanel({ goal, imagineMonthly, imaginedEta, onChange }) {
+  const formattedMonthly = formatCurrencyInput(imagineMonthly);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(formattedMonthly);
   const imaginedText = imaginedEta?.date
     ? `Goal will be reached in ${formatFullMonthDate(imaginedEta.date)}`
     : 'Goal needs more monthly savings history to project a date';
+
+  useEffect(() => {
+    if (!editing) setDraft(formattedMonthly);
+  }, [editing, formattedMonthly]);
+
+  function commitDraft() {
+    setEditing(false);
+    if (!String(draft || '').trim()) {
+      setDraft(formattedMonthly);
+      return;
+    }
+    const parsed = parseMoney(draft);
+    setDraft(formatCurrencyInput(parsed));
+    onChange(parsed);
+  }
 
   return (
     <div className="goal-imagine-panel">
@@ -675,11 +693,17 @@ function ImaginePanel({ goal, imagineMonthly, imaginedEta, onChange }) {
           onChange={(e) => onChange(Number(e.target.value))}
           aria-label={`Extra monthly savings for ${goal.name}`}
         />
-        <input
-          type="text"
-          inputMode="numeric"
-          value={formatMoney(imagineMonthly)}
-          onChange={(e) => onChange(parseMoney(e.target.value))}
+        <CurrencyInput
+          value={editing ? draft : formattedMonthly}
+          onFocus={() => {
+            setEditing(true);
+            setDraft(formattedMonthly);
+          }}
+          onChange={(nextValue) => {
+            setDraft(nextValue);
+            if (String(nextValue || '').trim()) onChange(parseMoney(nextValue));
+          }}
+          onBlur={commitDraft}
           aria-label="Extra monthly savings amount"
         />
       </div>
@@ -1119,6 +1143,13 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
   const currentAmount = fixedCanSteal
     ? Math.min(Math.max(0, allocationValueNumber(allocation)), basis)
     : openSpaceAllocationAmount(allocation, openAmount);
+  const lastAllocationValueRef = useRef(allocation.allocation_value || '25');
+
+  useEffect(() => {
+    if (String(allocation.allocation_value || '').trim()) {
+      lastAllocationValueRef.current = allocation.allocation_value;
+    }
+  }, [allocation.allocation_value]);
 
   function changeType(type) {
     const nextValue = type === 'fixed'
@@ -1132,12 +1163,24 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
   }
 
   function changeValue(value) {
+    if (!String(value || '').trim()) {
+      onChange('allocation_value', '');
+      return;
+    }
     if (allocation.allocation_type === 'fixed') {
       onChange('allocation_value', formatCurrencyInput(Math.min(maxAmount, parseMoney(value))));
       return;
     }
     const parsed = Number(String(value).replace(/[^0-9.]/g, '')) || 0;
     onChange('allocation_value', String(Math.min(100, Math.max(0, parsed))));
+  }
+
+  function restoreEmptyValue() {
+    if (String(allocation.allocation_value || '').trim()) return;
+    onChange(
+      'allocation_value',
+      lastAllocationValueRef.current || (allocation.allocation_type === 'fixed' ? formatCurrencyInput(0) : '25')
+    );
   }
 
   return (
@@ -1172,6 +1215,7 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
             <CurrencyInput
               value={allocation.allocation_value}
               onChange={changeValue}
+              onBlur={restoreEmptyValue}
               placeholder="$500"
             />
           ) : (
@@ -1180,6 +1224,7 @@ function AllocationEditor({ account, allocation, goalId, onChange }) {
               inputMode="decimal"
               value={allocation.allocation_value}
               onChange={(e) => changeValue(e.target.value)}
+              onBlur={restoreEmptyValue}
               placeholder="25"
             />
           )}

@@ -14,6 +14,7 @@ import ExpandingSection from '../components/ExpandingSection.jsx';
 import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import PeriodNav from '../components/PeriodNav.jsx';
+import TapIndicatorText from '../components/TapIndicatorText.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { formatCurrency } from '../lib/formatters.js';
 import {
@@ -520,7 +521,7 @@ export default function Budgets({
                 <div>
                   <h3>Unbudgeted Spending</h3>
                   <p>{formatMoney(budgetModel.spentUnbudgeted)} outside budgeted categories</p>
-                  <p className="budget-beta-helper">Tap a category to see transactions</p>
+                  <TapIndicatorText>Tap a category to see transactions</TapIndicatorText>
                 </div>
               </header>
               <ul className="budget-beta-unbudgeted-list">
@@ -554,7 +555,7 @@ export default function Budgets({
                 <div>
                   <h3>Budgeted Categories</h3>
                   <p>{budgetModel.sortedRows.length} tracked categories</p>
-                  <p className="budget-beta-helper">Tap a category to see transactions</p>
+                  <TapIndicatorText>Tap a category to see transactions</TapIndicatorText>
                 </div>
                 <AppSelect
                   className="budget-beta-sort"
@@ -805,7 +806,7 @@ function SpendingMixPanel({
         <div>
           <h3>Spending Mix</h3>
           <p>Largest category shares this month</p>
-          <p className="budget-beta-helper">Tap a category to see transactions</p>
+          <TapIndicatorText>Tap a category to see transactions</TapIndicatorText>
         </div>
       </header>
 
@@ -892,7 +893,7 @@ function NotablePanel({
         <div>
           <h3>Notable This Month</h3>
           <p>Overages, high usage, and spending outside the plan</p>
-          <p className="budget-beta-helper">Tap a category to see transactions</p>
+          <TapIndicatorText>Tap a category to see transactions</TapIndicatorText>
         </div>
       </header>
 

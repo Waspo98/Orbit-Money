@@ -534,7 +534,7 @@ async function sendSnapshotReminders(householdId, prefs, userId, now) {
         type: 'account_snapshot',
         dedupeKey: `account:${account.id}:${period.key}`,
         title: 'Snapshot Time',
-        body: `Time to update your ${account.name} snapshot.`,
+        body: `Time to update ${account.name} account!`,
         url: `/accounts?action=add-snapshot&accountId=${account.id}`,
         tag: `account-snapshot:${account.id}`
       }

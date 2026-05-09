@@ -1,6 +1,6 @@
 {
   "name": "orbit-money-frontend",
-  "version": "0.62.0",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "scripts": {

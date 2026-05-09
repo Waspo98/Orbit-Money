@@ -6,6 +6,7 @@ import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
 } from '../CurrencyInput.jsx';
+import OptionalNumberInput from '../OptionalNumberInput.jsx';
 import SelectableListItem from '../SelectableListItem.jsx';
 import { addMonthsToLocalDate, formatLocalDate } from '../../lib/localDate.js';
 
@@ -680,11 +681,12 @@ export default function RecurringItemEditor({
               <div className="upcoming-custom-frequency">
                 <label className="field">
                   <span>Every</span>
-                  <input
-                    type="number"
-                    min="1"
+                  <OptionalNumberInput
+                    min={1}
+                    fallback={1}
                     value={form.frequency_interval}
-                    onChange={(event) => patch({ frequency_interval: event.target.value })}
+                    onChange={(frequencyInterval) => patch({ frequency_interval: String(frequencyInterval) })}
+                    aria-label="Custom recurring interval"
                   />
                 </label>
                 <label className="field">

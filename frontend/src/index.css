@@ -599,6 +599,12 @@ input, textarea, select {
   cursor: not-allowed;
 }
 
+.form-control-input,
+.form-control-select .app-select-trigger {
+  min-height: 44px;
+  padding: 10px 14px;
+}
+
 .app-select-label {
   min-width: 0;
   overflow: hidden;
@@ -752,6 +758,14 @@ input, textarea, select {
   margin-bottom: 20px;
 }
 .info-banner strong { color: var(--accent-hover); }
+
+.tap-indicator-text,
+.budget-beta-section-header .tap-indicator-text {
+  margin: 3px 0 0;
+  color: color-mix(in srgb, var(--accent) 72%, var(--text-muted));
+  font-size: 0.78rem;
+  font-weight: 700;
+}
 
 
 /* ================== 3. PRIMITIVES — Modals ================== */
@@ -1213,9 +1227,71 @@ input, textarea, select {
 
 .rule-builder-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-areas:
+    "field operator ."
+    "value value remove";
   gap: 8px;
   align-items: center;
+}
+
+.rule-builder-grid.no-remove {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "field operator"
+    "value value";
+}
+
+.rule-condition-grid,
+.rule-condition-grid.has-remove {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "field operator"
+    "value value";
+}
+
+.rule-action-grid {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "field field"
+    "value remove";
+}
+
+.rule-action-grid.no-remove {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "field"
+    "value";
+}
+
+.rule-field-control { grid-area: field; }
+.rule-operator-control { grid-area: operator; }
+.rule-value-control {
+  grid-area: value;
+  min-width: 0;
+}
+.rule-value-control.subtle {
+  align-self: center;
+  padding: 10px 0;
+}
+.rule-remove-btn { grid-area: remove; }
+
+.rule-condition-grid .rule-value-line {
+  grid-area: value;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.rule-condition-grid.has-remove .rule-value-line {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.rule-value-line > .rule-value-control,
+.rule-value-line > .rule-remove-btn {
+  grid-area: auto;
 }
 
 .rule-builder-grid .app-select,
@@ -1224,7 +1300,8 @@ input, textarea, select {
 }
 
 .rule-builder-grid input {
-  padding: 8px 10px;
+  padding: 10px 14px;
+  min-height: 44px;
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
@@ -1235,21 +1312,21 @@ input, textarea, select {
   transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
 
+.rule-builder-grid .form-control-select .app-select-trigger {
+  min-height: 44px;
+  padding: 10px 14px;
+}
+
 .rule-builder-grid input:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
-.rule-select-span-2 {
-  grid-column: span 2;
-}
-
 .rule-between {
   display: flex;
   align-items: center;
   gap: 6px;
-  grid-column: span 2;
 }
 
 .rule-between input { flex: 1; min-width: 0; }
@@ -1304,12 +1381,21 @@ input, textarea, select {
 }
 
 .rule-preview-summary {
+  display: grid;
+  gap: 6px;
+  color: var(--text-muted);
+}
+
+.rule-preview-summary-primary,
+.rule-preview-summary-details {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  flex-wrap: wrap;
   gap: 10px;
-  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.rule-preview-summary-details:empty {
+  display: none;
 }
 
 .rule-preview-summary strong {
@@ -1412,18 +1498,12 @@ input, textarea, select {
     padding-inline: 8px;
   }
 
-  .rule-builder-grid {
-    grid-template-columns: 1fr 1fr auto;
-    grid-template-areas:
-      "field    field     remove"
-      "operator operator  operator"
-      "value    value     value";
-    gap: 6px;
+  .rule-builder-grid,
+  .rule-builder-grid.no-remove,
+  .rule-action-grid,
+  .rule-action-grid.no-remove {
+    gap: 8px;
   }
-  .rule-builder-grid > .app-select:nth-child(1) { grid-area: field;    }
-  .rule-builder-grid > .app-select:nth-child(2) { grid-area: operator; }
-  .rule-builder-grid > *:nth-child(3)      { grid-area: value;    }
-  .rule-builder-grid > button              { grid-area: remove;   }
 }
 
 
@@ -10170,6 +10250,30 @@ body.modal-page-blur-active .txn-pinned-month-header {
   padding-top: 22px;
 }
 
+.settings-card-action-button {
+  width: 100%;
+  min-height: 44px;
+}
+
+.settings-card-separator {
+  border-top: 1px solid var(--border);
+}
+
+.settings-separated-action {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-account-card .settings-card-body {
+  padding-top: 10px;
+}
+
+.settings-account-card .settings-share-list {
+  margin-top: 0;
+}
+
 .settings-hub-section {
   padding: 24px;
 }
@@ -10515,7 +10619,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   border-top: 1px solid var(--border);
 }
 
-.notification-privacy-heading {
+.notification-toggle-heading {
   width: 100%;
   display: flex;
   align-items: center;
@@ -10532,7 +10636,12 @@ body.modal-page-blur-active .txn-pinned-month-header {
 }
 
 .notification-types-note {
+  margin-top: 0;
   margin-bottom: 12px;
+}
+
+#settings-card-body-notification-types {
+  padding-top: 8px;
 }
 
 .notification-editor-form {
@@ -10683,13 +10792,6 @@ body.modal-page-blur-active .txn-pinned-month-header {
   color: var(--text-muted);
   font-size: 0.84rem;
   overflow-wrap: anywhere;
-}
-
-.settings-share-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
 }
 
 .settings-share-footer .btn-primary {
@@ -10867,7 +10969,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   .settings-action > button { width: 100%; }
   .settings-action > a { width: 100%; justify-content: center; }
   .notification-preference-row,
-  .notification-privacy-heading,
+  .notification-toggle-heading,
   .notification-status-main { flex-direction: row; align-items: center; }
   .notification-status-main { align-items: flex-start; flex-wrap: wrap; }
   .settings-action-buttons { width: 100%; justify-content: stretch; }
@@ -12571,12 +12673,6 @@ body.modal-page-blur-active .txn-pinned-month-header {
   margin: 3px 0 0;
   color: var(--text-muted);
   font-size: 0.84rem;
-}
-
-.budget-beta-section-header .budget-beta-helper {
-  color: color-mix(in srgb, var(--accent) 72%, var(--text-muted));
-  font-size: 0.78rem;
-  font-weight: 700;
 }
 
 .budget-beta-sort {
