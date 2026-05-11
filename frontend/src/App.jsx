@@ -49,6 +49,8 @@ import {
 
 const SCROLL_RESTORE_MAX_ATTEMPTS = 240;
 const SCROLL_RESTORE_TOLERANCE = 2;
+const ROUTE_LOAD_RETRY_PREFIX = 'orbit-money-route-load-retry-v1';
+const ROUTE_LOAD_RETRY_WINDOW_MS = 60 * 1000;
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Transactions = lazy(() => import('./pages/Transactions.jsx'));
@@ -240,6 +242,34 @@ function RouteLoading() {
   );
 }
 
+function isLikelyStaleRouteChunk(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return (
+    message.includes('dynamically imported module') ||
+    message.includes('failed to fetch dynamically imported module') ||
+    message.includes('failed to load module script') ||
+    message.includes('importing a module script failed') ||
+    (message.includes('module script') && message.includes('mime type')) ||
+    (message.includes('module') && message.includes('text/html')) ||
+    message.includes('chunkloaderror') ||
+    message.includes('loading chunk')
+  );
+}
+
+function shouldRetryRouteLoad(resetKey, error) {
+  if (!isLikelyStaleRouteChunk(error) || typeof window === 'undefined') return false;
+  try {
+    const key = `${ROUTE_LOAD_RETRY_PREFIX}:${resetKey || window.location.pathname}`;
+    const lastAttempt = Number(window.sessionStorage.getItem(key)) || 0;
+    const now = Date.now();
+    if (now - lastAttempt < ROUTE_LOAD_RETRY_WINDOW_MS) return false;
+    window.sessionStorage.setItem(key, String(now));
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 class RouteErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -248,6 +278,12 @@ class RouteErrorBoundary extends Component {
 
   static getDerivedStateFromError(error) {
     return { error };
+  }
+
+  componentDidCatch(error) {
+    if (shouldRetryRouteLoad(this.props.resetKey, error)) {
+      window.location.reload();
+    }
   }
 
   componentDidUpdate(prevProps) {

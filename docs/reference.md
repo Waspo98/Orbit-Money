@@ -52,6 +52,11 @@ successful online app load. Keep that preloading behavior when adding new
 offline-readable pages, otherwise a never-visited page can fail to import while
 offline.
 
+The backend serves the SPA shell with `Cache-Control: no-cache`, serves `sw.js`
+with no-store CDN/browser headers, and returns 404s for missing static asset URLs
+instead of falling through to `index.html`. This keeps stale hashed route chunks
+from producing confusing module-load failures after a Docker rebuild or deploy.
+
 `frontend/src/offlineWarmup.js` also warms core read-only API paths shortly
 after login, including the default Transactions and Budgets requests. Keep those
 paths mechanically aligned with each page's initial `api.get(...)` call; the
@@ -228,10 +233,12 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 
 ### Retirement Calculator
 - Standalone More-menu page at `/retirement-calculator`.
-- Uses Household retirement inputs and linked retirement/HSA accounts as the automatic current-balance and contribution source.
-- Question modes answer "What Will We Have?", "When Can We Retire?", and "How Much To Save?" from the same projection model.
-- Assumption controls cover market return, inflation, and withdrawal rate presets; bridge checks separate HSA assets from non-HSA retirement balances before age 65.
-- Preferred retirement age and default growth estimator (Conservative, Balanced, Aggressive) persist as account preferences and feed the Dashboard retirement snapshot.
+- Uses Household retirement inputs and linked retirement/HSA accounts as the automatic current-balance, income, age, and contribution source.
+- Compares Conservative, Balanced, and Aggressive market scenarios in today's dollars on one chart with touch scrubbing and a dynamic projection ceiling.
+- Defaults retirement spending to 80% of current gross household income, shows 55% and 80% guideposts, and supports manual spending and savings inputs.
+- Includes a retirement runway drawdown with spending and final-age controls, final-age balance, breakeven/static-savings pace, and projected depletion age when savings reach zero.
+- Expandable Current Retirement Stats cards show linked-account mix, YTD growth, and member-level contribution detail.
+- Non-HSA Savings checks separate HSA assets from non-HSA retirement balances before age 65.
 
 ### Household
 - Create and edit household members from the More menu after Net Worth
@@ -422,6 +429,7 @@ Sample households are seeded with two adult household members, MHA enabled, a ho
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/household` | Household summary, member profiles, linked retirement accounts, and recent income history snapshots. |
+| GET | `/api/household/retirement-history?months=` | Monthly balance history and YTD account growth for household-linked retirement accounts. |
 | POST | `/api/household/members` | Create a household member, save linked retirement accounts, and write the first dated income snapshot. |
 | PUT | `/api/household/members/:id` | Update a household member, replace linked retirement accounts, and upsert a dated income snapshot. |
 | POST | `/api/household/members/:id/income-records` | Upsert a manual income/benefit snapshot for a member. |

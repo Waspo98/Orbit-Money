@@ -97,7 +97,46 @@ app.use('/api', requireAuth, (req, res) => {
 
 // --- Frontend static files --------------------------------------------------
 const publicDir = path.join(__dirname, '..', 'public');
-app.use(express.static(publicDir));
+
+function setNoStoreHeaders(res) {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('CDN-Cache-Control', 'no-store');
+  res.setHeader('Cloudflare-CDN-Cache-Control', 'no-store');
+}
+
+function setFrontendCacheHeaders(res, filePath) {
+  const fileName = path.basename(filePath);
+  if (fileName === 'sw.js') {
+    setNoStoreHeaders(res);
+    return;
+  }
+
+  if (fileName === 'index.html' || fileName === 'manifest.webmanifest') {
+    res.setHeader('Cache-Control', 'no-cache');
+    return;
+  }
+
+  const normalizedPath = filePath.split(path.sep).join('/');
+  if (normalizedPath.includes('/assets/')) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  }
+}
+
+app.get('/sw.js', (req, res) => {
+  const swPath = path.join(publicDir, 'sw.js');
+  if (!fs.existsSync(swPath)) {
+    return res.status(404).type('text/plain').send('Service worker not found');
+  }
+  setNoStoreHeaders(res);
+  res.type('application/javascript');
+  res.sendFile(swPath);
+});
+
+app.use(express.static(publicDir, { setHeaders: setFrontendCacheHeaders }));
+
+app.get(/^\/.*\.[^/]+$/, (req, res) => {
+  res.status(404).type('text/plain').send('Static asset not found');
+});
 
 app.get(/^\/(?!api).*/, (req, res) => {
   if (!fs.existsSync(path.join(publicDir, 'index.html'))) {
@@ -107,6 +146,7 @@ app.get(/^\/(?!api).*/, (req, res) => {
         'Frontend dev server is separate in local development. Open http://localhost:5173 instead.'
       );
   }
+  res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(publicDir, 'index.html'));
 });
 

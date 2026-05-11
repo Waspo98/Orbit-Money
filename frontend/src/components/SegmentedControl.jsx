@@ -7,6 +7,7 @@ export default function SegmentedControl({
   role = 'tablist',
   buttonRole,
   getOptionLabel = (option) => option.label,
+  getOptionSubtitle = () => null,
   getOptionValue = (option) => option.value,
   isOptionActive,
   getOptionDisabled = (option) => Boolean(option.disabled)
@@ -22,6 +23,8 @@ export default function SegmentedControl({
     <div className={classes} role={role || undefined} aria-label={ariaLabel}>
       {options.map((option) => {
         const optionValue = getOptionValue(option);
+        const label = getOptionLabel(option);
+        const subtitle = getOptionSubtitle(option);
         const active = isOptionActive
           ? isOptionActive(option, value)
           : Object.is(optionValue, value);
@@ -41,7 +44,12 @@ export default function SegmentedControl({
               if (!disabled) onChange?.(optionValue, option);
             }}
           >
-            {getOptionLabel(option)}
+            {subtitle ? (
+              <span className="segmented-option-content">
+                <span className="segmented-option-label">{label}</span>
+                <span className="segmented-option-subtitle">{subtitle}</span>
+              </span>
+            ) : label}
           </button>
         );
       })}

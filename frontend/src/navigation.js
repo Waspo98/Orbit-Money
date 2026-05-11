@@ -76,7 +76,7 @@ export const ROUTES = [
   {
     path: '/retirement-calculator',
     label: 'Retirement Calculator',
-    description: 'Project retirement age, savings, and income',
+    description: 'Compare retirement projection scenarios',
     icon: 'retirement',
     nav: 'more',
     hasPageHero: true
