@@ -129,8 +129,8 @@ router.post('/', requireAuth, (req, res) => {
 
       if (recordDate) {
         db.prepare(
-          `INSERT INTO account_balance_records (household_id, account_id, record_date, balance)
-           VALUES (?, ?, ?, ?)`
+          `INSERT INTO account_balance_records (household_id, account_id, record_date, balance, source)
+           VALUES (?, ?, ?, ?, 'manual')`
         ).run(householdId, result.lastInsertRowid, recordDate, balance);
       }
 
@@ -351,10 +351,11 @@ router.post('/:id/records', requireAuth, (req, res) => {
     const run = db.transaction(() => {
       const insertRecord = db.prepare(
         `
-        INSERT INTO account_balance_records (household_id, account_id, record_date, balance)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO account_balance_records (household_id, account_id, record_date, balance, source)
+        VALUES (?, ?, ?, ?, 'manual')
         ON CONFLICT(household_id, account_id, record_date) DO UPDATE SET
           balance = excluded.balance,
+          source = 'manual',
           updated_at = datetime('now')
       `
       );

@@ -60,6 +60,14 @@ const TARGET_MODE_LABELS = {
   legacy: 'Leave a Legacy',
   custom: 'Custom Amount'
 };
+const RETIREMENT_HISTORY_MONTHS = 1200;
+const HISTORY_RANGE_OPTIONS = [
+  { value: 'ytd', label: 'YTD' },
+  { value: '3y', label: '3Y' },
+  { value: '5y', label: '5Y' },
+  { value: '10y', label: '10Y' },
+  { value: 'all', label: 'All' }
+];
 const ACCOUNT_MIX_COLORS = ['#10b981', '#38bdf8', '#a78bfa', '#f59e0b', '#f472b6', '#22d3ee'];
 
 function formatMoney(amount, digits = 0) {
@@ -300,6 +308,115 @@ function monthAge(month, currentAge) {
   return currentAge - (monthDiff / 12);
 }
 
+function currentMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function addMonthsToKey(key, amount) {
+  const [year, monthNumber] = String(key || '').split('-').map(Number);
+  if (!year || !monthNumber) return currentMonthKey();
+  const date = new Date(year, monthNumber - 1 + amount, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function historyRangeStart(range) {
+  const now = new Date();
+  if (range === 'ytd') return `${now.getFullYear()}-01`;
+  if (range === '3y') return addMonthsToKey(currentMonthKey(), -35);
+  if (range === '5y') return addMonthsToKey(currentMonthKey(), -59);
+  if (range === '10y') return addMonthsToKey(currentMonthKey(), -119);
+  return null;
+}
+
+function historyRangeDetail(range, firstMonth) {
+  if (range === 'ytd') return 'since January 1';
+  if (range === '3y') return 'over last 3 years';
+  if (range === '5y') return 'over last 5 years';
+  if (range === '10y') return 'over last 10 years';
+  return firstMonth ? `since ${formatHistoryMonth(firstMonth)}` : 'over all time';
+}
+
+function formatHistoryMonth(month) {
+  const [year, monthNumber] = String(month || '').split('-').map(Number);
+  if (!year || !monthNumber) return String(month || 'History');
+  return new Date(year, monthNumber - 1, 1).toLocaleDateString(undefined, {
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
+function historyAccountBalance(point, accountId) {
+  const accountPoint = point?.accounts?.find((item) => Number(item.account_id) === Number(accountId));
+  return accountPoint ? Number(accountPoint.balance) || 0 : null;
+}
+
+function historyAccountRangeStats(account, history, range) {
+  const accountId = Number(account.accountId);
+  if (!Number.isFinite(accountId)) {
+    return {
+      change: null,
+      detail: 'No linked account history.'
+    };
+  }
+
+  const values = (Array.isArray(history) ? history : [])
+    .map((point) => ({
+      month: point.month,
+      balance: historyAccountBalance(point, accountId)
+    }))
+    .filter((point) => point.month && point.balance !== null);
+
+  if (values.length < 2) {
+    return {
+      change: null,
+      detail: 'Needs more history.'
+    };
+  }
+
+  const first = values[0];
+  const latest = values[values.length - 1];
+  const change = latest.balance - first.balance;
+  const percent = first.balance > 0 ? (change / first.balance) * 100 : null;
+  const period = historyRangeDetail(range, first.month);
+
+  return {
+    change,
+    detail: percent === null
+      ? `${formatMoney(change)} ${period}.`
+      : `${formatPercent(percent, { maximumFractionDigits: 1 })} ${period}.`
+  };
+}
+
+function truncateChartLabel(value, maxLength = 28) {
+  const label = String(value || 'Account');
+  return label.length > maxLength ? `${label.slice(0, maxLength - 3)}...` : label;
+}
+
+function chartPathByIndex(points, width, height, max) {
+  if (!points.length) return '';
+  const span = Math.max(1, points.length - 1);
+  return points.map((point, index) => {
+    const x = points.length === 1 ? width / 2 : (index / span) * width;
+    const y = height - (Math.max(0, Math.min(max, point.amount)) / max) * height;
+    return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+  }).join(' ');
+}
+
+function valueAtPosition(points, position) {
+  if (!points.length) return null;
+  if (points.length === 1 || position <= 0) return points[0].amount;
+  const lastIndex = points.length - 1;
+  if (position >= lastIndex) return points[lastIndex].amount;
+  const leftIndex = Math.floor(position);
+  const rightIndex = Math.ceil(position);
+  const left = points[leftIndex];
+  const right = points[rightIndex];
+  if (!left || !right) return null;
+  const ratio = position - leftIndex;
+  return left.amount + (right.amount - left.amount) * ratio;
+}
+
 function formatAgeLabel(age) {
   const rounded = Math.round(age * 10) / 10;
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
@@ -421,7 +538,7 @@ function useRetirementCalculatorData() {
           api.get('/api/goals?months=24')
             .then((data) => ({ data }))
             .catch((err) => ({ error: err })),
-          api.get('/api/household/retirement-history?months=120')
+          api.get(`/api/household/retirement-history?months=${RETIREMENT_HISTORY_MONTHS}`)
             .then((data) => ({ data }))
             .catch((err) => ({ error: err }))
         ]);
@@ -554,11 +671,24 @@ export default function RetirementCalculator() {
     );
     const selected = scenarios[scenarioKey] || scenarios.balanced;
     const rawHistory = Array.isArray(history?.history) ? history.history : [];
-    const actualHistory = rawHistory
+    const actualHistoryRows = rawHistory
+      .map((point) => ({
+        month: point.month,
+        balance: Number(point.balance) || 0,
+        accounts: Array.isArray(point.accounts)
+          ? point.accounts.map((account) => ({
+            account_id: Number(account.account_id),
+            balance: Number(account.balance) || 0
+          }))
+          : []
+      }))
+      .filter((point) => point.month)
+      .sort((a, b) => String(a.month).localeCompare(String(b.month)));
+    const actualHistory = actualHistoryRows
       .map((point) => ({
         month: point.month,
         age: monthAge(point.month, currentAge),
-        amount: Number(point.balance) || 0
+        amount: point.balance
       }))
       .filter((point) => point.age <= currentAge + 0.05)
       .sort((a, b) => a.age - b.age);
@@ -667,6 +797,7 @@ export default function RetirementCalculator() {
       accounts,
       actualChange,
       actualHistory,
+      actualHistoryRows,
       annualSpending,
       baselineSpending,
       bridgeGap,
@@ -1074,18 +1205,6 @@ export default function RetirementCalculator() {
                 <CurrentBalanceDetails accounts={model.accountDetails} />
               </ExpandableStatCard>
               <ExpandableStatCard
-                statKey="history"
-                label="Actual History"
-                value={warnings.history ? 'Unavailable' : model.ytdGrowthPercent === null ? 'No YTD' : formatPercent(model.ytdGrowthPercent)}
-                detail={warnings.history || (model.ytdGrowthPercent === null ? 'Add snapshots to build YTD history' : `${formatMoney(model.ytdChange)} YTD balance growth`)}
-                tone={warnings.history ? 'expense' : model.ytdChange >= 0 ? 'income' : 'expense'}
-                expanded={expandedCurrentStat === 'history'}
-                showIndicator={false}
-                onToggle={toggleCurrentStat}
-              >
-                <HistoryDetails accounts={model.accountDetails} unavailable={Boolean(warnings.history)} onRetry={retry} />
-              </ExpandableStatCard>
-              <ExpandableStatCard
                 statKey="savings"
                 label="Monthly Savings"
                 value={`${formatMoney(model.plannedMonthly)}/mo`}
@@ -1097,6 +1216,24 @@ export default function RetirementCalculator() {
                 onToggle={toggleCurrentStat}
               >
                 <MonthlySavingsDetails members={model.contributionMembers} plannedMonthly={model.plannedMonthly} />
+              </ExpandableStatCard>
+              <ExpandableStatCard
+                statKey="history"
+                label="Retirement History"
+                value={warnings.history ? 'Unavailable' : model.ytdGrowthPercent === null ? 'No YTD' : formatPercent(model.ytdGrowthPercent)}
+                detail={warnings.history || (model.ytdGrowthPercent === null ? 'Add snapshots to build YTD history' : `${formatMoney(model.ytdChange)} YTD balance growth`)}
+                tone={warnings.history ? 'expense' : model.ytdChange >= 0 ? 'income' : 'expense'}
+                expanded={expandedCurrentStat === 'history'}
+                showIndicator={false}
+                onToggle={toggleCurrentStat}
+                className="retcalc-history-stat-card"
+              >
+                <HistoryDetails
+                  accounts={model.accountDetails}
+                  history={model.actualHistoryRows}
+                  unavailable={Boolean(warnings.history)}
+                  onRetry={retry}
+                />
               </ExpandableStatCard>
             </div>
           </section>
@@ -1300,9 +1437,20 @@ function employerMatchDetail(member, employerAnnual, employeeAnnual) {
   return 'Employer match';
 }
 
-function ExpandableStatCard({ statKey, label, value, detail, tone = '', expanded, showIndicator = true, onToggle, children }) {
+function ExpandableStatCard({
+  statKey,
+  label,
+  value,
+  detail,
+  tone = '',
+  expanded,
+  showIndicator = true,
+  onToggle,
+  className = '',
+  children
+}) {
   return (
-    <article className={`retcalc-stat-card ${tone} ${expanded ? 'expanded' : ''}`.trim()}>
+    <article className={`retcalc-stat-card ${tone} ${expanded ? 'expanded' : ''} ${className}`.trim()}>
       <button
         type="button"
         className={`retcalc-stat-summary ${showIndicator ? 'has-indicator' : ''}`.trim()}
@@ -1384,7 +1532,22 @@ function CurrentBalanceDetails({ accounts }) {
   );
 }
 
-function HistoryDetails({ accounts, unavailable, onRetry }) {
+function HistoryDetails({ accounts, history, unavailable, onRetry }) {
+  const [range, setRange] = useState('ytd');
+  const rangeStart = historyRangeStart(range);
+  const visibleHistory = (Array.isArray(history) ? history : [])
+    .filter((point) => !rangeStart || String(point.month) >= rangeStart)
+    .sort((a, b) => String(a.month).localeCompare(String(b.month)));
+  const latestHistoryPoint = visibleHistory.at(-1) || null;
+  const sortedAccounts = [...accounts].sort((left, right) => {
+    const leftSnapshot = historyAccountBalance(latestHistoryPoint, Number(left.accountId));
+    const rightSnapshot = historyAccountBalance(latestHistoryPoint, Number(right.accountId));
+    const leftBalance = leftSnapshot ?? (Number(left.balance) || 0);
+    const rightBalance = rightSnapshot ?? (Number(right.balance) || 0);
+    if (rightBalance !== leftBalance) return rightBalance - leftBalance;
+    return String(left.name || left.label || '').localeCompare(String(right.name || right.label || ''));
+  });
+
   if (unavailable) {
     return (
       <div className="retcalc-empty-detail">
@@ -1406,24 +1569,269 @@ function HistoryDetails({ accounts, unavailable, onRetry }) {
   }
 
   return (
-    <ul className="retcalc-detail-list">
-      {accounts.map((account) => {
-        const tone = Number(account.ytdChange) < 0 ? 'expense' : 'income';
-        return (
-          <li key={account.id} className={`retcalc-detail-row ${tone}`}>
-            <div>
-              <strong>{account.name || account.label || 'Retirement Account'}</strong>
-              <em>
-                {account.ytdChange === null
-                  ? 'No YTD baseline yet'
-                  : `${formatMoney(account.ytdChange)} since year start`}
-              </em>
-            </div>
-            <span>{formatGrowthPercent(account.ytdGrowthPercent)}</span>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="retcalc-history-detail">
+      <SegmentedControl
+        className="retcalc-history-range-tabs"
+        ariaLabel="Retirement history range"
+        options={HISTORY_RANGE_OPTIONS}
+        value={range}
+        onChange={setRange}
+        role="radiogroup"
+        buttonRole="radio"
+      />
+      <RetirementHistoryChart accounts={sortedAccounts} history={visibleHistory} />
+      <ul className="retcalc-detail-list retcalc-account-list">
+        {sortedAccounts.map((account, index) => {
+          const stats = historyAccountRangeStats(account, visibleHistory, range);
+          const tone = stats.change === null ? '' : Number(stats.change) < 0 ? 'expense' : 'income';
+          const color = ACCOUNT_MIX_COLORS[index % ACCOUNT_MIX_COLORS.length];
+          return (
+            <li
+              key={account.id}
+              className={`retcalc-detail-row retcalc-account-row ${tone}`}
+              style={{ '--account-color': color }}
+            >
+              <div>
+                <strong>{account.name || account.label || 'Retirement Account'}</strong>
+                <em>{stats.detail}</em>
+              </div>
+              <span>{stats.change === null ? 'No Data' : formatMoney(stats.change)}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function RetirementHistoryChart({ accounts, history }) {
+  const width = 900;
+  const height = 320;
+  const [activePosition, setActivePosition] = useState(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const pointerIntentRef = useRef({ pointerId: null, startX: 0, startY: 0, mode: 'idle' });
+  const points = (Array.isArray(history) ? history : [])
+    .map((point) => ({
+      month: point.month,
+      amount: Number(point.balance) || 0,
+      accounts: Array.isArray(point.accounts) ? point.accounts : []
+    }))
+    .filter((point) => point.month)
+    .sort((a, b) => String(a.month).localeCompare(String(b.month)));
+
+  if (points.length === 0) {
+    return (
+      <div className="retcalc-history-empty">
+        Add balance snapshots or run SimpleFIN syncs to build the graph.
+      </div>
+    );
+  }
+
+  const accountSeries = accounts.map((account, index) => {
+    const accountId = Number(account.accountId);
+    return {
+      id: accountId,
+      label: account.name || account.label || 'Retirement Account',
+      color: ACCOUNT_MIX_COLORS[index % ACCOUNT_MIX_COLORS.length],
+      points: points.map((point) => {
+        const accountPoint = point.accounts.find((item) => Number(item.account_id) === accountId);
+        return {
+          month: point.month,
+          amount: accountPoint ? Number(accountPoint.balance) || 0 : 0
+        };
+      })
+    };
+  }).filter((series) => Number.isFinite(series.id));
+  const max = Math.max(
+    1,
+    ...points.map((point) => point.amount),
+    ...accountSeries.flatMap((series) => series.points.map((point) => point.amount))
+  ) * 1.08;
+  const labels = [max, max / 2, 0];
+  const totalPath = chartPathByIndex(points, width, height, max);
+  const active = activePosition ?? points.length - 1;
+  const activeIndex = Math.max(0, Math.min(points.length - 1, Math.round(active)));
+  const activeMonth = points[activeIndex]?.month;
+  const scrubX = points.length === 1 ? width / 2 : (active / Math.max(1, points.length - 1)) * width;
+  const totalValue = valueAtPosition(points, active);
+  const tooltipRows = [
+    { key: 'total', label: 'Total Savings', value: totalValue, color: '#ffffff', emphasis: true },
+    ...accountSeries.map((series) => ({
+      key: series.id,
+      label: truncateChartLabel(series.label),
+      value: valueAtPosition(series.points, active),
+      color: series.color
+    }))
+  ];
+  const tooltipHeight = 48 + tooltipRows.length * 20;
+  const tooltipWidth = 286;
+  const tooltipX = scrubX > width - tooltipWidth - 18 ? scrubX - tooltipWidth - 14 : scrubX + 14;
+  const tooltipY = 18;
+  const latestAccountTotal = accountSeries.reduce((sum, series) => {
+    const latest = series.points.at(-1)?.amount || 0;
+    return sum + Math.max(0, latest);
+  }, 0);
+  const positiveAccountSeries = accountSeries.filter((series) => Math.max(0, series.points.at(-1)?.amount || 0) > 0);
+
+  function updateScrub(event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    setActivePosition(ratio * Math.max(0, points.length - 1));
+  }
+
+  function handlePointerDown(event) {
+    if (event.pointerType === 'mouse') {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      setIsScrubbing(true);
+      updateScrub(event);
+      return;
+    }
+
+    pointerIntentRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      mode: 'pending'
+    };
+  }
+
+  function handlePointerMove(event) {
+    if (event.pointerType === 'mouse') {
+      updateScrub(event);
+      return;
+    }
+
+    const intent = pointerIntentRef.current;
+    if (intent.pointerId !== event.pointerId) return;
+
+    if (intent.mode === 'pending') {
+      const deltaX = event.clientX - intent.startX;
+      const deltaY = event.clientY - intent.startY;
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+      if (absX < 8 && absY < 8) return;
+      if (absY > absX) {
+        intent.mode = 'scroll';
+        setIsScrubbing(false);
+        return;
+      }
+
+      intent.mode = 'scrub';
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      setIsScrubbing(true);
+    }
+
+    if (intent.mode === 'scrub') {
+      event.preventDefault();
+      updateScrub(event);
+    }
+  }
+
+  function handlePointerUp(event) {
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    pointerIntentRef.current = { pointerId: null, startX: 0, startY: 0, mode: 'idle' };
+    setIsScrubbing(false);
+  }
+
+  return (
+    <div className="retcalc-chart-wrap retcalc-history-chart-wrap">
+      {positiveAccountSeries.length > 0 && (
+        <div className="retcalc-account-mix retcalc-history-account-mix" aria-label="Retirement history account color key">
+          {positiveAccountSeries.map((series) => {
+            const latest = Math.max(0, series.points.at(-1)?.amount || 0);
+            const widthPercent = latestAccountTotal > 0 ? (latest / latestAccountTotal) * 100 : 0;
+            return (
+              <span
+                key={`${series.id}-history-mix`}
+                style={{ width: `${Math.max(3, widthPercent)}%`, '--account-color': series.color }}
+                title={`${series.label}: ${formatMoney(latest)}`}
+              />
+            );
+          })}
+        </div>
+      )}
+      <svg
+        className="retcalc-chart retcalc-history-chart"
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label="Retirement account balance history"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onPointerLeave={(event) => {
+          if (event.pointerType === 'mouse' && !isScrubbing) setActivePosition(null);
+        }}
+      >
+        {labels.map((value) => {
+          const y = height - (value / max) * height;
+          return (
+            <g key={value}>
+              <line x1="0" x2={width} y1={y} y2={y} className="retcalc-gridline" />
+              <text x="10" y={Math.max(16, y - 8)} className="retcalc-axis-label">
+                {formatMoney(value)}
+              </text>
+            </g>
+          );
+        })}
+
+        {accountSeries.map((series) => (
+          <path
+            key={series.id}
+            d={chartPathByIndex(series.points, width, height, max)}
+            fill="none"
+            className="retcalc-history-account-line"
+            style={{ '--account-color': series.color }}
+          >
+            <title>{series.label}</title>
+          </path>
+        ))}
+
+        <path d={totalPath} fill="none" className="retcalc-history-total-line">
+          <title>{`Total savings: ${formatMoney(points.at(-1)?.amount || 0)}`}</title>
+        </path>
+
+        {points.length === 1 && (
+          <circle cx={width / 2} cy={height - (points[0].amount / max) * height} r="7" className="retcalc-current-dot" />
+        )}
+
+        {activePosition !== null && (
+          <g className="retcalc-scrub retcalc-history-scrub">
+            <line className="retcalc-scrub-rail" x1={scrubX} x2={scrubX} y1="0" y2={height} />
+            <circle className="retcalc-scrub-handle" cx={scrubX} cy={height - 24} r="12" />
+            <g transform={`translate(${tooltipX.toFixed(2)} ${tooltipY})`}>
+              <rect width={tooltipWidth} height={tooltipHeight} rx="16" />
+              <text x="16" y="25">{formatHistoryMonth(activeMonth)}</text>
+              {tooltipRows.map((row, index) => (
+                <g key={row.key} style={{ '--scenario-color': row.color }}>
+                  {!row.emphasis && (
+                    <rect
+                      x="16"
+                      y={40 + index * 20}
+                      width="4"
+                      height="12"
+                      rx="2"
+                      className="retcalc-history-tooltip-indicator"
+                    />
+                  )}
+                  <text
+                    x={row.emphasis ? '16' : '28'}
+                    y={50 + index * 20}
+                    className={row.emphasis ? 'retcalc-history-total-tooltip' : ''}
+                  >
+                    {row.label}: {formatMoney(row.value || 0)}
+                  </text>
+                </g>
+              ))}
+            </g>
+          </g>
+        )}
+      </svg>
+      <div className="retcalc-chart-label-row">
+        <span>{formatHistoryMonth(points[0].month)}</span>
+        <span>{formatHistoryMonth(points.at(-1).month)}</span>
+      </div>
+    </div>
   );
 }
 
@@ -1626,7 +2034,7 @@ function RetirementProjectionChart({
 
         {actualLine && (
           <path d={actualLine} fill="none" className="retcalc-actual-line">
-            <title>{`Actual retirement balance history through today: ${formatMoney(currentBalance)}`}</title>
+            <title>{`Retirement balance history through today: ${formatMoney(currentBalance)}`}</title>
           </path>
         )}
 

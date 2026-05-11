@@ -465,7 +465,7 @@ function buildRetirementHistory(householdId, months) {
     });
     const total = accountBalances.reduce((sum, account) => sum + account.balance, 0);
     accountRows.push({ month: cursor, accounts: accountBalances });
-    rows.push({ month: cursor, balance: total });
+    rows.push({ month: cursor, balance: total, accounts: accountBalances });
 
     for (const delta of deltasByMonth.get(cursor) || []) {
       balancesByAccount.set(
@@ -562,7 +562,7 @@ router.get('/retirement-history', requireAuth, (req, res) => {
   const months = parseBoundedInteger(req.query.months, {
     fallback: 120,
     min: 3,
-    max: 240
+    max: 1200
   });
   try {
     sendOk(res, buildRetirementHistory(householdId, months));

@@ -10169,8 +10169,12 @@ body.modal-page-blur-active .txn-pinned-month-header {
 }
 
 .retcalc-current-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
+}
+
+.retcalc-history-stat-card {
+  grid-column: 1 / -1;
 }
 
 .retcalc-stat-card {
@@ -10265,6 +10269,76 @@ body.modal-page-blur-active .txn-pinned-month-header {
 
 .retcalc-stat-detail.expanded > .retcalc-stat-detail-inner {
   padding: 0 14px 14px;
+}
+
+.retcalc-history-detail {
+  display: grid;
+  gap: 12px;
+}
+
+.segmented-control.retcalc-history-range-tabs {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-radius: var(--radius-sm);
+}
+
+.segmented-control.retcalc-history-range-tabs button {
+  min-height: 38px;
+  padding: 6px;
+  font-size: 0.78rem;
+  font-weight: 780;
+}
+
+.retcalc-history-chart-wrap {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 32%, transparent), transparent 46%),
+    color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.retcalc-history-chart {
+  min-height: 240px;
+}
+
+.retcalc-history-total-line {
+  stroke: var(--text);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 10px 16px color-mix(in srgb, var(--text) 14%, transparent));
+}
+
+.retcalc-history-account-line {
+  stroke: var(--account-color);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.42;
+}
+
+.retcalc-history-account-mix {
+  height: 10px;
+}
+
+.retcalc-history-tooltip-indicator {
+  fill: var(--scenario-color, var(--accent));
+}
+
+.retcalc-history-empty {
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.retcalc-history-total-tooltip {
+  font-weight: 840;
 }
 
 .retcalc-detail-list {

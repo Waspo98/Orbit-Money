@@ -34,6 +34,7 @@ import {
   sendIncomeNotificationsForTransactions
 } from './notifications.js';
 import { dollarsToCents } from '../lib/money.js';
+import { formatLocalDate, isValidDateOnly } from '../lib/localDate.js';
 
 const STALE_RUN_MINUTES = 15;
 const LOOKBACK_BUFFER_DAYS = 7; // re-fetch the last N days on every sync
@@ -55,6 +56,39 @@ function simpleFinPostedToIsoDate(posted) {
   }
 
   return toIsoDate(date);
+}
+
+function simpleFinBalanceToCents(sfAccount) {
+  return dollarsToCents(Number.parseFloat(sfAccount?.balance) || 0);
+}
+
+function simpleFinBalanceDate(sfAccount, fallbackDate) {
+  const raw =
+    sfAccount?.['balance-date'] ??
+    sfAccount?.balance_date ??
+    sfAccount?.balanceDate;
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (isValidDateOnly(trimmed)) return trimmed;
+  }
+
+  const timestamp = Number(raw);
+  if (Number.isFinite(timestamp) && timestamp > 0) {
+    const milliseconds = timestamp > 1000000000000 ? timestamp : timestamp * 1000;
+    const isoDate = new Date(milliseconds).toISOString().slice(0, 10);
+    if (isValidDateOnly(isoDate)) return isoDate;
+  }
+
+  if (typeof raw === 'string' && raw.trim()) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      const isoDate = parsed.toISOString().slice(0, 10);
+      if (isValidDateOnly(isoDate)) return isoDate;
+    }
+  }
+
+  return fallbackDate;
 }
 
 /**
@@ -170,6 +204,7 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
     // Date range: cutover → today (capped by a small lookback on re-runs
     // to avoid fetching 5 years on a normal daily pull).
     const today = new Date();
+    const todayDate = formatLocalDate(today);
     const cutover = new Date(cutoverDate + 'T00:00:00Z');
 
     let start;
@@ -214,6 +249,15 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
        WHERE id = ?
          AND household_id = ?
     `);
+    const upsertSimpleFinBalanceRecord = db.prepare(`
+      INSERT INTO account_balance_records (household_id, account_id, record_date, balance, source)
+      VALUES (?, ?, ?, ?, 'simplefin')
+      ON CONFLICT(household_id, account_id, record_date) DO UPDATE SET
+        balance = excluded.balance,
+        source = 'simplefin',
+        updated_at = datetime('now')
+      WHERE account_balance_records.source = 'simplefin'
+    `);
     const insertAccount = db.prepare(`
       INSERT INTO accounts (household_id, name, type, institution, account_number_last4,
                             simplefin_account_id, current_balance, is_manual)
@@ -222,6 +266,15 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
 
     let accountsCreated = 0;
     let accountsUnmatched = 0;
+    let balanceSnapshotsStored = 0;
+
+    function captureSimpleFinBalance(accountId, sfAccount) {
+      const balance = simpleFinBalanceToCents(sfAccount);
+      const recordDate = simpleFinBalanceDate(sfAccount, todayDate);
+      const result = upsertSimpleFinBalanceRecord.run(householdId, accountId, recordDate, balance);
+      if (result.changes > 0) balanceSnapshotsStored++;
+      return balance;
+    }
 
     // Map of SimpleFIN account id → our account id, so we can attribute
     // transactions correctly below.
@@ -232,7 +285,8 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
       const linked = findAccountBySfId.get(householdId, sf.id);
       if (linked) {
         sfToLocalId.set(sf.id, linked.id);
-        updateBalance.run(dollarsToCents(parseFloat(sf.balance) || 0), linked.id, householdId);
+        const balance = captureSimpleFinBalance(linked.id, sf);
+        updateBalance.run(balance, linked.id, householdId);
         continue;
       }
 
@@ -244,7 +298,8 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
         const existing = findAccountByInstLast4.get(householdId, institution, last4);
         if (existing) {
           linkSfId.run(sf.id, existing.id, householdId);
-          updateBalance.run(dollarsToCents(parseFloat(sf.balance) || 0), existing.id, householdId);
+          const balance = captureSimpleFinBalance(existing.id, sf);
+          updateBalance.run(balance, existing.id, householdId);
           sfToLocalId.set(sf.id, existing.id);
           continue;
         }
@@ -252,6 +307,7 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
 
       // No match → create new, flag unmatched.
       const type = guessAccountTypeFromSimpleFin(sf);
+      const balance = simpleFinBalanceToCents(sf);
       const result = insertAccount.run(
         householdId,
         sf.name || 'SimpleFIN Account',
@@ -259,9 +315,10 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
         institution,
         last4,
         sf.id,
-        dollarsToCents(parseFloat(sf.balance) || 0)
+        balance
       );
       sfToLocalId.set(sf.id, result.lastInsertRowid);
+      captureSimpleFinBalance(result.lastInsertRowid, sf);
       accountsCreated++;
       accountsUnmatched++;
     }
@@ -469,6 +526,7 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
       accountsUnmatched,
       transfersPaired,
       upcoming_reconciliation: upcomingReconciliation,
+      balanceSnapshotsStored,
       error: errorMsg
     };
   } catch (err) {
