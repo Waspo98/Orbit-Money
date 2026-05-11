@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
+import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppRangeSlider from '../components/AppRangeSlider.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
-import CurrencyInput, { formatCurrencyInput, parseCurrencyInput } from '../components/CurrencyInput.jsx';
+import CurrencyInput, { formatCurrencyInput, hasCurrencyInputValue, parseCurrencyInput } from '../components/CurrencyInput.jsx';
 import ExpandingSection from '../components/ExpandingSection.jsx';
 import PageHero from '../components/PageHero.jsx';
 import SegmentedControl from '../components/SegmentedControl.jsx';
@@ -51,6 +52,14 @@ const DEFAULT_CHART_MAX = 4000000;
 const DEFAULT_WITHDRAWAL_RATE = 0.04;
 const RETIREMENT_RUNWAY_END_AGE = 95;
 const DEFAULT_RETIREMENT_SPENDING_RATIO = 0.8;
+const DEFAULT_LEGACY_AMOUNT = 1000000;
+const TARGET_MODE_KEYS = ['withdrawal', 'nestEgg', 'legacy', 'custom'];
+const TARGET_MODE_LABELS = {
+  withdrawal: '4% Withdrawal',
+  nestEgg: 'Nest Egg',
+  legacy: 'Leave a Legacy',
+  custom: 'Custom Amount'
+};
 const ACCOUNT_MIX_COLORS = ['#10b981', '#38bdf8', '#a78bfa', '#f59e0b', '#f472b6', '#22d3ee'];
 
 function formatMoney(amount, digits = 0) {
@@ -69,13 +78,28 @@ function readRetirementCalculatorPreferences() {
     const calculator = JSON.parse(localStorage.getItem(RETIREMENT_CALCULATOR_PREFS_STORAGE_KEY) || '{}');
     const classic = JSON.parse(localStorage.getItem(RETIREMENT_PREFS_STORAGE_KEY) || '{}');
     const runwayEndAge = Number(calculator.runwayEndAge) || RETIREMENT_RUNWAY_END_AGE;
+    const targetMode = TARGET_MODE_KEYS.includes(calculator.targetMode) ? calculator.targetMode : 'withdrawal';
     return {
       retirementAge: Number(calculator.retirementAge || classic.retirementAge) || 67,
       runwayEndAge: Math.min(110, Math.max(70, Math.round(runwayEndAge))),
-      scenarioKey: PRESETS[calculator.scenarioKey || classic.presetKey] ? (calculator.scenarioKey || classic.presetKey) : 'balanced'
+      scenarioKey: PRESETS[calculator.scenarioKey || classic.presetKey] ? (calculator.scenarioKey || classic.presetKey) : 'balanced',
+      targetMode,
+      legacyAmount: Number.isFinite(Number(calculator.legacyAmount)) ? Number(calculator.legacyAmount) : DEFAULT_LEGACY_AMOUNT,
+      customTargetAmount: calculator.customTargetAmount !== null &&
+        calculator.customTargetAmount !== undefined &&
+        Number.isFinite(Number(calculator.customTargetAmount))
+        ? Number(calculator.customTargetAmount)
+        : null
     };
   } catch {
-    return { retirementAge: 67, runwayEndAge: RETIREMENT_RUNWAY_END_AGE, scenarioKey: 'balanced' };
+    return {
+      retirementAge: 67,
+      runwayEndAge: RETIREMENT_RUNWAY_END_AGE,
+      scenarioKey: 'balanced',
+      targetMode: 'withdrawal',
+      legacyAmount: DEFAULT_LEGACY_AMOUNT,
+      customTargetAmount: null
+    };
   }
 }
 
@@ -123,6 +147,63 @@ function requiredMonthlyContribution(current, target, annualReturn, months) {
   const grownPrincipal = principal * ((1 + monthlyReturn) ** monthCount);
   const factor = (((1 + monthlyReturn) ** monthCount) - 1) / monthlyReturn;
   return Math.max(0, (goal - grownPrincipal) / factor);
+}
+
+function requiredRetirementBalance({ annualSpending, finalBalance, retirementAge, endAge, realReturn }) {
+  const months = Math.max(0, Math.round((Number(endAge) - Number(retirementAge)) * 12));
+  const monthlySpending = Math.max(0, Number(annualSpending) || 0) / 12;
+  const safeFinalBalance = Math.max(0, Number(finalBalance) || 0);
+  const monthlyReturn = effectiveMonthlyRate(realReturn);
+  if (months <= 0) return safeFinalBalance;
+  if (Math.abs(monthlyReturn) < 0.000001) {
+    return Math.max(0, monthlySpending * months + safeFinalBalance);
+  }
+
+  const discount = (1 + monthlyReturn) ** months;
+  const spendingNeed = monthlySpending * ((1 - (1 / discount)) / monthlyReturn);
+  const finalNeed = safeFinalBalance / discount;
+  return Math.max(0, spendingNeed + finalNeed);
+}
+
+function buildTargetCandidates({
+  annualSpending,
+  customTargetAmount,
+  legacyAmount,
+  retirementAge,
+  realReturn,
+  runwayEndAge
+}) {
+  const withdrawalTarget = Math.max(0, (Number(annualSpending) || 0) / DEFAULT_WITHDRAWAL_RATE);
+  const retirementGrowthRate = Math.max(0.001, Number(realReturn) || 0);
+  const nestEggTarget = Math.max(0, (Number(annualSpending) || 0) / retirementGrowthRate);
+  const safeLegacyAmount = Math.max(0, Number(legacyAmount) || 0);
+  const hasCustomTarget = customTargetAmount !== null && customTargetAmount !== undefined && Number.isFinite(Number(customTargetAmount));
+  const customTarget = hasCustomTarget ? Math.max(0, Number(customTargetAmount)) : withdrawalTarget;
+
+  return {
+    withdrawal: {
+      amount: withdrawalTarget,
+      detail: `${formatMoney(annualSpending)}/yr spending at 4% withdrawal`
+    },
+    nestEgg: {
+      amount: nestEggTarget,
+      detail: `${formatPercent(realReturn * 100)} real return covers ${formatMoney(annualSpending)}/yr spending`
+    },
+    legacy: {
+      amount: requiredRetirementBalance({
+        annualSpending,
+        finalBalance: safeLegacyAmount,
+        retirementAge,
+        endAge: runwayEndAge,
+        realReturn
+      }),
+      detail: `Leaves ${formatMoney(safeLegacyAmount)} at age ${Math.round(runwayEndAge)}`
+    },
+    custom: {
+      amount: customTarget,
+      detail: `Static target at age ${Math.round(retirementAge)}`
+    }
+  };
 }
 
 function classifyAccount(account) {
@@ -248,13 +329,34 @@ function makeDrawdownPoints({ retirementAge, endAge, startingBalance, annualSpen
   };
 }
 
-function buildScenarioModel({ preset, currentAge, retirementAge, endAge, runwayEndAge, currentBalance, monthlySavings, annualSpending, withdrawalRate }) {
+function buildScenarioModel({
+  preset,
+  currentAge,
+  retirementAge,
+  endAge,
+  runwayEndAge,
+  currentBalance,
+  monthlySavings,
+  annualSpending,
+  targetMode,
+  legacyAmount,
+  customTargetAmount
+}) {
   const annualReturn = parsePercentInput(preset.annualReturn) / 100;
   const inflation = parsePercentInput(preset.inflation) / 100;
   const realReturn = ((1 + annualReturn) / (1 + inflation)) - 1;
-  const safeWithdrawalRate = Math.max(0.001, withdrawalRate);
   const months = Math.max(0, Math.round((retirementAge - currentAge) * 12));
-  const targetNestEgg = annualSpending / safeWithdrawalRate;
+  const targetCandidates = buildTargetCandidates({
+    annualSpending,
+    customTargetAmount,
+    legacyAmount,
+    retirementAge,
+    realReturn,
+    runwayEndAge
+  });
+  const safeTargetMode = TARGET_MODE_KEYS.includes(targetMode) ? targetMode : 'withdrawal';
+  const selectedTarget = targetCandidates[safeTargetMode] || targetCandidates.withdrawal;
+  const targetNestEgg = selectedTarget.amount;
   const projectedBalance = futureValue(currentBalance, monthlySavings, realReturn, months);
   const retirementMonthlyReturn = effectiveMonthlyRate(realReturn);
   const breakevenAnnualSpending = Math.max(0, projectedBalance * retirementMonthlyReturn * 12);
@@ -290,8 +392,11 @@ function buildScenarioModel({ preset, currentAge, retirementAge, endAge, runwayE
     monthsToRetirement: months,
     savingsGap: months > 0 ? Math.max(0, requiredMonthly - monthlySavings) : targetFundingGap,
     targetFundingGap,
-    targetNestEgg,
-    withdrawalRate: safeWithdrawalRate
+    targetCandidates,
+    targetDetail: selectedTarget.detail,
+    targetMode: safeTargetMode,
+    targetModeLabel: TARGET_MODE_LABELS[safeTargetMode],
+    targetNestEgg
   };
 }
 
@@ -358,12 +463,16 @@ export default function RetirementCalculator() {
   const savedPreferences = useMemo(readRetirementCalculatorPreferences, []);
   const { loading, error, household, goals, history, warnings, retry } = useRetirementCalculatorData();
   const [scenarioKey, setScenarioKey] = useState(savedPreferences.scenarioKey);
+  const [targetSettingsOpen, setTargetSettingsOpen] = useState(false);
   const [expandedCurrentStat, setExpandedCurrentStat] = useState(null);
   const [values, setValues] = useState({
     retirementAge: savedPreferences.retirementAge,
     runwayEndAge: savedPreferences.runwayEndAge,
     monthlySavings: '',
-    annualSpending: ''
+    annualSpending: '',
+    targetMode: savedPreferences.targetMode,
+    legacyAmount: savedPreferences.legacyAmount,
+    customTargetAmount: savedPreferences.customTargetAmount ?? ''
   });
 
   useEffect(() => {
@@ -373,13 +482,18 @@ export default function RetirementCalculator() {
         JSON.stringify({
           retirementAge: Number(values.retirementAge) || 67,
           runwayEndAge: Number(values.runwayEndAge) || RETIREMENT_RUNWAY_END_AGE,
-          scenarioKey
+          scenarioKey,
+          targetMode: TARGET_MODE_KEYS.includes(values.targetMode) ? values.targetMode : 'withdrawal',
+          legacyAmount: parseCurrencyInput(values.legacyAmount, DEFAULT_LEGACY_AMOUNT),
+          customTargetAmount: hasCurrencyInputValue(values.customTargetAmount)
+            ? parseCurrencyInput(values.customTargetAmount, 0)
+            : null
         })
       );
     } catch {
       /* ignore */
     }
-  }, [scenarioKey, values.retirementAge, values.runwayEndAge]);
+  }, [scenarioKey, values.customTargetAmount, values.legacyAmount, values.retirementAge, values.runwayEndAge, values.targetMode]);
 
   const model = useMemo(() => {
     const members = household?.members || [];
@@ -415,7 +529,11 @@ export default function RetirementCalculator() {
       ? baselineSpending
       : parseCurrencyInput(values.annualSpending);
     const endAge = Math.max(95, runwayEndAge, retirementAge + 10);
-    const withdrawalRate = DEFAULT_WITHDRAWAL_RATE;
+    const targetMode = TARGET_MODE_KEYS.includes(values.targetMode) ? values.targetMode : 'withdrawal';
+    const legacyAmount = parseCurrencyInput(values.legacyAmount, DEFAULT_LEGACY_AMOUNT);
+    const customTargetAmount = hasCurrencyInputValue(values.customTargetAmount)
+      ? parseCurrencyInput(values.customTargetAmount, 0)
+      : null;
     const scenarios = Object.fromEntries(
       Object.entries(PRESETS).map(([key, preset]) => [
         key,
@@ -428,7 +546,9 @@ export default function RetirementCalculator() {
           currentBalance,
           monthlySavings,
           annualSpending,
-          withdrawalRate
+          targetMode,
+          legacyAmount,
+          customTargetAmount
         })
       ])
     );
@@ -575,7 +695,9 @@ export default function RetirementCalculator() {
       savingsRate: grossIncome > 0 ? ((monthlySavings * 12) / grossIncome) * 100 : 0,
       scenarios,
       selected,
-      withdrawalRate,
+      targetMode,
+      legacyAmount,
+      customTargetAmount,
       contributionMembers,
       ytdChange,
       ytdGrowthPercent
@@ -584,6 +706,20 @@ export default function RetirementCalculator() {
 
   function update(key, value) {
     setValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function selectTargetMode(nextMode) {
+    const safeNextMode = TARGET_MODE_KEYS.includes(nextMode) ? nextMode : 'withdrawal';
+    setValues((prev) => {
+      const next = { ...prev, targetMode: safeNextMode };
+      if (safeNextMode === 'legacy' && !hasCurrencyInputValue(next.legacyAmount)) {
+        next.legacyAmount = formatCurrencyInput(DEFAULT_LEGACY_AMOUNT);
+      }
+      if (safeNextMode === 'custom' && !hasCurrencyInputValue(next.customTargetAmount)) {
+        next.customTargetAmount = formatCurrencyInput(model.selected.targetNestEgg);
+      }
+      return next;
+    });
   }
 
   function toggleCurrentStat(key) {
@@ -595,10 +731,12 @@ export default function RetirementCalculator() {
   const customPlan =
     Math.round(Number(values.retirementAge) || baselineRetirementAge) !== Math.round(baselineRetirementAge) ||
     String(values.monthlySavings).trim() !== '' ||
-    String(values.annualSpending).trim() !== '';
+    String(values.annualSpending).trim() !== '' ||
+    model.targetMode !== 'withdrawal';
   const scenarioDisplayLabel = customPlan ? 'Custom Plan' : selectedPreset.label;
   const planChips = [
     `Market Scenario: ${selectedPreset.label}`,
+    `Target: ${model.selected.targetModeLabel}`,
     `Retirement Age: ${Math.round(model.retirementAge)}`,
     `${formatMoney(model.monthlySavings)}/mo saving`,
     `${formatMoney(model.annualSpending)}/yr spending`
@@ -638,6 +776,45 @@ export default function RetirementCalculator() {
   const runwayDepletionAge = model.selected.depletionAge && model.selected.depletionAge <= model.runwayEndAge
     ? model.selected.depletionAge
     : null;
+  const selectedTargetCandidates = model.selected.targetCandidates || {};
+  const targetOptions = [
+    {
+      value: 'withdrawal',
+      label: TARGET_MODE_LABELS.withdrawal,
+      subtitle: 'Default retirement advice'
+    },
+    {
+      value: 'nestEgg',
+      label: TARGET_MODE_LABELS.nestEgg,
+      subtitle: (
+        <>
+          <span>Retirement interest matches spending</span>
+          <span>{formatPercent(model.selected.realReturn * 100)} real return</span>
+        </>
+      )
+    },
+    {
+      value: 'legacy',
+      label: TARGET_MODE_LABELS.legacy,
+      subtitle: (
+        <>
+          <span>Leave {formatMoney(model.legacyAmount)}</span>
+          <span>At age {Math.round(model.runwayEndAge)}</span>
+        </>
+      )
+    },
+    {
+      value: 'custom',
+      label: TARGET_MODE_LABELS.custom,
+      subtitle: (
+        <>
+          <span>Static Amount</span>
+          <span>{formatMoney(selectedTargetCandidates.custom?.amount || 0)}</span>
+        </>
+      )
+    }
+  ];
+  const canEditTarget = model.targetMode === 'legacy' || model.targetMode === 'custom';
   const requiredFundingMetric = model.selected.monthsToRetirement > 0
     ? {
         label: 'Required Monthly',
@@ -705,24 +882,50 @@ export default function RetirementCalculator() {
                   selectedKey={scenarioKey}
                   targetNestEgg={model.selected.targetNestEgg}
                 />
-                <div className="retcalc-scenario-row" aria-label="Choose highlighted retirement scenario">
-                  <SegmentedControl
-                    className="retcalc-scenario-tabs"
-                    ariaLabel="Highlighted retirement scenario"
-                    options={Object.entries(PRESETS).map(([key, preset]) => ({
-                      value: key,
-                      label: preset.label,
-                      subtitle: (
-                        <>
-                          <span>{preset.annualReturn} market</span>
-                          <span>{preset.inflation} inflation</span>
-                        </>
-                      )
-                    }))}
-                    value={scenarioKey}
-                    onChange={setScenarioKey}
-                    getOptionSubtitle={(option) => option.subtitle}
-                  />
+                <div className="retcalc-choice-group">
+                  <div className="retcalc-choice-header">
+                    <span>Market Scenario</span>
+                  </div>
+                  <div className="retcalc-scenario-row" aria-label="Choose highlighted retirement scenario">
+                    <SegmentedControl
+                      className="retcalc-scenario-tabs"
+                      ariaLabel="Highlighted retirement scenario"
+                      options={Object.entries(PRESETS).map(([key, preset]) => ({
+                        value: key,
+                        label: preset.label,
+                        subtitle: (
+                          <>
+                            <span>{preset.annualReturn} market</span>
+                            <span>{preset.inflation} inflation</span>
+                          </>
+                        )
+                      }))}
+                      value={scenarioKey}
+                      onChange={setScenarioKey}
+                      getOptionSubtitle={(option) => option.subtitle}
+                    />
+                  </div>
+                </div>
+
+                <div className="retcalc-choice-group">
+                  <div className="retcalc-choice-header">
+                    <span>Retirement Target</span>
+                    {canEditTarget && (
+                      <button type="button" className="dashboard-card-link dashboard-card-action-button" onClick={() => setTargetSettingsOpen(true)}>
+                        Edit Target
+                      </button>
+                    )}
+                  </div>
+                  <div className="retcalc-scenario-row" aria-label="Choose retirement target method">
+                    <SegmentedControl
+                      className="retcalc-scenario-tabs retcalc-target-tabs"
+                      ariaLabel="Retirement target method"
+                      options={targetOptions}
+                      value={model.targetMode}
+                      onChange={selectTargetMode}
+                      getOptionSubtitle={(option) => option.subtitle}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -739,9 +942,9 @@ export default function RetirementCalculator() {
 
               <div className="retcalc-metric-list">
                 <MetricRow
-                  label="Retirement Spending Target"
+                  label="Retirement Target"
                   value={formatMoney(model.selected.targetNestEgg)}
-                  detail={`${formatMoney(model.annualSpending)}/yr spending at ${formatPercent(model.selected.withdrawalRate * 100)} withdrawal`}
+                  detail={model.selected.targetDetail}
                 />
                 <MetricRow
                   label={requiredFundingMetric.label}
@@ -927,6 +1130,24 @@ export default function RetirementCalculator() {
               />
             </div>
           </section>
+
+          {targetSettingsOpen && (
+            <RetirementTargetSettingsModal
+              annualSpending={model.annualSpending}
+              customTargetAmount={values.customTargetAmount}
+              legacyAmount={values.legacyAmount}
+              mode={model.targetMode}
+              onChange={update}
+              onClose={() => setTargetSettingsOpen(false)}
+              retirementAge={model.retirementAge}
+              spendingMax={spendingMax}
+              spendingGuideHint={spendingGuideHint}
+              spendingGuideMarkers={spendingGuideMarkers}
+              spendingSnapTolerance={spendingSnapTolerance}
+              runwayEndAge={model.runwayEndAge}
+              selectedTarget={model.selected}
+            />
+          )}
         </>
       )}
     </div>
@@ -947,6 +1168,94 @@ function RetirementInputsError({ message, onRetry }) {
         <Link to="/household" className="btn-secondary">Edit Household</Link>
       </div>
     </section>
+  );
+}
+
+function RetirementTargetSettingsModal({
+  annualSpending,
+  customTargetAmount,
+  legacyAmount,
+  mode,
+  onChange,
+  onClose,
+  retirementAge,
+  spendingMax,
+  spendingGuideHint,
+  spendingGuideMarkers,
+  spendingSnapTolerance,
+  runwayEndAge,
+  selectedTarget
+}) {
+  const isLegacy = mode === 'legacy';
+  const fieldKey = isLegacy ? 'legacyAmount' : 'customTargetAmount';
+  const fieldLabel = isLegacy ? 'Legacy Amount' : 'Custom Retirement Target';
+  const currentValue = isLegacy
+    ? legacyAmount
+    : hasCurrencyInputValue(customTargetAmount)
+      ? customTargetAmount
+      : selectedTarget.targetNestEgg;
+  const summary = isLegacy
+    ? `Orbit will calculate the balance needed at age ${Math.round(retirementAge)} to leave this amount at age ${Math.round(runwayEndAge)}.`
+    : `Orbit will draw the target line at this fixed amount for age ${Math.round(retirementAge)}.`;
+
+  return (
+    <AnimatedModal onClose={onClose} size="lg" animation="zoom">
+      {({ close }) => (
+        <div className="retcalc-target-modal">
+          <header className="dashboard-card-header">
+            <div>
+              <span className="retcalc-kicker">Retirement Target</span>
+              <h3>{TARGET_MODE_LABELS[mode] || 'Retirement Target'}</h3>
+            </div>
+          </header>
+          <p>{summary}</p>
+          <div className="retcalc-target-modal-metrics">
+            <MetricRow
+              label="Target"
+              value={formatMoney(selectedTarget.targetNestEgg)}
+              detail={selectedTarget.targetDetail}
+            />
+          </div>
+          {isLegacy && (
+            <>
+              <MoneyLever
+                label="Retirement Spending"
+                value={annualSpending}
+                suffix="/yr"
+                max={spendingMax}
+                step="1000"
+                hint={spendingGuideHint}
+                markers={spendingGuideMarkers}
+                snapTolerance={spendingSnapTolerance}
+                resetLabel="80% Income"
+                onReset={() => onChange('annualSpending', '')}
+                onChange={(value) => onChange('annualSpending', value)}
+              />
+              <SliderLever
+                label="Final Age"
+                value={runwayEndAge}
+                display={String(Math.round(runwayEndAge))}
+                min={Math.round(retirementAge) + 1}
+                max="110"
+                step="1"
+                onChange={(value) => onChange('runwayEndAge', Number(value))}
+              />
+            </>
+          )}
+          <label className="retcalc-target-field">
+            <span>{fieldLabel}</span>
+            <CurrencyInput
+              value={formatCurrencyInput(currentValue)}
+              onChange={(value) => onChange(fieldKey, value)}
+              aria-label={fieldLabel}
+            />
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="btn-primary" onClick={close}>Done</button>
+          </div>
+        </div>
+      )}
+    </AnimatedModal>
   );
 }
 
@@ -1175,6 +1484,7 @@ function RetirementProjectionChart({
 }) {
   const [activeAge, setActiveAge] = useState(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
+  const pointerIntentRef = useRef({ pointerId: null, startX: 0, startY: 0, mode: 'idle' });
   const width = 900;
   const height = 380;
   const labels = [chartMax, chartMax / 2, 0];
@@ -1215,19 +1525,56 @@ function RetirementProjectionChart({
   }
 
   function handlePointerDown(event) {
-    event.preventDefault();
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    setIsScrubbing(true);
-    updateScrubAge(event);
+    if (event.pointerType === 'mouse') {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      setIsScrubbing(true);
+      updateScrubAge(event);
+      return;
+    }
+
+    pointerIntentRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      mode: 'pending'
+    };
   }
 
   function handlePointerMove(event) {
-    if (event.pointerType !== 'mouse' && !isScrubbing) return;
-    updateScrubAge(event);
+    if (event.pointerType === 'mouse') {
+      updateScrubAge(event);
+      return;
+    }
+
+    const intent = pointerIntentRef.current;
+    if (intent.pointerId !== event.pointerId) return;
+
+    if (intent.mode === 'pending') {
+      const deltaX = event.clientX - intent.startX;
+      const deltaY = event.clientY - intent.startY;
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+      if (absX < 8 && absY < 8) return;
+      if (absY > absX) {
+        intent.mode = 'scroll';
+        setIsScrubbing(false);
+        return;
+      }
+
+      intent.mode = 'scrub';
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      setIsScrubbing(true);
+    }
+
+    if (intent.mode === 'scrub') {
+      event.preventDefault();
+      updateScrubAge(event);
+    }
   }
 
   function handlePointerUp(event) {
     event.currentTarget.releasePointerCapture?.(event.pointerId);
+    pointerIntentRef.current = { pointerId: null, startX: 0, startY: 0, mode: 'idle' };
     setIsScrubbing(false);
   }
 

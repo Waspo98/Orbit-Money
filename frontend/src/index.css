@@ -9515,7 +9515,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   min-height: 320px;
   overflow: visible;
   cursor: ew-resize;
-  touch-action: none;
+  touch-action: pan-y;
   user-select: none;
 }
 
@@ -9658,6 +9658,27 @@ body.modal-page-blur-active .txn-pinned-month-header {
   text-align: right;
 }
 
+.retcalc-choice-group {
+  display: grid;
+  gap: 8px;
+}
+
+.retcalc-choice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 780;
+  text-transform: uppercase;
+}
+
+.retcalc-choice-header .dashboard-card-action-button {
+  text-transform: none;
+}
+
 .retcalc-scenario-row {
   display: grid;
   grid-template-columns: minmax(0, 560px);
@@ -9667,6 +9688,49 @@ body.modal-page-blur-active .txn-pinned-month-header {
 .retcalc-scenario-tabs button {
   min-height: 78px;
   padding: 8px 10px;
+}
+
+.segmented-control.retcalc-target-tabs button {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.segmented-control.retcalc-target-tabs button:nth-child(2n) {
+  border-right: 0;
+}
+
+.segmented-control.retcalc-target-tabs button:nth-last-child(-n+2) {
+  border-bottom: 0;
+}
+
+.segmented-control.retcalc-target-tabs .segmented-option-label {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+  line-height: 1.05;
+}
+
+.segmented-control.retcalc-target-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 981px) {
+  .segmented-control.retcalc-target-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .segmented-control.retcalc-target-tabs button {
+    border-bottom: 0;
+    border-right: 1px solid var(--border);
+  }
+
+  .segmented-control.retcalc-target-tabs button:nth-child(2n) {
+    border-right: 1px solid var(--border);
+  }
+
+  .segmented-control.retcalc-target-tabs button:last-child {
+    border-right: 0;
+  }
 }
 
 .retcalc-control-panel {
@@ -9895,6 +9959,55 @@ body.modal-page-blur-active .txn-pinned-month-header {
 
 .retcalc-stage-spending-control {
   min-height: 0;
+}
+
+.retcalc-target-modal {
+  display: grid;
+  gap: 14px;
+}
+
+.retcalc-target-modal .dashboard-card-header h3 {
+  margin: 2px 0 0;
+}
+
+.retcalc-target-modal p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 680;
+  line-height: 1.45;
+}
+
+.retcalc-target-modal-metrics {
+  display: grid;
+  gap: 0;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.retcalc-target-field {
+  display: grid;
+  gap: 7px;
+}
+
+.retcalc-target-field span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 740;
+}
+
+.retcalc-target-field input[type="text"] {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .retcalc-hsa-card,
