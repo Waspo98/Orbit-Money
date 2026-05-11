@@ -788,7 +788,7 @@ export default function RetirementCalculator() {
       label: TARGET_MODE_LABELS.nestEgg,
       subtitle: (
         <>
-          <span>Retirement interest matches spending</span>
+          <span>Retirement interest = spending</span>
           <span>{formatPercent(model.selected.realReturn * 100)} real return</span>
         </>
       )
@@ -799,7 +799,7 @@ export default function RetirementCalculator() {
       subtitle: (
         <>
           <span>Leave {formatMoney(model.legacyAmount)}</span>
-          <span>At age {Math.round(model.runwayEndAge)}</span>
+          <span>at age {Math.round(model.runwayEndAge)}</span>
         </>
       )
     },
@@ -808,8 +808,8 @@ export default function RetirementCalculator() {
       label: TARGET_MODE_LABELS.custom,
       subtitle: (
         <>
-          <span>Static Amount</span>
           <span>{formatMoney(selectedTargetCandidates.custom?.amount || 0)}</span>
+          <span>Static Amount</span>
         </>
       )
     }
