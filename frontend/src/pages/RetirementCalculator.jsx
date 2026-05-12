@@ -581,7 +581,7 @@ export default function RetirementCalculator() {
   const { loading, error, household, goals, history, warnings, retry } = useRetirementCalculatorData();
   const [scenarioKey, setScenarioKey] = useState(savedPreferences.scenarioKey);
   const [targetSettingsOpen, setTargetSettingsOpen] = useState(false);
-  const [expandedCurrentStat, setExpandedCurrentStat] = useState(null);
+  const [expandedCurrentStat, setExpandedCurrentStat] = useState('history');
   const [values, setValues] = useState({
     retirementAge: savedPreferences.retirementAge,
     runwayEndAge: savedPreferences.runwayEndAge,

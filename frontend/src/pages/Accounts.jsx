@@ -151,7 +151,7 @@ export default function Accounts({ onChange }) {
   const [merging, setMerging] = useState(null);
   const [recording, setRecording] = useState(null);
   const [addingManual, setAddingManual] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState(() => new Set(Object.keys(TYPE_LABELS)));
   const [activeDragId, setActiveDragId] = useState(null);
   const [overDragId, setOverDragId] = useState(null);
   const [accountReorderGroupType, setAccountReorderGroupType] = useState(null);
