@@ -13,6 +13,7 @@ stores data in SQLite, and runs as a Docker Compose app.
   and net worth screens
 - Rocket Money CSV import
 - SimpleFIN bank sync with encrypted access URL storage
+- Credit card profile tracking
 - Merchant logo enrichment with optional Logo.dev keys
 - Local login, optional OIDC login, or both, with household-scoped data
 - Household sharing for OIDC users by invited email

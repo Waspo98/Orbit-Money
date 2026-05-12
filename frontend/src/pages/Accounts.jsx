@@ -17,6 +17,7 @@ import AppSelect from '../components/AppSelect.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ExpandingSection from '../components/ExpandingSection.jsx';
+import { ImageUrlFinderPanel } from '../components/ImageUrlFinderModal.jsx';
 import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
@@ -54,6 +55,46 @@ function parseOptionalCurrency(value) {
   if (String(value ?? '').replace(/[$,\s]/g, '').trim() === '') return null;
   const parsed = parseCurrencyInput(value, NaN);
   return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+function formatShortDate(value) {
+  if (!value) return '';
+  const [year, month, day] = String(value).split('-').map(Number);
+  if (!year || !month || !day) return '';
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric'
+  });
+}
+
+function formatRewardRateLabel(item) {
+  if (!item) return '';
+  if (typeof item === 'string') return item;
+  const label = item.label || item.category || 'Other';
+  const rate = Number(item.rate);
+  if (!Number.isFinite(rate)) return label;
+  const type = String(item.type || '').toLowerCase();
+  if (type.includes('cashback') || type.includes('percent')) return `${label} ${rate}%`;
+  return `${label} ${rate}x`;
+}
+
+function splitCommaList(value) {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function splitLineList(value) {
+  return String(value || '')
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function joinProfileList(value, formatter = (item) => item) {
+  if (!Array.isArray(value)) return '';
+  return value.map(formatter).filter(Boolean).join(', ');
 }
 
 function todayLocalDate() {
@@ -100,6 +141,43 @@ function buildAccountGroups(accounts) {
   });
 }
 
+function normalizeAccountGroupLayoutPreference(saved, groups) {
+  const savedByType = new Map();
+  if (Array.isArray(saved)) {
+    for (const item of saved) {
+      const type = String(item?.type || '').trim();
+      if (!type || savedByType.has(type)) continue;
+      savedByType.set(type, {
+        type,
+        wideSpan: Number(item?.wideSpan) === 2 ? 2 : 1
+      });
+    }
+  }
+
+  return groups.map((group) => ({
+    type: group.type,
+    wideSpan: savedByType.get(group.type)?.wideSpan || 1
+  }));
+}
+
+function getAccountGroupStandardPlacementByType(layout) {
+  const placements = new Map();
+  let filledColumns = 0;
+
+  for (const item of layout) {
+    const standardPlacement = filledColumns === 0 ? 'left' : 'right';
+    placements.set(item.type, standardPlacement);
+
+    if (item.wideSpan === 2) {
+      filledColumns = 0;
+    } else {
+      filledColumns = standardPlacement === 'left' ? 1 : 0;
+    }
+  }
+
+  return placements;
+}
+
 function flattenGroups(groups) {
   return groups.flatMap((group) => group.items);
 }
@@ -139,7 +217,11 @@ function findAccountGroup(groups, accountId) {
 // Main page
 // ============================================================================
 
-export default function Accounts({ onChange }) {
+export default function Accounts({
+  onChange,
+  accountGroupLayoutPreference = [],
+  onAccountGroupLayoutPreferenceChange
+}) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { alert, confirm, Dialog } = useAppDialog();
@@ -150,6 +232,7 @@ export default function Accounts({ onChange }) {
   const [editing, setEditing] = useState(null);
   const [merging, setMerging] = useState(null);
   const [recording, setRecording] = useState(null);
+  const [cardDetailsAccount, setCardDetailsAccount] = useState(null);
   const [addingManual, setAddingManual] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set(Object.keys(TYPE_LABELS)));
   const [activeDragId, setActiveDragId] = useState(null);
@@ -277,6 +360,18 @@ export default function Accounts({ onChange }) {
 
   const activeAccounts = accounts.filter((account) => !account.is_archived);
   const accountGroups = useMemo(() => buildAccountGroups(accounts), [accounts]);
+  const accountGroupLayout = useMemo(
+    () => normalizeAccountGroupLayoutPreference(accountGroupLayoutPreference, accountGroups),
+    [accountGroupLayoutPreference, accountGroups]
+  );
+  const accountGroupLayoutByType = useMemo(
+    () => new Map(accountGroupLayout.map((item) => [item.type, item])),
+    [accountGroupLayout]
+  );
+  const accountGroupStandardPlacementByType = useMemo(
+    () => getAccountGroupStandardPlacementByType(accountGroupLayout),
+    [accountGroupLayout]
+  );
   const cashBalance = activeAccounts
     .filter((account) => account.type === 'checking' || account.type === 'savings')
     .reduce((total, account) => total + (Number(account.current_balance) || 0), 0);
@@ -318,6 +413,13 @@ export default function Accounts({ onChange }) {
   function resetDragState() {
     setActiveDragId(null);
     setOverDragId(null);
+  }
+
+  function updateAccountGroupWideSpan(type, wideSpan) {
+    const next = accountGroupLayout.map((item) =>
+      item.type === type ? { ...item, wideSpan } : item
+    );
+    onAccountGroupLayoutPreferenceChange?.(next);
   }
 
   function handleGroupDragStart(event) {
@@ -471,11 +573,14 @@ export default function Accounts({ onChange }) {
             items={accountGroups.map((group) => groupSortableId(group.type))}
             strategy={verticalListSortingStrategy}
           >
-            <div className="goal-list reorder-active reorder-drag-scope">
+            <div className="reorder-list reorder-active reorder-drag-scope">
               {accountGroups.map((group) => (
                 <DraggableAccountGroupRow
                   key={group.type}
                   group={group}
+                  wideSpan={accountGroupLayoutByType.get(group.type)?.wideSpan || 1}
+                  standardPlacement={accountGroupStandardPlacementByType.get(group.type) || 'left'}
+                  onWideSpanChange={(wideSpan) => updateAccountGroupWideSpan(group.type, wideSpan)}
                   previewDisplaced={
                     groupSortableId(group.type) === overDragId &&
                     groupSortableId(group.type) !== activeDragId
@@ -493,6 +598,7 @@ export default function Accounts({ onChange }) {
             <AccountGroup
               key={group.type}
               group={group}
+              wideSpan={accountGroupLayoutByType.get(group.type)?.wideSpan || 1}
               collapsed={collapsedGroups.has(group.type)}
               disabled={accountReorderGroupType === group.type}
               onToggle={() => toggleAccountGroup(group.type)}
@@ -589,6 +695,7 @@ export default function Accounts({ onChange }) {
                       onDelete={() => handleDelete(a)}
                       onViewTransactions={() => viewTransactions(a.id)}
                       onManageSnapshotReminder={() => manageSnapshotReminder(a.id)}
+                      onCardDetails={a.type === 'credit' ? () => setCardDetailsAccount(a) : null}
                     />
                   ))}
                 </ul>
@@ -650,6 +757,18 @@ export default function Accounts({ onChange }) {
         />
       )}
 
+      {cardDetailsAccount && (
+        <CreditCardDetailsModal
+          account={cardDetailsAccount}
+          onClose={() => setCardDetailsAccount(null)}
+          onSaved={() => {
+            setCardDetailsAccount(null);
+            load();
+            onChange?.();
+          }}
+        />
+      )}
+
       <Dialog />
     </div>
   );
@@ -659,11 +778,11 @@ export default function Accounts({ onChange }) {
 // Row used in reorder mode — entire row is a drag handle, no buttons
 // ============================================================================
 
-function AccountGroup({ group, children, collapsed, disabled = false, onToggle }) {
+function AccountGroup({ group, children, collapsed, disabled = false, wideSpan = 1, onToggle }) {
   const totalTone = group.total < 0 ? 'negative' : 'positive';
 
   return (
-    <section className={`dashboard-card account-group-card ${collapsed ? 'collapsed' : ''}`}>
+    <section className={`dashboard-card account-group-card ${wideSpan === 2 ? 'account-group-span-wide' : ''} ${collapsed ? 'collapsed' : ''}`}>
       <button
         type="button"
         className="dashboard-card-header account-group-header account-group-toggle"
@@ -693,7 +812,53 @@ function AccountGroup({ group, children, collapsed, disabled = false, onToggle }
   );
 }
 
-function DraggableAccountGroupRow({ group, previewDisplaced = false }) {
+function AccountGroupWidthPicker({ type, wideSpan, standardPlacement, onWideSpanChange }) {
+  const title = pluralTypeLabel(type, 2);
+  const placementLabel = standardPlacement === 'right' ? 'right side' : 'left side';
+
+  return (
+    <span
+      className="dashboard-column-picker account-group-column-picker"
+      role="group"
+      aria-label={`${title} width on wider screens`}
+    >
+      <button
+        type="button"
+        className={wideSpan === 1 ? 'active' : ''}
+        aria-label={`Use standard width for ${title}, previewed on the ${placementLabel}`}
+        aria-pressed={wideSpan === 1}
+        title={`Standard Width (${placementLabel})`}
+        onClick={() => onWideSpanChange(1)}
+      >
+        <span
+          className={`dashboard-width-icon dashboard-width-icon-standard dashboard-width-icon-${standardPlacement}`}
+          aria-hidden="true"
+        />
+      </button>
+      <button
+        type="button"
+        className={wideSpan === 2 ? 'active' : ''}
+        aria-label={`Use two-column width for ${title}`}
+        aria-pressed={wideSpan === 2}
+        title="Two-Column Width"
+        onClick={() => onWideSpanChange(2)}
+      >
+        <span
+          className="dashboard-width-icon dashboard-width-icon-wide"
+          aria-hidden="true"
+        />
+      </button>
+    </span>
+  );
+}
+
+function DraggableAccountGroupRow({
+  group,
+  wideSpan = 1,
+  standardPlacement = 'left',
+  onWideSpanChange,
+  previewDisplaced = false
+}) {
   const totalTone = group.total < 0 ? 'negative' : 'positive';
 
   return (
@@ -703,8 +868,20 @@ function DraggableAccountGroupRow({ group, previewDisplaced = false }) {
       handleLabel={`Reorder ${pluralTypeLabel(group.type, group.items.length)}`}
       title={pluralTypeLabel(group.type, group.items.length)}
       subtitle={`${group.items.length.toLocaleString()} ${group.items.length === 1 ? 'account' : 'accounts'}`}
-      sidePrimary={formatCurrency(group.total)}
-      sideSecondary={totalTone === 'negative' ? 'Liability' : 'Asset'}
+      side={(
+        <span className="account-group-reorder-side">
+          <AccountGroupWidthPicker
+            type={group.type}
+            wideSpan={wideSpan}
+            standardPlacement={standardPlacement}
+            onWideSpanChange={onWideSpanChange}
+          />
+          <span className="account-group-reorder-values">
+            <strong>{formatCurrency(group.total)}</strong>
+            <em>{totalTone === 'negative' ? 'Liability' : 'Asset'}</em>
+          </span>
+        </span>
+      )}
       previewDisplaced={previewDisplaced}
     />
   );
@@ -745,13 +922,49 @@ function StaticAccountRow({
   onArchive,
   onDelete,
   onViewTransactions,
-  onManageSnapshotReminder
+  onManageSnapshotReminder,
+  onCardDetails
 }) {
   const canDelete = account.transaction_count === 0;
+  const isCreditCard = account.type === 'credit' && typeof onCardDetails === 'function';
+  const profile = account.credit_card_profile || null;
+  const rewardLabels = Array.isArray(profile?.reward_categories)
+    ? profile.reward_categories.map(formatRewardRateLabel).filter(Boolean).slice(0, 3)
+    : [];
+  const authorizedUsers = Array.isArray(profile?.authorized_users)
+    ? profile.authorized_users
+    : [];
+  const creditLimit = Number(profile?.credit_limit);
+  const balance = Math.abs(Number(account.current_balance) || 0);
+  const utilization = Number.isFinite(creditLimit) && creditLimit > 0
+    ? Math.round((balance / creditLimit) * 100)
+    : null;
+  const glanceItems = [];
+  if (Number.isFinite(creditLimit) && creditLimit > 0) {
+    glanceItems.push(`Limit ${formatCurrency(creditLimit)}`);
+    if (utilization !== null) glanceItems.push(`${utilization}% used`);
+  }
+  if (profile?.annual_fee_post_date) {
+    const fee = Number(profile.annual_fee);
+    glanceItems.push(
+      `${Number.isFinite(fee) ? formatCurrency(fee) : 'Fee'} ${formatShortDate(profile.annual_fee_post_date)}`
+    );
+  } else if (profile && Number(profile.annual_fee) === 0) {
+    glanceItems.push('No annual fee');
+  }
+  if (authorizedUsers.length > 0) {
+    glanceItems.push(authorizedUsers.length === 1 ? authorizedUsers[0] : `${authorizedUsers[0]} + ${authorizedUsers.length - 1}`);
+  }
   const menuItems = [
+    {
+      label: 'Edit Card',
+      icon: '✎',
+      onClick: onCardDetails,
+      hidden: !isCreditCard
+    },
     { label: 'Add Record', icon: '+', onClick: onAddRecord },
     { label: 'Snapshot Reminder', icon: '!', onClick: onManageSnapshotReminder },
-    { label: 'Edit', icon: '✎', onClick: onEdit },
+    { label: 'Edit', icon: '✎', onClick: onEdit, hidden: isCreditCard },
     {
       label: 'Merge',
       icon: '⇌',
@@ -779,10 +992,10 @@ function StaticAccountRow({
       {TYPE_LABELS[account.type] || account.type}
     </span>
   );
-  if (account.simplefin_account_id) {
+  if (account.is_manual && !account.simplefin_account_id) {
     badges.push(
-      <span key="sf" className="badge-simplefin" title="Linked to SimpleFIN">
-        SimpleFIN
+      <span key="manual" className="badge-manual">
+        Manual
       </span>
     );
   }
@@ -794,13 +1007,41 @@ function StaticAccountRow({
     );
   }
 
+  function handleRowClick() {
+    if (isCreditCard) onCardDetails();
+  }
+
+  function handleRowKeyDown(event) {
+    if (!isCreditCard) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onCardDetails();
+  }
+
   return (
-    <li className={`account-row ${account.is_archived ? 'archived' : ''}`}>
+    <li
+      className={`account-row ${isCreditCard ? 'credit-card-row' : ''} ${profile?.image_url ? 'has-card-image' : ''} ${account.is_archived ? 'archived' : ''}`.trim()}
+      role={isCreditCard ? 'button' : undefined}
+      tabIndex={isCreditCard ? 0 : undefined}
+      onClick={handleRowClick}
+      onKeyDown={handleRowKeyDown}
+    >
       <div className="account-main">
-        <div className="account-name">{account.name}</div>
+        <div className="account-title-line">
+          {profile?.image_url && (
+            <span className="account-card-thumb">
+              <img src={profile.image_url} alt="" loading="lazy" />
+            </span>
+          )}
+          <div className="account-title-copy">
+            <div className="account-name">{account.name}</div>
+            {account.institution && (
+              <div className="account-title-institution">{account.institution}</div>
+            )}
+          </div>
+        </div>
         <div className="account-badges">{badges}</div>
         <div className="account-meta">
-          {account.institution && <span>{account.institution}</span>}
           {account.account_number_last4 && (
             <span>···{account.account_number_last4}</span>
           )}
@@ -808,13 +1049,29 @@ function StaticAccountRow({
             <span>Estimated value {formatCurrency(account.estimated_value)}</span>
           )}
         </div>
+        {isCreditCard && (
+          <div className="account-credit-glance">
+            {glanceItems.length > 0 || rewardLabels.length > 0 ? (
+              <>
+                {glanceItems.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+                {rewardLabels.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </>
+            ) : (
+              <span>Tap to add card details</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="account-balance">
         {formatCurrency(account.current_balance)}
       </div>
 
-      <div className="account-row-actions">
+      <div className="account-row-actions" onClick={(event) => event.stopPropagation()}>
         <button
           type="button"
           className="btn-secondary btn-compact"
@@ -829,6 +1086,240 @@ function StaticAccountRow({
         />
       </div>
     </li>
+  );
+}
+
+function formFromCreditCardProfile(account) {
+  const profile = account.credit_card_profile || {};
+  return {
+    account_name: account.name || '',
+    account_institution: account.institution || '',
+    card_name: profile.card_name || '',
+    issuer_name: profile.issuer_name || account.institution || '',
+    network: profile.network || '',
+    image_url: profile.image_url || '',
+    annual_fee: profile.annual_fee == null ? '' : formatCurrencyInput(profile.annual_fee),
+    annual_fee_post_date: profile.annual_fee_post_date || '',
+    credit_limit: profile.credit_limit == null ? '' : formatCurrencyInput(profile.credit_limit),
+    authorized_users: joinProfileList(profile.authorized_users),
+    reward_categories: joinProfileList(profile.reward_categories, formatRewardRateLabel),
+    benefits: joinProfileList(profile.benefits, (item) => item?.name || item).replace(/, /g, '\n'),
+    notes: profile.notes || ''
+  };
+}
+
+function CreditCardDetailsModal({ account, onClose, onSaved }) {
+  const [form, setForm] = useState(() => formFromCreditCardProfile(account));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  function updateField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleSave(event, close) {
+    event.preventDefault();
+    setError('');
+
+    const annualFee = parseOptionalCurrency(form.annual_fee);
+    if (Number.isNaN(annualFee)) {
+      setError('Annual fee must be a valid amount.');
+      return;
+    }
+    const creditLimit = parseOptionalCurrency(form.credit_limit);
+    if (Number.isNaN(creditLimit)) {
+      setError('Credit limit must be a valid amount.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await api.put(`/api/accounts/${account.id}/credit-card-profile`, {
+        account_name: form.account_name,
+        account_institution: form.account_institution,
+        card_name: form.card_name,
+        issuer_name: form.issuer_name,
+        network: form.network,
+        image_url: form.image_url,
+        annual_fee: annualFee,
+        annual_fee_post_date: form.annual_fee_post_date,
+        credit_limit: creditLimit,
+        authorized_users: splitCommaList(form.authorized_users),
+        reward_categories: splitCommaList(form.reward_categories).map((label) => ({ label })),
+        benefits: splitLineList(form.benefits).map((name) => ({ name })),
+        notes: form.notes
+      });
+      close({ animate: true });
+      setTimeout(onSaved, 180);
+    } catch (err) {
+      setError(err.message || 'Save failed.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AnimatedModal onClose={onClose} size="lg">
+      {({ close }) => (
+        <>
+          <div className="modal-header">
+            <div>
+              <h3>Edit Card</h3>
+              <p className="modal-copy">{form.account_name || account.name}</p>
+            </div>
+            <button type="button" className="modal-close" onClick={close} aria-label="Close">
+              x
+            </button>
+          </div>
+
+          <form className="credit-card-profile-form" onSubmit={(event) => handleSave(event, close)}>
+            {form.image_url && (
+              <div className="credit-card-modal-photo">
+                <img src={form.image_url} alt="" />
+              </div>
+            )}
+
+            <div className="credit-card-profile-grid">
+              <label className="field">
+                <span>Account Name</span>
+                <input
+                  type="text"
+                  value={form.account_name}
+                  onChange={(event) => updateField('account_name', event.target.value)}
+                  placeholder="Chase Freedom Unlimited (2457)"
+                  required
+                />
+              </label>
+              <label className="field">
+                <span>Institution</span>
+                <input
+                  type="text"
+                  value={form.account_institution}
+                  onChange={(event) => updateField('account_institution', event.target.value)}
+                  placeholder="Chase Bank"
+                />
+              </label>
+              <label className="field">
+                <span>Card Name</span>
+                <input
+                  type="text"
+                  value={form.card_name}
+                  onChange={(event) => updateField('card_name', event.target.value)}
+                  placeholder="Chase Freedom Unlimited"
+                />
+              </label>
+              <label className="field">
+                <span>Issuer</span>
+                <input
+                  type="text"
+                  value={form.issuer_name}
+                  onChange={(event) => updateField('issuer_name', event.target.value)}
+                  placeholder="Chase"
+                />
+              </label>
+              <label className="field">
+                <span>Network</span>
+                <input
+                  type="text"
+                  value={form.network}
+                  onChange={(event) => updateField('network', event.target.value)}
+                  placeholder="Visa"
+                />
+              </label>
+              <label className="field">
+                <span>Credit Limit</span>
+                <CurrencyInput
+                  value={form.credit_limit}
+                  onChange={(value) => updateField('credit_limit', value)}
+                  placeholder="$15,000"
+                />
+              </label>
+              <label className="field">
+                <span>Annual Fee</span>
+                <CurrencyInput
+                  value={form.annual_fee}
+                  onChange={(value) => updateField('annual_fee', value)}
+                  placeholder="$95"
+                />
+              </label>
+              <label className="field">
+                <span>Fee Posts</span>
+                <input
+                  type="date"
+                  value={form.annual_fee_post_date}
+                  onChange={(event) => updateField('annual_fee_post_date', event.target.value)}
+                />
+              </label>
+            </div>
+
+            <label className="field">
+              <span>Authorized Users (separate with commas)</span>
+              <input
+                type="text"
+                value={form.authorized_users}
+                onChange={(event) => updateField('authorized_users', event.target.value)}
+                placeholder="You, Alex"
+              />
+            </label>
+
+            <label className="field">
+              <span>Best Categories (separate with commas)</span>
+              <input
+                type="text"
+                value={form.reward_categories}
+                onChange={(event) => updateField('reward_categories', event.target.value)}
+                placeholder="Dining 3x, Travel 2x, Everything 1.5x"
+              />
+            </label>
+
+            <label className="field">
+              <span>Benefits</span>
+              <textarea
+                value={form.benefits}
+                onChange={(event) => updateField('benefits', event.target.value)}
+                rows={3}
+                placeholder="One benefit per line"
+              />
+            </label>
+
+            <label className="field">
+              <span>Notes</span>
+              <textarea
+                value={form.notes}
+                onChange={(event) => updateField('notes', event.target.value)}
+                rows={3}
+                placeholder="Downgrade plan, retention offer, reminders"
+              />
+            </label>
+
+            <section className="credit-card-image-panel" aria-label="Card image lookup">
+              <ImageUrlFinderPanel
+                initialQuery={form.card_name || account.name || ''}
+                initialUrl={form.image_url}
+                searchLabel="Card Image Search"
+                searchPlaceholder="Chase Freedom Unlimited"
+                urlLabel="Card Image URL"
+                urlPlaceholder="https://example.com/card.png"
+                externalSearchQuery={(currentQuery) => `${currentQuery || form.card_name || account.name || 'credit card'} credit card image`}
+                onSelectedUrlChange={(value) => updateField('image_url', value)}
+                showExternalSearchInTools={false}
+                imageVariant="card"
+              />
+            </section>
+
+            {error && <div className="error">{error}</div>}
+
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={close}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </>
+      )}
+    </AnimatedModal>
   );
 }
 

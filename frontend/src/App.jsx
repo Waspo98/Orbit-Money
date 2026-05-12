@@ -574,7 +574,15 @@ function AppShell() {
     ),
     '/budget-beta': <Navigate to={`/budgets${location.search}`} replace />,
     '/spending-trends': <SpendingTrends />,
-    '/accounts': <Accounts onChange={loadLookups} />,
+    '/accounts': (
+      <Accounts
+        onChange={loadLookups}
+        accountGroupLayoutPreference={userPreferences[USER_PREFERENCE_KEYS.accountGroupLayout]}
+        onAccountGroupLayoutPreferenceChange={(value) =>
+          setUserPreference(USER_PREFERENCE_KEYS.accountGroupLayout, value)
+        }
+      />
+    ),
     '/rules': <Rules />,
     '/categories': (
       <Categories

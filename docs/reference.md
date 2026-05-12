@@ -126,6 +126,8 @@ offline cache keys by exact request path.
 
 **Account balance records:** `account_balance_records` stores dated balance snapshots for accounts that need manual history outside SimpleFIN. Adding a record upserts by `(account_id, record_date)` and updates `accounts.current_balance` when that record is the newest snapshot for the account. Net Worth history uses the latest snapshot on or before each month when one exists, then falls back to transaction-derived balances. Push snapshot reminders can target selected accounts and deep-link to `/accounts?action=add-snapshot&accountId=...`.
 
+**Credit card profiles:** `credit_card_profiles` stores optional one-to-one profile details for credit accounts, including card name, issuer, network, credit limit, annual fee timing, authorized users, best-use reward categories, benefits, notes, and optional card imagery. Money fields are integer cents in SQLite and dollar values in API payloads.
+
 **Overlap strategy (SimpleFIN + Rocket Money):** cutover date approach — RM owns transactions before cutover, SimpleFIN owns after. Pre-cutover RM transactions are deleted during sync if SimpleFIN provides the same period.
 
 **Budgets:** One row per spending `category_id` (globally applied). Transfer and income categories are excluded from budget rows and per-category spending lists; income is summarized separately in the monthly Income / Expenses / Net stat row. The `budgets` table retains the `rollover` column from migration 001 for future Phase 2 work but it's not consumed by the current UI.
@@ -202,6 +204,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Three-dot dropdown menu per account (Add Record, Edit, Merge, Archive, Delete)
 - Add Record modal stores a dated account total snapshot with an app-dialog confirmation that summarizes the percentage change from the previous balance.
 - Edit modal: name, type, institution, plus estimated value for mortgage accounts. Balance and last-4 are intentionally not editable in the UI.
+- Credit card account rows open an Edit Card modal on tap/click. The modal stores the account name, institution, local card name, issuer, network, credit limit, annual fee timing, authorized users, best-use categories, benefits, notes, and optional card imagery. Card images can be found through the shared image finder using a DuckDuckGo Images helper or a direct image URL.
 
 ### Budgets
 - **Monthly caps, global per category.** One amount per category that applies to every month. Editing `Groceries` updates the cap for every past and future month.

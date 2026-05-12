@@ -15,9 +15,46 @@ const router = express.Router();
 const VALID_TYPES = ['checking', 'savings', 'credit', 'investment', 'loan', 'mortgage', 'cash', 'other'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ACCOUNT_MONEY_FIELDS = ['current_balance', 'estimated_value'];
+const CREDIT_CARD_PROFILE_MONEY_FIELDS = ['annual_fee', 'credit_limit'];
 
 function serializeAccount(row) {
   return moneyFieldsToDollars(row, ACCOUNT_MONEY_FIELDS);
+}
+
+function safeJsonParse(value, fallback) {
+  if (typeof value !== 'string') return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function serializeCreditCardProfile(row) {
+  if (!row) return null;
+  const profile = moneyFieldsToDollars(row, CREDIT_CARD_PROFILE_MONEY_FIELDS);
+  profile.authorized_users = safeJsonParse(profile.authorized_users_json, []);
+  profile.reward_categories = safeJsonParse(profile.reward_categories_json, []);
+  profile.benefits = safeJsonParse(profile.benefits_json, []);
+  delete profile.authorized_users_json;
+  delete profile.reward_categories_json;
+  delete profile.benefits_json;
+  return profile;
+}
+
+function attachCreditCardProfiles(householdId, accounts) {
+  if (accounts.length === 0) return accounts;
+  const profiles = db
+    .prepare('SELECT * FROM credit_card_profiles WHERE household_id = ?')
+    .all(householdId)
+    .map(serializeCreditCardProfile);
+  const profileByAccountId = new Map(
+    profiles.map((profile) => [profile.account_id, profile])
+  );
+  return accounts.map((account) => ({
+    ...account,
+    credit_card_profile: profileByAccountId.get(account.id) || null
+  }));
 }
 
 function isValidDateOnly(value) {
@@ -35,6 +72,123 @@ function previousMonthEnd(value) {
 function normalizeOptionalText(value) {
   const text = typeof value === 'string' ? value.trim() : '';
   return text || null;
+}
+
+function normalizeOptionalTextLength(value, maxLength = 500) {
+  const text = normalizeOptionalText(value);
+  return text ? text.slice(0, maxLength) : null;
+}
+
+function normalizeOptionalDateOnly(value) {
+  const text = normalizeOptionalText(value);
+  if (!text) return null;
+  if (!isValidDateOnly(text)) {
+    throw new Error('annual_fee_post_date must be a valid YYYY-MM-DD date.');
+  }
+  return text;
+}
+
+function normalizeOptionalMoney(value, fieldName) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) {
+    throw new Error(`${fieldName} must be a non-negative number.`);
+  }
+  return dollarsToCents(number);
+}
+
+function normalizeTextList(value, maxItems = 12, maxLength = 80) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .slice(0, maxItems)
+    .map((item) => item.slice(0, maxLength));
+}
+
+function normalizeRewardCategories(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (typeof item === 'string') {
+        const label = item.trim();
+        return label ? { label: label.slice(0, 80) } : null;
+      }
+      if (!item || typeof item !== 'object') return null;
+      const label = String(item.label || item.category || item.name || '').trim();
+      if (!label) return null;
+      const rate = item.rate === null || item.rate === undefined || item.rate === ''
+        ? null
+        : Number(item.rate);
+      return {
+        label: label.slice(0, 80),
+        category: normalizeOptionalTextLength(item.category, 80),
+        rate: Number.isFinite(rate) ? rate : null,
+        type: normalizeOptionalTextLength(item.type, 40),
+        notes: normalizeOptionalTextLength(item.notes || item.note, 180)
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function normalizeBenefits(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (typeof item === 'string') {
+        const name = item.trim();
+        return name ? { name: name.slice(0, 120) } : null;
+      }
+      if (!item || typeof item !== 'object') return null;
+      const name = String(item.name || item.label || '').trim();
+      if (!name) return null;
+      return {
+        name: name.slice(0, 120),
+        value: item.value === null || item.value === undefined || item.value === ''
+          ? null
+          : Number(item.value),
+        description: normalizeOptionalTextLength(item.description || item.notes, 300),
+        category: normalizeOptionalTextLength(item.category, 80)
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
+function stringifyProfileJson(value, fieldName) {
+  const text = JSON.stringify(value);
+  if (Buffer.byteLength(text, 'utf8') > 20000) {
+    throw new Error(`${fieldName} is too large.`);
+  }
+  return text;
+}
+
+function normalizeCreditCardProfileBody(body = {}) {
+  const authorizedUsers = normalizeTextList(body.authorized_users);
+  const rewardCategories = normalizeRewardCategories(body.reward_categories);
+  const benefits = normalizeBenefits(body.benefits);
+  const accountName = typeof body.account_name === 'string' ? body.account_name.trim() : null;
+
+  if (!accountName) {
+    throw new Error('account_name cannot be empty.');
+  }
+
+  return {
+    account_name: accountName,
+    account_institution: normalizeOptionalTextLength(body.account_institution, 180),
+    card_name: normalizeOptionalTextLength(body.card_name, 220),
+    issuer_name: normalizeOptionalTextLength(body.issuer_name, 180),
+    network: normalizeOptionalTextLength(body.network, 40),
+    image_url: normalizeOptionalTextLength(body.image_url, 1000),
+    annual_fee: normalizeOptionalMoney(body.annual_fee, 'annual_fee'),
+    annual_fee_post_date: normalizeOptionalDateOnly(body.annual_fee_post_date),
+    credit_limit: normalizeOptionalMoney(body.credit_limit, 'credit_limit'),
+    authorized_users_json: stringifyProfileJson(authorizedUsers, 'authorized_users'),
+    reward_categories_json: stringifyProfileJson(rewardCategories, 'reward_categories'),
+    benefits_json: stringifyProfileJson(benefits, 'benefits'),
+    notes: normalizeOptionalTextLength(body.notes, 2000)
+  };
 }
 
 /**
@@ -67,7 +221,7 @@ router.get('/', requireAuth, (req, res) => {
       .all(householdId, householdId)
       .map(serializeAccount);
 
-    sendOk(res, { items });
+    sendOk(res, { items: attachCreditCardProfiles(householdId, items) });
   } catch (err) {
     console.error('List accounts failed:', err);
     sendServerError(res, err);
@@ -275,6 +429,110 @@ router.put('/:id', requireAuth, (req, res) => {
   } catch (err) {
     console.error('Update account failed:', err);
     sendBadRequest(res, err.message);
+  }
+});
+
+router.put('/:id/credit-card-profile', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  const id = readIdParam(req, res, 'id', 'account');
+  if (id === null) return;
+
+  const account = db
+    .prepare('SELECT id, type FROM accounts WHERE id = ? AND household_id = ?')
+    .get(id, householdId);
+  if (!account) return sendNotFound(res, 'Account not found.');
+  if (account.type !== 'credit') {
+    return sendBadRequest(res, 'Credit card details can only be saved on credit accounts.');
+  }
+
+  let profile;
+  try {
+    profile = normalizeCreditCardProfileBody(req.body || {});
+  } catch (err) {
+    return sendBadRequest(res, err.message || 'Invalid credit card profile.');
+  }
+
+  try {
+    db.transaction(() => {
+      db.prepare(
+        `UPDATE accounts
+            SET name = ?,
+                institution = ?,
+                updated_at = datetime('now')
+          WHERE id = ?
+            AND household_id = ?`
+      ).run(profile.account_name, profile.account_institution, id, householdId);
+
+      db.prepare(
+        `INSERT INTO credit_card_profiles (
+           household_id, account_id, card_name, issuer_name, network, image_url,
+           annual_fee, annual_fee_post_date, credit_limit, authorized_users_json,
+           reward_categories_json, benefits_json, notes
+         ) VALUES (
+           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+         )
+         ON CONFLICT(household_id, account_id) DO UPDATE SET
+           card_name = excluded.card_name,
+           issuer_name = excluded.issuer_name,
+           network = excluded.network,
+           image_url = excluded.image_url,
+           annual_fee = excluded.annual_fee,
+           annual_fee_post_date = excluded.annual_fee_post_date,
+           credit_limit = excluded.credit_limit,
+           authorized_users_json = excluded.authorized_users_json,
+           reward_categories_json = excluded.reward_categories_json,
+           benefits_json = excluded.benefits_json,
+           notes = excluded.notes,
+           updated_at = datetime('now')`
+      ).run(
+        householdId,
+        id,
+        profile.card_name,
+        profile.issuer_name,
+        profile.network,
+        profile.image_url,
+        profile.annual_fee,
+        profile.annual_fee_post_date,
+        profile.credit_limit,
+        profile.authorized_users_json,
+        profile.reward_categories_json,
+        profile.benefits_json,
+        profile.notes
+      );
+    })();
+
+    const updated = db
+      .prepare('SELECT * FROM credit_card_profiles WHERE account_id = ? AND household_id = ?')
+      .get(id, householdId);
+    const updatedAccount = db
+      .prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?')
+      .get(id, householdId);
+    sendOk(res, {
+      success: true,
+      account: serializeAccount(updatedAccount),
+      profile: serializeCreditCardProfile(updated)
+    });
+  } catch (err) {
+    console.error('Save credit card profile failed:', err);
+    sendServerError(res, err);
+  }
+});
+
+router.delete('/:id/credit-card-profile', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  const id = readIdParam(req, res, 'id', 'account');
+  if (id === null) return;
+
+  try {
+    db.prepare(
+      `DELETE FROM credit_card_profiles
+        WHERE account_id = ?
+          AND household_id = ?`
+    ).run(id, householdId);
+    sendOk(res, { success: true });
+  } catch (err) {
+    console.error('Delete credit card profile failed:', err);
+    sendServerError(res, err);
   }
 });
 

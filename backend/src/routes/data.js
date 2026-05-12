@@ -16,6 +16,7 @@ const upload = createMemoryUpload({ fileSizeMb: 50 });
 const BACKUP_TABLES = [
   'accounts',
   'categories',
+  'credit_card_profiles',
   'transactions',
   'rules',
   'budgets',
@@ -69,6 +70,9 @@ function buildFinancialExport(householdId) {
     exportedAt: new Date().toISOString(),
     accounts: rowsForTable('accounts', householdId).map((row) =>
       withDollars(row, ['current_balance', 'estimated_value'])
+    ),
+    creditCardProfiles: rowsForTable('credit_card_profiles', householdId).map((row) =>
+      withDollars(row, ['annual_fee', 'credit_limit'])
     ),
     categories: rowsForTable('categories', householdId),
     transactions: rowsForTable('transactions', householdId).map((row) =>
@@ -140,6 +144,7 @@ function backupSummary(backup) {
     householdName: backup.household?.name || 'Orbit Household',
     exportedAt: backup.exportedAt || null,
     accounts: tables.accounts?.length || 0,
+    creditCardProfiles: tables.credit_card_profiles?.length || 0,
     transactions: tables.transactions?.length || 0,
     categories: tables.categories?.length || 0,
     rules: tables.rules?.length || 0,

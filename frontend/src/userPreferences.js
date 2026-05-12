@@ -10,6 +10,7 @@ export const USER_PREFERENCE_KEYS = {
   dashboardHandledReviewTransactions: 'dashboardHandledReviewTransactions',
   dashboardGoalFocusId: 'dashboardGoalFocusId',
   dashboardRetirement: 'dashboardRetirement',
+  accountGroupLayout: 'accountGroupLayout',
   settingsCardOrder: 'settingsCardOrder',
   budgetedSort: 'budgetedSort',
   notificationPreferences: 'notificationPreferences'
@@ -20,6 +21,7 @@ const BIGGEST_TRANSACTIONS_HIDDEN_KEY = 'orbit-money-biggest-transactions-hidden
 const TRANSACTION_REVIEW_HANDLED_KEY = 'orbit-money-transaction-review-handled-v1';
 const GOAL_FOCUS_STORAGE_KEY = 'orbit-money-dashboard-goal-focus-v1';
 const RETIREMENT_PREFS_STORAGE_KEY = 'orbit-money-retirement-preferences-v1';
+const ACCOUNT_GROUP_LAYOUT_STORAGE_KEY = 'orbit-money-account-group-layout-v1';
 const SETTINGS_CARD_ORDER_STORAGE_KEY = 'orbit-money-settings-card-order';
 const BUDGETED_SORT_STORAGE_KEY = 'orbit-money-budgeted-sort';
 const NOTIFICATION_PREFS_STORAGE_KEY = 'orbit-money-notification-preferences-v1';
@@ -97,6 +99,22 @@ function normalizeRetirementPreferences(value) {
 function normalizeBudgetedSort(value) {
   if (BUDGETED_SORT_OPTIONS.has(value)) return value;
   return LEGACY_BUDGETED_SORT_OPTIONS[value] || 'variance_desc';
+}
+
+function normalizeAccountGroupLayout(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const rows = [];
+  for (const item of value) {
+    const type = String(item?.type || '').trim();
+    if (!type || seen.has(type)) continue;
+    seen.add(type);
+    rows.push({
+      type,
+      wideSpan: Number(item?.wideSpan) === 2 ? 2 : 1
+    });
+  }
+  return rows;
 }
 
 function normalizeTime(value, fallback = '09:00') {
@@ -211,6 +229,8 @@ export function normalizePreferenceValue(key, value) {
       return normalizeGoalFocusId(value);
     case USER_PREFERENCE_KEYS.dashboardRetirement:
       return normalizeRetirementPreferences(value);
+    case USER_PREFERENCE_KEYS.accountGroupLayout:
+      return normalizeAccountGroupLayout(value);
     case USER_PREFERENCE_KEYS.settingsCardOrder:
       return Array.isArray(value) ? value : [];
     case USER_PREFERENCE_KEYS.budgetedSort:
@@ -230,6 +250,7 @@ export function defaultUserPreferences() {
     [USER_PREFERENCE_KEYS.dashboardHandledReviewTransactions]: [],
     [USER_PREFERENCE_KEYS.dashboardGoalFocusId]: null,
     [USER_PREFERENCE_KEYS.dashboardRetirement]: normalizeRetirementPreferences(),
+    [USER_PREFERENCE_KEYS.accountGroupLayout]: [],
     [USER_PREFERENCE_KEYS.settingsCardOrder]: [],
     [USER_PREFERENCE_KEYS.budgetedSort]: 'variance_desc',
     [USER_PREFERENCE_KEYS.notificationPreferences]: defaultNotificationPreferences()
@@ -253,6 +274,9 @@ export function readLocalUserPreferences() {
     ),
     [USER_PREFERENCE_KEYS.dashboardRetirement]: normalizeRetirementPreferences(
       readJson(RETIREMENT_PREFS_STORAGE_KEY, {})
+    ),
+    [USER_PREFERENCE_KEYS.accountGroupLayout]: normalizeAccountGroupLayout(
+      readJson(ACCOUNT_GROUP_LAYOUT_STORAGE_KEY, [])
     ),
     [USER_PREFERENCE_KEYS.settingsCardOrder]: readJson(SETTINGS_CARD_ORDER_STORAGE_KEY, []),
     [USER_PREFERENCE_KEYS.budgetedSort]: normalizeBudgetedSort(
@@ -307,6 +331,9 @@ export function writeLocalPreference(key, value) {
       break;
     case USER_PREFERENCE_KEYS.dashboardRetirement:
       writeJson(RETIREMENT_PREFS_STORAGE_KEY, normalized);
+      break;
+    case USER_PREFERENCE_KEYS.accountGroupLayout:
+      writeJson(ACCOUNT_GROUP_LAYOUT_STORAGE_KEY, normalized);
       break;
     case USER_PREFERENCE_KEYS.settingsCardOrder:
       writeJson(SETTINGS_CARD_ORDER_STORAGE_KEY, normalized);

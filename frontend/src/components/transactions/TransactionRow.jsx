@@ -3,6 +3,7 @@ import { api } from '../../api.js';
 import AppSelect from '../AppSelect.jsx';
 import AnimatedModal from '../AnimatedModal.jsx';
 import DropdownMenu from '../DropdownMenu.jsx';
+import ImageUrlFinderModal from '../ImageUrlFinderModal.jsx';
 import { formatCurrency, formatCurrencyOr, formatSignedCurrency } from '../../lib/formatters.js';
 import { formatFullDate, formatMonthDay } from '../../lib/localDate.js';
 
@@ -302,21 +303,6 @@ function TransactionMerchantMark({ txn, category, onLogoChanged }) {
 
 function LogoFinderModal({ txn, logo, onClose, onSaved }) {
   const [merchantLogo, setMerchantLogo] = useState(logo || null);
-  const [query, setQuery] = useState(txn.merchant || logo?.merchant_name || '');
-  const [logoUrl, setLogoUrl] = useState(logo?.url || '');
-  const [candidates, setCandidates] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [hasSearched, setHasSearched] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    searchBrands(query, { activeRef: () => active });
-    return () => {
-      active = false;
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function ensureLogoEntry() {
     if (merchantLogo?.merchant_key) return merchantLogo;
@@ -327,184 +313,77 @@ function LogoFinderModal({ txn, logo, onClose, onSaved }) {
     return result.merchant_logo;
   }
 
-  async function searchBrands(nextQuery = query, options = {}) {
-    const trimmed = nextQuery.trim();
-    if (!trimmed) return;
-    const isActive = options.activeRef || (() => true);
-    setSearching(true);
-    setError('');
-    try {
-      const result = await api.post('/api/merchant-logos/search', {
-        transaction_id: txn.id,
-        query: trimmed
-      });
-      if (!isActive()) return;
-      setMerchantLogo(result.merchant_logo);
-      setCandidates(result.candidates || []);
-      setHasSearched(true);
-      if (result.configured === false) {
-        setError('Logo search is not configured on this server yet. Paste a direct image URL below.');
-      }
-    } catch (err) {
-      if (!isActive()) return;
-      setError(err.message || 'Logo search failed');
-      setHasSearched(true);
-    } finally {
-      if (isActive()) setSearching(false);
-    }
+  async function searchBrands(searchQuery, options = {}) {
+    const result = await api.post('/api/merchant-logos/search', {
+      transaction_id: txn.id,
+      query: searchQuery
+    });
+    if (options.activeRef && !options.activeRef()) return { candidates: [] };
+    setMerchantLogo(result.merchant_logo);
+    return {
+      candidates: (result.candidates || []).map((candidate) => ({
+        key: candidate.domain,
+        imageUrl: candidate.logo_url,
+        title: candidate.name,
+        subtitle: candidate.domain
+      })),
+      message: result.configured === false
+        ? 'Logo search is not configured on this server yet. Paste a direct image URL below.'
+        : ''
+    };
   }
 
-  function openDuckDuckGo() {
-    const searchQuery = encodeURIComponent(`${query || txn.merchant || 'merchant'} logo`);
-    window.open(`https://duckduckgo.com/?q=${searchQuery}&iar=images&iax=images&ia=images`, '_blank', 'noopener,noreferrer');
-  }
-
-  async function handleSubmit(event, close) {
-    event.preventDefault();
+  async function saveLogo(logoUrl, { close }) {
     const ensuredLogo = await ensureLogoEntry();
     if (!ensuredLogo?.merchant_key) {
-      setError('This merchant does not have a logo entry to update yet.');
-      return;
+      throw new Error('This merchant does not have a logo entry to update yet.');
     }
-    if (!logoUrl.trim()) {
-      setError('Choose a result or paste a direct image URL.');
-      return;
-    }
-    setSaving(true);
-    setError('');
-    try {
-      const result = await api.post('/api/merchant-logos/override', {
-        merchant_key: ensuredLogo.merchant_key,
-        logo_url: logoUrl.trim()
-      });
-      close({ animate: true });
-      setTimeout(() => onSaved(result.merchant_logo), 180);
-    } catch (err) {
-      setError(err.message || 'Logo override failed');
-      setSaving(false);
-    }
+    const result = await api.post('/api/merchant-logos/override', {
+      merchant_key: ensuredLogo.merchant_key,
+      logo_url: logoUrl.trim()
+    });
+    close({ animate: true });
+    setTimeout(() => onSaved(result.merchant_logo), 180);
   }
 
-  async function useCategoryIcon(close) {
-    setSaving(true);
-    setError('');
-    try {
-      const ensuredLogo = await ensureLogoEntry();
-      if (!ensuredLogo?.merchant_key) {
-        setError('This merchant does not have a logo entry to update yet.');
-        setSaving(false);
-        return;
-      }
-      const result = await api.post('/api/merchant-logos/override', {
-        merchant_key: ensuredLogo.merchant_key,
-        use_category_icon: true
-      });
-      close({ animate: true });
-      setTimeout(() => onSaved(result.merchant_logo), 180);
-    } catch (err) {
-      setError(err.message || 'Logo override failed');
-      setSaving(false);
+  async function useCategoryIcon({ close }) {
+    const ensuredLogo = await ensureLogoEntry();
+    if (!ensuredLogo?.merchant_key) {
+      throw new Error('This merchant does not have a logo entry to update yet.');
     }
+    const result = await api.post('/api/merchant-logos/override', {
+      merchant_key: ensuredLogo.merchant_key,
+      use_category_icon: true
+    });
+    close({ animate: true });
+    setTimeout(() => onSaved(result.merchant_logo), 180);
   }
 
   return (
-    <AnimatedModal onClose={onClose} size="lg">
-      {({ close }) => (
-        <>
-          <h3>Find Logo</h3>
-          <p className="modal-copy">
-            Search Logo.dev results for {txn.merchant}, or paste a direct image URL.
-          </p>
-          <form
-            className="logo-finder-search"
-            onSubmit={(event) => {
-              event.preventDefault();
-              searchBrands(query);
-            }}
-          >
-            <label className="field">
-              <span>Merchant Search</span>
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Merchant name"
-                required
-              />
-            </label>
-            <button type="submit" className="btn-secondary" disabled={searching}>
-              {searching ? 'Searching...' : 'Search'}
-            </button>
-          </form>
-
-          <div className="logo-finder-results">
-            {candidates.map((candidate) => (
-              <button
-                key={candidate.domain}
-                type="button"
-                className={`logo-candidate ${logoUrl === candidate.logo_url ? 'selected' : ''}`}
-                onClick={() => setLogoUrl(candidate.logo_url || '')}
-              >
-                <span className="logo-candidate-image">
-                  <img src={candidate.logo_url} alt="" loading="lazy" />
-                </span>
-                <span className="logo-candidate-text">
-                  <strong>{candidate.name}</strong>
-                  <span>{candidate.domain}</span>
-                </span>
-              </button>
-            ))}
-            {!searching && hasSearched && candidates.length === 0 && (
-              <div className="logo-finder-empty">
-                No Logo.dev matches found. Try a simpler merchant name or paste a direct image URL.
-              </div>
-            )}
-          </div>
-
-          <form onSubmit={(event) => handleSubmit(event, close)}>
-            <label className="field">
-              <span>Logo Image URL</span>
-              <input
-                type="url"
-                value={logoUrl}
-                onChange={(event) => setLogoUrl(event.target.value)}
-                placeholder="https://example.com/logo.png"
-                required
-              />
-            </label>
-            <div className={`logo-finder-bottom-tools ${logoUrl ? 'has-preview' : ''}`}>
-              {logoUrl && (
-                <div className="logo-finder-preview" aria-label="Selected logo preview">
-                  <img src={logoUrl} alt="" />
-                </div>
-              )}
-              <div className="logo-finder-secondary-actions">
-                <button type="button" className="btn-secondary" onClick={openDuckDuckGo}>
-                  DuckDuckGo Images
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => useCategoryIcon(close)}
-                  disabled={saving}
-                >
-                  Use Category Icon
-                </button>
-              </div>
-            </div>
-            {error && <div className="error">{error}</div>}
-            <div className="modal-actions logo-finder-actions">
-              <button type="button" className="btn-secondary" onClick={close}>
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          </form>
-        </>
-      )}
-    </AnimatedModal>
+    <ImageUrlFinderModal
+      title="Find Logo"
+      copy={`Search Logo.dev results for ${txn.merchant}, or paste a direct image URL.`}
+      onClose={onClose}
+      initialQuery={txn.merchant || logo?.merchant_name || ''}
+      initialUrl={logo?.url || ''}
+      autoSearch
+      searchLabel="Merchant Search"
+      searchPlaceholder="Merchant name"
+      urlLabel="Logo Image URL"
+      urlPlaceholder="https://example.com/logo.png"
+      emptyMessage="No Logo.dev matches found. Try a simpler merchant name or paste a direct image URL."
+      externalSearchQuery={(currentQuery) => `${currentQuery || txn.merchant || 'merchant'} logo`}
+      onSearch={searchBrands}
+      onSave={saveLogo}
+      secondaryActions={[
+        {
+          label: 'Use Category Icon',
+          onClick: useCategoryIcon,
+          keepSaving: true
+        }
+      ]}
+      imageVariant="logo"
+    />
   );
 }
 

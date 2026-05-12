@@ -19,12 +19,14 @@ const RESTORE_DELETE_ORDER = [
   'budgets',
   'rules',
   'transactions',
+  'credit_card_profiles',
   'categories',
   'accounts'
 ];
 
 const RESTORE_INSERT_ORDER = [
   'accounts',
+  'credit_card_profiles',
   'categories',
   'rules',
   'transactions',
@@ -53,6 +55,7 @@ const RULE_SOURCE_FIELDS = [
 
 const IMPORT_BATCH_ROW_TABLES = new Set([
   'accounts',
+  'credit_card_profiles',
   'categories',
   'transactions',
   'rules',
@@ -69,6 +72,12 @@ const IMPORT_BATCH_ROW_TABLES = new Set([
 
 function tableColumns(db, table) {
   return db.pragma(`table_info(${table})`).map((column) => column.name);
+}
+
+function tableExists(db, table) {
+  return Boolean(
+    db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)
+  );
 }
 
 function asPositiveInteger(value) {
@@ -295,6 +304,13 @@ function transformRestoreRow(table, row, householdId, context) {
       break;
     }
 
+    case 'credit_card_profiles': {
+      const accountId = mapRequiredId(context, 'accounts', next.account_id);
+      if (!accountId) return null;
+      next.account_id = accountId;
+      break;
+    }
+
     case 'household_income_records': {
       const memberId = mapRequiredId(context, 'household_members', next.member_id);
       if (!memberId) return null;
@@ -356,6 +372,7 @@ function transformRestoreRow(table, row, householdId, context) {
 
 function insertRestoreRows(db, table, rows, householdId, context) {
   if (!Array.isArray(rows) || rows.length === 0) return 0;
+  if (!tableExists(db, table)) return 0;
   const columns = columnsFor(db, context, table);
   const available = new Set(columns);
   const hasIdColumn = available.has('id');
@@ -491,6 +508,7 @@ export function restoreOrbitBackup(db, backup, householdId, currentUserId) {
     db.exec('PRAGMA defer_foreign_keys = ON');
 
     for (const table of RESTORE_DELETE_ORDER) {
+      if (!tableExists(db, table)) continue;
       db.prepare(`DELETE FROM ${table} WHERE household_id = ?`).run(householdId);
     }
 

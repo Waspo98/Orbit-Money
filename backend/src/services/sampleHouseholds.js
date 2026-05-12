@@ -20,6 +20,7 @@ const HOUSEHOLD_DELETE_TABLES = [
   'budgets',
   'rules',
   'transactions',
+  'credit_card_profiles',
   'categories',
   'accounts'
 ];

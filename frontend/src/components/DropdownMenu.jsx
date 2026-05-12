@@ -167,8 +167,10 @@ export default function DropdownMenu({
                   });
                 }}
               >
-                {item.icon && <span>{item.icon}</span>}
-                <span>{item.label}</span>
+                <span className="dropdown-item-icon" aria-hidden="true">
+                  {item.icon || ''}
+                </span>
+                <span className="dropdown-item-label">{item.label}</span>
               </button>
             )
           )}
