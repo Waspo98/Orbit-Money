@@ -10,18 +10,18 @@ This folder defines the maintainer beta Docker deployment for Orbit Money.
 - Docker volume: `orbitmoney-beta_orbit-money-beta-data`
 - Optional reverse-proxy hostname: your own beta hostname
 
-The beta deployment pulls the published beta image and uses the root `.env` for
-shared secrets. If the pull fails, the deploy script prints the pull error,
-builds the beta Compose service locally from the checked-out `Beta` branch, and
-then restarts the container. It overrides:
+The beta deployment builds and publishes the beta image, builds the beta Compose
+service locally from the checked-out `Beta` branch, restarts the container, and
+verifies the running version. It uses the root `.env` for shared secrets and
+overrides:
 
 - `AUTH_PROVIDER=local`, `ADMIN_USERNAME=admin`, and `ADMIN_PASSWORD=admin` so the seeded demo beta is easy to review. Do not expose this beta container publicly without changing those credentials or adding external access controls.
 - `SESSION_NAME=orbit_beta.sid` so local beta and production browser sessions do not collide.
 - `SEED_DEMO_DATA=1` so a fresh beta volume starts with demo data.
 
 Beta is Docker-only. Do not run beta through Vite, a local preview server, or a
-`start-beta` helper. The supported path pulls the published beta image and
-restarts the `orbit-money-beta` Docker container.
+`start-beta` helper. The supported path publishes the beta image, locally builds
+the Compose service, and restarts the `orbit-money-beta` Docker container.
 
 Run from the project root:
 
@@ -38,21 +38,16 @@ deploy-beta.cmd
 That script ultimately runs:
 
 ```bat
-docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta pull
+docker build -t ghcr.io/waspo98/orbit-money:beta -t ghcr.io/waspo98/orbit-money:beta-<sha> .
+docker push ghcr.io/waspo98/orbit-money:beta
+docker push ghcr.io/waspo98/orbit-money:beta-<sha>
 docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta build orbit-money-beta
 docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta up -d
 ```
 
-The build command only runs when the image pull fails.
-
-If the GHCR package is public but the pull fails with
-`error from registry: denied`, Docker may be sending stale saved GHCR
-credentials. Clear the saved login and retry the beta pull:
-
-```bat
-docker logout ghcr.io
-docker compose -f "deploy\beta\docker-compose.yml" -p orbitmoney-beta pull
-```
+The script does not pull from GHCR. Manual beta deploys require Docker push
+access to `ghcr.io/waspo98/orbit-money`, either through `GITHUB_TOKEN` or an
+existing Docker registry login.
 
 After startup, test locally:
 

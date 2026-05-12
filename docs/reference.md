@@ -19,11 +19,11 @@ Multi-stage build:
 ## Docker Images
 - Public installs use `ghcr.io/waspo98/orbit-money:latest` from `docker-compose.yml`.
 - Maintainer beta uses `ghcr.io/waspo98/orbit-money:beta` from `deploy/beta/docker-compose.yml`.
-- The `main` and `Beta` GitHub Actions workflows run the self-hosted deploy scripts with `ORBIT_PUBLISH_IMAGE=1`; those scripts publish their image tags, then pull and restart the matching Docker Compose service.
-- Manual maintainer deploys still try to pull GHCR first, but fall back to building the same Compose service locally when the registry pull is denied or otherwise fails.
+- The `main` and `Beta` GitHub Actions workflows run the self-hosted deploy scripts; those scripts build and publish the branch image tags, build the matching Docker Compose service locally, restart the container, and verify the running container version.
+- Manual maintainer deploys use the same build/push/local-build/restart path and do not pull GHCR images.
 - Release tags like `v0.62.0` publish matching version image tags through `publish-release-image.yml`.
-- The Compose files keep `build` definitions as a local source-build fallback; normal update paths prefer `docker compose pull`, then build locally only when the pull fails.
-- If a public GHCR image returns `error from registry: denied`, run `docker logout ghcr.io` to clear stale Docker credentials and retry the pull anonymously.
+- The Compose files keep `build` definitions so maintainer deploys can always restart from the checked-out source instead of trusting a registry pull.
+- Public self-host installs can still use `docker compose pull` against `ghcr.io/waspo98/orbit-money:latest`; maintainer deploy scripts intentionally avoid pull-based updates.
 
 ## Data Storage
 All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:

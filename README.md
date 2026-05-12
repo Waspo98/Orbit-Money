@@ -258,41 +258,33 @@ PWA manifest/service worker still load.
 This repo includes optional GitHub Actions workflows for GitHub Container
 Registry and the maintainer's self-hosted Windows runner:
 
-- Pushes to `main` publish `ghcr.io/waspo98/orbit-money:latest` and `:main`,
-  then call `scripts\deploy-live.cmd`
-- Pushes to `Beta` publish `ghcr.io/waspo98/orbit-money:beta`, then call
-  `scripts\deploy-beta.cmd`, which delegates to `deploy\beta\deploy-beta.cmd`
+- Pushes to `main` call `scripts\deploy-live.cmd`, which builds and publishes
+  `ghcr.io/waspo98/orbit-money:latest`, `:main`, and a commit-specific
+  `:main-<sha>` tag before restarting the live container from a local build
+- Pushes to `Beta` call `scripts\deploy-beta.cmd`, which delegates to
+  `deploy\beta\deploy-beta.cmd`, builds and publishes
+  `ghcr.io/waspo98/orbit-money:beta` plus `:beta-<sha>`, then restarts beta
+  from a local build
 - Pushing a tag like `v0.76.0` publishes matching version image tags for
   release installs
 
 The deploy jobs run on the maintainer's self-hosted Windows runner. The deploy
-scripts publish the GHCR image when `ORBIT_PUBLISH_IMAGE=1`, then pull and
-restart the matching Docker Compose service. If a manual deploy cannot pull the
-published image, the scripts print the pull failure and build the same Compose
-service locally before restarting it. Self-hosters do not need GitHub Actions to
-run the app.
+scripts no longer pull from GHCR during maintainer deploys. They require a clean
+repo, update the target branch, build and push the branch image tags, build the
+matching Docker Compose service locally, restart that local container, and fail
+if the running container version does not match `backend/package.json`.
+Self-hosters do not need GitHub Actions to run the app.
 
-For public anonymous `docker compose pull` support, the GitHub Container
-Registry package must be public. If the first published package is private, make
-the package public from GitHub's package settings. If GHCR still returns
-`denied`, Docker may be sending stale local registry credentials; the deploy
-scripts will fall back to a local Docker build in that case.
-
-If the package is public but a manual deploy still logs
-`error from registry: denied`, clear Docker's saved GHCR login and retry the
-pull so Docker uses anonymous public access:
-
-```bat
-docker logout ghcr.io
-docker compose pull
-```
+Maintainer deploys require Docker push access to `ghcr.io/waspo98/orbit-money`.
+GitHub Actions provides `GITHUB_TOKEN`; manual runs use the existing Docker
+registry login unless `GITHUB_TOKEN` is set in the shell.
 
 ## Releases
 
-Deploys and releases are intentionally separate. A Docker deploy pulls the
-published image and restarts the running app from a branch. A GitHub Release marks a stable,
-named version with a Git tag, release notes, and GitHub's generated source
-archives.
+Deploys and releases are intentionally separate. A maintainer Docker deploy
+builds, publishes, locally rebuilds, and restarts the running app from a branch.
+A GitHub Release marks a stable, named version with a Git tag, release notes,
+and GitHub's generated source archives.
 
 Use releases for meaningful milestones, not every rebuild. The maintainer flow
 is semi-automatic: inspect changes since the previous tag, choose the next
@@ -303,8 +295,8 @@ Release. Keep the app in `0.x` until it is considered public-ready.
 ## Beta Deployment
 
 The beta deployment is maintainer infrastructure, not a second install path for
-normal users. It lives in `deploy/beta/`, pulls the published beta image, and runs a
-separate Docker container and volume:
+normal users. It lives in `deploy/beta/`, builds/publishes the beta image, and
+runs a separate Docker container and volume:
 
 ```powershell
 cmd /c scripts\deploy-beta.cmd

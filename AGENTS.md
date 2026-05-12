@@ -71,10 +71,11 @@
   `orbitmoney-beta` on host port `5019`.
 - Do not use a Vite dev server, local preview server, or `start-beta` helper for
   beta. There is intentionally no supported non-Docker beta deployment path.
-- Public Docker installs pull `ghcr.io/waspo98/orbit-money:latest`; beta pulls
-  `ghcr.io/waspo98/orbit-money:beta`. The self-hosted GitHub Actions deploy
-  jobs set `ORBIT_PUBLISH_IMAGE=1`, so the deploy scripts publish the image
-  before pulling and restarting containers.
+- Public Docker installs pull `ghcr.io/waspo98/orbit-money:latest`. Maintainer
+  beta publishes `ghcr.io/waspo98/orbit-money:beta`, then locally builds and
+  restarts the beta container. Maintainer deploy scripts do not pull GHCR
+  images; they build, push, locally build, restart, and verify the running
+  container version.
 
 ## Versioning and releases
 - Do not bump the app version for routine rebuilds, beta deploys, live deploys,
