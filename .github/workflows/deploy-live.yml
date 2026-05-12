@@ -21,7 +21,8 @@ jobs:
     steps:
       - name: Deploy live on home server
         shell: cmd
+        working-directory: 'C:\Docker\Orbit Money'
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: call "C:\Docker\Orbit Money\scripts\deploy-live.cmd"
+        run: call "scripts\deploy-live.cmd"
