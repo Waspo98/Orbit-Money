@@ -76,6 +76,11 @@
   restarts the beta container. Maintainer deploy scripts do not pull GHCR
   images; they build, push, locally build, restart, and verify the running
   container version.
+- Maintainer GitHub Actions deploys require the self-hosted Windows runner
+  service `actions.runner.Waspo98-Orbit-Money.orbit-money-server`. If deploy
+  jobs remain queued, check `Get-Service "actions.runner.*"`. The repair script
+  is `scripts\install-actions-runner-service.ps1` and must be run from an
+  Administrator PowerShell session.
 
 ## Versioning and releases
 - Do not bump the app version for routine rebuilds, beta deploys, live deploys,

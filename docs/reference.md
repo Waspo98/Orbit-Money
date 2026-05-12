@@ -21,6 +21,7 @@ Multi-stage build:
 - Maintainer beta uses `ghcr.io/waspo98/orbit-money:beta` from `deploy/beta/docker-compose.yml`.
 - The `main` and `Beta` GitHub Actions workflows run the self-hosted deploy scripts; those scripts build and publish the branch image tags, build the matching Docker Compose service locally, restart the container, and verify the running container version.
 - Manual maintainer deploys use the same build/push/local-build/restart path and do not pull GHCR images.
+- The maintainer Windows host keeps the self-hosted GitHub Actions runner online through the automatic service `actions.runner.Waspo98-Orbit-Money.orbit-money-server`. If deploy jobs are queued but not running, verify `Get-Service "actions.runner.*"` and repair with `scripts\install-actions-runner-service.ps1` from an Administrator PowerShell session.
 - Release tags like `v0.62.0` publish matching version image tags through `publish-release-image.yml`.
 - The Compose files keep `build` definitions so maintainer deploys can always restart from the checked-out source instead of trusting a registry pull.
 - Public self-host installs can still use `docker compose pull` against `ghcr.io/waspo98/orbit-money:latest`; maintainer deploy scripts intentionally avoid pull-based updates.

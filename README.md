@@ -279,6 +279,30 @@ Maintainer deploys require Docker push access to `ghcr.io/waspo98/orbit-money`.
 GitHub Actions provides `GITHUB_TOKEN`; manual runs use the existing Docker
 registry login unless `GITHUB_TOKEN` is set in the shell.
 
+### Self-hosted runner service
+
+The maintainer deploy workflows depend on the GitHub Actions runner installed at
+`C:\actions-runner`. On the maintainer Windows host, that runner should be
+registered as an automatic Windows service named
+`actions.runner.Waspo98-Orbit-Money.orbit-money-server`. If deploy jobs stay
+queued, first check whether the service is running:
+
+```powershell
+Get-Service "actions.runner.*"
+```
+
+To install or repair the service on the maintainer host, run PowerShell as
+Administrator from the repository root:
+
+```powershell
+.\scripts\install-actions-runner-service.ps1
+```
+
+The script registers the existing runner service host, writes the runner
+`.service` marker, enables automatic startup, configures restart-on-failure, and
+starts the service. It does not create a new GitHub runner registration token or
+replace the existing runner identity.
+
 ## Releases
 
 Deploys and releases are intentionally separate. A maintainer Docker deploy
