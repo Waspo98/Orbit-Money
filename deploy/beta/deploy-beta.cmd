@@ -8,10 +8,15 @@ if errorlevel 1 (
   exit /b 1
 )
 
+set "GIT_CONFIG_COUNT=1"
+set "GIT_CONFIG_KEY_0=safe.directory"
+set "GIT_CONFIG_VALUE_0=%CD%"
+
 git rev-parse --show-toplevel >nul 2>nul
 if errorlevel 1 (
   echo Repo root check failed. Current directory is:
   cd
+  git rev-parse --show-toplevel
   popd
   exit /b 1
 )
