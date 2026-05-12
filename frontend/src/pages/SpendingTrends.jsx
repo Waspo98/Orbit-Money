@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import AppSelect from '../components/AppSelect.jsx';
 import BudgetAmountModal from '../components/BudgetAmountModal.jsx';
+import ChartFrame from '../components/charts/ChartFrame.jsx';
+import DashboardCard from '../components/dashboard/DashboardCard.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
@@ -14,7 +16,8 @@ import {
 } from '../lib/formatters.js';
 import {
   formatMonthKeyLabel,
-  getLocalMonthBounds
+  getLocalMonthBounds,
+  parseMonthParts
 } from '../lib/localDate.js';
 
 const RANGE_OPTIONS = [
@@ -41,16 +44,16 @@ function formatSignedMoney(value) {
 }
 
 function formatMonthShort(month) {
-  if (!month) return '';
-  const [year, monthNumber] = month.split('-').map(Number);
-  const date = new Date(year, monthNumber - 1, 1);
+  const parts = parseMonthParts(month);
+  if (!parts) return '';
+  const date = new Date(parts.year, parts.month - 1, 1);
   return date.toLocaleDateString(undefined, { month: 'short' });
 }
 
 function formatMonthLong(month) {
-  if (!month) return '';
-  const [year, monthNumber] = month.split('-').map(Number);
-  const date = new Date(year, monthNumber - 1, 1);
+  const parts = parseMonthParts(month);
+  if (!parts) return '';
+  const date = new Date(parts.year, parts.month - 1, 1);
   return date.toLocaleDateString(undefined, { month: 'long' });
 }
 
@@ -232,27 +235,37 @@ export default function SpendingTrends() {
         />
       ) : (
         <div className={`spending-trends-content ${refreshing ? 'is-refreshing' : ''}`}>
-          <section className="dashboard-card spending-flow-card">
-            <header className="dashboard-card-header spending-card-header">
+          <DashboardCard
+            className="spending-flow-card"
+            headerClassName="spending-card-header"
+            header={
               <div>
                 <h3>Income Vs Expenses</h3>
                 <span className="muted">
                   {formatMonthWithYear(flow[0]?.month)} - {formatMonthWithYear(flow[flow.length - 1]?.month)}
                 </span>
               </div>
+            }
+            action={
               <strong className={asNumber(summary.total_net) >= 0 ? 'income' : 'expense'}>
                 {formatSignedMoney(summary.total_net)}
               </strong>
-            </header>
+            }
+            bodyClassName="spending-chart-body"
+          >
             <CashFlowChart flow={flow} />
-          </section>
+          </DashboardCard>
 
-          <section className="dashboard-card spending-category-card">
-            <header className="dashboard-card-header spending-card-header">
+          <DashboardCard
+            className="spending-category-card"
+            headerClassName="spending-card-header"
+            header={
               <div>
                 <h3>Category History</h3>
               </div>
-              {categoryOptions.length > 0 && (
+            }
+            action={
+              categoryOptions.length > 0 ? (
                 <div className="spending-category-actions">
                   <AppSelect
                     value={selectedCategoryKey}
@@ -272,9 +285,10 @@ export default function SpendingTrends() {
                     </button>
                   )}
                 </div>
-              )}
-            </header>
-
+              ) : null
+            }
+            bodyClassName="spending-category-body"
+          >
             {selectedCategory ? (
               <div className="spending-category-layout">
                 <div className="spending-category-main">
@@ -293,7 +307,7 @@ export default function SpendingTrends() {
             ) : (
               <p className="subtle">No spending categories in this range.</p>
             )}
-          </section>
+          </DashboardCard>
         </div>
       )}
 
@@ -413,11 +427,11 @@ function CashFlowChart({ flow }) {
 
   return (
     <div className="spending-chart-wrap spending-flow-chart-wrap">
-      <svg
+      <ChartFrame
         className={`spending-flow-chart ${activeItem ? 'has-active' : ''}`}
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label="Monthly income and expense chart"
+        width={width}
+        height={height}
+        label="Monthly income and expense chart"
         onPointerLeave={(event) => {
           if (event.pointerType !== 'touch') setActiveIndex(null);
         }}
@@ -520,7 +534,7 @@ function CashFlowChart({ flow }) {
             </g>
           );
         })}
-      </svg>
+      </ChartFrame>
       {activeItem && (
         <div
           className={`spending-flow-tooltip ${tooltipAlign}`}
@@ -612,7 +626,12 @@ function CategoryTrendChart({ trend, onMonthSelect }) {
 
   return (
     <div className="spending-chart-wrap">
-      <svg className="spending-category-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${trend.category.name} spending by month`}>
+      <ChartFrame
+        className="spending-category-chart"
+        width={width}
+        height={height}
+        label={`${trend.category.name} spending by month`}
+      >
         {[0.25, 0.5, 0.75, 1].map((line) => {
           const y = top + chartHeight - chartHeight * line;
           return (
@@ -710,7 +729,7 @@ function CategoryTrendChart({ trend, onMonthSelect }) {
             </g>
           );
         })}
-      </svg>
+      </ChartFrame>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import FilterSheet from '../components/FilterSheet.jsx';
 import AppSelect from '../components/AppSelect.jsx';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
+import DateInput from '../components/DateInput.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
@@ -28,7 +29,8 @@ import {
 } from '../lib/formatters.js';
 import {
   formatMonthDay,
-  formatMonthKeyLabel
+  formatMonthKeyLabel,
+  todayLocalDate
 } from '../lib/localDate.js';
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -74,12 +76,6 @@ function formatAmount(amount) {
 
 function formatShortAmount(amount) {
   return formatCurrency(amount, { maximumFractionDigits: 0 });
-}
-
-function todayLocalDate() {
-  const now = new Date();
-  const offsetDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return offsetDate.toISOString().slice(0, 10);
 }
 
 function groupByMonth(items, countsByMonth = {}) {
@@ -977,7 +973,7 @@ function ManualTransactionModal({ accounts, categories, onClose, onSaved }) {
 
             <label className="field">
               <span>Date</span>
-              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+              <DateInput value={date} onChange={setDate} required />
             </label>
 
             <label className="field">

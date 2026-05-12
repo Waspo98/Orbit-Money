@@ -1,12 +1,21 @@
 import { sendBadRequest } from './http.js';
 
+const INTEGER_RE = /^-?\d+$/;
+
 export function parseInteger(value) {
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : null;
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? value : null;
+  }
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (!INTEGER_RE.test(text)) return null;
+  const parsed = Number(text);
+  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 export function parseId(value) {
-  return parseInteger(value);
+  const parsed = parseInteger(value);
+  return parsed !== null && parsed > 0 ? parsed : null;
 }
 
 export function parseBoundedInteger(value, { fallback, min = -Infinity, max = Infinity }) {

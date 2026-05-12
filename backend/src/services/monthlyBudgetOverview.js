@@ -1,4 +1,5 @@
 import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
+import { getLocalMonthBounds } from '../lib/localDate.js';
 import {
   UNCATEGORIZED_BUDGET_CATEGORY,
   buildBudgetItem,
@@ -9,11 +10,7 @@ import {
 const EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL = effectiveCategoryIdSql('t');
 
 export function monthBounds(yyyymm) {
-  const [y, m] = yyyymm.split('-').map(Number);
-  const start = `${yyyymm}-01`;
-  const endDate = new Date(y, m, 0);
-  const end = `${y}-${String(m).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
-  return { start, end };
+  return getLocalMonthBounds(yyyymm);
 }
 
 export function buildMonthlyBudgetOverview(database, { householdId, month }) {

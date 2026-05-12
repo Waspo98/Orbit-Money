@@ -1,7 +1,7 @@
-export default function TapIndicatorText({ children, className = '', ...props }) {
+export default function TapIndicatorText({ as: Component = 'p', children, className = '', ...props }) {
   return (
-    <p className={`tap-indicator-text ${className}`.trim()} {...props}>
+    <Component className={`tap-indicator-text ${className}`.trim()} {...props}>
       {children}
-    </p>
+    </Component>
   );
 }

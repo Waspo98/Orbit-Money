@@ -27,6 +27,7 @@ import {
   sendOk,
   sendServerError
 } from '../lib/http.js';
+import { formatLocalMonth, isValidMonthOnly } from '../lib/localDate.js';
 import { dollarsToCents } from '../lib/money.js';
 import { parseId, readIdParam } from '../lib/routeParams.js';
 import { buildMonthlyBudgetOverview } from '../services/monthlyBudgetOverview.js';
@@ -35,12 +36,11 @@ const router = express.Router();
 
 function parseMonth(s) {
   if (!s || typeof s !== 'string') return null;
-  return /^\d{4}-\d{2}$/.test(s) ? s : null;
+  return isValidMonthOnly(s) ? s : null;
 }
 
 function currentMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return formatLocalMonth();
 }
 
 // ---------------------------------------------------------------------------

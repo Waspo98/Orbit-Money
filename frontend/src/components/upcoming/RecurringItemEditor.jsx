@@ -6,9 +6,15 @@ import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
 } from '../CurrencyInput.jsx';
+import DateInput from '../DateInput.jsx';
 import OptionalNumberInput from '../OptionalNumberInput.jsx';
 import SelectableListItem from '../SelectableListItem.jsx';
-import { addMonthsToLocalDate, formatLocalDate } from '../../lib/localDate.js';
+import {
+  addMonthsToLocalDate,
+  formatLocalDate,
+  parseDateParts,
+  todayLocalDate
+} from '../../lib/localDate.js';
 
 export const KIND_OPTIONS = [
   { value: 'income', label: 'Income' },
@@ -89,16 +95,11 @@ const SCHEDULE_KEYS = new Set([
 ]);
 
 function todayIso() {
-  return formatLocalDate();
+  return todayLocalDate();
 }
 
 function defaultNextDate() {
   return addMonthsToLocalDate(formatLocalDate(), 1);
-}
-
-function parseDateParts(value) {
-  const [year, month, day] = String(value || '').split('-').map(Number);
-  return { year, month, day };
 }
 
 function formatDateParts(year, month, day) {
@@ -165,7 +166,8 @@ function monthlyDatesForRule(rule, year, month) {
 
 function nextRuleDate(rule, startDate = todayIso()) {
   if (!rule) return '';
-  let { year, month } = parseDateParts(startDate);
+  const startParts = parseDateParts(startDate) || parseDateParts(todayIso());
+  let { year, month } = startParts;
   for (let i = 0; i < 36; i += 1) {
     const match = monthlyDatesForRule(rule, year, month).find((date) => date >= startDate);
     if (match) return match;
@@ -762,11 +764,7 @@ export default function RecurringItemEditor({
 
             <label className="field">
               <span>Next Date</span>
-              <input
-                type="date"
-                value={form.next_date}
-                onChange={(event) => patch({ next_date: event.target.value })}
-              />
+              <DateInput value={form.next_date} onChange={(value) => patch({ next_date: value })} />
             </label>
 
             <label className="field">

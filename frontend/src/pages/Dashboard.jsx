@@ -35,8 +35,11 @@ import {
   formatSignedCurrency
 } from '../lib/formatters.js';
 import {
+  ageFromDate,
   addMonthsToLocalMonth,
   formatLocalMonth,
+  formatMonthDay,
+  getLocalMonthBounds,
   formatMonthKeyLabel
 } from '../lib/localDate.js';
 import { sortCategoriesByName } from '../lib/categorySort.js';
@@ -210,15 +213,8 @@ function groupAccountBalances(accounts) {
   return { cash, investments, credit, loans, realEstate, other, net };
 }
 
-function parseDateValue(value) {
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
 function formatShortDate(value) {
-  const date = parseDateValue(value);
-  if (!date) return '';
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return formatMonthDay(value);
 }
 
 function formatShortMonth(value) {
@@ -231,10 +227,7 @@ function transactionMonthUrl(month, extra = '') {
 }
 
 function monthEndDate(month) {
-  const [year, monthNumber] = String(month || '').split('-').map(Number);
-  if (!year || !monthNumber) return '';
-  const lastDay = new Date(year, monthNumber, 0).getDate();
-  return `${month}-${String(lastDay).padStart(2, '0')}`;
+  return getLocalMonthBounds(month).end;
 }
 
 function kindLabel(kind) {
@@ -245,19 +238,6 @@ function kindLabel(kind) {
 
 function frequencyLabel(item) {
   return recurringFrequencyLabel(item);
-}
-
-function ageFromBirthDate(date) {
-  if (!date) return null;
-  const birth = parseDateValue(date);
-  if (!birth) return null;
-  const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  const hadBirthday =
-    now.getMonth() > birth.getMonth() ||
-    (now.getMonth() === birth.getMonth() && now.getDate() >= birth.getDate());
-  if (!hadBirthday) age -= 1;
-  return age >= 0 ? age : null;
 }
 
 function effectiveMonthlyRate(annualReturn) {
@@ -288,7 +268,7 @@ function retirementProjection(householdData, preferences) {
     (Number(summary.employer_retirement_annual) || 0)) / 12;
   const currentAge =
     members
-      .map((member) => ageFromBirthDate(member.birth_date))
+      .map((member) => ageFromDate(member.birth_date))
       .filter((age) => age !== null)
       .sort((a, b) => b - a)[0] ?? 35;
   const retirementAge = Math.max(currentAge, Number(preferences?.retirementAge) || 67);

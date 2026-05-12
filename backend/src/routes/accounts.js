@@ -7,13 +7,14 @@ import {
   sendOk,
   sendServerError
 } from '../lib/http.js';
+import { isValidDateOnly, parseDateParts } from '../lib/localDate.js';
 import { dollarsToCents, moneyFieldsToDollars } from '../lib/money.js';
 import { parseId, parseInteger, readIdParam } from '../lib/routeParams.js';
+import { mergeAccounts } from '../services/accountMerge.js';
 
 const router = express.Router();
 
 const VALID_TYPES = ['checking', 'savings', 'credit', 'investment', 'loan', 'mortgage', 'cash', 'other'];
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ACCOUNT_MONEY_FIELDS = ['current_balance', 'estimated_value'];
 const CREDIT_CARD_PROFILE_MONEY_FIELDS = ['annual_fee', 'credit_limit'];
 
@@ -57,14 +58,8 @@ function attachCreditCardProfiles(householdId, accounts) {
   }));
 }
 
-function isValidDateOnly(value) {
-  if (typeof value !== 'string' || !DATE_RE.test(value)) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
 function previousMonthEnd(value) {
-  const [year, month] = value.split('-').map(Number);
+  const { year, month } = parseDateParts(value);
   const date = new Date(Date.UTC(year, month - 1, 0));
   return date.toISOString().slice(0, 10);
 }
@@ -694,35 +689,13 @@ router.post('/:id/merge', requireAuth, (req, res) => {
     return sendBadRequest(res, "Can't merge an account into itself.");
   }
 
-  const source = db.prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?').get(sourceId, householdId);
-  const target = db.prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?').get(targetId, householdId);
-  if (!source) return sendNotFound(res, 'Source account not found.');
-  if (!target) return sendNotFound(res, 'Target account not found.');
-
   try {
-    const run = db.transaction(() => {
-      const moved = db
-        .prepare('UPDATE transactions SET account_id = ? WHERE account_id = ? AND household_id = ?')
-        .run(targetId, sourceId, householdId).changes;
-      if (source.estimated_value != null && target.estimated_value == null) {
-        db.prepare(
-          `UPDATE accounts
-              SET estimated_value = ?, updated_at = datetime('now')
-            WHERE id = ? AND household_id = ?`
-        ).run(source.estimated_value, targetId, householdId);
-      }
-      db.prepare('DELETE FROM accounts WHERE id = ? AND household_id = ?').run(sourceId, householdId);
-      return moved;
-    });
-    const transactionsMoved = run();
-
     sendOk(res, {
       success: true,
-      transactionsMoved,
-      mergedSourceName: source.name,
-      intoTargetName: target.name
+      ...mergeAccounts(db, { householdId, sourceId, targetId })
     });
   } catch (err) {
+    if (err.status === 404) return sendNotFound(res, err.message);
     console.error('Merge failed:', err);
     sendServerError(res, err);
   }

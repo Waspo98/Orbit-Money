@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppSelect from '../components/AppSelect.jsx';
+import DashboardCard from '../components/dashboard/DashboardCard.jsx';
 import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
@@ -12,6 +13,8 @@ import PeriodNav from '../components/PeriodNav.jsx';
 import PercentInput from '../components/PercentInput.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import SegmentedControl from '../components/SegmentedControl.jsx';
+import ResponsiveMetricValue from '../components/ResponsiveMetricValue.jsx';
+import SubcardGrid from '../components/SubcardGrid.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { TransactionRow, EditTransactionModal } from '../components/transactions/TransactionRow.jsx';
 import { RuleEditor } from '../components/rules/RuleEditor.jsx';
@@ -383,28 +386,24 @@ export default function MhaTracker() {
         kicker="Ministerial Housing Allowance"
         title="MHA Tracker"
         subtitle="Calculate Projected MHA Tax Savings"
-        stats={[]}
-        statsExtra={(
-          <div className="page-hero-stat page-hero-period-stat">
-            <PeriodNav
-              variant="hero"
-              size="compact"
-              value={selectedYear}
-              options={yearOptions.map((option) => ({
-                value: option,
-                label: formatYearLabel(option)
-              }))}
-              canGoForward={canGoForward}
-              onPrev={() => goToYear(selectedYear - 1)}
-              onNext={() => goToYear(selectedYear + 1)}
-              onJump={(value) => goToYear(Number(value))}
-              previousLabel="Previous year"
-              nextLabel="Next year"
-              jumpLabel="Jump to year"
-            />
-          </div>
+        toolbar={(
+          <PeriodNav
+            variant="hero"
+            value={selectedYear}
+            options={yearOptions.map((option) => ({
+              value: option,
+              label: formatYearLabel(option)
+            }))}
+            canGoForward={canGoForward}
+            onPrev={() => goToYear(selectedYear - 1)}
+            onNext={() => goToYear(selectedYear + 1)}
+            onJump={(value) => goToYear(Number(value))}
+            previousLabel="Previous year"
+            nextLabel="Next year"
+            jumpLabel="Jump to year"
+            menuPlacement="page-center"
+          />
         )}
-        statLabel="MHA summary"
       />
 
       {error && <div className="error app-page-width">{error}</div>}
@@ -656,18 +655,8 @@ export default function MhaTracker() {
   );
 }
 
-function MhaCard({ title, action, className = '', children }) {
-  const cardClassName = ['dashboard-card', className].filter(Boolean).join(' ');
-
-  return (
-    <section className={cardClassName}>
-      <header className="dashboard-card-header">
-        <h3>{title}</h3>
-        {action}
-      </header>
-      <div className="dashboard-card-body">{children}</div>
-    </section>
-  );
+function MhaCard(props) {
+  return <DashboardCard {...props} />;
 }
 
 function MhaDashboard({ summary, taxProfile, taxEstimate, year, onEdit }) {
@@ -697,10 +686,12 @@ function MhaDashboard({ summary, taxProfile, taxEstimate, year, onEdit }) {
         </button>
       }
     >
-      <div className="metric-grid mha-dashboard-grid">
+      <SubcardGrid className="mha-dashboard-grid" pattern="six">
         <div className="metric-card mha-dashboard-metric mha-dashboard-savings mha-dashboard-current-savings">
           <span>Current Savings</span>
-          <strong>{formatMoney(summary.savings)}</strong>
+          <ResponsiveMetricValue size="lg">
+            {formatMoney(summary.savings)}
+          </ResponsiveMetricValue>
         </div>
         <div className="metric-card mha-dashboard-metric">
           <span>Eligible Spending</span>
@@ -731,7 +722,7 @@ function MhaDashboard({ summary, taxProfile, taxEstimate, year, onEdit }) {
             <small>State savings are not auto-estimated for graduated-rate states yet.</small>
           )}
         </div>
-      </div>
+      </SubcardGrid>
     </MhaCard>
   );
 }

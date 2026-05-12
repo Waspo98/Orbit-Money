@@ -14,6 +14,7 @@ import ExpandingSection from '../components/ExpandingSection.jsx';
 import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import PeriodNav from '../components/PeriodNav.jsx';
+import SubcardGrid from '../components/SubcardGrid.jsx';
 import TapIndicatorText from '../components/TapIndicatorText.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { formatCurrency } from '../lib/formatters.js';
@@ -521,7 +522,7 @@ export default function Budgets({
                 <div>
                   <h3>Unbudgeted Spending</h3>
                   <p>{formatMoney(budgetModel.spentUnbudgeted)} outside budgeted categories</p>
-                  <TapIndicatorText>Tap a category to see transactions</TapIndicatorText>
+                  <TapIndicatorText>Tap to View Transactions</TapIndicatorText>
                 </div>
               </header>
               <ul className="budget-beta-unbudgeted-list">
@@ -555,7 +556,7 @@ export default function Budgets({
                 <div>
                   <h3>Budgeted Categories</h3>
                   <p>{budgetModel.sortedRows.length} tracked categories</p>
-                  <TapIndicatorText>Tap a category to see transactions</TapIndicatorText>
+                  <TapIndicatorText>Tap to View Transactions</TapIndicatorText>
                 </div>
                 <AppSelect
                   className="budget-beta-sort"
@@ -718,7 +719,7 @@ function SnapshotPanel({ model, monthLabel, selectedMonth, daysLeft }) {
         </div>
       </div>
 
-      <div className="metric-grid budget-beta-snapshot-grid">
+      <SubcardGrid className="budget-beta-snapshot-grid" pattern="four">
         <SnapshotStat
           label="Budgeted"
           value={`${formatMoney(model.spentInBudgets)} / ${formatMoney(model.totalBudgeted)}`}
@@ -743,7 +744,7 @@ function SnapshotPanel({ model, monthLabel, selectedMonth, daysLeft }) {
           detail={spendPace.detail}
           tone={spendPace.tone}
         />
-      </div>
+      </SubcardGrid>
     </section>
   );
 }
@@ -806,7 +807,7 @@ function SpendingMixPanel({
         <div>
           <h3>Spending Mix</h3>
           <p>Largest category shares this month</p>
-          <TapIndicatorText>Tap a category to see transactions</TapIndicatorText>
+          <TapIndicatorText>Tap to View Transactions</TapIndicatorText>
         </div>
       </header>
 
@@ -893,7 +894,7 @@ function NotablePanel({
         <div>
           <h3>Notable This Month</h3>
           <p>Overages, high usage, and spending outside the plan</p>
-          <TapIndicatorText>Tap a category to see transactions</TapIndicatorText>
+          <TapIndicatorText>Tap to View Transactions</TapIndicatorText>
         </div>
       </header>
 

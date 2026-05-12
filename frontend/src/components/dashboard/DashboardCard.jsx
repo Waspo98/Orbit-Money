@@ -1,12 +1,46 @@
-export default function DashboardCard({ title, action, children }) {
+export default function DashboardCard({
+  title,
+  subtitle,
+  action,
+  header,
+  children,
+  className = '',
+  headerClassName = '',
+  headerAs: HeaderComponent = 'header',
+  headerProps = {},
+  bodyClassName = '',
+  body = true,
+  as: Component = 'section',
+  ...props
+}) {
+  const cardClassName = ['dashboard-card', className].filter(Boolean).join(' ');
+  const {
+    className: headerPropsClassName = '',
+    ...restHeaderProps
+  } = headerProps;
+  const headerClasses = [
+    'dashboard-card-header',
+    headerClassName,
+    headerPropsClassName
+  ].filter(Boolean).join(' ');
+  const bodyClasses = ['dashboard-card-body', bodyClassName].filter(Boolean).join(' ');
+  const titleNode = subtitle ? (
+    <div className="dashboard-card-title-block">
+      <h3>{title}</h3>
+      {subtitle}
+    </div>
+  ) : (
+    <h3>{title}</h3>
+  );
+
   return (
-    <section className="dashboard-card">
-      <header className="dashboard-card-header">
-        <h3>{title}</h3>
+    <Component className={cardClassName} {...props}>
+      <HeaderComponent className={headerClasses} {...restHeaderProps}>
+        {header || titleNode}
         {action}
-      </header>
-      <div className="dashboard-card-body">{children}</div>
-    </section>
+      </HeaderComponent>
+      {body ? <div className={bodyClasses}>{children}</div> : children}
+    </Component>
   );
 }
 

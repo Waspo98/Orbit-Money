@@ -6,7 +6,7 @@
 // handled by the frontend's scoped IndexedDB cache.
 // =============================================================================
 
-const CACHE_NAME = 'orbit-money-v0.75-offline-readonly-20260511a';
+const CACHE_NAME = 'orbit-money-v0.76-offline-readonly-20260512a';
 const APP_SHELL_URLS = [
   '/',
   '/manifest.webmanifest',

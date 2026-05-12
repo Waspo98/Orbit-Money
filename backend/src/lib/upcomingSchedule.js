@@ -1,4 +1,4 @@
-import { formatLocalDate, isValidDateOnly } from './localDate.js';
+import { formatLocalDate, isValidDateOnly, parseDateParts } from './localDate.js';
 
 export const FREQUENCY_UNITS = new Set(['days', 'weeks', 'months']);
 
@@ -7,11 +7,6 @@ const LAST_WEEK_VALUE = -1;
 
 export function isoDate(value) {
   return isValidDateOnly(value) ? value : null;
-}
-
-export function parseDateParts(value) {
-  const [year, month, day] = value.split('-').map(Number);
-  return { year, month, day };
 }
 
 export function formatDateParts(year, month, day) {

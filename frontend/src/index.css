@@ -763,6 +763,7 @@ input, textarea, select {
 
 .tap-indicator-text,
 .budget-beta-section-header .tap-indicator-text {
+  display: block;
   margin: 3px 0 0;
   color: color-mix(in srgb, var(--accent) 72%, var(--text-muted));
   font-size: 0.78rem;
@@ -1830,7 +1831,7 @@ input, textarea, select {
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--muted);
-  letter-spacing: -1px;
+  letter-spacing: 0;
   flex-shrink: 0;
   touch-action: none;
 }
@@ -3431,6 +3432,16 @@ input, textarea, select {
   letter-spacing: 0.06em;
 }
 
+.dashboard-card-title-block {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.dashboard-card-title-block .tap-indicator-text {
+  margin-top: 0;
+}
+
 .dashboard-card-link {
   font-size: 0.82rem;
   color: var(--accent);
@@ -3484,6 +3495,105 @@ input, textarea, select {
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+}
+
+.subcard-grid-frame {
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.subcard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--subcard-grid-gap, 10px);
+  align-content: start;
+}
+
+.subcard-grid-auto {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--subcard-grid-min, 140px)), 1fr));
+}
+
+@container (min-width: 560px) {
+  .subcard-grid-six {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 640px) {
+  .subcard-grid-four {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 1080px) {
+  .subcard-grid-six {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .subcard-grid-frame.subcard-grid-four {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .subcard-grid-frame.subcard-grid-six {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1340px) {
+  .subcard-grid-frame.subcard-grid-six {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.responsive-metric-value-frame {
+  display: block;
+  width: 100%;
+  justify-self: stretch;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.responsive-metric-value {
+  display: block;
+  max-width: 100%;
+  color: var(--accent);
+  font-size: var(--responsive-metric-max, 2.05rem);
+  font-weight: 820;
+  line-height: 0.98;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.responsive-metric-value.responsive-metric-value-tone-accent,
+.responsive-metric-value.responsive-metric-value-tone-good {
+  color: var(--accent);
+}
+
+.responsive-metric-value.responsive-metric-value-tone-income {
+  color: var(--income);
+}
+
+.responsive-metric-value.responsive-metric-value-tone-danger,
+.responsive-metric-value.responsive-metric-value-tone-expense {
+  color: var(--danger);
+}
+
+.responsive-metric-value.responsive-metric-value-tone-caution,
+.responsive-metric-value.responsive-metric-value-tone-warning {
+  color: var(--warning, #e6a700);
+}
+
+.responsive-metric-value.responsive-metric-value-tone-text {
+  color: var(--text);
+}
+
+.responsive-metric-value.responsive-metric-value-tone-inherit {
+  color: inherit;
 }
 
 .dashboard-card-body {
@@ -4808,8 +4918,7 @@ input, textarea, select {
 }
 
 .mha-dashboard-grid {
-  --metric-grid-min: 140px;
-  --metric-grid-gap: 10px;
+  --subcard-grid-gap: 10px;
 }
 
 .mha-dashboard-metric {
@@ -4832,17 +4941,9 @@ input, textarea, select {
   overflow-wrap: anywhere;
 }
 
-.mha-dashboard-savings strong {
+.mha-dashboard-savings strong,
+.mha-dashboard-savings .responsive-metric-value {
   color: var(--accent);
-}
-
-.mha-dashboard-current-savings strong {
-  font-size: clamp(1.75rem, 13cqw, 3rem);
-  font-weight: 800;
-  line-height: 0.95;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: normal;
-  white-space: nowrap;
 }
 
 .mha-tax-modal {
@@ -5048,7 +5149,7 @@ input, textarea, select {
 .upcoming-cashflow-summary > strong {
   color: var(--text);
   font-size: 2.35rem;
-  font-size: clamp(1.9rem, 14cqw, 3rem);
+  font-size: 2.35rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0;
@@ -5588,7 +5689,7 @@ input, textarea, select {
 .networth-total {
   color: #ffffff;
   font-size: 3.4rem;
-  font-size: clamp(2.4rem, 12cqw, 4.8rem);
+  font-size: 3.4rem;
   font-weight: 750;
   line-height: 0.95;
   letter-spacing: 0;
@@ -6713,7 +6814,7 @@ input, textarea, select {
 
 .goal-progress-main strong {
   color: var(--text);
-  font-size: clamp(1.7rem, 18cqw, 3rem);
+  font-size: 2.35rem;
   font-weight: 750;
   line-height: 1.04;
   font-variant-numeric: tabular-nums;
@@ -6808,7 +6909,7 @@ input, textarea, select {
 }
 
 .goals-focus-card.collapsed .goal-progress-main strong {
-  font-size: clamp(2.05rem, 18cqw, 3.25rem);
+  font-size: 2.5rem;
 }
 
 .goals-focus-card.collapsed .goal-progress-ring {
@@ -6975,7 +7076,7 @@ input, textarea, select {
 .retirement-planner-hero strong {
   color: var(--text);
   font-size: 2.6rem;
-  font-size: clamp(2rem, 12cqw, 3.4rem);
+  font-size: 2.6rem;
   line-height: 1;
   font-weight: 780;
   font-variant-numeric: tabular-nums;
@@ -7233,7 +7334,7 @@ input, textarea, select {
 .retirement-hsa-panel > div:first-child strong {
   color: var(--text);
   font-size: 1.5rem;
-  font-size: clamp(1.25rem, 9cqw, 2rem);
+  font-size: 1.5rem;
   line-height: 1.05;
 }
 
@@ -7978,7 +8079,7 @@ input, textarea, select {
   }
 
   .goal-progress-main strong {
-    font-size: clamp(1.25rem, 18cqw, 2.55rem);
+    font-size: 1.85rem;
   }
 
   .goals-focus-card.collapsed .goal-progress-panel {
@@ -7990,7 +8091,7 @@ input, textarea, select {
   }
 
   .goals-focus-card.collapsed .goal-progress-main strong {
-    font-size: clamp(1.25rem, 18cqw, 2.55rem);
+    font-size: 1.85rem;
   }
 
   .goals-focus-card.collapsed .goal-progress-ring {
@@ -8078,7 +8179,7 @@ input, textarea, select {
 
   .goal-progress-main strong,
   .goals-focus-card.collapsed .goal-progress-main strong {
-    font-size: clamp(1rem, 18cqw, 2.5rem);
+    font-size: 1.65rem;
   }
 
   .goal-preset-grid {
@@ -8442,7 +8543,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   visibility: hidden;
 }
 
-.txn-month-label { font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em; }
+.txn-month-label { font-size: 1.1rem; font-weight: 600; letter-spacing: 0; }
 .txn-month-count { font-size: 0.82rem; color: var(--text-muted); }
 
 .txn-list { list-style: none; margin: 0; padding: 0; }
@@ -9732,7 +9833,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
 .retcalc-stage-copy h2 {
   margin: 0;
   color: var(--text);
-  font-size: clamp(1.65rem, 4vw, 2.5rem);
+  font-size: 2.15rem;
   line-height: 1;
   font-weight: 820;
 }
@@ -10042,7 +10143,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
 
 .retcalc-answer strong {
   color: var(--text);
-  font-size: clamp(2.15rem, 11cqw, 3.7rem);
+  font-size: 2.8rem;
   line-height: 0.96;
   font-weight: 840;
   font-variant-numeric: tabular-nums;
@@ -11857,9 +11958,8 @@ body.modal-page-blur-active .txn-pinned-month-header {
 }
 
 .settings-about-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  --subcard-grid-gap: 16px;
+
   margin: 18px 0 0;
 }
 
@@ -11987,7 +12087,6 @@ body.modal-page-blur-active .txn-pinned-month-header {
   .settings-theme-toggle-two { grid-template-columns: 1fr; }
   .choice-card,
   .settings-theme-option { min-height: auto; }
-  .settings-about-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .settings-about-info-card { min-height: 80px; }
   .settings-developer-line { align-items: stretch; flex-direction: column; }
 }
@@ -13692,12 +13791,6 @@ body.modal-page-blur-active .txn-pinned-month-header {
   overflow: hidden;
 }
 
-@media (min-width: 760px) {
-  .budget-beta-snapshot {
-    grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1.4fr);
-  }
-}
-
 .budget-beta-snapshot-main {
   display: grid;
   gap: 8px;
@@ -13706,13 +13799,6 @@ body.modal-page-blur-active .txn-pinned-month-header {
     linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 52%),
     var(--surface-2);
   border-bottom: 1px solid var(--border);
-}
-
-@media (min-width: 760px) {
-  .budget-beta-snapshot-main {
-    border-right: 1px solid var(--border);
-    border-bottom: 0;
-  }
 }
 
 .budget-beta-snapshot-main.over {
@@ -13731,7 +13817,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
 
 .budget-beta-main-number {
   color: var(--text);
-  font-size: clamp(2.2rem, 6vw, 4.4rem);
+  font-size: 3rem;
   font-weight: 900;
   line-height: 0.95;
   font-variant-numeric: tabular-nums;
@@ -13749,10 +13835,8 @@ body.modal-page-blur-active .txn-pinned-month-header {
 }
 
 .budget-beta-snapshot-grid {
-  --metric-grid-min: 140px;
-  --metric-grid-gap: 10px;
+  --subcard-grid-gap: 10px;
 
-  align-content: start;
   padding: 12px;
 }
 

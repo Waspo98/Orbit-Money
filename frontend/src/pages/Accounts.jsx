@@ -15,6 +15,8 @@ import DropdownMenu from '../components/DropdownMenu.jsx';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppSelect from '../components/AppSelect.jsx';
 import CollapseIndicator from '../components/CollapseIndicator.jsx';
+import DashboardCard from '../components/dashboard/DashboardCard.jsx';
+import DateInput from '../components/DateInput.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ExpandingSection from '../components/ExpandingSection.jsx';
 import { ImageUrlFinderPanel } from '../components/ImageUrlFinderModal.jsx';
@@ -30,6 +32,10 @@ import {
   formatCurrency as formatUsd,
   formatPercent
 } from '../lib/formatters.js';
+import {
+  formatMonthDay,
+  todayLocalDate
+} from '../lib/localDate.js';
 
 const TYPE_LABELS = {
   checking: 'Checking',
@@ -55,16 +61,6 @@ function parseOptionalCurrency(value) {
   if (String(value ?? '').replace(/[$,\s]/g, '').trim() === '') return null;
   const parsed = parseCurrencyInput(value, NaN);
   return Number.isFinite(parsed) ? parsed : NaN;
-}
-
-function formatShortDate(value) {
-  if (!value) return '';
-  const [year, month, day] = String(value).split('-').map(Number);
-  if (!year || !month || !day) return '';
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric'
-  });
 }
 
 function formatRewardRateLabel(item) {
@@ -95,12 +91,6 @@ function splitLineList(value) {
 function joinProfileList(value, formatter = (item) => item) {
   if (!Array.isArray(value)) return '';
   return value.map(formatter).filter(Boolean).join(', ');
-}
-
-function todayLocalDate() {
-  const now = new Date();
-  const offsetDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return offsetDate.toISOString().slice(0, 10);
 }
 
 function formatPercentChange(next, previous) {
@@ -782,25 +772,30 @@ function AccountGroup({ group, children, collapsed, disabled = false, wideSpan =
   const totalTone = group.total < 0 ? 'negative' : 'positive';
 
   return (
-    <section className={`dashboard-card account-group-card ${wideSpan === 2 ? 'account-group-span-wide' : ''} ${collapsed ? 'collapsed' : ''}`}>
-      <button
-        type="button"
-        className="dashboard-card-header account-group-header account-group-toggle"
-        aria-expanded={!collapsed}
-        disabled={disabled}
-        onClick={onToggle}
-      >
-        <div>
-          <h3>{pluralTypeLabel(group.type, group.items.length)}</h3>
-          <span className="muted">
-            {group.items.length.toLocaleString()} {group.items.length === 1 ? 'account' : 'accounts'}
-          </span>
-        </div>
+    <DashboardCard
+      title={pluralTypeLabel(group.type, group.items.length)}
+      subtitle={(
+        <span className="muted">
+          {group.items.length.toLocaleString()} {group.items.length === 1 ? 'account' : 'accounts'}
+        </span>
+      )}
+      className={`account-group-card ${wideSpan === 2 ? 'account-group-span-wide' : ''} ${collapsed ? 'collapsed' : ''}`}
+      headerAs="button"
+      headerClassName="account-group-header account-group-toggle"
+      headerProps={{
+        type: 'button',
+        'aria-expanded': !collapsed,
+        disabled,
+        onClick: onToggle
+      }}
+      action={(
         <span className="account-group-header-side">
           <strong className={`account-group-total ${totalTone}`}>{formatCurrency(group.total)}</strong>
           <CollapseIndicator expanded={!collapsed} className="account-group-caret" />
         </span>
-      </button>
+      )}
+      body={false}
+    >
       <ExpandingSection
         expanded={!collapsed}
         className="account-group-body"
@@ -808,7 +803,7 @@ function AccountGroup({ group, children, collapsed, disabled = false, wideSpan =
       >
         {children}
       </ExpandingSection>
-    </section>
+    </DashboardCard>
   );
 }
 
@@ -947,7 +942,7 @@ function StaticAccountRow({
   if (profile?.annual_fee_post_date) {
     const fee = Number(profile.annual_fee);
     glanceItems.push(
-      `${Number.isFinite(fee) ? formatCurrency(fee) : 'Fee'} ${formatShortDate(profile.annual_fee_post_date)}`
+      `${Number.isFinite(fee) ? formatCurrency(fee) : 'Fee'} ${formatMonthDay(profile.annual_fee_post_date)}`
     );
   } else if (profile && Number(profile.annual_fee) === 0) {
     glanceItems.push('No annual fee');
@@ -1243,10 +1238,9 @@ function CreditCardDetailsModal({ account, onClose, onSaved }) {
               </label>
               <label className="field">
                 <span>Fee Posts</span>
-                <input
-                  type="date"
+                <DateInput
                   value={form.annual_fee_post_date}
-                  onChange={(event) => updateField('annual_fee_post_date', event.target.value)}
+                  onChange={(value) => updateField('annual_fee_post_date', value)}
                 />
               </label>
             </div>
@@ -1485,12 +1479,7 @@ function AccountRecordModal({ account, confirm, onClose, onSaved }) {
           <form onSubmit={(e) => handleSave(e, close)}>
             <label className="field">
               <span>Date</span>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-              />
+              <DateInput value={date} onChange={setDate} required />
             </label>
 
             <label className="field">

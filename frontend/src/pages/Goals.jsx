@@ -12,8 +12,14 @@ import {
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppRangeSlider from '../components/AppRangeSlider.jsx';
+import DateInput from '../components/DateInput.jsx';
+import DashboardCard from '../components/dashboard/DashboardCard.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ExpandingSection from '../components/ExpandingSection.jsx';
+import {
+  FinancialField,
+  FinancialFormGrid
+} from '../components/FinancialForm.jsx';
 import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
@@ -31,7 +37,11 @@ import {
   formatCurrency,
   formatSignedCurrency
 } from '../lib/formatters.js';
-import { addMonthsToLocalDate } from '../lib/localDate.js';
+import {
+  addMonthsToLocalDate,
+  parseDateOnly,
+  parseMonthParts
+} from '../lib/localDate.js';
 
 const GOAL_PRESETS = [
   { kind: 'college', label: 'Kids College', icon: '??' },
@@ -82,9 +92,9 @@ function colorForGoal(goalKey) {
 }
 
 function formatMonth(key) {
-  if (!key) return '';
-  const [year, month] = key.split('-').map(Number);
-  return new Date(year, month - 1, 1).toLocaleDateString(undefined, {
+  const parts = parseMonthParts(key);
+  if (!parts) return '';
+  return new Date(parts.year, parts.month - 1, 1).toLocaleDateString(undefined, {
     month: 'short',
     year: 'numeric'
   });
@@ -92,7 +102,9 @@ function formatMonth(key) {
 
 function formatDate(date) {
   if (!date) return 'No ETA yet';
-  return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+  const parsed = parseDateOnly(date);
+  if (!parsed) return 'No ETA yet';
+  return parsed.toLocaleDateString(undefined, {
     month: 'short',
     year: 'numeric'
   });
@@ -100,7 +112,9 @@ function formatDate(date) {
 
 function formatFullMonthDate(date) {
   if (!date) return 'No ETA yet';
-  return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+  const parsed = parseDateOnly(date);
+  if (!parsed) return 'No ETA yet';
+  return parsed.toLocaleDateString(undefined, {
     month: 'long',
     year: 'numeric'
   });
@@ -115,8 +129,8 @@ function formatEta(eta) {
 
 function monthsUntil(date) {
   if (!date) return null;
-  const target = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(target.getTime())) return null;
+  const target = parseDateOnly(date);
+  if (!target) return null;
   const now = new Date();
   const months = (target.getFullYear() - now.getFullYear()) * 12 + (target.getMonth() - now.getMonth());
   return Math.max(1, months);
@@ -426,60 +440,59 @@ export default function Goals() {
         />
       ) : (
         <div className="goals-grid app-page-width">
-          <section
-            className={`dashboard-card goals-focus-card ${focusCollapsed ? 'collapsed' : ''}`}
-            onClick={toggleFocusCard}
-            onKeyDown={handleFocusCardKeyDown}
-            tabIndex={0}
-            aria-expanded={!focusCollapsed}
-          >
-            <header className="dashboard-card-header">
-              <h3>{selectedGoal?.name || 'Goal'}</h3>
+          <DashboardCard
+            title={selectedGoal?.name || 'Goal'}
+            className={`goals-focus-card ${focusCollapsed ? 'collapsed' : ''}`}
+            action={(
               <div className="goals-card-actions">
                 <button type="button" className="dashboard-card-link button-link" onClick={() => openEditGoal(selectedGoal)}>
                   Edit
                 </button>
               </div>
-            </header>
-            <div className="dashboard-card-body">
-              <GoalProgress goal={selectedGoal} />
-              <ExpandingSection
-                expanded={!focusCollapsed}
-                className="goals-focus-detail"
-                innerClassName="goals-focus-detail-inner"
-              >
-                <GoalChart goal={selectedGoal} />
-                <ImaginePanel
-                  goal={selectedGoal}
-                  imagineMonthly={imagineMonthly}
-                  imaginedEta={imaginedEta}
-                  onChange={setImagineMonthly}
-                />
-                <div className="goals-focus-actions">
-                  <button type="button" className="btn-secondary" onClick={() => openEditGoal(selectedGoal)}>
-                    Edit goal
-                  </button>
-                  <button type="button" className="btn-danger" onClick={() => handleDelete(selectedGoal)}>
-                    Delete
-                  </button>
-                </div>
-              </ExpandingSection>
-            </div>
-          </section>
-
-          <section className="dashboard-card goals-list-card">
-            <header className="dashboard-card-header">
-              <h3>Savings Goals</h3>
-              {goals.length > 1 && (
-                <button
-                  type="button"
-                  className="dashboard-card-link button-link"
-                  onClick={toggleReorderMode}
-                >
-                  {reorderMode ? 'Done' : 'Reorder'}
+            )}
+            onClick={toggleFocusCard}
+            onKeyDown={handleFocusCardKeyDown}
+            tabIndex={0}
+            aria-expanded={!focusCollapsed}
+          >
+            <GoalProgress goal={selectedGoal} />
+            <ExpandingSection
+              expanded={!focusCollapsed}
+              className="goals-focus-detail"
+              innerClassName="goals-focus-detail-inner"
+            >
+              <GoalChart goal={selectedGoal} />
+              <ImaginePanel
+                goal={selectedGoal}
+                imagineMonthly={imagineMonthly}
+                imaginedEta={imaginedEta}
+                onChange={setImagineMonthly}
+              />
+              <div className="goals-focus-actions">
+                <button type="button" className="btn-secondary" onClick={() => openEditGoal(selectedGoal)}>
+                  Edit goal
                 </button>
-              )}
-            </header>
+                <button type="button" className="btn-danger" onClick={() => handleDelete(selectedGoal)}>
+                  Delete
+                </button>
+              </div>
+            </ExpandingSection>
+          </DashboardCard>
+
+          <DashboardCard
+            title="Savings Goals"
+            className="goals-list-card"
+            body={false}
+            action={goals.length > 1 && (
+              <button
+                type="button"
+                className="dashboard-card-link button-link"
+                onClick={toggleReorderMode}
+              >
+                {reorderMode ? 'Done' : 'Reorder'}
+              </button>
+            )}
+          >
             <div className="goal-list">
               {reorderMode ? (
                 <DndContext
@@ -528,21 +541,19 @@ export default function Goals() {
                 );
               })}
             </div>
-          </section>
+          </DashboardCard>
 
-          <section className="dashboard-card goals-account-card">
-            <header className="dashboard-card-header">
-              <h3>Account allocation</h3>
-              <Link to="/accounts" className="dashboard-card-link">View Accounts</Link>
-            </header>
-            <div className="dashboard-card-body">
-              <div className="goal-account-list">
-                {accounts.map((account) => (
-                  <AccountAllocationRow key={account.id} account={account} />
-                ))}
-              </div>
+          <DashboardCard
+            title="Account allocation"
+            className="goals-account-card"
+            action={<Link to="/accounts" className="dashboard-card-link">View Accounts</Link>}
+          >
+            <div className="goal-account-list">
+              {accounts.map((account) => (
+                <AccountAllocationRow key={account.id} account={account} />
+              ))}
             </div>
-          </section>
+          </DashboardCard>
         </div>
       )}
 
@@ -1009,21 +1020,18 @@ function GoalWizard({ goal, accounts, confirm, onClose, onSaved, onDeleted }) {
                   />
                 </label>
               )}
-              <label className="field">
-                <span>What are you saving for?</span>
+              <FinancialField label="What are you saving for?">
                 <input value={draft.name} onChange={(e) => update('name', e.target.value)} placeholder="New car" />
-              </label>
-              <div className="goal-form-grid">
-                <label className="field">
-                  <span>Target amount</span>
+              </FinancialField>
+              <FinancialFormGrid>
+                <FinancialField label="Target amount">
                   <CurrencyInput
                     value={draft.target_amount}
                     onChange={(value) => update('target_amount', value)}
                     placeholder="$25,000"
                   />
-                </label>
-                <label className="field">
-                  <span>Target date</span>
+                </FinancialField>
+                <FinancialField label="Target date">
                   <div className="goal-date-choice" role="group" aria-label="Target date choice">
                     <button
                       type="button"
@@ -1041,10 +1049,10 @@ function GoalWizard({ goal, accounts, confirm, onClose, onSaved, onDeleted }) {
                     </button>
                   </div>
                   {targetDateMode === 'date' && (
-                    <input type="date" value={draft.target_date} onChange={(e) => update('target_date', e.target.value)} />
+                    <DateInput value={draft.target_date} onChange={(value) => update('target_date', value)} />
                   )}
-                </label>
-              </div>
+                </FinancialField>
+              </FinancialFormGrid>
             </div>
           )}
 

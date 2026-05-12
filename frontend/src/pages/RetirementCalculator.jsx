@@ -7,9 +7,14 @@ import CollapseIndicator from '../components/CollapseIndicator.jsx';
 import CurrencyInput, { formatCurrencyInput, hasCurrencyInputValue, parseCurrencyInput } from '../components/CurrencyInput.jsx';
 import ExpandingSection from '../components/ExpandingSection.jsx';
 import PageHero from '../components/PageHero.jsx';
+import ResponsiveMetricValue from '../components/ResponsiveMetricValue.jsx';
 import SegmentedControl from '../components/SegmentedControl.jsx';
 import TapIndicatorText from '../components/TapIndicatorText.jsx';
 import { formatCompactCurrency, formatCurrency, formatPercent, parsePercentInput } from '../lib/formatters.js';
+import {
+  ageFromDate,
+  parseMonthParts
+} from '../lib/localDate.js';
 
 const ACCOUNT_KIND_LABELS = {
   '401k': '401(k)',
@@ -109,19 +114,6 @@ function readRetirementCalculatorPreferences() {
       customTargetAmount: null
     };
   }
-}
-
-function ageFromBirthDate(date) {
-  if (!date) return null;
-  const birth = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(birth.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  const hadBirthday =
-    now.getMonth() > birth.getMonth() ||
-    (now.getMonth() === birth.getMonth() && now.getDate() >= birth.getDate());
-  if (!hadBirthday) age -= 1;
-  return age >= 0 ? age : null;
 }
 
 function effectiveMonthlyRate(annualReturn) {
@@ -301,10 +293,10 @@ function valueAtAge(points, age) {
 }
 
 function monthAge(month, currentAge) {
-  const [year, monthNumber] = String(month || '').split('-').map(Number);
-  if (!year || !monthNumber) return currentAge;
+  const parts = parseMonthParts(month);
+  if (!parts) return currentAge;
   const now = new Date();
-  const monthDiff = (now.getFullYear() - year) * 12 + (now.getMonth() + 1 - monthNumber);
+  const monthDiff = (now.getFullYear() - parts.year) * 12 + (now.getMonth() + 1 - parts.month);
   return currentAge - (monthDiff / 12);
 }
 
@@ -314,9 +306,9 @@ function currentMonthKey() {
 }
 
 function addMonthsToKey(key, amount) {
-  const [year, monthNumber] = String(key || '').split('-').map(Number);
-  if (!year || !monthNumber) return currentMonthKey();
-  const date = new Date(year, monthNumber - 1 + amount, 1);
+  const parts = parseMonthParts(key);
+  if (!parts) return currentMonthKey();
+  const date = new Date(parts.year, parts.month - 1 + amount, 1);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
@@ -338,9 +330,9 @@ function historyRangeDetail(range, firstMonth) {
 }
 
 function formatHistoryMonth(month) {
-  const [year, monthNumber] = String(month || '').split('-').map(Number);
-  if (!year || !monthNumber) return String(month || 'History');
-  return new Date(year, monthNumber - 1, 1).toLocaleDateString(undefined, {
+  const parts = parseMonthParts(month);
+  if (!parts) return String(month || 'History');
+  return new Date(parts.year, parts.month - 1, 1).toLocaleDateString(undefined, {
     month: 'short',
     year: 'numeric'
   });
@@ -621,7 +613,7 @@ export default function RetirementCalculator() {
     const hsaBalance = accounts
       .filter((account) => account.kind === 'hsa' || account.label === 'HSA')
       .reduce((sum, account) => sum + account.balance, 0);
-    const memberAges = members.map((member) => ageFromBirthDate(member.birth_date)).filter((age) => age !== null);
+    const memberAges = members.map((member) => ageFromDate(member.birth_date)).filter((age) => age !== null);
     const inferredAge = memberAges.sort((a, b) => b - a)[0] ?? 35;
     const hasAgeSource = memberAges.length > 0;
     const currentAge = Math.max(0, inferredAge);
@@ -1063,7 +1055,9 @@ export default function RetirementCalculator() {
               <aside className="retcalc-control-panel" aria-label="Retirement calculator controls">
                 <div className="retcalc-answer">
                   <span>At age {Math.round(model.retirementAge)}</span>
-                  <strong>{formatMoney(model.selected.projectedBalance)}</strong>
+                  <ResponsiveMetricValue size="xl">
+                    {formatMoney(model.selected.projectedBalance)}
+                  </ResponsiveMetricValue>
                   <em className={model.selected.gap >= 0 ? 'income' : 'expense'}>
                     {model.selected.gap >= 0
                       ? `${formatMoney(model.selected.gap)} above target`

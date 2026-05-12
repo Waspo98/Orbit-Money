@@ -4,7 +4,8 @@ import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
 } from './CurrencyInput.jsx';
-import { formatLocalDate } from '../lib/localDate.js';
+import DateInput from './DateInput.jsx';
+import { formatLocalDate, todayLocalDate } from '../lib/localDate.js';
 
 // ============================================================================
 // FilterSheet — comprehensive filter UI for the Transactions page.
@@ -32,7 +33,7 @@ const HAS_EDITS_OPTIONS = [
 
 // Date preset helpers — all return { from, to } as YYYY-MM-DD strings.
 function todayIso() {
-  return formatLocalDate();
+  return todayLocalDate();
 }
 function monthStart(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
@@ -211,19 +212,11 @@ export default function FilterSheet({
               <div className="filter-row">
                 <label className="filter-field">
                   <span>From</span>
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                  />
+                  <DateInput value={dateFrom} onChange={setDateFrom} />
                 </label>
                 <label className="filter-field">
                   <span>To</span>
-                  <input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                  />
+                  <DateInput value={dateTo} onChange={setDateTo} />
                 </label>
               </div>
             </section>

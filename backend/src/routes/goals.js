@@ -2,6 +2,7 @@ import express from 'express';
 import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import {
+  addMonthsToLocalMonth,
   formatLocalDate,
   formatLocalMonth,
   isValidOptionalDateOnly
@@ -31,9 +32,7 @@ function currentMonth() {
 }
 
 function addMonths(key, amount) {
-  const [year, month] = key.split('-').map(Number);
-  const d = new Date(year, month - 1 + amount, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return addMonthsToLocalMonth(key, amount);
 }
 
 function addMonthsToDate(date, amount) {

@@ -1,5 +1,11 @@
 import { centsToDollars } from '../lib/money.js';
 import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
+import {
+  addMonthsToLocalMonth,
+  formatLocalMonth,
+  getLocalMonthBounds,
+  isValidMonthOnly
+} from '../lib/localDate.js';
 
 export const SPENDING_TREND_MONTH_OPTIONS = [3, 6, 12];
 export const DEFAULT_SPENDING_TREND_MONTHS = 6;
@@ -36,11 +42,11 @@ export function buildSpendingTrendRowsSql() {
 }
 
 export function parseMonth(value) {
-  return typeof value === 'string' && /^\d{4}-\d{2}$/.test(value) ? value : null;
+  return typeof value === 'string' && isValidMonthOnly(value) ? value : null;
 }
 
 export function currentMonth(date = new Date()) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  return formatLocalMonth(date);
 }
 
 export function normalizeTrendMonths(value) {
@@ -53,19 +59,12 @@ export function normalizeTrendMonths(value) {
 export function addMonths(month, delta) {
   const parsed = parseMonth(month);
   if (!parsed) return currentMonth();
-  const [year, monthNumber] = parsed.split('-').map(Number);
-  const date = new Date(year, monthNumber - 1, 1);
-  date.setMonth(date.getMonth() + delta);
-  return currentMonth(date);
+  return addMonthsToLocalMonth(parsed, delta);
 }
 
 export function monthBounds(month) {
   const parsed = parseMonth(month) || currentMonth();
-  const [year, monthNumber] = parsed.split('-').map(Number);
-  const start = `${parsed}-01`;
-  const endDate = new Date(year, monthNumber, 0);
-  const end = `${year}-${String(monthNumber).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
-  return { start, end };
+  return getLocalMonthBounds(parsed);
 }
 
 export function buildMonthKeys({ endMonth = currentMonth(), months = DEFAULT_SPENDING_TREND_MONTHS } = {}) {

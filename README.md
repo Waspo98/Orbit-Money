@@ -158,6 +158,11 @@ use their cached data offline without a time limit. Shared/member households
 must have a successful online access validation within the last 7 days before
 cached data is shown offline.
 
+When refreshing PWA shell assets, keep the cache suffix aligned across
+`frontend/index.html`, `frontend/public/manifest.webmanifest`,
+`frontend/public/sw.js`, and `frontend/src/brandAssets.js`. This cache suffix is
+separate from the visible app version.
+
 ## Push Notifications
 
 When Web Push keys are configured, Preferences can enable push notifications for
@@ -257,7 +262,7 @@ Registry and the maintainer's self-hosted Windows runner:
   then call `scripts\deploy-live.cmd`
 - Pushes to `Beta` publish `ghcr.io/waspo98/orbit-money:beta`, then call
   `scripts\deploy-beta.cmd`, which delegates to `deploy\beta\deploy-beta.cmd`
-- Pushing a tag like `v0.75.0` publishes matching version image tags for
+- Pushing a tag like `v0.76.0` publishes matching version image tags for
   release installs
 
 The deploy jobs run on the maintainer's self-hosted Windows runner. The deploy

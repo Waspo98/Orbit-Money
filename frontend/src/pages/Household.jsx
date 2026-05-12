@@ -6,7 +6,13 @@ import CurrencyInput, {
   formatCurrencyInput,
   parseCurrencyInput
 } from '../components/CurrencyInput.jsx';
+import DateInput from '../components/DateInput.jsx';
+import DashboardCard from '../components/dashboard/DashboardCard.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import {
+  FinancialField,
+  FinancialFormGrid
+} from '../components/FinancialForm.jsx';
 import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import PercentInput from '../components/PercentInput.jsx';
@@ -19,7 +25,11 @@ import {
   formatPercentInput,
   parsePercentInput
 } from '../lib/formatters.js';
-import { formatLocalDate } from '../lib/localDate.js';
+import {
+  ageFromDate,
+  formatLocalDate,
+  formatMediumDate
+} from '../lib/localDate.js';
 
 const ROLE_OPTIONS = [
   ['adult', 'Adult'],
@@ -119,19 +129,6 @@ function setIncludeHsaInRetirementRate(memberId, include) {
   } catch {
     /* Local preference only; ignore storage failures. */
   }
-}
-
-function ageFromBirthDate(date) {
-  if (!date) return null;
-  const birth = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(birth.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  const hadBirthday =
-    now.getMonth() > birth.getMonth() ||
-    (now.getMonth() === birth.getMonth() && now.getDate() >= birth.getDate());
-  if (!hadBirthday) age -= 1;
-  return age >= 0 ? age : null;
 }
 
 function emptyDraft() {
@@ -298,68 +295,58 @@ export default function Household() {
         />
       ) : (
         <div className="household-grid app-page-width">
-          <section className="dashboard-card household-members-card">
-            <header className="dashboard-card-header">
-              <h3>Members</h3>
+          <DashboardCard
+            title="Members"
+            className="household-members-card"
+            action={(
               <button type="button" className="dashboard-card-link button-link" onClick={() => setEditingMember({ mode: 'new' })}>
                 Add
               </button>
-            </header>
-            <div className="dashboard-card-body">
-              <div className="household-member-list">
-                {members.map((member) => (
-                  <MemberCard
-                    key={member.id}
-                    member={member}
-                    onEdit={() => setEditingMember(member)}
-                    onDelete={() => handleDelete(member)}
-                  />
+            )}
+          >
+            <div className="household-member-list">
+              {members.map((member) => (
+                <MemberCard
+                  key={member.id}
+                  member={member}
+                  onEdit={() => setEditingMember(member)}
+                  onDelete={() => handleDelete(member)}
+                />
+              ))}
+            </div>
+          </DashboardCard>
+
+          <DashboardCard title="Planning Signals" className="household-summary-card">
+            <SignalRow label="Take-home pay" value={formatCurrency(summary.net_pay_annual)} detail="Annualized from pay cadence" />
+            <SignalRow label="Retirement savings" value={formatCurrency((summary.employee_retirement_annual || 0) + (summary.employer_retirement_annual || 0))} detail={`${formatCurrency(summary.employer_retirement_annual)} employer`} />
+            <SignalRow label="Benefits value" value={formatCurrency(summary.total_benefits_annual)} detail="Match, HSA, FSA, other" />
+            <SignalRow label="Largest contributor" value={topMember?.name || 'None'} detail={topMember ? formatCurrency(topMember.household_value_annual) : formatCurrency(0)} />
+          </DashboardCard>
+
+          <DashboardCard title="Income History" className="household-history-card">
+            {records.length === 0 ? (
+              <p className="subtle" style={{ margin: 0 }}>Save a member profile to record the first dated income snapshot.</p>
+            ) : (
+              <div className="household-history-list">
+                {records.slice(0, 10).map((record) => (
+                  <div key={record.id} className="household-history-row">
+                    <div>
+                      <strong>{record.member_name}</strong>
+                      <span>{formatMediumDate(record.effective_date)}</span>
+                    </div>
+                    <div>
+                      <strong>{formatCurrency(record.gross_income_annual)}</strong>
+                      <span>{formatCurrency(record.net_pay_annual)} net</span>
+                    </div>
+                    <div>
+                      <strong>{formatCurrency(record.employer_retirement_annual)}</strong>
+                      <span>Employer match</span>
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-          </section>
-
-          <section className="dashboard-card household-summary-card">
-            <header className="dashboard-card-header">
-              <h3>Planning Signals</h3>
-            </header>
-            <div className="dashboard-card-body">
-              <SignalRow label="Take-home pay" value={formatCurrency(summary.net_pay_annual)} detail="Annualized from pay cadence" />
-              <SignalRow label="Retirement savings" value={formatCurrency((summary.employee_retirement_annual || 0) + (summary.employer_retirement_annual || 0))} detail={`${formatCurrency(summary.employer_retirement_annual)} employer`} />
-              <SignalRow label="Benefits value" value={formatCurrency(summary.total_benefits_annual)} detail="Match, HSA, FSA, other" />
-              <SignalRow label="Largest contributor" value={topMember?.name || 'None'} detail={topMember ? formatCurrency(topMember.household_value_annual) : formatCurrency(0)} />
-            </div>
-          </section>
-
-          <section className="dashboard-card household-history-card">
-            <header className="dashboard-card-header">
-              <h3>Income History</h3>
-            </header>
-            <div className="dashboard-card-body">
-              {records.length === 0 ? (
-                <p className="subtle" style={{ margin: 0 }}>Save a member profile to record the first dated income snapshot.</p>
-              ) : (
-                <div className="household-history-list">
-                  {records.slice(0, 10).map((record) => (
-                    <div key={record.id} className="household-history-row">
-                      <div>
-                        <strong>{record.member_name}</strong>
-                        <span>{new Date(`${record.effective_date}T00:00:00`).toLocaleDateString()}</span>
-                      </div>
-                      <div>
-                        <strong>{formatCurrency(record.gross_income_annual)}</strong>
-                        <span>{formatCurrency(record.net_pay_annual)} net</span>
-                      </div>
-                      <div>
-                        <strong>{formatCurrency(record.employer_retirement_annual)}</strong>
-                        <span>Employer match</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
+            )}
+          </DashboardCard>
         </div>
       )}
 
@@ -381,7 +368,7 @@ export default function Household() {
 }
 
 function MemberCard({ member, onEdit, onDelete }) {
-  const age = ageFromBirthDate(member.birth_date);
+  const age = ageFromDate(member.birth_date);
   const includeHsa = shouldIncludeHsaInRetirementRate(member.id);
   const retirementContributions =
     Number(member.employee_retirement_annual || 0) +
@@ -486,42 +473,36 @@ function MemberModal({ member, accounts, onClose, onSaved }) {
 
           <div className="household-form-section">
             <h4>Person</h4>
-            <div className="goal-form-grid">
-              <label className="field">
-                <span>Name</span>
+            <FinancialFormGrid>
+              <FinancialField label="Name">
                 <input value={draft.name} onChange={(e) => update('name', e.target.value)} placeholder="Alex" />
-              </label>
-              <label className="field">
-                <span>Role</span>
+              </FinancialField>
+              <FinancialField label="Role">
                 <AppSelect
                   value={draft.role}
                   options={ROLE_OPTIONS}
                   onChange={(value) => update('role', value)}
                   ariaLabel="Household role"
                 />
-              </label>
-              <label className="field">
-                <span>Birth Date</span>
-                <input type="date" value={draft.birth_date || ''} onChange={(e) => update('birth_date', e.target.value)} />
-              </label>
-              <label className="field">
-                <span>Status</span>
+              </FinancialField>
+              <FinancialField label="Birth Date">
+                <DateInput value={draft.birth_date || ''} onChange={(value) => update('birth_date', value)} />
+              </FinancialField>
+              <FinancialField label="Status">
                 <AppSelect
                   value={draft.employment_status}
                   options={EMPLOYMENT_OPTIONS}
                   onChange={(value) => update('employment_status', value)}
                   ariaLabel="Employment status"
                 />
-              </label>
-              <label className="field">
-                <span>Employer</span>
+              </FinancialField>
+              <FinancialField label="Employer">
                 <input value={draft.employer || ''} onChange={(e) => update('employer', e.target.value)} placeholder="Employer name" />
-              </label>
-              <label className="field">
-                <span>Job Title</span>
+              </FinancialField>
+              <FinancialField label="Job Title">
                 <input value={draft.job_title || ''} onChange={(e) => update('job_title', e.target.value)} placeholder="Role or title" />
-              </label>
-            </div>
+              </FinancialField>
+            </FinancialFormGrid>
           </div>
 
           <div className="household-form-section">

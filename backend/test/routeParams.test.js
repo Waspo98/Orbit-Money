@@ -10,6 +10,16 @@ import {
 
 test('parseInteger and parseId return null for invalid integers', () => {
   assert.equal(parseInteger('42'), 42);
+  assert.equal(parseInteger('-3'), -3);
+  assert.equal(parseInteger(' 7 '), 7);
+  assert.equal(parseInteger('12abc'), null);
+  assert.equal(parseInteger('1.5'), null);
+  assert.equal(parseInteger(''), null);
+  assert.equal(parseInteger(undefined), null);
+  assert.equal(parseId('42'), 42);
+  assert.equal(parseId(42), 42);
+  assert.equal(parseId('0'), null);
+  assert.equal(parseId('-1'), null);
   assert.equal(parseId('abc'), null);
   assert.equal(parseId(undefined), null);
 });

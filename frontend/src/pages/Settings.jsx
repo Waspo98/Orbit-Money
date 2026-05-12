@@ -11,6 +11,7 @@ import AppIcon from '../components/AppIcon.jsx';
 import AppSelect from '../components/AppSelect.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import ChoiceCardGroup from '../components/ChoiceCardGroup.jsx';
+import DateInput from '../components/DateInput.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
   useDragInteractionLock,
@@ -18,6 +19,8 @@ import ReorderListItem, {
 } from '../components/ReorderListItem.jsx';
 import OptionalNumberInput from '../components/OptionalNumberInput.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
+import SettingsCard from '../components/settings/SettingsCard.jsx';
+import SubcardGrid from '../components/SubcardGrid.jsx';
 import TapIndicatorText from '../components/TapIndicatorText.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -30,6 +33,7 @@ import {
 } from '../navigation.js';
 import { APP_VERSION_LABEL } from '../version.js';
 import { APP_ICON_512 } from '../brandAssets.js';
+import { todayLocalDate } from '../lib/localDate.js';
 
 const SIMPLEFIN_BRIDGE_URL = 'https://beta-bridge.simplefin.org/';
 
@@ -89,6 +93,14 @@ const INCOME_TIMING_OPTIONS = [
   { value: 'scheduled', label: 'Scheduled Time' }
 ];
 
+function SettingsStatGrid({ children }) {
+  return (
+    <SubcardGrid as="dl" className="stat-grid" pattern="four" wrap={false}>
+      {children}
+    </SubcardGrid>
+  );
+}
+
 function formatDateTime(iso) {
   if (!iso) return '-';
   const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
@@ -96,14 +108,6 @@ function formatDateTime(iso) {
     dateStyle: 'medium',
     timeStyle: 'short'
   });
-}
-
-function todayIso() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }
 
 function displayPerson(person) {
@@ -134,32 +138,6 @@ function permissionLabel(permission) {
   if (permission === 'granted') return 'Enabled On This Device';
   if (permission === 'denied') return 'Blocked In Browser';
   return 'Not Enabled On This Device';
-}
-
-function SettingsCard({
-  id,
-  title,
-  description,
-  className = '',
-  children
-}) {
-  return (
-    <section
-      className={`settings-section settings-card ${className}`.trim()}
-      aria-labelledby={`settings-card-${id}`}
-    >
-      <div className="settings-card-header-static">
-        <span className="settings-section-header">
-          <h3 id={`settings-card-${id}`}>{title}</h3>
-          {description && <p>{description}</p>}
-        </span>
-      </div>
-
-      <div id={`settings-card-body-${id}`} className="settings-card-body">
-        {children}
-      </div>
-    </section>
-  );
 }
 
 function NotificationPreferenceRow({
@@ -284,7 +262,7 @@ export default function Settings({
 
   const [status, setStatus] = useState(null);
   const [setupToken, setSetupToken] = useState('');
-  const [cutoverDate, setCutoverDate] = useState(todayIso());
+  const [cutoverDate, setCutoverDate] = useState(todayLocalDate());
   const [setupError, setSetupError] = useState('');
   const [setupBusy, setSetupBusy] = useState(false);
 
@@ -1446,7 +1424,7 @@ export default function Settings({
 
             {syncError && <div className="error" style={{ marginTop: 16 }}>{syncError}</div>}
 
-            <div className="metric-grid status-grid simplefin-status-grid">
+            <SubcardGrid as="dl" className="status-grid simplefin-status-grid" pattern="four" wrap={false}>
               <div><dt>Last Sync</dt><dd>{formatDateTime(status.lastSyncAt)}</dd></div>
               <div>
                 <dt>Last Status</dt>
@@ -1485,7 +1463,7 @@ export default function Settings({
                   {showLog ? 'Hide' : 'Show'}
                 </button>
               </div>
-            </div>
+            </SubcardGrid>
 
             {status.lastSync?.error_message && (
               <div className="warning-banner">
@@ -1586,12 +1564,11 @@ export default function Settings({
 
             <label className="field">
               <span>Cutover Date</span>
-              <input
-                type="date"
+              <DateInput
                 value={cutoverDate}
-                onChange={(e) => setCutoverDate(e.target.value)}
+                onChange={setCutoverDate}
                 required
-                max={todayIso()}
+                max={todayLocalDate()}
               />
             </label>
 
@@ -1663,22 +1640,22 @@ export default function Settings({
             <div className="result-card">
               {importResult.undone ? (
                 <>
-                  <dl className="metric-grid stat-grid">
+                  <SettingsStatGrid>
                     <div><dt>Transactions Removed</dt><dd>{importResult.undone.transactionsDeleted.toLocaleString()}</dd></div>
                     <div><dt>Rules Removed</dt><dd>{importResult.undone.rulesDeleted.toLocaleString()}</dd></div>
                     <div><dt>Accounts Removed</dt><dd>{importResult.undone.accountsDeleted.toLocaleString()}</dd></div>
                     <div><dt>Accounts Kept</dt><dd>{importResult.undone.accountsKept.toLocaleString()}</dd></div>
-                  </dl>
+                  </SettingsStatGrid>
                   <p className="muted" style={{ marginBottom: 0 }}>Import was undone.</p>
                 </>
               ) : (
                 <>
-                  <dl className="metric-grid stat-grid">
+                  <SettingsStatGrid>
                     <div><dt>Imported</dt><dd>{importResult.inserted.toLocaleString()}</dd></div>
                     <div><dt>Skipped</dt><dd>{importResult.skipped.toLocaleString()}</dd></div>
                     <div><dt>Accounts</dt><dd>{importResult.accountsCreated.toLocaleString()}</dd></div>
                     <div><dt>Rules</dt><dd>{importResult.rulesCreated.toLocaleString()}</dd></div>
-                  </dl>
+                  </SettingsStatGrid>
 
                   {importResult.parseWarnings > 0 && (
                     <p className="muted" style={{ marginTop: 0 }}>
@@ -1741,12 +1718,12 @@ export default function Settings({
 
               {importPreview && (
                 <div className="result-card">
-                  <dl className="metric-grid stat-grid">
+                  <SettingsStatGrid>
                     <div><dt>Would Import</dt><dd>{importPreview.estimatedInserted.toLocaleString()}</dd></div>
                     <div><dt>Duplicates</dt><dd>{importPreview.duplicateRows.toLocaleString()}</dd></div>
                     <div><dt>New Accounts</dt><dd>{importPreview.accountsCreated.toLocaleString()}</dd></div>
                     <div><dt>New Rules</dt><dd>{importPreview.rulesCreated.toLocaleString()}</dd></div>
-                  </dl>
+                  </SettingsStatGrid>
                   {importPreview.invalidRows > 0 && (
                     <div className="warning-banner">
                       {importPreview.invalidRows.toLocaleString()} row{importPreview.invalidRows === 1 ? '' : 's'} could not be imported.
@@ -1846,12 +1823,12 @@ export default function Settings({
 
           {restorePreview && (
             <div className="result-card">
-              <dl className="metric-grid stat-grid">
+              <SettingsStatGrid>
                 <div><dt>Accounts</dt><dd>{restorePreview.accounts.toLocaleString()}</dd></div>
                 <div><dt>Transactions</dt><dd>{restorePreview.transactions.toLocaleString()}</dd></div>
                 <div><dt>Rules</dt><dd>{restorePreview.rules.toLocaleString()}</dd></div>
                 <div><dt>Goals</dt><dd>{restorePreview.goals.toLocaleString()}</dd></div>
-              </dl>
+              </SettingsStatGrid>
             </div>
           )}
 
@@ -2101,7 +2078,7 @@ export default function Settings({
           </div>
         </div>
 
-        <div className="settings-about-grid">
+        <SubcardGrid className="settings-about-grid" pattern="four">
           <div className="settings-about-info-card">
             <span className="settings-about-info-label">Developer</span>
             <strong>Neal Overbay</strong>
@@ -2131,7 +2108,7 @@ export default function Settings({
               {signingOut ? 'Signing Out...' : 'Sign Out'}
             </button>
           </div>
-        </div>
+        </SubcardGrid>
 
         <div className="settings-about-footer">
           <span>Copyright 2026 Neal Overbay. All rights reserved.</span>

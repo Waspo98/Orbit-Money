@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import AppSelect from '../components/AppSelect.jsx';
 import PageHero from '../components/PageHero.jsx';
 import CurrencyInput, { formatCurrencyInput } from '../components/CurrencyInput.jsx';
+import DashboardCard from '../components/dashboard/DashboardCard.jsx';
 import PercentInput from '../components/PercentInput.jsx';
 import SegmentedControl from '../components/SegmentedControl.jsx';
 import { formatCurrency } from '../lib/formatters.js';
@@ -203,10 +204,7 @@ export default function HousingCalculator({ accounts = [] }) {
         subtitle="Estimate selling proceeds, cash to close, and projected monthly payment."
       />
 
-      <section className="dashboard-card housing-picker">
-        <header className="dashboard-card-header">
-          <h3>Mortgage</h3>
-        </header>
+      <DashboardCard title="Mortgage" className="housing-picker">
         <div className="housing-picker-row">
           <label className="field">
             <span>Select mortgage</span>
@@ -235,13 +233,10 @@ export default function HousingCalculator({ accounts = [] }) {
             )}
           </div>
         </div>
-      </section>
+      </DashboardCard>
 
       <div className="housing-grid">
-        <section className="dashboard-card housing-panel">
-          <header className="dashboard-card-header">
-            <h3>Selling</h3>
-          </header>
+        <DashboardCard title="Selling" className="housing-panel">
           <div className="housing-form-grid">
             <MoneyField label="Estimated Sale Price" value={values.salePrice} onChange={(v) => update('salePrice', v)} />
             <MoneyField label="Remaining Mortgage Balance" value={values.remainingMortgage} onChange={(v) => update('remainingMortgage', v)} />
@@ -258,15 +253,17 @@ export default function HousingCalculator({ accounts = [] }) {
               ['Net proceeds', formatMoney(selling.netProceeds), true]
             ]}
           />
-        </section>
+        </DashboardCard>
 
-        <section className="dashboard-card housing-panel">
-          <header className="dashboard-card-header">
-            <h3>Buying</h3>
+        <DashboardCard
+          title="Buying"
+          className="housing-panel"
+          action={(
             <button type="button" className="dashboard-card-link button-link" onClick={useNetProceeds}>
               Use net proceeds
             </button>
-          </header>
+          )}
+        >
           <div className="housing-form-grid">
             <MoneyField label="Purchase Price" value={values.purchasePrice} placeholder="$375,000" onChange={(v) => update('purchasePrice', v)} />
             <MoneyField label="Downpayment" value={values.downPayment} onChange={(v) => update('downPayment', v)} />
@@ -294,12 +291,9 @@ export default function HousingCalculator({ accounts = [] }) {
               ]
             ]}
           />
-        </section>
+        </DashboardCard>
 
-        <section className="dashboard-card housing-panel housing-monthly">
-          <header className="dashboard-card-header">
-            <h3>Monthly Payment</h3>
-          </header>
+        <DashboardCard title="Monthly Payment" className="housing-panel housing-monthly">
           <ResultList
             rows={[
               ['Principal & Interest', formatMoney(buying.principalInterest)],
@@ -309,7 +303,7 @@ export default function HousingCalculator({ accounts = [] }) {
               ['Projected Monthly Payment', formatMoney(buying.totalMonthlyPayment), true]
             ]}
           />
-        </section>
+        </DashboardCard>
       </div>
 
       <div className="housing-danger-zone">

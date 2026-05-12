@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
+import DashboardCard from '../components/dashboard/DashboardCard.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { OVERLAY_ANIM_MS } from '../components/overlayBehavior.js';
 import PageActionRow from '../components/PageActionRow.jsx';
@@ -8,6 +9,7 @@ import PageHero from '../components/PageHero.jsx';
 import SearchField from '../components/SearchField.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import SegmentedControl from '../components/SegmentedControl.jsx';
+import TapIndicatorText from '../components/TapIndicatorText.jsx';
 import RecurringItemEditor, {
   formFromRecurringItem,
   formFromSuggestion,
@@ -18,7 +20,12 @@ import RecurringItemEditor, {
 } from '../components/upcoming/RecurringItemEditor.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { formatCurrency, formatSignedCurrency } from '../lib/formatters.js';
-import { formatFullDate, formatMonthDay } from '../lib/localDate.js';
+import {
+  formatFullDate,
+  formatMonthDay,
+  parseDateOnly,
+  todayLocalDate
+} from '../lib/localDate.js';
 
 const FILTERS = [
   { value: 'all', label: 'All' },
@@ -60,14 +67,13 @@ const GIVING_HINTS = [
 const MODAL_HANDOFF_DELAY_MS = OVERLAY_ANIM_MS + 80;
 
 function todayIso() {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return todayLocalDate();
 }
 
 function dueLabel(value) {
-  const date = new Date(`${value}T00:00:00`);
-  const today = new Date(`${todayIso()}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return 'Scheduled';
+  const date = parseDateOnly(value);
+  const today = parseDateOnly(todayIso());
+  if (!date || !today) return 'Scheduled';
   const diff = Math.round((date.getTime() - today.getTime()) / 86400000);
   if (diff < 0) return `${Math.abs(diff)} Days Overdue`;
   if (diff === 0) return 'Today';
@@ -128,9 +134,9 @@ function upcomingKindLabel(kind) {
 }
 
 function daysBetweenDates(startDate, endDate) {
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+  const start = parseDateOnly(startDate);
+  const end = parseDateOnly(endDate);
+  if (!start || !end) return 0;
   return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000));
 }
 
@@ -523,21 +529,22 @@ function UpcomingPlan({
         />
       ))}
       {suggestions.length > 0 && (
-        <section className="dashboard-card upcoming-lane upcoming-lane-suggestions">
-          <header className="dashboard-card-header upcoming-card-header">
-            <h3>Suggested Recurring</h3>
-            <span className="pill accent upcoming-count-pill">{suggestions.length}</span>
-          </header>
-          <div className="dashboard-card-body upcoming-lane-body">
-            <SuggestionsList
-              suggestions={suggestions.slice(0, 4)}
-              onViewHistory={onViewHistory}
-              onReview={onReviewSuggestion}
-              onDismiss={onDismissSuggestion}
-              compact
-            />
-          </div>
-        </section>
+        <DashboardCard
+          title="Suggested Recurring"
+          subtitle={<TapIndicatorText>Tap to View Transactions</TapIndicatorText>}
+          className="upcoming-lane upcoming-lane-suggestions"
+          headerClassName="upcoming-card-header"
+          bodyClassName="upcoming-lane-body"
+          action={<span className="pill accent upcoming-count-pill">{suggestions.length}</span>}
+        >
+          <SuggestionsList
+            suggestions={suggestions.slice(0, 4)}
+            onViewHistory={onViewHistory}
+            onReview={onReviewSuggestion}
+            onDismiss={onDismissSuggestion}
+            compact
+          />
+        </DashboardCard>
       )}
     </div>
   );
@@ -545,35 +552,35 @@ function UpcomingPlan({
 
 function UpcomingLane({ kind, items, total, onAdd, onEdit, onDelete, onViewHistory }) {
   return (
-    <section className={`dashboard-card upcoming-lane upcoming-lane-${kind}`}>
-      <header className="dashboard-card-header upcoming-card-header">
-        <h3>{KIND_TITLES[kind]}</h3>
-        <span className="upcoming-card-total">{formatCurrency(total)}</span>
-      </header>
-
-      <div className="dashboard-card-body upcoming-lane-body">
-        {items.length === 0 ? (
-          <div className="upcoming-mini-empty">
-            <span>No {KIND_TITLES[kind].toLowerCase()} saved.</span>
-            <button type="button" className="dashboard-card-link dashboard-card-action-button" onClick={onAdd}>
-              Add
-            </button>
-          </div>
-        ) : (
-          <ul className="upcoming-plan-list">
-            {items.map((item) => (
-              <RecurringRow
-                key={item.id}
-                item={item}
-                onViewHistory={() => onViewHistory(item)}
-                onEdit={() => onEdit(item)}
-                onDelete={() => onDelete(item)}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-    </section>
+    <DashboardCard
+      title={KIND_TITLES[kind]}
+      subtitle={items.length > 0 ? <TapIndicatorText>Tap to View Transactions</TapIndicatorText> : null}
+      className={`upcoming-lane upcoming-lane-${kind}`}
+      headerClassName="upcoming-card-header"
+      bodyClassName="upcoming-lane-body"
+      action={<span className="upcoming-card-total">{formatCurrency(total)}</span>}
+    >
+      {items.length === 0 ? (
+        <div className="upcoming-mini-empty">
+          <span>No {KIND_TITLES[kind].toLowerCase()} saved.</span>
+          <button type="button" className="dashboard-card-link dashboard-card-action-button" onClick={onAdd}>
+            Add
+          </button>
+        </div>
+      ) : (
+        <ul className="upcoming-plan-list">
+          {items.map((item) => (
+            <RecurringRow
+              key={item.id}
+              item={item}
+              onViewHistory={() => onViewHistory(item)}
+              onEdit={() => onEdit(item)}
+              onDelete={() => onDelete(item)}
+            />
+          ))}
+        </ul>
+      )}
+    </DashboardCard>
   );
 }
 
@@ -870,20 +877,21 @@ function HistoryTransactionRow({ txn, account, category }) {
 
 function SuggestionsPanel({ suggestions, onViewHistory, onReview, onDismiss }) {
   return (
-    <section className="dashboard-card upcoming-lane upcoming-suggestions-panel">
-      <header className="dashboard-card-header upcoming-card-header">
-        <h3>Suggested Recurring</h3>
-        <span className="pill accent upcoming-count-pill">{suggestions.length}</span>
-      </header>
-      <div className="dashboard-card-body upcoming-lane-body">
-        <SuggestionsList
-          suggestions={suggestions}
-          onViewHistory={onViewHistory}
-          onReview={onReview}
-          onDismiss={onDismiss}
-        />
-      </div>
-    </section>
+    <DashboardCard
+      title="Suggested Recurring"
+      subtitle={<TapIndicatorText>Tap to View Transactions</TapIndicatorText>}
+      className="upcoming-lane upcoming-suggestions-panel"
+      headerClassName="upcoming-card-header"
+      bodyClassName="upcoming-lane-body"
+      action={<span className="pill accent upcoming-count-pill">{suggestions.length}</span>}
+    >
+      <SuggestionsList
+        suggestions={suggestions}
+        onViewHistory={onViewHistory}
+        onReview={onReview}
+        onDismiss={onDismiss}
+      />
+    </DashboardCard>
   );
 }
 

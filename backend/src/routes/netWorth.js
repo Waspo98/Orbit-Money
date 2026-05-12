@@ -1,7 +1,7 @@
 import express from 'express';
 import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
-import { formatLocalMonth } from '../lib/localDate.js';
+import { addMonthsToLocalMonth, formatLocalMonth } from '../lib/localDate.js';
 import { sendOk, sendServerError } from '../lib/http.js';
 import { parseBoundedInteger } from '../lib/routeParams.js';
 
@@ -17,9 +17,7 @@ function monthKey(date) {
 }
 
 function addMonths(key, amount) {
-  const [year, month] = key.split('-').map(Number);
-  const d = new Date(year, month - 1 + amount, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return addMonthsToLocalMonth(key, amount);
 }
 
 function contributionForAccount(account, balance) {

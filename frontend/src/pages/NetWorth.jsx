@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
+import ChartFrame from '../components/charts/ChartFrame.jsx';
+import DashboardCard from '../components/dashboard/DashboardCard.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import PageHero from '../components/PageHero.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
@@ -9,6 +11,7 @@ import {
   formatCurrency,
   formatSignedCurrency
 } from '../lib/formatters.js';
+import { parseMonthParts } from '../lib/localDate.js';
 
 const BUCKET_LABELS = {
   cash: 'Cash',
@@ -57,9 +60,9 @@ function formatSignedMoney(amount) {
 }
 
 function formatMonth(key) {
-  if (!key) return '';
-  const [year, month] = key.split('-').map(Number);
-  return new Date(year, month - 1, 1).toLocaleDateString(undefined, {
+  const parts = parseMonthParts(key);
+  if (!parts) return '';
+  return new Date(parts.year, parts.month - 1, 1).toLocaleDateString(undefined, {
     month: 'short',
     year: 'numeric'
   });
@@ -203,9 +206,10 @@ export default function NetWorth() {
       ) : (
         <>
           <div className="networth-grid app-page-width">
-            <section className="dashboard-card networth-trend-card">
-              <header className="dashboard-card-header">
-                <h3>Net worth over time</h3>
+            <DashboardCard
+              title="Net worth over time"
+              className="networth-trend-card"
+              action={
                 <DropdownMenu
                   ariaLabel="Choose net worth range"
                   triggerClassName="dashboard-card-link button-link networth-range-trigger"
@@ -216,70 +220,62 @@ export default function NetWorth() {
                     onClick: () => setRangeKey(option.key)
                   }))}
                 />
-              </header>
+              }
+              bodyClassName="networth-chart-body"
+            >
               <NetWorthChart history={history} />
-            </section>
+            </DashboardCard>
 
-            <section className="dashboard-card">
-              <header className="dashboard-card-header">
-                <h3>Allocation</h3>
-                <Link to="/accounts" className="dashboard-card-link">Accounts</Link>
-              </header>
-              <div className="dashboard-card-body">
-                <AllocationBar items={mix} total={summary.netWorth} />
-                <ul className="networth-mix-list">
-                  {mix.map((item) => (
-                    <li key={item.key}>
-                      <span>
-                        <i style={{ background: BUCKET_COLORS[item.key] }} />
-                        {item.label}
-                      </span>
-                      <strong className={item.value < 0 ? 'expense' : ''}>
-                        {formatMoney(item.value)}
-                      </strong>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </section>
+            <DashboardCard
+              title="Allocation"
+              action={<Link to="/accounts" className="dashboard-card-link">Accounts</Link>}
+            >
+              <AllocationBar items={mix} total={summary.netWorth} />
+              <ul className="networth-mix-list">
+                {mix.map((item) => (
+                  <li key={item.key}>
+                    <span>
+                      <i style={{ background: BUCKET_COLORS[item.key] }} />
+                      {item.label}
+                    </span>
+                    <strong className={item.value < 0 ? 'expense' : ''}>
+                      {formatMoney(item.value)}
+                    </strong>
+                  </li>
+                ))}
+              </ul>
+            </DashboardCard>
 
-            <section className="dashboard-card">
-              <header className="dashboard-card-header">
-                <h3>Signals</h3>
-              </header>
-              <div className="dashboard-card-body">
-                <SignalRow
-                  label="Largest asset"
-                  value={largestPositive ? largestPositive.name : 'None yet'}
-                  detail={largestPositive ? formatMoney(largestPositive.contribution) : formatMoney(0)}
-                />
-                <SignalRow
-                  label="Largest liability"
-                  value={largestDebt ? largestDebt.name : 'None yet'}
-                  detail={largestDebt ? formatMoney(largestDebt.contribution) : formatMoney(0)}
-                  detailClassName={largestDebt ? 'expense' : ''}
-                />
-                <SignalRow
-                  label="Tracked accounts"
-                  value={`${summary.accountCount.toLocaleString()} active`}
-                  detail={`${positiveAccounts.length} positive, ${debtAccounts.length} negative`}
-                />
-              </div>
-            </section>
+            <DashboardCard title="Signals">
+              <SignalRow
+                label="Largest asset"
+                value={largestPositive ? largestPositive.name : 'None yet'}
+                detail={largestPositive ? formatMoney(largestPositive.contribution) : formatMoney(0)}
+              />
+              <SignalRow
+                label="Largest liability"
+                value={largestDebt ? largestDebt.name : 'None yet'}
+                detail={largestDebt ? formatMoney(largestDebt.contribution) : formatMoney(0)}
+                detailClassName={largestDebt ? 'expense' : ''}
+              />
+              <SignalRow
+                label="Tracked accounts"
+                value={`${summary.accountCount.toLocaleString()} active`}
+                detail={`${positiveAccounts.length} positive, ${debtAccounts.length} negative`}
+              />
+            </DashboardCard>
 
-            <section className="dashboard-card networth-account-card">
-              <header className="dashboard-card-header">
-                <h3>Account contributions</h3>
-                <Link to="/accounts" className="dashboard-card-link">Edit values</Link>
-              </header>
-              <div className="dashboard-card-body">
-                <ul className="networth-account-list">
-                  {topAccounts.map((account) => (
-                    <AccountContribution key={account.id} account={account} total={summary.netWorth} />
-                  ))}
-                </ul>
-              </div>
-            </section>
+            <DashboardCard
+              title="Account contributions"
+              className="networth-account-card"
+              action={<Link to="/accounts" className="dashboard-card-link">Edit values</Link>}
+            >
+              <ul className="networth-account-list">
+                {topAccounts.map((account) => (
+                  <AccountContribution key={account.id} account={account} total={summary.netWorth} />
+                ))}
+              </ul>
+            </DashboardCard>
           </div>
         </>
       )}
@@ -301,7 +297,7 @@ function NetWorthChart({ history }) {
 
   return (
     <div className="networth-chart-wrap">
-      <svg className="networth-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Net worth trend">
+      <ChartFrame className="networth-chart" width={width} height={height} label="Net worth trend">
         <defs>
           <linearGradient id="networthArea" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.24" />
@@ -327,7 +323,7 @@ function NetWorthChart({ history }) {
             </circle>
           );
         })}
-      </svg>
+      </ChartFrame>
       <div className="networth-chart-labels">
         <span>{formatMonth(first?.month)}</span>
         <strong>{latest ? formatMoney(latest.netWorth) : formatMoney(0)}</strong>

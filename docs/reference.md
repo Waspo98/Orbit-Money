@@ -7,7 +7,7 @@
 - **Backend:** Node.js 20.19+ + Express
 - **Auth:** Local session login, OIDC login, or both; `API_KEY` header for programmatic access
 - **Data:** SQLite (better-sqlite3) + Docker named volume
-- **Key dependencies:** `express`, `express-session`, `better-sqlite3`, `multer` (CSV upload), `papaparse` (CSV parsing), `@dnd-kit/core` + `@dnd-kit/sortable` (dashboard, account, navigation, and settings reorder UI)
+- **Key dependencies:** `express`, `express-session`, `better-sqlite3`, `multer` 2.x (CSV upload), `papaparse` (CSV parsing), `@dnd-kit/core` + `@dnd-kit/sortable` (dashboard, account, navigation, and settings reorder UI)
 - **Session storage:** local `better-sqlite3` session store in `backend/src/services/sessionStore.js`
 
 ## Dockerfile
@@ -62,7 +62,12 @@ after login, including the default Transactions and Budgets requests. Keep those
 paths mechanically aligned with each page's initial `api.get(...)` call; the
 offline cache keys by exact request path.
 
-### Database Schema (30 migrations)
+PWA asset cache strings are intentionally repeated in `frontend/index.html`,
+`frontend/public/manifest.webmanifest`, `frontend/public/sw.js`, and
+`frontend/src/brandAssets.js`. Keep those suffixes aligned when refreshing the
+app-shell cache; this is not an app version bump.
+
+### Database Schema (34 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -97,6 +102,9 @@ offline cache keys by exact request path.
 | `029_permissions_import_batches.sql` | Adds household read/write permissions plus import preview and undo batch tracking |
 | `030_user_preferences.sql` | Adds account-scoped UI preferences so customization follows the user across browsers |
 | `031_push_notifications.sql` | Adds browser push subscriptions and per-user delivery history for deduped notifications |
+| `032_account_balance_record_source.sql` | Adds source metadata to account balance snapshots and keeps balance record uniqueness household-scoped |
+| `033_credit_card_profiles.sql` | Adds local credit card profile metadata for tracked credit accounts |
+| `034_clean_credit_card_profiles.sql` | Removes external catalog-specific card columns and keeps the user-entered card name as local data |
 
 ### Key Data Model Notes
 
@@ -104,7 +112,7 @@ offline cache keys by exact request path.
 
 **Money representation:** SQLite stores money fields as integer cents. API responses and request bodies still use dollar values for the frontend. Convert at route/service boundaries with `backend/src/lib/money.js`; do not store floating-point dollars in SQLite. Percent fields remain percent values, and goal allocations store percent allocations in `allocation_percent` while fixed-dollar allocations use integer cents in `allocation_amount`.
 
-**Route template:** Express handlers should validate and normalize route inputs at the boundary, use `backend/src/lib/routeParams.js` for common id/boolean/bounded-integer parsing, and send responses through `backend/src/lib/http.js` helpers (`sendOk`, `sendBadRequest`, `sendNotFound`, `sendServerError`, etc.) so API success and error shapes stay mechanical.
+**Route template:** Express handlers should validate and normalize route inputs at the boundary, use `backend/src/lib/routeParams.js` for common id/boolean/bounded-integer parsing, use `backend/src/lib/localDate.js` for strict date/month validation, and send responses through `backend/src/lib/http.js` helpers (`sendOk`, `sendBadRequest`, `sendNotFound`, `sendServerError`, etc.) so API success and error shapes stay mechanical.
 
 **Transaction sources:** `csv_import`, `simplefin`, `manual` — tracked in `source` column, deduplicated via `external_id`.
 
@@ -197,7 +205,7 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Bundled tax data exposes source, reviewed, and review-after metadata so the UI can show freshness and stale-data warnings instead of silently using old tables.
 
 ### Accounts
-- Full CRUD + merge (reassigns all transactions to target, deletes source) + archive/unarchive
+- Full CRUD + merge + archive/unarchive. Account merge preserves dependent account data before deleting the source: transactions, balance snapshots, goal links/allocations, household retirement links, upcoming items, credit card profiles, estimated value, and SimpleFIN id when the target has room for it.
 - **Reorder mode:** dedicated toggle that replaces normal grouped account cards with drag handles; account rows can be reordered within their account-type group, and group headers can be dragged to reorder whole groups. In-mode there are no competing tap targets, activation distance is 0 (any movement), and tapping "Done" exits. Outside reorder mode, no `@dnd-kit` listeners are mounted at all — eliminating the press-and-hold activation problems that dogged earlier versions.
 - Sort order persisted to `sort_order` column
 - "See transactions" button filters the Transactions page via `?accounts=X` query param
@@ -297,6 +305,11 @@ Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones,
 - `AnimatedModal` component: render-prop pattern (`{({ close }) => ...}`), 180ms slide/zoom animations via `.closing` CSS classes. Saved closes animate; canceled closes should feel immediate unless a specific flow says otherwise.
 - `PageHero` component and `useMorphingPageHero(initialHeight)` hook own the morphing sticky hero measurement logic. Reuse `PageHero` for page headers; pass `chrome` and `toolbar` slots when a page needs custom header controls.
 - `AppDialog.jsx` exposes `useAppDialog()` for modal alert/confirmation flows. Prefer it over native `alert()` / `confirm()` so mobile UX and destructive-action styling stay consistent.
+- `DashboardCard.jsx` is the shared card primitive for dashboard-style panels outside the Dashboard page too. Prefer its `className`, `headerClassName`, `bodyClassName`, `header`, and `action` slots instead of duplicating `.dashboard-card` markup.
+- `SettingsCard.jsx` is the shared settings-section primitive. Keep new settings pages mechanically similar by using it instead of local settings card copies.
+- `FinancialForm.jsx` provides `FinancialFormGrid` and `FinancialField` for money/date/settings forms that use the existing `.goal-form-grid` and `.field` treatment.
+- `DateInput.jsx` wraps native date inputs and only displays strict `YYYY-MM-DD` values accepted by `frontend/src/lib/localDate.js`.
+- `charts/ChartFrame.jsx` owns the accessible SVG chart shell; chart implementations should provide geometry and marks, not repeat `viewBox`/`role`/`aria-label` boilerplate.
 - `AppSelect.jsx` is the shared custom select primitive. Pass an `options` array (`{ value, label }`) and do not nest native `<option>` children; use `menuPlacement="page-center"` for compact month/year picker pills.
 - `ExpandingSection.jsx` owns expand/collapse animation. Pair it with `CollapseIndicator` only when the local pattern wants a visible affordance; `CollapseIndicator` supports `visible={false}` so pages can keep shared structure without showing a chevron.
 - `frontend/src/navigation.js` owns route metadata. `BottomTabs.jsx`, `DesktopSidebar.jsx`, `MoreSheet.jsx`, `App.jsx`, and route visibility should read from it so labels, icons, route rendering, and feature gating stay aligned.
@@ -486,7 +499,7 @@ role and read/write access.
 - `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
 - `db/index.js`, `db/migrations.js`
 - `lib/`: http, localDate, money, routeParams, upcomingProjection, upcomingSchedule
-- `db/migrations/001` through `030`
+- `db/migrations/001` through `034`
 - `routes/`: accounts, auth, budgets, categories, goals, health, household, householdSharing, import, merchantLogos, mha, netWorth, rules, simplefin, spendingTrends, transactions, upcoming
 - `services/`: budgetOverview, csvImport, demoSeed, householdDefaults, merchantLogos, mhaSummary, mhaTaxEstimate, oidc, ruleMatcher, sampleHouseholds, sessionStore, simplefinClient, simplefinSync, spendingTrends, taxData2026, transferMatcher, upcomingReconciliation
 - `test/`: Node built-in test runner coverage for backend helpers and calculation services
@@ -496,7 +509,7 @@ role and read/write access.
 - `public/`: manifest.webmanifest, PNG/SVG icons, splash wordmarks, sw.js
 - `src/main.jsx`, `src/App.jsx`, `src/Login.jsx`, `src/api.js`, `src/index.css`
 - `src/hooks/useTheme.js`
-- `src/components/`: AnimatedModal, AppDialog, AppIcon, AppRangeSlider, AppSelect, BottomTabs, BrandLogo, CollapseIndicator, CurrencyInput, DesktopSidebar, DropdownMenu, FilterSheet, InlinePopover, MoreDotsIcon, MoreSheet, PageHero, PercentInput, ReorderListItem, SearchField, SelectableListItem, SyncErrorBanner, rule editor primitives, transaction row primitives
+- `src/components/`: AnimatedModal, AppDialog, AppIcon, AppRangeSlider, AppSelect, BottomTabs, BrandLogo, CollapseIndicator, CurrencyInput, DateInput, DesktopSidebar, DropdownMenu, FilterSheet, FinancialForm, InlinePopover, MoreDotsIcon, MoreSheet, PageHero, PercentInput, ReorderListItem, SearchField, SelectableListItem, SettingsCard, SyncErrorBanner, chart primitives, dashboard primitives, rule editor primitives, transaction row primitives
 - `src/pages/`: Accounts, Budgets, Categories, Dashboard, Goals, Household, HousingCalculator, MhaTracker, NetWorth, RetirementCalculator, Rules, Settings, SpendingTrends, Transactions, Upcoming
 
 ## Known Gotchas

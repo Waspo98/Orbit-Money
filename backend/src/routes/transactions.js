@@ -42,6 +42,7 @@ import {
   sendOk,
   sendServerError
 } from '../lib/http.js';
+import { formatLocalMonth, getLocalMonthBounds, isValidDateOnly } from '../lib/localDate.js';
 import { centsToDollars, dollarsToCents } from '../lib/money.js';
 import {
   parseBoundedInteger,
@@ -159,23 +160,11 @@ function parseNumber(s) {
 function isoDate(s) {
   // Accept YYYY-MM-DD only. Invalid → null.
   if (!s || typeof s !== 'string') return null;
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
-}
-
-function isValidDateOnly(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  return isValidDateOnly(s) ? s : null;
 }
 
 function currentMonthBounds() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  const start = `${year}-${String(month).padStart(2, '0')}-01`;
-  const lastDay = new Date(year, month, 0).getDate();
-  const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-  return { start, end };
+  return getLocalMonthBounds(formatLocalMonth());
 }
 
 const MERCHANT_NOISE_HINTS = [

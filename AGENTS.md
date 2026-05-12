@@ -139,6 +139,10 @@
   imports it so mobile and desktop stay in sync.
 - Use `AnimatedModal`, `DropdownMenu`, `FilterSheet`, `MoreSheet`, and
   `SyncErrorBanner` rather than recreating equivalent overlays or menus.
+- Use `DashboardCard` for dashboard-style cards, `SettingsCard` for settings
+  sections, `ChartFrame` for accessible SVG chart shells, `DateInput` for
+  strict date fields, and `FinancialFormGrid`/`FinancialField` for money and
+  planning forms.
 - Use `SelectableListItem` for two-line selectable rows such as goal/category
   pickers; selected rows should use the shared green active treatment.
 - Use `useAppDialog` from `frontend/src/components/AppDialog.jsx` for alert

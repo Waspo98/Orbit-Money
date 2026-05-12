@@ -1,11 +1,10 @@
 import { config } from './config.js';
 import { db } from './db/index.js';
+import { parseId } from './lib/routeParams.js';
 import { touchSampleUser } from './services/sampleHouseholds.js';
 
 function parseHouseholdHeader(req) {
-  const raw = req.header('X-Household-ID');
-  const id = raw ? Number.parseInt(raw, 10) : 1;
-  return Number.isInteger(id) && id > 0 ? id : 1;
+  return parseId(req.header('X-Household-ID')) || 1;
 }
 
 /**

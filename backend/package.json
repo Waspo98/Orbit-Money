@@ -1,6 +1,6 @@
 {
   "name": "orbit-money-backend",
-  "version": "0.75.0",
+  "version": "0.76.0",
   "private": true,
   "description": "Self-hosted personal finance tracker — Express + SQLite backend",
   "type": "module",
@@ -14,7 +14,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "express-session": "^1.18.0",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^2.1.1",
     "papaparse": "^5.4.1",
     "web-push": "^3.6.7"
   },
