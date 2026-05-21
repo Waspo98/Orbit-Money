@@ -98,20 +98,17 @@ if errorlevel 1 (
 echo Publishing live Docker image to ghcr.io/waspo98/orbit-money...
 docker push %IMAGE%:latest
 if errorlevel 1 (
-  popd
-  exit /b 1
+  echo WARNING: Could not push latest image to ghcr.io. Continuing with local deployment.
 )
 
 docker push %IMAGE%:main
 if errorlevel 1 (
-  popd
-  exit /b 1
+  echo WARNING: Could not push main image to ghcr.io. Continuing with local deployment.
 )
 
 docker push %IMAGE%:main-%DEPLOY_SHA%
 if errorlevel 1 (
-  popd
-  exit /b 1
+  echo WARNING: Could not push main SHA image to ghcr.io. Continuing with local deployment.
 )
 
 echo Building local Compose image from the checked-out main branch...

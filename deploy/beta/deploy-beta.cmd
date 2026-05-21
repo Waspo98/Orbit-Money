@@ -98,14 +98,12 @@ if errorlevel 1 (
 echo Publishing beta Docker image to ghcr.io/waspo98/orbit-money...
 docker push %IMAGE%:beta
 if errorlevel 1 (
-  popd
-  exit /b 1
+  echo WARNING: Could not push beta image to ghcr.io. Continuing with local deployment.
 )
 
 docker push %IMAGE%:beta-%DEPLOY_SHA%
 if errorlevel 1 (
-  popd
-  exit /b 1
+  echo WARNING: Could not push beta SHA image to ghcr.io. Continuing with local deployment.
 )
 
 echo Building local Compose image from the checked-out Beta branch...
