@@ -59,11 +59,36 @@ async function withStore(storeName, mode, callback) {
     if (!request) {
       tx.oncomplete = () => resolve(undefined);
       tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(new Error('Transaction aborted'));
       return;
     }
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    let requestResult;
+
+    request.onsuccess = () => {
+      requestResult = request.result;
+      if (mode === 'readonly') {
+        resolve(requestResult);
+      }
+    };
+
+    request.onerror = () => {
+      reject(request.error);
+    };
+
+    tx.oncomplete = () => {
+      if (mode !== 'readonly') {
+        resolve(requestResult);
+      }
+    };
+
+    tx.onerror = () => {
+      reject(tx.error);
+    };
+
+    tx.onabort = () => {
+      reject(new Error('Transaction aborted'));
+    };
   }).catch((err) => {
     console.warn('Offline cache operation failed:', err);
     return undefined;

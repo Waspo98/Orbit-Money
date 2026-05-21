@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import express from 'express';
 import { config } from '../config.js';
 import { db } from '../db/index.js';
@@ -70,6 +71,15 @@ router.get('/config', (req, res) => {
   });
 });
 
+function timingSafeCompare(str1, str2) {
+  if (typeof str1 !== 'string' || typeof str2 !== 'string') {
+    return false;
+  }
+  const h1 = crypto.createHash('sha256').update(str1).digest();
+  const h2 = crypto.createHash('sha256').update(str2).digest();
+  return crypto.timingSafeEqual(h1, h2);
+}
+
 /**
  * POST /api/auth/login
  * Local login. OIDC-only deployments should use /api/auth/oidc/login.
@@ -85,7 +95,10 @@ router.post('/login', (req, res) => {
     return sendBadRequest(res, 'Username and password required');
   }
 
-  if (username === config.adminUsername && password === config.adminPassword) {
+  const isUsernameMatch = timingSafeCompare(username, config.adminUsername);
+  const isPasswordMatch = timingSafeCompare(password, config.adminPassword);
+
+  if (isUsernameMatch && isPasswordMatch) {
     const user = db.prepare('SELECT * FROM users WHERE id = 1').get();
     const membership = db
       .prepare(
