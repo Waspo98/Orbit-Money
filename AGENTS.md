@@ -187,7 +187,7 @@
 - **Stack & Toolchain:** Capacitor wraps the Vite frontend into an Android Studio Gradle project in `frontend/android/`.
   - Android SDK: `C:\Users\nealo\AppData\Local\Android\Sdk`
   - Java: JDK 17+ on PATH
-  - Android package ID: `app.orbitmoney.client` (standard) / `app.orbitmoney.beta` (beta)
+  - Android package ID: `app.overbay.orbit`
 - **Windows CLI Build Command:** Use `scripts\build-apk.cmd` (or `powershell scripts\build-apk.ps1`) to run the full pipeline:
   1. Build frontend: `npm run build`
   2. Sync Capacitor: `npx cap sync android`

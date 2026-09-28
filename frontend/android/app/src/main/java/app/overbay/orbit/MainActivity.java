@@ -1,4 +1,4 @@
-package app.orbitmoney.client;
+package app.overbay.orbit;
 
 import android.os.Bundle;
 import android.webkit.CookieManager;

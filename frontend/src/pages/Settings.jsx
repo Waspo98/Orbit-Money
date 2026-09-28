@@ -34,7 +34,28 @@ import {
 import { APP_VERSION_LABEL } from '../version.js';
 import { APP_ICON_512 } from '../brandAssets.js';
 import { todayLocalDate } from '../lib/localDate.js';
-import { isNativeApp, getServerUrl, resolveApiUrl } from '../serverConfig.js';
+import {
+  isNativeApp,
+  getServerUrl,
+  setServerUrl,
+  resolveApiUrl,
+  getStorageMode,
+  setStorageMode,
+  STORAGE_MODE_LOCAL,
+  STORAGE_MODE_SELF_HOSTED
+} from '../serverConfig.js';
+import {
+  uploadBackupToGoogleDrive,
+  restoreBackupFromGoogleDrive,
+  getDriveBackupInfo,
+  getStoredGoogleAccountEmail,
+  disconnectGoogleDrive,
+  downloadLocalBackupFile,
+  restoreFromFile,
+  getStoredGoogleClientId,
+  setStoredGoogleClientId,
+  requestGoogleAccessToken
+} from '../lib/googleDrive.js';
 import { isHapticsEnabled, setHapticsEnabled, triggerHaptic } from '../lib/haptics.js';
 import { isBiometricsAvailable, isBiometricLockEnabled, setBiometricLockEnabled, promptBiometricAuth } from '../lib/biometrics.js';
 
@@ -308,6 +329,27 @@ export default function Settings({
   const [rulesBusy, setRulesBusy] = useState(false);
   const [rulesResult, setRulesResult] = useState(null);
   const [rulesError, setRulesError] = useState('');
+
+  const [currentStorageMode, setCurrentStorageMode] = useState(() => getStorageMode());
+  const [switchModeModalOpen, setSwitchModeModalOpen] = useState(false);
+  const [targetServerUrl, setTargetServerUrl] = useState(() => getServerUrl() || '');
+  const [migrateDataOnSwitch, setMigrateDataOnSwitch] = useState(true);
+  const [switchingBusy, setSwitchingBusy] = useState(false);
+  const [switchingError, setSwitchingError] = useState('');
+
+  const [googleDriveEmail, setGoogleDriveEmail] = useState(() => getStoredGoogleAccountEmail());
+  const [googleClientId, setGoogleClientId] = useState(() => getStoredGoogleClientId());
+  const [googleDriveBusy, setGoogleDriveBusy] = useState(false);
+  const [googleDriveBackupInfo, setGoogleDriveBackupInfo] = useState(null);
+  const [googleDriveStatusMessage, setGoogleDriveStatusMessage] = useState('');
+  const [googleClientIdModalOpen, setGoogleClientIdModalOpen] = useState(false);
+  const localFileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (googleDriveEmail) {
+      getDriveBackupInfo().then(setGoogleDriveBackupInfo);
+    }
+  }, [googleDriveEmail]);
   const [downloadBusy, setDownloadBusy] = useState('');
   const [downloadNotice, setDownloadNotice] = useState(null);
   const [moreReorderMode, setMoreReorderMode] = useState(false);
@@ -1912,6 +1954,386 @@ export default function Settings({
     );
   }
 
+  function renderStorageModeCard() {
+    const isLocal = currentStorageMode === STORAGE_MODE_LOCAL;
+
+    return (
+      <SettingsCard
+        id="storage-mode"
+        key="storage-mode"
+        title="Storage Mode & Cloud Backup"
+        description="Choose between offline device SQLite storage or connecting to a self-hosted Orbit server."
+      >
+        <div className="settings-action settings-flow-card">
+          <div className="settings-action-info">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <strong>Current Mode: {isLocal ? 'Local First' : 'Self-Hosted Server'}</strong>
+              <span className={`pill ${isLocal ? 'success' : 'accent'}`}>
+                {isLocal ? 'Device SQLite' : 'Remote Server'}
+              </span>
+            </div>
+            <p>
+              {isLocal
+                ? 'Your accounts, budgets, and transactions live directly on this device in SQLite. Completely private and works offline.'
+                : `Connected to your self-hosted Orbit Money Docker instance at ${getServerUrl() || 'configured URL'}.`}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              setTargetServerUrl(getServerUrl() || '');
+              setSwitchModeModalOpen(true);
+            }}
+          >
+            {isLocal ? 'Switch to Self-Hosted...' : 'Switch to Local First...'}
+          </button>
+        </div>
+
+        {/* Google Drive Cloud Backup (when in Local Mode) */}
+        {isLocal && (
+          <div className="settings-action settings-flow-card">
+            <div className="settings-action-info">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <strong>Google Drive Cloud Sync</strong>
+                {googleDriveEmail && <span className="pill success">Connected</span>}
+              </div>
+              <p>
+                {googleDriveEmail
+                  ? `Connected as ${googleDriveEmail}. Backs up securely to your private Google Drive AppData sandbox.`
+                  : 'Back up your local database silently to your private Google Drive AppData folder.'}
+              </p>
+              {googleDriveBackupInfo?.exists && (
+                <p className="subtle" style={{ marginTop: 4 }}>
+                  Last cloud backup: {formatDateTime(googleDriveBackupInfo.lastModified)} ({Math.round((googleDriveBackupInfo.sizeBytes || 0) / 1024)} KB)
+                </p>
+              )}
+              {googleDriveStatusMessage && (
+                <p className="success-banner" style={{ marginTop: 8 }}>{googleDriveStatusMessage}</p>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {googleDriveEmail ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={googleDriveBusy}
+                    onClick={async () => {
+                      setGoogleDriveBusy(true);
+                      setGoogleDriveStatusMessage('');
+                      try {
+                        await uploadBackupToGoogleDrive();
+                        const info = await getDriveBackupInfo();
+                        setGoogleDriveBackupInfo(info);
+                        setGoogleDriveStatusMessage('Database successfully backed up to Google Drive!');
+                      } catch (err) {
+                        alert(err.message || 'Google Drive backup failed.');
+                      } finally {
+                        setGoogleDriveBusy(false);
+                      }
+                    }}
+                  >
+                    {googleDriveBusy ? 'Backing up...' : 'Backup to Drive'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={googleDriveBusy}
+                    onClick={async () => {
+                      const ok = await confirm('Restore your database from Google Drive? This will replace your current local database with the cloud backup.', {
+                        title: 'Restore from Google Drive',
+                        confirmLabel: 'Restore'
+                      });
+                      if (!ok) return;
+                      setGoogleDriveBusy(true);
+                      try {
+                        await restoreBackupFromGoogleDrive();
+                        alert('Database restored successfully from Google Drive! Reloading...', { title: 'Restore Complete' });
+                        window.location.reload();
+                      } catch (err) {
+                        alert(err.message || 'Google Drive restore failed.');
+                      } finally {
+                        setGoogleDriveBusy(false);
+                      }
+                    }}
+                  >
+                    Restore from Drive
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      disconnectGoogleDrive();
+                      setGoogleDriveEmail('');
+                      setGoogleDriveBackupInfo(null);
+                    }}
+                  >
+                    Disconnect
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setGoogleClientIdModalOpen(true)}
+                >
+                  Connect Google Drive
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Manual SQLite File Export / Import */}
+        {isLocal && (
+          <div className="settings-action settings-flow-card">
+            <div className="settings-action-info">
+              <strong>Manual SQLite Database File</strong>
+              <p>Download your raw SQLite database file (`.sqlite`) for complete offline portability, or restore from a file.</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={downloadLocalBackupFile}
+              >
+                Download .sqlite
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => localFileInputRef.current?.click()}
+              >
+                Restore from File...
+              </button>
+              <input
+                ref={localFileInputRef}
+                type="file"
+                accept=".sqlite,.db,.json"
+                style={{ display: 'none' }}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  const ok = await confirm(`Restore database from "${f.name}"? This will replace your current local database.`, {
+                    title: 'Confirm File Restore',
+                    confirmLabel: 'Restore'
+                  });
+                  if (!ok) return;
+                  try {
+                    await restoreFromFile(f);
+                    alert('Database restored successfully! Reloading...');
+                    window.location.reload();
+                  } catch (err) {
+                    alert(err.message || 'Restore failed.');
+                  }
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Replay Onboarding Walkthrough */}
+        <div className="settings-action settings-flow-card">
+          <div className="settings-action-info">
+            <strong>Setup Walkthrough</strong>
+            <p>Replay the introductory cards and walkthrough tour.</p>
+          </div>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => window.dispatchEvent(new CustomEvent('orbit:open-onboarding'))}
+          >
+            Replay Walkthrough
+          </button>
+        </div>
+      </SettingsCard>
+    );
+  }
+
+  function renderSwitchModeModal() {
+    if (!switchModeModalOpen) return null;
+    const isLocal = currentStorageMode === STORAGE_MODE_LOCAL;
+    const targetMode = isLocal ? STORAGE_MODE_SELF_HOSTED : STORAGE_MODE_LOCAL;
+
+    const handleExecuteSwitch = async () => {
+      setSwitchingBusy(true);
+      setSwitchingError('');
+      try {
+        if (targetMode === STORAGE_MODE_SELF_HOSTED) {
+          if (!targetServerUrl.trim()) {
+            throw new Error('Please enter a valid self-hosted server URL.');
+          }
+          setServerUrl(targetServerUrl);
+
+          if (migrateDataOnSwitch) {
+            const localBackup = await api.get('/api/data/orbit-backup');
+            await api.remotePost('/api/data/orbit-restore', localBackup);
+          }
+
+          setStorageMode(STORAGE_MODE_SELF_HOSTED);
+          setSwitchModeModalOpen(false);
+          alert('Switched to Self-Hosted server mode successfully! Reloading...');
+          window.location.reload();
+        } else {
+          if (migrateDataOnSwitch) {
+            const remoteBackup = await api.remoteGet('/api/data/orbit-backup');
+            const { handleLocalApiRequest } = await import('../db/localApi.js');
+            await handleLocalApiRequest('/api/data/orbit-restore', {
+              method: 'POST',
+              body: JSON.stringify(remoteBackup)
+            });
+          }
+
+          setStorageMode(STORAGE_MODE_LOCAL);
+          setSwitchModeModalOpen(false);
+          alert('Switched to Local First mode successfully! Reloading...');
+          window.location.reload();
+        }
+      } catch (err) {
+        setSwitchingError(err.message || 'Switch failed.');
+      } finally {
+        setSwitchingBusy(false);
+      }
+    };
+
+    return (
+      <AnimatedModal
+        open={switchModeModalOpen}
+        onClose={() => setSwitchModeModalOpen(false)}
+        title={isLocal ? 'Switch to Self-Hosted Server' : 'Switch to Local First'}
+      >
+        <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p>
+            {isLocal
+              ? 'Connect Orbit Money to your private self-hosted server. This unlocks multi-user household sharing, member roles, and SSO.'
+              : 'Switch to running completely offline on this device. Your data will be stored directly in local SQLite.'}
+          </p>
+
+          {isLocal && (
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6 }}>
+                Server URL
+              </label>
+              <input
+                type="url"
+                className="input"
+                style={{ width: '100%' }}
+                placeholder="https://orbit.yourdomain.com"
+                value={targetServerUrl}
+                onChange={(e) => setTargetServerUrl(e.target.value)}
+              />
+            </div>
+          )}
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={migrateDataOnSwitch}
+              onChange={(e) => setMigrateDataOnSwitch(e.target.checked)}
+            />
+            <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+              {isLocal
+                ? 'Migrate current local data to the server'
+                : 'Copy current server data to this device'}
+            </span>
+          </label>
+
+          {switchingError && <div className="error">{switchingError}</div>}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={switchingBusy}
+              onClick={() => setSwitchModeModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={switchingBusy}
+              onClick={handleExecuteSwitch}
+            >
+              {switchingBusy ? 'Switching...' : 'Switch Storage Mode'}
+            </button>
+          </div>
+        </div>
+      </AnimatedModal>
+    );
+  }
+
+  function renderGoogleClientIdModal() {
+    if (!googleClientIdModalOpen) return null;
+
+    const handleConnectGoogle = async () => {
+      setGoogleDriveBusy(true);
+      try {
+        setStoredGoogleClientId(googleClientId);
+        await requestGoogleAccessToken(googleClientId);
+        setGoogleDriveEmail(getStoredGoogleAccountEmail());
+        const info = await getDriveBackupInfo();
+        setGoogleDriveBackupInfo(info);
+        setGoogleClientIdModalOpen(false);
+      } catch (err) {
+        alert(err.message || 'Google authorization failed.');
+      } finally {
+        setGoogleDriveBusy(false);
+      }
+    };
+
+    return (
+      <AnimatedModal
+        open={googleClientIdModalOpen}
+        onClose={() => setGoogleClientIdModalOpen(false)}
+        title="Connect Google Drive"
+      >
+        <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p>
+            Orbit Money uses Google Drive's hidden <code>appDataFolder</code> to safely back up your database without cluttering your Drive or accessing any personal files.
+          </p>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 6 }}>
+              Google OAuth Client ID
+            </label>
+            <input
+              type="text"
+              className="input"
+              style={{ width: '100%' }}
+              placeholder="e.g. 123456789-abcdef.apps.googleusercontent.com"
+              value={googleClientId}
+              onChange={(e) => setGoogleClientId(e.target.value)}
+            />
+            <p className="subtle" style={{ marginTop: 6, fontSize: '0.8rem' }}>
+              Create an OAuth Client ID in your Google Cloud Console project with the <code>drive.appdata</code> scope.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setGoogleClientIdModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={googleDriveBusy || !googleClientId.trim()}
+              onClick={handleConnectGoogle}
+            >
+              {googleDriveBusy ? 'Authorizing...' : 'Authorize & Connect'}
+            </button>
+          </div>
+        </div>
+      </AnimatedModal>
+    );
+  }
+
   function renderBackupCard() {
     return (
       <SettingsCard
@@ -2055,6 +2477,35 @@ export default function Settings({
   }
 
   function renderAccountCard() {
+    if (currentStorageMode === STORAGE_MODE_LOCAL) {
+      return (
+        <SettingsCard
+          id="account"
+          key="account"
+          title="Household Sharing"
+          description="Multi-user collaboration and partner sharing."
+          className="settings-account-card"
+        >
+          <div className="settings-action settings-flow-card">
+            <div className="settings-action-info">
+              <strong>Self-Hosted Feature</strong>
+              <p>Household sharing, partner access, and multi-user permissions require a self-hosted Orbit Money server. In Local First mode, your data is completely private to this device.</p>
+            </div>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                setTargetServerUrl(getServerUrl() || '');
+                setSwitchModeModalOpen(true);
+              }}
+            >
+              Switch to Self-Hosted...
+            </button>
+          </div>
+        </SettingsCard>
+      );
+    }
+
     return (
       <SettingsCard
         id="account"
@@ -2397,6 +2848,7 @@ export default function Settings({
     if (settingsPage === 'data-management') {
       return (
         <div className="settings-card-stack settings-section-top">
+          {renderStorageModeCard()}
           {renderSimpleFinCard()}
           {renderAccountCard()}
           {renderRulesCard()}
@@ -2473,6 +2925,8 @@ export default function Settings({
       )}
 
       {renderShareModal()}
+      {renderSwitchModeModal()}
+      {renderGoogleClientIdModal()}
       <Dialog />
       {renderMoreReorderModal()}
     </div>

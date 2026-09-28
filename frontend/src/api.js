@@ -6,7 +6,8 @@ import {
 } from './offlineCache.js';
 
 import { CapacitorHttp } from '@capacitor/core';
-import { isNativeApp, resolveApiUrl } from './serverConfig.js';
+import { isNativeApp, resolveApiUrl, getStorageMode, STORAGE_MODE_LOCAL } from './serverConfig.js';
+import { handleLocalApiRequest } from './db/localApi.js';
 
 const NATIVE_COOKIE_KEY = 'orbit_native_session_cookie';
 
@@ -52,6 +53,10 @@ function isNetworkFailure(err) {
 }
 
 async function request(path, options = {}) {
+  if (!options.directRemote && getStorageMode() === STORAGE_MODE_LOCAL) {
+    return handleLocalApiRequest(path, options);
+  }
+
   const method = String(options.method || 'GET').toUpperCase();
   const unsafe = isUnsafeMethod(method);
 
@@ -167,12 +172,15 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  get: (path) => request(path),
-  post: (path, body = {}) =>
-    request(path, { method: 'POST', body: JSON.stringify(body) }),
-  put: (path, body = {}) =>
-    request(path, { method: 'PUT', body: JSON.stringify(body) }),
-  patch: (path, body = {}) =>
-    request(path, { method: 'PATCH', body: JSON.stringify(body) }),
-  del: (path) => request(path, { method: 'DELETE' })
+  get: (path, options) => request(path, { ...(options || {}), method: 'GET' }),
+  post: (path, body = {}, options = {}) =>
+    request(path, { ...(options || {}), method: 'POST', body: JSON.stringify(body) }),
+  put: (path, body = {}, options = {}) =>
+    request(path, { ...(options || {}), method: 'PUT', body: JSON.stringify(body) }),
+  patch: (path, body = {}, options = {}) =>
+    request(path, { ...(options || {}), method: 'PATCH', body: JSON.stringify(body) }),
+  del: (path, options = {}) => request(path, { ...(options || {}), method: 'DELETE' }),
+  remoteGet: (path) => request(path, { method: 'GET', directRemote: true }),
+  remotePost: (path, body = {}) =>
+    request(path, { method: 'POST', body: JSON.stringify(body), directRemote: true })
 };

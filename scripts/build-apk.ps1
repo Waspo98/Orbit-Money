@@ -41,7 +41,7 @@ finally {
 }
 
 $branch = (git branch --show-current).Trim()
-$isBeta = $branch -eq "beta"
+$isBeta = $branch.ToLower() -eq "beta"
 $apkName = if ($isBeta) { "OrbitBeta-debug.apk" } else { "OrbitMoney-debug.apk" }
 $tag = if ($isBeta) { "beta-latest" } else { "debug-latest" }
 $apkPath = Join-Path $repoRoot $apkName

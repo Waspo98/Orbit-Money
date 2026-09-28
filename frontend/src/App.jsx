@@ -19,6 +19,8 @@ import {
 } from 'react-router-dom';
 
 import Login from './Login.jsx';
+import OnboardingWalkthrough from './components/OnboardingWalkthrough.jsx';
+import { hasCompletedOnboarding, setCompletedOnboarding } from './serverConfig.js';
 import BrandLogo from './components/BrandLogo.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
@@ -323,8 +325,15 @@ export default function App() {
 
 function AppShell() {
   const [authState, setAuthState] = useState('loading');
+  const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
   const [offlineAccessMessage, setOfflineAccessMessage] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => {
+    const handleReplay = () => setShowOnboarding(true);
+    window.addEventListener('orbit:open-onboarding', handleReplay);
+    return () => window.removeEventListener('orbit:open-onboarding', handleReplay);
+  }, []);
 
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -653,6 +662,18 @@ function AppShell() {
     '/settings/preferences': renderSettings('preferences'),
     '/settings/data-management': renderSettings('data-management')
   };
+
+  if (showOnboarding) {
+    return (
+      <OnboardingWalkthrough
+        onComplete={() => {
+          setCompletedOnboarding(true);
+          setShowOnboarding(false);
+          checkAuth({ refreshLookups: true });
+        }}
+      />
+    );
+  }
 
   if (authState === 'loading') {
     return (

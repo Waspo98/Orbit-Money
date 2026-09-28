@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "app.orbitmoney.client"
+    namespace "app.overbay.orbit"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "app.orbitmoney.client"
+        applicationId "app.overbay.orbit"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
