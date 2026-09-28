@@ -61,9 +61,21 @@ $apkSizeMB = [math]::Round((Get-Item $apkPath).Length / 1MB, 2)
 Write-Host "==> Successfully created $apkName ($apkSizeMB MB)" -ForegroundColor Green
 
 if (-not $SkipUpload) {
-    Write-Host "==> Uploading $apkName to GitHub release $tag..." -ForegroundColor Cyan
-    gh release upload $tag $apkPath --clobber
-    if ($LASTEXITCODE -ne 0) { throw "GitHub release upload failed" }
+    $releaseExists = $false
+    try {
+        $viewResult = gh release view $tag --json tagName 2>$null
+        if ($LASTEXITCODE -eq 0 -and $viewResult) { $releaseExists = $true }
+    } catch {}
+
+    if (-not $releaseExists) {
+        Write-Host "==> Release $tag does not exist. Creating pre-release..." -ForegroundColor Cyan
+        $releaseTitle = if ($isBeta) { "Beta Builds (Latest)" } else { "Debug Builds (Latest)" }
+        gh release create $tag $apkPath --title $releaseTitle --notes "Automated rolling debug builds for Orbit Money Android ($tag)." --prerelease
+        if ($LASTEXITCODE -ne 0) { throw "GitHub release creation failed" }
+    } else {
+        gh release upload $tag $apkPath --clobber
+        if ($LASTEXITCODE -ne 0) { throw "GitHub release upload failed" }
+    }
 
     $downloadUrl = "https://github.com/Waspo98/Orbit-Money/releases/download/$tag/$apkName"
     Write-Host ""
