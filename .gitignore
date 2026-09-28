@@ -11,6 +11,8 @@ Server_info.md
 # Build output
 dist/
 build/
+*.apk
+*.aab
 
 # Runtime data (if running locally without Docker)
 data/

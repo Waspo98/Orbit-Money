@@ -121,6 +121,8 @@
   --sidebar-width:     260px;
   --bottom-tab-height: 80px;  /* Material Design bottom nav baseline */
   --header-height:     56px;
+  --safe-area-top:     env(safe-area-inset-top, 0px);
+  --safe-area-bottom:  env(safe-area-inset-bottom, 0px);
 }
 
 :root[data-theme="dark"] {
@@ -1999,6 +2001,7 @@ input, textarea, select {
   min-height: 100dvh;
   display: grid;
   grid-template-rows: auto auto 1fr;
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .app-header {
@@ -2010,7 +2013,7 @@ input, textarea, select {
   border-bottom: 1px solid var(--border);
   height: var(--header-height);
   position: sticky;
-  top: 0;
+  top: env(safe-area-inset-top, 0px);
   z-index: 50;
 }
 
@@ -2151,7 +2154,7 @@ input, textarea, select {
 .app-main {
   position: relative;
   isolation: isolate;
-  padding: 28px 20px calc(var(--bottom-tab-height) + 32px);
+  padding: 28px 20px calc(var(--bottom-tab-height) + env(safe-area-inset-bottom, 0px) + 32px);
   max-width: var(--app-max-width);
   margin: 0 auto;
   width: 100%;
@@ -2256,8 +2259,9 @@ input, textarea, select {
   bottom: 0;
   left: 0;
   right: 0;
-  height: var(--bottom-tab-height);
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  height: calc(var(--bottom-tab-height) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
   background: var(--surface);
   border-top: 1px solid var(--border);
   display: grid;
@@ -8528,7 +8532,8 @@ input, textarea, select {
   align-items: baseline;
   justify-content: space-between;
   box-sizing: border-box;
-  padding: 12px 0 8px;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+  padding-bottom: 8px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   pointer-events: none;
@@ -8536,6 +8541,15 @@ input, textarea, select {
   transition:
     opacity var(--dur-fast) var(--ease-out),
     visibility var(--dur-fast) var(--ease-out);
+}
+
+@media (max-width: 1079px) {
+  .txn-pinned-month-header {
+    left: 0 !important;
+    width: 100% !important;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
 }
 
 body.modal-page-blur-active .txn-pinned-month-header {
@@ -12691,7 +12705,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   position: sticky;
   bottom: 0;
   margin: 8px 0 0;
-  padding: 12px 0 0;
+  padding: 12px 0 calc(env(safe-area-inset-bottom, 0px) + 8px);
   border-top: 1px solid var(--border);
   border-radius: 0;
   background: var(--surface);

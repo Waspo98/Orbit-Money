@@ -60,6 +60,18 @@
 - For broad changes, present a short plan before editing. Then work step by step
   and keep changes small enough to review.
 
+## Token conservation & execution efficiency
+- **Mandatory Session Kickoff Protocol:** In the first response of every new chat session, inspect the current branch and status:
+  ```powershell
+  git status; git branch --show-current
+  ```
+  Explicitly confirm with the user which branch to work on before modifying files.
+- **Headless / No Emulator:** Never launch, start, inspect, or capture screenshots from an Android emulator or device via ADB/CLI unless explicitly requested by the user. Rely exclusively on Gradle/Vite compilation, unit tests, and GitHub release downloads.
+- **Zero-Polling on Asynchronous Tasks (CRITICAL):** Long-running commands (Gradle builds, Docker builds, unit tests) run in the background. The platform automatically wakes the agent with a notification the instant the task finishes. **NEVER poll `manage_task: status` in a loop**, and **NEVER spam `schedule` timers** to check build progress. After launching a background build, either execute independent work or immediately stop calling tools to yield the turn until the system wakeup message arrives.
+- **Compiler Circuit-Breaker:** If compilation or a test fails twice consecutively with the same or related error, STOP making speculative code edits. Inspect the exact class signature, stack trace, or library source definitions before making further changes.
+- **Concise Dialogue & Zero Code Duplication:** Keep dialogue punchy and focused on decisions, architecture, and verification. Avoid pasting full file listings or large redundant blocks into chat dialogue.
+- **Zero-Orphan Policy:** When refactoring or replacing components, libraries, or models, remove old implementations in the same commit. Non-trivial tasks must be committed and pushed with conventional commit prefixes (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
+
 ## Project-specific notes
 - Public app URL is handled through Cloudflare Tunnel.
 - Public-facing services must stay compatible with the existing Docker/network setup.
@@ -170,6 +182,33 @@
   not mutate original imported values.
 - Keep account, transaction, budget, and rule behavior compatible with the
   existing SQLite migrations and Docker volume.
+
+## Android build, testing & GitHub release delivery
+- **Stack & Toolchain:** Capacitor wraps the Vite frontend into an Android Studio Gradle project in `frontend/android/`.
+  - Android SDK: `C:\Users\nealo\AppData\Local\Android\Sdk`
+  - Java: JDK 17+ on PATH
+  - Android package ID: `app.orbitmoney.client` (standard) / `app.orbitmoney.beta` (beta)
+- **Windows CLI Build Command:** Use `scripts\build-apk.cmd` (or `powershell scripts\build-apk.ps1`) to run the full pipeline:
+  1. Build frontend: `npm run build`
+  2. Sync Capacitor: `npx cap sync android`
+  3. Compile Gradle debug APK: `.\gradlew.bat assembleDebug` in `frontend\android`
+  4. Copy APK to root:
+     - On standard branches (`main` or feature): copies to `OrbitMoney-debug.apk`
+     - On the `beta` branch: copies to `OrbitBeta-debug.apk`
+  5. Upload to GitHub Releases (`gh release upload --clobber`):
+     - `main` / feature: tag `debug-latest`
+     - `beta`: tag `beta-latest`
+- **MANDATORY DELIVERY RULE (Final Turn of Any Built APK):**
+  - Whenever a new APK is compiled and uploaded to GitHub Releases, the agent's **final completion response** MUST explicitly include the direct download link:
+    - **Beta Branch:**
+      ```markdown
+      📥 **[Download OrbitBeta-debug.apk](https://github.com/Waspo98/Orbit-Money/releases/download/beta-latest/OrbitBeta-debug.apk)**
+      ```
+    - **Main / General Branches:**
+      ```markdown
+      📥 **[Download OrbitMoney-debug.apk](https://github.com/Waspo98/Orbit-Money/releases/download/debug-latest/OrbitMoney-debug.apk)**
+      ```
+  - Intermediate responses (e.g. when yielding while Gradle is compiling in the background) do NOT include this link.
 
 ## Done when
 - Build passes

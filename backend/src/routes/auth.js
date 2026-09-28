@@ -194,6 +194,34 @@ router.post('/sample', (req, res) => {
   }
 });
 
+const pendingNativeExchanges = new Map();
+
+function cleanExpiredExchanges() {
+  const now = Date.now();
+  for (const [code, item] of pendingNativeExchanges.entries()) {
+    if (item.expiresAt <= now) {
+      pendingNativeExchanges.delete(code);
+    }
+  }
+}
+
+function createNativeExchange(code, identity) {
+  cleanExpiredExchanges();
+  pendingNativeExchanges.set(code, {
+    identity,
+    expiresAt: Date.now() + 60000
+  });
+}
+
+function consumeNativeExchange(code) {
+  cleanExpiredExchanges();
+  const item = pendingNativeExchanges.get(code);
+  if (!item) return null;
+  pendingNativeExchanges.delete(code);
+  if (item.expiresAt <= Date.now()) return null;
+  return item;
+}
+
 router.get('/oidc/login', async (req, res) => {
   if (!oidcEnabled()) {
     return res.redirect('/');
@@ -215,12 +243,61 @@ router.get('/oidc/callback', async (req, res) => {
 
   try {
     const identity = await completeOidcLogin(req, req.query.code, req.query.state);
+
+    if (identity.isAppReturn) {
+      const exchangeCode = crypto.randomBytes(32).toString('hex');
+      createNativeExchange(exchangeCode, identity);
+      const appScheme = identity.appScheme || 'orbitmoney';
+      const appCallbackUrl = `${appScheme}://auth/callback?code=${encodeURIComponent(exchangeCode)}`;
+
+      return res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orbit Money - Authenticated</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafaf7; color: #171717; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; box-sizing: border-box; text-align: center; }
+    .card { background: #ffffff; border: 1px solid #e5e5e5; border-radius: 16px; padding: 32px 24px; max-width: 400px; width: 100%; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+    h2 { margin: 0 0 12px; font-size: 1.25rem; font-weight: 600; color: #047857; }
+    p { margin: 0 0 24px; font-size: 0.95rem; color: #666666; line-height: 1.4; }
+    .btn { display: inline-block; background: #047857; color: #ffffff; padding: 12px 24px; border-radius: 9999px; text-decoration: none; font-weight: 500; font-size: 0.95rem; }
+  </style>
+  <script>
+    window.location.href = ${JSON.stringify(appCallbackUrl)};
+  </script>
+</head>
+<body>
+  <div class="card">
+    <h2>Login Successful</h2>
+    <p>Returning you to Orbit Money...</p>
+    <a href="${appCallbackUrl}" class="btn">Open Orbit Money</a>
+  </div>
+</body>
+</html>`);
+    }
+
     setSessionIdentity(req, identity);
     res.redirect('/');
   } catch (err) {
     console.error('OIDC callback failed:', err);
     res.status(401).send('OIDC login failed. Return to Orbit Money and try again.');
   }
+});
+
+router.post('/oidc/native-exchange', (req, res) => {
+  const { code } = req.body || {};
+  if (!code || typeof code !== 'string') {
+    return sendBadRequest(res, 'Exchange code required');
+  }
+
+  const exchange = consumeNativeExchange(code);
+  if (!exchange) {
+    return sendUnauthorized(res, 'Invalid or expired exchange code');
+  }
+
+  setSessionIdentity(req, exchange.identity);
+  return sendOk(res, { success: true, ...currentSessionPayload(req) });
 });
 
 router.post('/logout', (req, res) => {

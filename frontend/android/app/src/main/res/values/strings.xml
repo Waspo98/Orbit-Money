@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Orbit Money</string>
+    <string name="title_activity_main">Orbit Money</string>
+    <string name="package_name">app.orbitmoney.client</string>
+    <string name="custom_url_scheme">app.orbitmoney.client</string>
+    <string name="shortcut_add_transaction_short">Add</string>
+    <string name="shortcut_add_transaction_long">Add Transaction</string>
+    <string name="shortcut_budgets_short">Budgets</string>
+    <string name="shortcut_budgets_long">View Budgets</string>
+    <string name="shortcut_accounts_short">Accounts</string>
+    <string name="shortcut_accounts_long">View Accounts</string>
+</resources>

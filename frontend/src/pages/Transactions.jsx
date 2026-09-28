@@ -15,6 +15,7 @@ import SegmentedControl from '../components/SegmentedControl.jsx';
 import CurrencyInput, { parseCurrencyInput } from '../components/CurrencyInput.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { APP_ICON_192 } from '../brandAssets.js';
+import { triggerHaptic } from '../lib/haptics.js';
 import { RuleEditor } from '../components/rules/RuleEditor.jsx';
 import {
   EditTransactionModal,
@@ -247,6 +248,15 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.q]);
 
+  useEffect(() => {
+    if (searchParams.get('action') === 'add') {
+      setManualTxnOpen(true);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('action');
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   // ---------- Data loading ----------
   //
   // `silent: true` skips the loading-spinner swap. Useful when refreshing
@@ -418,6 +428,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     if (!ok) {
       return;
     }
+    triggerHaptic('warning');
     try {
       await api.del(`/api/transactions/${txn.id}`);
       removeLocal(txn.id);
@@ -499,16 +510,21 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
 
     function measurePinnedMonth() {
       frameId = null;
-      const topOffset = 0;
+      const safeAreaTop =
+        parseFloat(window.getComputedStyle(document.documentElement).getPropertyValue('--safe-area-top')) ||
+        (document.querySelector('.app-shell')
+          ? parseFloat(window.getComputedStyle(document.querySelector('.app-shell')).paddingTop) || 0
+          : 0);
+      const topOffset = safeAreaTop;
       const headerHeight =
-        floatingHeaderRef.current?.getBoundingClientRect().height || 52;
+        floatingHeaderRef.current?.getBoundingClientRect().height || (52 + safeAreaTop);
       let activeIndex = -1;
 
       for (let index = 0; index < groups.length; index += 1) {
         const node = groupRefs.current.get(groups[index].id);
         if (!node) continue;
         const rect = node.getBoundingClientRect();
-        if (rect.top <= topOffset && rect.bottom > topOffset + headerHeight) {
+        if (rect.top <= topOffset && rect.bottom > headerHeight) {
           activeIndex = index;
         }
       }
@@ -531,7 +547,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
       const nextTop = nextNode?.getBoundingClientRect().top;
       const translateY =
         typeof nextTop === 'number'
-          ? Math.min(0, nextTop - topOffset - headerHeight)
+          ? Math.min(0, nextTop - headerHeight)
           : 0;
 
       const nextPinnedMonth = {
@@ -943,6 +959,7 @@ function ManualTransactionModal({ accounts, categories, onClose, onSaved }) {
         notes,
         is_transfer: isTransfer
       });
+      triggerHaptic('success');
       close({ animate: true });
       setTimeout(onSaved, 180);
     } catch (err) {

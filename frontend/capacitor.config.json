@@ -1,0 +1,20 @@
+{
+  "appId": "app.orbitmoney.client",
+  "appName": "Orbit Money",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "plugins": {
+    "Keyboard": {
+      "resize": "body"
+    },
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "CapacitorCookies": {
+      "enabled": true
+    }
+  }
+}

@@ -90,16 +90,37 @@ router.post('/setup', requireAuth, async (req, res) => {
 
 /**
  * POST /api/simplefin/sync
- * Kicks off a manual sync. Returns the summary when complete.
+ * Kicks off a manual sync. Returns immediately, running the sync in the background.
  */
 router.post('/sync', requireAuth, async (req, res) => {
   const householdId = requireHouseholdId(req);
   try {
-    const result = await runSync({ trigger: 'manual', householdId });
-    sendOk(res, { success: true, ...result });
+    // Check if a sync is already running and is not stale (less than 15 minutes old)
+    const active = db
+      .prepare(
+        `SELECT id, started_at FROM sync_log
+          WHERE household_id = ? AND status = 'running'
+         ORDER BY started_at DESC
+         LIMIT 1`
+      )
+      .get(householdId);
+
+    if (active) {
+      const ageMs = Date.now() - new Date(active.started_at + 'Z').getTime();
+      if (ageMs < 15 * 60 * 1000) {
+        return sendBadRequest(res, 'Another sync is already running. Please wait for it to finish.');
+      }
+    }
+
+    // Run sync in the background, catching errors so they don't cause unhandled promise rejections
+    runSync({ trigger: 'manual', householdId }).catch((err) => {
+      console.error('[simplefin] Background manual sync failed:', err.message || err);
+    });
+
+    sendOk(res, { success: true, status: 'running' });
   } catch (err) {
-    console.error('Manual sync failed:', err);
-    sendServerError(res, new Error(err.message || 'Sync failed'));
+    console.error('Manual sync initiation failed:', err);
+    sendServerError(res, new Error(err.message || 'Sync failed to start'));
   }
 });
 

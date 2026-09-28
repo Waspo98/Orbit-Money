@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import AppIcon from './AppIcon.jsx';
 import MoreDotsIcon from './MoreDotsIcon.jsx';
 import { getPrimaryRoutes } from '../navigation.js';
+import { triggerHaptic } from '../lib/haptics.js';
 
 export default function BottomTabs({ onMoreClick }) {
   const location = useLocation();
@@ -14,6 +15,7 @@ export default function BottomTabs({ onMoreClick }) {
         <NavLink
           key={t.path}
           to={t.path}
+          onClick={() => triggerHaptic('selection')}
           state={
             currentIndex >= 0 && index !== currentIndex
               ? { transition: index > currentIndex ? 'forward' : 'back' }
@@ -30,7 +32,10 @@ export default function BottomTabs({ onMoreClick }) {
       <button
         type="button"
         className="bottom-tab"
-        onClick={onMoreClick}
+        onClick={() => {
+          triggerHaptic('selection');
+          onMoreClick?.();
+        }}
         aria-label="Open more menu"
       >
         <MoreDotsIcon className="bottom-tab-icon" />

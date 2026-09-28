@@ -53,13 +53,19 @@ async function getJwks() {
 
 export async function buildAuthorizationUrl(req) {
   const discovery = await getDiscovery();
-  const state = randomUrlSafe();
+  const rawState = randomUrlSafe();
   const nonce = randomUrlSafe();
   const codeVerifier = randomUrlSafe(64);
+
+  const isAppReturn = req.query?.app_return === '1';
+  const appScheme = String(req.query?.app_scheme || 'orbitmoney').trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'orbitmoney';
+  const state = isAppReturn ? `${rawState}.app.${appScheme}` : rawState;
 
   req.session.oidcState = state;
   req.session.oidcNonce = nonce;
   req.session.oidcCodeVerifier = codeVerifier;
+  req.session.oidcAppReturn = isAppReturn;
+  req.session.oidcAppScheme = appScheme;
 
   const params = new URLSearchParams({
     client_id: config.oidcClientId,
@@ -207,9 +213,14 @@ export async function completeOidcLogin(req, code, state) {
   const preferredHouseholdId = acceptPendingHouseholdShares(db, userId, profile.email || null);
   const membership = defaultMembershipForUser(userId, displayName, preferredHouseholdId);
 
+  const isAppReturn = Boolean(req.session.oidcAppReturn || (typeof state === 'string' && state.includes('.app.')));
+  const appScheme = req.session.oidcAppScheme || (typeof state === 'string' && state.split('.app.')[1]) || 'orbitmoney';
+
   delete req.session.oidcState;
   delete req.session.oidcNonce;
   delete req.session.oidcCodeVerifier;
+  delete req.session.oidcAppReturn;
+  delete req.session.oidcAppScheme;
 
   return {
     userId,
@@ -219,6 +230,8 @@ export async function completeOidcLogin(req, code, state) {
     username: profile.preferred_username || profile.email || profile.sub,
     email: profile.email || null,
     displayName,
-    householdName: membership.name
+    householdName: membership.name,
+    isAppReturn,
+    appScheme
   };
 }

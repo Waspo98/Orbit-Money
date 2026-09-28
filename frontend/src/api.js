@@ -5,7 +5,31 @@ import {
   saveValidatedSession
 } from './offlineCache.js';
 
-// Thin fetch wrapper. Sends cookies (credentials: 'same-origin') and parses JSON.
+import { CapacitorHttp } from '@capacitor/core';
+import { isNativeApp, resolveApiUrl } from './serverConfig.js';
+
+const NATIVE_COOKIE_KEY = 'orbit_native_session_cookie';
+
+export function getStoredSessionCookie() {
+  if (typeof window === 'undefined') return '';
+  return window.localStorage.getItem(NATIVE_COOKIE_KEY) || '';
+}
+
+export function saveSessionCookieFromHeader(headerValue) {
+  if (!headerValue || typeof window === 'undefined') return;
+  const str = Array.isArray(headerValue) ? headerValue.join('; ') : String(headerValue);
+  const match = str.match(/([a-zA-Z0-9_.-]+=[^;,\s]+)/);
+  if (match) {
+    window.localStorage.setItem(NATIVE_COOKIE_KEY, match[1]);
+  }
+}
+
+export function clearStoredSessionCookie() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(NATIVE_COOKIE_KEY);
+}
+
+// Thin fetch wrapper. Sends cookies (credentials: 'same-origin' on web, 'include' on native) and parses JSON.
 // Throws an Error with .status and .data populated for non-2xx responses.
 
 function isUnsafeMethod(method) {
@@ -35,35 +59,98 @@ async function request(path, options = {}) {
     throw offlineReadOnlyError();
   }
 
-  let res;
-  try {
-    res = await fetch(path, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {})
-      },
-      credentials: 'same-origin'
-    });
-  } catch (err) {
-    if (unsafe && isNetworkFailure(err)) {
-      throw offlineReadOnlyError();
+  const url = resolveApiUrl(path);
+
+  let data;
+  let status = 200;
+  let ok = true;
+
+  if (isNativeApp()) {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    };
+    const sessionCookie = getStoredSessionCookie();
+    if (sessionCookie) {
+      headers['Cookie'] = sessionCookie;
     }
-    if (method === 'GET' && isNetworkFailure(err)) {
-      const cached = path === '/api/auth/me'
-        ? await readCachedAuthPayload()
-        : await readCachedGetResponse(path);
-      if (cached) return cached;
+
+    let reqData = options.body;
+    if (typeof reqData === 'string') {
+      try {
+        reqData = JSON.parse(reqData);
+      } catch {
+        // preserve string
+      }
     }
-    throw err;
+
+    try {
+      const res = await CapacitorHttp.request({
+        url,
+        method,
+        headers,
+        data: reqData
+      });
+
+      status = res.status;
+      ok = status >= 200 && status < 300;
+      data = res.data ?? {};
+
+      const setCookie = res.headers?.['Set-Cookie'] || res.headers?.['set-cookie'];
+      if (setCookie) {
+        saveSessionCookieFromHeader(setCookie);
+      }
+
+      if (status === 401 && path !== '/api/auth/login') {
+        clearStoredSessionCookie();
+      }
+      if (path === '/api/auth/logout') {
+        clearStoredSessionCookie();
+      }
+    } catch (err) {
+      if (unsafe && isNetworkFailure(err)) {
+        throw offlineReadOnlyError();
+      }
+      if (method === 'GET' && isNetworkFailure(err)) {
+        const cached = path === '/api/auth/me'
+          ? await readCachedAuthPayload()
+          : await readCachedGetResponse(path);
+        if (cached) return cached;
+      }
+      throw err;
+    }
+  } else {
+    let res;
+    try {
+      res = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers || {})
+        },
+        credentials: 'same-origin'
+      });
+    } catch (err) {
+      if (unsafe && isNetworkFailure(err)) {
+        throw offlineReadOnlyError();
+      }
+      if (method === 'GET' && isNetworkFailure(err)) {
+        const cached = path === '/api/auth/me'
+          ? await readCachedAuthPayload()
+          : await readCachedGetResponse(path);
+        if (cached) return cached;
+      }
+      throw err;
+    }
+
+    status = res.status;
+    ok = res.ok;
+    data = await res.json().catch(() => ({}));
   }
 
-  // Tolerate empty bodies (e.g. 204 responses).
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const err = new Error(data.error || `Request failed: ${res.status}`);
-    err.status = res.status;
+  if (!ok) {
+    const err = new Error(data?.error || `Request failed: ${status}`);
+    err.status = status;
     err.data = data;
     throw err;
   }

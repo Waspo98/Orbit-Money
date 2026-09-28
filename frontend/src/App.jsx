@@ -32,6 +32,9 @@ import { api } from './api.js';
 import { APP_ICON_192 } from './brandAssets.js';
 import { clearOfflineFinancialCache } from './offlineCache.js';
 import { warmOfflineReadCache } from './offlineWarmup.js';
+import { initNativeApp, syncNativeStatusBar, onAppUrlOpen, onAppStateChange } from './nativeApp.js';
+import { isBiometricLockEnabled } from './lib/biometrics.js';
+import BiometricLockOverlay from './components/BiometricLockOverlay.jsx';
 import { sortCategoriesByName } from './lib/categorySort.js';
 import {
   ROUTES,
@@ -377,6 +380,55 @@ function AppShell() {
     };
   }, []);
 
+  useEffect(() => {
+    syncNativeStatusBar(themeMode, darkVariant);
+  }, [themeMode, darkVariant]);
+
+  const [biometricLocked, setBiometricLocked] = useState(() => isBiometricLockEnabled());
+
+  useEffect(() => {
+    const unsubUrl = onAppUrlOpen((data) => {
+      const url = data?.url || '';
+      if (url.includes('://action/add-transaction')) {
+        navigate('/transactions?action=add');
+      } else if (url.includes('://action/budgets')) {
+        navigate('/budgets');
+      } else if (url.includes('://action/accounts')) {
+        navigate('/accounts');
+      }
+    });
+
+    const unsubState = onAppStateChange(({ isActive, elapsedMs }) => {
+      if (isActive && elapsedMs >= 30000 && isBiometricLockEnabled()) {
+        setBiometricLocked(true);
+      }
+    });
+
+    return () => {
+      unsubUrl();
+      unsubState();
+    };
+  }, [navigate]);
+
+  useEffect(() => {
+    initNativeApp({
+      onBackButton: () => {
+        if (moreOpen) {
+          setMoreOpen(false);
+          return true;
+        }
+        return false;
+      },
+      onNavigateRoot: () => {
+        if (location.pathname !== '/' && location.pathname !== '/dashboard') {
+          navigate('/dashboard');
+          return true;
+        }
+        return false;
+      }
+    });
+  }, [moreOpen, location.pathname, navigate]);
+
   async function checkAuth({ refreshLookups = false } = {}) {
     try {
       const me = await api.get('/api/auth/me');
@@ -703,6 +755,10 @@ function AppShell() {
         mhaTrackerEnabled={mhaTrackerEnabled}
         navigationPreferences={navigationPreferences}
       />
+
+      {biometricLocked && (
+        <BiometricLockOverlay onUnlock={() => setBiometricLocked(false)} />
+      )}
     </div>
   );
 }

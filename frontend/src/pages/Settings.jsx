@@ -5,7 +5,7 @@ import {
   SortableContext,
   verticalListSortingStrategy
 } from '@dnd-kit/sortable';
-import { api } from '../api.js';
+import { api, getStoredSessionCookie } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import AppIcon from '../components/AppIcon.jsx';
 import AppSelect from '../components/AppSelect.jsx';
@@ -34,6 +34,9 @@ import {
 import { APP_VERSION_LABEL } from '../version.js';
 import { APP_ICON_512 } from '../brandAssets.js';
 import { todayLocalDate } from '../lib/localDate.js';
+import { isNativeApp, getServerUrl, resolveApiUrl } from '../serverConfig.js';
+import { isHapticsEnabled, setHapticsEnabled, triggerHaptic } from '../lib/haptics.js';
+import { isBiometricsAvailable, isBiometricLockEnabled, setBiometricLockEnabled, promptBiometricAuth } from '../lib/biometrics.js';
 
 const SIMPLEFIN_BRIDGE_URL = 'https://beta-bridge.simplefin.org/';
 
@@ -260,6 +263,14 @@ export default function Settings({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const [hapticsOn, setHapticsOn] = useState(() => isHapticsEnabled());
+  const [biometricsAvailable, setBiometricsAvailable] = useState(false);
+  const [biometricOn, setBiometricOn] = useState(() => isBiometricLockEnabled());
+
+  useEffect(() => {
+    isBiometricsAvailable().then(setBiometricsAvailable);
+  }, []);
+
   const [status, setStatus] = useState(null);
   const [setupToken, setSetupToken] = useState('');
   const [cutoverDate, setCutoverDate] = useState(todayLocalDate());
@@ -379,6 +390,53 @@ export default function Settings({
     loadStatus();
     loadSharing();
   }, []);
+
+  // Poll for sync completion when status.lastSync.status is 'running'
+  useEffect(() => {
+    if (!status?.lastSync || status.lastSync.status !== 'running') {
+      return;
+    }
+
+    let active = true;
+    const interval = setInterval(async () => {
+      try {
+        const nextStatus = await api.get('/api/simplefin/status');
+        if (!active) return;
+
+        setStatus(nextStatus);
+
+        if (!nextStatus.lastSync || nextStatus.lastSync.status !== 'running') {
+          // Sync has finished!
+          clearInterval(interval);
+          loadSyncLog(); // Refresh the sync history log
+
+          if (syncBusy) {
+            const last = nextStatus.lastSync;
+            if (last) {
+              if (last.status === 'success') {
+                const inserted = Number(last.transactions_inserted || 0);
+                alert(
+                  `Inserted ${inserted.toLocaleString()} transaction${inserted === 1 ? '' : 's'}.`,
+                  { title: 'Sync Complete' }
+                );
+              } else if (last.status === 'error') {
+                const msg = last.error_message || 'Sync finished with issues';
+                alert(msg, { title: 'Sync Finished With Issues' });
+              }
+            }
+            setSyncBusy(false);
+          }
+        }
+      } catch (err) {
+        console.error('[simplefin] Polling status failed:', err);
+      }
+    }, 3000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [status?.lastSync?.status, syncBusy]);
 
   useEffect(() => {
     if (settingsPage !== 'preferences') return;
@@ -535,16 +593,29 @@ export default function Settings({
     setSyncBusy(true);
     setSyncError('');
     try {
-      const data = await api.post('/api/simplefin/sync');
-      const inserted = Number(data.inserted || 0);
-      await alert(
-        `Inserted ${inserted.toLocaleString()} transaction${inserted === 1 ? '' : 's'}.`,
-        { title: data.status === 'error' ? 'Sync Finished With Issues' : 'Sync Complete' }
-      );
-      await loadStatus();
+      await api.post('/api/simplefin/sync');
+      
+      // Reload status immediately to detect the 'running' state and trigger the polling effect
+      const nextStatus = await api.get('/api/simplefin/status');
+      setStatus(nextStatus);
+
+      // In case the sync finishes instantly (e.g. immediate cached response or mock mode)
+      if (nextStatus.lastSync && nextStatus.lastSync.status !== 'running') {
+        const last = nextStatus.lastSync;
+        if (last.status === 'success') {
+          const inserted = Number(last.transactions_inserted || 0);
+          await alert(
+            `Inserted ${inserted.toLocaleString()} transaction${inserted === 1 ? '' : 's'}.`,
+            { title: 'Sync Complete' }
+          );
+        } else if (last.status === 'error') {
+          const msg = last.error_message || 'Sync finished with issues';
+          await alert(msg, { title: 'Sync Finished With Issues' });
+        }
+        setSyncBusy(false);
+      }
     } catch (err) {
       setSyncError(err.message || 'Sync failed');
-    } finally {
       setSyncBusy(false);
     }
   }
@@ -797,7 +868,14 @@ export default function Settings({
     setDownloadBusy(label);
     setDownloadNotice(null);
     try {
-      const res = await fetch(path, { credentials: 'same-origin' });
+      const endpoint = resolveApiUrl(path);
+      const headers = isNativeApp() ? {
+        ...(getStoredSessionCookie() ? { Cookie: getStoredSessionCookie() } : {})
+      } : {};
+      const res = await fetch(endpoint, {
+        credentials: isNativeApp() ? 'include' : 'same-origin',
+        headers
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Download failed: ${res.status}`);
@@ -870,9 +948,9 @@ export default function Settings({
       const form = new FormData();
       form.append('file', file);
 
-      const res = await fetch('/api/import/rocket-money/preview', {
+      const res = await fetch(resolveApiUrl('/api/import/rocket-money/preview'), {
         method: 'POST',
-        credentials: 'same-origin',
+        credentials: isNativeApp() ? 'include' : 'same-origin',
         body: form
       });
 
@@ -948,9 +1026,9 @@ export default function Settings({
     try {
       const form = new FormData();
       form.append('file', restoreFile);
-      const res = await fetch('/api/data/orbit-restore/preview', {
+      const res = await fetch(resolveApiUrl('/api/data/orbit-restore/preview'), {
         method: 'POST',
-        credentials: 'same-origin',
+        credentials: isNativeApp() ? 'include' : 'same-origin',
         body: form
       });
       const data = await res.json().catch(() => ({}));
@@ -981,9 +1059,9 @@ export default function Settings({
     try {
       const form = new FormData();
       form.append('file', restoreFile);
-      const res = await fetch('/api/data/orbit-restore', {
+      const res = await fetch(resolveApiUrl('/api/data/orbit-restore'), {
         method: 'POST',
-        credentials: 'same-origin',
+        credentials: isNativeApp() ? 'include' : 'same-origin',
         body: form
       });
       const data = await res.json().catch(() => ({}));
@@ -1394,6 +1472,76 @@ export default function Settings({
     );
   }
 
+  function renderDeviceCard() {
+    if (!isNativeApp()) return null;
+
+    return (
+      <SettingsCard
+        id="device"
+        key="device"
+        title="Device & Privacy"
+        description="Native app experience and security settings on this device."
+      >
+        <div className="settings-notification-lead">
+          <label className="settings-notification-toggle">
+            <span className="settings-notification-toggle-copy">
+              <strong>Haptic Feedback</strong>
+              <p>Tactile vibration on keypad taps, category selection, and actions.</p>
+            </span>
+            <span className="switch notification-switch">
+              <input
+                type="checkbox"
+                aria-label="Haptic Feedback"
+                checked={hapticsOn}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setHapticsOn(next);
+                  setHapticsEnabled(next);
+                  if (next) triggerHaptic('light');
+                }}
+              />
+              <span className="switch-track" />
+            </span>
+          </label>
+        </div>
+
+        {biometricsAvailable && (
+          <div className="settings-notification-lead" style={{ marginTop: 12 }}>
+            <label className="settings-notification-toggle">
+              <span className="settings-notification-toggle-copy">
+                <strong>Biometric Unlock</strong>
+                <p>Require fingerprint or face unlock when opening Orbit Money.</p>
+              </span>
+              <span className="switch notification-switch">
+                <input
+                  type="checkbox"
+                  aria-label="Biometric Unlock"
+                  checked={biometricOn}
+                  onChange={async (e) => {
+                    const next = e.target.checked;
+                    if (next) {
+                      const verified = await promptBiometricAuth('Enable Biometric Unlock');
+                      if (verified) {
+                        setBiometricOn(true);
+                        setBiometricLockEnabled(true);
+                        triggerHaptic('success');
+                      }
+                    } else {
+                      setBiometricOn(false);
+                      setBiometricLockEnabled(false);
+                      triggerHaptic('selection');
+                    }
+                  }}
+                />
+                <span className="switch-track" />
+              </span>
+            </label>
+          </div>
+        )}
+      </SettingsCard>
+    );
+  }
+
   function renderSimpleFinCard() {
     const statusCopy =
       status === null
@@ -1415,9 +1563,13 @@ export default function Settings({
               type="button"
               className="btn-primary settings-card-action-button simplefin-sync-now-button"
               onClick={handleSync}
-              disabled={syncBusy}
+              disabled={syncBusy || status?.lastSync?.status === 'running'}
             >
-              {syncBusy ? (<><span className="spinner-inline" /> Syncing...</>) : 'Sync Now'}
+              {syncBusy || status?.lastSync?.status === 'running' ? (
+                <><span className="spinner-inline" /> Syncing...</>
+              ) : (
+                'Sync Now'
+              )}
             </button>
 
             <div className="settings-card-separator" aria-hidden="true" />
@@ -1438,6 +1590,9 @@ export default function Settings({
                     if (s === 'success') {
                       pillClass = 'success';
                       pillLabel = 'success';
+                    } else if (s === 'running') {
+                      pillClass = 'accent';
+                      pillLabel = 'running';
                     } else if (s === 'error' && isPartial) {
                       pillClass = 'warning';
                       pillLabel = 'partial sync';
@@ -2098,6 +2253,13 @@ export default function Settings({
             <strong>{APP_VERSION_LABEL}</strong>
           </div>
 
+          {isNativeApp() && (
+            <div className="settings-about-info-card">
+              <span className="settings-about-info-label">Server</span>
+              <strong style={{ wordBreak: 'break-all', fontSize: '0.85rem' }}>{getServerUrl() || 'Not configured'}</strong>
+            </div>
+          )}
+
           <div className="settings-about-info-card settings-signout-card">
             <button
               type="button"
@@ -2227,6 +2389,7 @@ export default function Settings({
           {renderAppearanceCard()}
           {renderNotificationsCard()}
           {renderFeaturesCard()}
+          {renderDeviceCard()}
         </div>
       );
     }

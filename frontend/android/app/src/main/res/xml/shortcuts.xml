@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="add_transaction"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_add"
+        android:shortcutShortLabel="@string/shortcut_add_transaction_short"
+        android:shortcutLongLabel="@string/shortcut_add_transaction_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="${applicationId}"
+            android:targetClass="app.orbitmoney.client.MainActivity"
+            android:data="orbitmoney://action/add-transaction" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="budgets"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_budgets"
+        android:shortcutShortLabel="@string/shortcut_budgets_short"
+        android:shortcutLongLabel="@string/shortcut_budgets_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="${applicationId}"
+            android:targetClass="app.orbitmoney.client.MainActivity"
+            android:data="orbitmoney://action/budgets" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="accounts"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_accounts"
+        android:shortcutShortLabel="@string/shortcut_accounts_short"
+        android:shortcutLongLabel="@string/shortcut_accounts_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="${applicationId}"
+            android:targetClass="app.orbitmoney.client.MainActivity"
+            android:data="orbitmoney://action/accounts" />
+    </shortcut>
+</shortcuts>

@@ -1,3 +1,5 @@
+import { triggerHaptic } from '../lib/haptics.js';
+
 export default function SelectableListItem({
   active = false,
   disabled = false,
@@ -14,7 +16,10 @@ export default function SelectableListItem({
     <button
       type="button"
       className={`selectable-list-item ${active ? 'active' : ''} ${className}`}
-      onClick={onClick}
+      onClick={(e) => {
+        triggerHaptic('selection');
+        onClick?.(e);
+      }}
       aria-pressed={active}
       aria-label={ariaLabel}
       disabled={disabled}
