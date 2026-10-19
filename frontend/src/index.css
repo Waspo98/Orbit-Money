@@ -2487,6 +2487,31 @@ input, textarea, select {
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04);
 }
 
+/* Sliding indicator pill connecting tabs */
+.bottom-tabs-slider {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    transform var(--dur-spring-default) var(--spring-spatial-default),
+    opacity var(--dur-effects-fast) var(--spring-effects);
+  will-change: transform;
+}
+
+.bottom-tabs-slider::before {
+  content: '';
+  width: 56px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+}
+
 .bottom-tab {
   display: flex;
   flex-direction: column;
@@ -2512,6 +2537,7 @@ input, textarea, select {
   touch-action: manipulation;
   transition: color var(--dur-fast);
   position: relative;
+  z-index: 1;
   min-height: 44px;
 }
 
@@ -2553,6 +2579,11 @@ input, textarea, select {
   z-index: -1;
 }
 
+/* When the connected slider is active, hide individual tab-pill backgrounds */
+.bottom-tabs:has(.bottom-tabs-slider) .bottom-tab-pill::before {
+  display: none;
+}
+
 .bottom-tab:active .bottom-tab-pill {
   transform: scale(0.9);
   border-radius: 10px;
@@ -2568,7 +2599,8 @@ input, textarea, select {
 }
 
 .bottom-tab.active .bottom-tab-icon {
-  transform: translateY(-1px) scale(1.08);
+  transform: translateY(-2px) scale(1.14);
+  transition: transform var(--dur-spring-fast) var(--spring-spatial-fast);
 }
 
 .bottom-tab-icon {
@@ -2591,6 +2623,16 @@ input, textarea, select {
 
 .bottom-tab.active .bottom-tab-label {
   font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-tabs-slider {
+    transition: none !important;
+  }
+  .bottom-tab.active .bottom-tab-icon {
+    transition: none !important;
+    transform: none !important;
+  }
 }
 
 @media (min-width: 1080px) { .bottom-tabs { display: none; } }
@@ -11368,6 +11410,8 @@ body.modal-page-blur-active .txn-pinned-month-header {
 }
 
 .segmented-control {
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   overflow: hidden;
@@ -11376,7 +11420,26 @@ body.modal-page-blur-active .txn-pinned-month-header {
   background: var(--surface-2);
 }
 
+.segmented-control-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--accent-soft);
+  border-radius: calc(var(--radius-md) - 2px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    width var(--dur-spring-fast) var(--spring-spatial-fast),
+    height var(--dur-spring-fast) var(--spring-spatial-fast),
+    opacity var(--dur-effects-fast) var(--spring-effects);
+  will-change: transform, width, height;
+}
+
 .segmented-control button {
+  position: relative;
+  z-index: 1;
   min-height: 44px;
   border: 0;
   border-right: 1px solid var(--border);
@@ -11393,7 +11456,9 @@ body.modal-page-blur-active .txn-pinned-month-header {
 }
 
 .segmented-control button:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.975);
+  transition-duration: 75ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 
 .segmented-option-content {
@@ -11434,13 +11499,28 @@ body.modal-page-blur-active .txn-pinned-month-header {
 
 .segmented-control button:hover,
 .segmented-control button.active {
-  background: var(--accent-soft);
   color: var(--accent);
+}
+
+/* Fallback when thumb is absent or unmeasured */
+.segmented-control:not(.has-thumb) button.active,
+.segmented-control:not(:has(.segmented-control-thumb)) button.active {
+  background: var(--accent-soft);
+}
+
+.segmented-control:not(.has-thumb) button:hover {
+  background: var(--accent-soft);
 }
 
 .segmented-control button:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmented-control-thumb {
+    transition: none !important;
+  }
 }
 
 .segmented-control.mha-tax-mode-tabs {
@@ -13127,13 +13207,28 @@ body.modal-page-blur-active .txn-pinned-month-header {
 .chip {
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill, 999px);
   background: var(--surface);
   color: var(--text);
   font-size: 0.85rem;
   font-family: inherit;
+  font-weight: 500;
   cursor: pointer;
-  transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects),
+    border-color var(--dur-effects-fast) var(--spring-effects),
+    color var(--dur-effects-fast) var(--spring-effects);
+  will-change: transform;
+}
+
+.chip:active:not(:disabled) {
+  transform: scale(0.975);
+  transition-duration: 75ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 
 .chip:hover {
@@ -13145,6 +13240,14 @@ body.modal-page-blur-active .txn-pinned-month-header {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-contrast, white);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .chip:active:not(:disabled) {
+    transform: none !important;
+    transition: none !important;
+  }
 }
 
 /* Checkbox list (accounts, categories) */

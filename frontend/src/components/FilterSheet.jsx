@@ -6,6 +6,7 @@ import CurrencyInput, {
 } from './CurrencyInput.jsx';
 import DateInput from './DateInput.jsx';
 import { formatLocalDate, todayLocalDate } from '../lib/localDate.js';
+import { triggerHaptic } from '../lib/haptics.js';
 
 // ============================================================================
 // FilterSheet — comprehensive filter UI for the Transactions page.
@@ -202,8 +203,11 @@ export default function FilterSheet({
                   <button
                     key={p.key}
                     type="button"
-                    className={`chip ${activePreset === p.key ? 'chip-active' : ''}`}
-                    onClick={() => applyPreset(p)}
+                    className={`chip m3-tactile ${activePreset === p.key ? 'chip-active' : ''}`}
+                    onClick={() => {
+                      triggerHaptic('selection');
+                      applyPreset(p);
+                    }}
                   >
                     {p.label}
                   </button>
@@ -229,8 +233,11 @@ export default function FilterSheet({
                   <button
                     key={o.value}
                     type="button"
-                    className={`chip ${type === o.value ? 'chip-active' : ''}`}
-                    onClick={() => setType(o.value)}
+                    className={`chip m3-tactile ${type === o.value ? 'chip-active' : ''}`}
+                    onClick={() => {
+                      triggerHaptic('selection');
+                      setType(o.value);
+                    }}
                   >
                     {o.label}
                   </button>
@@ -345,8 +352,11 @@ export default function FilterSheet({
                   <button
                     key={o.value}
                     type="button"
-                    className={`chip ${hasEdits === o.value ? 'chip-active' : ''}`}
-                    onClick={() => setHasEdits(o.value)}
+                    className={`chip m3-tactile ${hasEdits === o.value ? 'chip-active' : ''}`}
+                    onClick={() => {
+                      triggerHaptic('selection');
+                      setHasEdits(o.value);
+                    }}
                   >
                     {o.label}
                   </button>
