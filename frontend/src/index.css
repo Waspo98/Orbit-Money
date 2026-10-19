@@ -994,26 +994,63 @@ input, textarea, select {
   animation: modalZoomOut var(--dur-base) var(--ease-in-out) forwards;
 }
 
-@media (max-width: 640px) {
-  .modal-backdrop:has(.modal:not(.modal-zoom):not(.modal-sm)) {
+/* ================== M3 Bottom Sheet Handle ================== */
+
+.m3-sheet-handle-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 4px 0 14px;
+  cursor: grab;
+  touch-action: none;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.m3-sheet-handle {
+  width: 32px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  opacity: 0.75;
+  transition: opacity var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+
+.m3-sheet-handle-bar:active .m3-sheet-handle {
+  opacity: 1;
+  transform: scaleY(1.25);
+}
+
+@media (min-width: 768px) {
+  .m3-sheet-handle-bar {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .modal-backdrop {
     align-items: flex-end;
     padding: 0;
   }
 
-  .modal:not(.modal-zoom):not(.modal-sm) {
-    max-width: 100%;
-    border-radius: 28px 28px 0 0;
+  .modal {
+    max-width: 100% !important;
+    border-radius: 28px 28px 0 0 !important;
     max-height: 90vh;
     max-height: 90dvh;
-    padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
-    animation: modalSheetIn var(--dur-spring-default) var(--spring-spatial-default);
+    padding: 12px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+    animation: modalSheetIn var(--dur-spring-default) var(--spring-spatial-default) !important;
+    overscroll-behavior-y: contain;
   }
 
-  .modal:not(.modal-zoom):not(.modal-sm).closing {
-    animation: modalSheetOut var(--dur-base) var(--ease-in-out) forwards;
+  .modal.closing,
+  .modal.closing-zoom {
+    animation: modalSheetOut var(--dur-base) var(--ease-in-out) forwards !important;
   }
 
-  .modal:not(.modal-zoom):not(.modal-sm) .modal-actions {
+  .modal .modal-actions {
     bottom: calc(-24px - env(safe-area-inset-bottom, 0px));
     margin: 24px -20px calc(-24px - env(safe-area-inset-bottom, 0px));
     padding: 14px 20px calc(18px + env(safe-area-inset-bottom, 0px));
