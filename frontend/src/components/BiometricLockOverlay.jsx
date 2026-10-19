@@ -50,8 +50,8 @@ export default function BiometricLockOverlay({ onUnlock }) {
         alignItems: 'center',
         justifyContent: 'center',
         padding: '24px',
-        background: 'var(--color-bg, #fafaf7)',
-        color: 'var(--color-text, #111827)'
+        background: 'var(--bg, #fafaf7)',
+        color: 'var(--text, #1a1f1b)'
       }}
     >
       <div
@@ -77,12 +77,12 @@ export default function BiometricLockOverlay({ onUnlock }) {
         <h2 style={{ fontSize: '1.4rem', fontWeight: 600, margin: '8px 0 0 0' }}>
           Orbit Money
         </h2>
-        <p style={{ margin: 0, color: 'var(--color-text-muted, #6b7280)', fontSize: '0.95rem' }}>
+        <p style={{ margin: 0, color: 'var(--text-muted, #6b7268)', fontSize: '0.95rem' }}>
           App is locked for your privacy.
         </p>
 
         {error && (
-          <p style={{ color: '#ef4444', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+          <p style={{ color: 'var(--danger, #ef4444)', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
             {error}
           </p>
         )}

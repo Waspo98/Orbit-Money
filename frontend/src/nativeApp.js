@@ -39,6 +39,9 @@ export async function closeInAppBrowser() {
 
 let backgroundedAt = 0;
 const appStateListeners = new Set();
+let nativeInitialized = false;
+let backButtonHandler = null;
+let navigateRootHandler = null;
 
 export function onAppStateChange(callback) {
   appStateListeners.add(callback);
@@ -46,7 +49,10 @@ export function onAppStateChange(callback) {
 }
 
 export async function initNativeApp({ onBackButton, onNavigateRoot } = {}) {
-  if (!isNativePlatform()) return;
+  backButtonHandler = onBackButton || null;
+  navigateRootHandler = onNavigateRoot || null;
+  if (!isNativePlatform() || nativeInitialized) return;
+  nativeInitialized = true;
 
   try {
     StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
@@ -80,12 +86,12 @@ export async function initNativeApp({ onBackButton, onNavigateRoot } = {}) {
     });
 
     CapApp.addListener('backButton', ({ canGoBack }) => {
-      if (onBackButton && onBackButton()) {
+      if (backButtonHandler && backButtonHandler()) {
         return;
       }
       if (canGoBack) {
         window.history.back();
-      } else if (onNavigateRoot && onNavigateRoot()) {
+      } else if (navigateRootHandler && navigateRootHandler()) {
         return;
       } else {
         CapApp.minimizeApp();

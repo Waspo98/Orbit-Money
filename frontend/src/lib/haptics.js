@@ -13,7 +13,18 @@ export function setHapticsEnabled(enabled) {
 }
 
 export async function triggerHaptic(type = 'light') {
-  if (!isNativePlatform() || !isHapticsEnabled()) return;
+  if (!isHapticsEnabled()) return;
+
+  if (!isNativePlatform()) {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      try {
+        navigator.vibrate(type === 'selection' ? 4 : 10);
+      } catch {
+        // Ignore fallback errors
+      }
+    }
+    return;
+  }
 
   try {
     switch (type) {
@@ -30,8 +41,10 @@ export async function triggerHaptic(type = 'light') {
         await Haptics.notification({ type: NotificationType.Success });
         break;
       case 'warning':
-      case 'error':
         await Haptics.notification({ type: NotificationType.Warning });
+        break;
+      case 'error':
+        await Haptics.notification({ type: NotificationType.Error });
         break;
       case 'light':
       default:

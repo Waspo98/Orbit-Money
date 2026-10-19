@@ -1,3 +1,5 @@
+import { triggerHaptic } from '../lib/haptics.js';
+
 function defaultValue(option) {
   return option?.value;
 }
@@ -60,7 +62,10 @@ export default function ChoiceCardGroup({
               active ? 'active' : '',
               disabled ? 'locked' : ''
             ].filter(Boolean).join(' ')}
-            onClick={() => onChange?.(optionValue, option)}
+            onClick={() => {
+              triggerHaptic('selection');
+              onChange?.(optionValue, option);
+            }}
             disabled={disabled}
             role={isRadio ? 'radio' : undefined}
             aria-checked={isRadio ? active : undefined}

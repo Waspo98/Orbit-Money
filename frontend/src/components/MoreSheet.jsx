@@ -8,6 +8,7 @@ import {
   useOverlayBackDismiss
 } from './overlayBehavior.js';
 import { getMoreRoutes } from '../navigation.js';
+import { triggerHaptic } from '../lib/haptics.js';
 
 const DRAG_START_PX = 12;
 const INTERACTIVE_DRAG_START_PX = 28;
@@ -43,6 +44,8 @@ export default function MoreSheet({
   const enterFrameRef = useRef(null);
   const dragFrameRef = useRef(null);
   const sheetRef = useRef(null);
+  const backdropRef = useRef(null);
+  const crossedThresholdRef = useRef(false);
   const scrollRef = useRef(null);
   const scrollLockRef = useRef({ locked: false, overflowY: '' });
   const gestureRef = useRef(createGestureState());
@@ -171,8 +174,18 @@ export default function MoreSheet({
   function setSheetTransform(value, { dragging }) {
     const sheet = sheetRef.current;
     if (!sheet) return;
-    sheet.classList.toggle('dragging', Boolean(dragging && value > 0));
-    sheet.style.transform = `translateY(${value}px)`;
+    sheet.classList.toggle('dragging', Boolean(dragging));
+    sheet.style.transform = `translate3d(0, ${value}px, 0)`;
+    if (backdropRef.current) {
+      if (dragging && value > 0) {
+        const progress = Math.min(1, value / 320);
+        backdropRef.current.style.opacity = String(1 - progress * 0.85);
+        backdropRef.current.style.transition = 'none';
+      } else {
+        backdropRef.current.style.opacity = '';
+        backdropRef.current.style.transition = '';
+      }
+    }
   }
 
   function scheduleSheetTransform(value, options) {
@@ -291,7 +304,7 @@ export default function MoreSheet({
     if (gesture.mode === 'scroll') return;
 
     if (gesture.mode === 'pending') {
-      if (!gesture.startedAtTop || totalY < 0) {
+      if (!gesture.startedAtTop) {
         gesture.mode = 'scroll';
         return;
       }
@@ -299,7 +312,7 @@ export default function MoreSheet({
       const dragStartPx = gesture.startedOnInteractive
         ? INTERACTIVE_DRAG_START_PX
         : DRAG_START_PX;
-      if (totalY < dragStartPx) return;
+      if (Math.abs(totalY) < dragStartPx) return;
       gesture.mode = 'sheet';
       lockInternalScroll();
     }
@@ -307,8 +320,17 @@ export default function MoreSheet({
     if (gesture.mode !== 'sheet') return;
     if (event.cancelable) event.preventDefault();
 
-    const distance = Math.max(0, totalY);
+    const distance = totalY < 0
+      ? -Math.pow(Math.abs(totalY), 0.68) * 1.8
+      : totalY;
     gesture.distance = distance;
+
+    const crossed = distance > DRAG_CLOSE_PX;
+    if (crossed !== crossedThresholdRef.current) {
+      crossedThresholdRef.current = crossed;
+      triggerHaptic('selection');
+    }
+
     scheduleSheetTransform(distance, { dragging: true });
   }
 
@@ -337,7 +359,10 @@ export default function MoreSheet({
     if (!gesture.active || gesture.pointerType === 'touch' || gesture.mode !== 'sheet') return;
 
     const nextY = event.clientY;
-    const distance = Math.max(0, nextY - gesture.startY);
+    const totalY = nextY - gesture.startY;
+    const distance = totalY < 0
+      ? -Math.pow(Math.abs(totalY), 0.68) * 1.8
+      : totalY;
     const now = window.performance.now();
     const elapsed = Math.max(1, now - gesture.lastMoveAt);
     gesture.velocityY = (nextY - gesture.lastY) / elapsed;
@@ -345,7 +370,13 @@ export default function MoreSheet({
     gesture.lastMoveAt = now;
     gesture.distance = distance;
 
-    if (distance > 6) event.preventDefault();
+    const crossed = distance > DRAG_CLOSE_PX;
+    if (crossed !== crossedThresholdRef.current) {
+      crossedThresholdRef.current = crossed;
+      triggerHaptic('selection');
+    }
+
+    if (Math.abs(distance) > 6) event.preventDefault();
     scheduleSheetTransform(distance, { dragging: true });
   }
 
@@ -360,6 +391,7 @@ export default function MoreSheet({
   function finishGesture() {
     const gesture = gestureRef.current;
     if (!gesture.active) return;
+    crossedThresholdRef.current = false;
 
     if (
       gesture.mode === 'sheet' &&
@@ -369,7 +401,7 @@ export default function MoreSheet({
       return;
     }
 
-    if (gesture.mode === 'sheet' && gesture.distance > 0) {
+    if (gesture.mode === 'sheet' && gesture.distance !== 0) {
       snapBackFromGesture();
       return;
     }
@@ -385,6 +417,7 @@ export default function MoreSheet({
 
   return (
     <div
+      ref={backdropRef}
       className={`more-sheet-backdrop ${drawerState === 'open' ? 'open' : ''} ${isClosing ? 'closing' : ''}`.trim()}
       onClick={() => close({ animate: true })}
       role="dialog"

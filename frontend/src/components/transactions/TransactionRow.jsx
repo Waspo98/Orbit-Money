@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { api } from '../../api.js';
 import AppSelect from '../AppSelect.jsx';
 import AnimatedModal from '../AnimatedModal.jsx';
@@ -30,7 +30,7 @@ function ruleIdFromEditSource(source) {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
-export function TransactionRow({
+export const TransactionRow = memo(function TransactionRow({
   txn,
   expanded,
   onExpand,
@@ -52,6 +52,16 @@ export function TransactionRow({
   hideActions = false,
   mhaTrackerEnabled = false
 }) {
+  const [renderDetail, setRenderDetail] = useState(expanded);
+  useEffect(() => {
+    if (expanded) {
+      setRenderDetail(true);
+      return undefined;
+    }
+    const timer = setTimeout(() => setRenderDetail(false), EXPAND_ANIMATION_MS + EXPAND_ANIMATION_BUFFER_MS);
+    return () => clearTimeout(timer);
+  }, [expanded]);
+
   const isIncome = txn.amount > 0 && !txn.is_transfer;
   const isTransfer = !!txn.is_transfer;
   const actionItems = [
@@ -159,27 +169,31 @@ export function TransactionRow({
       </div>
 
       <div className="txn-detail-wrapper" aria-hidden={!expanded}>
-        <TransactionDetail
-          txn={txn}
-          account={account}
-          category={category}
-          originalCategory={originalCategory}
-          interactive={expanded}
-          onEdit={onEdit}
-          onCreateRule={onCreateRule}
-          onMarkRecurring={onMarkRecurring}
-          onToggleTransfer={onToggleTransfer}
-          onToggleIgnored={onToggleIgnored}
-          onToggleMhaEligible={onToggleMhaEligible}
-          onDelete={onDelete}
-          onResetField={onResetField}
-          onViewRule={onViewRule}
-          mhaTrackerEnabled={mhaTrackerEnabled}
-        />
+        {(renderDetail || expanded) ? (
+          <TransactionDetail
+            txn={txn}
+            account={account}
+            category={category}
+            originalCategory={originalCategory}
+            interactive={expanded}
+            onEdit={onEdit}
+            onCreateRule={onCreateRule}
+            onMarkRecurring={onMarkRecurring}
+            onToggleTransfer={onToggleTransfer}
+            onToggleIgnored={onToggleIgnored}
+            onToggleMhaEligible={onToggleMhaEligible}
+            onDelete={onDelete}
+            onResetField={onResetField}
+            onViewRule={onViewRule}
+            mhaTrackerEnabled={mhaTrackerEnabled}
+          />
+        ) : (
+          <div className="txn-detail" />
+        )}
       </div>
     </li>
   );
-}
+});
 
 function TransactionMerchantMark({ txn, category, onLogoChanged }) {
   const logo = txn.merchant_logo;

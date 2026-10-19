@@ -2050,7 +2050,7 @@ export default function Settings({
                       setGoogleDriveBusy(true);
                       try {
                         await restoreBackupFromGoogleDrive();
-                        alert('Database restored successfully from Google Drive! Reloading...', { title: 'Restore Complete' });
+                        await alert('Database restored successfully from Google Drive! Reloading...', { title: 'Restore Complete' });
                         window.location.reload();
                       } catch (err) {
                         alert(err.message || 'Google Drive restore failed.');
@@ -2123,7 +2123,7 @@ export default function Settings({
                   if (!ok) return;
                   try {
                     await restoreFromFile(f);
-                    alert('Database restored successfully! Reloading...');
+                    await alert('Database restored successfully! Reloading...');
                     window.location.reload();
                   } catch (err) {
                     alert(err.message || 'Restore failed.');
@@ -2174,7 +2174,7 @@ export default function Settings({
 
           setStorageMode(STORAGE_MODE_SELF_HOSTED);
           setSwitchModeModalOpen(false);
-          alert('Switched to Self-Hosted server mode successfully! Reloading...');
+          await alert('Switched to Self-Hosted server mode successfully! Reloading...');
           window.location.reload();
         } else {
           if (migrateDataOnSwitch) {
@@ -2188,7 +2188,7 @@ export default function Settings({
 
           setStorageMode(STORAGE_MODE_LOCAL);
           setSwitchModeModalOpen(false);
-          alert('Switched to Local First mode successfully! Reloading...');
+          await alert('Switched to Local First mode successfully! Reloading...');
           window.location.reload();
         }
       } catch (err) {

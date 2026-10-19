@@ -4,9 +4,13 @@ import MoreDotsIcon from './MoreDotsIcon.jsx';
 import { getPrimaryRoutes } from '../navigation.js';
 import { triggerHaptic } from '../lib/haptics.js';
 
-export default function BottomTabs({ onMoreClick }) {
+export default function BottomTabs({
+  onMoreClick,
+  mhaTrackerEnabled = false,
+  navigationPreferences
+}) {
   const location = useLocation();
-  const primaryTabs = getPrimaryRoutes();
+  const primaryTabs = getPrimaryRoutes({ mhaTrackerEnabled, navigationPreferences });
   const currentIndex = primaryTabs.findIndex((tab) => tab.path === location.pathname);
 
   return (
@@ -25,8 +29,10 @@ export default function BottomTabs({ onMoreClick }) {
             `bottom-tab ${isActive ? 'active' : ''}`
           }
         >
-          <AppIcon name={t.icon} className="bottom-tab-icon" />
-          <span>{t.label}</span>
+          <span className="bottom-tab-pill">
+            <AppIcon name={t.icon} className="bottom-tab-icon" />
+          </span>
+          <span className="bottom-tab-label">{t.label}</span>
         </NavLink>
       ))}
       <button
@@ -38,8 +44,10 @@ export default function BottomTabs({ onMoreClick }) {
         }}
         aria-label="Open more menu"
       >
-        <MoreDotsIcon className="bottom-tab-icon" />
-        <span>More</span>
+        <span className="bottom-tab-pill">
+          <MoreDotsIcon className="bottom-tab-icon" />
+        </span>
+        <span className="bottom-tab-label">More</span>
       </button>
     </nav>
   );

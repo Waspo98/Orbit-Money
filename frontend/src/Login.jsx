@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import BrandLogo from './components/BrandLogo.jsx';
 import { APP_ICON_192 } from './brandAssets.js';
-import { isNativeApp, getServerUrl, setServerUrl, normalizeServerUrl, resolveApiUrl } from './serverConfig.js';
+import { isNativeApp, getServerUrl, setServerUrl, normalizeServerUrl, resolveApiUrl, setStorageMode, STORAGE_MODE_LOCAL } from './serverConfig.js';
 import { openInAppBrowser, closeInAppBrowser, onAppUrlOpen } from './nativeApp.js';
 
 export default function Login({ onLogin }) {
@@ -217,6 +217,19 @@ export default function Login({ onLogin }) {
                 </button>
               </div>
             )}
+            <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+              <button
+                type="button"
+                className="btn-ghost"
+                style={{ fontSize: '0.82rem' }}
+                onClick={() => {
+                  setStorageMode(STORAGE_MODE_LOCAL);
+                  onLogin();
+                }}
+              >
+                Use Offline Local Storage Instead
+              </button>
+            </div>
           </div>
         )}
 

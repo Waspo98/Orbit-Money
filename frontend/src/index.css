@@ -107,6 +107,28 @@
   --dur-base:          0.18s;
   --dur-slow:          0.28s;
 
+  /* Material 3 Expressive — Spatial Springs (position, scale, corner morphing) */
+  --spring-spatial-fast: linear(
+    0, 0.452 7.8%, 0.803 16.1%, 1.008 24.8%, 1.082 33.4%,
+    1.074 43.2%, 1.031 56.4%, 1.004 71%, 1
+  );
+  --spring-spatial-default: linear(
+    0, 0.366 8.2%, 0.695 16.8%, 0.929 25.6%, 1.045 34.6%,
+    1.069 44.2%, 1.042 56.2%, 1.011 70.4%, 1
+  );
+  --spring-spatial-slow: linear(
+    0, 0.324 8.5%, 0.635 17.5%, 0.869 26.8%, 0.999 36.4%,
+    1.044 46.8%, 1.034 58.6%, 1.01 72.4%, 1
+  );
+  --dur-spring-fast:    320ms;
+  --dur-spring-default: 420ms;
+  --dur-spring-slow:    540ms;
+
+  /* Material 3 Expressive — Effects Springs (opacity, color, elevation — zero overshoot) */
+  --spring-effects:     cubic-bezier(0.2, 0, 0, 1);
+  --dur-effects-fast:   150ms;
+  --dur-effects-default: 240ms;
+
   --font-sans:         'Inter Tight', -apple-system, BlinkMacSystemFont, 'Segoe UI',
                        Roboto, Helvetica, sans-serif;
   --font-title:        'DM Sans', var(--font-sans);
@@ -273,17 +295,18 @@ body.drag-interaction-lock {
 }
 
 body.login-scroll-lock {
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: none;
 }
 
 #root { min-height: 100vh; min-height: 100dvh; }
 
+/* Eliminating whole-tree #root blur for 60/120Hz mobile WebView performance */
 body.modal-page-blur-active #root {
-  filter: blur(5px);
-  transition: filter var(--dur-base) var(--ease-out);
+  /* intentionally empty; overlays use backdrop-filter */
 }
 
 a { color: var(--accent); text-decoration: none; transition: color var(--dur-fast); }
@@ -329,7 +352,11 @@ input, textarea, select {
   cursor: pointer;
   white-space: nowrap;
   box-shadow: var(--shadow-sm);
-  transition: background-color var(--dur-fast), transform var(--dur-fast), box-shadow var(--dur-fast);
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    border-radius var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects),
+    box-shadow var(--dur-effects-fast) var(--spring-effects);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -337,7 +364,11 @@ input, textarea, select {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
-.btn-primary:active:not(:disabled) { transform: translateY(0); box-shadow: var(--shadow-sm); }
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.95);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-secondary {
@@ -354,9 +385,18 @@ input, textarea, select {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    border-radius var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects),
+    border-color var(--dur-effects-fast) var(--spring-effects),
+    color var(--dur-effects-fast) var(--spring-effects);
 }
 .btn-secondary:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
+.btn-secondary:active:not(:disabled) {
+  transform: scale(0.95);
+  border-radius: 12px;
+}
 .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .btn-danger {
@@ -373,9 +413,17 @@ input, textarea, select {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color var(--dur-fast), color var(--dur-fast);
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    border-radius var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects),
+    color var(--dur-effects-fast) var(--spring-effects);
 }
 .btn-danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
+.btn-danger:active:not(:disabled) {
+  transform: scale(0.95);
+  border-radius: 12px;
+}
 
 .btn-ghost {
   background: transparent;
@@ -385,9 +433,13 @@ input, textarea, select {
   border-radius: var(--radius-sm);
   font-size: 0.9rem;
   cursor: pointer;
-  transition: background-color var(--dur-fast), color var(--dur-fast);
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects),
+    color var(--dur-effects-fast) var(--spring-effects);
 }
 .btn-ghost:hover { background: var(--surface-hover); color: var(--text); }
+.btn-ghost:active { transform: scale(0.95); }
 
 .btn-icon {
   width: 40px;
@@ -400,9 +452,17 @@ input, textarea, select {
   border-radius: var(--radius-md);
   color: var(--text-muted);
   cursor: pointer;
-  transition: background-color var(--dur-fast), color var(--dur-fast);
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    border-radius var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects),
+    color var(--dur-effects-fast) var(--spring-effects);
 }
 .btn-icon:hover { background: var(--surface-hover); color: var(--text); }
+.btn-icon:active:not(:disabled) {
+  transform: scale(0.9);
+  border-radius: 16px;
+}
 .btn-icon.active { background: var(--accent-soft); color: var(--accent); }
 
 .app-icon {
@@ -800,12 +860,12 @@ input, textarea, select {
   max-height: 90vh;
   max-height: 90dvh;
   overflow-y: auto;
-  animation: modalIn var(--dur-base) var(--ease-out);
+  animation: modalIn var(--dur-spring-default) var(--spring-spatial-default);
   scrollbar-gutter: stable;
 }
 
 .modal.modal-zoom {
-  animation: modalZoomIn var(--dur-base) var(--ease-out);
+  animation: modalZoomIn var(--dur-spring-fast) var(--spring-spatial-fast);
 }
 
 .modal-sm {
@@ -878,6 +938,41 @@ input, textarea, select {
 }
 .modal.closing-zoom {
   animation: modalZoomOut var(--dur-base) var(--ease-in-out) forwards;
+}
+
+@media (max-width: 640px) {
+  .modal-backdrop:has(.modal:not(.modal-zoom):not(.modal-sm)) {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal:not(.modal-zoom):not(.modal-sm) {
+    max-width: 100%;
+    border-radius: 28px 28px 0 0;
+    max-height: 90vh;
+    max-height: 90dvh;
+    padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+    animation: modalSheetIn var(--dur-spring-default) var(--spring-spatial-default);
+  }
+
+  .modal:not(.modal-zoom):not(.modal-sm).closing {
+    animation: modalSheetOut var(--dur-base) var(--ease-in-out) forwards;
+  }
+
+  .modal:not(.modal-zoom):not(.modal-sm) .modal-actions {
+    margin: 24px -20px calc(-24px - env(safe-area-inset-bottom, 0px));
+    padding: 14px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+    border-radius: 0;
+  }
+}
+
+@keyframes modalSheetIn {
+  from { opacity: 0; transform: translateY(48px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes modalSheetOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(48px) scale(0.98); }
 }
 
 
@@ -1599,35 +1694,28 @@ input, textarea, select {
   inset: 0;
   background: rgba(10, 20, 16, 0.5);
   opacity: 0;
-  backdrop-filter: blur(0);
-  -webkit-backdrop-filter: blur(0);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 150;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  transition:
-    opacity var(--dur-base) var(--ease-out),
-    backdrop-filter var(--dur-base) var(--ease-out),
-    -webkit-backdrop-filter var(--dur-base) var(--ease-out);
+  transition: opacity var(--dur-base) var(--ease-out);
 }
 
 .more-sheet-backdrop.open {
   opacity: 1;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 .more-sheet-backdrop.closing {
   opacity: 0;
-  backdrop-filter: blur(0);
-  -webkit-backdrop-filter: blur(0);
 }
 
 .more-sheet {
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: 28px 28px 0 0;
   box-shadow: var(--shadow-xl);
   width: 100%;
   max-height: 92vh;
@@ -1635,7 +1723,9 @@ input, textarea, select {
   overflow: hidden;
   padding: 12px 0 0;
   touch-action: pan-y;
-  transition: transform var(--dur-base) var(--ease-out);
+  transition:
+    transform var(--dur-spring-default) var(--spring-spatial-default),
+    border-radius var(--dur-spring-fast) var(--spring-spatial-fast);
   will-change: transform;
 }
 
@@ -1683,6 +1773,18 @@ input, textarea, select {
   opacity: 0.6;
   cursor: grab;
   touch-action: none;
+  transition:
+    width var(--dur-spring-fast) var(--spring-spatial-fast),
+    height var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects),
+    opacity var(--dur-effects-fast) var(--spring-effects);
+}
+
+.more-sheet.dragging .more-sheet-handle {
+  width: 48px;
+  height: 6px;
+  background: var(--accent);
+  opacity: 1;
 }
 
 .more-sheet-scroll {
@@ -2186,10 +2288,9 @@ input, textarea, select {
   }
 
   .route-transition {
-    animation-duration: 280ms;
-    animation-timing-function: var(--ease-out);
+    animation-duration: var(--dur-spring-default);
+    animation-timing-function: var(--spring-spatial-default);
     animation-fill-mode: both;
-    will-change: transform, opacity;
   }
 
   .route-transition-forward {
@@ -2216,6 +2317,11 @@ input, textarea, select {
   .login-title .brand-logo {
     animation: none !important;
   }
+
+  .dashboard-card,
+  .more-card {
+    animation: none !important;
+  }
 }
 
 @keyframes routeSlideInFromRight {
@@ -2231,6 +2337,25 @@ input, textarea, select {
 @keyframes routeSlideInFromBottom {
   from { opacity: 0.92; transform: translateY(42px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes m3SurfaceRise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dashboard-card {
+  animation: m3SurfaceRise var(--dur-spring-default) var(--spring-spatial-default) both;
+}
+
+.more-card {
+  animation: m3SurfaceRise var(--dur-spring-fast) var(--spring-spatial-fast) both;
 }
 
 /* Tablet: 640–1079px. Adds side padding so content doesn't sprawl full-width
@@ -2307,11 +2432,58 @@ input, textarea, select {
   outline: none;
 }
 
+.bottom-tab-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  z-index: 1;
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    border-radius var(--dur-spring-fast) var(--spring-spatial-fast);
+}
+
+.bottom-tab-pill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent-soft);
+  border-radius: inherit;
+  opacity: 0;
+  transform: scaleX(0.45) scaleY(0.75);
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    opacity var(--dur-effects-fast) var(--spring-effects),
+    border-radius var(--dur-spring-fast) var(--spring-spatial-fast);
+  z-index: -1;
+}
+
+.bottom-tab:active .bottom-tab-pill {
+  transform: scale(0.9);
+  border-radius: 10px;
+}
+
+.bottom-tab.active .bottom-tab-pill::before {
+  opacity: 1;
+  transform: scaleX(1) scaleY(1);
+}
+
+.bottom-tab.active {
+  color: var(--accent);
+}
+
+.bottom-tab.active .bottom-tab-icon {
+  transform: translateY(-1px) scale(1.08);
+}
+
 .bottom-tab-icon {
   font-size: 1.32rem;
   font-weight: 600;
   line-height: 1;
-  transition: transform var(--dur-base) var(--ease-out);
+  transition: transform var(--dur-spring-fast) var(--spring-spatial-fast);
 }
 
 .bottom-tab-icon.app-icon {
@@ -2319,19 +2491,14 @@ input, textarea, select {
   height: 22px;
 }
 
-.bottom-tab.active { color: var(--accent); }
-.bottom-tab.active .bottom-tab-icon { transform: scale(1.05); }
+.bottom-tab-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  transition: color var(--dur-effects-fast) var(--spring-effects), font-weight var(--dur-effects-fast) var(--spring-effects);
+}
 
-.bottom-tab.active::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 32px;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 0 0 2px 2px;
+.bottom-tab.active .bottom-tab-label {
+  font-weight: 600;
 }
 
 @media (min-width: 1080px) { .bottom-tabs { display: none; } }
@@ -2784,6 +2951,15 @@ input, textarea, select {
   transform:
     translate(0, 0)
     scale(1);
+}
+
+.page-hero:not(.page-hero-morphing) h2 {
+  transform: scale(calc(1 - var(--hero-scroll-progress, 0) * 0.06));
+  font-variation-settings: 'opsz' 32, 'wght' 700;
+}
+
+.page-hero:not(.page-hero-morphing) .page-hero-main p {
+  opacity: calc(1 - var(--hero-scroll-progress, 0) * 0.4);
 }
 
 .page-hero-collapsed-slot {
@@ -7464,19 +7640,30 @@ input, textarea, select {
   color: var(--text);
   text-align: left;
   cursor: pointer;
-  transition: background-color var(--dur-fast), border-color var(--dur-fast), transform var(--dur-fast);
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    border-radius var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects),
+    border-color var(--dur-effects-fast) var(--spring-effects);
 }
 
 .selectable-list-item:hover,
-.selectable-list-item:focus,
-.selectable-list-item.active {
+.selectable-list-item:focus {
   border-color: transparent;
   background: var(--accent-soft);
   outline: none;
 }
 
+.selectable-list-item.active {
+  border-color: transparent;
+  background: var(--accent-soft);
+  border-radius: 16px;
+  outline: none;
+}
+
 .selectable-list-item:active {
-  transform: translateY(1px);
+  transform: scale(0.98);
+  border-radius: 14px;
 }
 
 .selectable-list-leading {
@@ -8573,13 +8760,16 @@ body.modal-page-blur-active .txn-pinned-month-header {
      since those only change when collapsing into/out of the card style. */
   transition:
     background-color var(--dur-fast),
-    margin var(--dur-fast) var(--ease-out, ease),
-    padding var(--dur-fast) var(--ease-out, ease),
     transform var(--dur-fast) var(--ease-out, ease),
     box-shadow 220ms var(--ease-out, ease),
     border-color var(--dur-fast) var(--ease-out, ease),
     border-radius 220ms var(--ease-out, ease);
   -webkit-tap-highlight-color: transparent;
+}
+
+.txn-row:not(.expanded) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 72px;
 }
 
 .txn-row:has(.txn-logo-menu) {
@@ -11568,10 +11758,12 @@ body.modal-page-blur-active .txn-pinned-month-header {
   align-items: flex-start;
   gap: 12px;
   transition:
-    background-color var(--dur-fast),
-    border-color var(--dur-fast),
-    color var(--dur-fast),
-    box-shadow var(--dur-fast);
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    border-radius var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects),
+    border-color var(--dur-effects-fast) var(--spring-effects),
+    color var(--dur-effects-fast) var(--spring-effects),
+    box-shadow var(--dur-effects-fast) var(--spring-effects);
 }
 
 .choice-card:hover,
@@ -11580,12 +11772,35 @@ body.modal-page-blur-active .txn-pinned-month-header {
   background: var(--surface-3);
 }
 
+.choice-card:active:not(:disabled),
+.settings-theme-option:active:not(:disabled) {
+  transform: scale(0.97);
+  border-radius: 12px;
+}
+
 .choice-card.active,
 .settings-theme-option.active {
   color: var(--text);
   background: var(--surface);
   border-color: var(--accent);
+  border-radius: 14px;
   box-shadow: var(--shadow-sm);
+}
+
+@keyframes m3CheckPop {
+  from {
+    transform: scale(0.4) rotate(-35deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.selectable-list-check,
+.choice-card-check {
+  animation: m3CheckPop var(--dur-spring-fast) var(--spring-spatial-fast) both;
 }
 
 .choice-card:disabled,

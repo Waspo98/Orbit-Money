@@ -42,7 +42,7 @@ export function getStorageMode() {
   if (stored === STORAGE_MODE_LOCAL || stored === STORAGE_MODE_SELF_HOSTED) {
     return stored;
   }
-  return STORAGE_MODE_LOCAL;
+  return isNativeApp() ? STORAGE_MODE_LOCAL : STORAGE_MODE_SELF_HOSTED;
 }
 
 export function setStorageMode(mode) {

@@ -1,3 +1,5 @@
+import { triggerHaptic } from '../lib/haptics.js';
+
 export default function SegmentedControl({
   options,
   value,
@@ -41,7 +43,10 @@ export default function SegmentedControl({
             aria-pressed={!usesTabs && !usesRadio ? active : undefined}
             disabled={disabled}
             onClick={() => {
-              if (!disabled) onChange?.(optionValue, option);
+              if (!disabled) {
+                triggerHaptic('selection');
+                onChange?.(optionValue, option);
+              }
             }}
           >
             {subtitle ? (

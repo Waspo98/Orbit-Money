@@ -141,8 +141,31 @@ export default function PageHero({
   statLabel
 }) {
   const hasHeroStats = stats.length > 0 || !!statsExtra;
+  const sectionRef = useRef(null);
   const staticInnerRef = useRef(null);
   const staticTitleRef = useRef(null);
+
+  useEffect(() => {
+    let frameId = null;
+    function onScroll() {
+      if (frameId != null) return;
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+        if (sectionRef.current) {
+          const progress = Math.min(1, Math.max(0, window.scrollY / 110));
+          sectionRef.current.style.setProperty('--hero-scroll-progress', progress.toFixed(3));
+        }
+      });
+    }
+
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      if (frameId != null) window.cancelAnimationFrame(frameId);
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, []);
+
   const hero = controlledHero || {
     progress: 0,
     height: null,
@@ -164,6 +187,7 @@ export default function PageHero({
   return (
     <>
       <section
+        ref={sectionRef}
         className={`page-hero page-hero-${variant} ${controlledHero ? 'page-hero-morphing' : ''} ${hasHeroStats ? '' : 'page-hero-plain'}`}
         aria-labelledby={id}
         style={{

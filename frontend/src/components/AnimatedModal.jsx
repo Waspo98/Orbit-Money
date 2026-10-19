@@ -33,6 +33,7 @@ export default function AnimatedModal({
   size = 'md',
   animation = 'default',
   initialInteractionDelayMs = 0,
+  title,
   children
 }) {
   const [closing, setClosing] = useState(false);
@@ -137,6 +138,7 @@ export default function AnimatedModal({
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
+        {title && <h3>{title}</h3>}
         {typeof children === 'function' ? children({ close }) : children}
       </div>
     </div>

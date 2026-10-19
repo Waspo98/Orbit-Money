@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { triggerHaptic } from '../lib/haptics.js';
 
 export default function AppRangeSlider({
   value,
@@ -15,7 +16,7 @@ export default function AppRangeSlider({
     const tickValue = Math.round(numericValue / tickSize);
     if (lastTickRef.current !== tickValue) {
       lastTickRef.current = tickValue;
-      if (navigator.vibrate) navigator.vibrate(8);
+      triggerHaptic('selection');
     }
   }
 

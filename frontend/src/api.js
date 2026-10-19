@@ -7,7 +7,6 @@ import {
 
 import { CapacitorHttp } from '@capacitor/core';
 import { isNativeApp, resolveApiUrl, getStorageMode, STORAGE_MODE_LOCAL } from './serverConfig.js';
-import { handleLocalApiRequest } from './db/localApi.js';
 
 const NATIVE_COOKIE_KEY = 'orbit_native_session_cookie';
 
@@ -49,11 +48,24 @@ function offlineReadOnlyError() {
 }
 
 function isNetworkFailure(err) {
-  return err instanceof TypeError || err?.name === 'TypeError';
+  if (err instanceof TypeError || err?.name === 'TypeError') return true;
+  if (isOffline()) return true;
+  const msg = String(err?.message || err || '').toLowerCase();
+  return (
+    !err?.status &&
+    (msg.includes('unable to resolve host') ||
+      msg.includes('failed to connect') ||
+      msg.includes('network') ||
+      msg.includes('timeout') ||
+      msg.includes('econnrefused') ||
+      msg.includes('socket') ||
+      msg.includes('offline'))
+  );
 }
 
 async function request(path, options = {}) {
   if (!options.directRemote && getStorageMode() === STORAGE_MODE_LOCAL) {
+    const { handleLocalApiRequest } = await import('./db/localApi.js');
     return handleLocalApiRequest(path, options);
   }
 
@@ -162,9 +174,9 @@ async function request(path, options = {}) {
 
   if (method === 'GET') {
     if (path === '/api/auth/me') {
-      await saveValidatedSession(data);
+      void saveValidatedSession(data);
     } else {
-      await cacheGetResponse(path, data);
+      void cacheGetResponse(path, data);
     }
   }
 

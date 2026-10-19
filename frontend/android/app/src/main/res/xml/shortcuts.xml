@@ -8,8 +8,8 @@
         android:shortcutLongLabel="@string/shortcut_add_transaction_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="${applicationId}"
-            android:targetClass="app.orbitmoney.client.MainActivity"
+            android:targetPackage="app.overbay.orbit"
+            android:targetClass="app.overbay.orbit.MainActivity"
             android:data="orbitmoney://action/add-transaction" />
     </shortcut>
     <shortcut
@@ -20,8 +20,8 @@
         android:shortcutLongLabel="@string/shortcut_budgets_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="${applicationId}"
-            android:targetClass="app.orbitmoney.client.MainActivity"
+            android:targetPackage="app.overbay.orbit"
+            android:targetClass="app.overbay.orbit.MainActivity"
             android:data="orbitmoney://action/budgets" />
     </shortcut>
     <shortcut
@@ -32,8 +32,8 @@
         android:shortcutLongLabel="@string/shortcut_accounts_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="${applicationId}"
-            android:targetClass="app.orbitmoney.client.MainActivity"
+            android:targetPackage="app.overbay.orbit"
+            android:targetClass="app.overbay.orbit.MainActivity"
             android:data="orbitmoney://action/accounts" />
     </shortcut>
 </shortcuts>

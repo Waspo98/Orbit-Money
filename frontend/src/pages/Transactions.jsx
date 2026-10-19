@@ -79,7 +79,20 @@ function formatShortAmount(amount) {
   return formatCurrency(amount, { maximumFractionDigits: 0 });
 }
 
-function groupByMonth(items, countsByMonth = {}) {
+function groupByMonth(items, countsByMonth = {}, sort = 'date_desc') {
+  if (!items.length) return [];
+  if (sort && sort !== 'date_desc' && sort !== 'date_asc') {
+    const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label || 'Sorted';
+    return [
+      {
+        id: `sorted-${sort}`,
+        key: `sorted-${sort}`,
+        label: `Sorted by ${sortLabel}`,
+        count: items.length,
+        items
+      }
+    ];
+  }
   const groups = [];
   let current = null;
   for (const item of items) {
@@ -232,6 +245,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   const [simpleFinSyncState, setSimpleFinSyncState] = useState('idle');
   const groupRefs = useRef(new Map());
   const floatingHeaderRef = useRef(null);
+  const pinnedTranslateYRef = useRef(0);
   const [pinnedMonth, setPinnedMonth] = useState(null);
 
   // Local (debounced) search input - keeps typing snappy, writes to URL
@@ -297,8 +311,12 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  const latestFiltersRef = useRef(filters);
+  latestFiltersRef.current = filters;
+
   useEffect(() => () => {
     if (syncResetRef.current) window.clearTimeout(syncResetRef.current);
+    if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
   }, []);
 
   // ---------- URL writers ----------
@@ -317,7 +335,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     setSearchLocal(value);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
-      commitFilters({ ...filters, q: value.trim() }, { scrollTop: false });
+      commitFilters({ ...latestFiltersRef.current, q: value.trim() }, { scrollTop: false });
     }, 350);
   }
 
@@ -496,8 +514,8 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   const activeCount = countActiveFilters(filters);
   const isFiltered = activeCount > 0;
   const groups = useMemo(
-    () => groupByMonth(items, monthCounts),
-    [items, monthCounts]
+    () => groupByMonth(items, monthCounts, filters.sort),
+    [items, monthCounts, filters.sort]
   );
 
   useEffect(() => {
@@ -550,13 +568,17 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           ? Math.min(0, nextTop - headerHeight)
           : 0;
 
+      pinnedTranslateYRef.current = translateY;
+      if (floatingHeaderRef.current) {
+        floatingHeaderRef.current.style.transform = `translate3d(0, ${translateY}px, 0)`;
+      }
+
       const nextPinnedMonth = {
         key: group.id,
         label: group.label,
         count: group.count,
         left: rect.left,
-        width: rect.width,
-        translateY
+        width: rect.width
       };
 
       setPinnedMonth((prev) =>
@@ -564,8 +586,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         prev.key === nextPinnedMonth.key &&
         prev.count === nextPinnedMonth.count &&
         Math.abs(prev.left - nextPinnedMonth.left) < 0.5 &&
-        Math.abs(prev.width - nextPinnedMonth.width) < 0.5 &&
-        Math.abs(prev.translateY - nextPinnedMonth.translateY) < 0.5
+        Math.abs(prev.width - nextPinnedMonth.width) < 0.5
           ? prev
           : nextPinnedMonth
       );
@@ -712,7 +733,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           style={{
             left: `${pinnedMonth.left}px`,
             width: `${pinnedMonth.width}px`,
-            transform: `translateY(${pinnedMonth.translateY}px)`
+            transform: `translate3d(0, ${pinnedTranslateYRef.current}px, 0)`
           }}
           aria-hidden="true"
         >

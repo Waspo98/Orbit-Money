@@ -11,19 +11,27 @@ let activeDb = null;
 let saveTimeout = null;
 let isDirty = false;
 
+let idbPromise = null;
+
 function openIdb() {
   if (typeof indexedDB === 'undefined') return Promise.resolve(null);
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(IDB_NAME, 1);
-    request.onupgradeneeded = () => {
-      const idb = request.result;
-      if (!idb.objectStoreNames.contains(IDB_STORE)) {
-        idb.createObjectStore(IDB_STORE);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  if (!idbPromise) {
+    idbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(IDB_NAME, 1);
+      request.onupgradeneeded = () => {
+        const idb = request.result;
+        if (!idb.objectStoreNames.contains(IDB_STORE)) {
+          idb.createObjectStore(IDB_STORE);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => {
+        idbPromise = null;
+        reject(request.error);
+      };
+    });
+  }
+  return idbPromise;
 }
 
 async function loadPersistedBytes() {
@@ -79,6 +87,17 @@ export async function flushDatabase() {
   } catch (err) {
     console.error('Failed to flush local SQLite database:', err);
   }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      void flushDatabase();
+    }
+  });
+  window.addEventListener('pagehide', () => {
+    void flushDatabase();
+  });
 }
 
 function runDatabaseMigrations(db) {

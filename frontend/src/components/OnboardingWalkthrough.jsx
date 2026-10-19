@@ -8,10 +8,13 @@ import {
   isNativeApp
 } from '../serverConfig.js';
 import { api } from '../api.js';
+import { setBiometricLockEnabled } from '../lib/biometrics.js';
 
 export default function OnboardingWalkthrough({ onComplete }) {
   const [currentPage, setCurrentPage] = useState(0);
-  const [selectedMode, setSelectedMode] = useState(STORAGE_MODE_LOCAL);
+  const [selectedMode, setSelectedMode] = useState(
+    isNativeApp() ? STORAGE_MODE_LOCAL : STORAGE_MODE_SELF_HOSTED
+  );
   const [customServerUrl, setCustomServerUrl] = useState(getServerUrl() || '');
   const [serverTesting, setServerTesting] = useState(false);
   const [serverTestStatus, setServerTestStatus] = useState(null); // { ok: bool, message: string }
@@ -56,7 +59,7 @@ export default function OnboardingWalkthrough({ onComplete }) {
       setServerUrl(customServerUrl);
     }
     if (biometricsEnabled) {
-      localStorage.setItem('orbit_biometrics_enabled', 'true');
+      setBiometricLockEnabled(true);
     }
     onComplete();
   };

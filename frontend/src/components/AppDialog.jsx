@@ -10,6 +10,58 @@ function normalizeInteractionDelay(options = {}) {
   return Number.isFinite(delay) && delay > 0 ? delay : 0;
 }
 
+function AppDialogModal({ dialog, onClose }) {
+  const resultRef = useRef(false);
+
+  useEffect(() => {
+    resultRef.current = false;
+  }, [dialog]);
+
+  if (!dialog) return null;
+
+  return (
+    <AnimatedModal
+      onClose={() => onClose(resultRef.current)}
+      size="sm"
+      animation="zoom"
+      initialInteractionDelayMs={dialog.interactionDelayMs}
+    >
+      {({ close: closeModal }) => {
+        function finish(result, options = {}) {
+          resultRef.current = result;
+          closeModal(options.animate ? { animate: true } : {});
+        }
+
+        return (
+          <>
+            <h3>{dialog.title}</h3>
+            <p className="modal-copy">{dialog.message}</p>
+            <div className="modal-actions">
+              {dialog.type === 'confirm' && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => finish(false)}
+                >
+                  {dialog.cancelLabel}
+                </button>
+              )}
+              <button
+                type="button"
+                className={dialog.destructive ? 'btn-danger' : 'btn-primary'}
+                onClick={() => finish(true, { animate: true })}
+                autoFocus
+              >
+                {dialog.confirmLabel}
+              </button>
+            </div>
+          </>
+        );
+      }}
+    </AnimatedModal>
+  );
+}
+
 export function useAppDialog() {
   const [dialog, setDialog] = useState(null);
 
@@ -48,60 +100,10 @@ export function useAppDialog() {
     });
   }, []);
 
-  function Dialog() {
-    const resultRef = useRef(false);
-
-    useEffect(() => {
-      resultRef.current = false;
-    }, [dialog]);
-
-    if (!dialog) return null;
-
-    return (
-      <AnimatedModal
-        onClose={() => close(resultRef.current)}
-        size="sm"
-        initialInteractionDelayMs={dialog.interactionDelayMs}
-      >
-        {({ close: closeModal }) => {
-          function finish(result, options = {}) {
-            resultRef.current = result;
-            closeModal(options.animate ? { animate: true } : {});
-          }
-
-          return (
-            <>
-              <h3>{dialog.title}</h3>
-              <p className="modal-copy">{dialog.message}</p>
-              <div className="modal-actions">
-                {dialog.type === 'confirm' && (
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => {
-                      finish(false);
-                    }}
-                  >
-                    {dialog.cancelLabel}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className={dialog.destructive ? 'btn-danger' : 'btn-primary'}
-                  onClick={() => {
-                    finish(true, { animate: true });
-                  }}
-                  autoFocus
-                >
-                  {dialog.confirmLabel}
-                </button>
-              </div>
-            </>
-          );
-        }}
-      </AnimatedModal>
-    );
-  }
+  const Dialog = useCallback(
+    () => <AppDialogModal dialog={dialog} onClose={close} />,
+    [dialog, close]
+  );
 
   return { alert, confirm, Dialog };
 }

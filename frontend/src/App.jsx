@@ -422,6 +422,9 @@ function AppShell() {
   useEffect(() => {
     initNativeApp({
       onBackButton: () => {
+        if (biometricLocked) {
+          return true;
+        }
         if (moreOpen) {
           setMoreOpen(false);
           return true;
@@ -436,7 +439,7 @@ function AppShell() {
         return false;
       }
     });
-  }, [moreOpen, location.pathname, navigate]);
+  }, [biometricLocked, moreOpen, location.pathname, navigate]);
 
   async function checkAuth({ refreshLookups = false } = {}) {
     try {
@@ -507,16 +510,19 @@ function AppShell() {
 
   useEffect(() => {
     if (authState !== 'in' || !lookupsReady || !isOnline || offlineRoutesPreloadedRef.current) {
-      return;
+      return undefined;
     }
-    offlineRoutesPreloadedRef.current = true;
-    Promise.allSettled(OFFLINE_ROUTE_PRELOADS.map((load) => load())).then((results) => {
-      const failed = results.filter((result) => result.status === 'rejected');
-      if (failed.length > 0) {
-        offlineRoutesPreloadedRef.current = false;
-        console.warn('Offline route preload failed:', failed.map((result) => result.reason));
-      }
-    });
+    const timer = window.setTimeout(() => {
+      offlineRoutesPreloadedRef.current = true;
+      Promise.allSettled(OFFLINE_ROUTE_PRELOADS.map((load) => load())).then((results) => {
+        const failed = results.filter((result) => result.status === 'rejected');
+        if (failed.length > 0) {
+          offlineRoutesPreloadedRef.current = false;
+          console.warn('Offline route preload failed:', failed.map((result) => result.reason));
+        }
+      });
+    }, 2500);
+    return () => window.clearTimeout(timer);
   }, [authState, isOnline, lookupsReady]);
 
   useEffect(() => {
@@ -768,7 +774,11 @@ function AppShell() {
         )}
       </main>
 
-      <BottomTabs onMoreClick={() => setMoreOpen(true)} />
+      <BottomTabs
+        onMoreClick={() => setMoreOpen(true)}
+        mhaTrackerEnabled={mhaTrackerEnabled}
+        navigationPreferences={navigationPreferences}
+      />
 
       <MoreSheet
         open={moreOpen}

@@ -44,6 +44,7 @@ import {
 } from '../lib/localDate.js';
 import { sortCategoriesByName } from '../lib/categorySort.js';
 import { USER_PREFERENCE_KEYS } from '../userPreferences.js';
+import { triggerHaptic } from '../lib/haptics.js';
 
 // ============================================================================
 // Dashboard - v16
@@ -109,28 +110,34 @@ function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-function useAnimatedNumber(value, duration = 700) {
+function AnimatedMoney({
+  as: Component = 'span',
+  value,
+  formatter = formatCurrency,
+  className = '',
+  duration = 700
+}) {
   const target = Number(value) || 0;
-  const [displayValue, setDisplayValue] = useState(() =>
-    prefersReducedMotion() ? target : 0
-  );
-  const previousTargetRef = useRef(target);
-  const mountedRef = useRef(false);
+  const nodeRef = useRef(null);
+  const previousTargetRef = useRef(prefersReducedMotion() ? target : 0);
+  const formatterRef = useRef(formatter);
+  formatterRef.current = formatter;
 
   useEffect(() => {
+    const node = nodeRef.current;
+    if (!node) return undefined;
+
     if (prefersReducedMotion()) {
       previousTargetRef.current = target;
-      mountedRef.current = true;
-      setDisplayValue(target);
+      node.textContent = formatterRef.current(target);
       return undefined;
     }
 
-    const from = mountedRef.current ? previousTargetRef.current : 0;
+    const from = previousTargetRef.current;
     previousTargetRef.current = target;
-    mountedRef.current = true;
 
     if (from === target) {
-      setDisplayValue(target);
+      node.textContent = formatterRef.current(target);
       return undefined;
     }
 
@@ -140,8 +147,10 @@ function useAnimatedNumber(value, duration = 700) {
     function step(now) {
       const progress = Math.min(1, (now - startedAt) / duration);
       const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(from + (target - from) * eased);
-
+      const current = from + (target - from) * eased;
+      if (nodeRef.current) {
+        nodeRef.current.textContent = formatterRef.current(current);
+      }
       if (progress < 1) {
         frameId = window.requestAnimationFrame(step);
       }
@@ -151,20 +160,9 @@ function useAnimatedNumber(value, duration = 700) {
     return () => window.cancelAnimationFrame(frameId);
   }, [duration, target]);
 
-  return displayValue;
-}
-
-function AnimatedMoney({
-  as: Component = 'span',
-  value,
-  formatter = formatCurrency,
-  className = ''
-}) {
-  const animatedValue = useAnimatedNumber(value);
-
   return (
-    <Component className={className}>
-      {formatter(animatedValue)}
+    <Component ref={nodeRef} className={className}>
+      {formatter(prefersReducedMotion() ? target : previousTargetRef.current)}
     </Component>
   );
 }
@@ -265,7 +263,8 @@ function retirementProjection(householdData, preferences) {
   const currentBalance = Number(summary.retirement_account_balance) || 0;
   const monthlyContributions =
     ((Number(summary.employee_retirement_annual) || 0) +
-    (Number(summary.employer_retirement_annual) || 0)) / 12;
+    (Number(summary.employer_retirement_annual) || 0) +
+    (Number(summary.hsa_contribution_annual) || 0)) / 12;
   const currentAge =
     members
       .map((member) => ageFromDate(member.birth_date))
@@ -374,7 +373,14 @@ export default function Dashboard({
       setGoalsData(goals);
       setHouseholdData(household);
       setMhaData(mha);
-      setUserName(firstNameFromDisplayName(me?.displayName || me?.username || me?.email));
+      const rawName =
+        me?.displayName ||
+        me?.username ||
+        me?.email ||
+        me?.user?.display_name ||
+        me?.user?.username ||
+        me?.user?.email;
+      setUserName(firstNameFromDisplayName(rawName));
     } catch (err) {
       setError(err.message || 'Failed to load dashboard');
     } finally {
@@ -1345,6 +1351,7 @@ function TransactionReviewModal({
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+  const [exitDirection, setExitDirection] = useState(0);
   const dragRef = useRef({ active: false, startX: 0, readySide: null });
   const transitionTimerRef = useRef(null);
   const pickerTimerRef = useRef(null);
@@ -1539,10 +1546,21 @@ function TransactionReviewModal({
     const nextX = event.clientX - dragRef.current.startX;
     const readySide = nextX > 90 ? 'yes' : nextX < -90 ? 'no' : null;
     if (readySide && readySide !== dragRef.current.readySide) {
-      navigator.vibrate?.(12);
+      triggerHaptic('light');
     }
     dragRef.current.readySide = readySide;
     setDragX(nextX);
+  }
+
+  function triggerSwipeExit(direction, callback) {
+    setExitDirection(direction);
+    setTransitioning(true);
+    window.setTimeout(() => {
+      callback();
+      setExitDirection(0);
+      setDragX(0);
+      setTransitioning(false);
+    }, 180);
   }
 
   function onPointerUp(event) {
@@ -1551,9 +1569,13 @@ function TransactionReviewModal({
     dragRef.current.readySide = null;
     setDragging(false);
     event.currentTarget.releasePointerCapture?.(event.pointerId);
-    if (dragX > 90) handleApprove();
-    else if (dragX < -90) handleReject();
-    else setDragX(0);
+    if (dragX > 90) {
+      triggerSwipeExit(1, () => handleApprove());
+    } else if (dragX < -90) {
+      triggerSwipeExit(-1, () => handleReject());
+    } else {
+      setDragX(0);
+    }
   }
 
   function makeRuleDraft(txn) {
@@ -1665,7 +1687,11 @@ function TransactionReviewModal({
                     key={currentTxn.id}
                     className={`review-swipe-card ${dragging ? 'dragging' : ''} ${transitioning ? 'entering' : ''} ${cardTone}`}
                     style={{
-                      transform: `translateX(${dragX}px) rotate(${cardRotation}deg)`
+                      transform: exitDirection !== 0
+                        ? `translate3d(${exitDirection * 115}%, 12px, 0) rotate(${exitDirection * 16}deg)`
+                        : `translate3d(${dragX}px, 0, 0) rotate(${cardRotation}deg)`,
+                      opacity: exitDirection !== 0 ? 0 : 1,
+                      transition: exitDirection !== 0 ? 'transform 180ms var(--ease-out), opacity 180ms ease' : undefined
                     }}
                     onPointerDown={onPointerDown}
                     onPointerMove={onPointerMove}

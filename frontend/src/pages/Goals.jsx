@@ -44,12 +44,12 @@ import {
 } from '../lib/localDate.js';
 
 const GOAL_PRESETS = [
-  { kind: 'college', label: 'Kids College', icon: '??' },
-  { kind: 'car', label: 'New Car', icon: '??' },
-  { kind: 'home', label: 'Home', icon: '??' },
-  { kind: 'emergency', label: 'Emergency Fund', icon: '??' },
-  { kind: 'travel', label: 'Travel', icon: '??' },
-  { kind: 'custom', label: 'Something Else', icon: '?' }
+  { kind: 'college', label: 'Kids College', icon: '🎓' },
+  { kind: 'car', label: 'New Car', icon: '🚗' },
+  { kind: 'home', label: 'Home', icon: '🏠' },
+  { kind: 'emergency', label: 'Emergency Fund', icon: '🛡️' },
+  { kind: 'travel', label: 'Travel', icon: '✈️' },
+  { kind: 'custom', label: 'Something Else', icon: '🎯' }
 ];
 
 const ACCOUNT_TYPE_LABELS = {
@@ -520,7 +520,7 @@ export default function Goals() {
                   {activeDragId && <div className="drag-screen-blocker" aria-hidden="true" />}
                 </DndContext>
               ) : goals.map((goal) => {
-                const leading = <span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>;
+                const leading = <span className="goal-list-icon">{resolveGoalIcon(goal)}</span>;
                 const subtitle = `${formatMoney(goal.current_amount)} of ${formatMoney(goal.target_amount)}`;
                 const progress = `${Math.round(goal.progress_percent || 0)}%`;
                 const eta = formatEta(goal.eta);
@@ -584,6 +584,14 @@ function presetFor(kind) {
   return GOAL_PRESETS.find((preset) => preset.kind === kind) || GOAL_PRESETS[GOAL_PRESETS.length - 1];
 }
 
+function resolveGoalIcon(goal) {
+  const raw = String(goal?.icon || '').trim();
+  if (!raw || raw === '?' || raw === '??') {
+    return presetFor(goal?.kind).icon;
+  }
+  return raw;
+}
+
 function DraggableGoalRow({ goal, previewDisplaced = false }) {
   return (
     <ReorderListItem
@@ -591,7 +599,7 @@ function DraggableGoalRow({ goal, previewDisplaced = false }) {
       className="goal-list-row"
       handleLabel={`Reorder ${goal.name}`}
       previewDisplaced={previewDisplaced}
-      leading={<span className="goal-list-icon">{goal.icon || presetFor(goal.kind).icon}</span>}
+      leading={<span className="goal-list-icon">{resolveGoalIcon(goal)}</span>}
       title={goal.name}
       subtitle={`${formatMoney(goal.current_amount)} of ${formatMoney(goal.target_amount)}`}
       sidePrimary={`${Math.round(goal.progress_percent || 0)}%`}
