@@ -49,18 +49,19 @@ export function DashProgressBar({ percent, overBudget = false }) {
   const label = `${Math.round(percent || 0)}%${overBudget ? ' over target' : ' complete'}`;
   return (
     <div
-      className="budget-progress"
+      className="budget-progress dash-progress"
       role="progressbar"
       aria-valuenow={Math.round(percent || 0)}
       aria-valuemin="0"
       aria-valuemax="100"
       title={label}
+      style={{ borderRadius: '999px' }}
     >
       <div
-        className={`budget-progress-fill ${
+        className={`budget-progress-fill dash-progress-fill ${
           overBudget ? 'over' : percent >= 85 ? 'warning' : ''
         }`}
-        style={{ width: `${clamped}%` }}
+        style={{ width: `${clamped}%`, borderRadius: '999px' }}
       />
     </div>
   );

@@ -770,10 +770,11 @@ function ProgressMeter({ percent, over = false, size = 'normal' }) {
       aria-valuemin="0"
       aria-valuemax="100"
       title={label}
+      style={{ borderRadius: '999px' }}
     >
       <div
         className={`budget-beta-progress-fill ${over ? 'over' : percent >= 85 ? 'watch' : ''}`}
-        style={{ width: `${clamped}%` }}
+        style={{ width: `${clamped}%`, borderRadius: '999px' }}
       />
     </div>
   );

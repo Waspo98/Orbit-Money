@@ -8,6 +8,7 @@ import PageHero from '../components/PageHero.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
 import { APP_ICON_192 } from '../brandAssets.js';
+import RollingTicker from '../components/RollingTicker.jsx';
 import DashboardCard, {
   CardSkeleton,
   DashProgressBar
@@ -106,66 +107,8 @@ function formatWholeCurrency(amount) {
   });
 }
 
-function prefersReducedMotion() {
-  if (typeof window === 'undefined' || !window.matchMedia) return false;
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function AnimatedMoney({
-  as: Component = 'span',
-  value,
-  formatter = formatCurrency,
-  className = '',
-  duration = 700
-}) {
-  const target = Number(value) || 0;
-  const nodeRef = useRef(null);
-  const previousTargetRef = useRef(prefersReducedMotion() ? target : 0);
-  const formatterRef = useRef(formatter);
-  formatterRef.current = formatter;
-
-  useEffect(() => {
-    const node = nodeRef.current;
-    if (!node) return undefined;
-
-    if (prefersReducedMotion()) {
-      previousTargetRef.current = target;
-      node.textContent = formatterRef.current(target);
-      return undefined;
-    }
-
-    const from = previousTargetRef.current;
-    previousTargetRef.current = target;
-
-    if (from === target) {
-      node.textContent = formatterRef.current(target);
-      return undefined;
-    }
-
-    let frameId = 0;
-    const startedAt = window.performance.now();
-
-    function step(now) {
-      const progress = Math.min(1, (now - startedAt) / duration);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const current = from + (target - from) * eased;
-      if (nodeRef.current) {
-        nodeRef.current.textContent = formatterRef.current(current);
-      }
-      if (progress < 1) {
-        frameId = window.requestAnimationFrame(step);
-      }
-    }
-
-    frameId = window.requestAnimationFrame(step);
-    return () => window.cancelAnimationFrame(frameId);
-  }, [duration, target]);
-
-  return (
-    <Component ref={nodeRef} className={className}>
-      {formatter(prefersReducedMotion() ? target : previousTargetRef.current)}
-    </Component>
-  );
+function AnimatedMoney(props) {
+  return <RollingTicker {...props} />;
 }
 
 function daysInCurrentMonth() {
@@ -835,7 +778,7 @@ function AccountsCard({ totals, activeCount, loading }) {
         <>
           <div className="dash-networth">
             <div className="dash-networth-label">Net worth</div>
-            <AnimatedMoney
+            <RollingTicker
               as="div"
               value={totals.net}
               formatter={formatCurrency}
@@ -856,7 +799,7 @@ function AccountsCard({ totals, activeCount, loading }) {
                       r.isDebt || r.value < 0 ? 'expense' : ''
                     }`}
                   >
-                    <AnimatedMoney value={r.value} formatter={formatCurrency} />
+                    <RollingTicker value={r.value} formatter={formatCurrency} />
                   </span>
                 </li>
               ))}
@@ -894,7 +837,7 @@ function MonthCard({ summary, dayOfMonth, totalDays, loading }) {
           <div className="dash-month-stats">
             <div className="dash-month-stat">
               <div className="dash-month-stat-label">Income</div>
-              <AnimatedMoney
+              <RollingTicker
                 as="div"
                 value={summary.total_income}
                 formatter={formatCompactCurrency}
@@ -903,7 +846,7 @@ function MonthCard({ summary, dayOfMonth, totalDays, loading }) {
             </div>
             <div className="dash-month-stat">
               <div className="dash-month-stat-label">Expenses</div>
-              <AnimatedMoney
+              <RollingTicker
                 as="div"
                 value={Math.abs(summary.total_expenses)}
                 formatter={formatCompactCurrency}
@@ -912,7 +855,7 @@ function MonthCard({ summary, dayOfMonth, totalDays, loading }) {
             </div>
             <div className="dash-month-stat">
               <div className="dash-month-stat-label">Net</div>
-              <AnimatedMoney
+              <RollingTicker
                 as="div"
                 value={Math.abs(summary.total_net)}
                 formatter={formatCompactCurrency}

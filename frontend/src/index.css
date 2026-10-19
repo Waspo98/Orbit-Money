@@ -13766,7 +13766,8 @@ body.modal-page-blur-active .txn-pinned-month-header {
 
 /* ---------- Progress bar ---------- */
 
-.budget-progress {
+.budget-progress,
+.dash-progress {
   height: 10px;
   background: var(--surface-hover, color-mix(in srgb, var(--border) 60%, transparent));
   border-radius: 999px;
@@ -13774,22 +13775,29 @@ body.modal-page-blur-active .txn-pinned-month-header {
   position: relative;
 }
 
-.budget-progress-compact {
+.budget-progress-compact,
+.dash-progress-compact {
   height: 6px;
 }
 
-.budget-progress-fill {
+.budget-progress-fill,
+.dash-progress-fill {
   height: 100%;
   border-radius: 999px;
   background: var(--accent);
-  transition: width 320ms var(--ease-out, ease), background 180ms var(--ease-out, ease);
+  transition:
+    width var(--dur-spring-default) var(--spring-spatial-default),
+    background var(--dur-effects-fast) var(--spring-effects);
+  will-change: width;
 }
 
-.budget-progress-fill.warning {
+.budget-progress-fill.warning,
+.dash-progress-fill.warning {
   background: var(--warning, #e6a700);
 }
 
-.budget-progress-fill.over {
+.budget-progress-fill.over,
+.dash-progress-fill.over {
   background: var(--expense, #d84848);
 }
 
@@ -14467,9 +14475,12 @@ body.modal-page-blur-active .txn-pinned-month-header {
 
 .budget-beta-progress-fill {
   height: 100%;
-  border-radius: inherit;
+  border-radius: 999px;
   background: var(--accent);
-  transition: width 280ms var(--ease-out, ease), background 160ms ease-out;
+  transition:
+    width var(--dur-spring-default) var(--spring-spatial-default),
+    background var(--dur-effects-fast) var(--spring-effects);
+  will-change: width;
 }
 
 .budget-beta-progress-fill.watch {
@@ -15472,4 +15483,64 @@ html {
   width: 24px;
   background: var(--accent);
 }
+
+/* ================== Material 3 Expressive: Rolling Ticker & Progress Meters ================== */
+
+.rolling-ticker {
+  display: inline-flex;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  white-space: nowrap;
+  vertical-align: baseline;
+  line-height: 1.2;
+}
+
+.rolling-ticker-column {
+  display: inline-block;
+  position: relative;
+  height: 1.2em;
+  line-height: 1.2em;
+  overflow: hidden;
+  vertical-align: baseline;
+  text-align: center;
+  width: 1ch;
+}
+
+.rolling-ticker-reel {
+  display: flex;
+  flex-direction: column;
+  height: 1000%;
+  will-change: transform;
+  transition: transform var(--dur-spring-default) var(--spring-spatial-default);
+}
+
+.rolling-ticker-digit {
+  height: 10%;
+  line-height: 1.2em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.rolling-ticker-char {
+  display: inline-block;
+  height: 1.2em;
+  line-height: 1.2em;
+  vertical-align: baseline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rolling-ticker-reel {
+    transition: none !important;
+    transform: none !important;
+  }
+  .budget-progress-fill,
+  .dash-progress-fill,
+  .budget-beta-progress-fill {
+    transition: none !important;
+  }
+}
+
 
