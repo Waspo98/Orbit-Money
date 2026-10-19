@@ -45,6 +45,7 @@ import {
 import { sortCategoriesByName } from '../lib/categorySort.js';
 import { USER_PREFERENCE_KEYS } from '../userPreferences.js';
 import { triggerHaptic } from '../lib/haptics.js';
+import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 
 // ============================================================================
 // Dashboard - v16
@@ -388,6 +389,10 @@ export default function Dashboard({
     }
   }
 
+  const { indicator: ptrIndicator } = usePullToRefresh({
+    onRefresh: loadDashboard
+  });
+
   useEffect(() => {
     loadDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -676,6 +681,7 @@ export default function Dashboard({
   if (noActivity) {
     return (
       <div className="dashboard-view">
+        {ptrIndicator}
         <DashboardHero
           dateLabel={formatLongDate(now)}
           greeting={timeGreeting(now)}
@@ -711,6 +717,7 @@ export default function Dashboard({
 
   return (
     <div className="dashboard-view">
+      {ptrIndicator}
       <DashboardHero
         dateLabel={formatLongDate(now)}
         greeting={timeGreeting(now)}

@@ -27,6 +27,7 @@ import ReorderListItem, {
   useReorderSensors
 } from '../components/ReorderListItem.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import CurrencyInput, { formatCurrencyInput, parseCurrencyInput } from '../components/CurrencyInput.jsx';
 import {
   formatCurrency as formatUsd,
@@ -252,6 +253,11 @@ export default function Accounts({
     }
   }
 
+  const { indicator: ptrIndicator } = usePullToRefresh({
+    onRefresh: load,
+    disabled: reorderMode
+  });
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -451,6 +457,7 @@ export default function Accounts({
 
   return (
     <div className={`accounts-view app-page-width ${reorderMode ? 'reorder-mode' : ''} ${activeDragId ? 'dragging-active' : ''}`}>
+      {ptrIndicator}
       <PageHero
         id="accounts-title"
         variant="accounts"

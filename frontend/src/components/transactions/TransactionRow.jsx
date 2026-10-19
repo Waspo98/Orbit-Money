@@ -6,6 +6,8 @@ import DropdownMenu from '../DropdownMenu.jsx';
 import ImageUrlFinderModal from '../ImageUrlFinderModal.jsx';
 import { formatCurrency, formatCurrencyOr, formatSignedCurrency } from '../../lib/formatters.js';
 import { formatFullDate, formatMonthDay } from '../../lib/localDate.js';
+import { useSwipeableRow } from '../../hooks/useSwipeableRow.js';
+import { hapticTap, triggerHaptic } from '../../lib/haptics.js';
 
 const EXPAND_ANIMATION_MS = 220;
 const EXPAND_ANIMATION_BUFFER_MS = 40;
@@ -121,7 +123,44 @@ export const TransactionRow = memo(function TransactionRow({
     return () => clearTimeout(timer);
   }, [expanded]);
 
+  const maxSwipe = (onEdit && onDelete) ? 128 : (onEdit || onDelete) ? 68 : 0;
+  const swipeDisabled = hideActions || expanded || maxSwipe === 0;
+
+  const {
+    swipeOffset,
+    isSwiping,
+    isOpen,
+    suppressClickRef,
+    closeSwipe,
+    rowProps
+  } = useSwipeableRow({
+    disabled: swipeDisabled,
+    maxSwipe
+  });
+
+  function handleSwipeEdit(e) {
+    e.stopPropagation();
+    hapticTap();
+    closeSwipe();
+    onEdit?.();
+  }
+
+  function handleSwipeDelete(e) {
+    e.stopPropagation();
+    triggerHaptic('medium');
+    closeSwipe();
+    onDelete?.();
+  }
+
   function handleRowClick(event) {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    if (isOpen) {
+      closeSwipe();
+      return;
+    }
     if (event.target.closest('button, a, input, select, textarea, [role=button]')) return;
     onExpand();
   }
@@ -129,41 +168,91 @@ export const TransactionRow = memo(function TransactionRow({
   return (
     <li
       ref={rowRef}
-      className={`txn-row ${hideMerchantLogo ? 'no-logo' : ''} ${txn.is_ignored ? 'ignored' : ''} ${isTransfer ? 'transfer' : ''} ${expanded ? 'expanded' : ''} ${txn.has_edits ? 'has-edits' : ''}`}
+      className={`txn-row ${hideMerchantLogo ? 'no-logo' : ''} ${txn.is_ignored ? 'ignored' : ''} ${isTransfer ? 'transfer' : ''} ${expanded ? 'expanded' : ''} ${txn.has_edits ? 'has-edits' : ''} ${isOpen ? 'swiped-open' : ''}`}
       onClick={handleRowClick}
     >
-      <div className="txn-row-summary">
-        {!hideMerchantLogo && (
-          <TransactionMerchantMark txn={txn} category={category} onLogoChanged={onLogoChanged} />
-        )}
-        <div className="txn-main">
-          <div className="txn-merchant">{txn.merchant}</div>
-          <div className="txn-meta">
-            <span className="txn-date-short">{formatMonthDay(txn.date)}</span>
-            {category && (
-              <>
-                <span className="dot" />
-                <span className="txn-category-chip" style={{ color: category.color }}>
-                  <span>{category.icon}</span>
-                  <span>{category.name}</span>
-                </span>
-              </>
+      <div className="txn-row-swipe-wrapper" {...rowProps}>
+        <div
+          className={`txn-row-swipe-content ${isSwiping ? 'swiping' : ''}`}
+          style={{
+            transform: swipeOffset !== 0 ? `translate3d(${swipeOffset}px, 0, 0)` : undefined
+          }}
+        >
+          <div className="txn-row-summary">
+            {!hideMerchantLogo && (
+              <TransactionMerchantMark txn={txn} category={category} onLogoChanged={onLogoChanged} />
             )}
-            {account && !hideAccountInMeta && (
-              <span>
-                {account.name}
-                {account.account_number_last4 && ` ...${account.account_number_last4}`}
-              </span>
+            <div className="txn-main">
+              <div className="txn-merchant">{txn.merchant}</div>
+              <div className="txn-meta">
+                <span className="txn-date-short">{formatMonthDay(txn.date)}</span>
+                {category && (
+                  <>
+                    <span className="dot" />
+                    <span className="txn-category-chip" style={{ color: category.color }}>
+                      <span>{category.icon}</span>
+                      <span>{category.name}</span>
+                    </span>
+                  </>
+                )}
+                {account && !hideAccountInMeta && (
+                  <span>
+                    {account.name}
+                    {account.account_number_last4 && ` ...${account.account_number_last4}`}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className={`txn-amount ${isIncome ? 'income' : ''}`}>
+              {formatSignedCurrency(txn.amount)}
+            </div>
+            {!expanded && !hideActions && (
+              <div className="txn-row-menu">
+                <DropdownMenu items={actionItems} ariaLabel={`Actions for ${txn.merchant}`} />
+              </div>
             )}
           </div>
         </div>
 
-        <div className={`txn-amount ${isIncome ? 'income' : ''}`}>
-          {formatSignedCurrency(txn.amount)}
-        </div>
-        {!expanded && !hideActions && (
-          <div className="txn-row-menu">
-            <DropdownMenu items={actionItems} ariaLabel={`Actions for ${txn.merchant}`} />
+        {!hideActions && !expanded && maxSwipe > 0 && (
+          <div
+            className="txn-swipe-actions"
+            style={{
+              visibility: (swipeOffset !== 0 || isOpen) ? 'visible' : 'hidden'
+            }}
+            aria-hidden={!isOpen && swipeOffset === 0}
+          >
+            {onEdit && (
+              <button
+                type="button"
+                className="txn-swipe-action-btn edit"
+                onClick={handleSwipeEdit}
+                aria-label={`Edit ${txn.merchant}`}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                <span>Edit</span>
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                className="txn-swipe-action-btn delete"
+                onClick={handleSwipeDelete}
+                aria-label={`Delete ${txn.merchant}`}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <line x1="10" y1="11" x2="10" y2="17" />
+                  <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+                <span>Delete</span>
+              </button>
+            )}
           </div>
         )}
       </div>

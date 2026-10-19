@@ -16,6 +16,7 @@ import CurrencyInput, { parseCurrencyInput } from '../components/CurrencyInput.j
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { APP_ICON_192 } from '../brandAssets.js';
 import { triggerHaptic } from '../lib/haptics.js';
+import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 import { RuleEditor } from '../components/rules/RuleEditor.jsx';
 import {
   EditTransactionModal,
@@ -305,6 +306,10 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
       if (!silent) setLoading(false);
     }
   }
+
+  const { indicator: ptrIndicator } = usePullToRefresh({
+    onRefresh: () => load({ silent: true })
+  });
 
   useEffect(() => {
     load();
@@ -610,25 +615,29 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   // Onboarding empty state - only when no filters AND nothing exists at all.
   if (!loading && grandTotal === 0 && !isFiltered) {
     return (
-      <EmptyState
-        icon="$"
-        title="No transactions yet"
-        description="Import your Rocket Money export to bring over your full history, preserve your custom merchant names, and generate rename rules."
-        action={(
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => navigate('/settings')}
-          >
-            Import from Rocket Money
-          </button>
-        )}
-      />
+      <div className="transactions-view">
+        {ptrIndicator}
+        <EmptyState
+          icon="$"
+          title="No transactions yet"
+          description="Import your Rocket Money export to bring over your full history, preserve your custom merchant names, and generate rename rules."
+          action={(
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => navigate('/settings')}
+            >
+              Import from Rocket Money
+            </button>
+          )}
+        />
+      </div>
     );
   }
 
   return (
     <div className="transactions-view">
+      {ptrIndicator}
       <PageHero
         id="transactions-title"
         variant="transactions"

@@ -2637,6 +2637,72 @@ input, textarea, select {
 
 @media (min-width: 1080px) { .bottom-tabs { display: none; } }
 
+/* ================== Material 3 Pull-to-Refresh Indicator ================== */
+.m3-ptr-indicator {
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  left: 50%;
+  transform: translate3d(-50%, -64px, 0);
+  z-index: 500;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  color: var(--accent);
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    opacity var(--dur-effects-fast) var(--spring-effects);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.m3-ptr-indicator.active {
+  opacity: 1;
+}
+
+.m3-ptr-indicator.dragging {
+  transition: none;
+}
+
+.m3-ptr-indicator.armed {
+  color: var(--accent-hover);
+  box-shadow: var(--shadow-lg), 0 0 0 3px var(--accent-ring);
+}
+
+.m3-ptr-spinner {
+  width: 24px;
+  height: 24px;
+  transform-origin: center center;
+}
+
+.m3-ptr-indicator.refreshing .m3-ptr-spinner {
+  animation: m3PtrSpin 750ms linear infinite;
+}
+
+@keyframes m3PtrSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m3-ptr-indicator {
+    transition: none !important;
+  }
+  .m3-ptr-indicator.refreshing .m3-ptr-spinner {
+    animation-duration: 2s;
+  }
+}
+
 
 /* ================== 4. LAYOUT — Desktop sidebar ================== */
 
@@ -8951,6 +9017,90 @@ body.modal-page-blur-active .txn-pinned-month-header {
 
 .txn-row.ignored { opacity: 0.55; }
 .txn-row.transfer .txn-amount { color: var(--neutral); }
+
+/* ================== Swipeable Transaction Rows ================== */
+.txn-row-swipe-wrapper {
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-y;
+  border-radius: var(--radius-sm);
+}
+
+.txn-row-swipe-content {
+  position: relative;
+  z-index: 2;
+  background: var(--bg);
+  transition: transform var(--dur-spring-fast) var(--spring-spatial-fast);
+  will-change: transform;
+}
+
+.card .txn-row-swipe-content,
+.modal .txn-row-swipe-content {
+  background: var(--surface);
+}
+
+.txn-row:hover:not(.expanded) .txn-row-swipe-content {
+  background: var(--surface-hover);
+}
+
+.txn-row-swipe-content.swiping {
+  transition: none;
+}
+
+.txn-swipe-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 4px 6px;
+  z-index: 1;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.txn-swipe-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 58px;
+  height: calc(100% - 4px);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform var(--dur-fast), filter var(--dur-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.txn-swipe-action-btn:active {
+  transform: scale(0.94);
+}
+
+.txn-swipe-action-btn.edit {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.txn-swipe-action-btn.delete {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid rgba(185, 28, 28, 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .txn-row-swipe-content {
+    transition: none !important;
+  }
+}
 
 .txn-logo-menu-wrap {
   position: relative;
