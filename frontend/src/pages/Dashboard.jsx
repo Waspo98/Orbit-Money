@@ -1555,11 +1555,12 @@ function TransactionReviewModal({
   function triggerSwipeExit(direction, callback) {
     setExitDirection(direction);
     setTransitioning(true);
-    window.setTimeout(() => {
-      callback();
+    window.clearTimeout(transitionTimerRef.current);
+    transitionTimerRef.current = window.setTimeout(() => {
       setExitDirection(0);
       setDragX(0);
       setTransitioning(false);
+      callback();
     }, 180);
   }
 

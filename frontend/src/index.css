@@ -960,6 +960,7 @@ input, textarea, select {
   }
 
   .modal:not(.modal-zoom):not(.modal-sm) .modal-actions {
+    bottom: calc(-24px - env(safe-area-inset-bottom, 0px));
     margin: 24px -20px calc(-24px - env(safe-area-inset-bottom, 0px));
     padding: 14px 20px calc(18px + env(safe-area-inset-bottom, 0px));
     border-radius: 0;
@@ -2346,16 +2347,16 @@ input, textarea, select {
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: none;
   }
 }
 
 .dashboard-card {
-  animation: m3SurfaceRise var(--dur-spring-default) var(--spring-spatial-default) both;
+  animation: m3SurfaceRise var(--dur-spring-default) var(--spring-spatial-default) backwards;
 }
 
 .more-card {
-  animation: m3SurfaceRise var(--dur-spring-fast) var(--spring-spatial-fast) both;
+  animation: m3SurfaceRise var(--dur-spring-fast) var(--spring-spatial-fast) backwards;
 }
 
 /* Tablet: 640–1079px. Adds side padding so content doesn't sprawl full-width
@@ -2954,6 +2955,7 @@ input, textarea, select {
 }
 
 .page-hero:not(.page-hero-morphing) h2 {
+  transform-origin: left center;
   transform: scale(calc(1 - var(--hero-scroll-progress, 0) * 0.06));
   font-variation-settings: 'opsz' 32, 'wght' 700;
 }
@@ -8767,12 +8769,12 @@ body.modal-page-blur-active .txn-pinned-month-header {
   -webkit-tap-highlight-color: transparent;
 }
 
-.txn-row:not(.expanded) {
+.txn-row:not(.expanded):not(:has(.dropdown-menu, .txn-logo-menu)) {
   content-visibility: auto;
   contain-intrinsic-size: auto 72px;
 }
 
-.txn-row:has(.txn-logo-menu) {
+.txn-row:has(.txn-logo-menu, .dropdown-menu) {
   z-index: 160;
 }
 
@@ -11292,7 +11294,15 @@ body.modal-page-blur-active .txn-pinned-month-header {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color var(--dur-fast), color var(--dur-fast);
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    border-radius var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects),
+    color var(--dur-effects-fast) var(--spring-effects);
+}
+
+.segmented-control button:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .segmented-option-content {

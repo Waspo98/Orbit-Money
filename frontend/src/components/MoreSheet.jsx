@@ -244,7 +244,7 @@ export default function MoreSheet({
   }
 
   function shouldCloseDrawer(distance, velocityY) {
-    return distance > DRAG_CLOSE_PX || velocityY > DRAG_CLOSE_VELOCITY;
+    return distance > DRAG_CLOSE_PX || (distance > 16 && velocityY > DRAG_CLOSE_VELOCITY);
   }
 
   function handleItemClick(item) {
@@ -267,7 +267,14 @@ export default function MoreSheet({
   }
 
   function startTouchGesture(touch, target) {
-    const scrollTop = scrollRef.current?.scrollTop || 0;
+    const scrollEl = scrollRef.current;
+    const scrollTop = scrollEl?.scrollTop || 0;
+    const canScrollDown = scrollEl
+      ? scrollEl.scrollHeight > scrollEl.clientHeight + 1
+      : false;
+    const startedOnHeader = Boolean(
+      target?.closest?.('.more-sheet-header, .more-sheet-handle')
+    );
     const startedOnInteractive = Boolean(
       target?.closest?.('button, a, input, select, textarea, [role="button"]')
     );
@@ -277,6 +284,8 @@ export default function MoreSheet({
       pointerType: 'touch',
       pointerId: touch.identifier,
       startedAtTop: scrollTop <= 0,
+      canScrollDown,
+      startedOnHeader,
       startedOnInteractive,
       startY: touch.clientY,
       lastY: touch.clientY,
@@ -304,7 +313,10 @@ export default function MoreSheet({
     if (gesture.mode === 'scroll') return;
 
     if (gesture.mode === 'pending') {
-      if (!gesture.startedAtTop) {
+      if (
+        !gesture.startedAtTop ||
+        (totalY < 0 && gesture.canScrollDown && !gesture.startedOnHeader)
+      ) {
         gesture.mode = 'scroll';
         return;
       }
