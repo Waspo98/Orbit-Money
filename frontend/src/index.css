@@ -257,6 +257,20 @@
   }
 }
 
+/* ================== Reduced Motion Token Collapse ================== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --spring-spatial-fast: linear(0, 1);
+    --spring-spatial-default: linear(0, 1);
+    --spring-spatial-slow: linear(0, 1);
+    --spring-effects: linear(0, 1);
+    --dur-spring-fast: 0.01ms;
+    --dur-spring-default: 0.01ms;
+    --dur-spring-slow: 0.01ms;
+    --dur-effects-fast: 0.01ms;
+    --dur-effects-default: 0.01ms;
+  }
+}
 
 /* ================== 2. RESET / BASE ================== */
 
@@ -334,7 +348,35 @@ input, textarea, select {
 }
 
 
-/* ================== 3. PRIMITIVES — Buttons ================== */
+/* ================== 3. PRIMITIVES — Buttons & Tactile Primitives ================== */
+
+/* Material 3 Expressive — Tactile Press Primitive (.m3-tactile) */
+.m3-tactile {
+  transform: scale(1);
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects),
+    border-color var(--dur-effects-fast) var(--spring-effects),
+    box-shadow var(--dur-effects-fast) var(--spring-effects),
+    color var(--dur-effects-fast) var(--spring-effects);
+  will-change: transform;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.m3-tactile:active:not(:disabled) {
+  transform: scale(0.975);
+  transition-duration: 75ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m3-tactile,
+  .m3-tactile:active:not(:disabled) {
+    transform: none !important;
+    transition: none !important;
+  }
+}
 
 .btn-primary {
   display: inline-flex;
@@ -365,8 +407,9 @@ input, textarea, select {
   transform: translateY(-1px);
 }
 .btn-primary:active:not(:disabled) {
-  transform: scale(0.95);
-  border-radius: 12px;
+  transform: scale(0.975);
+  transition-duration: 75ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   box-shadow: var(--shadow-sm);
 }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -394,8 +437,9 @@ input, textarea, select {
 }
 .btn-secondary:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
 .btn-secondary:active:not(:disabled) {
-  transform: scale(0.95);
-  border-radius: 12px;
+  transform: scale(0.975);
+  transition-duration: 75ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -421,8 +465,18 @@ input, textarea, select {
 }
 .btn-danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
 .btn-danger:active:not(:disabled) {
-  transform: scale(0.95);
-  border-radius: 12px;
+  transform: scale(0.975);
+  transition-duration: 75ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-primary:active:not(:disabled),
+  .btn-secondary:active:not(:disabled),
+  .btn-danger:active:not(:disabled) {
+    transform: none !important;
+    transition: none !important;
+  }
 }
 
 .btn-ghost {
