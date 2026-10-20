@@ -2482,7 +2482,7 @@ input, textarea, select {
   background: var(--surface);
   border-top: 1px solid var(--border);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   z-index: 40;
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04);
 }
@@ -2500,8 +2500,9 @@ input, textarea, select {
   z-index: 0;
   transition:
     transform var(--dur-spring-default) var(--spring-spatial-default),
+    width var(--dur-spring-default) var(--spring-spatial-default),
     opacity var(--dur-effects-fast) var(--spring-effects);
-  will-change: transform;
+  will-change: transform, width;
 }
 
 .bottom-tabs-slider::before {
@@ -2518,7 +2519,7 @@ input, textarea, select {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 12px 4px;
+  padding: 12px 2px;
   background: transparent;
   border: none;
   color: var(--text-muted);
@@ -2526,7 +2527,7 @@ input, textarea, select {
   font-family: inherit;
   font-size: 0.7rem;
   font-weight: 500;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   text-decoration: none;
   outline: none;
@@ -2539,6 +2540,7 @@ input, textarea, select {
   position: relative;
   z-index: 1;
   min-height: 44px;
+  min-width: 0;
 }
 
 /* Kill the <a> underline on all states (NavLink renders as <a>). */
@@ -2580,6 +2582,7 @@ input, textarea, select {
 }
 
 /* When the connected slider is active, hide individual tab-pill backgrounds */
+.bottom-tabs.has-slider .bottom-tab-pill::before,
 .bottom-tabs:has(.bottom-tabs-slider) .bottom-tab-pill::before {
   display: none;
 }
@@ -2616,8 +2619,12 @@ input, textarea, select {
 }
 
 .bottom-tab-label {
-  font-size: 0.72rem;
-  letter-spacing: 0.02em;
+  font-size: 0.7rem;
+  letter-spacing: 0.01em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: color var(--dur-effects-fast) var(--spring-effects), font-weight var(--dur-effects-fast) var(--spring-effects);
 }
 
