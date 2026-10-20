@@ -9030,6 +9030,10 @@ body.modal-page-blur-active .txn-pinned-month-header {
   animation: m3CheckPop var(--dur-spring-fast) var(--spring-spatial-fast) both;
 }
 
+.txn-row-collapse-indicator.expanded .collapse-indicator-chevron {
+  transform: translateY(2px) rotate(-135deg);
+}
+
 .txn-row:hover:not(.expanded) {
   background: var(--surface-hover);
   margin: 0 -8px;
@@ -9573,14 +9577,17 @@ body.modal-page-blur-active .txn-pinned-month-header {
 /* ===== Expanded detail panel (M3E Bento & Control Deck) ===== */
 
 .txn-detail-wrapper {
+  container-type: inline-size;
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows var(--dur-spring-default) var(--spring-spatial-default);
+  /* Non-overshooting curve on collapse so 0fr never clamps early */
+  transition: grid-template-rows 240ms cubic-bezier(0.32, 0.72, 0, 1);
   pointer-events: none;
 }
 
 .txn-row.expanded .txn-detail-wrapper {
   grid-template-rows: 1fr;
+  transition: grid-template-rows var(--dur-spring-default) var(--spring-spatial-default);
   pointer-events: auto;
 }
 
@@ -9590,13 +9597,16 @@ body.modal-page-blur-active .txn-pinned-month-header {
   opacity: 0;
   transform: translateY(-4px);
   transition:
-    opacity var(--dur-effects-default) var(--spring-effects),
-    transform var(--dur-spring-default) var(--spring-spatial-default);
+    opacity 160ms var(--spring-effects),
+    transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .txn-row.expanded .txn-detail-wrapper > .txn-detail {
   opacity: 1;
   transform: translateY(0);
+  transition:
+    opacity var(--dur-effects-default) var(--spring-effects),
+    transform var(--dur-spring-default) var(--spring-spatial-default);
 }
 
 .txn-detail {
@@ -9605,11 +9615,18 @@ body.modal-page-blur-active .txn-pinned-month-header {
   border-top: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
 }
 
+/* Strictly 2x2 on mobile/narrow cards, and 4-wide when the card has room — never 3 and 1 */
 .txn-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 0 0 12px;
+}
+
+@container (min-width: 720px) {
+  .txn-detail-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .txn-detail-grid > div { min-width: 0; }
@@ -9625,10 +9642,10 @@ body.modal-page-blur-active .txn-pinned-month-header {
   background: var(--surface-2);
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   opacity: 0;
-  transform: translateY(10px) scale(0.985);
+  transform: translateY(8px) scale(0.985);
   transition:
-    opacity var(--dur-effects-default) var(--spring-effects),
-    transform var(--dur-spring-default) var(--spring-spatial-default),
+    opacity 150ms var(--spring-effects) 0ms,
+    transform 200ms cubic-bezier(0.32, 0.72, 0, 1) 0ms,
     border-color var(--dur-effects-fast) var(--spring-effects),
     background-color var(--dur-effects-fast) var(--spring-effects);
 }
@@ -9646,6 +9663,11 @@ body.modal-page-blur-active .txn-pinned-month-header {
 .txn-row.expanded .txn-bento-tile {
   opacity: 1;
   transform: translateY(0) scale(1);
+  transition:
+    opacity var(--dur-effects-default) var(--spring-effects),
+    transform var(--dur-spring-default) var(--spring-spatial-default),
+    border-color var(--dur-effects-fast) var(--spring-effects),
+    background-color var(--dur-effects-fast) var(--spring-effects);
 }
 
 .txn-row.expanded .txn-bento-tile:nth-child(1),
@@ -9653,17 +9675,13 @@ body.modal-page-blur-active .txn-pinned-month-header {
   transition-delay: 15ms;
 }
 
-.txn-row.expanded .txn-bento-tile:nth-child(3) {
-  transition-delay: 40ms;
+.txn-row.expanded .txn-bento-tile:nth-child(3),
+.txn-row.expanded .txn-bento-tile:nth-child(4) {
+  transition-delay: 45ms;
 }
 
-.txn-row.expanded .txn-bento-tile:nth-child(4),
-.txn-row.expanded .txn-bento-tile:nth-child(5) {
-  transition-delay: 65ms;
-}
-
-.txn-row.expanded .txn-bento-tile:nth-child(n+6) {
-  transition-delay: 90ms;
+.txn-row.expanded .txn-bento-tile:nth-child(n+5) {
+  transition-delay: 70ms;
 }
 
 .txn-detail-grid dt,
@@ -9784,16 +9802,18 @@ body.modal-page-blur-active .txn-pinned-month-header {
   flex-direction: column;
   gap: 10px;
   opacity: 0;
-  transform: translateY(10px) scale(0.985);
+  transform: translateY(8px) scale(0.985);
   transition:
-    opacity var(--dur-effects-default) var(--spring-effects),
-    transform var(--dur-spring-default) var(--spring-spatial-default);
+    opacity 150ms var(--spring-effects) 0ms,
+    transform 200ms cubic-bezier(0.32, 0.72, 0, 1) 0ms;
 }
 
 .txn-row.expanded .txn-control-deck {
   opacity: 1;
   transform: translateY(0) scale(1);
-  transition-delay: 105ms;
+  transition:
+    opacity var(--dur-effects-default) var(--spring-effects) 80ms,
+    transform var(--dur-spring-default) var(--spring-spatial-default) 80ms;
 }
 
 .txn-status-chips {
@@ -9841,10 +9861,30 @@ body.modal-page-blur-active .txn-pinned-month-header {
   animation: m3CheckPop var(--dur-spring-fast) var(--spring-spatial-fast) both;
 }
 
+/* Strictly 2x2 on mobile/narrow cards, and 4-wide (or 3-wide if Recurring is omitted)
+   when the card has room — never 3 and 1 */
 .txn-detail-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.txn-detail-actions:not(:has(> :nth-child(4))) > :last-child {
+  grid-column: 1 / -1;
+}
+
+@container (min-width: 520px) {
+  .txn-detail-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .txn-detail-actions:not(:has(> :nth-child(4))) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .txn-detail-actions:not(:has(> :nth-child(4))) > :last-child {
+    grid-column: auto;
+  }
 }
 
 .txn-action-pill {

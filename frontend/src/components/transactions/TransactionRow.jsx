@@ -1,17 +1,17 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../../api.js';
 import AppSelect from '../AppSelect.jsx';
 import AnimatedModal from '../AnimatedModal.jsx';
 import CollapseIndicator from '../CollapseIndicator.jsx';
 import DropdownMenu from '../DropdownMenu.jsx';
 import ImageUrlFinderModal from '../ImageUrlFinderModal.jsx';
-import { formatCurrency, formatCurrencyOr, formatSignedCurrency } from '../../lib/formatters.js';
-import { formatFullDate, formatMonthDay } from '../../lib/localDate.js';
+import { formatSignedCurrency } from '../../lib/formatters.js';
+import { formatMediumDate, formatMonthDay, formatMonthKeyLabel } from '../../lib/localDate.js';
 import { useSwipeableRow } from '../../hooks/useSwipeableRow.js';
 import { hapticSelection, hapticTap, triggerHaptic } from '../../lib/haptics.js';
 
-const EXPAND_ANIMATION_MS = 420;
-const EXPAND_ANIMATION_BUFFER_MS = 40;
+const COLLAPSE_UNMOUNT_MS = 260;
 const reportedLogoStatuses = new Set();
 
 function normalizeNullableId(value) {
@@ -61,7 +61,7 @@ export const TransactionRow = memo(function TransactionRow({
       setRenderDetail(true);
       return undefined;
     }
-    const timer = setTimeout(() => setRenderDetail(false), EXPAND_ANIMATION_MS + EXPAND_ANIMATION_BUFFER_MS);
+    const timer = setTimeout(() => setRenderDetail(false), COLLAPSE_UNMOUNT_MS);
     return () => clearTimeout(timer);
   }, [expanded]);
 
@@ -87,42 +87,6 @@ export const TransactionRow = memo(function TransactionRow({
     { divider: true },
     { label: 'Delete', onClick: onDelete, destructive: true }
   ];
-
-  const rowRef = useRef(null);
-  const prevExpandedRef = useRef(expanded);
-
-  useEffect(() => {
-    const wasExpanded = prevExpandedRef.current;
-    prevExpandedRef.current = expanded;
-
-    if (!expanded || wasExpanded) return undefined;
-
-    const timer = setTimeout(() => {
-      const element = rowRef.current;
-      if (!element) return;
-
-      const rect = element.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const tabsElement = document.querySelector('.bottom-tabs');
-      let tabsHeight = 0;
-      if (tabsElement) {
-        const style = window.getComputedStyle(tabsElement);
-        if (style.display !== 'none') {
-          tabsHeight = tabsElement.getBoundingClientRect().height;
-        }
-      }
-
-      const effectiveBottom = viewportHeight - tabsHeight - 16;
-      if (rect.bottom > effectiveBottom) {
-        const overflow = Math.ceil(rect.bottom - effectiveBottom);
-        const maxScroll = Math.max(0, rect.top - 16);
-        const scrollBy = Math.min(overflow, Math.max(overflow, 0) + maxScroll);
-        window.scrollBy({ top: scrollBy, behavior: 'smooth' });
-      }
-    }, EXPAND_ANIMATION_MS + EXPAND_ANIMATION_BUFFER_MS);
-
-    return () => clearTimeout(timer);
-  }, [expanded]);
 
   const maxSwipe = (onEdit && onDelete) ? 128 : (onEdit || onDelete) ? 68 : 0;
   const swipeDisabled = hideActions || expanded || maxSwipe === 0;
@@ -169,7 +133,6 @@ export const TransactionRow = memo(function TransactionRow({
 
   return (
     <li
-      ref={rowRef}
       className={`txn-row ${hideMerchantLogo ? 'no-logo' : ''} ${txn.is_ignored ? 'ignored' : ''} ${isTransfer ? 'transfer' : ''} ${expanded ? 'expanded' : ''} ${txn.has_edits ? 'has-edits' : ''} ${isOpen ? 'swiped-open' : ''}`}
       onClick={handleRowClick}
     >
@@ -187,7 +150,9 @@ export const TransactionRow = memo(function TransactionRow({
             <div className="txn-main">
               <div className="txn-merchant">{txn.merchant}</div>
               <div className="txn-meta">
-                <span className="txn-date-short">{formatMonthDay(txn.date)}</span>
+                <span className="txn-date-short">
+                  {expanded ? formatMediumDate(txn.date) : formatMonthDay(txn.date)}
+                </span>
                 {category && (
                   <>
                     <span className="dot" />
@@ -197,7 +162,7 @@ export const TransactionRow = memo(function TransactionRow({
                     </span>
                   </>
                 )}
-                {account && !hideAccountInMeta && (
+                {account && (!hideAccountInMeta || expanded) && (
                   <span>
                     {account.name}
                     {account.account_number_last4 && ` ...${account.account_number_last4}`}
@@ -273,7 +238,6 @@ export const TransactionRow = memo(function TransactionRow({
         {(renderDetail || expanded) ? (
           <TransactionDetail
             txn={txn}
-            account={account}
             category={category}
             originalCategory={originalCategory}
             interactive={expanded}
@@ -504,7 +468,6 @@ function LogoFinderModal({ txn, logo, onClose, onSaved }) {
 
 function TransactionDetail({
   txn,
-  account,
   category,
   originalCategory,
   interactive,
@@ -529,32 +492,12 @@ function TransactionDetail({
   const categoryRuleId = ruleIdFromEditSource(txn.edited_category_id_source);
   const tabProps = interactive ? {} : { tabIndex: -1 };
   const budgetMonth = (txn.date || '').slice(0, 7);
+  const budgetLabel = budgetMonth ? `${formatMonthKeyLabel(budgetMonth)} Budget` : 'Monthly Budget';
 
   return (
     <div className="txn-detail">
       <dl className="txn-detail-grid txn-bento-grid">
-        <div className="txn-bento-tile">
-          <dt className="txn-bento-label">Date</dt>
-          <dd className="txn-bento-value">{formatFullDate(txn.date)}</dd>
-        </div>
-
-        <div className="txn-bento-tile">
-          <dt className="txn-bento-label">Account</dt>
-          <dd className="txn-bento-value">
-            {account ? (
-              <span className="txn-bento-stack">
-                <span className="txn-bento-primary">{account.name}</span>
-                {account.institution && (
-                  <span className="subtle txn-bento-subtext">{account.institution}</span>
-                )}
-              </span>
-            ) : (
-              <span className="subtle">-</span>
-            )}
-          </dd>
-        </div>
-
-        <div className={`txn-bento-tile txn-detail-full ${merchantEdited ? 'is-edited' : ''}`}>
+        <div className={`txn-bento-tile ${merchantEdited ? 'is-edited' : ''}`}>
           <dt className="txn-bento-label">
             <span>Merchant</span>
             {merchantEdited && (
@@ -601,7 +544,7 @@ function TransactionDetail({
           </dd>
         </div>
 
-        <div className={`txn-bento-tile ${categoryEdited ? 'txn-detail-full is-edited' : ''}`}>
+        <div className={`txn-bento-tile ${categoryEdited ? 'is-edited' : ''}`}>
           <dt className="txn-bento-label">
             <span>Category</span>
             {categoryEdited && (
@@ -660,27 +603,28 @@ function TransactionDetail({
           </dd>
         </div>
 
-        <div className={`txn-bento-tile ${categoryEdited ? 'txn-detail-full' : ''}`}>
+        <div className="txn-bento-tile">
           <dt className="txn-bento-label">Budget</dt>
           <dd className="txn-bento-value">
-            <a
-              href={`/budgets?month=${encodeURIComponent(budgetMonth)}`}
+            <Link
+              to={`/budgets?month=${encodeURIComponent(budgetMonth)}`}
               className="txn-bento-budget-link m3-tactile"
+              onClick={() => hapticTap()}
               {...tabProps}
             >
               <span className="txn-bento-budget-text">
-                <span>View {budgetMonth || 'Monthly'}</span>
+                <span>{budgetLabel}</span>
                 {category && <span className="subtle txn-bento-budget-cat"> · {category.name}</span>}
               </span>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M7 17L17 7" />
                 <path d="M7 7h10v10" />
               </svg>
-            </a>
+            </Link>
           </dd>
         </div>
 
-        <div className="txn-bento-tile txn-detail-full">
+        <div className="txn-bento-tile">
           <dt className="txn-bento-label">Original Description</dt>
           <dd className="txn-bento-value txn-detail-mono">
             {txn.original_description || <span className="subtle">-</span>}
@@ -830,7 +774,7 @@ function TransactionDetail({
                 <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
                 <path d="M16 16h5v5" />
               </svg>
-              <span>Mark as Recurring</span>
+              <span>Recurring</span>
             </button>
           )}
 
