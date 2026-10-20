@@ -8959,19 +8959,22 @@ body.modal-page-blur-active .txn-pinned-month-header {
 
 .txn-row {
   position: relative;
+  margin: 0;
   padding: 14px 4px;
-  border-bottom: 1px solid var(--border);
-  /* The transition list covers both hover (fast) and expand (slower) state
-     changes. margin/padding/background transition at dur-fast so hover
-     feels snappy, matching the Dashboard's Recent Transactions card.
-     box-shadow/border-radius use the longer 220ms for the expand animation
-     since those only change when collapsing into/out of the card style. */
+  border: 1px solid transparent;
+  border-bottom-color: var(--border);
+  border-radius: 0;
+  /* Material 3 Expressive spatial & effects springs:
+     margin, padding, transform, and border-radius morph on the spatial spring,
+     while color, border, and elevation use the zero-overshoot effects curve. */
   transition:
-    background-color var(--dur-fast),
-    transform var(--dur-fast) var(--ease-out, ease),
-    box-shadow 220ms var(--ease-out, ease),
-    border-color var(--dur-fast) var(--ease-out, ease),
-    border-radius 220ms var(--ease-out, ease);
+    margin var(--dur-spring-default) var(--spring-spatial-default),
+    padding var(--dur-spring-default) var(--spring-spatial-default),
+    border-radius var(--dur-spring-default) var(--spring-spatial-default),
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-default) var(--spring-effects),
+    border-color var(--dur-effects-default) var(--spring-effects),
+    box-shadow var(--dur-effects-default) var(--spring-effects);
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -8984,9 +8987,19 @@ body.modal-page-blur-active .txn-pinned-month-header {
   z-index: 160;
 }
 
+.txn-row:has(+ .txn-row.expanded) {
+  border-bottom-color: transparent;
+}
+
+.txn-row:not(.expanded):not(.swiped-open):active:not(:has(button:active, a:active, input:active, [role=button]:active)) {
+  transform: scale(0.988);
+  transition-duration: 80ms;
+  transition-timing-function: var(--spring-effects);
+}
+
 .txn-row-summary {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
   cursor: pointer;
@@ -8996,8 +9009,25 @@ body.modal-page-blur-active .txn-pinned-month-header {
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
+.txn-row-trailing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+}
+
 .txn-row-menu {
   cursor: default;
+}
+
+.txn-row-collapse-indicator {
+  --collapse-indicator-size: 28px;
+  cursor: pointer;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 58%, var(--surface-2));
+  animation: m3CheckPop var(--dur-spring-fast) var(--spring-spatial-fast) both;
 }
 
 .txn-row:hover:not(.expanded) {
@@ -9006,20 +9036,24 @@ body.modal-page-blur-active .txn-pinned-month-header {
   padding: 14px 12px;
   border-radius: var(--radius-sm);
   border-bottom-color: transparent;
-  /* Subtle lift on hover — makes the "expand" feel more alive than a pure
-     margin/padding bleed. Paired with the snappier dur-fast transition. */
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
 }
 
 .txn-row.expanded {
   background: var(--surface);
-  margin: 8px -12px;
-  padding: 14px 16px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  margin: 10px -12px;
+  padding: 16px 16px 18px;
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border-strong, var(--border)));
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
   cursor: default;
+  z-index: 4;
+}
+
+.card .txn-row.expanded,
+.modal .txn-row.expanded {
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
 }
 
 .txn-row.ignored { opacity: 0.55; }
@@ -9033,11 +9067,17 @@ body.modal-page-blur-active .txn-pinned-month-header {
   border-radius: var(--radius-sm);
 }
 
+.txn-row.expanded .txn-row-swipe-wrapper {
+  overflow: visible;
+}
+
 .txn-row-swipe-content {
   position: relative;
   z-index: 2;
   background: var(--bg);
-  transition: transform var(--dur-spring-fast) var(--spring-spatial-fast);
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects);
   will-change: transform;
 }
 
@@ -9048,6 +9088,10 @@ body.modal-page-blur-active .txn-pinned-month-header {
 
 .txn-row:hover:not(.expanded) .txn-row-swipe-content {
   background: var(--surface-hover);
+}
+
+.txn-row.expanded .txn-row-swipe-content {
+  background: transparent;
 }
 
 .txn-row-swipe-content.swiping {
@@ -9104,15 +9148,43 @@ body.modal-page-blur-active .txn-pinned-month-header {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .txn-row-swipe-content {
+  .txn-row,
+  .txn-row-swipe-content,
+  .txn-logo-menu-wrap,
+  .txn-merchant-mark,
+  .txn-merchant-mark-fallback,
+  .txn-merchant,
+  .txn-amount,
+  .txn-detail-wrapper,
+  .txn-detail-wrapper > .txn-detail,
+  .txn-bento-tile,
+  .txn-control-deck,
+  .txn-status-chip {
     transition: none !important;
+  }
+
+  .txn-row-collapse-indicator,
+  .txn-chip-check {
+    animation: none !important;
   }
 }
 
 .txn-logo-menu-wrap {
   position: relative;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
   z-index: 1;
+  transition:
+    width var(--dur-spring-default) var(--spring-spatial-default),
+    height var(--dur-spring-default) var(--spring-spatial-default);
+}
+
+.txn-row.expanded .txn-logo-menu-wrap {
+  width: 42px;
+  height: 42px;
 }
 
 .txn-merchant-mark {
@@ -9128,6 +9200,17 @@ body.modal-page-blur-active .txn-pinned-month-header {
   box-shadow: none;
   cursor: pointer;
   padding: 0;
+  transition:
+    width var(--dur-spring-default) var(--spring-spatial-default),
+    height var(--dur-spring-default) var(--spring-spatial-default),
+    border-radius var(--dur-spring-default) var(--spring-spatial-default),
+    transform var(--dur-spring-fast) var(--spring-spatial-fast);
+}
+
+.txn-row.expanded .txn-merchant-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
 }
 
 .txn-merchant-mark img {
@@ -9141,6 +9224,11 @@ body.modal-page-blur-active .txn-pinned-month-header {
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.16),
     0 4px 10px rgba(0, 0, 0, 0.18);
+  transition: border-radius var(--dur-spring-default) var(--spring-spatial-default);
+}
+
+.txn-row.expanded .txn-merchant-mark img {
+  border-radius: 11px;
 }
 
 .txn-merchant-mark-fallback {
@@ -9155,6 +9243,18 @@ body.modal-page-blur-active .txn-pinned-month-header {
   font-weight: 650;
   background: color-mix(in srgb, currentColor 10%, var(--surface-2));
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.36);
+  transition:
+    width var(--dur-spring-default) var(--spring-spatial-default),
+    height var(--dur-spring-default) var(--spring-spatial-default),
+    border-radius var(--dur-spring-default) var(--spring-spatial-default),
+    font-size var(--dur-spring-default) var(--spring-spatial-default);
+}
+
+.txn-row.expanded .txn-merchant-mark-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  font-size: 1.15rem;
 }
 
 .txn-logo-menu {
@@ -9420,13 +9520,16 @@ body.modal-page-blur-active .txn-pinned-month-header {
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.35;
+  transition:
+    font-size var(--dur-spring-default) var(--spring-spatial-default),
+    color var(--dur-effects-fast) var(--spring-effects);
 }
 
 .txn-row.expanded .txn-merchant {
   white-space: normal;
   overflow: visible;
   text-overflow: unset;
-  font-size: 1.05rem;
+  font-size: 1.06rem;
   font-weight: 600;
 }
 
@@ -9457,6 +9560,9 @@ body.modal-page-blur-active .txn-pinned-month-header {
   white-space: nowrap;
   text-align: right;
   color: var(--expense);
+  transition:
+    font-size var(--dur-spring-default) var(--spring-spatial-default),
+    color var(--dur-effects-fast) var(--spring-effects);
 }
 
 .txn-amount.income { color: var(--income); }
@@ -9464,21 +9570,12 @@ body.modal-page-blur-active .txn-pinned-month-header {
 .txn-row.expanded .txn-amount { font-size: 1.2rem; }
 
 
-/* ===== Expanded detail panel ===== */
-
-/* Expand/contract animation via a grid-template-rows wrapper.
-   The detail panel is always mounted (for animation purposes) but the
-   wrapper's row track smoothly transitions from 0fr (collapsed) to 1fr
-   (expanded) — browsers interpolate fractional row tracks giving a
-   clean height animation without the known pitfalls of animating to
-   height: auto. Overflow hidden on the inner node clips content during
-   the transition, and pointer-events: none on the wrapper prevents
-   collapsed rows from accepting keyboard/mouse focus. */
+/* ===== Expanded detail panel (M3E Bento & Control Deck) ===== */
 
 .txn-detail-wrapper {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 220ms var(--ease-out, ease);
+  transition: grid-template-rows var(--dur-spring-default) var(--spring-spatial-default);
   pointer-events: none;
 }
 
@@ -9490,53 +9587,180 @@ body.modal-page-blur-active .txn-pinned-month-header {
 .txn-detail-wrapper > .txn-detail {
   overflow: hidden;
   min-height: 0;
-  /* Content fades in slightly after the height transition begins so the
-     text doesn't appear stretched mid-animation. */
   opacity: 0;
-  transition: opacity 160ms var(--ease-out, ease) 60ms;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--dur-effects-default) var(--spring-effects),
+    transform var(--dur-spring-default) var(--spring-spatial-default);
 }
 
 .txn-row.expanded .txn-detail-wrapper > .txn-detail {
   opacity: 1;
+  transform: translateY(0);
 }
 
 .txn-detail {
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
 }
 
 .txn-detail-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px 20px;
-  margin: 0 0 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
 }
 
 .txn-detail-grid > div { min-width: 0; }
 .txn-detail-full      { grid-column: 1 / -1; }
 
-.txn-detail-grid dt {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  margin-bottom: 4px;
+.txn-bento-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 5px;
+  padding: 11px 13px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+  transition:
+    opacity var(--dur-effects-default) var(--spring-effects),
+    transform var(--dur-spring-default) var(--spring-spatial-default),
+    border-color var(--dur-effects-fast) var(--spring-effects),
+    background-color var(--dur-effects-fast) var(--spring-effects);
 }
 
-.txn-detail-grid dd {
+.card .txn-bento-tile,
+.modal .txn-bento-tile {
+  background: var(--surface-3);
+}
+
+.txn-bento-tile.is-edited {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 18%, var(--surface-2));
+}
+
+.txn-row.expanded .txn-bento-tile {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.txn-row.expanded .txn-bento-tile:nth-child(1),
+.txn-row.expanded .txn-bento-tile:nth-child(2) {
+  transition-delay: 15ms;
+}
+
+.txn-row.expanded .txn-bento-tile:nth-child(3) {
+  transition-delay: 40ms;
+}
+
+.txn-row.expanded .txn-bento-tile:nth-child(4),
+.txn-row.expanded .txn-bento-tile:nth-child(5) {
+  transition-delay: 65ms;
+}
+
+.txn-row.expanded .txn-bento-tile:nth-child(n+6) {
+  transition-delay: 90ms;
+}
+
+.txn-detail-grid dt,
+.txn-bento-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.68rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
   margin: 0;
-  font-size: 0.92rem;
+}
+
+.txn-detail-grid dd,
+.txn-bento-value {
+  margin: 0;
+  font-size: 0.91rem;
+  font-weight: 500;
   color: var(--text);
   word-break: break-word;
 }
 
+.txn-bento-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.txn-bento-primary {
+  font-weight: 560;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.txn-bento-subtext {
+  font-size: 0.78rem;
+  font-weight: 450;
+  line-height: 1.25;
+}
+
+.txn-bento-category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.86rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--cat-color, var(--accent)) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--cat-color, var(--accent)) 28%, var(--border));
+}
+
+.txn-bento-budget-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.txn-bento-budget-link:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 35%, var(--surface));
+}
+
+.txn-bento-budget-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.txn-bento-budget-cat {
+  font-weight: 500;
+}
+
 .txn-detail-mono {
   font-family: var(--font-mono);
-  font-size: 0.82rem;
-  line-height: 1.4;
+  font-size: 0.8rem;
+  line-height: 1.45;
   color: var(--text-muted);
+  padding: 6px 9px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
 }
 
 .coming-soon-badge {
@@ -9553,10 +9777,97 @@ body.modal-page-blur-active .txn-pinned-month-header {
   vertical-align: 2px;
 }
 
-.txn-detail-actions {
+/* ---------- Two-Tier M3E Control Deck ---------- */
+
+.txn-control-deck {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+  transition:
+    opacity var(--dur-effects-default) var(--spring-effects),
+    transform var(--dur-spring-default) var(--spring-spatial-default);
+}
+
+.txn-row.expanded .txn-control-deck {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition-delay: 105ms;
+}
+
+.txn-status-chips {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+}
+
+.txn-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform var(--dur-spring-fast) var(--spring-spatial-fast),
+    border-radius var(--dur-spring-fast) var(--spring-spatial-fast),
+    background-color var(--dur-effects-fast) var(--spring-effects),
+    border-color var(--dur-effects-fast) var(--spring-effects),
+    color var(--dur-effects-fast) var(--spring-effects),
+    box-shadow var(--dur-effects-fast) var(--spring-effects);
+}
+
+.txn-status-chip:hover {
+  color: var(--text);
+  border-color: var(--border-strong, var(--border));
+  background: var(--surface-hover);
+}
+
+.txn-status-chip.active {
+  border-radius: 12px;
+  background: var(--accent-soft) !important;
+  color: var(--accent) !important;
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent) !important;
+}
+
+.txn-chip-check {
+  animation: m3CheckPop var(--dur-spring-fast) var(--spring-spatial-fast) both;
+}
+
+.txn-detail-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.txn-action-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.83rem;
+  font-weight: 600;
+}
+
+.txn-action-pill.txn-action-primary {
+  background: color-mix(in srgb, var(--accent-soft) 50%, var(--surface-2));
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+}
+
+.txn-action-pill.txn-action-primary:hover {
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
 }
 
 .btn-active {
@@ -12845,27 +13156,66 @@ body.modal-page-blur-active .txn-pinned-month-header {
    and original-value annotations are the sole indicators. */
 
 /* Inline badge next to field labels in the expanded detail that declares
-   the edit provenance and offers a one-click reset */
+   the edit provenance */
 .txn-detail-grid dt .edit-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: 8px;
-  padding: 1px 8px;
+  padding: 2px 8px;
   border-radius: 999px;
-  background: var(--surface-2, var(--surface));
-  color: var(--muted);
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  background: color-mix(in srgb, var(--accent-soft) 65%, var(--surface));
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  font-size: 0.64rem;
+  font-weight: 650;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
-/* Original-value annotation below an edited field */
+.txn-provenance-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed color-mix(in srgb, var(--border-strong, var(--border)) 65%, transparent);
+}
+
+.txn-provenance-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.txn-provenance-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.txn-provenance-pill:hover {
+  background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface));
+  border-color: var(--accent);
+}
+
+/* Original-value annotation inside provenance footer */
 .txn-original {
-  display: block;
-  margin-top: 3px;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 0;
   font-size: 0.78rem;
   color: var(--muted);
 }
@@ -12874,7 +13224,7 @@ body.modal-page-blur-active .txn-pinned-month-header {
   background: var(--surface);
   border-radius: 4px;
   font-family: var(--font-mono, ui-monospace, Menlo, monospace);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--text);
 }
 
@@ -12894,9 +13244,10 @@ body.modal-page-blur-active .txn-pinned-month-header {
 .linkish:hover { color: var(--accent-strong, var(--accent)); }
 .linkish:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Toggle buttons that have a non-original state get a small indicator */
-.btn-compact.edited {
-  box-shadow: inset 0 0 0 1px var(--accent);
+/* Toggle buttons/chips that have a non-original state get a small indicator */
+.btn-compact.edited,
+.txn-status-chip.edited {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 
 

@@ -2,14 +2,15 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { api } from '../../api.js';
 import AppSelect from '../AppSelect.jsx';
 import AnimatedModal from '../AnimatedModal.jsx';
+import CollapseIndicator from '../CollapseIndicator.jsx';
 import DropdownMenu from '../DropdownMenu.jsx';
 import ImageUrlFinderModal from '../ImageUrlFinderModal.jsx';
 import { formatCurrency, formatCurrencyOr, formatSignedCurrency } from '../../lib/formatters.js';
 import { formatFullDate, formatMonthDay } from '../../lib/localDate.js';
 import { useSwipeableRow } from '../../hooks/useSwipeableRow.js';
-import { hapticTap, triggerHaptic } from '../../lib/haptics.js';
+import { hapticSelection, hapticTap, triggerHaptic } from '../../lib/haptics.js';
 
-const EXPAND_ANIMATION_MS = 220;
+const EXPAND_ANIMATION_MS = 420;
 const EXPAND_ANIMATION_BUFFER_MS = 40;
 const reportedLogoStatuses = new Set();
 
@@ -162,6 +163,7 @@ export const TransactionRow = memo(function TransactionRow({
       return;
     }
     if (event.target.closest('button, a, input, select, textarea, [role=button]')) return;
+    hapticSelection();
     onExpand();
   }
 
@@ -207,9 +209,19 @@ export const TransactionRow = memo(function TransactionRow({
             <div className={`txn-amount ${isIncome ? 'income' : ''}`}>
               {formatSignedCurrency(txn.amount)}
             </div>
-            {!expanded && !hideActions && (
-              <div className="txn-row-menu">
-                <DropdownMenu items={actionItems} ariaLabel={`Actions for ${txn.merchant}`} />
+            {!hideActions && (
+              <div className="txn-row-trailing">
+                {expanded ? (
+                  <CollapseIndicator
+                    expanded
+                    className="txn-row-collapse-indicator"
+                    label={`Collapse ${txn.merchant}`}
+                  />
+                ) : (
+                  <div className="txn-row-menu">
+                    <DropdownMenu items={actionItems} ariaLabel={`Actions for ${txn.merchant}`} />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -516,195 +528,328 @@ function TransactionDetail({
   const merchantRuleId = ruleIdFromEditSource(txn.edited_merchant_source);
   const categoryRuleId = ruleIdFromEditSource(txn.edited_category_id_source);
   const tabProps = interactive ? {} : { tabIndex: -1 };
+  const budgetMonth = (txn.date || '').slice(0, 7);
 
   return (
     <div className="txn-detail">
-      <dl className="txn-detail-grid">
-        <div>
-          <dt>Date</dt>
-          <dd>{formatFullDate(txn.date)}</dd>
+      <dl className="txn-detail-grid txn-bento-grid">
+        <div className="txn-bento-tile">
+          <dt className="txn-bento-label">Date</dt>
+          <dd className="txn-bento-value">{formatFullDate(txn.date)}</dd>
         </div>
-        <div>
-          <dt>Account</dt>
-          <dd>
+
+        <div className="txn-bento-tile">
+          <dt className="txn-bento-label">Account</dt>
+          <dd className="txn-bento-value">
             {account ? (
-              <>
-                {account.name}
-                {account.institution && <span className="subtle">  .  {account.institution}</span>}
-              </>
-            ) : '-'}
-          </dd>
-        </div>
-
-        <div className="txn-detail-full">
-          <dt>
-            Merchant
-            {merchantEdited && (
-              <span className="edit-badge">
-                {merchantSourceLabel}
-                <button
-                  type="button"
-                  className="linkish"
-                  onClick={() => onResetField('merchant')}
-                  title="Revert to the original bank value"
-                  {...tabProps}
-                >
-                  reset
-                </button>
-                {merchantRuleId && onViewRule && (
-                  <button
-                    type="button"
-                    className="linkish"
-                    onClick={() => onViewRule(merchantRuleId)}
-                    title="Open this rule in the rule editor"
-                    {...tabProps}
-                  >
-                    view rule
-                  </button>
+              <span className="txn-bento-stack">
+                <span className="txn-bento-primary">{account.name}</span>
+                {account.institution && (
+                  <span className="subtle txn-bento-subtext">{account.institution}</span>
                 )}
               </span>
-            )}
-          </dt>
-          <dd>
-            {txn.merchant}
-            {merchantEdited && (
-              <span className="subtle txn-original">
-                Originally: <code>{txn.original_merchant}</code>
-              </span>
+            ) : (
+              <span className="subtle">-</span>
             )}
           </dd>
         </div>
 
-        <div>
-          <dt>
-            Category
+        <div className={`txn-bento-tile txn-detail-full ${merchantEdited ? 'is-edited' : ''}`}>
+          <dt className="txn-bento-label">
+            <span>Merchant</span>
+            {merchantEdited && (
+              <span className="edit-badge">{merchantSourceLabel}</span>
+            )}
+          </dt>
+          <dd className="txn-bento-value">
+            <div className="txn-bento-primary">{txn.merchant}</div>
+            {merchantEdited && (
+              <div className="txn-provenance-footer">
+                <span className="subtle txn-original">
+                  Originally: <code>{txn.original_merchant}</code>
+                </span>
+                <div className="txn-provenance-actions">
+                  <button
+                    type="button"
+                    className="txn-provenance-pill m3-tactile"
+                    onClick={() => {
+                      hapticTap();
+                      onResetField('merchant');
+                    }}
+                    title="Revert to the original bank value"
+                    {...tabProps}
+                  >
+                    Reset
+                  </button>
+                  {merchantRuleId && onViewRule && (
+                    <button
+                      type="button"
+                      className="txn-provenance-pill m3-tactile"
+                      onClick={() => {
+                        hapticTap();
+                        onViewRule(merchantRuleId);
+                      }}
+                      title="Open this rule in the rule editor"
+                      {...tabProps}
+                    >
+                      View Rule
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </dd>
+        </div>
+
+        <div className={`txn-bento-tile ${categoryEdited ? 'txn-detail-full is-edited' : ''}`}>
+          <dt className="txn-bento-label">
+            <span>Category</span>
             {categoryEdited && (
-              <span className="edit-badge">
-                {categorySourceLabel}
-                <button
-                  type="button"
-                  className="linkish"
-                  onClick={() => onResetField('category_id')}
-                  title="Revert to the original category"
-                  {...tabProps}
-                >
-                  reset
-                </button>
-                {categoryRuleId && onViewRule && (
-                  <button
-                    type="button"
-                    className="linkish"
-                    onClick={() => onViewRule(categoryRuleId)}
-                    title="Open this rule in the rule editor"
-                    {...tabProps}
-                  >
-                    view rule
-                  </button>
-                )}
-              </span>
+              <span className="edit-badge">{categorySourceLabel}</span>
             )}
           </dt>
-          <dd>
+          <dd className="txn-bento-value">
             {category ? (
-              <span style={{ color: category.color }}>
-                {category.icon} {category.name}
+              <span
+                className="txn-bento-category-pill"
+                style={category.color ? { '--cat-color': category.color, color: category.color } : undefined}
+              >
+                <span aria-hidden="true">{category.icon}</span>
+                <span>{category.name}</span>
               </span>
             ) : (
               <span className="subtle">Uncategorized</span>
             )}
-            {categoryEdited && originalCategory && (
-              <span className="subtle txn-original">
-                Originally: {originalCategory.icon} {originalCategory.name}
-              </span>
+            {categoryEdited && (
+              <div className="txn-provenance-footer">
+                {originalCategory && (
+                  <span className="subtle txn-original">
+                    Originally: {originalCategory.icon} {originalCategory.name}
+                  </span>
+                )}
+                <div className="txn-provenance-actions">
+                  <button
+                    type="button"
+                    className="txn-provenance-pill m3-tactile"
+                    onClick={() => {
+                      hapticTap();
+                      onResetField('category_id');
+                    }}
+                    title="Revert to the original category"
+                    {...tabProps}
+                  >
+                    Reset
+                  </button>
+                  {categoryRuleId && onViewRule && (
+                    <button
+                      type="button"
+                      className="txn-provenance-pill m3-tactile"
+                      onClick={() => {
+                        hapticTap();
+                        onViewRule(categoryRuleId);
+                      }}
+                      title="Open this rule in the rule editor"
+                      {...tabProps}
+                    >
+                      View Rule
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
           </dd>
         </div>
 
-        <div>
-          <dt>Original description</dt>
-          <dd className="txn-detail-mono">
+        <div className={`txn-bento-tile ${categoryEdited ? 'txn-detail-full' : ''}`}>
+          <dt className="txn-bento-label">Budget</dt>
+          <dd className="txn-bento-value">
+            <a
+              href={`/budgets?month=${encodeURIComponent(budgetMonth)}`}
+              className="txn-bento-budget-link m3-tactile"
+              {...tabProps}
+            >
+              <span className="txn-bento-budget-text">
+                <span>View {budgetMonth || 'Monthly'}</span>
+                {category && <span className="subtle txn-bento-budget-cat"> · {category.name}</span>}
+              </span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M7 17L17 7" />
+                <path d="M7 7h10v10" />
+              </svg>
+            </a>
+          </dd>
+        </div>
+
+        <div className="txn-bento-tile txn-detail-full">
+          <dt className="txn-bento-label">Original Description</dt>
+          <dd className="txn-bento-value txn-detail-mono">
             {txn.original_description || <span className="subtle">-</span>}
           </dd>
         </div>
 
         {txn.notes && (
-          <div className="txn-detail-full">
-            <dt>Notes</dt>
-            <dd>{txn.notes}</dd>
+          <div className="txn-bento-tile txn-detail-full">
+            <dt className="txn-bento-label">Notes</dt>
+            <dd className="txn-bento-value">{txn.notes}</dd>
           </div>
         )}
-
-        <div className="txn-detail-full">
-          <dt>Budget</dt>
-          <dd className="subtle">
-            <a
-              href={`/budgets?month=${encodeURIComponent((txn.date || '').slice(0, 7))}`}
-              className="linkish"
-            >
-              View budgets for {(txn.date || '').slice(0, 7) || 'this month'}
-            </a>
-            {category && <> . {category.name}</>}
-          </dd>
-        </div>
       </dl>
 
-      <div className="txn-detail-actions">
-        <button type="button" className="btn-secondary btn-compact" onClick={onEdit} {...tabProps}>
-          Edit
-        </button>
-        <button
-          type="button"
-          className="btn-secondary btn-compact"
-          onClick={onCreateRule}
-          {...tabProps}
-        >
-          Create rule
-        </button>
-        {onMarkRecurring && (
+      <div className="txn-control-deck">
+        <div className="txn-status-chips" role="group" aria-label="Transaction status flags">
           <button
             type="button"
-            className="btn-secondary btn-compact"
-            onClick={onMarkRecurring}
+            className={`txn-status-chip m3-tactile ${txn.is_transfer ? 'btn-active active' : ''} ${transferEdited ? 'edited' : ''}`}
+            onClick={() => {
+              hapticSelection();
+              onToggleTransfer?.();
+            }}
+            aria-pressed={!!txn.is_transfer}
+            title={txn.is_transfer ? 'Unmark as transfer' : 'Mark as transfer'}
             {...tabProps}
           >
-            Mark as recurring
+            {txn.is_transfer ? (
+              <svg className="txn-chip-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="17 1 21 5 17 9" />
+                <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                <polyline points="7 23 3 19 7 15" />
+                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+              </svg>
+            )}
+            <span>Transfer</span>
           </button>
-        )}
-        <button
-          type="button"
-          className={`btn-secondary btn-compact ${txn.is_transfer ? 'btn-active' : ''} ${transferEdited ? 'edited' : ''}`}
-          onClick={onToggleTransfer}
-          {...tabProps}
-        >
-          {txn.is_transfer ? 'Unmark as transfer' : 'Mark as transfer'}
-        </button>
-        {mhaTrackerEnabled && (
+
           <button
             type="button"
-            className={`btn-secondary btn-compact ${txn.mha_eligible ? 'btn-active' : ''}`}
-            onClick={onToggleMhaEligible}
-            aria-pressed={!!txn.mha_eligible}
+            className={`txn-status-chip m3-tactile ${txn.is_ignored ? 'btn-active active' : ''} ${ignoredEdited ? 'edited' : ''}`}
+            onClick={() => {
+              hapticSelection();
+              onToggleIgnored?.();
+            }}
+            aria-pressed={!!txn.is_ignored}
+            title={txn.is_ignored ? 'Unignore transaction' : 'Ignore transaction'}
             {...tabProps}
           >
-            MHA Eligible
+            {txn.is_ignored ? (
+              <svg className="txn-chip-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+            )}
+            <span>Ignored</span>
           </button>
-        )}
-        <button
-          type="button"
-          className={`btn-secondary btn-compact ${txn.is_ignored ? 'btn-active' : ''} ${ignoredEdited ? 'edited' : ''}`}
-          onClick={onToggleIgnored}
-          {...tabProps}
-        >
-          {txn.is_ignored ? 'Unignore' : 'Ignore'}
-        </button>
-        <button
-          type="button"
-          className="btn-danger btn-compact"
-          onClick={onDelete}
-          {...tabProps}
-        >
-          Delete
-        </button>
+
+          {mhaTrackerEnabled && (
+            <button
+              type="button"
+              className={`txn-status-chip m3-tactile ${txn.mha_eligible ? 'btn-active active' : ''}`}
+              onClick={() => {
+                hapticSelection();
+                onToggleMhaEligible?.();
+              }}
+              aria-pressed={!!txn.mha_eligible}
+              title={txn.mha_eligible ? 'Mark MHA ineligible' : 'Mark MHA eligible'}
+              {...tabProps}
+            >
+              {txn.mha_eligible ? (
+                <svg className="txn-chip-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+              )}
+              <span>MHA Eligible</span>
+            </button>
+          )}
+        </div>
+
+        <div className="txn-detail-actions">
+          <button
+            type="button"
+            className="btn-secondary btn-compact txn-action-pill txn-action-primary m3-tactile"
+            onClick={() => {
+              hapticTap();
+              onEdit?.();
+            }}
+            {...tabProps}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            <span>Edit</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn-secondary btn-compact txn-action-pill m3-tactile"
+            onClick={() => {
+              hapticTap();
+              onCreateRule?.();
+            }}
+            {...tabProps}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="4" y1="21" x2="4" y2="14" />
+              <line x1="4" y1="10" x2="4" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12" y2="3" />
+              <line x1="20" y1="21" x2="20" y2="16" />
+              <line x1="20" y1="12" x2="20" y2="3" />
+              <line x1="1" y1="14" x2="7" y2="14" />
+              <line x1="9" y1="8" x2="15" y2="8" />
+              <line x1="17" y1="16" x2="23" y2="16" />
+            </svg>
+            <span>Create Rule</span>
+          </button>
+
+          {onMarkRecurring && (
+            <button
+              type="button"
+              className="btn-secondary btn-compact txn-action-pill m3-tactile"
+              onClick={() => {
+                hapticTap();
+                onMarkRecurring();
+              }}
+              {...tabProps}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                <path d="M16 16h5v5" />
+              </svg>
+              <span>Mark as Recurring</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="btn-danger btn-compact txn-action-pill txn-action-delete m3-tactile"
+            onClick={() => {
+              triggerHaptic('medium');
+              onDelete?.();
+            }}
+            {...tabProps}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            <span>Delete</span>
+          </button>
+        </div>
       </div>
     </div>
   );
