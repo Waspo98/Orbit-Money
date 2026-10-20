@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import AppIcon from './AppIcon.jsx';
 import MoreDotsIcon from './MoreDotsIcon.jsx';
@@ -13,67 +13,23 @@ export default function BottomTabs({
   const location = useLocation();
   const primaryTabs = getPrimaryRoutes({ mhaTrackerEnabled, navigationPreferences });
   const currentIndex = primaryTabs.findIndex((tab) => tab.path === location.pathname);
+  const totalTabs = primaryTabs.length + 1;
 
-  const containerRef = useRef(null);
-  const isFirstMeasurement = useRef(true);
+  const [mounted, setMounted] = useState(false);
   const prevIndexRef = useRef(currentIndex);
   const [isStretching, setIsStretching] = useState(false);
   const [direction, setDirection] = useState('forward');
-  const [isMeasured, setIsMeasured] = useState(false);
-  const [sliderRect, setSliderRect] = useState({
-    left: 0,
-    width: 0,
-    visible: false
-  });
 
-  const prefersReducedMotion = typeof window !== 'undefined'
-    && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-
-  const updateSlider = () => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    if (currentIndex < 0) {
-      setSliderRect((prev) => ({ ...prev, visible: false }));
-      return;
-    }
-
-    const activeTab = container.querySelector('.bottom-tab.active');
-    if (!activeTab) {
-      setSliderRect((prev) => ({ ...prev, visible: false }));
-      return;
-    }
-
-    const containerRect = container.getBoundingClientRect();
-    const tabRect = activeTab.getBoundingClientRect();
-
-    setSliderRect({
-      left: tabRect.left - containerRect.left,
-      width: tabRect.width,
-      visible: true
+  // Suppress animation on initial page mount (mount directly at target tab index without sliding from 0)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      setMounted(true);
     });
-    setIsMeasured(true);
-  };
-
-  useLayoutEffect(() => {
-    updateSlider();
-  }, [currentIndex, primaryTabs]);
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container || typeof ResizeObserver === 'undefined') return;
-
-    const observer = new ResizeObserver(() => {
-      updateSlider();
-    });
-
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [currentIndex, primaryTabs]);
-
-  useEffect(() => {
-    if (isFirstMeasurement.current) {
-      isFirstMeasurement.current = false;
+    if (!mounted) {
       prevIndexRef.current = currentIndex;
       return;
     }
@@ -91,28 +47,26 @@ export default function BottomTabs({
       return () => clearTimeout(timer);
     }
     prevIndexRef.current = currentIndex;
-  }, [currentIndex]);
+  }, [currentIndex, mounted]);
 
+  const prefersReducedMotion = typeof window !== 'undefined'
+    && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
   const scale = isStretching && !prefersReducedMotion ? 1.12 : 1.0;
 
   const sliderStyle = {
-    width: sliderRect.width ? `${sliderRect.width}px` : undefined,
-    transform: sliderRect.visible
-      ? `translate3d(${sliderRect.left}px, 0, 0) scaleX(${scale})`
+    width: `calc(100% / ${totalTabs})`,
+    transform: currentIndex >= 0
+      ? `translate3d(calc(${currentIndex} * 100%), 0, 0) scaleX(${scale})`
       : 'translate3d(0, 0, 0) scaleX(1)',
     transformOrigin: direction === 'forward' ? 'left center' : 'right center',
-    opacity: sliderRect.visible ? 1 : 0,
-    transition: isFirstMeasurement.current || prefersReducedMotion
+    opacity: currentIndex >= 0 ? 1 : 0,
+    transition: !mounted || prefersReducedMotion
       ? 'none'
       : undefined
   };
 
   return (
-    <nav
-      ref={containerRef}
-      className={`bottom-tabs ${isMeasured ? 'has-slider' : ''}`}
-      aria-label="Primary navigation"
-    >
+    <nav className="bottom-tabs" aria-label="Primary navigation">
       <span
         className="bottom-tabs-slider"
         aria-hidden="true"
