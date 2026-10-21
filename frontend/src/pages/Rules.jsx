@@ -93,6 +93,7 @@ export default function Rules() {
         kicker="Automation"
         title="Rules"
         subtitle={`${rules.length.toLocaleString()} rule${rules.length === 1 ? '' : 's'}`}
+        showBackButton={true}
       />
 
       <PageActionRow className="rules-page-actions" label="Rule actions">
@@ -110,7 +111,7 @@ export default function Rules() {
       <PageSearchToolbar
         value={search}
         onChange={setSearch}
-        placeholder="Search rules by name, merchant, or category..."
+        placeholder="Search rules..."
       />
 
       {loading ? (
@@ -119,7 +120,7 @@ export default function Rules() {
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          icon="R"
+          icon={<span className="material-symbols-rounded">rule</span>}
           title={search ? 'No matching rules' : 'No rules yet'}
           description={
             search

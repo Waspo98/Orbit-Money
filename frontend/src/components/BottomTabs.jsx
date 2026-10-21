@@ -15,8 +15,12 @@ export default function BottomTabs({
   const currentIndex = primaryTabs.findIndex((tab) => tab.path === location.pathname);
   const totalTabs = primaryTabs.length + 1;
 
+  const isPrimaryTab = currentIndex >= 0;
+  const isMoreActive = !isPrimaryTab;
+  const activeIndex = isPrimaryTab ? currentIndex : primaryTabs.length;
+
   const [mounted, setMounted] = useState(false);
-  const prevIndexRef = useRef(currentIndex);
+  const prevIndexRef = useRef(activeIndex);
   const [isStretching, setIsStretching] = useState(false);
   const [direction, setDirection] = useState('forward');
 
@@ -30,12 +34,12 @@ export default function BottomTabs({
 
   useEffect(() => {
     if (!mounted) {
-      prevIndexRef.current = currentIndex;
+      prevIndexRef.current = activeIndex;
       return;
     }
 
-    if (currentIndex >= 0 && prevIndexRef.current >= 0 && currentIndex !== prevIndexRef.current) {
-      const dir = currentIndex > prevIndexRef.current ? 'forward' : 'backward';
+    if (activeIndex >= 0 && prevIndexRef.current >= 0 && activeIndex !== prevIndexRef.current) {
+      const dir = activeIndex > prevIndexRef.current ? 'forward' : 'backward';
       setDirection(dir);
       setIsStretching(true);
 
@@ -43,11 +47,11 @@ export default function BottomTabs({
         setIsStretching(false);
       }, 180);
 
-      prevIndexRef.current = currentIndex;
+      prevIndexRef.current = activeIndex;
       return () => clearTimeout(timer);
     }
-    prevIndexRef.current = currentIndex;
-  }, [currentIndex, mounted]);
+    prevIndexRef.current = activeIndex;
+  }, [activeIndex, mounted]);
 
   const prefersReducedMotion = typeof window !== 'undefined'
     && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
@@ -55,11 +59,9 @@ export default function BottomTabs({
 
   const sliderStyle = {
     width: `calc(100% / ${totalTabs})`,
-    transform: currentIndex >= 0
-      ? `translate3d(calc(${currentIndex} * 100%), 0, 0) scaleX(${scale})`
-      : 'translate3d(0, 0, 0) scaleX(1)',
+    transform: `translate3d(calc(${activeIndex} * 100%), 0, 0) scaleX(${scale})`,
     transformOrigin: direction === 'forward' ? 'left center' : 'right center',
-    opacity: currentIndex >= 0 ? 1 : 0,
+    opacity: 1,
     transition: !mounted || prefersReducedMotion
       ? 'none'
       : undefined
@@ -94,7 +96,7 @@ export default function BottomTabs({
       ))}
       <button
         type="button"
-        className="bottom-tab"
+        className={`bottom-tab ${isMoreActive ? 'active' : ''}`}
         onClick={() => {
           triggerHaptic('selection');
           onMoreClick?.();

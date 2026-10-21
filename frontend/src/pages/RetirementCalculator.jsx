@@ -11,6 +11,7 @@ import ResponsiveMetricValue from '../components/ResponsiveMetricValue.jsx';
 import SegmentedControl from '../components/SegmentedControl.jsx';
 import TapIndicatorText from '../components/TapIndicatorText.jsx';
 import { formatCompactCurrency, formatCurrency, formatPercent, parsePercentInput } from '../lib/formatters.js';
+import { triggerHaptic } from '../lib/haptics.js';
 import {
   ageFromDate,
   parseMonthParts
@@ -961,6 +962,7 @@ export default function RetirementCalculator() {
         title="Retirement Calculator"
         subtitle="All projections are shown in today's dollars, so market returns are adjusted for inflation before comparing conservative, balanced, and aggressive paths."
         stats={heroStats}
+        showBackButton={true}
       />
 
       {loading ? (
@@ -1667,10 +1669,18 @@ function RetirementHistoryChart({ accounts, history }) {
   }, 0);
   const positiveAccountSeries = accountSeries.filter((series) => Math.max(0, series.points.at(-1)?.amount || 0) > 0);
 
+  const lastHistoryIndexRef = useRef(null);
+
   function updateScrub(event) {
     const rect = event.currentTarget.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-    setActivePosition(ratio * Math.max(0, points.length - 1));
+    const nextActive = ratio * Math.max(0, points.length - 1);
+    const nextIdx = Math.round(nextActive);
+    if (nextIdx !== lastHistoryIndexRef.current) {
+      lastHistoryIndexRef.current = nextIdx;
+      triggerHaptic('selection');
+    }
+    setActivePosition(nextActive);
   }
 
   function handlePointerDown(event) {
@@ -1763,7 +1773,7 @@ function RetirementHistoryChart({ accounts, history }) {
             <g key={value}>
               <line x1="0" x2={width} y1={y} y2={y} className="retcalc-gridline" />
               <text x="10" y={Math.max(16, y - 8)} className="retcalc-axis-label">
-                {formatMoney(value)}
+                {formatCompactCurrency(value)}
               </text>
             </g>
           );
@@ -1920,10 +1930,18 @@ function RetirementProjectionChart({
   const tooltipX = scrubX > width - (tooltipWidth + 20) ? scrubX - (tooltipWidth + 12) : scrubX + 12;
   const tooltipY = 20;
 
+  const lastScrubAgeRef = useRef(null);
+
   function updateScrubAge(event) {
     const rect = event.currentTarget.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-    setActiveAge(minAge + ratio * (maxAge - minAge));
+    const nextAge = minAge + ratio * (maxAge - minAge);
+    const roundedAge = Math.round(nextAge);
+    if (roundedAge !== lastScrubAgeRef.current) {
+      lastScrubAgeRef.current = roundedAge;
+      triggerHaptic('selection');
+    }
+    setActiveAge(nextAge);
   }
 
   function handlePointerDown(event) {
@@ -2008,7 +2026,7 @@ function RetirementProjectionChart({
             <g key={value}>
               <line x1="0" x2={width} y1={y} y2={y} className="retcalc-gridline" />
               <text x="10" y={Math.max(16, y - 8)} className="retcalc-axis-label">
-                {formatMoney(value)}
+                {formatCompactCurrency(value)}
               </text>
             </g>
           );
@@ -2018,7 +2036,7 @@ function RetirementProjectionChart({
           <title>{`Target: ${formatMoney(targetNestEgg)}`}</title>
         </line>
         <text x={width - 12} y={Math.max(18, targetY - 10)} className="retcalc-target-label">
-          Target {formatMoney(targetNestEgg)}
+          Target {formatCompactCurrency(targetNestEgg)}
         </text>
 
         <line x1={todayX} x2={todayX} y1="0" y2={height} className="retcalc-today-line" />

@@ -245,6 +245,9 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [simpleFinSyncState, setSimpleFinSyncState] = useState('idle');
   const groupRefs = useRef(new Map());
+  const sentinelRefs = useRef(new Map());
+  const endSentinelRef = useRef(null);
+  const dimensionsRef = useRef({ left: 0, width: 0 });
   const floatingHeaderRef = useRef(null);
   const pinnedTranslateYRef = useRef(0);
   const [pinnedMonth, setPinnedMonth] = useState(null);
@@ -291,15 +294,15 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
 
       const data = await api.get(`/api/transactions?${p.toString()}`);
       setItems(data.items);
-      setTotal(data.total);
-      setGrandTotal(data.grandTotal ?? data.total);
+      setTotal(data.total ?? data.totalCount ?? (Array.isArray(data.items) ? data.items.length : 0));
+      setGrandTotal(data.grandTotal ?? data.total ?? data.totalCount ?? (Array.isArray(data.items) ? data.items.length : 0));
       setMonthlyTotal(data.monthlyTotal ?? 0);
       setMonthCounts(
         Object.fromEntries(
           (data.monthCounts || []).map((row) => [row.month, Number(row.count) || 0])
         )
       );
-      setTotalPages(data.totalPages);
+      setTotalPages(data.totalPages ?? data.pageCount ?? 1);
     } catch (err) {
       setError(err.message || 'Failed to load transactions');
     } finally {
@@ -529,86 +532,121 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
       return undefined;
     }
 
-    let frameId = null;
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+      return undefined;
+    }
 
-    function measurePinnedMonth() {
-      frameId = null;
-      const safeAreaTop =
-        parseFloat(window.getComputedStyle(document.documentElement).getPropertyValue('--safe-area-top')) ||
-        (document.querySelector('.app-shell')
-          ? parseFloat(window.getComputedStyle(document.querySelector('.app-shell')).paddingTop) || 0
-          : 0);
-      const topOffset = safeAreaTop;
-      const headerHeight =
-        floatingHeaderRef.current?.getBoundingClientRect().height || (52 + safeAreaTop);
-      let activeIndex = -1;
+    const safeAreaTop =
+      parseFloat(window.getComputedStyle(document.documentElement).getPropertyValue('--safe-area-top')) ||
+      (document.querySelector('.app-shell')
+        ? parseFloat(window.getComputedStyle(document.querySelector('.app-shell')).paddingTop) || 0
+        : 0);
+    const topOffset = Math.round(safeAreaTop + 12);
 
-      for (let index = 0; index < groups.length; index += 1) {
-        const node = groupRefs.current.get(groups[index].id);
-        if (!node) continue;
-        const rect = node.getBoundingClientRect();
-        if (rect.top <= topOffset && rect.bottom > headerHeight) {
-          activeIndex = index;
+    function updateDimensions() {
+      if (window.innerWidth < 1080) {
+        dimensionsRef.current = { left: 0, width: window.innerWidth };
+      } else {
+        const firstNode = groupRefs.current.values().next().value;
+        if (firstNode) {
+          const rect = firstNode.getBoundingClientRect();
+          dimensionsRef.current = { left: rect.left, width: rect.width };
         }
       }
+    }
 
-      if (activeIndex < 0) {
+    updateDimensions();
+
+    const scrolledPast = new Set();
+    let endPassed = false;
+
+    function evaluateActiveMonth() {
+      if (endPassed) {
         setPinnedMonth(null);
         return;
       }
-
-      const group = groups[activeIndex];
-      const node = groupRefs.current.get(group.id);
-      if (!node) {
+      let active = null;
+      for (let i = groups.length - 1; i >= 0; i -= 1) {
+        if (scrolledPast.has(groups[i].id)) {
+          active = groups[i];
+          break;
+        }
+      }
+      if (!active) {
         setPinnedMonth(null);
         return;
       }
+      const dims = dimensionsRef.current;
+      setPinnedMonth((prev) => {
+        if (
+          prev &&
+          prev.key === active.id &&
+          prev.count === active.count &&
+          Math.abs(prev.left - dims.left) < 0.5 &&
+          Math.abs(prev.width - dims.width) < 0.5
+        ) {
+          return prev;
+        }
+        return {
+          key: active.id,
+          label: active.label,
+          count: active.count,
+          left: dims.left,
+          width: dims.width
+        };
+      });
+    }
 
-      const rect = node.getBoundingClientRect();
-      const nextGroup = groups[activeIndex + 1];
-      const nextNode = nextGroup ? groupRefs.current.get(nextGroup.id) : null;
-      const nextTop = nextNode?.getBoundingClientRect().top;
-      const translateY =
-        typeof nextTop === 'number'
-          ? Math.min(0, nextTop - headerHeight)
-          : 0;
-
-      pinnedTranslateYRef.current = translateY;
-      if (floatingHeaderRef.current) {
-        floatingHeaderRef.current.style.transform = `translate3d(0, ${translateY}px, 0)`;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const target = entry.target;
+          if (target === endSentinelRef.current) {
+            endPassed = entry.boundingClientRect.top <= topOffset;
+          } else {
+            const groupId = target.dataset.groupId;
+            if (groupId) {
+              if (entry.boundingClientRect.top <= topOffset) {
+                scrolledPast.add(groupId);
+              } else {
+                scrolledPast.delete(groupId);
+              }
+            }
+          }
+        }
+        evaluateActiveMonth();
+      },
+      {
+        root: null,
+        rootMargin: `-${topOffset}px 0px 0px 0px`,
+        threshold: 0
       }
+    );
 
-      const nextPinnedMonth = {
-        key: group.id,
-        label: group.label,
-        count: group.count,
-        left: rect.left,
-        width: rect.width
-      };
-
-      setPinnedMonth((prev) =>
-        prev &&
-        prev.key === nextPinnedMonth.key &&
-        prev.count === nextPinnedMonth.count &&
-        Math.abs(prev.left - nextPinnedMonth.left) < 0.5 &&
-        Math.abs(prev.width - nextPinnedMonth.width) < 0.5
-          ? prev
-          : nextPinnedMonth
-      );
+    sentinelRefs.current.forEach((node) => {
+      if (node) observer.observe(node);
+    });
+    if (endSentinelRef.current) {
+      observer.observe(endSentinelRef.current);
     }
 
-    function updatePinnedMonth() {
-      if (frameId != null) return;
-      frameId = window.requestAnimationFrame(measurePinnedMonth);
+    function onResize() {
+      updateDimensions();
+      const dims = dimensionsRef.current;
+      setPinnedMonth((prev) => {
+        if (!prev) return null;
+        if (Math.abs(prev.left - dims.left) < 0.5 && Math.abs(prev.width - dims.width) < 0.5) {
+          return prev;
+        }
+        return { ...prev, left: dims.left, width: dims.width };
+      });
     }
 
-    updatePinnedMonth();
-    window.addEventListener('scroll', updatePinnedMonth, { passive: true });
-    window.addEventListener('resize', updatePinnedMonth);
+    window.addEventListener('resize', onResize);
+
     return () => {
-      if (frameId != null) window.cancelAnimationFrame(frameId);
-      window.removeEventListener('scroll', updatePinnedMonth);
-      window.removeEventListener('resize', updatePinnedMonth);
+      observer.disconnect();
+      window.removeEventListener('resize', onResize);
     };
   }, [groups]);
 
@@ -771,17 +809,27 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         <div className="center-loading app-page-width">
           <div className="spinner" />
         </div>
-      ) : total === 0 ? (
+      ) : (total === 0 || (Array.isArray(items) && items.length === 0)) ? (
         <EmptyState
           className="app-page-width"
-          icon="$"
-          title="No transactions match your filters"
-          description="Try widening the date range or removing some criteria."
-          action={(
-            <button type="button" className="btn-secondary" onClick={clearAllFilters}>
-              Clear all filters
-            </button>
-          )}
+          icon={<span className="material-symbols-rounded">receipt_long</span>}
+          title={activeCount > 0 ? "No transactions match your filters" : "No transactions yet"}
+          description={
+            activeCount > 0
+              ? "Try widening the date range or removing some criteria."
+              : "Transactions will appear here when you import a file, sync accounts, or add them manually."
+          }
+          action={
+            activeCount > 0 ? (
+              <button type="button" className="btn-secondary" onClick={clearAllFilters}>
+                Clear all filters
+              </button>
+            ) : (
+              <button type="button" className="btn-primary" onClick={() => setManualTxnOpen(true)}>
+                + Add Transaction
+              </button>
+            )
+          }
         />
       ) : (
         <>
@@ -794,6 +842,15 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                 else groupRefs.current.delete(group.id);
               }}
             >
+              <div
+                className="txn-month-sentinel"
+                data-group-id={group.id}
+                ref={(node) => {
+                  if (node) sentinelRefs.current.set(group.id, node);
+                  else sentinelRefs.current.delete(group.id);
+                }}
+                style={{ height: 1, marginBottom: -1, pointerEvents: 'none' }}
+              />
               <header className="txn-month-header">
                 <span className="txn-month-label">{group.label}</span>
                 <span className="txn-month-count">
@@ -832,27 +889,35 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             </section>
           ))}
 
-          <div className="pagination app-page-width">
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={filters.page <= 1}
-              onClick={() => goToPage(filters.page - 1)}
-            >
-              Previous
-            </button>
-            <span className="page-info">
-              Page {filters.page} of {totalPages}
-            </span>
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={filters.page >= totalPages}
-              onClick={() => goToPage(filters.page + 1)}
-            >
-              Next
-            </button>
-          </div>
+          <div
+            className="txn-month-end-sentinel"
+            ref={endSentinelRef}
+            style={{ height: 1, pointerEvents: 'none' }}
+          />
+
+          {totalPages > 1 && (
+            <div className="pagination app-page-width">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={filters.page <= 1}
+                onClick={() => goToPage(filters.page - 1)}
+              >
+                Previous
+              </button>
+              <span className="page-info">
+                Page {filters.page} of {totalPages || 1}
+              </span>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={filters.page >= (totalPages || 1)}
+                onClick={() => goToPage(filters.page + 1)}
+              >
+                Next
+              </button>
+            </div>
+          )}
         </>
       )}
 

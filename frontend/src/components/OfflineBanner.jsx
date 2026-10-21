@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
+import { getStorageMode, STORAGE_MODE_LOCAL } from '../serverConfig.js';
 
 export default function OfflineBanner({ isOnline }) {
   const [dismissed, setDismissed] = useState(false);
+  const isLocalMode = getStorageMode() === STORAGE_MODE_LOCAL;
 
   useEffect(() => {
     if (isOnline) setDismissed(false);
   }, [isOnline]);
 
-  if (isOnline || dismissed) return null;
+  if (isLocalMode || isOnline || dismissed) return null;
 
   return (
     <div className="offline-banner" role="status">

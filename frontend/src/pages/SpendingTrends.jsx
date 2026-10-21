@@ -14,6 +14,7 @@ import {
   formatCurrency,
   formatSignedCurrency
 } from '../lib/formatters.js';
+import { triggerHaptic } from '../lib/haptics.js';
 import {
   formatMonthKeyLabel,
   getLocalMonthBounds,
@@ -213,6 +214,7 @@ export default function SpendingTrends() {
         kicker="History"
         title="Spending Trends"
         subtitle={`What has happened over the last ${range.months} months`}
+        showBackButton={true}
         toolbar={
           <RangeTabs
             value={rangeValue}
@@ -389,6 +391,16 @@ function CashFlowChart({ flow }) {
     touchStartRef.current = null;
   }, [flow]);
 
+  const lastScrubIndexRef = useRef(null);
+
+  function handleSelectIndex(index) {
+    if (index !== lastScrubIndexRef.current && index !== null && index >= 0) {
+      lastScrubIndexRef.current = index;
+      triggerHaptic('selection');
+    }
+    setActiveIndex(index);
+  }
+
   function startTouchSelection(event, index) {
     if (event.pointerType !== 'touch') return;
     touchStartRef.current = {
@@ -397,14 +409,22 @@ function CashFlowChart({ flow }) {
       y: event.clientY,
       moved: false
     };
+    handleSelectIndex(index);
   }
 
   function trackTouchSelection(event) {
     if (event.pointerType !== 'touch' || !touchStartRef.current) return;
     const dx = Math.abs(event.clientX - touchStartRef.current.x);
     const dy = Math.abs(event.clientY - touchStartRef.current.y);
-    if (dx > 10 || dy > 10) {
+    if (dx > 8 || dy > 8) {
       touchStartRef.current.moved = true;
+    }
+    const svg = event.currentTarget.ownerSVGElement || event.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    const relativeX = event.clientX - rect.left - plotLeft;
+    const computedIndex = Math.max(0, Math.min(flow.length - 1, Math.floor(relativeX / band)));
+    if (computedIndex >= 0 && computedIndex < flow.length) {
+      handleSelectIndex(computedIndex);
     }
   }
 
@@ -417,8 +437,8 @@ function CashFlowChart({ flow }) {
       ignoreNextClickRef.current = false;
     }, 400);
 
-    if (!touchStart || touchStart.index !== index || touchStart.moved) return;
-    setActiveIndex(index);
+    if (!touchStart) return;
+    handleSelectIndex(index);
   }
 
   function yFor(value) {
@@ -497,11 +517,11 @@ function CashFlowChart({ flow }) {
                 role="button"
                 aria-label={hitboxLabel}
                 onPointerEnter={(event) => {
-                  if (event.pointerType !== 'touch') setActiveIndex(index);
+                  if (event.pointerType !== 'touch') handleSelectIndex(index);
                 }}
                 onPointerMove={(event) => {
                   if (event.pointerType !== 'touch') {
-                    setActiveIndex(index);
+                    handleSelectIndex(index);
                     return;
                   }
                   trackTouchSelection(event);
@@ -521,14 +541,14 @@ function CashFlowChart({ flow }) {
                 }}
                 onClick={() => {
                   if (ignoreNextClickRef.current) return;
-                  setActiveIndex(index);
+                  handleSelectIndex(index);
                 }}
-                onFocus={() => setActiveIndex(index)}
+                onFocus={() => handleSelectIndex(index)}
                 onBlur={() => setActiveIndex(null)}
                 onKeyDown={(event) => {
                   if (event.key !== 'Enter' && event.key !== ' ') return;
                   event.preventDefault();
-                  setActiveIndex(index);
+                  handleSelectIndex(index);
                 }}
               />
             </g>
@@ -594,6 +614,7 @@ function CategoryTrendChart({ trend, onMonthSelect }) {
 
   function startTouchSelection(event, index) {
     if (event.pointerType !== 'touch') return;
+    triggerHaptic('selection');
     touchStartRef.current = {
       index,
       x: event.clientX,

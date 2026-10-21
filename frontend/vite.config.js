@@ -40,6 +40,9 @@ function sqliteMigrationsPlugin() {
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), sqliteMigrationsPlugin()],
+  worker: {
+    plugins: () => [sqliteMigrationsPlugin()]
+  },
   server: {
     // During `npm run dev`, proxy API calls to the Express backend.
     proxy: {

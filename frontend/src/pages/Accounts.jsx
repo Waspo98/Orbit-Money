@@ -471,52 +471,8 @@ export default function Accounts({
         stats={accountHeroStats}
       />
 
-      <PageActionRow className="accounts-toolbar accounts-page-toolbar" label="Account actions">
-        {!reorderMode && (
-          <label className="toggle-row">
-            <input
-              type="checkbox"
-              checked={showArchived}
-              onChange={(e) => setShowArchived(e.target.checked)}
-            />
-            <span>Show archived</span>
-          </label>
-        )}
-        {accounts.length > 1 && (
-          <button
-            type="button"
-            className={reorderMode ? 'btn-primary' : 'btn-secondary'}
-            disabled={Boolean(accountReorderGroupType)}
-            onClick={toggleReorderMode}
-          >
-            {reorderMode ? 'Done' : 'Reorder Groups'}
-          </button>
-        )}
-        {!reorderMode && (
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => setAddingManual(true)}
-          >
-            + Manual Account
-          </button>
-        )}
-      </PageActionRow>
-
-      <div className="view-header" hidden>
-        <div>
-          <h2>Accounts</h2>
-          <p className="muted">
-            {accounts.length.toLocaleString()} account
-            {accounts.length === 1 ? '' : 's'}
-            {showArchived ? ' (including archived)' : ''}
-            {reorderMode && (
-              <span className="subtle"> · Drag a row to reorder</span>
-            )}
-          </p>
-        </div>
-
-        <div className="accounts-toolbar">
+      {accounts.length > 0 && (
+        <PageActionRow className="accounts-toolbar accounts-page-toolbar" label="Account actions">
           {!reorderMode && (
             <label className="toggle-row">
               <input
@@ -531,13 +487,23 @@ export default function Accounts({
             <button
               type="button"
               className={reorderMode ? 'btn-primary' : 'btn-secondary'}
+              disabled={Boolean(accountReorderGroupType)}
               onClick={toggleReorderMode}
             >
-              {reorderMode ? 'Done' : 'Reorder'}
+              {reorderMode ? 'Done' : 'Reorder Groups'}
             </button>
           )}
-        </div>
-      </div>
+          {!reorderMode && (
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setAddingManual(true)}
+            >
+              + Manual Account
+            </button>
+          )}
+        </PageActionRow>
+      )}
 
       {error && <div className="error">{error}</div>}
 
@@ -547,12 +513,12 @@ export default function Accounts({
         </div>
       ) : accounts.length === 0 ? (
         <EmptyState
-          icon="$"
+          icon={<span className="material-symbols-rounded">account_balance</span>}
           title="No accounts yet"
           description="Import from Rocket Money, connect SimpleFIN, or add a manual account."
           action={(
-            <button type="button" className="btn-secondary" onClick={() => setAddingManual(true)}>
-              Add Manual Account
+            <button type="button" className="btn-primary" onClick={() => setAddingManual(true)}>
+              + Manual Account
             </button>
           )}
         />

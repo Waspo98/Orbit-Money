@@ -91,6 +91,54 @@ const OFFLINE_ROUTE_PRELOADS = [
   () => import('./pages/Household.jsx')
 ];
 
+function prewarmRoutesIdle(queue, onComplete) {
+  if (!queue || queue.length === 0) {
+    if (onComplete) onComplete();
+    return () => {};
+  }
+
+  const remaining = [...queue];
+
+  const scheduleIdle =
+    typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function'
+      ? window.requestIdleCallback.bind(window)
+      : (cb) => setTimeout(() => cb({ timeRemaining: () => 15, didTimeout: false }), 60);
+
+  const cancelIdle =
+    typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function'
+      ? window.cancelIdleCallback.bind(window)
+      : clearTimeout;
+
+  let idleHandle = null;
+
+  function processSlice(deadline) {
+    while (remaining.length > 0 && (deadline.timeRemaining() > 8 || deadline.didTimeout)) {
+      const loader = remaining.shift();
+      try {
+        loader().catch((err) => {
+          console.warn('Idle chunk prewarm skipped:', err);
+        });
+      } catch (err) {
+        console.warn('Idle chunk prewarm failed to invoke:', err);
+      }
+    }
+
+    if (remaining.length > 0) {
+      idleHandle = scheduleIdle(processSlice, { timeout: 10000 });
+    } else if (onComplete) {
+      onComplete();
+    }
+  }
+
+  idleHandle = scheduleIdle(processSlice, { timeout: 10000 });
+
+  return () => {
+    if (idleHandle != null) {
+      cancelIdle(idleHandle);
+    }
+  };
+}
+
 function transitionBetween(fromPath, toPath, routes) {
   const fromIndex = routes.indexOf(fromPath);
   const toIndex = routes.indexOf(toPath);
@@ -179,13 +227,24 @@ function useRouteScrollRestoration(location, navigationType, previousPathRef) {
   }
 
   useEffect(() => {
-    window.addEventListener('scroll', saveActiveScrollPosition, { passive: true });
+    let frameId = null;
+
+    function handleScrollThrottled() {
+      if (frameId !== null) return;
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+        saveActiveScrollPosition();
+      });
+    }
+
+    window.addEventListener('scroll', handleScrollThrottled, { passive: true });
     window.addEventListener('click', saveActiveScrollPosition, true);
     window.addEventListener('popstate', saveActiveScrollPosition);
     window.addEventListener('pagehide', saveActiveScrollPosition);
 
     return () => {
-      window.removeEventListener('scroll', saveActiveScrollPosition);
+      if (frameId !== null) window.cancelAnimationFrame(frameId);
+      window.removeEventListener('scroll', handleScrollThrottled);
       window.removeEventListener('click', saveActiveScrollPosition, true);
       window.removeEventListener('popstate', saveActiveScrollPosition);
       window.removeEventListener('pagehide', saveActiveScrollPosition);
@@ -512,17 +571,17 @@ function AppShell() {
     if (authState !== 'in' || !lookupsReady || !isOnline || offlineRoutesPreloadedRef.current) {
       return undefined;
     }
+    let cancelPrewarm = null;
     const timer = window.setTimeout(() => {
       offlineRoutesPreloadedRef.current = true;
-      Promise.allSettled(OFFLINE_ROUTE_PRELOADS.map((load) => load())).then((results) => {
-        const failed = results.filter((result) => result.status === 'rejected');
-        if (failed.length > 0) {
-          offlineRoutesPreloadedRef.current = false;
-          console.warn('Offline route preload failed:', failed.map((result) => result.reason));
-        }
+      cancelPrewarm = prewarmRoutesIdle(OFFLINE_ROUTE_PRELOADS, () => {
+        // Idle route chunk preloading complete
       });
     }, 2500);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      if (cancelPrewarm) cancelPrewarm();
+    };
   }, [authState, isOnline, lookupsReady]);
 
   useEffect(() => {
@@ -712,6 +771,7 @@ function AppShell() {
 
   return (
     <div className={`app-shell has-sidebar ${hasPageHero ? 'has-page-hero' : ''}`}>
+      <div className="status-bar-scrim" aria-hidden="true" />
       <DesktopSidebar
         mhaTrackerEnabled={mhaTrackerEnabled}
         navigationPreferences={navigationPreferences}

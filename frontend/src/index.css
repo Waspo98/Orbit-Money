@@ -150,14 +150,17 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg:                #0a1410;
-  --surface:           #111a15;
-  --surface-2:         #172220;
-  --surface-3:         #1f2b28;
+  --bg:                #070c09;
+  --surface:           rgba(17, 26, 21, 0.72);
+  --surface-2:         rgba(23, 34, 32, 0.76);
+  --surface-3:         rgba(31, 43, 40, 0.82);
+  --surface-glass:     rgba(13, 22, 18, 0.75);
   --surface-hover:     #1a2622;
 
   --border:            #243330;
   --border-strong:     #38463f;
+  --border-glass:      rgba(255, 255, 255, 0.08);
+  --border-specular:   inset 0 1px 1px rgba(255, 255, 255, 0.12);
 
   --text:              #e8ece6;
   --text-muted:        #8a948c;
@@ -192,13 +195,16 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --bg:                #0a1410;
-    --surface:           #111a15;
-    --surface-2:         #172220;
-    --surface-3:         #1f2b28;
+    --bg:                #070c09;
+    --surface:           rgba(17, 26, 21, 0.72);
+    --surface-2:         rgba(23, 34, 32, 0.76);
+    --surface-3:         rgba(31, 43, 40, 0.82);
+    --surface-glass:     rgba(13, 22, 18, 0.75);
     --surface-hover:     #1a2622;
     --border:            #243330;
     --border-strong:     #38463f;
+    --border-glass:      rgba(255, 255, 255, 0.08);
+    --border-specular:   inset 0 1px 1px rgba(255, 255, 255, 0.12);
     --text:              #e8ece6;
     --text-muted:        #8a948c;
     --text-subtle:       #636d65;
@@ -2356,6 +2362,72 @@ input, textarea, select {
   overflow-x: clip;
 }
 
+/* Universal Bottom Safe Space across mobile scroll views */
+:root {
+  --universal-bottom-safe-space: calc(var(--bottom-tab-height) + env(safe-area-inset-bottom, 0px) + 24px);
+}
+
+.app-main,
+.dashboard-view,
+.transactions-view,
+.budgets-view,
+.accounts-view,
+.upcoming-view,
+.settings-view,
+.categories-view,
+.goals-view,
+.spending-trends-view,
+.retirement-calculator-view,
+.housing-calculator-view,
+.net-worth-view,
+.household-view {
+  padding-bottom: var(--universal-bottom-safe-space);
+}
+
+/* Status Bar Scrim for Android system status bar */
+.status-bar-scrim {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 100;
+  pointer-events: none;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: rgba(7, 12, 9, 0.78);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* PageHero Frosted Back Button */
+.page-hero-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 6px 10px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: background var(--dur-fast), transform var(--dur-spring-fast);
+}
+
+.page-hero-back-btn:active {
+  transform: scale(0.94);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.page-hero-back-btn .material-symbols-rounded {
+  font-size: 1.1rem;
+}
+
 .app-main > * {
   min-width: 0;
 }
@@ -2524,11 +2596,10 @@ input, textarea, select {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-family: inherit;
-  font-size: 0.7rem;
+  font-size: clamp(0.62rem, 1.9vw, 0.72rem);
   font-weight: 500;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  letter-spacing: -0.015em;
+  text-transform: none;
   text-decoration: none;
   outline: none;
   -webkit-tap-highlight-color: transparent;
@@ -2619,8 +2690,9 @@ input, textarea, select {
 }
 
 .bottom-tab-label {
-  font-size: 0.7rem;
-  letter-spacing: 0.01em;
+  font-size: clamp(0.62rem, 1.9vw, 0.72rem);
+  letter-spacing: -0.015em;
+  line-height: 1.15;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2951,15 +3023,20 @@ input, textarea, select {
   gap: 22px;
   margin: 20px auto 28px;
   padding: 30px 20px 32px;
-  border: 0;
-  border-radius: var(--radius-lg, 14px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 28px;
   color: #f7fbff;
   /* PageHero variants share one app-wide palette; page-hero-* classes are for layout and content tweaks only. */
   background:
-    linear-gradient(135deg, #052e24 0%, #065f46 46%, #047857 100%);
+    radial-gradient(circle at 50% -20%, rgba(16, 185, 129, 0.22), transparent 70%),
+    radial-gradient(circle at 85% 25%, rgba(52, 211, 153, 0.14), transparent 50%),
+    radial-gradient(circle at 15% 45%, rgba(6, 78, 59, 0.28), transparent 60%),
+    linear-gradient(135deg, rgba(5, 46, 36, 0.88) 0%, rgba(4, 30, 24, 0.94) 100%);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   box-shadow:
-    0 22px 52px rgba(5, 20, 52, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    0 24px 60px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.12);
 }
 
 .page-hero-morphing {
@@ -2980,12 +3057,12 @@ input, textarea, select {
   content: '';
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   pointer-events: none;
   background:
-    radial-gradient(circle at 86% 18%, rgba(77, 208, 225, 0.28), transparent 28%),
-    radial-gradient(circle at 12% 100%, rgba(16, 185, 129, 0.18), transparent 32%),
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
-  opacity: 0.9;
+    radial-gradient(circle at 80% 15%, rgba(110, 231, 183, 0.18), transparent 30%),
+    radial-gradient(circle at 20% 90%, rgba(16, 185, 129, 0.12), transparent 35%);
+  opacity: 0.85;
 }
 
 .page-hero > * {
@@ -3265,12 +3342,18 @@ input, textarea, select {
   text-transform: uppercase;
 }
 
-.page-hero-stat > strong {
+.page-hero-stat > strong,
+.page-hero-main-number,
+.budget-beta-main-number,
+.upcoming-cashflow-summary > strong,
+.hero-metric-tabular {
   color: #ffffff;
   font-size: 1.18rem;
   font-weight: 700;
   line-height: 1.1;
-  letter-spacing: 0;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 .page-hero-stat > strong {
@@ -3793,12 +3876,52 @@ input, textarea, select {
 .dashboard-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg, 14px);
+  border-radius: var(--radius-xl, 24px);
   padding: 16px 18px;
   box-shadow: var(--shadow-sm);
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+
+:root[data-theme="dark"] .dashboard-card,
+:root[data-theme="dark"] .settings-card,
+:root[data-theme="dark"] .settings-section,
+:root[data-theme="dark"] .budget-beta-section,
+:root[data-theme="dark"] .budget-beta-snapshot,
+:root[data-theme="dark"] .budget-card,
+:root[data-theme="dark"] .account-group-card,
+:root[data-theme="dark"] .upcoming-cashflow-panel,
+:root[data-theme="dark"] .upcoming-card {
+  background: rgba(17, 26, 21, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-xl, 24px);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .dashboard-card,
+  :root:not([data-theme="light"]) .settings-card,
+  :root:not([data-theme="light"]) .settings-section,
+  :root:not([data-theme="light"]) .budget-beta-section,
+  :root:not([data-theme="light"]) .budget-beta-snapshot,
+  :root:not([data-theme="light"]) .budget-card,
+  :root:not([data-theme="light"]) .account-group-card,
+  :root:not([data-theme="light"]) .upcoming-cashflow-panel,
+  :root:not([data-theme="light"]) .upcoming-card {
+    background: rgba(17, 26, 21, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-xl, 24px);
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.06),
+      0 8px 24px rgba(0, 0, 0, 0.28);
+  }
 }
 
 .dashboard-card-header {

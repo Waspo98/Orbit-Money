@@ -1,96 +1,115 @@
-import initSqlJs from 'sql.js';
-import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
-import migrations from 'virtual:sqlite-migrations';
+// frontend/src/db/localDb.js
+// Main-thread Web Worker proxy for Orbit Money's SQLite WASM engine.
 
-const IDB_NAME = 'orbit-local-sqlite-v1';
-const IDB_STORE = 'sqlite_storage';
-const IDB_KEY = 'budget_db_bytes';
+let workerInstance = null;
+let nextId = 1;
+const pendingRequests = new Map();
 
-let sqlEnginePromise = null;
-let activeDb = null;
-let saveTimeout = null;
-let isDirty = false;
+function getWorker() {
+  if (!workerInstance) {
+    workerInstance = new Worker(
+      new URL('./sqlite.worker.js', import.meta.url),
+      { type: 'module' }
+    );
 
-let idbPromise = null;
+    workerInstance.onmessage = (event) => {
+      const { id, success, result, bytes, error, status } = event.data || {};
+      const pending = pendingRequests.get(id);
+      if (!pending) return;
+      pendingRequests.delete(id);
 
-function openIdb() {
-  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
-  if (!idbPromise) {
-    idbPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(IDB_NAME, 1);
-      request.onupgradeneeded = () => {
-        const idb = request.result;
-        if (!idb.objectStoreNames.contains(IDB_STORE)) {
-          idb.createObjectStore(IDB_STORE);
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => {
-        idbPromise = null;
-        reject(request.error);
-      };
-    });
+      if (success) {
+        pending.resolve(bytes !== undefined ? bytes : result);
+      } else {
+        const err = new Error(error || 'Worker request failed');
+        if (status) err.status = status;
+        pending.reject(err);
+      }
+    };
+
+    workerInstance.onerror = (err) => {
+      console.error('[localDb] SQLite worker error:', err);
+      for (const [, pending] of pendingRequests.entries()) {
+        pending.reject(new Error(err.message || 'SQLite worker crashed'));
+      }
+      pendingRequests.clear();
+      try {
+        workerInstance.terminate();
+      } catch {}
+      workerInstance = null;
+    };
   }
-  return idbPromise;
+  return workerInstance;
 }
 
-async function loadPersistedBytes() {
-  const idb = await openIdb();
-  if (!idb) return null;
-  return new Promise((resolve) => {
-    try {
-      const tx = idb.transaction(IDB_STORE, 'readonly');
-      const store = tx.objectStore(IDB_STORE);
-      const req = store.get(IDB_KEY);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
-  });
-}
-
-async function saveBytesToIdb(bytes) {
-  const idb = await openIdb();
-  if (!idb) return;
+export function callWorker(type, payload = {}, transferList = []) {
   return new Promise((resolve, reject) => {
     try {
-      const tx = idb.transaction(IDB_STORE, 'readwrite');
-      const store = tx.objectStore(IDB_STORE);
-      store.put(bytes, IDB_KEY);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      const w = getWorker();
+      const id = nextId++;
+      pendingRequests.set(id, { resolve, reject });
+      w.postMessage({ id, type, ...payload }, transferList);
     } catch (err) {
       reject(err);
     }
   });
 }
 
-export function scheduleSave() {
-  isDirty = true;
-  if (saveTimeout) clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(async () => {
-    await flushDatabase();
-  }, 350);
+export async function exportDatabaseBytes() {
+  return callWorker('EXPORT_DATABASE');
+}
+
+export async function importDatabaseBytes(bytes) {
+  let uint8;
+  if (bytes instanceof Uint8Array) {
+    if (bytes.byteOffset !== 0 || bytes.byteLength !== bytes.buffer.byteLength) {
+      uint8 = new Uint8Array(bytes);
+    } else {
+      uint8 = bytes;
+    }
+  } else if (bytes instanceof ArrayBuffer) {
+    uint8 = new Uint8Array(bytes);
+  } else {
+    uint8 = new Uint8Array(bytes || []);
+  }
+
+  // Zero-copy transfer of the ArrayBuffer to worker
+  return callWorker('IMPORT_DATABASE', { bytes: uint8 }, [uint8.buffer]);
 }
 
 export async function flushDatabase() {
-  if (saveTimeout) {
-    clearTimeout(saveTimeout);
-    saveTimeout = null;
-  }
-  if (!activeDb || !isDirty) return;
-  try {
-    const bytes = activeDb.export();
-    await saveBytesToIdb(bytes);
-    isDirty = false;
-  } catch (err) {
-    console.error('Failed to flush local SQLite database:', err);
-  }
+  return callWorker('FLUSH_DATABASE');
 }
 
-if (typeof window !== 'undefined') {
-  window.addEventListener('visibilitychange', () => {
+export async function resetLocalDatabase() {
+  return callWorker('RESET_DATABASE');
+}
+
+export async function getLocalDatabase() {
+  await callWorker('PING');
+  return {
+    exec: (sql, params = []) => callWorker('API_REQUEST', { url: '/api/exec', options: { method: 'POST', body: { sql, params } } }),
+    export: () => exportDatabaseBytes()
+  };
+}
+
+export function scheduleSave() {
+  // Worker automatically debounces writes with a 500ms trailing timer
+  return flushDatabase();
+}
+
+export function createStatementWrapper() {
+  console.warn('[localDb] createStatementWrapper is deprecated on main thread. All queries are offloaded to sqlite.worker.js.');
+  return {
+    all: () => [],
+    get: () => null,
+    run: () => ({ changes: 0, lastInsertRowid: 0 })
+  };
+}
+
+// Lifecycle listeners for immediate flush on exit or tab hide
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       void flushDatabase();
     }
@@ -98,176 +117,4 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', () => {
     void flushDatabase();
   });
-}
-
-function runDatabaseMigrations(db) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS _migrations (
-      name TEXT PRIMARY KEY,
-      applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
-
-  const stmt = db.prepare('SELECT name FROM _migrations');
-  const applied = new Set();
-  while (stmt.step()) {
-    const row = stmt.getAsObject();
-    applied.add(row.name);
-  }
-  stmt.free();
-
-  let count = 0;
-  for (const item of migrations) {
-    if (applied.has(item.name)) continue;
-    try {
-      db.exec('BEGIN TRANSACTION;');
-      db.exec(item.sql);
-      const ins = db.prepare('INSERT INTO _migrations (name) VALUES (?)');
-      ins.run([item.name]);
-      ins.free();
-      db.exec('COMMIT;');
-      count++;
-    } catch (err) {
-      try {
-        db.exec('ROLLBACK;');
-      } catch {}
-      console.error(`Migration ${item.name} failed:`, err);
-      throw err;
-    }
-  }
-
-  // Ensure household 1 and user 1 exist with default settings
-  db.exec(`
-    INSERT OR IGNORE INTO households (id, name, default_currency)
-    VALUES (1, 'My Household', 'USD');
-
-    INSERT OR IGNORE INTO users (id, username, display_name, is_local_admin)
-    VALUES (1, 'local_user', 'Local User', 1);
-
-    INSERT OR IGNORE INTO household_memberships (household_id, user_id, role, access_level)
-    VALUES (1, 1, 'owner', 'write');
-  `);
-
-  return count;
-}
-
-export async function getLocalDatabase() {
-  if (activeDb) return activeDb;
-  if (sqlEnginePromise) return sqlEnginePromise;
-
-  sqlEnginePromise = (async () => {
-    const SQL = await initSqlJs({
-      locateFile: () => sqlWasmUrl
-    });
-
-    const persisted = await loadPersistedBytes();
-    let db;
-    if (persisted && persisted.length > 0) {
-      try {
-        db = new SQL.Database(persisted);
-      } catch (err) {
-        console.warn('Failed to load persisted SQLite bytes, initializing fresh db:', err);
-        db = new SQL.Database();
-      }
-    } else {
-      db = new SQL.Database();
-    }
-
-    // Set performance / integrity pragmas
-    try {
-      db.exec('PRAGMA foreign_keys = ON;');
-    } catch {}
-
-    const appliedCount = runDatabaseMigrations(db);
-    if (appliedCount > 0 || !persisted) {
-      const bytes = db.export();
-      await saveBytesToIdb(bytes);
-    }
-
-    activeDb = db;
-    return activeDb;
-  })();
-
-  return sqlEnginePromise;
-}
-
-export function createStatementWrapper(db, sql) {
-  return {
-    all(...params) {
-      const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
-      const stmt = db.prepare(sql);
-      if (flatParams && flatParams.length > 0) {
-        stmt.bind(flatParams);
-      }
-      const rows = [];
-      while (stmt.step()) {
-        rows.push(stmt.getAsObject());
-      }
-      stmt.free();
-      return rows;
-    },
-    get(...params) {
-      const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
-      const stmt = db.prepare(sql);
-      if (flatParams && flatParams.length > 0) {
-        stmt.bind(flatParams);
-      }
-      let row = null;
-      if (stmt.step()) {
-        row = stmt.getAsObject();
-      }
-      stmt.free();
-      return row;
-    },
-    run(...params) {
-      const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
-      const stmt = db.prepare(sql);
-      if (flatParams && flatParams.length > 0) {
-        stmt.bind(flatParams);
-      }
-      stmt.step();
-      stmt.free();
-
-      const lastIdRes = db.exec('SELECT last_insert_rowid() AS id;');
-      const lastInsertRowid = lastIdRes[0]?.values[0]?.[0] ?? 0;
-      const changes = db.getRowsModified();
-
-      scheduleSave();
-      return { changes, lastInsertRowid };
-    }
-  };
-}
-
-export async function exportDatabaseBytes() {
-  const db = await getLocalDatabase();
-  await flushDatabase();
-  return db.export();
-}
-
-export async function importDatabaseBytes(bytes) {
-  const SQL = await initSqlJs({
-    locateFile: () => sqlWasmUrl
-  });
-
-  const db = new SQL.Database(bytes);
-  runDatabaseMigrations(db);
-  const exported = db.export();
-  await saveBytesToIdb(exported);
-  activeDb = db;
-  return activeDb;
-}
-
-export async function resetLocalDatabase() {
-  if (saveTimeout) {
-    clearTimeout(saveTimeout);
-    saveTimeout = null;
-  }
-  const idb = await openIdb();
-  if (idb) {
-    const tx = idb.transaction(IDB_STORE, 'readwrite');
-    tx.objectStore(IDB_STORE).delete(IDB_KEY);
-  }
-  activeDb = null;
-  sqlEnginePromise = null;
-  return getLocalDatabase();
 }

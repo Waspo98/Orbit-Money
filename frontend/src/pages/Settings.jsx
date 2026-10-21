@@ -1969,7 +1969,7 @@ export default function Settings({
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <strong>Current Mode: {isLocal ? 'Local First' : 'Self-Hosted Server'}</strong>
               <span className={`pill ${isLocal ? 'success' : 'accent'}`}>
-                {isLocal ? 'Device SQLite' : 'Remote Server'}
+                {isLocal ? 'Local Device • Offline Ready' : 'Remote Server'}
               </span>
             </div>
             <p>
@@ -2890,6 +2890,8 @@ export default function Settings({
         kicker="Control Center"
         title={pageMeta.title}
         subtitle={pageMeta.subtitle}
+        showBackButton={true}
+        onBack={isSettingsSubpage ? () => navigate('/settings', { state: { transition: 'back' } }) : () => navigate(-1)}
         toolbar={isSettingsSubpage ? (
           <div className="settings-hero-toolbar">
             <button

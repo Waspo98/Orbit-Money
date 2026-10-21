@@ -20,11 +20,14 @@ export function formatSignedCurrency(amount, options = {}) {
 export function formatCompactCurrency(amount) {
   const value = Number(amount || 0);
   const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
   if (abs >= 1_000_000) {
-    return `${value < 0 ? '-' : ''}$${(abs / 1_000_000).toFixed(1)}M`;
+    const formatted = (abs / 1_000_000).toFixed(1).replace(/\.0$/, '');
+    return `${sign}$${formatted}M`;
   }
-  if (abs >= 10_000) {
-    return `${value < 0 ? '-' : ''}$${(abs / 1_000).toFixed(1)}k`;
+  if (abs >= 1_000) {
+    const formatted = (abs / 1_000).toFixed(1).replace(/\.0$/, '');
+    return `${sign}$${formatted}K`;
   }
   return formatCurrency(value, { maximumFractionDigits: 0 });
 }
