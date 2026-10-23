@@ -650,28 +650,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
     };
   }, [groups]);
 
-  // Onboarding empty state - only when no filters AND nothing exists at all.
-  if (!loading && grandTotal === 0 && !isFiltered) {
-    return (
-      <div className="transactions-view">
-        {ptrIndicator}
-        <EmptyState
-          icon="$"
-          title="No transactions yet"
-          description="Import your Rocket Money export to bring over your full history, preserve your custom merchant names, and generate rename rules."
-          action={(
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => navigate('/settings')}
-            >
-              Import from Rocket Money
-            </button>
-          )}
-        />
-      </div>
-    );
-  }
+
 
   return (
     <div className="transactions-view">
@@ -682,6 +661,52 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         kicker="Money movement"
         title="Transactions"
         subtitle={`${monthlyTotal.toLocaleString()} ${monthlyTotal === 1 ? 'transaction' : 'transactions'} this month`}
+        onAction={() => setManualTxnOpen(true)}
+        actionLabel="Add Transaction"
+        collapsedTrailing={(
+          <div className="canopy-collapsed-tools">
+            <button
+              type="button"
+              className="canopy-collapsed-btn"
+              onClick={() => {
+                triggerHaptic('selection');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                setTimeout(() => {
+                  document.querySelector('.txn-search-field input')?.focus();
+                }, 250);
+              }}
+              aria-label="Search transactions"
+              title="Search transactions"
+            >
+              <span className="material-symbols-rounded">search</span>
+            </button>
+            <button
+              type="button"
+              className={`canopy-collapsed-btn ${activeCount > 0 ? 'is-active' : ''}`}
+              onClick={() => {
+                triggerHaptic('selection');
+                setFilterSheetOpen(true);
+              }}
+              aria-label={`Filter transactions${activeCount > 0 ? ` (${activeCount} active)` : ''}`}
+              title="Filter transactions"
+            >
+              <span className="material-symbols-rounded">tune</span>
+              {activeCount > 0 && <span className="canopy-badge">{activeCount}</span>}
+            </button>
+            <button
+              type="button"
+              className="canopy-add-btn"
+              onClick={() => {
+                triggerHaptic('impact');
+                setManualTxnOpen(true);
+              }}
+              aria-label="Add Transaction"
+              title="Add Transaction"
+            >
+              <span className="material-symbols-rounded">add</span>
+            </button>
+          </div>
+        )}
         chrome={(hero) => (
           <div className="page-hero-chrome">
             <button
@@ -698,6 +723,7 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
         toolbar={(
           <div className="txn-toolbar txn-toolbar-hero" role="group" aria-label="Transaction tools">
             <SearchField
+              variant="capsule"
               value={searchLocal}
               onChange={setSearch}
               placeholder="Search merchant, description, notes..."
@@ -706,20 +732,17 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
             <div className="txn-toolbar-actions">
               <button
                 type="button"
-                className="btn-secondary txn-filter-button txn-control-button"
-                onClick={() => setFilterSheetOpen(true)}
+                className={`txn-filter-button m3-filter-chip ${activeCount > 0 ? 'is-active' : ''}`.trim()}
+                onClick={() => {
+                  triggerHaptic('selection');
+                  setFilterSheetOpen(true);
+                }}
+                aria-label={`Filter transactions${activeCount > 0 ? ` (${activeCount} active)` : ''}`}
               >
-                <svg
-                  className="txn-filter-icon"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                  focusable="false"
-                >
-                  <path d="M4 6h16l-6 7v4.5l-4 2V13L4 6Z" />
-                </svg>
+                <span className="material-symbols-rounded txn-filter-icon" aria-hidden="true">tune</span>
                 <span className="txn-control-label">Filter</span>
                 {activeCount > 0 && (
-                  <span className="txn-filter-count">{activeCount}</span>
+                  <span className="m3-filter-badge txn-filter-count">{activeCount}</span>
                 )}
               </button>
               <AppSelect
@@ -749,8 +772,8 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
           </div>
         )}
       />
-      <PageActionRow className="txn-page-actions" label="Transaction actions">
-        {hasSimpleFinAccount && (
+      {hasSimpleFinAccount && (
+        <PageActionRow className="txn-page-actions" label="Transaction actions">
           <button
             type="button"
             className={`btn-secondary txn-sync-button ${simpleFinSyncState === 'success' ? 'success' : ''}`.trim()}
@@ -764,15 +787,44 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
                 ? 'Synced'
                 : 'SimpleFIN Sync'}
           </button>
-        )}
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => setManualTxnOpen(true)}
-        >
-          + Manual Transaction
-        </button>
-      </PageActionRow>
+        </PageActionRow>
+      )}
+
+      {!loading && grandTotal === 0 && !isFiltered ? (
+        <EmptyState
+          icon="$"
+          title="No transactions yet"
+          description="Import your Rocket Money export to bring over your full history, preserve your custom merchant names, and generate rename rules."
+          action={(
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => navigate('/settings')}
+            >
+              Import from Rocket Money
+            </button>
+          )}
+        />
+      ) : (
+        <>
+
+      {!loading && grandTotal === 0 && !isFiltered ? (
+        <EmptyState
+          icon="$"
+          title="No transactions yet"
+          description="Import your Rocket Money export to bring over your full history, preserve your custom merchant names, and generate rename rules."
+          action={(
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => navigate('/settings')}
+            >
+              Import from Rocket Money
+            </button>
+          )}
+        />
+      ) : (
+        <>
       {pinnedMonth && typeof document !== 'undefined' && createPortal(
         <header
           ref={floatingHeaderRef}
@@ -918,6 +970,10 @@ export default function Transactions({ accounts, categories, mhaTrackerEnabled =
               </button>
             </div>
           )}
+        </>
+      )}
+        </>
+      )}
         </>
       )}
 

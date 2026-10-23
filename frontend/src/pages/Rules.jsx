@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import { PageSearchToolbar } from '../components/PageToolbar.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
@@ -94,17 +93,9 @@ export default function Rules() {
         title="Rules"
         subtitle={`${rules.length.toLocaleString()} rule${rules.length === 1 ? '' : 's'}`}
         showBackButton={true}
+        onAction={() => setEditing({})}
+        actionLabel="Add Rule"
       />
-
-      <PageActionRow className="rules-page-actions" label="Rule actions">
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => setEditing({})}
-        >
-          + New Rule
-        </button>
-      </PageActionRow>
 
       {error && <div className="error">{error}</div>}
 

@@ -308,6 +308,9 @@ export default function Upcoming({ accounts = [], categories = [] }) {
         subtitle="Projected bills, subscriptions, income, and cash flow."
         stats={heroStats}
         statLabel="Upcoming summary"
+        showBackButton={true}
+        onAction={() => openNew()}
+        actionLabel="Add Recurring"
       />
 
       <PageActionRow className="upcoming-page-actions" label="Upcoming actions">

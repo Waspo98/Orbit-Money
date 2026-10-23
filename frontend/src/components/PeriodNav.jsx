@@ -1,4 +1,5 @@
 import AppSelect from './AppSelect.jsx';
+import { triggerHaptic } from '../lib/haptics.js';
 
 export default function PeriodNav({
   className = '',
@@ -15,9 +16,11 @@ export default function PeriodNav({
   jumpLabel = 'Jump to period',
   menuPlacement = 'default'
 }) {
+  const isConnected = variant === 'hero' || variant === 'connected';
   const classes = [
     'period-nav',
     variant ? `period-nav-${variant}` : '',
+    isConnected ? 'period-nav-connected m3-period-nav' : '',
     size ? `period-nav-${size}` : '',
     className
   ].filter(Boolean).join(' ');
@@ -26,13 +29,14 @@ export default function PeriodNav({
     <div className={classes}>
       <button
         type="button"
-        className="btn-icon period-nav-arrow"
-        onClick={onPrev}
+        className="btn-icon period-nav-arrow period-nav-prev"
+        onClick={(e) => {
+          triggerHaptic('selection');
+          onPrev?.(e);
+        }}
         aria-label={previousLabel}
       >
-        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-          <path d="M14.5 6.5 9 12l5.5 5.5" />
-        </svg>
+        <span className="material-symbols-rounded" aria-hidden="true">chevron_left</span>
       </button>
 
       <div className="period-nav-label-wrap">
@@ -40,7 +44,10 @@ export default function PeriodNav({
           className="period-nav-select"
           value={value}
           options={options}
-          onChange={onJump}
+          onChange={(val) => {
+            triggerHaptic('selection');
+            onJump?.(val);
+          }}
           ariaLabel={jumpLabel}
           menuPlacement={menuPlacement}
         />
@@ -48,14 +55,16 @@ export default function PeriodNav({
 
       <button
         type="button"
-        className="btn-icon period-nav-arrow"
-        onClick={onNext}
+        className="btn-icon period-nav-arrow period-nav-next"
+        onClick={(e) => {
+          if (!canGoForward) return;
+          triggerHaptic('selection');
+          onNext?.(e);
+        }}
         disabled={!canGoForward}
         aria-label={nextLabel}
       >
-        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-          <path d="m9.5 6.5L15 12l-5.5 5.5" />
-        </svg>
+        <span className="material-symbols-rounded" aria-hidden="true">chevron_right</span>
       </button>
     </div>
   );

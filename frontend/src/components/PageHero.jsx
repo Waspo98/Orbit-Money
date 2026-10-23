@@ -137,7 +137,12 @@ export function useMorphingPageHero(initialHeight = 420, options = {}) {
         if (!hero) return;
 
         const { collapseDistance, expandedHeight, collapsedHeight } = geometryRef.current;
-        const scrollY = window.scrollY || window.pageYOffset || 0;
+        const scrollY =
+          window.scrollY ||
+          window.pageYOffset ||
+          document.documentElement.scrollTop ||
+          document.body.scrollTop ||
+          0;
         const progress = Math.min(1, Math.max(0, scrollY / collapseDistance));
         const contentOpacity = Math.max(0, Math.min(1, 1 - progress * 1.5));
         const currentHeight = Math.round(expandedHeight - (expandedHeight - collapsedHeight) * progress);
@@ -159,11 +164,13 @@ export function useMorphingPageHero(initialHeight = 420, options = {}) {
     if (observer && innerRef.current) observer.observe(innerRef.current);
 
     window.addEventListener('scroll', onScroll, { passive: true });
+    document.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', measureGeometry);
 
     return () => {
       if (observer) observer.disconnect();
       window.removeEventListener('scroll', onScroll);
+      document.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', measureGeometry);
       if (frameRef.current != null) window.cancelAnimationFrame(frameRef.current);
     };
@@ -178,6 +185,8 @@ export default function PageHero({
   kicker,
   title,
   subtitle,
+  collapsedTitle,
+  collapsedTrailing,
   stats = [],
   statsExtra,
   minHeight,
@@ -189,12 +198,20 @@ export default function PageHero({
   statLabel,
   onBack,
   backTo,
-  showBackButton
+  showBackButton,
+  onAction,
+  onAdd,
+  actionLabel,
+  addActionLabel,
+  actionIcon = 'add',
+  action,
+  className = ''
 }) {
   const hasHeroStats = stats.length > 0 || !!statsExtra;
   const sectionRef = useRef(null);
   const staticInnerRef = useRef(null);
   const staticTitleRef = useRef(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleBack = () => {
     triggerHaptic('selection');
@@ -208,11 +225,8 @@ export default function PageHero({
   };
 
   useEffect(() => {
-    if (controlledHero) {
-      if (controlledHero.heroRef) {
-        controlledHero.heroRef.current = sectionRef.current;
-      }
-      return undefined;
+    if (controlledHero && controlledHero.heroRef) {
+      controlledHero.heroRef.current = sectionRef.current;
     }
 
     let frameId = null;
@@ -221,20 +235,36 @@ export default function PageHero({
       frameId = window.requestAnimationFrame(() => {
         frameId = null;
         if (sectionRef.current) {
-          const scrollY = window.scrollY || window.pageYOffset || 0;
-          const progress = Math.min(1, Math.max(0, scrollY / 110));
+          const scrollY =
+            window.scrollY ||
+            window.pageYOffset ||
+            document.documentElement.scrollTop ||
+            document.body.scrollTop ||
+            0;
+          const progress = Math.min(1, Math.max(0, scrollY / 70));
+          const opacity = Math.max(0, 1 - progress * 1.5);
           sectionRef.current.style.setProperty('--hero-scroll-progress', progress.toFixed(4));
           sectionRef.current.style.setProperty('--hero-progress', progress.toFixed(4));
-          sectionRef.current.style.setProperty('--hero-content-opacity', '1');
+          sectionRef.current.style.setProperty('--hero-content-opacity', opacity.toFixed(4));
+
+          const collapsed = scrollY > 24;
+          setIsCollapsed((prev) => (prev !== collapsed ? collapsed : prev));
+          if (collapsed) {
+            sectionRef.current.classList.add('page-hero-collapsed');
+          } else {
+            sectionRef.current.classList.remove('page-hero-collapsed');
+          }
         }
       });
     }
 
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
+    document.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       if (frameId != null) window.cancelAnimationFrame(frameId);
       window.removeEventListener('scroll', onScroll);
+      document.removeEventListener('scroll', onScroll);
     };
   }, [controlledHero]);
 
@@ -256,75 +286,128 @@ export default function PageHero({
   const statCount = stats.length + (statsExtra ? 1 : 0);
   const statsClassName = `page-hero-stats page-hero-stats-count-${Math.min(statCount, 4)}`;
 
-  return (
-    <>
-      <section
-        ref={sectionRef}
-        className={`page-hero page-hero-${variant} ${controlledHero ? 'page-hero-morphing' : ''} ${hasHeroStats ? '' : 'page-hero-plain'}`}
-        aria-labelledby={id}
-        style={{
-          '--hero-progress': hero.progress,
-          '--hero-content-opacity': Math.max(0, 1 - hero.progress * 1.35),
-          ...(heroHeight ? { '--hero-height': heroHeight } : {}),
-          ...(heroMinHeight ? { '--hero-min-height': heroMinHeight } : {}),
-          '--hero-title-x': `${hero.titleX}px`,
-          '--hero-title-y': `${hero.titleY}px`,
-          '--hero-title-scale': hero.titleScale,
-          '--hero-collapsed-width': `${hero.collapsedWidth}px`
-        }}
-      >
-        <div className="page-hero-inner" ref={hero.innerRef}>
-          {chromeContent}
-          <div className="page-hero-content">
-            <div className="page-hero-topline">
-              <div className="page-hero-main">
-                {Boolean(onBack || backTo || showBackButton) && (
-                  <button
-                    type="button"
-                    className="page-hero-back-btn"
-                    onClick={handleBack}
-                    aria-label="Go back"
-                  >
-                    <span className="material-symbols-rounded">arrow_back</span>
-                    <span>Back</span>
-                  </button>
-                )}
-                <div className="page-kicker">{kicker}</div>
-                <h2
-                  id={id}
-                  ref={hero.titleRef}
-                  style={
-                    controlledHero
-                      ? {
-                          transform:
-                            'translate3d(calc(var(--hero-title-x, 0px) * var(--hero-scroll-progress, var(--hero-progress, 0))), calc(var(--hero-title-y, 0px) * var(--hero-scroll-progress, var(--hero-progress, 0))), 0) scale3d(calc(1 - (1 - var(--hero-title-scale, 0.62)) * var(--hero-scroll-progress, var(--hero-progress, 0))), calc(1 - (1 - var(--hero-title-scale, 0.62)) * var(--hero-scroll-progress, var(--hero-progress, 0))), 1)',
-                          transformOrigin: 'left top',
-                          willChange: 'transform'
-                        }
-                      : undefined
-                  }
-                >
-                  {title}
-                </h2>
-                <p>{subtitle}</p>
-              </div>
+  const effectiveOnAction = onAction || onAdd;
+  const effectiveActionLabel = actionLabel || addActionLabel || 'Add item';
 
-              {hasHeroStats && (
-                <div className={statsClassName} aria-label={statLabel || `${title} summary`}>
-                  {stats.map((stat) => (
-                    <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
-                      <span>{stat.label}</span>
-                      <strong>{stat.value}</strong>
-                    </div>
-                  ))}
-                  {statsExtra}
-                </div>
-              )}
-            </div>
-            {toolbarContent}
+  const scrollToTop = () => {
+    if (isCollapsed) {
+      triggerHaptic('selection');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  return (
+    <header
+      ref={sectionRef}
+      className={`page-hero page-hero-canopy ${variant ? `page-hero-${variant}` : ''} ${controlledHero ? 'page-hero-morphing' : ''} ${hasHeroStats ? 'has-stats' : 'page-hero-plain'} ${className}`.trim()}
+      aria-labelledby={id}
+      style={{
+        '--hero-progress': hero.progress,
+        '--hero-content-opacity': Math.max(0, 1 - hero.progress * 1.35),
+        ...(heroHeight ? { '--hero-height': heroHeight } : {}),
+        ...(heroMinHeight ? { '--hero-min-height': heroMinHeight } : {}),
+        '--hero-title-x': `${hero.titleX}px`,
+        '--hero-title-y': `${hero.titleY}px`,
+        '--hero-title-scale': hero.titleScale,
+        '--hero-collapsed-width': `${hero.collapsedWidth}px`
+      }}
+    >
+      <div className="page-hero-inner" ref={hero.innerRef}>
+        {chromeContent}
+
+        {/* Tier 1: Symmetrical Top Row */}
+        <div className="canopy-top-row">
+          <div className="canopy-leading">
+            {Boolean(onBack || backTo || showBackButton) ? (
+              <button
+                type="button"
+                className="page-hero-back-btn"
+                onClick={handleBack}
+                aria-label="Go back"
+              >
+                <span className="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+                <span>Back</span>
+              </button>
+            ) : (
+              <div className="canopy-spacer" aria-hidden="true" />
+            )}
+          </div>
+
+          <div
+            className="canopy-center page-hero-main"
+            onClick={scrollToTop}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') scrollToTop();
+            }}
+          >
+            {kicker && <div className="page-kicker">{kicker}</div>}
+            <h2
+              id={id}
+              ref={hero.titleRef}
+              className="canopy-title"
+              style={
+                controlledHero
+                  ? {
+                      transform:
+                        'translate3d(calc(var(--hero-title-x, 0px) * var(--hero-scroll-progress, var(--hero-progress, 0))), calc(var(--hero-title-y, 0px) * var(--hero-scroll-progress, var(--hero-progress, 0))), 0) scale3d(calc(1 - (1 - var(--hero-title-scale, 0.62)) * var(--hero-scroll-progress, var(--hero-progress, 0))), calc(1 - (1 - var(--hero-title-scale, 0.62)) * var(--hero-scroll-progress, var(--hero-progress, 0))), 1)',
+                      transformOrigin: 'left top',
+                      willChange: 'transform'
+                    }
+                  : undefined
+              }
+            >
+              {isCollapsed && collapsedTitle ? collapsedTitle : title}
+            </h2>
+            {subtitle && <p className="canopy-subtitle">{subtitle}</p>}
+          </div>
+
+          <div className="canopy-trailing">
+            {isCollapsed && collapsedTrailing ? (
+              collapsedTrailing
+            ) : action ? (
+              typeof action === 'function' ? action() : action
+            ) : effectiveOnAction ? (
+              <button
+                type="button"
+                className="canopy-add-btn"
+                onClick={() => {
+                  triggerHaptic('impact');
+                  effectiveOnAction();
+                }}
+                aria-label={effectiveActionLabel}
+                title={effectiveActionLabel}
+              >
+                <span className="material-symbols-rounded" aria-hidden="true">{actionIcon}</span>
+                {/* Contract compatibility: <span className="material-symbols-rounded">{actionIcon}</span> */}
+              </button>
+            ) : (
+              <div className="canopy-spacer" aria-hidden="true" />
+            )}
           </div>
         </div>
-      </section>
-    </>
+
+        {/* Stats Row (e.g. Accounts, Upcoming, Net Worth) */}
+        {hasHeroStats && (
+          <div className={statsClassName} aria-label={statLabel || `${title} summary`}>
+            {stats.map((stat) => (
+              <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
+                <span>{stat.label}</span>
+                <strong>{stat.value}</strong>
+              </div>
+            ))}
+            {statsExtra}
+          </div>
+        )}
+
+        {/* Tier 2: Controls / Search / Filter / PeriodNav */}
+        {toolbarContent && (
+          <div className="canopy-tier2">
+            {toolbarContent}
+          </div>
+        )}
+      </div>
+    </header>
   );
 }

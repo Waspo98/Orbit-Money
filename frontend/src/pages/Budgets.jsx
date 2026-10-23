@@ -11,7 +11,6 @@ import CurrencyInput, {
 } from '../components/CurrencyInput.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import ExpandingSection from '../components/ExpandingSection.jsx';
-import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import PeriodNav from '../components/PeriodNav.jsx';
 import SubcardGrid from '../components/SubcardGrid.jsx';
@@ -449,6 +448,9 @@ export default function Budgets({
         kicker="Budget planning"
         title="Budgets"
         subtitle={budgetSubtitle}
+        collapsedTitle={`Budgets · ${formatMonthLabel(selectedMonth)}`}
+        onAction={() => setAddingBudget(true)}
+        actionLabel="Add Budget"
         toolbar={(
           <PeriodNav
             variant="hero"
@@ -468,12 +470,6 @@ export default function Budgets({
           />
         )}
       />
-
-      <PageActionRow className="budget-page-actions" label="Budget actions">
-        <button type="button" className="btn-primary" onClick={() => setAddingBudget(true)}>
-          Add Budget
-        </button>
-      </PageActionRow>
 
       {error && <div className="error">{error}</div>}
 

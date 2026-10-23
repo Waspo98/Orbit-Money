@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import AppIcon from './AppIcon.jsx';
-import MoreDotsIcon from './MoreDotsIcon.jsx';
 import { getPrimaryRoutes } from '../navigation.js';
 import { triggerHaptic } from '../lib/haptics.js';
 
 export default function BottomTabs({
+  onSettingsClick,
   onMoreClick,
   mhaTrackerEnabled = false,
   navigationPreferences
 }) {
+  const handleOpenDrawer = onSettingsClick || onMoreClick;
   const location = useLocation();
   const primaryTabs = getPrimaryRoutes({ mhaTrackerEnabled, navigationPreferences });
   const currentIndex = primaryTabs.findIndex((tab) => tab.path === location.pathname);
@@ -99,14 +100,14 @@ export default function BottomTabs({
         className={`bottom-tab ${isMoreActive ? 'active' : ''}`}
         onClick={() => {
           triggerHaptic('selection');
-          onMoreClick?.();
+          handleOpenDrawer?.();
         }}
-        aria-label="Open more menu"
+        aria-label="Open settings and navigation drawer"
       >
         <span className="bottom-tab-pill">
-          <MoreDotsIcon className="bottom-tab-icon" />
+          <AppIcon name="settings" className="bottom-tab-icon" />
         </span>
-        <span className="bottom-tab-label">More</span>
+        <span className="bottom-tab-label">Settings</span>
       </button>
     </nav>
   );

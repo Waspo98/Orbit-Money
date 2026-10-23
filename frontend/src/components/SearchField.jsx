@@ -4,14 +4,20 @@ export default function SearchField({
   placeholder = 'Search',
   className = '',
   compact = false,
+  variant = 'default',
   ariaLabel
 }) {
   const hasValue = Boolean(value);
+  const isCapsule = variant === 'capsule';
 
   return (
-    <div className={`search-field ${compact ? 'search-field-compact' : ''} ${className}`.trim()}>
-      <span className="search-field-icon" aria-hidden="true">
-        {'\u2315'}
+    <div
+      className={`search-field ${compact ? 'search-field-compact' : ''} ${
+        isCapsule ? 'search-field-capsule' : ''
+      } ${className}`.trim()}
+    >
+      <span className="material-symbols-rounded search-field-icon search-field-symbol" aria-hidden="true">
+        search
       </span>
       <input
         type="search"
@@ -28,7 +34,7 @@ export default function SearchField({
           onClick={() => onChange('')}
           aria-label="Clear search"
         >
-          {'\u00d7'}
+          <span className="material-symbols-rounded" aria-hidden="true">close</span>
         </button>
       )}
     </div>

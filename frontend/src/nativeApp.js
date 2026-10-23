@@ -8,6 +8,10 @@ export function isNativePlatform() {
   return Capacitor.isNativePlatform();
 }
 
+if (typeof document !== 'undefined' && isNativePlatform()) {
+  document.documentElement.classList.add('is-native-app');
+}
+
 const appUrlListeners = new Set();
 
 export function onAppUrlOpen(callback) {
@@ -51,11 +55,15 @@ export function onAppStateChange(callback) {
 export async function initNativeApp({ onBackButton, onNavigateRoot } = {}) {
   backButtonHandler = onBackButton || null;
   navigateRootHandler = onNavigateRoot || null;
+  if (typeof document !== 'undefined' && isNativePlatform()) {
+    document.documentElement.classList.add('is-native-app');
+  }
   if (!isNativePlatform() || nativeInitialized) return;
   nativeInitialized = true;
 
   try {
-    StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+    StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
+    StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
 
     CapApp.addListener('appUrlOpen', (data) => {
       console.log('[nativeApp] App opened with URL:', data?.url);
@@ -108,25 +116,9 @@ export async function syncNativeStatusBar(theme, darkVariant) {
   if (!isNativePlatform()) return;
 
   try {
-    const isDark =
-      theme === 'dark' ||
-      (theme === 'system' &&
-        window.matchMedia &&
-        window.matchMedia('(prefers-color-scheme: dark)').matches);
-    const isAmoled = isDark && darkVariant === 'amoled';
-
-    let backgroundColor = '#fafaf7';
-    if (isAmoled) {
-      backgroundColor = '#000000';
-    } else if (isDark) {
-      backgroundColor = '#0a1410';
-    }
-
-    await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
-    await StatusBar.setBackgroundColor({ color: backgroundColor });
-    await StatusBar.setOverlaysWebView({ overlay: false });
+    await StatusBar.setOverlaysWebView({ overlay: true });
+    await StatusBar.setStyle({ style: Style.Dark });
   } catch (err) {
     // Gracefully ignore on unsupported devices
   }
 }
-

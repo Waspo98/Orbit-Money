@@ -2890,8 +2890,8 @@ export default function Settings({
         kicker="Control Center"
         title={pageMeta.title}
         subtitle={pageMeta.subtitle}
-        showBackButton={true}
-        onBack={isSettingsSubpage ? () => navigate('/settings', { state: { transition: 'back' } }) : () => navigate(-1)}
+        showBackButton={isSettingsSubpage}
+        onBack={isSettingsSubpage ? () => navigate('/settings', { state: { transition: 'back' } }) : undefined}
         toolbar={isSettingsSubpage ? (
           <div className="settings-hero-toolbar">
             <button

@@ -469,6 +469,8 @@ export default function Accounts({
             : `${formatCurrency(netWorth)} Net Worth across ${accountCountLabel}`
         }
         stats={accountHeroStats}
+        onAction={() => setAddingManual(true)}
+        actionLabel="Add Account"
       />
 
       {accounts.length > 0 && (
@@ -493,15 +495,7 @@ export default function Accounts({
               {reorderMode ? 'Done' : 'Reorder Groups'}
             </button>
           )}
-          {!reorderMode && (
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => setAddingManual(true)}
-            >
-              + Manual Account
-            </button>
-          )}
+
         </PageActionRow>
       )}
 

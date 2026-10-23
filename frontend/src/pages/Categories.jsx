@@ -153,6 +153,9 @@ export default function Categories({
         subtitle={`${categories.length.toLocaleString()} categor${
           categories.length === 1 ? 'y' : 'ies'
         }`}
+        showBackButton={true}
+        onAction={() => setEditing({})}
+        actionLabel="Add Category"
       />
 
       <PageActionRow className="categories-page-actions" label="Category actions">

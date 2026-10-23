@@ -46,9 +46,9 @@ test('R4: Mobile layout, responsive BottomTabs, safe area padding & status bar s
   assert.ok(css.includes('--universal-bottom-safe-space: calc(var(--bottom-tab-height) + env(safe-area-inset-bottom, 0px) + 24px);'), 'Universal bottom safe space must be declared');
   assert.ok(css.includes('padding-bottom: var(--universal-bottom-safe-space);'), 'Universal bottom safe space must be applied to views');
 
-  // Verify status bar scrim
-  assert.ok(appCode.includes('<div className="status-bar-scrim" aria-hidden="true" />'), 'App.jsx must render status bar scrim');
-  assert.ok(css.includes('.status-bar-scrim {'), 'index.css must style status bar scrim');
+  // Verify edge-to-edge status bar safe area padding
+  assert.ok(css.includes('padding: calc(env(safe-area-inset-top, 0px) +'), 'PageHero must pad for status bar notch');
+  assert.ok(css.includes('.app-shell.has-page-hero'), 'AppShell must support has-page-hero');
 
   // Verify sub-route navigation keeping More active
   assert.ok(bottomTabsCode.includes('isMoreActive'), 'BottomTabs must compute isMoreActive');

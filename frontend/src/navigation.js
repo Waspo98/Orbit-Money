@@ -51,6 +51,7 @@ export const ROUTES = [
   {
     path: '/categories',
     label: 'Category Manager',
+    shortLabel: 'Categories',
     description: 'Organize spending categories',
     icon: 'categories',
     nav: 'more',
@@ -60,6 +61,7 @@ export const ROUTES = [
   {
     path: '/goals',
     label: 'Savings Goals',
+    shortLabel: 'Goals',
     description: 'Track savings targets',
     icon: 'goals',
     nav: 'more',

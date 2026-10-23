@@ -267,6 +267,9 @@ export default function Household() {
         kicker="Income And Benefits"
         title="Household"
         subtitle="Track net pay, employer benefits, retirement inputs, and compensation history."
+        showBackButton={true}
+        onAction={() => setEditingMember({ mode: 'new' })}
+        actionLabel="Add Member"
       />
 
       <PageActionRow className="household-page-actions" label="Household actions">

@@ -26,7 +26,7 @@ import BottomTabs from './components/BottomTabs.jsx';
 import DesktopSidebar from './components/DesktopSidebar.jsx';
 import OfflineBanner from './components/OfflineBanner.jsx';
 import SyncErrorBanner from './components/SyncErrorBanner.jsx';
-import MoreSheet from './components/MoreSheet.jsx';
+import RightDrawer from './components/RightDrawer.jsx';
 import { getBodyScrollLockPosition } from './components/overlayBehavior.js';
 import { useTheme } from './hooks/useTheme.js';
 import { useOnlineStatus } from './hooks/useOnlineStatus.js';
@@ -386,7 +386,7 @@ function AppShell() {
   const [authState, setAuthState] = useState('loading');
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
   const [offlineAccessMessage, setOfflineAccessMessage] = useState('');
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     const handleReplay = () => setShowOnboarding(true);
@@ -484,8 +484,8 @@ function AppShell() {
         if (biometricLocked) {
           return true;
         }
-        if (moreOpen) {
-          setMoreOpen(false);
+        if (drawerOpen) {
+          setDrawerOpen(false);
           return true;
         }
         return false;
@@ -498,7 +498,7 @@ function AppShell() {
         return false;
       }
     });
-  }, [biometricLocked, moreOpen, location.pathname, navigate]);
+  }, [biometricLocked, drawerOpen, location.pathname, navigate]);
 
   async function checkAuth({ refreshLookups = false } = {}) {
     try {
@@ -600,9 +600,9 @@ function AppShell() {
     return () => window.clearTimeout(id);
   }, [authState, isOnline, lookupsReady, mhaTrackerEnabled]);
 
-  // Close the More sheet whenever the route changes.
+  // Close the right drawer whenever the route changes.
   useEffect(() => {
-    setMoreOpen(false);
+    setDrawerOpen(false);
   }, [location.pathname]);
 
   async function handleLogout() {
@@ -771,7 +771,6 @@ function AppShell() {
 
   return (
     <div className={`app-shell has-sidebar ${hasPageHero ? 'has-page-hero' : ''}`}>
-      <div className="status-bar-scrim" aria-hidden="true" />
       <DesktopSidebar
         mhaTrackerEnabled={mhaTrackerEnabled}
         navigationPreferences={navigationPreferences}
@@ -835,14 +834,14 @@ function AppShell() {
       </main>
 
       <BottomTabs
-        onMoreClick={() => setMoreOpen(true)}
+        onSettingsClick={() => setDrawerOpen(true)}
         mhaTrackerEnabled={mhaTrackerEnabled}
         navigationPreferences={navigationPreferences}
       />
 
-      <MoreSheet
-        open={moreOpen}
-        onClose={() => setMoreOpen(false)}
+      <RightDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
         mhaTrackerEnabled={mhaTrackerEnabled}
         navigationPreferences={navigationPreferences}
       />

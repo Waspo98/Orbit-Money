@@ -409,6 +409,8 @@ export default function Goals() {
         title="Savings Goals"
         subtitle="Connect asset accounts, allocate savings, and project when each target lands."
         showBackButton={true}
+        onAction={openNewGoal}
+        actionLabel="Add Goal"
       />
 
       <PageActionRow className="goals-page-actions" label="Goal actions">
