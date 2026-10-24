@@ -1,19 +1,46 @@
 apply plugin: 'com.android.application'
 
+def detectGitBranch() {
+    try {
+        def proc = 'git branch --show-current'.execute([], rootProject.rootDir)
+        proc.waitFor()
+        return proc.text.trim()
+    } catch (Exception ignored) {
+        return ""
+    }
+}
+
+def currentGitBranch = detectGitBranch()
+def isBetaBuild = project.hasProperty("betaBuild")
+    ? project.property("betaBuild").toString().toBoolean()
+    : currentGitBranch.equalsIgnoreCase("beta")
+
 android {
     namespace "app.overbay.orbit"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "app.overbay.orbit"
+        applicationId isBetaBuild ? "app.overbay.orbit.beta" : "app.overbay.orbit"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName isBetaBuild ? "1.0-beta" : "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    sourceSets {
+        debug {
+            if (isBetaBuild) {
+                res.srcDirs = ['src/beta/res']
+            }
+        }
+        release {
+            if (isBetaBuild) {
+                res.srcDirs = ['src/beta/res']
+            }
         }
     }
     buildTypes {
@@ -55,14 +82,6 @@ try {
 
 task copyDebugApkToRoot {
     doLast {
-        def gitBranch = ""
-        try {
-            def proc = 'git branch --show-current'.execute([], rootProject.rootDir)
-            proc.waitFor()
-            gitBranch = proc.text.trim()
-        } catch (Exception e) {}
-
-        def isBeta = gitBranch.equalsIgnoreCase("beta")
         def srcApk = file("${buildDir}/outputs/apk/debug/app-debug.apk")
         def repoRoot = file("${rootProject.rootDir}/../..")
 
@@ -70,7 +89,7 @@ task copyDebugApkToRoot {
         def betaApk = new File(repoRoot, "OrbitBeta-debug.apk")
 
         if (srcApk.exists()) {
-            if (isBeta) {
+            if (isBetaBuild) {
                 ant.copy(file: srcApk, tofile: betaApk, overwrite: true)
                 if (normalApk.exists()) normalApk.delete()
                 println "Copied APK to ${betaApk.path}"
@@ -86,4 +105,3 @@ task copyDebugApkToRoot {
 afterEvaluate {
     tasks.findByName("assembleDebug")?.finalizedBy("copyDebugApkToRoot")
 }
-
