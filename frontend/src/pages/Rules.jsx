@@ -3,8 +3,9 @@ import { api } from '../api.js';
 import AnimatedModal from '../components/AnimatedModal.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import PageHero from '../components/PageHero.jsx';
-import { PageSearchToolbar } from '../components/PageToolbar.jsx';
+import SearchField from '../components/SearchField.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import { triggerHaptic } from '../lib/haptics.js';
 import { RuleEditor } from '../components/rules/RuleEditor.jsx';
 import { summarizeAction, summarizeCondition } from '../components/rules/ruleDefinitions.js';
 
@@ -92,18 +93,51 @@ export default function Rules() {
         kicker="Automation"
         title="Rules"
         subtitle={`${rules.length.toLocaleString()} rule${rules.length === 1 ? '' : 's'}`}
-        showBackButton={true}
         onAction={() => setEditing({})}
         actionLabel="Add Rule"
+        collapsedTrailing={(
+          <div className="canopy-collapsed-tools">
+            <button
+              type="button"
+              className="canopy-collapsed-btn"
+              onClick={() => {
+                triggerHaptic('selection');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                setTimeout(() => {
+                  document.querySelector('.rules-search input')?.focus();
+                }, 250);
+              }}
+              aria-label="Search rules"
+              title="Search rules"
+            >
+              <span className="material-symbols-rounded" aria-hidden="true">search</span>
+            </button>
+            <button
+              type="button"
+              className="canopy-add-btn"
+              onClick={() => {
+                triggerHaptic('impact');
+                setEditing({});
+              }}
+              aria-label="Add Rule"
+              title="Add Rule"
+            >
+              <span className="material-symbols-rounded" aria-hidden="true">add</span>
+            </button>
+          </div>
+        )}
+        toolbar={(
+          <SearchField
+            variant="capsule"
+            className="rules-search"
+            value={search}
+            onChange={setSearch}
+            placeholder="Search rules..."
+          />
+        )}
       />
 
       {error && <div className="error">{error}</div>}
-
-      <PageSearchToolbar
-        value={search}
-        onChange={setSearch}
-        placeholder="Search rules..."
-      />
 
       {loading ? (
         <div className="center-loading">

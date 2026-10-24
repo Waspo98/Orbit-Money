@@ -210,7 +210,7 @@ test('PageHero: Two-tier sticky canopy eliminates scroll-anchoring strobe loop',
     'PageHero must use separate collapseThreshold and expandThreshold for scroll hysteresis'
   );
 
-  // 3. CSS uses native negative-top sticky offset + sticky .canopy-top-row and overflow-anchor: none
+  // 3. CSS uses native negative-top sticky offset + GPU transform morphing and overflow-anchor: none
   const heroBlock = css.match(/^\.page-hero\s*\{([^}]+)\}/m);
   assert.ok(heroBlock, '.page-hero block must exist');
   assert.ok(
@@ -218,15 +218,19 @@ test('PageHero: Two-tier sticky canopy eliminates scroll-anchoring strobe loop',
     '.page-hero must use negative top sticky offset equal to --hero-collapse-distance'
   );
   assert.ok(
+    heroBlock[1].includes('min-height: calc(var(--safe-area-top, 0px) + 168px)'),
+    '.page-hero must start as a full-size tall hero on every page'
+  );
+  assert.ok(
     heroBlock[1].includes('overflow-anchor: none'),
     '.page-hero must disable browser scroll anchoring'
   );
 
-  const topRowBlock = css.match(/\.canopy-top-row\s*\{([^}]+)\}/);
-  assert.ok(topRowBlock, '.canopy-top-row block must exist');
+  const titleBlock = css.match(/\.canopy-title[\s\S]*?\{([^}]+)\}/);
+  assert.ok(titleBlock, '.canopy-title block must exist');
   assert.ok(
-    topRowBlock[1].includes('position: sticky'),
-    '.canopy-top-row must be position: sticky to stay pinned while .canopy-collapsible scrolls under'
+    titleBlock[1].includes('var(--hero-title-y, 0px)'),
+    '.canopy-title must translate smoothly into the collapsed bar via --hero-title-y'
   );
 
   // 4. Collapsed state rules must NEVER animate or mutate max-height: 0 or padding in document flow

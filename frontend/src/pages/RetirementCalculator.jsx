@@ -962,7 +962,6 @@ export default function RetirementCalculator() {
         title="Retirement Calculator"
         subtitle="All projections are shown in today's dollars, so market returns are adjusted for inflation before comparing conservative, balanced, and aggressive paths."
         stats={heroStats}
-        showBackButton={true}
       />
 
       {loading ? (

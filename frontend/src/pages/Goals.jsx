@@ -20,7 +20,6 @@ import {
   FinancialField,
   FinancialFormGrid
 } from '../components/FinancialForm.jsx';
-import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import ReorderListItem, {
   useDragInteractionLock,
@@ -408,16 +407,9 @@ export default function Goals() {
         kicker="Saving Targets"
         title="Savings Goals"
         subtitle="Connect asset accounts, allocate savings, and project when each target lands."
-        showBackButton={true}
         onAction={openNewGoal}
         actionLabel="Add Goal"
       />
-
-      <PageActionRow className="goals-page-actions" label="Goal actions">
-        <button type="button" className="btn-primary" onClick={openNewGoal}>
-          + New Goal
-        </button>
-      </PageActionRow>
 
       {error && <div className="error app-page-width">{error}</div>}
 

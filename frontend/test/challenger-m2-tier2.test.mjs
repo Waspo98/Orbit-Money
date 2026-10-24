@@ -237,8 +237,8 @@ test('Milestone 2 - Vite production build emits Material Symbols font asset', ()
 test('Milestone 2 - PageHero.jsx accessible Material Symbols icons with aria-hidden', () => {
   const pageHeroSource = fs.readFileSync(path.join(COMPONENTS_DIR, 'PageHero.jsx'), 'utf8');
   assert.ok(
-    pageHeroSource.includes('<span className="material-symbols-rounded" aria-hidden="true">arrow_back</span>'),
-    'PageHero back button icon must declare aria-hidden="true"'
+    !pageHeroSource.includes('arrow_back'),
+    'PageHero must not render an in-header arrow_back button'
   );
   assert.ok(
     pageHeroSource.includes('<span className="material-symbols-rounded" aria-hidden="true">{actionIcon}</span>'),

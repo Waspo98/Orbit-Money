@@ -187,7 +187,6 @@ export default function NetWorth() {
         title="Net Worth"
         subtitle={`Assets minus liabilities${latest ? `, updated through ${formatMonth(latest.month)}` : ''}`}
         stats={netWorthStats}
-        showBackButton={true}
       />
 
       {error && <div className="error app-page-width">{error}</div>}

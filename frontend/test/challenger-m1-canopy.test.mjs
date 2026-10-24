@@ -23,17 +23,14 @@ test('Milestone 1 - PageHero component static contracts & structure', () => {
   assert.ok(source.includes('<header'), 'PageHero must render a semantic <header> tag');
   assert.ok(source.includes('page-hero-canopy'), 'PageHero must include page-hero-canopy class');
 
-  // Symmetrical 3-column top row layout
+  // 2-column left-aligned hero top row layout (no dead leading back-button column)
   assert.ok(source.includes('className="canopy-top-row"'), 'PageHero must render canopy-top-row');
-  assert.ok(source.includes('className="canopy-leading"'), 'PageHero must render canopy-leading cell');
+  assert.ok(!source.includes('className="canopy-leading"'), 'PageHero must not render dead canopy-leading cell');
+  assert.ok(!source.includes('className="page-hero-back-btn"'), 'PageHero must not render in-header back button');
   assert.ok(source.includes('className="canopy-center page-hero-main"'), 'PageHero must render canopy-center cell');
   assert.ok(source.includes('className="canopy-trailing"'), 'PageHero must render canopy-trailing cell');
-  assert.ok(source.includes('className="canopy-spacer"'), 'PageHero must render canopy-spacer for balance');
-
-  // Back button contract
-  assert.ok(source.includes('Boolean(onBack || backTo || showBackButton)'), 'Back button check must evaluate onBack, backTo, or showBackButton');
-  assert.ok(source.includes('className="page-hero-back-btn"'), 'Back button must use page-hero-back-btn class');
-  assert.ok(source.includes("triggerHaptic('selection')"), 'Back button must trigger selection haptic');
+  assert.ok(source.includes('isCollapsed && collapsedTrailing'), 'PageHero must render collapsedTrailing when collapsed');
+  assert.ok(source.includes("triggerHaptic('selection')"), 'Collapsed title tap must trigger selection haptic');
 
   // Action button contract
   assert.ok(source.includes('className="canopy-add-btn"'), 'Action button must use canopy-add-btn class');
@@ -76,11 +73,11 @@ test('Milestone 1 - index.css sticky edge-to-edge canopy layout & safe area padd
   assert.ok(heroStyles.includes('linear-gradient(135deg, rgba(5, 46, 36,'), 'Canopy must have emerald gradient background');
   assert.ok(heroStyles.includes('border-bottom: 1px solid rgba(255, 255, 255, 0.12)'), 'Canopy must have specular bottom border');
 
-  // 3-column top row grid
+  // 2-column top row grid (left-aligned hero stack + right-aligned action row)
   const rowBlock = css.match(/\.canopy-top-row\s*\{([^}]+)\}/);
   assert.ok(rowBlock, '.canopy-top-row CSS rule must exist');
   assert.ok(rowBlock[1].includes('display: grid'), 'canopy-top-row must be a CSS grid');
-  assert.ok(rowBlock[1].includes('grid-template-columns: minmax(40px, auto) 1fr minmax(40px, auto)'), 'canopy-top-row must define 3-column symmetrical grid');
+  assert.ok(rowBlock[1].includes('grid-template-columns: minmax(0, 1fr) auto'), 'canopy-top-row must define 2-column left-aligned grid');
 
   // Tactile (+) action button styling
   const addBtnBlock = css.match(/\.canopy-add-btn\s*\{([^}]+)\}/);
@@ -90,7 +87,7 @@ test('Milestone 1 - index.css sticky edge-to-edge canopy layout & safe area padd
   assert.ok(addBtnBlock[1].includes('border-radius: 50%'), 'canopy-add-btn must be circular');
 
   // Title & Subtitle ellipsis hygiene
-  const titleBlock = css.match(/\.canopy-title\s*\{([^}]+)\}/);
+  const titleBlock = css.match(/\.canopy-title[\s\S]*?\{([^}]+)\}/);
   assert.ok(titleBlock, '.canopy-title CSS rule must exist');
   assert.ok(titleBlock[1].includes('text-overflow: ellipsis'), 'canopy-title must have text-overflow: ellipsis');
   assert.ok(titleBlock[1].includes('overflow: hidden'), 'canopy-title must have overflow: hidden');
@@ -164,49 +161,13 @@ test('Milestone 1 - Dashboard and read-only pages strictly omit (+) action butto
   }
 });
 
-test('Milestone 1 - Root view vs Sub-view back navigation hygiene', () => {
-  // Primary root views must never show a back button
-  const primaryRootPages = [
+test('Milestone 1 - Zero header back buttons across all 15 pages', () => {
+  const allPages = [
     'Dashboard.jsx',
     'Transactions.jsx',
     'Budgets.jsx',
-    'Accounts.jsx'
-  ];
-
-  for (const file of primaryRootPages) {
-    const filePath = path.join(PAGES_DIR, file);
-    const content = fs.readFileSync(filePath, 'utf8');
-    const heroMatch = content.match(/<PageHero[\s\S]*?\/>/);
-    assert.ok(heroMatch, `${file} must contain a <PageHero />`);
-    const heroInvocation = heroMatch[0];
-
-    assert.ok(
-      !heroInvocation.includes('showBackButton'),
-      `Root page ${file} must omit showBackButton`
-    );
-    assert.ok(
-      !heroInvocation.includes('onBack'),
-      `Root page ${file} must omit onBack`
-    );
-    assert.ok(
-      !heroInvocation.includes('backTo'),
-      `Root page ${file} must omit backTo`
-    );
-  }
-
-  // Settings root must only show back button when on a subpage
-  const settingsSource = fs.readFileSync(path.join(PAGES_DIR, 'Settings.jsx'), 'utf8');
-  assert.ok(
-    settingsSource.includes('showBackButton={isSettingsSubpage}'),
-    'Settings.jsx must bind showBackButton to isSettingsSubpage'
-  );
-  assert.ok(
-    settingsSource.includes('onBack={isSettingsSubpage ?'),
-    'Settings.jsx must bind onBack conditionally to isSettingsSubpage'
-  );
-
-  // Sub-views must explicitly show back button
-  const subViews = [
+    'Accounts.jsx',
+    'Settings.jsx',
     'Upcoming.jsx',
     'Goals.jsx',
     'Rules.jsx',
@@ -219,7 +180,7 @@ test('Milestone 1 - Root view vs Sub-view back navigation hygiene', () => {
     'MhaTracker.jsx'
   ];
 
-  for (const file of subViews) {
+  for (const file of allPages) {
     const filePath = path.join(PAGES_DIR, file);
     const content = fs.readFileSync(filePath, 'utf8');
     const heroMatch = content.match(/<PageHero[\s\S]*?\/>/);
@@ -227,8 +188,16 @@ test('Milestone 1 - Root view vs Sub-view back navigation hygiene', () => {
     const heroInvocation = heroMatch[0];
 
     assert.ok(
-      heroInvocation.includes('showBackButton={true}'),
-      `Sub-view ${file} must pass showBackButton={true}`
+      !heroInvocation.includes('showBackButton'),
+      `${file} must omit showBackButton from PageHero`
+    );
+    assert.ok(
+      !heroInvocation.includes('onBack'),
+      `${file} must omit onBack from PageHero`
+    );
+    assert.ok(
+      !heroInvocation.includes('backTo'),
+      `${file} must omit backTo from PageHero`
     );
   }
 });

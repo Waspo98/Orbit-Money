@@ -6,10 +6,10 @@ import AnimatedModal from '../components/AnimatedModal.jsx';
 import DropdownMenu from '../components/DropdownMenu.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import InlinePopover from '../components/InlinePopover.jsx';
-import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
-import { PageSearchToolbar } from '../components/PageToolbar.jsx';
+import SearchField from '../components/SearchField.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
+import { triggerHaptic } from '../lib/haptics.js';
 
 const COLOR_PRESETS = [
   '#5B8DEF',
@@ -153,27 +153,48 @@ export default function Categories({
         subtitle={`${categories.length.toLocaleString()} categor${
           categories.length === 1 ? 'y' : 'ies'
         }`}
-        showBackButton={true}
         onAction={() => setEditing({})}
         actionLabel="Add Category"
-      />
-
-      <PageActionRow className="categories-page-actions" label="Category actions">
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => setEditing({})}
-        >
-          + New Category
-        </button>
-      </PageActionRow>
-
-      <PageSearchToolbar
-        className="categories-toolbar app-page-width"
-        searchClassName="categories-search"
-        value={search}
-        onChange={setSearch}
-        placeholder="Search categories..."
+        collapsedTrailing={(
+          <div className="canopy-collapsed-tools">
+            <button
+              type="button"
+              className="canopy-collapsed-btn"
+              onClick={() => {
+                triggerHaptic('selection');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                setTimeout(() => {
+                  document.querySelector('.categories-search input')?.focus();
+                }, 250);
+              }}
+              aria-label="Search categories"
+              title="Search categories"
+            >
+              <span className="material-symbols-rounded" aria-hidden="true">search</span>
+            </button>
+            <button
+              type="button"
+              className="canopy-add-btn"
+              onClick={() => {
+                triggerHaptic('impact');
+                setEditing({});
+              }}
+              aria-label="Add Category"
+              title="Add Category"
+            >
+              <span className="material-symbols-rounded" aria-hidden="true">add</span>
+            </button>
+          </div>
+        )}
+        toolbar={(
+          <SearchField
+            variant="capsule"
+            className="categories-search"
+            value={search}
+            onChange={setSearch}
+            placeholder="Search categories..."
+          />
+        )}
       />
 
       <div className="categories-content app-page-width">

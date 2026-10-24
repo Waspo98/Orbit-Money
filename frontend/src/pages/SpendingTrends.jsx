@@ -214,7 +214,23 @@ export default function SpendingTrends() {
         kicker="History"
         title="Spending Trends"
         subtitle={`What has happened over the last ${range.months} months`}
-        showBackButton={true}
+        collapsedTrailing={(
+          <div className="canopy-collapsed-tools">
+            {RANGE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`canopy-collapsed-pill ${rangeValue === option.value ? 'is-active' : ''}`}
+                onClick={() => {
+                  triggerHaptic('selection');
+                  setRangeValue(option.value);
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
         toolbar={
           <RangeTabs
             value={rangeValue}

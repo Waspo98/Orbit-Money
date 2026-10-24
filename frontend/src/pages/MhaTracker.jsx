@@ -386,7 +386,6 @@ export default function MhaTracker() {
         kicker="Ministerial Housing Allowance"
         title="MHA Tracker"
         subtitle="Calculate Projected MHA Tax Savings"
-        showBackButton={true}
         toolbar={(
           <PeriodNav
             variant="hero"

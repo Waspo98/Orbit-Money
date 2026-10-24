@@ -3231,8 +3231,14 @@ input, textarea, select {
 
 .page-hero {
   --hero-progress: 0;
+  --hero-scroll-progress: 0;
   --hero-content-opacity: 1;
+  --hero-kicker-opacity: 1;
   --hero-collapse-distance: 0px;
+  --hero-title-y: 0px;
+  --hero-title-scale: 0.54;
+  --hero-current-scale: 1;
+  --hero-trailing-y: 0px;
   position: sticky;
   top: 0;
   top: calc(-1 * var(--hero-collapse-distance, 0px));
@@ -3240,12 +3246,14 @@ input, textarea, select {
   right: 0;
   width: 100%;
   max-width: 100%;
+  min-height: calc(var(--safe-area-top, 0px) + 168px);
   margin: 0;
   z-index: 40;
   box-sizing: border-box;
   overflow-anchor: none;
-  padding: calc(env(safe-area-inset-top, 0px) + 12px) var(--app-page-gutter) 14px;
-  padding: calc(var(--safe-area-top) + 12px) var(--app-page-gutter) 14px;
+  overflow: clip;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) var(--app-page-gutter) 24px;
+  padding: calc(var(--safe-area-top) + 24px) var(--app-page-gutter) 24px;
   border-top: none;
   border-left: none;
   border-right: none;
@@ -3273,8 +3281,8 @@ input, textarea, select {
 }
 
 .page-hero .page-kicker {
-  opacity: var(--hero-content-opacity, 1);
-  transition: opacity 120ms linear;
+  opacity: var(--hero-kicker-opacity, var(--hero-content-opacity, 1));
+  will-change: opacity;
 }
 
 .page-hero.page-hero-collapsed .page-kicker {
@@ -3324,37 +3332,25 @@ input, textarea, select {
   align-self: start;
 }
 
-/* Symmetrical Canopy Top Row — stays pinned at top of viewport while collapsible drawer scrolls under */
+/* Expressive Hero Top Row — left-aligned hero stack + right-aligned action row */
 .canopy-top-row {
   display: grid;
-  grid-template-columns: minmax(40px, auto) 1fr minmax(40px, auto);
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 12px;
   width: 100%;
-  position: sticky;
-  top: calc(env(safe-area-inset-top, 0px) + 12px);
-  top: calc(var(--safe-area-top) + 12px);
+  position: relative;
   z-index: 3;
-}
-
-.canopy-leading {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  min-width: 40px;
 }
 
 .canopy-trailing {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-width: 40px;
-}
-
-.canopy-spacer {
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
+  min-height: 40px;
+  transform: translate3d(0, calc(var(--hero-trailing-y, 0px) * var(--hero-scroll-progress, 0)), 0);
+  will-change: transform;
+  z-index: 4;
 }
 
 .canopy-center {
@@ -3366,29 +3362,35 @@ input, textarea, select {
 .page-hero .canopy-title {
   margin: 0;
   display: block;
-  width: 100%;
+  width: calc(100% / var(--hero-current-scale, 1));
   font-family: var(--font-title);
   color: #ffffff;
-  font-size: clamp(1.3rem, 3.8vw, 1.65rem);
+  font-size: clamp(2rem, 5.6vw, 2.45rem);
   font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transform-origin: left top;
+  transform:
+    translate3d(0, calc(var(--hero-title-y, 0px) * var(--hero-scroll-progress, 0)), 0)
+    scale3d(var(--hero-current-scale, 1), var(--hero-current-scale, 1), 1);
+  will-change: transform;
+  z-index: 4;
 }
 
 .canopy-subtitle,
 .page-hero .canopy-subtitle {
-  margin: 2px 0 0;
-  color: rgba(234, 245, 255, 0.72);
-  font-size: 0.82rem;
-  line-height: 1.25;
+  margin: 8px 0 0;
+  color: rgba(234, 245, 255, 0.78);
+  font-size: 0.92rem;
+  line-height: 1.35;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  opacity: var(--hero-content-opacity, 1);
-  transition: opacity 120ms linear;
+  opacity: var(--hero-kicker-opacity, var(--hero-content-opacity, 1));
+  will-change: opacity;
 }
 
 .page-hero.page-hero-collapsed .canopy-subtitle {
@@ -3427,18 +3429,17 @@ input, textarea, select {
 }
 
 /* Collapsible Secondary Canopy Body (Stats + Tier 2 Controls)
-   Maintains constant DOM height so scrollHeight never mutates; slides under .canopy-top-row natively */
+   Maintains constant DOM height so scrollHeight never mutates */
 .canopy-collapsible {
   width: 100%;
-  padding-top: 10px;
+  padding-top: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   position: relative;
   z-index: 1;
   opacity: var(--hero-content-opacity, 1);
-  clip-path: inset(max(0px, calc(var(--hero-scroll-progress, 0) * var(--hero-collapse-distance, 0px) - 10px)) -16px -16px -16px);
-  will-change: opacity, clip-path;
+  will-change: opacity;
 }
 
 .page-hero.page-hero-collapsed .canopy-collapsible {
@@ -4058,12 +4059,12 @@ input, textarea, select {
 }
 
 .page-kicker {
-  margin-bottom: 2px;
-  color: rgba(203, 231, 255, 0.78);
-  font-size: 0.7rem;
+  margin-bottom: 6px;
+  color: rgba(203, 231, 255, 0.82);
+  font-size: 0.74rem;
   font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1.15;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
@@ -4089,7 +4090,7 @@ input, textarea, select {
     scale(1);
 }
 
-.page-hero:not(.page-hero-morphing) h2 {
+.page-hero:not(.page-hero-morphing):not(.page-hero-canopy) h2 {
   transform-origin: left center;
   transform: scale3d(calc(1 - var(--hero-scroll-progress, 0) * 0.04), calc(1 - var(--hero-scroll-progress, 0) * 0.04), 1);
   font-variation-settings: 'opsz' 32, 'wght' 700;
@@ -4116,8 +4117,6 @@ input, textarea, select {
   font-size: 0.98rem;
 }
 
-.page-kicker,
-.page-hero p,
 .page-hero-stats,
 .categories-hero-toolbar,
 .txn-toolbar-hero,
@@ -4289,6 +4288,36 @@ input, textarea, select {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.canopy-collapsed-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.canopy-collapsed-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 11px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+  transition: transform var(--dur-spring-fast, 200ms) cubic-bezier(0.2, 0, 0, 1),
+              background var(--dur-fast, 150ms);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.canopy-collapsed-pill:active {
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .page-hero-stat.good > strong { color: #8ff0c9; }

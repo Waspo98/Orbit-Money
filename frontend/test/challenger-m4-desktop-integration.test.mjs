@@ -200,21 +200,21 @@ test('Suite 2.2: Canopy Header edge-to-edge geometry and zero horizontal overflo
   assert.ok(css.includes('box-sizing: border-box;'), '.page-hero must use box-sizing: border-box to prevent overflow');
   assert.ok(css.includes('env(safe-area-inset-top'), '.page-hero must include safe-area-inset-top padding for mobile status bar');
 
-  // Canopy top row symmetrical 3-column grid
+  // Canopy top row 2-column left-aligned grid
   const canopyTopRowBlock = css.match(/\.canopy-top-row\s*\{([^}]+)\}/);
   assert.ok(canopyTopRowBlock, '.canopy-top-row rule must exist');
   const topRowStyles = canopyTopRowBlock[1];
   assert.ok(topRowStyles.includes('display: grid;'), '.canopy-top-row must be display: grid');
-  assert.ok(topRowStyles.includes('grid-template-columns: minmax(40px, auto) 1fr minmax(40px, auto);'), 'Must use 3-column symmetrical template');
+  assert.ok(topRowStyles.includes('grid-template-columns: minmax(0, 1fr) auto;'), 'Must use 2-column left-aligned template');
 
   // Ellipsis overflow protection on canopy typography
-  const titleBlock = css.match(/\.canopy-title\s*\{([^}]+)\}/);
+  const titleBlock = css.match(/\.canopy-title[\s\S]*?\{([^}]+)\}/);
   assert.ok(titleBlock, '.canopy-title rule must exist');
   assert.ok(titleBlock[1].includes('white-space: nowrap;'), '.canopy-title must prevent wrapping');
   assert.ok(titleBlock[1].includes('overflow: hidden;'), '.canopy-title must hide overflow');
   assert.ok(titleBlock[1].includes('text-overflow: ellipsis;'), '.canopy-title must truncate with ellipsis');
 
-  const subtitleBlock = css.match(/\.canopy-subtitle\s*\{([^}]+)\}/);
+  const subtitleBlock = css.match(/\.canopy-subtitle[\s\S]*?\{([^}]+)\}/);
   assert.ok(subtitleBlock, '.canopy-subtitle rule must exist');
   assert.ok(subtitleBlock[1].includes('white-space: nowrap;'), '.canopy-subtitle must prevent wrapping');
   assert.ok(subtitleBlock[1].includes('overflow: hidden;'), '.canopy-subtitle must hide overflow');

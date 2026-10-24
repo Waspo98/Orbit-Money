@@ -17,6 +17,7 @@ import SubcardGrid from '../components/SubcardGrid.jsx';
 import TapIndicatorText from '../components/TapIndicatorText.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
 import { formatCurrency } from '../lib/formatters.js';
+import { triggerHaptic } from '../lib/haptics.js';
 import {
   addMonthsToLocalMonth,
   daysLeftInLocalMonth,
@@ -448,9 +449,62 @@ export default function Budgets({
         kicker="Budget planning"
         title="Budgets"
         subtitle={budgetSubtitle}
-        collapsedTitle={`Budgets · ${formatMonthLabel(selectedMonth)}`}
         onAction={() => setAddingBudget(true)}
         actionLabel="Add Budget"
+        collapsedTrailing={(
+          <div className="canopy-collapsed-tools">
+            <button
+              type="button"
+              className="canopy-collapsed-btn"
+              onClick={() => {
+                triggerHaptic('selection');
+                goToMonth(addMonths(selectedMonth, -1));
+              }}
+              aria-label="Previous month"
+              title="Previous month"
+            >
+              <span className="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+            </button>
+            <button
+              type="button"
+              className="canopy-collapsed-pill"
+              onClick={() => {
+                triggerHaptic('selection');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              aria-label={`Current month: ${formatMonthLabel(selectedMonth)}. Tap to jump to top`}
+              title={formatMonthLabel(selectedMonth)}
+            >
+              {formatMonthLabel(selectedMonth)}
+            </button>
+            <button
+              type="button"
+              className="canopy-collapsed-btn"
+              disabled={!canGoForward}
+              onClick={() => {
+                if (!canGoForward) return;
+                triggerHaptic('selection');
+                goToMonth(addMonths(selectedMonth, 1));
+              }}
+              aria-label="Next month"
+              title="Next month"
+            >
+              <span className="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+            </button>
+            <button
+              type="button"
+              className="canopy-add-btn"
+              onClick={() => {
+                triggerHaptic('impact');
+                setAddingBudget(true);
+              }}
+              aria-label="Add Budget"
+              title="Add Budget"
+            >
+              <span className="material-symbols-rounded" aria-hidden="true">add</span>
+            </button>
+          </div>
+        )}
         toolbar={(
           <PeriodNav
             variant="hero"

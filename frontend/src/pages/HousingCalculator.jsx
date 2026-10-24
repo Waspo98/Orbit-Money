@@ -202,7 +202,6 @@ export default function HousingCalculator({ accounts = [] }) {
         kicker="Home Planning"
         title="Housing Calculator"
         subtitle="Estimate selling proceeds, cash to close, and projected monthly payment."
-        showBackButton={true}
       />
 
       <DashboardCard title="Mortgage" className="housing-picker">

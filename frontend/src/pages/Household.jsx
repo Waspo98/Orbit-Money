@@ -13,7 +13,6 @@ import {
   FinancialField,
   FinancialFormGrid
 } from '../components/FinancialForm.jsx';
-import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import PercentInput from '../components/PercentInput.jsx';
 import { useAppDialog } from '../components/AppDialog.jsx';
@@ -267,16 +266,9 @@ export default function Household() {
         kicker="Income And Benefits"
         title="Household"
         subtitle="Track net pay, employer benefits, retirement inputs, and compensation history."
-        showBackButton={true}
         onAction={() => setEditingMember({ mode: 'new' })}
         actionLabel="Add Member"
       />
-
-      <PageActionRow className="household-page-actions" label="Household actions">
-        <button type="button" className="btn-primary" onClick={() => setEditingMember({ mode: 'new' })}>
-          + New Member
-        </button>
-      </PageActionRow>
 
       {error && <div className="error app-page-width">{error}</div>}
 

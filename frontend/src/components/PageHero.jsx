@@ -209,22 +209,26 @@ export default function PageHero({
 }) {
   const hasHeroStats = stats.length > 0 || !!statsExtra;
   const sectionRef = useRef(null);
+  const topRowRef = useRef(null);
+  const trailingRef = useRef(null);
   const collapsibleRef = useRef(null);
   const staticInnerRef = useRef(null);
   const staticTitleRef = useRef(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const isCollapsedRef = useRef(false);
-  const collapseDistanceRef = useRef(0);
+  const collapseDistanceRef = useRef(110);
+  const titleScaleRef = useRef(0.54);
 
-  const handleBack = () => {
-    triggerHaptic('selection');
-    if (typeof onBack === 'function') {
-      onBack();
-    } else if (typeof backTo === 'string') {
-      window.location.href = backTo;
-    } else if (typeof window !== 'undefined' && window.history.length > 1) {
-      window.history.back();
-    }
+  const hero = controlledHero || {
+    progress: 0,
+    height: null,
+    expandedHeight: null,
+    titleX: 0,
+    titleY: 0,
+    titleScale: 0.54,
+    collapsedWidth: 0,
+    innerRef: staticInnerRef,
+    titleRef: staticTitleRef
   };
 
   useEffect(() => {
@@ -234,13 +238,53 @@ export default function PageHero({
 
     let frameId = null;
 
-    function measureCollapsible() {
+    function getOffsetTopWithin(el, ancestor) {
+      let top = 0;
+      let node = el;
+      while (node && node !== ancestor && ancestor.contains(node)) {
+        top += node.offsetTop || 0;
+        node = node.offsetParent;
+      }
+      return top;
+    }
+
+    function measureHeroGeometry() {
       const heroEl = sectionRef.current;
       if (!heroEl) return;
-      const collapsibleEl = collapsibleRef.current;
-      const distance = collapsibleEl ? Math.max(0, Math.round(collapsibleEl.offsetHeight)) : 0;
+
+      const styles = window.getComputedStyle(heroEl);
+      const paddingTop = parseFloat(styles.paddingTop) || 24;
+      // Expanded top padding is calc(var(--safe-area-top) + 24px)
+      const safeAreaTop = Math.max(0, paddingTop - 24);
+      const collapsedBarHeight = 56;
+      const collapsedTotalHeight = safeAreaTop + collapsedBarHeight;
+
+      const expandedTotalHeight = heroEl.offsetHeight;
+      const distance = Math.max(1, Math.round(expandedTotalHeight - collapsedTotalHeight));
       collapseDistanceRef.current = distance;
+
+      const titleEl = hero.titleRef.current;
+      const trailingEl = trailingRef.current;
+
+      const titleHeight = titleEl ? titleEl.offsetHeight || 38 : 38;
+      const targetScaledHeight = 20;
+      const titleScale = Math.min(0.64, Math.max(0.46, targetScaledHeight / titleHeight));
+      titleScaleRef.current = titleScale;
+      const scaledTitleHeight = titleHeight * titleScale;
+
+      const naturalTitleTop = titleEl ? getOffsetTopWithin(titleEl, heroEl) : paddingTop + 20;
+      const targetTitleTop = distance + safeAreaTop + (collapsedBarHeight - scaledTitleHeight) / 2;
+      const titleY = targetTitleTop - naturalTitleTop;
+
+      const trailingHeight = trailingEl ? trailingEl.offsetHeight || 40 : 40;
+      const naturalTrailingTop = trailingEl ? getOffsetTopWithin(trailingEl, heroEl) : paddingTop + 14;
+      const targetTrailingTop = distance + safeAreaTop + (collapsedBarHeight - trailingHeight) / 2;
+      const trailingY = targetTrailingTop - naturalTrailingTop;
+
       heroEl.style.setProperty('--hero-collapse-distance', `${distance}px`);
+      heroEl.style.setProperty('--hero-title-y', `${titleY.toFixed(2)}px`);
+      heroEl.style.setProperty('--hero-title-scale', titleScale.toFixed(4));
+      heroEl.style.setProperty('--hero-trailing-y', `${trailingY.toFixed(2)}px`);
     }
 
     function applyScrollState() {
@@ -254,18 +298,22 @@ export default function PageHero({
         document.body.scrollTop ||
         0;
 
-      const distance = collapseDistanceRef.current;
-      const progressRange = distance > 0 ? distance : 56;
-      const progress = Math.min(1, Math.max(0, scrollY / progressRange));
-      const opacity = Math.max(0, Math.min(1, 1 - progress * 1.4));
+      const distance = Math.max(1, collapseDistanceRef.current);
+      const progress = Math.min(1, Math.max(0, scrollY / distance));
+      const contentOpacity = Math.max(0, Math.min(1, 1 - progress * 1.65));
+      const kickerOpacity = Math.max(0, Math.min(1, 1 - progress * 2.2));
+      const minScale = titleScaleRef.current;
+      const currentScale = 1 - (1 - minScale) * progress;
 
       heroEl.style.setProperty('--hero-scroll-progress', progress.toFixed(4));
       heroEl.style.setProperty('--hero-progress', progress.toFixed(4));
-      heroEl.style.setProperty('--hero-content-opacity', opacity.toFixed(4));
+      heroEl.style.setProperty('--hero-content-opacity', contentOpacity.toFixed(4));
+      heroEl.style.setProperty('--hero-kicker-opacity', kickerOpacity.toFixed(4));
+      heroEl.style.setProperty('--hero-current-scale', currentScale.toFixed(4));
 
       // Hysteresis deadband prevents boundary oscillation during touch or momentum scroll
-      const collapseThreshold = distance > 0 ? Math.max(28, Math.round(distance * 0.65)) : 36;
-      const expandThreshold = distance > 0 ? Math.max(12, Math.round(distance * 0.3)) : 14;
+      const collapseThreshold = Math.max(28, Math.round(distance * 0.62));
+      const expandThreshold = Math.max(12, Math.round(distance * 0.35));
 
       let nextCollapsed = isCollapsedRef.current;
       if (!nextCollapsed && scrollY >= collapseThreshold) {
@@ -293,45 +341,34 @@ export default function PageHero({
       });
     }
 
-    measureCollapsible();
+    measureHeroGeometry();
     applyScrollState();
 
     const observer =
       typeof window !== 'undefined' && 'ResizeObserver' in window
         ? new ResizeObserver(() => {
-            measureCollapsible();
+            measureHeroGeometry();
             applyScrollState();
           })
         : null;
 
     if (observer) {
-      if (collapsibleRef.current) observer.observe(collapsibleRef.current);
       if (sectionRef.current) observer.observe(sectionRef.current);
+      if (topRowRef.current) observer.observe(topRowRef.current);
+      if (collapsibleRef.current) observer.observe(collapsibleRef.current);
     }
 
     window.addEventListener('scroll', onScroll, { passive: true });
     document.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', measureCollapsible);
+    window.addEventListener('resize', measureHeroGeometry);
     return () => {
       if (observer) observer.disconnect();
       if (frameId != null) window.cancelAnimationFrame(frameId);
       window.removeEventListener('scroll', onScroll);
       document.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', measureCollapsible);
+      window.removeEventListener('resize', measureHeroGeometry);
     };
-  }, [controlledHero, hasHeroStats, Boolean(toolbar)]);
-
-  const hero = controlledHero || {
-    progress: 0,
-    height: null,
-    expandedHeight: null,
-    titleX: 0,
-    titleY: 0,
-    titleScale: 1,
-    collapsedWidth: 0,
-    innerRef: staticInnerRef,
-    titleRef: staticTitleRef
-  };
+  }, [controlledHero, hasHeroStats, Boolean(toolbar), title, subtitle, kicker]);
   const heroHeight = controlledHero && Number.isFinite(hero.height) ? `${hero.height}px` : null;
   const heroMinHeight = !controlledHero && Number.isFinite(minHeight) ? `${minHeight}px` : null;
   const chromeContent = typeof chrome === 'function' ? chrome(hero) : chrome;
@@ -368,24 +405,8 @@ export default function PageHero({
       <div className="page-hero-inner" ref={hero.innerRef}>
         {chromeContent}
 
-        {/* Tier 1: Symmetrical Top Row */}
-        <div className="canopy-top-row">
-          <div className="canopy-leading">
-            {Boolean(onBack || backTo || showBackButton) ? (
-              <button
-                type="button"
-                className="page-hero-back-btn"
-                onClick={handleBack}
-                aria-label="Go back"
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">arrow_back</span>
-                <span>Back</span>
-              </button>
-            ) : (
-              <div className="canopy-spacer" aria-hidden="true" />
-            )}
-          </div>
-
+        {/* Tier 1: Hero Title Stack & Trailing Action Row */}
+        <div className="canopy-top-row" ref={topRowRef}>
           <div
             className="canopy-center page-hero-main"
             onClick={scrollToTop}
@@ -416,7 +437,7 @@ export default function PageHero({
             {subtitle && <p className="canopy-subtitle">{subtitle}</p>}
           </div>
 
-          <div className="canopy-trailing">
+          <div className="canopy-trailing" ref={trailingRef}>
             {isCollapsed && collapsedTrailing ? (
               collapsedTrailing
             ) : action ? (
@@ -435,9 +456,7 @@ export default function PageHero({
                 <span className="material-symbols-rounded" aria-hidden="true">{actionIcon}</span>
                 {/* Contract compatibility: <span className="material-symbols-rounded">{actionIcon}</span> */}
               </button>
-            ) : (
-              <div className="canopy-spacer" aria-hidden="true" />
-            )}
+            ) : null}
           </div>
         </div>
 

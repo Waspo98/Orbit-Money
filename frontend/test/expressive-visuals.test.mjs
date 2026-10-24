@@ -55,8 +55,8 @@ test('R4: Mobile layout, responsive BottomTabs, safe area padding & status bar s
   assert.ok(bottomTabsCode.includes('activeIndex = isPrimaryTab ? currentIndex : primaryTabs.length'), 'BottomTabs must dock slider to More when isMoreActive');
 
   // Verify frosted back button in PageHero
-  assert.ok(pageHeroCode.includes('page-hero-back-btn'), 'PageHero must support frosted back button');
-  assert.ok(css.includes('.page-hero-back-btn {'), 'index.css must style page-hero-back-btn');
+  assert.ok(pageHeroCode.includes('collapsedTrailing'), 'PageHero must support collapsedTrailing single-row actions');
+  assert.ok(css.includes('.canopy-collapsed-btn'), 'index.css must style canopy-collapsed-btn');
 });
 
 test('R5: Local-first state & offline banner hygiene', () => {

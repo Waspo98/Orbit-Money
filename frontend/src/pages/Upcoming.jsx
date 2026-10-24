@@ -4,7 +4,6 @@ import AnimatedModal from '../components/AnimatedModal.jsx';
 import DashboardCard from '../components/dashboard/DashboardCard.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { OVERLAY_ANIM_MS } from '../components/overlayBehavior.js';
-import PageActionRow from '../components/PageActionRow.jsx';
 import PageHero from '../components/PageHero.jsx';
 import SearchField from '../components/SearchField.jsx';
 import SelectableListItem from '../components/SelectableListItem.jsx';
@@ -308,16 +307,9 @@ export default function Upcoming({ accounts = [], categories = [] }) {
         subtitle="Projected bills, subscriptions, income, and cash flow."
         stats={heroStats}
         statLabel="Upcoming summary"
-        showBackButton={true}
         onAction={() => openNew()}
         actionLabel="Add Recurring"
       />
-
-      <PageActionRow className="upcoming-page-actions" label="Upcoming actions">
-        <button type="button" className="btn-primary" onClick={() => openNew()}>
-          + Add Recurring
-        </button>
-      </PageActionRow>
 
       {error && <div className="error app-page-width">{error}</div>}
 
