@@ -209,9 +209,12 @@ export default function PageHero({
 }) {
   const hasHeroStats = stats.length > 0 || !!statsExtra;
   const sectionRef = useRef(null);
+  const collapsibleRef = useRef(null);
   const staticInnerRef = useRef(null);
   const staticTitleRef = useRef(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const isCollapsedRef = useRef(false);
+  const collapseDistanceRef = useRef(0);
 
   const handleBack = () => {
     triggerHaptic('selection');
@@ -230,43 +233,93 @@ export default function PageHero({
     }
 
     let frameId = null;
+
+    function measureCollapsible() {
+      const heroEl = sectionRef.current;
+      if (!heroEl) return;
+      const collapsibleEl = collapsibleRef.current;
+      const distance = collapsibleEl ? Math.max(0, Math.round(collapsibleEl.offsetHeight)) : 0;
+      collapseDistanceRef.current = distance;
+      heroEl.style.setProperty('--hero-collapse-distance', `${distance}px`);
+    }
+
+    function applyScrollState() {
+      const heroEl = sectionRef.current;
+      if (!heroEl) return;
+
+      const scrollY =
+        window.scrollY ||
+        window.pageYOffset ||
+        document.documentElement.scrollTop ||
+        document.body.scrollTop ||
+        0;
+
+      const distance = collapseDistanceRef.current;
+      const progressRange = distance > 0 ? distance : 56;
+      const progress = Math.min(1, Math.max(0, scrollY / progressRange));
+      const opacity = Math.max(0, Math.min(1, 1 - progress * 1.4));
+
+      heroEl.style.setProperty('--hero-scroll-progress', progress.toFixed(4));
+      heroEl.style.setProperty('--hero-progress', progress.toFixed(4));
+      heroEl.style.setProperty('--hero-content-opacity', opacity.toFixed(4));
+
+      // Hysteresis deadband prevents boundary oscillation during touch or momentum scroll
+      const collapseThreshold = distance > 0 ? Math.max(28, Math.round(distance * 0.65)) : 36;
+      const expandThreshold = distance > 0 ? Math.max(12, Math.round(distance * 0.3)) : 14;
+
+      let nextCollapsed = isCollapsedRef.current;
+      if (!nextCollapsed && scrollY >= collapseThreshold) {
+        nextCollapsed = true;
+      } else if (nextCollapsed && scrollY <= expandThreshold) {
+        nextCollapsed = false;
+      }
+
+      if (nextCollapsed !== isCollapsedRef.current) {
+        isCollapsedRef.current = nextCollapsed;
+        setIsCollapsed(nextCollapsed);
+        if (nextCollapsed) {
+          heroEl.classList.add('page-hero-collapsed');
+        } else {
+          heroEl.classList.remove('page-hero-collapsed');
+        }
+      }
+    }
+
     function onScroll() {
       if (frameId != null) return;
       frameId = window.requestAnimationFrame(() => {
         frameId = null;
-        if (sectionRef.current) {
-          const scrollY =
-            window.scrollY ||
-            window.pageYOffset ||
-            document.documentElement.scrollTop ||
-            document.body.scrollTop ||
-            0;
-          const progress = Math.min(1, Math.max(0, scrollY / 70));
-          const opacity = Math.max(0, 1 - progress * 1.5);
-          sectionRef.current.style.setProperty('--hero-scroll-progress', progress.toFixed(4));
-          sectionRef.current.style.setProperty('--hero-progress', progress.toFixed(4));
-          sectionRef.current.style.setProperty('--hero-content-opacity', opacity.toFixed(4));
-
-          const collapsed = scrollY > 24;
-          setIsCollapsed((prev) => (prev !== collapsed ? collapsed : prev));
-          if (collapsed) {
-            sectionRef.current.classList.add('page-hero-collapsed');
-          } else {
-            sectionRef.current.classList.remove('page-hero-collapsed');
-          }
-        }
+        applyScrollState();
       });
     }
 
-    onScroll();
+    measureCollapsible();
+    applyScrollState();
+
+    const observer =
+      typeof window !== 'undefined' && 'ResizeObserver' in window
+        ? new ResizeObserver(() => {
+            measureCollapsible();
+            applyScrollState();
+          })
+        : null;
+
+    if (observer) {
+      if (collapsibleRef.current) observer.observe(collapsibleRef.current);
+      if (sectionRef.current) observer.observe(sectionRef.current);
+    }
+
     window.addEventListener('scroll', onScroll, { passive: true });
     document.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', measureCollapsible);
     return () => {
+      if (observer) observer.disconnect();
       if (frameId != null) window.cancelAnimationFrame(frameId);
       window.removeEventListener('scroll', onScroll);
       document.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', measureCollapsible);
     };
-  }, [controlledHero]);
+  }, [controlledHero, hasHeroStats, Boolean(toolbar)]);
 
   const hero = controlledHero || {
     progress: 0,
@@ -388,23 +441,27 @@ export default function PageHero({
           </div>
         </div>
 
-        {/* Stats Row (e.g. Accounts, Upcoming, Net Worth) */}
-        {hasHeroStats && (
-          <div className={statsClassName} aria-label={statLabel || `${title} summary`}>
-            {stats.map((stat) => (
-              <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
-                <span>{stat.label}</span>
-                <strong>{stat.value}</strong>
+        {(hasHeroStats || toolbarContent) && (
+          <div className="canopy-collapsible" ref={collapsibleRef}>
+            {/* Stats Row (e.g. Accounts, Upcoming, Net Worth) */}
+            {hasHeroStats && (
+              <div className={statsClassName} aria-label={statLabel || `${title} summary`}>
+                {stats.map((stat) => (
+                  <div key={stat.label} className={`page-hero-stat ${stat.tone || ''}`}>
+                    <span>{stat.label}</span>
+                    <strong>{stat.value}</strong>
+                  </div>
+                ))}
+                {statsExtra}
               </div>
-            ))}
-            {statsExtra}
-          </div>
-        )}
+            )}
 
-        {/* Tier 2: Controls / Search / Filter / PeriodNav */}
-        {toolbarContent && (
-          <div className="canopy-tier2">
-            {toolbarContent}
+            {/* Tier 2: Controls / Search / Filter / PeriodNav */}
+            {toolbarContent && (
+              <div className="canopy-tier2">
+                {toolbarContent}
+              </div>
+            )}
           </div>
         )}
       </div>

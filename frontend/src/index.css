@@ -2928,19 +2928,6 @@ input, textarea, select {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-height: 24px;
-  opacity: var(--hero-content-opacity, 1);
-  transition: max-height 160ms ease, opacity 140ms ease, margin 140ms ease;
-}
-
-.page-hero.page-hero-collapsed .canopy-subtitle {
-  max-height: 0;
-  opacity: 0;
-  margin: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  pointer-events: none;
 }
 
 .right-drawer-chevron {
@@ -3245,8 +3232,10 @@ input, textarea, select {
 .page-hero {
   --hero-progress: 0;
   --hero-content-opacity: 1;
+  --hero-collapse-distance: 0px;
   position: sticky;
   top: 0;
+  top: calc(-1 * var(--hero-collapse-distance, 0px));
   left: 0;
   right: 0;
   width: 100%;
@@ -3254,6 +3243,7 @@ input, textarea, select {
   margin: 0;
   z-index: 40;
   box-sizing: border-box;
+  overflow-anchor: none;
   padding: calc(env(safe-area-inset-top, 0px) + 12px) var(--app-page-gutter) 14px;
   padding: calc(var(--safe-area-top) + 12px) var(--app-page-gutter) 14px;
   border-top: none;
@@ -3273,30 +3263,22 @@ input, textarea, select {
   box-shadow:
     0 10px 30px rgba(0, 0, 0, 0.35),
     inset 0 1px 1px rgba(255, 255, 255, 0.12);
-  transition:
-    padding var(--dur-spring-fast, 200ms) var(--spring-spatial-default, cubic-bezier(0.16, 1, 0.3, 1)),
-    box-shadow var(--dur-fast, 150ms) ease;
+  transition: box-shadow var(--dur-fast, 150ms) ease;
 }
 
 .page-hero.page-hero-collapsed {
-  padding-top: calc(var(--safe-area-top) + 6px);
-  padding-bottom: 8px;
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.45),
     inset 0 1px 1px rgba(255, 255, 255, 0.15);
 }
 
 .page-hero .page-kicker {
-  transition: max-height 160ms ease, opacity 140ms ease, margin 140ms ease;
-  max-height: 24px;
   opacity: var(--hero-content-opacity, 1);
+  transition: opacity 120ms linear;
 }
 
 .page-hero.page-hero-collapsed .page-kicker {
-  max-height: 0;
   opacity: 0;
-  margin: 0;
-  overflow: hidden;
   pointer-events: none;
 }
 
@@ -3337,18 +3319,22 @@ input, textarea, select {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
   align-content: start;
   align-self: start;
 }
 
-/* Symmetrical Canopy Top Row */
+/* Symmetrical Canopy Top Row — stays pinned at top of viewport while collapsible drawer scrolls under */
 .canopy-top-row {
   display: grid;
   grid-template-columns: minmax(40px, auto) 1fr minmax(40px, auto);
   align-items: center;
   gap: 12px;
   width: 100%;
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  top: calc(var(--safe-area-top) + 12px);
+  z-index: 3;
 }
 
 .canopy-leading {
@@ -3376,25 +3362,24 @@ input, textarea, select {
   text-align: left;
 }
 
-.canopy-title {
+.canopy-title,
+.page-hero .canopy-title {
   margin: 0;
+  display: block;
+  width: 100%;
   font-family: var(--font-title);
   color: #ffffff;
-  font-size: clamp(1.35rem, 4.2vw, 1.85rem);
+  font-size: clamp(1.3rem, 3.8vw, 1.65rem);
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: font-size var(--dur-spring-fast, 200ms) var(--spring-spatial-default, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
-.page-hero.page-hero-collapsed .canopy-title {
-  font-size: 1.15rem;
-}
-
-.canopy-subtitle {
+.canopy-subtitle,
+.page-hero .canopy-subtitle {
   margin: 2px 0 0;
   color: rgba(234, 245, 255, 0.72);
   font-size: 0.82rem;
@@ -3402,6 +3387,13 @@ input, textarea, select {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  opacity: var(--hero-content-opacity, 1);
+  transition: opacity 120ms linear;
+}
+
+.page-hero.page-hero-collapsed .canopy-subtitle {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* In-Header (+) Action Button */
@@ -3434,47 +3426,46 @@ input, textarea, select {
   font-weight: 600;
 }
 
+/* Collapsible Secondary Canopy Body (Stats + Tier 2 Controls)
+   Maintains constant DOM height so scrollHeight never mutates; slides under .canopy-top-row natively */
+.canopy-collapsible {
+  width: 100%;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+  opacity: var(--hero-content-opacity, 1);
+  clip-path: inset(max(0px, calc(var(--hero-scroll-progress, 0) * var(--hero-collapse-distance, 0px) - 10px)) -16px -16px -16px);
+  will-change: opacity, clip-path;
+}
+
+.page-hero.page-hero-collapsed .canopy-collapsible {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Tier 2 Controls Container */
 .canopy-tier2 {
   width: 100%;
-  margin-top: 4px;
+  margin-top: 2px;
   position: relative;
   z-index: 2;
-  max-height: 220px;
   opacity: var(--hero-content-opacity, 1);
-  transform: translateY(0);
-  transition:
-    max-height var(--dur-spring-fast, 240ms) var(--spring-spatial-default, cubic-bezier(0.16, 1, 0.3, 1)),
-    opacity 160ms ease,
-    margin-top 160ms ease,
-    transform 200ms ease;
   overflow: visible;
 }
 
 .page-hero.page-hero-collapsed .canopy-tier2 {
-  max-height: 0;
-  opacity: 0;
-  margin-top: 0;
-  transform: translateY(-8px);
-  overflow: hidden;
   pointer-events: none;
 }
 
 .page-hero .page-hero-stats {
-  transition:
-    max-height var(--dur-spring-fast, 240ms) var(--spring-spatial-default, cubic-bezier(0.16, 1, 0.3, 1)),
-    opacity 160ms ease,
-    margin-top 160ms ease;
-  max-height: 160px;
   opacity: var(--hero-content-opacity, 1);
   overflow: visible;
 }
 
 .page-hero.page-hero-collapsed .page-hero-stats {
-  max-height: 0;
-  opacity: 0;
-  margin-top: 0;
-  overflow: hidden;
   pointer-events: none;
 }
 
@@ -4067,16 +4058,16 @@ input, textarea, select {
 }
 
 .page-kicker {
-  margin-bottom: 5px;
+  margin-bottom: 2px;
   color: rgba(203, 231, 255, 0.78);
-  font-size: 0.73rem;
+  font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0;
-  line-height: 1.2;
+  line-height: 1.15;
   text-transform: uppercase;
 }
 
-.page-hero h2 {
+.page-hero:not(.page-hero-canopy) h2 {
   margin: 0;
   font-family: var(--font-title);
   color: #ffffff;
@@ -4100,12 +4091,8 @@ input, textarea, select {
 
 .page-hero:not(.page-hero-morphing) h2 {
   transform-origin: left center;
-  transform: scale(calc(1 - var(--hero-scroll-progress, 0) * 0.06));
+  transform: scale3d(calc(1 - var(--hero-scroll-progress, 0) * 0.04), calc(1 - var(--hero-scroll-progress, 0) * 0.04), 1);
   font-variation-settings: 'opsz' 32, 'wght' 700;
-}
-
-.page-hero:not(.page-hero-morphing) .page-hero-main p {
-  opacity: calc(1 - var(--hero-scroll-progress, 0) * 0.4);
 }
 
 .page-hero-collapsed-slot {
@@ -4123,7 +4110,7 @@ input, textarea, select {
   z-index: 4;
 }
 
-.page-hero p {
+.page-hero:not(.page-hero-canopy) p {
   margin: 10px 0 0;
   color: rgba(234, 245, 255, 0.78);
   font-size: 0.98rem;

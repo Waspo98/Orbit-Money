@@ -187,3 +187,65 @@ test('App: Progressive idle pre-warming with requestIdleCallback and budget chec
   assert.equal(loadedItems.length, 1, 'First slice should yield when remaining time drops below 8ms budget');
   assert.equal(remaining.length, 2, 'Remaining items should yield to next idle frame');
 });
+
+test('PageHero: Two-tier sticky canopy eliminates scroll-anchoring strobe loop', () => {
+  const pageHeroPath = path.join(rootDir, 'src', 'components', 'PageHero.jsx');
+  const cssPath = path.join(rootDir, 'src', 'index.css');
+  const source = fs.readFileSync(pageHeroPath, 'utf8');
+  const css = fs.readFileSync(cssPath, 'utf8');
+
+  // 1. PageHero wraps collapsible secondary content in .canopy-collapsible and measures its natural height
+  assert.ok(
+    source.includes('className="canopy-collapsible"'),
+    'PageHero must wrap stats and tier 2 controls in .canopy-collapsible'
+  );
+  assert.ok(
+    source.includes('--hero-collapse-distance'),
+    'PageHero must set --hero-collapse-distance from collapsible content height'
+  );
+
+  // 2. Hysteresis deadband prevents single-pixel threshold oscillation
+  assert.ok(
+    source.includes('collapseThreshold') && source.includes('expandThreshold'),
+    'PageHero must use separate collapseThreshold and expandThreshold for scroll hysteresis'
+  );
+
+  // 3. CSS uses native negative-top sticky offset + sticky .canopy-top-row and overflow-anchor: none
+  const heroBlock = css.match(/^\.page-hero\s*\{([^}]+)\}/m);
+  assert.ok(heroBlock, '.page-hero block must exist');
+  assert.ok(
+    heroBlock[1].includes('top: calc(-1 * var(--hero-collapse-distance, 0px))'),
+    '.page-hero must use negative top sticky offset equal to --hero-collapse-distance'
+  );
+  assert.ok(
+    heroBlock[1].includes('overflow-anchor: none'),
+    '.page-hero must disable browser scroll anchoring'
+  );
+
+  const topRowBlock = css.match(/\.canopy-top-row\s*\{([^}]+)\}/);
+  assert.ok(topRowBlock, '.canopy-top-row block must exist');
+  assert.ok(
+    topRowBlock[1].includes('position: sticky'),
+    '.canopy-top-row must be position: sticky to stay pinned while .canopy-collapsible scrolls under'
+  );
+
+  // 4. Collapsed state rules must NEVER animate or mutate max-height: 0 or padding in document flow
+  const collapsedRules = [
+    css.match(/\.page-hero\.page-hero-collapsed\s*\{([^}]+)\}/)?.[1] || '',
+    css.match(/\.page-hero\.page-hero-collapsed\s+\.page-kicker\s*\{([^}]+)\}/)?.[1] || '',
+    css.match(/\.page-hero\.page-hero-collapsed\s+\.canopy-subtitle\s*\{([^}]+)\}/)?.[1] || '',
+    css.match(/\.page-hero\.page-hero-collapsed\s+\.canopy-tier2\s*\{([^}]+)\}/)?.[1] || '',
+    css.match(/\.page-hero\.page-hero-collapsed\s+\.page-hero-stats\s*\{([^}]+)\}/)?.[1] || ''
+  ].join('\n');
+
+  assert.equal(
+    collapsedRules.includes('max-height: 0'),
+    false,
+    '.page-hero-collapsed rules must never collapse max-height: 0 in document flow'
+  );
+  assert.equal(
+    collapsedRules.includes('padding-top'),
+    false,
+    '.page-hero-collapsed must not mutate padding-top'
+  );
+});
