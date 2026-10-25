@@ -1,0 +1,240 @@
+package app.overbay.orbit.ui.categories.dialogs
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.util.LocalOrbitHaptics
+
+private val PRESET_COLORS = listOf(
+    "#2E7D32", // Forest Emerald
+    "#1976D2", // Blue
+    "#00897B", // Teal
+    "#E64A19", // Coral
+    "#F57C00", // Amber
+    "#7B1FA2", // Violet
+    "#C2185B", // Rose
+    "#546E7A", // Slate
+    "#0097A7", // Cyan
+    "#689F38"  // Olive
+)
+
+@Composable
+fun CategoryEditorDialog(
+    category: Category?,
+    onSave: (
+        id: Long,
+        name: String,
+        color: String,
+        icon: String?,
+        isTransfer: Boolean,
+        isIncome: Boolean,
+        mhaEligible: Boolean
+    ) -> Unit,
+    onDelete: ((Long) -> Unit)? = null,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalOrbitHaptics.current
+    val isEditing = category != null && category.id > 0L
+
+    var name by remember(category) { mutableStateOf(category?.name ?: "") }
+    var selectedColor by remember(category) { mutableStateOf(category?.color ?: PRESET_COLORS.first()) }
+    var isTransfer by remember(category) { mutableStateOf(category?.isTransfer ?: false) }
+    var isIncome by remember(category) { mutableStateOf(category?.isIncome ?: false) }
+    var mhaEligible by remember(category) { mutableStateOf(category?.mhaDefaultEligible ?: false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = if (isEditing) "Edit Category" else "New Category",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Name Input
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Category Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Color Swatches
+                Text(
+                    text = "COLOR",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    PRESET_COLORS.forEach { hex ->
+                        val color = Color(hex.removePrefix("#").toLong(16) or 0xFF000000)
+                        val isSelected = selectedColor.equals(hex, ignoreCase = true)
+
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .clickable {
+                                    haptics.tick()
+                                    selectedColor = hex
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Selected",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Type Switches
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Income Category", style = MaterialTheme.typography.bodyMedium)
+                    Switch(
+                        checked = isIncome,
+                        onCheckedChange = {
+                            isIncome = it
+                            if (it) isTransfer = false
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Transfer Category", style = MaterialTheme.typography.bodyMedium)
+                    Switch(
+                        checked = isTransfer,
+                        onCheckedChange = {
+                            isTransfer = it
+                            if (it) isIncome = false
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Default MHA Eligible", style = MaterialTheme.typography.bodyMedium)
+                    Switch(
+                        checked = mhaEligible,
+                        onCheckedChange = { mhaEligible = it }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    haptics.confirm()
+                    onSave(
+                        category?.id ?: 0L,
+                        name.trim(),
+                        selectedColor,
+                        category?.icon,
+                        isTransfer,
+                        isIncome,
+                        mhaEligible
+                    )
+                },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (isEditing && onDelete != null) {
+                    TextButton(
+                        onClick = {
+                            haptics.reject()
+                            onDelete(category.id)
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Delete")
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        },
+        shape = MaterialTheme.shapes.extraLarge,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = modifier
+    )
+}
