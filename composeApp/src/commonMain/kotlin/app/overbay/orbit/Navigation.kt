@@ -20,17 +20,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.ui.budgets.BudgetsScreen
+import app.overbay.orbit.ui.budgets.BudgetsViewModel
 import app.overbay.orbit.ui.categories.CategoriesScreen
 import app.overbay.orbit.ui.categories.CategoriesViewModel
 import app.overbay.orbit.ui.components.AdaptiveNavigationShell
 import app.overbay.orbit.ui.dashboard.DashboardScreen
 import app.overbay.orbit.ui.dashboard.DashboardViewModel
+import app.overbay.orbit.ui.goals.GoalsScreen
+import app.overbay.orbit.ui.goals.GoalsViewModel
 import app.overbay.orbit.ui.onboarding.OnboardingScreen
 import app.overbay.orbit.ui.onboarding.OnboardingViewModel
 import app.overbay.orbit.ui.rules.RulesScreen
 import app.overbay.orbit.ui.rules.RulesViewModel
 import app.overbay.orbit.ui.transactions.TransactionsScreen
 import app.overbay.orbit.ui.transactions.TransactionsViewModel
+import app.overbay.orbit.ui.upcoming.UpcomingScreen
+import app.overbay.orbit.ui.upcoming.UpcomingViewModel
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.PlatformStorage
@@ -51,6 +57,9 @@ fun OrbitNavigation(
     val transactionsViewModel = remember(repo) { TransactionsViewModel(repo) }
     val categoriesViewModel = remember(repo) { CategoriesViewModel(repo) }
     val rulesViewModel = remember(repo) { RulesViewModel(repo) }
+    val budgetsViewModel = remember(repo) { BudgetsViewModel(repo) }
+    val upcomingViewModel = remember(repo) { UpcomingViewModel(repo) }
+    val goalsViewModel = remember(repo) { GoalsViewModel(repo) }
 
     if (currentKey == OrbitNavKey.Onboarding) {
         OnboardingScreen(
@@ -109,6 +118,39 @@ fun OrbitNavigation(
                     }
                     TransactionsScreen(
                         viewModel = transactionsViewModel,
+                        onNavigate = { destination ->
+                            if (destination != currentKey) {
+                                backStack.add(destination)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                OrbitNavKey.Budgets -> {
+                    BudgetsScreen(
+                        viewModel = budgetsViewModel,
+                        onNavigate = { destination ->
+                            if (destination != currentKey) {
+                                backStack.add(destination)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                OrbitNavKey.Upcoming -> {
+                    UpcomingScreen(
+                        viewModel = upcomingViewModel,
+                        onNavigate = { destination ->
+                            if (destination != currentKey) {
+                                backStack.add(destination)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                OrbitNavKey.Goals -> {
+                    GoalsScreen(
+                        viewModel = goalsViewModel,
                         onNavigate = { destination ->
                             if (destination != currentKey) {
                                 backStack.add(destination)
