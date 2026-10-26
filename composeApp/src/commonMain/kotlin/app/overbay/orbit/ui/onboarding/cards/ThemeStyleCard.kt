@@ -18,9 +18,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -42,6 +46,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
  * Visual styling and theme customizer card for the Onboarding flow.
  * Features color preset swatches, display mode selection, and live component preview.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThemeStyleCard(
     state: OnboardingUiState,
@@ -115,19 +120,18 @@ fun ThemeStyleCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OrbitThemeMode.entries.forEach { mode ->
-                        FilterChip(
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val modes = OrbitThemeMode.entries
+                    modes.forEachIndexed { index, mode ->
+                        SegmentedButton(
                             selected = state.selectedThemeMode == mode,
                             onClick = {
                                 haptics.tick()
                                 onIntent(OnboardingIntent.SelectThemeMode(mode))
                             },
-                            label = { Text(mode.displayName) },
-                            modifier = Modifier.weight(1f)
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
+                            icon = {},
+                            label = { Text(mode.displayName, style = MaterialTheme.typography.labelMedium) }
                         )
                     }
                 }

@@ -7,8 +7,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,6 +28,7 @@ import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HouseholdIncomeAssumptionsCard(
     uiState: RetirementUiState,
@@ -105,19 +110,17 @@ fun HouseholdIncomeAssumptionsCard(
             color = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.height(6.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            RetirementScenarioPreset.entries.forEach { preset ->
-                val isSelected = uiState.preset == preset
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            val presets = RetirementScenarioPreset.entries
+            presets.forEachIndexed { index, preset ->
                 val returnStr = "${(preset.nominalAnnualReturn * 100).toInt()}%"
                 val inflStr = "${(preset.inflationRate * 100).toInt()}%"
-                FilterChip(
-                    selected = isSelected,
+                SegmentedButton(
+                    selected = uiState.preset == preset,
                     onClick = { onPresetChange(preset) },
-                    label = { Text("${preset.label} ($returnStr / $inflStr)") },
-                    modifier = Modifier.weight(1f)
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = presets.size),
+                    icon = {},
+                    label = { Text("${preset.label} ($returnStr / $inflStr)", style = MaterialTheme.typography.labelSmall) }
                 )
             }
         }
@@ -132,30 +135,22 @@ fun HouseholdIncomeAssumptionsCard(
             color = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.height(6.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            FilterChip(
-                selected = uiState.targetMode == RetirementTargetMode.WITHDRAWAL_4_PERCENT,
-                onClick = { onTargetModeChange(RetirementTargetMode.WITHDRAWAL_4_PERCENT) },
-                label = { Text("4% Rule") }
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            val modes = listOf(
+                RetirementTargetMode.WITHDRAWAL_4_PERCENT to "4% Rule",
+                RetirementTargetMode.NEST_EGG to "Real Return",
+                RetirementTargetMode.LEAVE_LEGACY to "Legacy",
+                RetirementTargetMode.CUSTOM to "Custom"
             )
-            FilterChip(
-                selected = uiState.targetMode == RetirementTargetMode.NEST_EGG,
-                onClick = { onTargetModeChange(RetirementTargetMode.NEST_EGG) },
-                label = { Text("Real Return") }
-            )
-            FilterChip(
-                selected = uiState.targetMode == RetirementTargetMode.LEAVE_LEGACY,
-                onClick = { onTargetModeChange(RetirementTargetMode.LEAVE_LEGACY) },
-                label = { Text("Legacy") }
-            )
-            FilterChip(
-                selected = uiState.targetMode == RetirementTargetMode.CUSTOM,
-                onClick = { onTargetModeChange(RetirementTargetMode.CUSTOM) },
-                label = { Text("Custom") }
-            )
+            modes.forEachIndexed { index, (mode, label) ->
+                SegmentedButton(
+                    selected = uiState.targetMode == mode,
+                    onClick = { onTargetModeChange(mode) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
+                    icon = {},
+                    label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(14.dp))

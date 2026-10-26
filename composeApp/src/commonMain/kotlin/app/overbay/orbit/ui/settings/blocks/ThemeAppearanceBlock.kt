@@ -6,8 +6,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +24,7 @@ import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThemeAppearanceBlock(
     preferences: OrbitPreferences,
@@ -42,16 +47,15 @@ fun ThemeAppearanceBlock(
         )
         Spacer(modifier = Modifier.height(6.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OrbitThemeMode.entries.forEach { mode ->
-                FilterChip(
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            val modes = OrbitThemeMode.entries
+            modes.forEachIndexed { index, mode ->
+                SegmentedButton(
                     selected = preferences.themeMode == mode,
                     onClick = { onThemeModeChange(mode) },
-                    label = { Text(mode.displayName) },
-                    modifier = Modifier.weight(1f)
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
+                    icon = {},
+                    label = { Text(mode.displayName, style = MaterialTheme.typography.labelMedium) }
                 )
             }
         }

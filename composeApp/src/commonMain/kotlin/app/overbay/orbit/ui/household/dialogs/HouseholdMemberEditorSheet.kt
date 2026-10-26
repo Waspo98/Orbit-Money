@@ -17,6 +17,9 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -86,15 +89,15 @@ fun HouseholdMemberEditorSheet(
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf("adult" to "Adult / Partner", "child" to "Child", "dependent" to "Dependent").forEach { (key, label) ->
-                    FilterChip(
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                val roles = listOf("adult" to "Adult / Partner", "child" to "Child", "dependent" to "Dependent")
+                roles.forEachIndexed { index, (key, label) ->
+                    SegmentedButton(
                         selected = role == key,
                         onClick = { role = key },
-                        label = { Text(label) }
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = roles.size),
+                        icon = {},
+                        label = { Text(label, style = MaterialTheme.typography.labelMedium) }
                     )
                 }
             }

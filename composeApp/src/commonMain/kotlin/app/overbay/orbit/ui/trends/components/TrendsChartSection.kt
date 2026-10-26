@@ -19,9 +19,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +49,7 @@ import app.overbay.orbit.ui.trends.TrendsPeriod
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrendsChartSection(
     state: SpendingTrendsUiState,
@@ -218,32 +223,21 @@ fun TrendsChartSection(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Horizon Range Tabs (1M, 3M, 6M, 1Y, ALL)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                TrendsPeriod.entries.forEach { period ->
-                    val isSelected = period == state.selectedPeriod
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                        border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                haptics.tick()
-                                onSelectPeriod(period)
-                            }
-                    ) {
-                        Text(
-                            text = period.label,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 6.dp),
-                            textAlign = TextAlign.Center
-                        )
-                    }
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                TrendsPeriod.entries.forEachIndexed { index, period ->
+                    SegmentedButton(
+                        selected = period == state.selectedPeriod,
+                        onClick = {
+                            haptics.tick()
+                            onSelectPeriod(period)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = TrendsPeriod.entries.size
+                        ),
+                        icon = {},
+                        label = { Text(period.label, style = MaterialTheme.typography.labelMedium) }
+                    )
                 }
             }
 

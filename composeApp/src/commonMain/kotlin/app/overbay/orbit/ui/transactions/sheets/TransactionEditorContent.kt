@@ -23,10 +23,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,6 +58,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.datetime.LocalDate
 import kotlin.math.abs
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionEditorContent(
     transaction: Transaction?,
@@ -150,34 +155,27 @@ fun TransactionEditorContent(
                 )
             }
 
-            Surface(
-                onClick = {
-                    haptics.tick()
-                    isExpense = !isExpense
-                },
-                shape = RoundedCornerShape(12.dp),
-                color = if (isExpense) {
-                    MaterialTheme.colorScheme.errorContainer
-                } else {
-                    MaterialTheme.colorScheme.primaryContainer
-                },
-                modifier = Modifier.height(56.dp)
-            ) {
-                Box(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (isExpense) "Expense (-)" else "Income (+)",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isExpense) {
-                            MaterialTheme.colorScheme.onErrorContainer
-                        } else {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        }
-                    )
-                }
+            SingleChoiceSegmentedButtonRow {
+                SegmentedButton(
+                    selected = isExpense,
+                    onClick = {
+                        haptics.tick()
+                        isExpense = true
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    icon = {},
+                    label = { Text("Expense") }
+                )
+                SegmentedButton(
+                    selected = !isExpense,
+                    onClick = {
+                        haptics.tick()
+                        isExpense = false
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    icon = {},
+                    label = { Text("Income") }
+                )
             }
         }
 

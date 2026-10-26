@@ -12,11 +12,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +39,7 @@ import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.util.LocalOidcAuthLauncher
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StorageSyncModeBlock(
     preferences: OrbitPreferences,
@@ -59,21 +64,20 @@ fun StorageSyncModeBlock(
         modifier = modifier
     ) {
         // Storage mode chips
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            FilterChip(
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
                 selected = preferences.storageMode == StorageMode.LOCAL,
                 onClick = { onStorageModeChange(StorageMode.LOCAL) },
-                label = { Text("Local Device (Offline)") },
-                modifier = Modifier.weight(1f)
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                icon = {},
+                label = { Text("Local Device (Offline)", style = MaterialTheme.typography.labelMedium) }
             )
-            FilterChip(
+            SegmentedButton(
                 selected = preferences.storageMode == StorageMode.SELF_HOSTED,
                 onClick = { onStorageModeChange(StorageMode.SELF_HOSTED) },
-                label = { Text("Self-Hosted Server") },
-                modifier = Modifier.weight(1f)
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                icon = {},
+                label = { Text("Self-Hosted Server", style = MaterialTheme.typography.labelMedium) }
             )
         }
 

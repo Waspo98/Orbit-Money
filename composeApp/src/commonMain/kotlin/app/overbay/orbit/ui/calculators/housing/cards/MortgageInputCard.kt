@@ -15,11 +15,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +43,7 @@ import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MortgageInputCard(
     uiState: HousingUiState,
@@ -248,12 +253,15 @@ fun MortgageInputCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(15, 20, 30).forEach { years ->
-                        FilterChip(
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val terms = listOf(15, 20, 30)
+                    terms.forEachIndexed { index, years ->
+                        SegmentedButton(
                             selected = uiState.loanTermYears == years,
                             onClick = { onLoanTermChange(years) },
-                            label = { Text("${years}y") }
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = terms.size),
+                            icon = {},
+                            label = { Text("${years}y", style = MaterialTheme.typography.labelSmall) }
                         )
                     }
                 }

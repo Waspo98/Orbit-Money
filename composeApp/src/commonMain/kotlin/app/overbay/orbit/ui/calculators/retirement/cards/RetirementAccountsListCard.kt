@@ -7,9 +7,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +27,7 @@ import app.overbay.orbit.ui.calculators.retirement.RetirementUiState
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RetirementAccountsListCard(
     uiState: RetirementUiState,
@@ -40,19 +45,20 @@ fun RetirementAccountsListCard(
     ) {
         // Toggle Linked Accounts vs Manual
         if (uiState.investmentAccounts.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
                     selected = uiState.useConnectedAccounts,
                     onClick = { onToggleUseConnectedAccounts(true) },
-                    label = { Text("Linked Accounts (${uiState.investmentAccounts.size})") }
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    icon = {},
+                    label = { Text("Linked Accounts (${uiState.investmentAccounts.size})", style = MaterialTheme.typography.labelMedium) }
                 )
-                FilterChip(
+                SegmentedButton(
                     selected = !uiState.useConnectedAccounts,
                     onClick = { onToggleUseConnectedAccounts(false) },
-                    label = { Text("Manual Balance") }
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    icon = {},
+                    label = { Text("Manual Balance", style = MaterialTheme.typography.labelMedium) }
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))

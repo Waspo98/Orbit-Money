@@ -13,7 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +32,7 @@ import app.overbay.orbit.ui.components.charts.NetWorthAreaChart
 import app.overbay.orbit.ui.networth.NetWorthPeriod
 import app.overbay.orbit.util.LocalOrbitHaptics
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NetWorthChartCard(
     points: List<MonthlyNetWorthPoint>,
@@ -98,35 +103,21 @@ fun NetWorthChartCard(
             Spacer(modifier = Modifier.height(14.dp))
 
             // Horizon Tabs (1M, 3M, 6M, 1Y, ALL)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                NetWorthPeriod.entries.forEach { period ->
-                    val isSelected = period == selectedPeriod
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surface,
-                        border = if (isSelected) null
-                        else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                haptics.tick()
-                                onSelectPeriod(period)
-                            }
-                    ) {
-                        Text(
-                            text = period.label,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 6.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                    }
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                NetWorthPeriod.entries.forEachIndexed { index, period ->
+                    SegmentedButton(
+                        selected = period == selectedPeriod,
+                        onClick = {
+                            haptics.tick()
+                            onSelectPeriod(period)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = NetWorthPeriod.entries.size
+                        ),
+                        icon = {},
+                        label = { Text(period.label, style = MaterialTheme.typography.labelMedium) }
+                    )
                 }
             }
 

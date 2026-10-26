@@ -27,6 +27,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -128,26 +131,27 @@ fun RecurringItemEditorSheet(
                     )
                 }
 
-                Surface(
-                    onClick = {
-                        haptics.tick()
-                        isExpense = !isExpense
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isExpense) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.height(56.dp)
-                ) {
-                    Box(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (isExpense) "Bill / Expense" else "Income",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isExpense) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
+                SingleChoiceSegmentedButtonRow {
+                    SegmentedButton(
+                        selected = isExpense,
+                        onClick = {
+                            haptics.tick()
+                            isExpense = true
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        icon = {},
+                        label = { Text("Expense") }
+                    )
+                    SegmentedButton(
+                        selected = !isExpense,
+                        onClick = {
+                            haptics.tick()
+                            isExpense = false
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        icon = {},
+                        label = { Text("Income") }
+                    )
                 }
             }
 

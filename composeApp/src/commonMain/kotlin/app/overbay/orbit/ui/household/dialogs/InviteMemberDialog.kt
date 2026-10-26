@@ -8,9 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HouseholdRole
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InviteMemberDialog(
     onDismiss: () -> Unit,
@@ -67,20 +72,20 @@ fun InviteMemberDialog(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = selectedRole == HouseholdRole.MEMBER,
-                        onClick = { selectedRole = HouseholdRole.MEMBER },
-                        label = { Text("Member (Edit)") }
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val roles = listOf(
+                        HouseholdRole.MEMBER to "Member (Edit)",
+                        HouseholdRole.ADMIN to "Admin (Full)"
                     )
-                    FilterChip(
-                        selected = selectedRole == HouseholdRole.ADMIN,
-                        onClick = { selectedRole = HouseholdRole.ADMIN },
-                        label = { Text("Admin (Full)") }
-                    )
+                    roles.forEachIndexed { index, (role, label) ->
+                        SegmentedButton(
+                            selected = selectedRole == role,
+                            onClick = { selectedRole = role },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = roles.size),
+                            icon = {},
+                            label = { Text(label, style = MaterialTheme.typography.labelMedium) }
+                        )
+                    }
                 }
             }
         },

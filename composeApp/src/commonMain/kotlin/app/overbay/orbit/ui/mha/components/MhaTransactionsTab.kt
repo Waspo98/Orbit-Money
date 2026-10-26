@@ -16,11 +16,15 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +41,7 @@ import app.overbay.orbit.ui.mha.MhaTransactionTabFilter
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MhaTransactionsTab(
     transactions: List<MhaTransactionItem>,
@@ -80,37 +85,24 @@ fun MhaTransactionsTab(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Segmented Chips
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = selectedTab == MhaTransactionTabFilter.ELIGIBLE,
-                    onClick = {
-                        haptics.tick()
-                        onTabChange(MhaTransactionTabFilter.ELIGIBLE)
-                    },
-                    label = { Text("Eligible ($eligibleCount)") },
-                    shape = RoundedCornerShape(999.dp)
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                val tabs = listOf(
+                    Triple(MhaTransactionTabFilter.ELIGIBLE, "Eligible", eligibleCount),
+                    Triple(MhaTransactionTabFilter.REVIEW_QUEUE, "Review Queue", reviewQueueCount),
+                    Triple(MhaTransactionTabFilter.ALL, "All", allCount)
                 )
-                FilterChip(
-                    selected = selectedTab == MhaTransactionTabFilter.REVIEW_QUEUE,
-                    onClick = {
-                        haptics.tick()
-                        onTabChange(MhaTransactionTabFilter.REVIEW_QUEUE)
-                    },
-                    label = { Text("Review Queue ($reviewQueueCount)") },
-                    shape = RoundedCornerShape(999.dp)
-                )
-                FilterChip(
-                    selected = selectedTab == MhaTransactionTabFilter.ALL,
-                    onClick = {
-                        haptics.tick()
-                        onTabChange(MhaTransactionTabFilter.ALL)
-                    },
-                    label = { Text("All ($allCount)") },
-                    shape = RoundedCornerShape(999.dp)
-                )
+                tabs.forEachIndexed { index, (tab, label, count) ->
+                    SegmentedButton(
+                        selected = selectedTab == tab,
+                        onClick = {
+                            haptics.tick()
+                            onTabChange(tab)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = tabs.size),
+                        icon = {},
+                        label = { Text("$label ($count)", style = MaterialTheme.typography.labelMedium) }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
