@@ -32,6 +32,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
 /**
@@ -95,24 +96,44 @@ class OrbitRepository(
         _storageMode.value = pref.storageMode
         if (pref.storageMode == StorageMode.SELF_HOSTED) {
             val client = createApiClient(pref.selfHostedServerUrl)
-            activeEngine = SelfHostedApiEngine(client, storage) { _preferences.value }
-            val me = client.getMe().getOrNull()
-            if (me != null && me.authenticated) {
-                storage.delete(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
-                _isAuthenticated.value = true
-                _currentUser.value = me.displayName ?: me.username ?: me.email
-                val loaded = activeEngine.loadSnapshot().copy(preferences = pref)
-                updateMemoryState(loaded)
-                if (!pendingOidcUrl.isNullOrBlank()) localEngine.saveSnapshot(loaded)
+            val remoteEngine = SelfHostedApiEngine(client, storage) { _preferences.value }
+            activeEngine = remoteEngine
+            val cachedSnap = remoteEngine.loadCachedSnapshot()?.copy(preferences = pref) ?: localSnap.copy(preferences = pref)
+            val hasSession = !storage.loadString(OrbitApiClient.COOKIE_STORAGE_KEY).isNullOrBlank() ||
+                cachedSnap.accounts.isNotEmpty() || cachedSnap.transactions.isNotEmpty()
+            _isAuthenticated.value = hasSession
+            updateMemoryState(cachedSnap)
+            if (customApiClient == null) {
+                scope.launch { refreshSelfHostedSession(client, remoteEngine, pref, pendingOidcUrl, hasSession) }
             } else {
-                _isAuthenticated.value = false
-                _currentUser.value = null
-                updateMemoryState(localSnap.copy(preferences = pref))
+                refreshSelfHostedSession(client, remoteEngine, pref, pendingOidcUrl, hasSession)
             }
         } else {
             _isAuthenticated.value = true
             activeEngine = localEngine
-            updateMemoryState(activeEngine.loadSnapshot().copy(preferences = pref))
+            updateMemoryState(localSnap.copy(preferences = pref))
+        }
+    }
+
+    private suspend fun refreshSelfHostedSession(
+        client: OrbitApiClient,
+        remoteEngine: SelfHostedApiEngine,
+        pref: OrbitPreferences,
+        pendingOidcUrl: String?,
+        hadCachedSession: Boolean
+    ) {
+        val meResult = client.getMe()
+        val me = meResult.getOrNull()
+        if (me != null && me.authenticated) {
+            storage.delete(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
+            _isAuthenticated.value = true
+            _currentUser.value = me.displayName ?: me.username ?: me.email
+            val loaded = remoteEngine.loadSnapshot().copy(preferences = pref)
+            updateMemoryState(loaded)
+            localEngine.saveSnapshot(loaded)
+        } else if ((me != null && !me.authenticated) || !hadCachedSession || meResult.exceptionOrNull()?.message.orEmpty().contains("401")) {
+            _isAuthenticated.value = false
+            _currentUser.value = null
         }
     }
 
@@ -461,24 +482,14 @@ class OrbitRepository(
         val current = _budgets.value
         val existing = current.find { it.categoryId == categoryId }
         val updated = existing?.copy(amountCents = amountCents, rollover = rollover)
-            ?: CategoryBudget(
-                id = (current.maxOfOrNull { it.id } ?: 0L) + 1L,
-                categoryId = categoryId,
-                amountCents = amountCents,
-                rollover = rollover
-            )
-        val updatedList = if (existing != null) {
-            current.map { if (it.categoryId == categoryId) updated else it }
-        } else {
-            current + updated
-        }
+            ?: CategoryBudget(id = (current.maxOfOrNull { it.id } ?: 0L) + 1L, categoryId = categoryId, amountCents = amountCents, rollover = rollover)
+        val updatedList = if (existing != null) current.map { if (it.categoryId == categoryId) updated else it } else current + updated
         commitSnapshot(_snapshot.value.copy(budgets = updatedList))
         activeEngine.pushBudget(updated)
     }
 
     suspend fun deleteBudget(id: Long) {
-        val updatedList = _budgets.value.filterNot { it.id == id }
-        commitSnapshot(_snapshot.value.copy(budgets = updatedList))
+        commitSnapshot(_snapshot.value.copy(budgets = _budgets.value.filterNot { it.id == id }))
         activeEngine.deleteBudget(id)
     }
 
@@ -486,38 +497,28 @@ class OrbitRepository(
     suspend fun saveGoal(goal: Goal) {
         val current = _goals.value
         val exists = current.any { it.id == goal.id && goal.id != 0L }
-        val updatedList = if (exists) {
-            current.map { if (it.id == goal.id) goal else it }
-        } else {
-            val newId = if (goal.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else goal.id
-            current + goal.copy(id = newId)
-        }
+        val updatedList = if (exists) current.map { if (it.id == goal.id) goal else it }
+        else current + goal.copy(id = if (goal.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else goal.id)
         commitSnapshot(_snapshot.value.copy(goals = updatedList))
         activeEngine.pushGoal(goal)
     }
 
     suspend fun deleteGoal(id: Long) {
-        val updatedList = _goals.value.filterNot { it.id == id }
-        commitSnapshot(_snapshot.value.copy(goals = updatedList))
+        commitSnapshot(_snapshot.value.copy(goals = _goals.value.filterNot { it.id == id }))
         activeEngine.deleteGoal(id)
     }
 
     suspend fun saveRule(rule: TransactionRule) {
         val current = _rules.value
         val exists = current.any { it.id == rule.id && rule.id != 0L }
-        val updatedList = if (exists) {
-            current.map { if (it.id == rule.id) rule else it }
-        } else {
-            val newId = if (rule.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else rule.id
-            current + rule.copy(id = newId)
-        }
+        val updatedList = if (exists) current.map { if (it.id == rule.id) rule else it }
+        else current + rule.copy(id = if (rule.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else rule.id)
         commitSnapshot(_snapshot.value.copy(rules = updatedList))
         activeEngine.pushRule(rule)
     }
 
     suspend fun deleteRule(id: Long) {
-        val updatedList = _rules.value.filterNot { it.id == id }
-        commitSnapshot(_snapshot.value.copy(rules = updatedList))
+        commitSnapshot(_snapshot.value.copy(rules = _rules.value.filterNot { it.id == id }))
         activeEngine.deleteRule(id)
     }
 
@@ -528,27 +529,21 @@ class OrbitRepository(
     }
 
     suspend fun pairTransfers() {
-        val paired = TransferMatcherEngine.matchTransfers(_transactions.value)
-        commitSnapshot(_snapshot.value.copy(transactions = paired))
+        commitSnapshot(_snapshot.value.copy(transactions = TransferMatcherEngine.matchTransfers(_transactions.value)))
     }
 
     // Upcoming Items
     suspend fun saveUpcoming(item: UpcomingItem) {
         val current = _upcomingItems.value
         val exists = current.any { it.id == item.id && item.id != 0L }
-        val updatedList = if (exists) {
-            current.map { if (it.id == item.id) item else it }
-        } else {
-            val newId = if (item.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else item.id
-            current + item.copy(id = newId)
-        }
+        val updatedList = if (exists) current.map { if (it.id == item.id) item else it }
+        else current + item.copy(id = if (item.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else item.id)
         commitSnapshot(_snapshot.value.copy(upcomingItems = updatedList))
         activeEngine.pushUpcoming(item)
     }
 
     suspend fun deleteUpcoming(id: Long) {
-        val updatedList = _upcomingItems.value.filterNot { it.id == id }
-        commitSnapshot(_snapshot.value.copy(upcomingItems = updatedList))
+        commitSnapshot(_snapshot.value.copy(upcomingItems = _upcomingItems.value.filterNot { it.id == id }))
         activeEngine.deleteUpcoming(id)
     }
 

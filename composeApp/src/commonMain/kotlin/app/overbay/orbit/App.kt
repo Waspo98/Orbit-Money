@@ -1,5 +1,10 @@
 package app.overbay.orbit
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -8,7 +13,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.OrbitThemeMode
@@ -29,6 +36,8 @@ import app.overbay.orbit.util.rememberDevicePosture
 import app.overbay.orbit.util.rememberFileImportExportHelper
 import app.overbay.orbit.util.rememberOidcAuthLauncher
 import app.overbay.orbit.util.rememberOrbitHaptics
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun App(
@@ -47,8 +56,15 @@ fun App(
     var isInitialized by remember(repo) { mutableStateOf(repository != null) }
 
     LaunchedEffect(repo) {
-        repo.initialize()
-        isInitialized = true
+        try {
+            withContext(Dispatchers.Default) {
+                repo.initialize()
+            }
+        } catch (_: Throwable) {
+            // Ensure initialization error never hangs startup screen
+        } finally {
+            isInitialized = true
+        }
     }
 
     LaunchedEffect(isInitialized, repo) {
@@ -97,9 +113,20 @@ fun App(
             themeMode = activeMode,
             dynamicColor = activeDynamicColor
         ) {
-            Surface(modifier = modifier) {
+            Surface(
+                modifier = modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
                 if (!isInitialized) {
-                    // Wait for initial local preference snapshot load before mounting initial nav key
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
                 } else if (isBiometricLocked && preferences.biometricLockEnabled) {
                     BiometricLockOverlay(
                         onUnlock = { isBiometricLocked = false }

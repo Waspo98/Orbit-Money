@@ -124,7 +124,7 @@ class SelfHostedApiEngine(
         )
     }
 
-    private fun loadCachedSnapshot(): OrbitWorkspaceSnapshot? {
+    internal fun loadCachedSnapshot(): OrbitWorkspaceSnapshot? {
         val raw = storage.loadString(CACHE_SNAPSHOT_KEY) ?: return null
         return runCatching {
             json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), raw)

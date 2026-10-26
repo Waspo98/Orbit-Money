@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -42,10 +41,11 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -55,6 +55,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Scroll state for [MorphingPageHero] implementing ExitUntilCollapsed physics,
@@ -65,7 +66,7 @@ class HeroScrollState(
     val minHeightPx: Float,
     private val coroutineScope: CoroutineScope
 ) {
-    var maxHeightPx by mutableFloatStateOf(initialMaxHeightPx)
+    var maxHeightPx: Float = initialMaxHeightPx
     var scrollOffsetPx by mutableFloatStateOf(0f)
     var isFabVisible by mutableStateOf(true)
 
@@ -177,15 +178,6 @@ fun MorphingPageHero(
     val canopyColors = OrbitTheme.colors
     val scrollShadowElevation = (fraction * 6f).dp
 
-    val currentHeightDp = if (scrollState != null) {
-        with(density) {
-            val px = scrollState.maxHeightPx - (scrollState.maxHeightPx - scrollState.minHeightPx) * fraction
-            px.toDp()
-        }
-    } else {
-        if (expandedToolbar != null || heroContent != null) 148.dp else 96.dp
-    }
-
     val minBarHeightDp = if (scrollState != null) {
         with(density) { scrollState.minHeightPx.toDp() }
     } else 56.dp
@@ -225,25 +217,35 @@ fun MorphingPageHero(
                 )
             }
             .statusBarsPadding()
-            .height(currentHeightDp)
             .clipToBounds()
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(
+                    constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
+                )
+                val minPx = scrollState?.minHeightPx ?: 56.dp.toPx()
+                val expandedPx = placeable.height.toFloat().coerceAtLeast(minPx)
+                scrollState?.updateMaxHeight(expandedPx)
+                val currentPx = if (scrollState != null) {
+                    val maxCollapse = (expandedPx - minPx).coerceAtLeast(0f)
+                    val offset = scrollState.scrollOffsetPx.coerceIn(0f, maxCollapse)
+                    (expandedPx - offset).roundToInt()
+                } else {
+                    expandedPx.roundToInt()
+                }
+                layout(placeable.width, currentPx) {
+                    placeable.placeRelative(0, 0)
+                }
+            }
     ) {
         val expandedAlpha = (1f - fraction * 1.65f).coerceIn(0f, 1f)
         val collapsedAlpha = if (scrollState != null) {
             ((fraction - 0.45f) / 0.55f).coerceIn(0f, 1f)
         } else 0f
 
-        // Expanded Content (Unbounded height measurement so maxHeightPx always matches exact content)
+        // Expanded Content (Single-pass unbounded measurement via Modifier.layout)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .wrapContentHeight(unbounded = true, align = Alignment.Top)
-                .onGloballyPositioned { coordinates ->
-                    val measuredHeightPx = coordinates.size.height.toFloat()
-                    if (scrollState != null && measuredHeightPx > 0f) {
-                        scrollState.updateMaxHeight(measuredHeightPx)
-                    }
-                }
                 .padding(horizontal = 20.dp, vertical = 12.dp)
                 .graphicsLayer {
                     alpha = expandedAlpha
