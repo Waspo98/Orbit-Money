@@ -38,54 +38,45 @@ fun CurrencyTextField(
         mutableStateOf(initial)
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = rawText,
-            onValueChange = { input ->
-                // Clean input: digits, optional leading minus (if allowed), and at most one decimal point
-                val sanitized = buildString {
-                    var hasDecimal = false
-                    input.forEachIndexed { index, c ->
-                        if (c.isDigit()) {
-                            append(c)
-                        } else if (c == '.' && !hasDecimal) {
-                            append(c)
-                            hasDecimal = true
-                        } else if (c == '-' && index == 0 && allowNegative) {
-                            append(c)
-                        }
+    OutlinedTextField(
+        value = rawText,
+        onValueChange = { input ->
+            // Clean input: digits, optional leading minus (if allowed), and at most one decimal point
+            val sanitized = buildString {
+                var hasDecimal = false
+                input.forEachIndexed { index, c ->
+                    if (c.isDigit()) {
+                        append(c)
+                    } else if (c == '.' && !hasDecimal) {
+                        append(c)
+                    } else if (c == '-' && index == 0 && allowNegative) {
+                        append(c)
                     }
                 }
-                rawText = sanitized
-                val parsedCents = MoneyUtils.dollarsToCents(sanitized)
-                onCentsChange(parsedCents)
-            },
-            modifier = Modifier.fillMaxWidth(),
-            label = if (label != null) {
-                { Text(label) }
-            } else null,
-            leadingIcon = {
-                Text(
-                    text = "$",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            },
-            isError = isError || errorMessage != null,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = if (allowNegative) KeyboardType.Text else KeyboardType.Decimal
-            ),
-            singleLine = true
-        )
-
-        if (errorMessage != null) {
+            }
+            rawText = sanitized
+            val parsedCents = MoneyUtils.dollarsToCents(sanitized)
+            onCentsChange(parsedCents)
+        },
+        modifier = modifier.fillMaxWidth(),
+        label = if (label != null) {
+            { Text(label) }
+        } else null,
+        leadingIcon = {
             Text(
-                text = errorMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                text = "$",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
             )
-        }
-    }
+        },
+        supportingText = if (errorMessage != null) {
+            { Text(errorMessage) }
+        } else null,
+        isError = isError || errorMessage != null,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = if (allowNegative) KeyboardType.Text else KeyboardType.Decimal
+        ),
+        singleLine = true
+    )
 }

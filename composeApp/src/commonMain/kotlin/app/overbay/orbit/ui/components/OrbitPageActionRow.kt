@@ -23,9 +23,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -124,46 +125,33 @@ fun OrbitTogglePill(
     enabled: Boolean = true
 ) {
     val haptics = LocalOrbitHaptics.current
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-        modifier = modifier
-            .heightIn(min = 44.dp)
-            .clip(CircleShape)
-            .clickable(enabled = enabled) {
-                haptics.tick()
-                onCheckedChange(!checked)
-            }
-    ) {
-        Row(
-            modifier = Modifier.padding(start = 6.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(
-                checked = checked,
-                onCheckedChange = {
-                    haptics.tick()
-                    onCheckedChange(it)
-                },
-                enabled = enabled,
-                colors = CheckboxDefaults.colors(
-                    checkedColor = MaterialTheme.colorScheme.primary,
-                    checkmarkColor = Color.White,
-                    uncheckedColor = MaterialTheme.colorScheme.outline
-                ),
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
+    FilterChip(
+        selected = checked,
+        onClick = {
+            haptics.tick()
+            onCheckedChange(!checked)
+        },
+        label = {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
                 fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                fontWeight = FontWeight.SemiBold
             )
-        }
-    }
+        },
+        leadingIcon = if (checked) {
+            {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(FilterChipDefaults.IconSize)
+                )
+            }
+        } else null,
+        enabled = enabled,
+        shape = CircleShape,
+        modifier = modifier.heightIn(min = 44.dp)
+    )
 }
 
 /**
@@ -196,7 +184,7 @@ fun OrbitFloatingActionButton(
             },
             shape = RoundedCornerShape(16.dp),
             containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = Color.White,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
             elevation = FloatingActionButtonDefaults.elevation(
                 defaultElevation = 6.dp,
                 pressedElevation = 10.dp

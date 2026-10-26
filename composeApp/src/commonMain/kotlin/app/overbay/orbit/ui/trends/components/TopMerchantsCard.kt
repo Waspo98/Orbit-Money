@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MerchantSpendingSummary
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
 @Composable
@@ -126,21 +127,12 @@ fun TopMerchantsCard(
 
                         // Proportion bar relative to top merchant
                         val fraction = (item.totalSpentCents.toFloat() / topSpend.toFloat()).coerceIn(0.02f, 1f)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(3.dp)
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(fraction)
-                                    .height(3.dp)
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(MaterialTheme.colorScheme.primary)
-                            )
-                        }
+                        OrbitPillProgressBar(
+                            percent = fraction,
+                            height = 3.dp,
+                            customFillColor = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+                        )
                     }
                 }
             }

@@ -27,6 +27,7 @@ import app.overbay.orbit.domain.CategorySpendingTrend
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -147,21 +148,12 @@ fun CategoryBreakdownList(
 
                         // Proportion Bar
                         val fraction = (trend.totalSpentCents.toFloat() / maxSpend.toFloat()).coerceIn(0.02f, 1f)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(fraction)
-                                    .height(4.dp)
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(catColor)
-                            )
-                        }
+                        OrbitPillProgressBar(
+                            percent = fraction,
+                            height = 4.dp,
+                            customFillColor = catColor,
+                            trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+                        )
                     }
                 }
             }

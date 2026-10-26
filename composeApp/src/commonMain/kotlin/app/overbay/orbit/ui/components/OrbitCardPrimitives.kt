@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -50,23 +52,18 @@ fun OrbitPillProgressBar(
         MaterialTheme.colorScheme.primary
     }
 
-    Box(
+    LinearProgressIndicator(
+        progress = { clampedPercent },
         modifier = modifier
             .fillMaxWidth()
             .height(height)
-            .clip(CircleShape)
-            .background(trackColor)
-    ) {
-        if (clampedPercent > 0f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(clampedPercent)
-                    .clip(CircleShape)
-                    .background(fillColor)
-            )
-        }
-    }
+            .clip(CircleShape),
+        color = fillColor,
+        trackColor = trackColor,
+        strokeCap = StrokeCap.Round,
+        gapSize = 0.dp,
+        drawStopIndicator = {}
+    )
 }
 
 /**

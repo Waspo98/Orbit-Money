@@ -1,15 +1,9 @@
 package app.overbay.orbit.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.DatePicker
@@ -17,7 +11,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -54,47 +48,32 @@ fun DateFieldButton(
     var showDialog by remember { mutableStateOf(false) }
     val haptics = LocalOrbitHaptics.current
 
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
-            .clickable(enabled = enabled) {
-                haptics.tick()
-                showDialog = true
-            },
-        shape = MaterialTheme.shapes.small,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        color = MaterialTheme.colorScheme.surface
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                if (label != null) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Text(
-                    text = LocalDateUtils.formatIsoDate(date),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
+    Box(modifier = modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = LocalDateUtils.formatIsoDate(date),
+            onValueChange = {},
+            readOnly = true,
+            enabled = enabled,
+            label = if (label != null) { { Text(label) } } else null,
+            trailingIcon = {
+                Icon(
+                    imageVector = Icons.Default.DateRange,
+                    contentDescription = "Select Date",
+                    tint = MaterialTheme.colorScheme.primary
                 )
-            }
-            Icon(
-                imageVector = Icons.Default.DateRange,
-                contentDescription = "Select Date",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
-        }
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clip(MaterialTheme.shapes.extraSmall)
+                .clickable(enabled = enabled) {
+                    haptics.tick()
+                    showDialog = true
+                }
+        )
     }
 
     if (showDialog) {
