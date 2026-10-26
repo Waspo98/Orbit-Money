@@ -1,23 +1,16 @@
 package app.overbay.orbit.ui.trends
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -27,12 +20,18 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.HeroStatItem
+import app.overbay.orbit.ui.components.HeroStatTone
+import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.trends.components.CategoryBreakdownList
 import app.overbay.orbit.ui.trends.components.TopMerchantsCard
 import app.overbay.orbit.ui.trends.components.TrendsChartSection
@@ -45,6 +44,7 @@ fun SpendingTrendsScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val heroScrollState = rememberHeroScrollState(maxHeight = 220.dp, minHeight = 64.dp)
 
     if (state.isLoading) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -72,116 +72,104 @@ fun SpendingTrendsScreen(
             return@Scaffold
         }
 
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 48.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(innerPadding)
+                .nestedScroll(heroScrollState.nestedScrollConnection)
         ) {
-            // Header Bar
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu")
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Column {
-                        Text(
-                            text = "Spending Trends",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = "Income vs expense velocity & category breakdown",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Hero Period Net Flow Card
-            item {
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+            // Curved Green Canopy Hero
+            MorphingPageHero(
+                kicker = "HISTORY",
+                title = "Spending Trends",
+                subtitle = "Spending patterns and category breakdown over time",
+                canNavigateBack = true,
+                onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                scrollState = heroScrollState,
+                stats = listOf(
+                    HeroStatItem("NET FLOW", (if (state.totalPeriodNetCents > 0L) "+" else "") + MoneyUtils.formatCents(state.totalPeriodNetCents), if (state.totalPeriodNetCents >= 0L) HeroStatTone.GOOD else HeroStatTone.CAUTION),
+                    HeroStatItem("INCOME", MoneyUtils.formatCents(state.overview.totalPeriodIncomeCents), HeroStatTone.GOOD),
+                    HeroStatItem("EXPENSES", MoneyUtils.formatCents(state.overview.totalPeriodSpendingCents), HeroStatTone.CAUTION),
+                    HeroStatItem("SAVINGS RATE", "${state.overallSavingsRatePercent.toInt()}%", if (state.overallSavingsRatePercent >= 20.0) HeroStatTone.GOOD else HeroStatTone.DEFAULT)
+                ),
+                expandedToolbar = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "TOTAL NET CASH FLOW (${state.selectedPeriod.label})",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.outline,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        val netColor = if (state.totalPeriodNetCents >= 0L) OrbitColorTokens.Green else OrbitColorTokens.Red
-                        Text(
-                            text = (if (state.totalPeriodNetCents > 0L) "+" else "") + MoneyUtils.formatCents(state.totalPeriodNetCents),
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = netColor
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Text(
-                                text = "Income: ${MoneyUtils.formatCents(state.overview.totalPeriodIncomeCents)}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = OrbitColorTokens.Green,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = "Expenses: ${MoneyUtils.formatCents(state.overview.totalPeriodSpendingCents)}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = OrbitColorTokens.Red,
-                                fontWeight = FontWeight.Medium
-                            )
+                        TrendsPeriod.entries.forEach { period ->
+                            val selected = period == state.selectedPeriod
+                            Surface(
+                                shape = CircleShape,
+                                color = if (selected) Color.White else Color.White.copy(alpha = 0.18f),
+                                modifier = Modifier.clickable { viewModel.setPeriod(period) }
+                            ) {
+                                Text(
+                                    text = period.label,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (selected) Color(0xFF064E3B) else Color.White,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                )
+                            }
                         }
                     }
-                }
-            }
-
-            // Interactive Bar Chart Section
-            item {
-                TrendsChartSection(
-                    state = state,
-                    onSelectPeriod = { viewModel.setPeriod(it) },
-                    onSelectChartMode = { viewModel.setChartMode(it) },
-                    onSelectCategory = { viewModel.selectCategory(it) },
-                    onScrubBar = { idx, item -> viewModel.onScrubBar(idx, item) }
-                )
-            }
-
-            // Category Breakdown List
-            item {
-                CategoryBreakdownList(
-                    categoryTrends = state.overview.categoryTrends,
-                    selectedCategoryId = state.selectedCategoryId,
-                    onSelectCategory = { categoryId ->
-                        viewModel.selectCategory(categoryId)
+                },
+                collapsedActions = {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.White.copy(alpha = 0.2f),
+                        modifier = Modifier.clickable {
+                            val nextIdx = (state.selectedPeriod.ordinal + 1) % TrendsPeriod.entries.size
+                            viewModel.setPeriod(TrendsPeriod.entries[nextIdx])
+                        }
+                    ) {
+                        Text(
+                            text = state.selectedPeriod.label,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
                     }
-                )
-            }
+                }
+            )
 
-            // Top Merchants Card
-            item {
-                TopMerchantsCard(
-                    topMerchants = state.overview.topMerchants,
-                    totalPeriodSpendingCents = state.overview.totalPeriodSpendingCents
-                )
+            // Scrollable Charts and Details
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Interactive Bar Chart Section
+                item {
+                    TrendsChartSection(
+                        state = state,
+                        onSelectPeriod = { viewModel.setPeriod(it) },
+                        onSelectChartMode = { viewModel.setChartMode(it) },
+                        onSelectCategory = { viewModel.selectCategory(it) },
+                        onScrubBar = { idx, item -> viewModel.onScrubBar(idx, item) }
+                    )
+                }
+
+                // Category Breakdown List
+                item {
+                    CategoryBreakdownList(
+                        categoryTrends = state.overview.categoryTrends,
+                        selectedCategoryId = state.selectedCategoryId,
+                        onSelectCategory = { categoryId ->
+                            viewModel.selectCategory(categoryId)
+                        }
+                    )
+                }
+
+                // Top Merchants Card
+                item {
+                    TopMerchantsCard(
+                        topMerchants = state.overview.topMerchants,
+                        totalPeriodSpendingCents = state.overview.totalPeriodSpendingCents
+                    )
+                }
             }
         }
     }

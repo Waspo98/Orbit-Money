@@ -25,26 +25,17 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.NetWorthSnapshot
 import app.overbay.orbit.theme.OrbitColorTokens
 
+import app.overbay.orbit.ui.components.OrbitSectionCard
+
 @Composable
 fun AssetLiabilityBreakdownCard(
     snapshot: NetWorthSnapshot,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+    OrbitSectionCard(
+        title = "Asset & Liability Breakdown",
+        modifier = modifier
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(
-                text = "Asset & Liability Breakdown",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
 
             // Total Assets Row
             Row(
@@ -137,7 +128,6 @@ fun AssetLiabilityBreakdownCard(
             }
         }
     }
-}
 
 @Composable
 private fun BreakdownRow(

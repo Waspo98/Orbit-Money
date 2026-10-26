@@ -2,13 +2,12 @@ package app.overbay.orbit.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -23,10 +22,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.settings.blocks.GoogleDriveBackupBlock
 import app.overbay.orbit.ui.settings.blocks.SecurityBiometricsBlock
 import app.overbay.orbit.ui.settings.blocks.SimpleFinBankSyncBlock
@@ -41,7 +42,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val scrollState = rememberScrollState()
+    val heroScrollState = rememberHeroScrollState(maxHeight = 180.dp, minHeight = 64.dp)
     val fileHelper = LocalFileImportExportHelper.current
 
     var restoreJsonText by remember { mutableStateOf("") }
@@ -49,72 +50,88 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
+            .nestedScroll(heroScrollState.nestedScrollConnection)
     ) {
+        // Edge-to-Edge Curved Green Canopy Hero
         MorphingPageHero(
+            kicker = "CONTROL CENTER",
             title = "Settings",
-            subtitle = "Data storage, bank feeds, cloud backup & personalization"
+            subtitle = "Preferences, sync connections, backups, and appearance.",
+            canNavigateBack = true,
+            onBack = { onNavigate(OrbitNavKey.Dashboard) },
+            scrollState = heroScrollState
         )
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // 1. Storage & Server Sync
-            StorageSyncModeBlock(
-                preferences = uiState.preferences,
-                isSyncing = uiState.isSyncing,
-                syncStatus = uiState.syncStatus,
-                onStorageModeChange = viewModel::setStorageMode,
-                onServerUrlChange = viewModel::setServerUrl,
-                onTriggerSync = viewModel::triggerSync,
-                onAuthenticateServer = viewModel::loginToSelfHostedServer,
-                onOpenLoginScreen = { onNavigate(OrbitNavKey.Login) },
-                onLogout = {
-                    viewModel.logout()
-                    onNavigate(OrbitNavKey.Login)
-                }
-            )
+            item {
+                StorageSyncModeBlock(
+                    preferences = uiState.preferences,
+                    isSyncing = uiState.isSyncing,
+                    syncStatus = uiState.syncStatus,
+                    onStorageModeChange = viewModel::setStorageMode,
+                    onServerUrlChange = viewModel::setServerUrl,
+                    onTriggerSync = viewModel::triggerSync,
+                    onAuthenticateServer = viewModel::loginToSelfHostedServer,
+                    onOpenLoginScreen = { onNavigate(OrbitNavKey.Login) },
+                    onLogout = {
+                        viewModel.logout()
+                        onNavigate(OrbitNavKey.Login)
+                    }
+                )
+            }
 
             // 2. SimpleFIN Bank Feeds
-            SimpleFinBankSyncBlock(
-                token = uiState.preferences.simpleFinToken,
-                onTokenChange = viewModel::setSimpleFinToken,
-                onTriggerSync = viewModel::triggerSync
-            )
+            item {
+                SimpleFinBankSyncBlock(
+                    token = uiState.preferences.simpleFinToken,
+                    onTokenChange = viewModel::setSimpleFinToken,
+                    onTriggerSync = viewModel::triggerSync
+                )
+            }
 
             // 3. Google Drive & File Backup
-            GoogleDriveBackupBlock(
-                isDriveSyncEnabled = uiState.preferences.googleDriveSyncEnabled,
-                lastSyncAt = uiState.preferences.lastGoogleDriveSyncAt,
-                onToggleDriveSync = viewModel::setGoogleDriveSync,
-                onExportJsonBackup = {
-                    val json = viewModel.exportBackup()
-                    fileHelper.exportFile("orbit-backup.orbit.json", json, "application/json")
-                },
-                onRestoreJsonBackup = viewModel::openRestoreDialog
-            )
+            item {
+                GoogleDriveBackupBlock(
+                    isDriveSyncEnabled = uiState.preferences.googleDriveSyncEnabled,
+                    lastSyncAt = uiState.preferences.lastGoogleDriveSyncAt,
+                    onToggleDriveSync = viewModel::setGoogleDriveSync,
+                    onExportJsonBackup = {
+                        val json = viewModel.exportBackup()
+                        fileHelper.exportFile("orbit-backup.orbit.json", json, "application/json")
+                    },
+                    onRestoreJsonBackup = viewModel::openRestoreDialog
+                )
+            }
 
             // 4. Appearance & Theme
-            ThemeAppearanceBlock(
-                preferences = uiState.preferences,
-                onPresetChange = viewModel::setThemePreset,
-                onThemeModeChange = viewModel::setThemeMode,
-                onDynamicColorChange = viewModel::setDynamicColor
-            )
+            item {
+                ThemeAppearanceBlock(
+                    preferences = uiState.preferences,
+                    onPresetChange = viewModel::setThemePreset,
+                    onThemeModeChange = viewModel::setThemeMode,
+                    onDynamicColorChange = viewModel::setDynamicColor
+                )
+            }
 
             // 5. Security & Biometrics
-            SecurityBiometricsBlock(
-                preferences = uiState.preferences,
-                onBiometricLockChange = viewModel::setBiometricLock,
-                onHapticsChange = viewModel::setHapticsEnabled,
-                onMhaTrackerChange = viewModel::setMhaTrackerEnabled,
-                onResetData = viewModel::openResetConfirmation
-            )
+            item {
+                SecurityBiometricsBlock(
+                    preferences = uiState.preferences,
+                    onBiometricLockChange = viewModel::setBiometricLock,
+                    onHapticsChange = viewModel::setHapticsEnabled,
+                    onMhaTrackerChange = viewModel::setMhaTrackerEnabled,
+                    onResetData = viewModel::openResetConfirmation
+                )
+            }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            item {
+                Spacer(modifier = Modifier.height(32.dp))
+            }
         }
     }
 

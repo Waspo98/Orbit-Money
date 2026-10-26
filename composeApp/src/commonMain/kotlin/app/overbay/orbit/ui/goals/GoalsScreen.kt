@@ -11,18 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -34,15 +26,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.HeroStatItem
+import app.overbay.orbit.ui.components.HeroStatTone
+import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitPageActionRow
+import app.overbay.orbit.ui.components.OrbitPrimaryPillButton
+import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.goals.components.GoalProgressCard
 import app.overbay.orbit.ui.goals.dialogs.GoalAllocationDialog
 import app.overbay.orbit.ui.goals.dialogs.GoalEditorSheet
-import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
 fun GoalsScreen(
@@ -52,22 +50,9 @@ fun GoalsScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
-    val haptics = LocalOrbitHaptics.current
+    val heroScrollState = rememberHeroScrollState(maxHeight = 220.dp, minHeight = 64.dp)
 
     Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    haptics.tick()
-                    viewModel.openAddGoal()
-                },
-                shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Add Goal")
-            }
-        },
         modifier = modifier.fillMaxSize()
     ) { paddingValues ->
         if (state.isLoading) {
@@ -80,163 +65,169 @@ fun GoalsScreen(
                 CircularProgressIndicator()
             }
         } else {
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(paddingValues)
+                    .nestedScroll(heroScrollState.nestedScrollConnection)
             ) {
-                // Header Canopy
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onOpenDrawer) {
-                            Icon(imageVector = Icons.Default.Menu, contentDescription = "Menu")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "Savings Goals",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Track progress toward milestone funds",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                // Curved Green Canopy Hero
+                MorphingPageHero(
+                    kicker = "SAVING TARGETS",
+                    title = "Savings Goals",
+                    subtitle = "Connect asset accounts, allocate savings, and project when each target lands.",
+                    canNavigateBack = true,
+                    onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                    scrollState = heroScrollState,
+                    onPrimaryAddClick = { viewModel.openAddGoal() },
+                    stats = listOf(
+                        HeroStatItem("TOTAL SAVED", MoneyUtils.formatCents(state.totalSavedCents), HeroStatTone.GOOD),
+                        HeroStatItem("TOTAL TARGET", MoneyUtils.formatCents(state.totalTargetCents), HeroStatTone.DEFAULT),
+                        HeroStatItem("FUNDED", "${(state.overallProgressRatio * 100).toInt()}%", if (state.overallProgressRatio >= 1.0) HeroStatTone.GOOD else HeroStatTone.DEFAULT),
+                        HeroStatItem("ACTIVE GOALS", "${state.activeGoals.size}", HeroStatTone.DEFAULT)
+                    )
+                )
+
+                // Action Row Directly Below Hero
+                OrbitPageActionRow {
+                    OrbitPrimaryPillButton(
+                        text = "+ New Goal",
+                        onClick = { viewModel.openAddGoal() }
+                    )
                 }
 
-                // Overall Savings Summary Banner
-                if (state.totalTargetCents > 0L) {
-                    item {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(18.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "TOTAL SAVED",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = MoneyUtils.formatCents(state.totalSavedCents, showCents = false),
-                                            style = MaterialTheme.typography.headlineMedium.copy(
+                // Scrollable Content
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Overall Savings Summary Banner
+                    if (state.totalTargetCents > 0L) {
+                        item {
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(18.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = "TOTAL SAVED",
+                                                style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
-                                                fontFeatureSettings = "tnum"
-                                            ),
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = MoneyUtils.formatCents(state.totalSavedCents, showCents = false),
+                                                style = MaterialTheme.typography.headlineMedium.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFeatureSettings = "tnum"
+                                                ),
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text(
+                                                text = "TOTAL TARGET",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = MoneyUtils.formatCents(state.totalTargetCents, showCents = false),
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontFeatureSettings = "tnum"
+                                                ),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
 
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text(
-                                            text = "TOTAL TARGET",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = MoneyUtils.formatCents(state.totalTargetCents, showCents = false),
-                                            style = MaterialTheme.typography.titleMedium.copy(
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontFeatureSettings = "tnum"
-                                            ),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    LinearProgressIndicator(
+                                        progress = { state.overallProgressRatio.toFloat().coerceIn(0f, 1f) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp)
+                                            .clip(RoundedCornerShape(4.dp)),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    )
                                 }
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                LinearProgressIndicator(
-                                    progress = { state.overallProgressRatio.toFloat().coerceIn(0f, 1f) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(RoundedCornerShape(4.dp)),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                )
                             }
                         }
                     }
-                }
 
-                // Active Goals Section
-                if (state.activeGoals.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "Active Goals (${state.activeGoals.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                    // Active Goals Section
+                    if (state.activeGoals.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "Active Goals (${state.activeGoals.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        items(state.activeGoals, key = { it.id }) { goal ->
+                            val acct = goal.linkedAccountId?.let { state.accountMap[it] }
+                            val monthlyNeeded = viewModel.calculateMonthlyRequiredCents(goal)
+                            GoalProgressCard(
+                                goal = goal,
+                                accountName = acct?.name,
+                                monthlyNeededCents = monthlyNeeded,
+                                onClick = { viewModel.openEditGoal(goal) },
+                                onDepositClick = { viewModel.openAllocationDialog(goal) }
+                            )
+                        }
                     }
 
-                    items(state.activeGoals, key = { it.id }) { goal ->
-                        val acct = goal.linkedAccountId?.let { state.accountMap[it] }
-                        val monthlyNeeded = viewModel.calculateMonthlyRequiredCents(goal)
-                        GoalProgressCard(
-                            goal = goal,
-                            accountName = acct?.name,
-                            monthlyNeededCents = monthlyNeeded,
-                            onClick = { viewModel.openEditGoal(goal) },
-                            onDepositClick = { viewModel.openAllocationDialog(goal) }
-                        )
-                    }
-                }
+                    // Completed Goals Section
+                    if (state.completedGoals.isNotEmpty()) {
+                        item {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Completed Goals (${state.completedGoals.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
 
-                // Completed Goals Section
-                if (state.completedGoals.isNotEmpty()) {
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Completed Goals (${state.completedGoals.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        items(state.completedGoals, key = { it.id }) { goal ->
+                            val acct = goal.linkedAccountId?.let { state.accountMap[it] }
+                            GoalProgressCard(
+                                goal = goal,
+                                accountName = acct?.name,
+                                monthlyNeededCents = null,
+                                onClick = { viewModel.openEditGoal(goal) },
+                                onDepositClick = {}
+                            )
+                        }
                     }
 
-                    items(state.completedGoals, key = { it.id }) { goal ->
-                        val acct = goal.linkedAccountId?.let { state.accountMap[it] }
-                        GoalProgressCard(
-                            goal = goal,
-                            accountName = acct?.name,
-                            monthlyNeededCents = null,
-                            onClick = { viewModel.openEditGoal(goal) },
-                            onDepositClick = {}
-                        )
-                    }
-                }
-
-                // Empty State
-                if (state.goals.isEmpty()) {
-                    item {
-                        EmptyStateCard(
-                            title = "No Goals Yet",
-                            description = "Set targets for emergency funds, major purchases, or future vacations.",
-                            actionButtonText = "+ Add First Goal",
-                            onActionClick = { viewModel.openAddGoal() }
-                        )
+                    // Empty State
+                    if (state.goals.isEmpty()) {
+                        item {
+                            EmptyStateCard(
+                                title = "No Goals Yet",
+                                description = "Set targets for emergency funds, major purchases, or future vacations.",
+                                actionButtonText = "+ Add First Goal",
+                                onActionClick = { viewModel.openAddGoal() }
+                            )
+                        }
                     }
                 }
             }
