@@ -1,33 +1,30 @@
 package app.overbay.orbit.ui.dashboard.cards
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.dashboard.AccountsOverviewState
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * Card summarizing total household assets vs debt liabilities
- * with category breakdown chips for liquid cash, investments, and loans.
+ * Editorial Accounts & Net Worth card matching original Orbit Money design.
+ * Features 32sp emerald net worth callout with full cents, account count caption,
+ * and 1dp divided ledger rows for Cash, Investments, Credit Cards, Loans, and Real Estate.
  */
 @Composable
 fun AccountsOverviewCard(
@@ -39,22 +36,9 @@ fun AccountsOverviewCard(
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
-        title = "Accounts & Net Worth",
-        subtitle = "Assets vs Debt Breakdown",
-        action = {
-            TextButton(
-                onClick = {
-                    haptics.tick()
-                    onClick()
-                }
-            ) {
-                Text(
-                    text = "Manage",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        },
+        title = "ACCOUNTS",
+        actionText = "See all",
+        onActionClick = onClick,
         modifier = modifier
             .clip(MaterialTheme.shapes.large)
             .clickable {
@@ -63,111 +47,65 @@ fun AccountsOverviewCard(
             }
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Net Worth Hero Callout
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "TOTAL NET WORTH",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = MoneyUtils.formatCents(accounts.totalNetWorthCents, showCents = false),
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontFeatureSettings = "tnum"
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        horizontalAlignment = Alignment.End
-                    ) {
-                        Text(
-                            text = "Assets: ${MoneyUtils.formatCents(accounts.totalAssetsCents, showCents = false)}",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            color = colors.income
-                        )
-                        Text(
-                            text = "Debt: -${MoneyUtils.formatCents(accounts.totalLiabilitiesCents, showCents = false)}",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            color = colors.expense
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Account Sub-Bucket Rows
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AccountBucketChip(
-                    label = "Cash",
-                    cents = accounts.liquidCents,
-                    color = colors.income,
-                    modifier = Modifier.weight(1f)
-                )
-                AccountBucketChip(
-                    label = "Invested",
-                    cents = accounts.investmentsCents,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f)
-                )
-                AccountBucketChip(
-                    label = "Debt",
-                    cents = -accounts.debtCents,
-                    color = colors.expense,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AccountBucketChip(
-    label: String,
-    cents: Long,
-    color: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-        ) {
             Text(
-                text = label.uppercase(),
+                text = "Net worth",
                 style = MaterialTheme.typography.labelSmall,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = MoneyUtils.formatCents(cents, showCents = false),
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontFeatureSettings = "tnum"
+                text = MoneyUtils.formatCents(accounts.totalNetWorthCents, showCents = true),
+                style = TabularNumStyle.copy(
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold
                 ),
-                color = color
+                color = colors.income
             )
+            Text(
+                text = "Across ${accounts.accountCount} accounts",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Divided ledger rows
+            OrbitMiniStatRow(
+                label = "Cash",
+                value = MoneyUtils.formatCents(accounts.cashCents)
+            )
+            OrbitMiniStatRow(
+                label = "Investments",
+                value = MoneyUtils.formatCents(accounts.investmentsCents)
+            )
+            if (accounts.creditCardsOwedCents > 0L) {
+                OrbitMiniStatRow(
+                    label = "Credit cards",
+                    value = "-${MoneyUtils.formatCents(accounts.creditCardsOwedCents)}",
+                    valueColor = colors.expense
+                )
+            }
+            if (accounts.loansOwedCents > 0L) {
+                OrbitMiniStatRow(
+                    label = "Loans",
+                    value = "-${MoneyUtils.formatCents(accounts.loansOwedCents)}",
+                    valueColor = colors.expense
+                )
+            }
+            if (accounts.realEstateEquityCents != 0L) {
+                OrbitMiniStatRow(
+                    label = "Real Estate",
+                    value = MoneyUtils.formatCents(accounts.realEstateEquityCents)
+                )
+            }
+            if (accounts.otherCents != 0L) {
+                OrbitMiniStatRow(
+                    label = "Other",
+                    value = MoneyUtils.formatCents(accounts.otherCents)
+                )
+            }
         }
     }
 }

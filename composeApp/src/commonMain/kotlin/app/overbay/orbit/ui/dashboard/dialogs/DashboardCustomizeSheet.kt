@@ -231,14 +231,22 @@ private fun CustomizeCardItem(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Title
-            Text(
-                text = config.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = if (config.isVisible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.weight(1f)
-            )
+            // Title and Description
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = config.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (config.isVisible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+                if (config.description.isNotBlank()) {
+                    Text(
+                        text = config.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (config.isVisible) 0.8f else 0.4f)
+                    )
+                }
+            }
 
             // Visibility Switch
             Switch(

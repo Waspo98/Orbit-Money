@@ -16,11 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,24 +26,32 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overbay.orbit.OrbitNavKey
-import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.MorphingPageHero
-import app.overbay.orbit.ui.components.PeriodNavigatorPill
+import app.overbay.orbit.ui.components.OrbitSecondaryPillButton
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.dashboard.cards.AccountsOverviewCard
+import app.overbay.orbit.ui.dashboard.cards.BiggestTransactionsCard
 import app.overbay.orbit.ui.dashboard.cards.BudgetPulseCard
+import app.overbay.orbit.ui.dashboard.cards.CategorizeRecentCard
+import app.overbay.orbit.ui.dashboard.cards.GoalFocusCard
 import app.overbay.orbit.ui.dashboard.cards.GoalsProgressCard
+import app.overbay.orbit.ui.dashboard.cards.MhaSummaryCard
+import app.overbay.orbit.ui.dashboard.cards.MonthComparisonCard
+import app.overbay.orbit.ui.dashboard.cards.MortgageSnapshotCard
 import app.overbay.orbit.ui.dashboard.cards.NetCashflowHeroCard
 import app.overbay.orbit.ui.dashboard.cards.RecentTransactionsCard
+import app.overbay.orbit.ui.dashboard.cards.RetirementSnapshotCard
+import app.overbay.orbit.ui.dashboard.cards.SubscriptionsCard
+import app.overbay.orbit.ui.dashboard.cards.TopSpendingCard
+import app.overbay.orbit.ui.dashboard.cards.UncategorizedCard
 import app.overbay.orbit.ui.dashboard.cards.UpcomingBillsCard
 import app.overbay.orbit.ui.dashboard.dialogs.DashboardCustomizeSheet
+import app.overbay.orbit.ui.dashboard.dialogs.TransactionReviewSheet
 import app.overbay.orbit.util.LocalDevicePosture
-import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * Main dashboard screen supporting responsive 1-column scroll on compact phones
- * and 2-column masonry on foldables and wide tablets.
- * Conforms strictly to the <= 6 parameter rule and < 350-line ceiling.
+ * Editorial Orbit Money Dashboard screen supporting all 16 customizable cards.
+ * Conforms strictly to <= 6 parameter rule and < 400-line ceiling.
  */
 @Composable
 fun DashboardScreen(
@@ -71,6 +75,14 @@ fun DashboardScreen(
                 is DashboardAction.MoveCardDown -> viewModel.moveCardDown(action.cardType)
                 DashboardAction.ResetCardsToDefault -> viewModel.resetCardsToDefault()
                 is DashboardAction.MarkBillPaid -> viewModel.markUpcomingPaid(action.upcomingItemId, action.dueDateIso)
+                is DashboardAction.HideBiggestTransaction -> viewModel.hideBiggestTransaction(action.transactionId)
+                DashboardAction.ResetHiddenBiggestTransactions -> viewModel.resetHiddenBiggestTransactions()
+                is DashboardAction.SetGoalFocus -> viewModel.setGoalFocus(action.goalId)
+                is DashboardAction.SetRetirementAge -> viewModel.setRetirementAge(action.age)
+                is DashboardAction.SetRetirementPreset -> viewModel.setRetirementPreset(action.presetKey)
+                DashboardAction.OpenCategorizeReview -> viewModel.openCategorizeReview()
+                DashboardAction.CloseCategorizeReview -> viewModel.closeCategorizeReview()
+                is DashboardAction.ApplyCategory -> viewModel.applyCategory(action.transactionId, action.categoryId)
             }
         },
         onNavigate = onNavigate,
@@ -86,8 +98,7 @@ fun DashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val posture = LocalDevicePosture.current
-    val haptics = LocalOrbitHaptics.current
-    val heroScrollState = rememberHeroScrollState(maxHeight = 120.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState(maxHeight = 130.dp, minHeight = 64.dp)
     val scrollState = rememberScrollState()
 
     val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -103,34 +114,12 @@ fun DashboardScreen(
                 .fillMaxSize()
                 .nestedScroll(heroScrollState.nestedScrollConnection)
         ) {
-            // Pinned Sticky Canopy Hero Header
+            // Edge-to-edge curved green canopy hero — no month selector in Dashboard header
             MorphingPageHero(
+                kicker = "FINANCIAL ORBIT",
                 title = "Dashboard",
-                kicker = "Overview",
-                scrollState = heroScrollState,
-                actions = {
-                    if (uiState.cashflow.monthLabel.isNotBlank()) {
-                        PeriodNavigatorPill(
-                            label = uiState.cashflow.monthLabel,
-                            canGoNext = uiState.cashflow.canGoNextMonth,
-                            onPrevious = { onAction(DashboardAction.PreviousMonth) },
-                            onNext = { onAction(DashboardAction.NextMonth) }
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            haptics.tick()
-                            onAction(DashboardAction.OpenCustomizeSheet)
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Customize Dashboard",
-                            tint = OrbitTheme.colors.onCanopy,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
+                subtitle = "${uiState.dateLabel} · ${uiState.greeting}",
+                scrollState = heroScrollState
             )
 
             if (uiState.isLoading) {
@@ -146,7 +135,9 @@ fun DashboardScreen(
                     )
                 }
             } else {
-                val visibleCards = uiState.visibleCards
+                val visibleCards = uiState.visibleCards.filter { cardType ->
+                    if (cardType == DashboardCardType.MHA_SUMMARY) uiState.mhaEnabled else true
+                }
 
                 Column(
                     modifier = Modifier
@@ -155,7 +146,6 @@ fun DashboardScreen(
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     if (posture.supportsTwoPane) {
-                        // Wide Screen & Foldable 2-Column Split
                         val leftCards = visibleCards.filterIndexed { index, _ -> index % 2 == 0 }
                         val rightCards = visibleCards.filterIndexed { index, _ -> index % 2 != 0 }
 
@@ -181,13 +171,25 @@ fun DashboardScreen(
                             }
                         }
                     } else {
-                        // Phone 1-Column Sequential Layout
                         visibleCards.forEachIndexed { index, cardType ->
                             DashboardCardItem(cardType, uiState, onAction, onNavigate)
                             if (index < visibleCards.lastIndex) {
                                 Spacer(modifier = Modifier.height(16.dp))
                             }
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Centered Customize Dashboard Button
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        OrbitSecondaryPillButton(
+                            text = "Customize Dashboard",
+                            onClick = { onAction(DashboardAction.OpenCustomizeSheet) }
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(bottomContentPadding))
@@ -203,6 +205,15 @@ fun DashboardScreen(
                 onDismiss = { onAction(DashboardAction.CloseCustomizeSheet) }
             )
         }
+
+        // Category Review Bottom Sheet
+        if (uiState.isReviewModalOpen) {
+            TransactionReviewSheet(
+                transactions = uiState.uncategorized.transactions,
+                onApplyCategory = { txnId, catId -> onAction(DashboardAction.ApplyCategory(txnId, catId)) },
+                onDismiss = { onAction(DashboardAction.CloseCategorizeReview) }
+            )
+        }
     }
 }
 
@@ -214,16 +225,86 @@ private fun DashboardCardItem(
     onNavigate: (OrbitNavKey) -> Unit
 ) {
     when (cardType) {
-        DashboardCardType.CASHFLOW_HERO -> {
-            NetCashflowHeroCard(
-                cashflow = uiState.cashflow,
-                onClick = { onNavigate(OrbitNavKey.SpendingTrends) }
+        DashboardCardType.ACCOUNTS_OVERVIEW -> {
+            AccountsOverviewCard(
+                accounts = uiState.accounts,
+                onClick = { onNavigate(OrbitNavKey.Accounts()) }
             )
         }
         DashboardCardType.BUDGET_PULSE -> {
             BudgetPulseCard(
                 summary = uiState.budgetPulse,
                 onClick = { onNavigate(OrbitNavKey.Budgets) }
+            )
+        }
+        DashboardCardType.TOP_SPENDING -> {
+            TopSpendingCard(
+                state = uiState.topSpending,
+                onClick = { onNavigate(OrbitNavKey.Budgets) }
+            )
+        }
+        DashboardCardType.CASHFLOW_HERO -> {
+            NetCashflowHeroCard(
+                cashflow = uiState.cashflow,
+                onClick = { onNavigate(OrbitNavKey.SpendingTrends) }
+            )
+        }
+        DashboardCardType.BIGGEST_TRANSACTIONS -> {
+            BiggestTransactionsCard(
+                state = uiState.biggestTransactions,
+                onClick = { onNavigate(OrbitNavKey.Transactions()) },
+                onHideTransaction = { onAction(DashboardAction.HideBiggestTransaction(it)) },
+                onResetHidden = { onAction(DashboardAction.ResetHiddenBiggestTransactions) }
+            )
+        }
+        DashboardCardType.SUBSCRIPTIONS -> {
+            SubscriptionsCard(
+                state = uiState.subscriptions,
+                onClick = { onNavigate(OrbitNavKey.Upcoming) }
+            )
+        }
+        DashboardCardType.UNCATEGORIZED -> {
+            UncategorizedCard(
+                state = uiState.uncategorized,
+                onClick = { onNavigate(OrbitNavKey.Transactions(uncategorizedOnly = true)) }
+            )
+        }
+        DashboardCardType.CATEGORIZE_RECENT -> {
+            CategorizeRecentCard(
+                onOpenReview = { onAction(DashboardAction.OpenCategorizeReview) }
+            )
+        }
+        DashboardCardType.MONTH_COMPARISON -> {
+            MonthComparisonCard(
+                state = uiState.monthComparison,
+                onClick = { onNavigate(OrbitNavKey.SpendingTrends) }
+            )
+        }
+        DashboardCardType.GOALS_PROGRESS -> {
+            GoalsProgressCard(
+                state = uiState.goals,
+                onClick = { onNavigate(OrbitNavKey.Goals) }
+            )
+        }
+        DashboardCardType.GOAL_FOCUS -> {
+            GoalFocusCard(
+                state = uiState.goalFocus,
+                onSelectGoal = { onAction(DashboardAction.SetGoalFocus(it)) },
+                onClick = { onNavigate(OrbitNavKey.Goals) }
+            )
+        }
+        DashboardCardType.RETIREMENT_SNAPSHOT -> {
+            RetirementSnapshotCard(
+                state = uiState.retirement,
+                onChangeAge = { onAction(DashboardAction.SetRetirementAge(it)) },
+                onChangePreset = { onAction(DashboardAction.SetRetirementPreset(it)) },
+                onClick = { onNavigate(OrbitNavKey.RetirementCalculator) }
+            )
+        }
+        DashboardCardType.MHA_SUMMARY -> {
+            MhaSummaryCard(
+                state = uiState.mha,
+                onClick = { onNavigate(OrbitNavKey.MhaTracker) }
             )
         }
         DashboardCardType.UPCOMING_BILLS -> {
@@ -233,23 +314,17 @@ private fun DashboardCardItem(
                 onViewAll = { onNavigate(OrbitNavKey.Upcoming) }
             )
         }
+        DashboardCardType.MORTGAGE_SNAPSHOT -> {
+            MortgageSnapshotCard(
+                state = uiState.mortgage,
+                onClick = { onNavigate(OrbitNavKey.Accounts()) }
+            )
+        }
         DashboardCardType.RECENT_TRANSACTIONS -> {
             RecentTransactionsCard(
                 transactions = uiState.recentTransactions.transactions,
                 onSelectTransaction = { onNavigate(OrbitNavKey.Transactions(it)) },
                 onViewAll = { onNavigate(OrbitNavKey.Transactions()) }
-            )
-        }
-        DashboardCardType.ACCOUNTS_OVERVIEW -> {
-            AccountsOverviewCard(
-                accounts = uiState.accounts,
-                onClick = { onNavigate(OrbitNavKey.Accounts()) }
-            )
-        }
-        DashboardCardType.GOALS_PROGRESS -> {
-            GoalsProgressCard(
-                goals = uiState.goals.goals,
-                onClick = { onNavigate(OrbitNavKey.Goals) }
             )
         }
     }

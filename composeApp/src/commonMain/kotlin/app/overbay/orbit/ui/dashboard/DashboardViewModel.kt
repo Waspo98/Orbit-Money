@@ -7,14 +7,8 @@ import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.DashboardWidgetConfig
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.OrbitPreferences
-import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.Transaction
-import app.overbay.orbit.data.model.UpcomingStatus
-import app.overbay.orbit.domain.BudgetEngine
-import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
-import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.domain.NetWorthEngine
 import app.overbay.orbit.domain.UpcomingEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +20,7 @@ import kotlin.math.abs
 
 /**
  * ViewModel orchestrating data transformations and user mutations for the M3E Dashboard.
+ * Keeps under the 600-line ceiling by delegating snapshot transformation to [DashboardDataTransform].
  */
 class DashboardViewModel(
     private val repository: OrbitRepository
@@ -36,21 +31,44 @@ class DashboardViewModel(
     private val _isRefreshing = MutableStateFlow(false)
     private val _isCustomizing = MutableStateFlow(false)
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
+    private val _hiddenBiggestIds = MutableStateFlow<Set<Long>>(emptySet())
+    private val _focusedGoalId = MutableStateFlow<Long?>(null)
+    private val _retirementAge = MutableStateFlow(67)
+    private val _retirementPreset = MutableStateFlow("balanced")
+    private val _isReviewModalOpen = MutableStateFlow(false)
 
     val uiState: StateFlow<DashboardUiState> = combine(
-        repository.snapshot,
-        _selectedMonth,
-        _isRefreshing,
-        _isCustomizing,
-        _syncErrorMessage
-    ) { snapshot, selectedMonth, isRefreshing, isCustomizing, syncError ->
-        buildDashboardUiState(
-            snapshot = snapshot,
-            selectedMonth = selectedMonth,
+        combine(
+            repository.snapshot,
+            _selectedMonth,
+            _isRefreshing,
+            _isCustomizing,
+            _syncErrorMessage
+        ) { snapshot, selectedMonth, isRefreshing, isCustomizing, syncError ->
+            TransformInput1(snapshot, selectedMonth, isRefreshing, isCustomizing, syncError)
+        },
+        combine(
+            _hiddenBiggestIds,
+            _focusedGoalId,
+            _retirementAge,
+            _retirementPreset,
+            _isReviewModalOpen
+        ) { hiddenBiggestIds, focusedGoalId, retirementAge, retirementPreset, isReviewModalOpen ->
+            TransformInput2(hiddenBiggestIds, focusedGoalId, retirementAge, retirementPreset, isReviewModalOpen)
+        }
+    ) { input1, input2 ->
+        DashboardDataTransform.buildDashboardUiState(
+            snapshot = input1.snapshot,
+            selectedMonth = input1.selectedMonth,
             currentMonth = currentMonth,
-            isRefreshing = isRefreshing,
-            isCustomizing = isCustomizing,
-            syncError = syncError
+            isRefreshing = input1.isRefreshing,
+            isCustomizing = input1.isCustomizing,
+            syncError = input1.syncError,
+            hiddenBiggestIds = input2.hiddenBiggestIds,
+            focusedGoalId = input2.focusedGoalId,
+            retirementAge = input2.retirementAge,
+            retirementPreset = input2.retirementPreset,
+            isReviewModalOpen = input2.isReviewModalOpen
         )
     }.stateIn(
         scope = viewModelScope,
@@ -112,26 +130,15 @@ class DashboardViewModel(
     fun toggleCardVisibility(type: DashboardCardType) {
         viewModelScope.launch {
             val widgets = repository.preferences.value.dashboardWidgets.toMutableList()
-            val index = widgets.indexOfFirst { it.widgetId.equals(type.widgetId, ignoreCase = true) }
+            val index = widgets.indexOfFirst {
+                it.widgetId.equals(type.widgetId, ignoreCase = true) ||
+                DashboardCardType.fromWidgetId(it.widgetId) == type
+            }
             if (index >= 0) {
                 val current = widgets[index]
                 widgets[index] = current.copy(isVisible = !current.isVisible)
             } else {
                 widgets.add(DashboardWidgetConfig(type.widgetId, type.defaultTitle, isVisible = false, sortOrder = widgets.size))
-            }
-            val updated = repository.preferences.value.copy(dashboardWidgets = widgets)
-            repository.updatePreferences(updated)
-        }
-    }
-
-    fun toggleCardVisibility(type: DashboardCardType, isVisible: Boolean) {
-        viewModelScope.launch {
-            val widgets = repository.preferences.value.dashboardWidgets.toMutableList()
-            val index = widgets.indexOfFirst { it.widgetId.equals(type.widgetId, ignoreCase = true) }
-            if (index >= 0) {
-                widgets[index] = widgets[index].copy(isVisible = isVisible)
-            } else {
-                widgets.add(DashboardWidgetConfig(type.widgetId, type.defaultTitle, isVisible = isVisible, sortOrder = widgets.size))
             }
             val updated = repository.preferences.value.copy(dashboardWidgets = widgets)
             repository.updatePreferences(updated)
@@ -153,7 +160,10 @@ class DashboardViewModel(
 
     fun moveCardUp(cardType: DashboardCardType) {
         val currentWidgets = repository.preferences.value.dashboardWidgets.sortedBy { it.sortOrder }
-        val index = currentWidgets.indexOfFirst { it.widgetId.equals(cardType.widgetId, ignoreCase = true) }
+        val index = currentWidgets.indexOfFirst {
+            it.widgetId.equals(cardType.widgetId, ignoreCase = true) ||
+            DashboardCardType.fromWidgetId(it.widgetId) == cardType
+        }
         if (index > 0) {
             moveCard(index, index - 1)
         }
@@ -161,7 +171,10 @@ class DashboardViewModel(
 
     fun moveCardDown(cardType: DashboardCardType) {
         val currentWidgets = repository.preferences.value.dashboardWidgets.sortedBy { it.sortOrder }
-        val index = currentWidgets.indexOfFirst { it.widgetId.equals(cardType.widgetId, ignoreCase = true) }
+        val index = currentWidgets.indexOfFirst {
+            it.widgetId.equals(cardType.widgetId, ignoreCase = true) ||
+            DashboardCardType.fromWidgetId(it.widgetId) == cardType
+        }
         if (index >= 0 && index < currentWidgets.lastIndex) {
             moveCard(index, index + 1)
         }
@@ -177,7 +190,7 @@ class DashboardViewModel(
     }
 
     // -------------------------------------------------------------------------
-    // Bill Quick Actions
+    // Card-Specific Actions
     // -------------------------------------------------------------------------
 
     fun markUpcomingPaid(upcomingItemId: Long, occurrenceDate: String) {
@@ -202,233 +215,58 @@ class DashboardViewModel(
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Transform Pipeline
-    // -------------------------------------------------------------------------
-
-    private fun buildDashboardUiState(
-        snapshot: OrbitWorkspaceSnapshot,
-        selectedMonth: String,
-        currentMonth: String,
-        isRefreshing: Boolean,
-        isCustomizing: Boolean,
-        syncError: String?
-    ): DashboardUiState {
-        val todayIso = LocalDateUtils.todayIsoDate()
-        val todayPlus14 = LocalDateUtils.parseIsoDate(todayIso)?.let {
-            LocalDateUtils.formatIsoDate(LocalDateUtils.addDays(it, 14))
-        } ?: todayIso
-
-        // 1. Cashflow Hero
-        val activeTxns = snapshot.transactions.filter { !it.effectiveIsIgnored && !it.effectiveIsTransfer }
-        val monthTxns = activeTxns.filter { it.effectiveDate.take(7) == selectedMonth }
-        var incomeCents: Cents = 0L
-        var expenseCents: Cents = 0L
-        for (t in monthTxns) {
-            val amt = t.effectiveAmountCents
-            if (amt > 0) incomeCents += amt else if (amt < 0) expenseCents += -amt
-        }
-        val netCents = incomeCents - expenseCents
-        val savingsRate = if (incomeCents > 0L) (netCents.toDouble() / incomeCents.toDouble()) * 100.0 else 0.0
-
-        val priorMonth = LocalDateUtils.addMonthsToYearMonth(selectedMonth, -1)
-        val priorTxns = activeTxns.filter { it.effectiveDate.take(7) == priorMonth }
-        var priorIncome: Cents = 0L
-        var priorExpense: Cents = 0L
-        for (t in priorTxns) {
-            val amt = t.effectiveAmountCents
-            if (amt > 0) priorIncome += amt else if (amt < 0) priorExpense += -amt
-        }
-        val priorNet = priorIncome - priorExpense
-        val netDeltaPct = if (priorNet != 0L) {
-            ((netCents - priorNet).toDouble() / abs(priorNet).toDouble()) * 100.0
-        } else null
-
-        val cashflowState = CashflowHeroState(
-            selectedMonth = selectedMonth,
-            monthLabel = LocalDateUtils.formatMonthLabel(selectedMonth),
-            isCurrentMonth = selectedMonth == currentMonth,
-            canGoNextMonth = selectedMonth < currentMonth,
-            incomeCents = incomeCents,
-            expenseCents = expenseCents,
-            netCents = netCents,
-            savingsRatePercent = savingsRate,
-            priorMonthNetCents = priorNet,
-            netDeltaPercent = netDeltaPct
-        )
-
-        // 2. Budget Pulse
-        val budgetOverview = BudgetEngine.calculateMonthlyOverview(
-            month = selectedMonth,
-            categories = snapshot.categories,
-            budgets = snapshot.budgets,
-            transactions = snapshot.transactions,
-            todayDate = todayIso
-        )
-        val budgetPulseState = BudgetPulseState(
-            totalBudgetedCents = budgetOverview.totalBudgetedCents,
-            totalSpentCents = budgetOverview.totalSpentCents,
-            remainingCents = budgetOverview.totalRemainingCents,
-            utilizationRatio = budgetOverview.utilizationRatio,
-            dailySafeSpendCents = budgetOverview.dailySafeSpend.dailyCents,
-            dailySafeSpendDetail = budgetOverview.dailySafeSpend.detail,
-            dailySafeSpendTone = budgetOverview.dailySafeSpend.tone,
-            paceStatus = if (budgetOverview.totalBudgetedCents <= 0L) app.overbay.orbit.data.model.BudgetPaceStatus.NO_BUDGET
-            else if (budgetOverview.totalSpentCents > budgetOverview.totalBudgetedCents) app.overbay.orbit.data.model.BudgetPaceStatus.OVER_BUDGET
-            else if (budgetOverview.utilizationRatio >= 0.85) app.overbay.orbit.data.model.BudgetPaceStatus.WATCH
-            else app.overbay.orbit.data.model.BudgetPaceStatus.ON_TRACK,
-            hasBudgets = budgetOverview.totalBudgetedCents > 0L,
-            topBudgets = budgetOverview.budgeted.take(3)
-        )
-
-        // 3. Upcoming Bills (within 14 days)
-        val activeUpcoming = snapshot.upcomingItems.filter { it.status == UpcomingStatus.ACTIVE }
-        val categoryById = snapshot.categories.associateBy { it.id }
-        val upcomingOccurrences = mutableListOf<UpcomingBillItem>()
-
-        for (item in activeUpcoming) {
-            val dates = UpcomingEngine.generateDates(item, todayIso, todayPlus14)
-            val effectiveDates = if (dates.isNotEmpty()) dates else listOf(item.nextDate).filter { it in todayIso..todayPlus14 }
-            val cat = item.categoryId?.let { categoryById[it] }
-            val isExpense = item.direction.lowercase() != "income"
-
-            for (date in effectiveDates) {
-                val days = LocalDateUtils.daysBetween(todayIso, date) ?: 0
-                val dueLabel = when {
-                    days == 0 -> "Today"
-                    days == 1 -> "Tomorrow"
-                    days < 0 -> "${-days}d overdue"
-                    else -> "In $days days"
-                }
-                upcomingOccurrences.add(
-                    UpcomingBillItem(
-                        upcomingItemId = item.id,
-                        name = item.name,
-                        merchant = item.merchant,
-                        amountCents = item.amountCents,
-                        isExpense = isExpense,
-                        dueDateIso = date,
-                        dueLabel = dueLabel,
-                        daysUntilDue = days,
-                        isDueSoon = days in 0..3,
-                        isOverdue = days < 0,
-                        categoryName = cat?.name,
-                        categoryColor = cat?.color,
-                        categoryIcon = cat?.icon
-                    )
-                )
-            }
-        }
-        val top3Bills = upcomingOccurrences.sortedBy { it.dueDateIso }.take(3)
-        val upcomingState = UpcomingBillsState(
-            upcomingCount = upcomingOccurrences.size,
-            totalUpcomingOutflowCents = top3Bills.filter { it.isExpense }.sumOf { it.amountCents },
-            totalUpcomingInflowCents = top3Bills.filter { !it.isExpense }.sumOf { it.amountCents },
-            items = top3Bills
-        )
-
-        // 4. Recent Transactions (last 5)
-        val accountById = snapshot.accounts.associateBy { it.id }
-        val recentList = snapshot.transactions
-            .filter { !it.effectiveIsIgnored }
-            .sortedWith(compareByDescending<Transaction> { it.effectiveDate }.thenByDescending { it.id })
-            .take(5)
-            .map { txn ->
-                val cat = txn.effectiveCategoryId?.let { categoryById[it] }
-                val acct = accountById[txn.accountId]
-                val dateDisplay = LocalDateUtils.parseIsoDate(txn.effectiveDate)?.let {
-                    LocalDateUtils.formatRelativeOrDisplayDate(it)
-                } ?: txn.effectiveDate
-
-                DashboardRecentTransactionItem(
-                    id = txn.id,
-                    merchant = txn.effectiveMerchant,
-                    amountCents = txn.effectiveAmountCents,
-                    isExpense = txn.isExpense,
-                    formattedAmount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
-                    dateIso = txn.effectiveDate,
-                    dateDisplay = dateDisplay,
-                    categoryName = cat?.name ?: txn.categoryName ?: "Uncategorized",
-                    categoryColor = cat?.color ?: txn.categoryColor,
-                    categoryIcon = cat?.icon ?: txn.categoryIcon,
-                    accountName = acct?.name ?: txn.accountName,
-                    isPending = txn.isPending
-                )
-            }
-        val recentState = RecentTransactionsState(transactions = recentList)
-
-        // 5. Accounts Overview
-        val netWorthSnap = NetWorthEngine.computeCurrentSnapshot(snapshot.accounts)
-        val accountsState = AccountsOverviewState(
-            totalNetWorthCents = netWorthSnap.netWorthCents,
-            totalAssetsCents = netWorthSnap.totalAssetsCents,
-            totalLiabilitiesCents = netWorthSnap.totalLiabilitiesCents,
-            liquidCents = netWorthSnap.cashCents,
-            investmentsCents = netWorthSnap.investmentsCents,
-            propertyCents = netWorthSnap.realEstateEquityCents,
-            debtCents = netWorthSnap.totalLiabilitiesCents,
-            accountCount = snapshot.accounts.count { !it.isArchived }
-        )
-
-        // 6. Savings Goals
-        val activeGoals = snapshot.goals.filter { !it.isCompleted }
-        val completedGoals = snapshot.goals.filter { it.isCompleted }
-        val totalSaved = snapshot.goals.sumOf { it.currentAmountCents }
-        val totalTarget = snapshot.goals.sumOf { it.targetAmountCents }
-        val overallRatio = if (totalTarget > 0L) (totalSaved.toDouble() / totalTarget.toDouble()).coerceIn(0.0, 1.0) else 0.0
-
-        val goalsState = GoalsProgressState(
-            activeGoalsCount = activeGoals.size,
-            completedGoalsCount = completedGoals.size,
-            totalSavedCents = totalSaved,
-            totalTargetCents = totalTarget,
-            overallProgressRatio = overallRatio,
-            goals = snapshot.goals.sortedBy { it.sortOrder }.take(3).map { g ->
-                DashboardGoalItem(
-                    id = g.id,
-                    name = g.name,
-                    currentAmountCents = g.currentAmountCents,
-                    targetAmountCents = g.targetAmountCents,
-                    progressRatio = g.progressRatio,
-                    remainingAmountCents = g.remainingAmountCents,
-                    isCompleted = g.isCompleted,
-                    targetDate = g.targetDate
-                )
-            }
-        )
-
-        // 7. Cards Display & Customization
-        val rawWidgets = snapshot.preferences.dashboardWidgets.ifEmpty {
-            OrbitPreferences.defaultDashboardWidgets()
-        }
-        val cardConfigs = DashboardCardType.entries.map { type ->
-            val existing = rawWidgets.find { it.widgetId.equals(type.widgetId, ignoreCase = true) }
-            DashboardCardConfigItem(
-                type = type,
-                title = existing?.title ?: type.defaultTitle,
-                isVisible = existing?.isVisible ?: true,
-                sortOrder = existing?.sortOrder ?: type.defaultSortOrder
-            )
-        }.sortedBy { it.sortOrder }
-
-        val visibleCards = cardConfigs.filter { it.isVisible }.map { it.type }
-
-        return DashboardUiState(
-            isLoading = false,
-            isRefreshing = isRefreshing,
-            selectedMonth = selectedMonth,
-            cashflow = cashflowState,
-            budgetPulse = budgetPulseState,
-            upcoming = upcomingState,
-            recentTransactions = recentState,
-            accounts = accountsState,
-            goals = goalsState,
-            visibleCards = visibleCards,
-            customization = DashboardCustomizationState(
-                isCustomizing = isCustomizing,
-                cardConfigs = cardConfigs
-            ),
-            syncErrorMessage = syncError
-        )
+    fun hideBiggestTransaction(transactionId: Long) {
+        _hiddenBiggestIds.value = _hiddenBiggestIds.value + transactionId
     }
+
+    fun resetHiddenBiggestTransactions() {
+        _hiddenBiggestIds.value = emptySet()
+    }
+
+    fun setGoalFocus(goalId: Long) {
+        _focusedGoalId.value = goalId
+    }
+
+    fun setRetirementAge(age: Int) {
+        _retirementAge.value = age.coerceIn(50, 80)
+    }
+
+    fun setRetirementPreset(preset: String) {
+        _retirementPreset.value = preset
+    }
+
+    fun openCategorizeReview() {
+        _isReviewModalOpen.value = true
+    }
+
+    fun closeCategorizeReview() {
+        _isReviewModalOpen.value = false
+    }
+
+    fun applyCategory(transactionId: Long, categoryId: Long) {
+        viewModelScope.launch {
+            val txn = repository.transactions.value.find { it.id == transactionId } ?: return@launch
+            val updated = txn.copy(
+                editedCategoryId = categoryId,
+                editSource = EditSource.USER
+            )
+            repository.saveTransaction(updated)
+        }
+    }
+
+    private data class TransformInput1(
+        val snapshot: app.overbay.orbit.data.model.OrbitWorkspaceSnapshot,
+        val selectedMonth: String,
+        val isRefreshing: Boolean,
+        val isCustomizing: Boolean,
+        val syncError: String?
+    )
+
+    private data class TransformInput2(
+        val hiddenBiggestIds: Set<Long>,
+        val focusedGoalId: Long?,
+        val retirementAge: Int,
+        val retirementPreset: String,
+        val isReviewModalOpen: Boolean
+    )
 }
