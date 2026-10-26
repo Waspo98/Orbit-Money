@@ -208,7 +208,7 @@ expect fun getPlatformColorScheme(darkTheme: Boolean, dynamicColor: Boolean): Co
 fun OrbitTheme(
     themePreset: OrbitThemePreset = OrbitThemePreset.ORBIT_EMERALD,
     themeMode: OrbitThemeMode = OrbitThemeMode.SYSTEM,
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     customPreset: CustomThemePreset? = null,
     content: @Composable () -> Unit
 ) {

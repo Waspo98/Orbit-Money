@@ -32,7 +32,7 @@ data class OrbitPreferences(
     val selfHostedServerUrl: String = "",
     val themePreset: OrbitThemePreset = OrbitThemePreset.ORBIT_EMERALD,
     val themeMode: OrbitThemeMode = OrbitThemeMode.SYSTEM,
-    val dynamicColor: Boolean = true,
+    val dynamicColor: Boolean = false,
     val biometricLockEnabled: Boolean = false,
     val biometricTimeoutSeconds: Int = 300, // 5 minutes
     val hapticsEnabled: Boolean = true,

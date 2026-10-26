@@ -35,7 +35,12 @@ data class CustomThemeColors(
     val chartPositive: Color,
     val chartNegative: Color,
     val chartNeutral: Color,
-    val chartGrid: Color
+    val chartGrid: Color,
+    val canopyMid: Color = canopyEnd,
+    val canopyGlow: Color = Color(0x474DD0E1),
+    val heroStatGood: Color = Color(0xFF8FF0C9),
+    val heroStatWarn: Color = Color(0xFFFFE28A),
+    val heroStatCaution: Color = Color(0xFFFFB3A8)
 )
 
 val LocalCustomThemeColors = staticCompositionLocalOf {
@@ -59,9 +64,10 @@ fun emeraldCustomColors(isDark: Boolean): CustomThemeColors = if (isDark) {
         transfer = FinanceTransferDark,
         onTransfer = Color(0xFF111827),
         canopyStart = Color(0xFF04271D),
+        canopyMid = Color(0xFF064E3B),
         canopyEnd = Color(0xFF084C36),
         onCanopy = Color(0xFFE1E3DF),
-        cardBorder = Color(0x1FFFFFFF),
+        cardBorder = Color(0xFF243330),
         chartPositive = FinanceIncomeDark,
         chartNegative = FinanceExpenseDark,
         chartNeutral = FinanceTransferDark,
@@ -83,10 +89,11 @@ fun emeraldCustomColors(isDark: Boolean): CustomThemeColors = if (isDark) {
         onWarningContainer = Color(0xFF78350F),
         transfer = FinanceTransferLight,
         onTransfer = Color.White,
-        canopyStart = Color(0xFF064E3B),
-        canopyEnd = Color(0xFF0B6E4F),
+        canopyStart = Color(0xFF052E24),
+        canopyMid = Color(0xFF065F46),
+        canopyEnd = Color(0xFF047857),
         onCanopy = Color.White,
-        cardBorder = Color(0x14000000),
+        cardBorder = Color(0xFFE4E2D7),
         chartPositive = FinanceIncomeLight,
         chartNegative = FinanceExpenseLight,
         chartNeutral = FinanceTransferLight,

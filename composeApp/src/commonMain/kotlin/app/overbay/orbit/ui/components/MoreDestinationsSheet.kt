@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,16 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.AccountBox
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -39,7 +32,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 private data class DestinationItem(
@@ -65,28 +60,28 @@ fun MoreDestinationsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val planningGroup = listOf(
-        DestinationItem(OrbitNavKey.Upcoming, "Upcoming", "Bills, subscriptions & recurring paychecks", Icons.Default.DateRange),
-        DestinationItem(OrbitNavKey.Goals, "Goals", "Target savings & sinking funds", Icons.Default.Star),
-        DestinationItem(OrbitNavKey.Categories, "Categories", "Budget structures & monthly caps", Icons.Default.AccountBox),
-        DestinationItem(OrbitNavKey.Rules, "Rules", "Automated merchant categorizations", Icons.Default.Edit)
+        DestinationItem(OrbitNavKey.Upcoming, "Upcoming", "Bills, subscriptions & recurring paychecks", OrbitIcons.Upcoming),
+        DestinationItem(OrbitNavKey.Goals, "Goals", "Target savings & sinking funds", OrbitIcons.Goals),
+        DestinationItem(OrbitNavKey.Categories, "Categories", "Budget structures & monthly caps", OrbitIcons.Categories),
+        DestinationItem(OrbitNavKey.Rules, "Rules", "Automated merchant categorizations", OrbitIcons.Rules)
     )
 
     val insightsGroup = buildList {
-        add(DestinationItem(OrbitNavKey.SpendingTrends, "Spending Trends", "Income vs expense breakdown & velocity", Icons.Default.Info))
-        add(DestinationItem(OrbitNavKey.NetWorth, "Net Worth", "Historical assets, liabilities & trajectory", Icons.Default.AccountCircle))
+        add(DestinationItem(OrbitNavKey.SpendingTrends, "Spending Trends", "Income vs expense breakdown & velocity", OrbitIcons.SpendingTrends))
+        add(DestinationItem(OrbitNavKey.NetWorth, "Net Worth", "Historical assets, liabilities & trajectory", OrbitIcons.NetWorth))
         if (mhaEnabled) {
-            add(DestinationItem(OrbitNavKey.MhaTracker, "MHA Tracker", "Ministerial housing allowance & tax tracking", Icons.Default.Check))
+            add(DestinationItem(OrbitNavKey.MhaTracker, "MHA Tracker", "Ministerial housing allowance & tax tracking", OrbitIcons.MhaTracker))
         }
     }
 
     val calculatorsGroup = listOf(
-        DestinationItem(OrbitNavKey.HousingCalculator, "Housing Calculator", "Mortgage, rent vs buy & affordability", Icons.Default.Home),
-        DestinationItem(OrbitNavKey.RetirementCalculator, "Retirement Calculator", "Coast FIRE, nest egg & drawdowns", Icons.Default.Star)
+        DestinationItem(OrbitNavKey.HousingCalculator, "Housing Calculator", "Mortgage, rent vs buy & affordability", OrbitIcons.HousingCalculator),
+        DestinationItem(OrbitNavKey.RetirementCalculator, "Retirement Calculator", "Coast FIRE, nest egg & drawdowns", OrbitIcons.RetirementCalculator)
     )
 
     val systemGroup = listOf(
-        DestinationItem(OrbitNavKey.Household, "Household", "Member profiles & account sharing", Icons.Default.AccountBox),
-        DestinationItem(OrbitNavKey.Settings, "Settings", "Data storage, Google Drive & theme presets", Icons.Default.Settings)
+        DestinationItem(OrbitNavKey.Household, "Household", "Member profiles & account sharing", OrbitIcons.Household),
+        DestinationItem(OrbitNavKey.Settings, "Settings", "Data storage, Google Drive & theme presets", OrbitIcons.Settings)
     )
 
     ModalBottomSheet(
@@ -94,7 +89,7 @@ fun MoreDestinationsSheet(
         sheetState = sheetState,
         modifier = modifier,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        containerColor = MaterialTheme.colorScheme.background
     ) {
         Column(
             modifier = Modifier
@@ -137,23 +132,30 @@ private fun DestinationSection(
 ) {
     Text(
         text = sectionTitle.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.8.sp),
         fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(bottom = 8.dp)
     )
 
     Surface(
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder)
     ) {
         Column {
-            items.forEach { item ->
+            items.forEachIndexed { index, item ->
+                if (index > 0) {
+                    HorizontalDivider(
+                        thickness = 1.dp,
+                        color = OrbitTheme.colors.cardBorder
+                    )
+                }
                 val isActive = currentKey == item.key
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(MaterialTheme.shapes.medium)
+                        .clip(RoundedCornerShape(16.dp))
                         .clickable {
                             onTick()
                             onNavigate(item.key)
@@ -164,14 +166,14 @@ private fun DestinationSection(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
                         modifier = Modifier.size(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = item.icon,
                                 contentDescription = null,
-                                tint = if (isActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
                         }

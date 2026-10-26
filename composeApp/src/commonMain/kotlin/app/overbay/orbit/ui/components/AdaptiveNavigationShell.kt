@@ -1,24 +1,22 @@
 package app.overbay.orbit.ui.components
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.AccountBox
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,8 +29,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.LocalOrbitHaptics
 import app.overbay.orbit.util.PostureMode
@@ -66,10 +67,10 @@ fun AdaptiveNavigationShell(
 
     val primaryTabs = remember {
         listOf(
-            NavTabItem(OrbitNavKey.Dashboard, "Dashboard", Icons.Default.Home),
-            NavTabItem(OrbitNavKey.Transactions(), "Transactions", Icons.AutoMirrored.Filled.List),
-            NavTabItem(OrbitNavKey.Budgets, "Budgets", Icons.Default.AccountBox),
-            NavTabItem(OrbitNavKey.Accounts(), "Accounts", Icons.Default.AccountCircle)
+            NavTabItem(OrbitNavKey.Dashboard, "Dashboard", OrbitIcons.Dashboard),
+            NavTabItem(OrbitNavKey.Transactions(), "Transactions", OrbitIcons.Transactions),
+            NavTabItem(OrbitNavKey.Budgets, "Budgets", OrbitIcons.Budgets),
+            NavTabItem(OrbitNavKey.Accounts(), "Accounts", OrbitIcons.Accounts)
         )
     }
 
@@ -89,37 +90,84 @@ fun AdaptiveNavigationShell(
         Scaffold(
             modifier = modifier.fillMaxSize(),
             bottomBar = {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    primaryTabs.forEach { tab ->
-                        val selected = when (tab.key) {
-                            is OrbitNavKey.Transactions -> currentKey is OrbitNavKey.Transactions
-                            is OrbitNavKey.Accounts -> currentKey is OrbitNavKey.Accounts
-                            else -> currentKey == tab.key
+                val itemColors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    HorizontalDivider(
+                        thickness = 1.dp,
+                        color = OrbitTheme.colors.cardBorder
+                    )
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        primaryTabs.forEach { tab ->
+                            val selected = when (tab.key) {
+                                is OrbitNavKey.Transactions -> currentKey is OrbitNavKey.Transactions
+                                is OrbitNavKey.Accounts -> currentKey is OrbitNavKey.Accounts
+                                else -> currentKey == tab.key
+                            }
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = {
+                                    haptics.tick()
+                                    onNavigate(tab.key)
+                                },
+                                icon = {
+                                    Icon(
+                                        imageVector = tab.icon,
+                                        contentDescription = tab.title,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = tab.title.uppercase(),
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Visible,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                },
+                                colors = itemColors
+                            )
                         }
+
+                        // 5th 'More' tab (active if currentKey is any secondary tool)
                         NavigationBarItem(
-                            selected = selected,
+                            selected = isSecondaryRoute,
                             onClick = {
                                 haptics.tick()
-                                onNavigate(tab.key)
+                                showMoreSheet = true
                             },
-                            icon = { Icon(tab.icon, contentDescription = tab.title) },
-                            label = { Text(tab.title) }
+                            icon = {
+                                Icon(
+                                    imageVector = OrbitIcons.MoreHoriz,
+                                    contentDescription = "More",
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = "MORE",
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Visible,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 0.5.sp
+                                )
+                            },
+                            colors = itemColors
                         )
                     }
-
-                    // 5th 'More' tab (active if currentKey is any secondary tool)
-                    NavigationBarItem(
-                        selected = isSecondaryRoute,
-                        onClick = {
-                            haptics.tick()
-                            showMoreSheet = true
-                        },
-                        icon = { Icon(Icons.Default.Menu, contentDescription = "More") },
-                        label = { Text("More") }
-                    )
                 }
             }
         ) { paddingValues ->
@@ -134,8 +182,15 @@ fun AdaptiveNavigationShell(
     } else {
         // Foldable / Tablet / Desktop Layout (>= 720dp)
         Row(modifier = modifier.fillMaxSize()) {
+            val railItemColors = NavigationRailItemDefaults.colors(
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             NavigationRail(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                containerColor = MaterialTheme.colorScheme.surface,
                 header = {
                     Surface(
                         shape = MaterialTheme.shapes.small,
@@ -168,8 +223,25 @@ fun AdaptiveNavigationShell(
                             haptics.tick()
                             onNavigate(tab.key)
                         },
-                        icon = { Icon(tab.icon, contentDescription = tab.title) },
-                        label = { Text(tab.title) }
+                        icon = {
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = tab.title,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = tab.title.uppercase(),
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Visible,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.5.sp
+                            )
+                        },
+                        colors = railItemColors
                     )
                 }
 
@@ -179,8 +251,25 @@ fun AdaptiveNavigationShell(
                         haptics.tick()
                         showMoreSheet = true
                     },
-                    icon = { Icon(Icons.Default.Menu, contentDescription = "More") },
-                    label = { Text("More") }
+                    icon = {
+                        Icon(
+                            imageVector = OrbitIcons.MoreHoriz,
+                            contentDescription = "More",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "MORE",
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Visible,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.5.sp
+                        )
+                    },
+                    colors = railItemColors
                 )
             }
 
