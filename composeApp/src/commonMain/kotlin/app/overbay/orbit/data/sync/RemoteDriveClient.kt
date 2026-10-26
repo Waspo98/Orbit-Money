@@ -1,9 +1,6 @@
 package app.overbay.orbit.data.sync
 
 import kotlinx.serialization.Serializable
-import okio.FileSystem
-import okio.Path.Companion.toPath
-import okio.buffer
 
 /**
  * Metadata descriptor for a file in cloud storage.
@@ -63,15 +60,12 @@ interface RemoteDriveClient {
 }
 
 /**
- * A file-system-backed implementation of [RemoteDriveClient] used for offline mocking and unit testing.
+ * An in-memory implementation of [RemoteDriveClient] used for offline mocking, unit testing, and fallbacks.
  */
-class LocalFileDriveClient(
-    private val syncDir: String,
-    private val fs: FileSystem = FileSystem.SYSTEM,
-    private var email: String? = null
+class InMemoryRemoteDriveClient(
+    private var email: String? = null,
+    val storage: MutableMap<String, String> = mutableMapOf()
 ) : RemoteDriveClient {
-
-    private val folderPath = "$syncDir/google_drive_sync".toPath()
 
     override suspend fun isAvailable(): Boolean = email != null
 
@@ -82,71 +76,36 @@ class LocalFileDriveClient(
     }
 
     override suspend fun listFiles(): List<RemoteFileInfo> {
-        if (!fs.exists(folderPath)) return emptyList()
-        return try {
-            fs.list(folderPath).mapNotNull { path ->
-                val meta = fs.metadataOrNull(path)
-                if (meta?.isRegularFile == true) {
-                    RemoteFileInfo(
-                        id = path.name,
-                        name = path.name,
-                        sizeBytes = meta.size ?: 0L
-                    )
-                } else null
-            }
-        } catch (_: Exception) {
-            emptyList()
+        return storage.map { (name, content) ->
+            RemoteFileInfo(
+                id = name,
+                name = name,
+                sizeBytes = content.length.toLong()
+            )
         }
     }
 
     override suspend fun downloadTextFile(fileName: String): String? {
-        val target = "$folderPath/$fileName".toPath()
-        return if (fs.exists(target)) {
-            try {
-                fs.read(target) { readUtf8() }
-            } catch (_: Exception) {
-                null
-            }
-        } else null
+        return storage[fileName]
     }
 
     override suspend fun uploadTextFile(fileName: String, content: String): Boolean {
-        return try {
-            fs.createDirectories(folderPath)
-            val target = "$folderPath/$fileName".toPath()
-            fs.write(target) {
-                writeUtf8(content)
-            }
-            true
-        } catch (_: Exception) {
-            false
-        }
+        storage[fileName] = content
+        return true
     }
 
     override suspend fun deleteFile(fileName: String): Boolean {
-        val target = "$folderPath/$fileName".toPath()
-        return try {
-            if (fs.exists(target)) {
-                fs.delete(target)
-            }
-            true
-        } catch (_: Exception) {
-            false
-        }
+        return storage.remove(fileName) != null
     }
 
     override suspend fun wipeAllFiles(): Boolean {
-        return try {
-            if (fs.exists(folderPath)) {
-                fs.deleteRecursively(folderPath)
-            }
-            true
-        } catch (_: Exception) {
-            false
-        }
+        storage.clear()
+        return true
     }
 
     override suspend fun disconnect() {
         email = null
     }
 }
+
+typealias LocalFileDriveClient = InMemoryRemoteDriveClient

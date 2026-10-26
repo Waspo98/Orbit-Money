@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -87,7 +88,7 @@ class CloudSyncManager(
         try {
             val backup = CloudBackupMetadata(
                 version = 1,
-                timestamp = System.currentTimeMillis(),
+                timestamp = Clock.System.now().toEpochMilliseconds(),
                 appVersion = "0.9.0-beta",
                 snapshot = snapshot
             )
@@ -146,7 +147,7 @@ class CloudSyncManager(
             }
             _lastSyncResult.value = SyncResult.Success("Backup restored from Google Drive")
             _syncStatus.value = _syncStatus.value.copy(
-                lastSyncTimestamp = System.currentTimeMillis(),
+                lastSyncTimestamp = Clock.System.now().toEpochMilliseconds(),
                 isSyncing = false,
                 error = null
             )

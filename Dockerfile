@@ -1,31 +1,27 @@
 # ==============================================================================
-# Orbit Money — Multi-stage Dockerfile
-# ==============================================================================
-# Build stage uses node:20-slim (Debian) because Rollup/musl hangs on Docker
-# Desktop + WSL2 with Alpine. Prod stage uses node:20-alpine for smaller image.
-# Debian build stage avoids Rollup/musl hangs seen on Docker Desktop + WSL2.
+# Orbit Money — Multi-stage Dockerfile (KMP wasmJs PWA + Express SQLite Backend)
 # ==============================================================================
 
-# ---- Stage 1: Build frontend ----
-FROM node:20-slim AS build
-WORKDIR /app/frontend
+# ---- Stage 1: Build Compose Multiplatform wasmJs PWA ----
+FROM eclipse-temurin:21-jdk AS build-wasm
+WORKDIR /workspace
 
-COPY frontend/package*.json ./
-RUN npm install --no-audit --no-fund
+# Copy Gradle wrapper and build configuration files
+COPY gradlew gradlew.bat settings.gradle.kts build.gradle.kts gradle.properties ./
+COPY gradle/ ./gradle/
+COPY composeApp/build.gradle.kts ./composeApp/
+COPY composeApp/src/ ./composeApp/src/
 
-COPY frontend/ ./
-RUN npm run build
-
+RUN chmod +x ./gradlew && ./gradlew :composeApp:wasmJsBrowserDistribution --no-daemon
 
 # ---- Stage 2: Production runtime ----
 FROM node:20-alpine AS prod
 WORKDIR /app
 
 LABEL org.opencontainers.image.source="https://github.com/Waspo98/Orbit-Money"
-LABEL org.opencontainers.image.description="Self-hosted personal finance tracker built as an installable PWA"
+LABEL org.opencontainers.image.description="Self-hosted personal finance tracker built with Jetpack Compose Multiplatform"
 
 # Install build tools for better-sqlite3 native compilation (removed after install).
-# sqlite runtime libs stay for the lifetime of the image.
 RUN apk add --no-cache sqlite wget \
     && apk add --no-cache --virtual .build-deps python3 make g++
 
@@ -37,8 +33,8 @@ RUN npm install --omit=dev --no-audit --no-fund \
 # Copy backend source
 COPY backend/src ./src
 
-# Copy built frontend into the location Express serves from
-COPY --from=build /app/frontend/dist ./public
+# Copy built wasmJs PWA distribution into the location Express serves from
+COPY --from=build-wasm /workspace/composeApp/build/dist/wasmJs/productionExecutable ./public
 
 # Data directory (volume mount target)
 RUN mkdir -p /app/data
