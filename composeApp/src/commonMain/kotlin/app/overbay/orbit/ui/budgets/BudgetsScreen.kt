@@ -4,34 +4,33 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.ui.budgets.components.BudgetCategoryGroupList
 import app.overbay.orbit.ui.budgets.components.BudgetSummaryHeroCard
 import app.overbay.orbit.ui.budgets.dialogs.BudgetAmountEditorSheet
+import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitPageActionRow
+import app.overbay.orbit.ui.components.OrbitPrimaryPillButton
+import app.overbay.orbit.ui.components.PeriodNavigatorPill
+import app.overbay.orbit.ui.components.rememberHeroScrollState
 
+/**
+ * Editorial Budgets screen featuring curved green canopy hero with period navigation,
+ * action row, 2x2 snapshot metrics panel, spending mix strip, and inline expandable category rows.
+ * Conforms strictly to <= 6 parameters and < 400-line ceiling.
+ */
 @Composable
 fun BudgetsScreen(
     viewModel: BudgetsViewModel,
@@ -40,6 +39,7 @@ fun BudgetsScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val heroScrollState = rememberHeroScrollState(maxHeight = 200.dp, minHeight = 64.dp)
 
     Scaffold(
         modifier = modifier.fillMaxSize()
@@ -54,60 +54,80 @@ fun BudgetsScreen(
                 CircularProgressIndicator()
             }
         } else {
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(paddingValues)
+                    .nestedScroll(heroScrollState.nestedScrollConnection)
             ) {
-                // Header Canopy
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onOpenDrawer) {
-                            Icon(imageVector = Icons.Default.Menu, contentDescription = "Menu")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "Budgets",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Envelope allocations and pacing",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                // Curved Green Canopy Hero
+                MorphingPageHero(
+                    kicker = "BUDGET PLANNING",
+                    title = "Budgets",
+                    subtitle = "${state.monthLabel} · ${state.daysRemaining} days left",
+                    scrollState = heroScrollState,
+                    onPrimaryAddClick = { viewModel.openAddBudget() },
+                    expandedToolbar = {
+                        PeriodNavigatorPill(
+                            label = state.monthLabel,
+                            onPrevious = { viewModel.onPreviousMonth() },
+                            onNext = { viewModel.onNextMonth() },
+                            canGoNext = state.canGoNextMonth,
+                            onClickLabel = { viewModel.onResetToCurrentMonth() }
+                        )
+                    },
+                    collapsedActions = {
+                        PeriodNavigatorPill(
+                            label = state.monthLabel,
+                            onPrevious = { viewModel.onPreviousMonth() },
+                            onNext = { viewModel.onNextMonth() },
+                            canGoNext = state.canGoNextMonth,
+                            onClickLabel = { viewModel.onResetToCurrentMonth() }
+                        )
                     }
-                }
+                )
 
-                // Hero Summary Card
-                item {
-                    BudgetSummaryHeroCard(
-                        overview = state.overview,
-                        monthLabel = state.monthLabel,
-                        canGoNextMonth = state.canGoNextMonth,
-                        onPreviousMonth = { viewModel.onPreviousMonth() },
-                        onNextMonth = { viewModel.onNextMonth() },
-                        onResetToCurrentMonth = { viewModel.onResetToCurrentMonth() }
+                // Action Row Directly Below Hero
+                OrbitPageActionRow {
+                    OrbitPrimaryPillButton(
+                        text = "+ Add Budget",
+                        onClick = { viewModel.openAddBudget() }
                     )
                 }
 
-                // Category List Section
-                item {
-                    BudgetCategoryGroupList(
-                        budgeted = state.budgetedItems,
-                        unbudgeted = state.unbudgetedItems,
-                        inactive = state.inactiveItems,
-                        activeSort = state.sortOption,
-                        onSortSelected = { viewModel.setSortOption(it) },
-                        onItemClick = { viewModel.openBudgetEditor(it) }
-                    )
+                // Scrollable Content
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Hero Snapshot Card
+                    item {
+                        BudgetSummaryHeroCard(
+                            overview = state.overview,
+                            monthLabel = state.monthLabel,
+                            daysRemaining = state.daysRemaining
+                        )
+                    }
+
+                    // Category List Section
+                    item {
+                        BudgetCategoryGroupList(
+                            budgeted = state.budgetedItems,
+                            unbudgeted = state.unbudgetedItems,
+                            inactive = state.inactiveItems,
+                            activeSort = state.sortOption,
+                            expandedCategoryId = state.expandedCategoryId,
+                            categoryTransactions = state.categoryTransactions,
+                            onSortSelected = { viewModel.setSortOption(it) },
+                            onToggleExpand = { viewModel.toggleExpandCategory(it) },
+                            onEditBudget = { viewModel.openBudgetEditor(it) },
+                            onDeleteBudget = { viewModel.deleteBudget(it) },
+                            onViewTransactions = { categoryId ->
+                                onNavigate(OrbitNavKey.Transactions(categoryId = categoryId))
+                            }
+                        )
+                    }
                 }
             }
         }

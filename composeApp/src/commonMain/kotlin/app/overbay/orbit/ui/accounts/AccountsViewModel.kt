@@ -30,6 +30,8 @@ class AccountsViewModel(
     private val _showMergeDialog = MutableStateFlow(false)
     private val _historyAccount = MutableStateFlow<Account?>(null)
     private val _showHistorySheet = MutableStateFlow(false)
+    private val _showArchived = MutableStateFlow(false)
+    private val _isReorderMode = MutableStateFlow(false)
     private val _isSyncing = MutableStateFlow(false)
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
 
@@ -60,8 +62,13 @@ class AccountsViewModel(
         AccountsActionBundle(selId, mergeAcct, showMerge, histAcct, showHist)
     }
 
-    private val syncFlow = combine(_isSyncing, _syncErrorMessage) { syncing, err ->
-        Pair(syncing, err)
+    private val syncFlow = combine(
+        _isSyncing,
+        _syncErrorMessage,
+        _showArchived,
+        _isReorderMode
+    ) { syncing, err, showArchived, reorder ->
+        SyncReorderBundle(syncing, err, showArchived, reorder)
     }
 
     val uiState: StateFlow<AccountsUiState> = combine(
@@ -69,12 +76,17 @@ class AccountsViewModel(
         dialogFlow,
         actionFlow,
         syncFlow
-    ) { data, dialog, action, (syncing, syncErr) ->
-        val sortedAccounts = data.accounts.sortedWith(
+    ) { data, dialog, action, syncReorder ->
+        val filteredAccounts = if (syncReorder.showArchived) {
+            data.accounts
+        } else {
+            data.accounts.filter { !it.isArchived }
+        }
+        val sortedAccounts = filteredAccounts.sortedWith(
             compareBy<Account> { it.isArchived }.thenBy { it.sortOrder }.thenBy { it.name }
         )
         val groups = groupAccounts(sortedAccounts)
-        val snapshot = NetWorthEngine.computeCurrentSnapshot(sortedAccounts)
+        val snapshot = NetWorthEngine.computeCurrentSnapshot(data.accounts)
 
         val selId = action.selectedAccountId ?: sortedAccounts.firstOrNull()?.id
         val selectedTxns = if (selId != null) {
@@ -89,6 +101,11 @@ class AccountsViewModel(
             totalAssetsCents = snapshot.totalAssetsCents,
             totalLiabilitiesCents = snapshot.totalLiabilitiesCents,
             netWorthCents = snapshot.netWorthCents,
+            cashCents = snapshot.cashCents,
+            creditCardCents = snapshot.creditDebtCents,
+            investmentsCents = snapshot.investmentsCents,
+            showArchived = syncReorder.showArchived,
+            isReorderMode = syncReorder.isReorderMode,
             selectedAccountId = selId,
             selectedAccountTransactions = selectedTxns,
             editingAccount = dialog.editingAccount,
@@ -100,8 +117,8 @@ class AccountsViewModel(
             showMergeDialog = action.showMergeDialog,
             historyAccount = action.historyAccount,
             showHistorySheet = action.showHistorySheet,
-            isSyncing = syncing,
-            syncErrorMessage = syncErr,
+            isSyncing = syncReorder.syncing,
+            syncErrorMessage = syncReorder.err,
             isLoading = false
         )
     }.stateIn(
@@ -119,8 +136,9 @@ class AccountsViewModel(
             id = 0L,
             name = "",
             type = defaultType,
-            currentBalanceCents = 0L,
-            isManual = true
+            institution = "",
+            isManual = true,
+            currentBalanceCents = 0L
         )
         _showEditorSheet.value = true
     }
@@ -139,29 +157,40 @@ class AccountsViewModel(
         viewModelScope.launch {
             repository.saveAccount(account)
             closeEditorSheet()
-            if (_selectedAccountId.value == null || _selectedAccountId.value == 0L) {
-                _selectedAccountId.value = account.id
-            }
         }
     }
 
-    fun deleteAccount(id: Long) {
+    fun deleteAccount(accountId: Long) {
         viewModelScope.launch {
-            repository.deleteAccount(id)
-            closeEditorSheet()
-            if (_selectedAccountId.value == id) {
+            repository.deleteAccount(accountId)
+            if (_selectedAccountId.value == accountId) {
                 _selectedAccountId.value = null
             }
+            closeEditorSheet()
+        }
+    }
+
+    fun deleteAccount(account: Account) {
+        deleteAccount(account.id)
+    }
+
+    fun toggleShowArchived() {
+        _showArchived.value = !_showArchived.value
+    }
+
+    fun toggleReorderMode() {
+        _isReorderMode.value = !_isReorderMode.value
+    }
+
+    fun toggleArchiveAccount(account: Account) {
+        viewModelScope.launch {
+            repository.saveAccount(account.copy(isArchived = !account.isArchived))
         }
     }
 
     fun openCreditCardProfile(account: Account) {
         _cardProfileAccountId.value = account.id
-        _editingCardProfile.value = account.creditCardProfile ?: CreditCardProfile(
-            accountId = account.id,
-            cardName = account.name,
-            issuerName = account.institution
-        )
+        _editingCardProfile.value = account.creditCardProfile ?: CreditCardProfile(accountId = account.id)
         _showCardProfileSheet.value = true
     }
 
@@ -172,17 +201,18 @@ class AccountsViewModel(
     }
 
     fun saveCreditCardProfile(profile: CreditCardProfile) {
+        val accountId = _cardProfileAccountId.value ?: return
         viewModelScope.launch {
-            val accountId = _cardProfileAccountId.value ?: profile.accountId
-            val account = repository.accounts.value.find { it.id == accountId } ?: return@launch
-            val updatedAccount = account.copy(creditCardProfile = profile)
-            repository.saveAccount(updatedAccount)
+            val account = uiState.value.accounts.find { it.id == accountId }
+            if (account != null) {
+                repository.saveAccount(account.copy(creditCardProfile = profile))
+            }
             closeCreditCardProfile()
         }
     }
 
-    fun openMergeDialog(account: Account) {
-        _mergingAccount.value = account
+    fun openMergeDialog(sourceAccount: Account) {
+        _mergingAccount.value = sourceAccount
         _showMergeDialog.value = true
     }
 
@@ -193,10 +223,17 @@ class AccountsViewModel(
 
     fun mergeAccountInto(sourceAccountId: Long, targetAccountId: Long, combineBalances: Boolean) {
         viewModelScope.launch {
-            repository.mergeAccounts(sourceAccountId, targetAccountId, combineBalances)
+            repository.mergeAccounts(
+                sourceAccountId = sourceAccountId,
+                targetAccountId = targetAccountId,
+                combineBalances = combineBalances
+            )
             closeMergeDialog()
-            _selectedAccountId.value = targetAccountId
         }
+    }
+
+    fun mergeAccountInto(sourceAccount: Account, targetAccountId: Long, combineBalances: Boolean) {
+        mergeAccountInto(sourceAccount.id, targetAccountId, combineBalances)
     }
 
     fun openBalanceHistory(account: Account) {
@@ -214,76 +251,75 @@ class AccountsViewModel(
             _isSyncing.value = true
             _syncErrorMessage.value = null
             when (val res = repository.sync(force = true)) {
-                is SyncResult.Success -> {
-                    _isSyncing.value = false
-                }
-                is SyncResult.Error -> {
-                    _isSyncing.value = false
-                    _syncErrorMessage.value = res.message
-                }
-                is SyncResult.NoOp -> {
-                    _isSyncing.value = false
-                }
+                is SyncResult.Error -> _syncErrorMessage.value = res.message
+                else -> {}
             }
+            _isSyncing.value = false
         }
+    }
+
+    fun clearSyncError() {
+        _syncErrorMessage.value = null
     }
 
     companion object {
         fun groupAccounts(accounts: List<Account>): List<AccountGroupDisplay> {
-            val active = accounts.filterNot { it.isArchived }
-
-            val cash = active.filter { it.type in setOf(AccountType.CHECKING, AccountType.SAVINGS, AccountType.CASH) }
-            val credit = active.filter { it.type == AccountType.CREDIT }
-            val invest = active.filter { it.type == AccountType.INVESTMENT }
-            val realEstate = active.filter { it.type == AccountType.MORTGAGE || (it.type == AccountType.OTHER && it.estimatedValueCents != null) }
-            val loans = active.filter { it.type == AccountType.LOAN || (it.type == AccountType.MORTGAGE && it.estimatedValueCents == null) }
-
             val groups = mutableListOf<AccountGroupDisplay>()
+
+            val cash = accounts.filter { it.type in setOf(AccountType.CHECKING, AccountType.SAVINGS, AccountType.CASH) }
             if (cash.isNotEmpty()) {
                 groups.add(
                     AccountGroupDisplay(
                         category = AccountTypeCategory.CASH_AND_CHECKING,
-                        title = AccountTypeCategory.CASH_AND_CHECKING.displayName,
+                        title = "Cash & Checking",
                         accounts = cash,
                         totalCents = cash.sumOf { it.currentBalanceCents }
                     )
                 )
             }
+
+            val credit = accounts.filter { it.type == AccountType.CREDIT }
             if (credit.isNotEmpty()) {
                 groups.add(
                     AccountGroupDisplay(
                         category = AccountTypeCategory.CREDIT_CARDS,
-                        title = AccountTypeCategory.CREDIT_CARDS.displayName,
+                        title = "Credit Cards",
                         accounts = credit,
                         totalCents = credit.sumOf { it.currentBalanceCents }
                     )
                 )
             }
-            if (invest.isNotEmpty()) {
+
+            val investments = accounts.filter { it.type == AccountType.INVESTMENT }
+            if (investments.isNotEmpty()) {
                 groups.add(
                     AccountGroupDisplay(
                         category = AccountTypeCategory.INVESTMENTS,
-                        title = AccountTypeCategory.INVESTMENTS.displayName,
-                        accounts = invest,
-                        totalCents = invest.sumOf { it.currentBalanceCents }
+                        title = "Investments & Retirement",
+                        accounts = investments,
+                        totalCents = investments.sumOf { it.currentBalanceCents }
                     )
                 )
             }
+
+            val realEstate = accounts.filter { it.type == AccountType.MORTGAGE && it.estimatedValueCents != null }
             if (realEstate.isNotEmpty()) {
                 groups.add(
                     AccountGroupDisplay(
                         category = AccountTypeCategory.REAL_ESTATE,
-                        title = AccountTypeCategory.REAL_ESTATE.displayName,
+                        title = "Real Estate",
                         accounts = realEstate,
-                        totalCents = realEstate.sumOf { it.homeEquityCents ?: it.currentBalanceCents }
+                        totalCents = realEstate.sumOf { it.homeEquityCents ?: 0L }
                     )
                 )
             }
+
+            val loans = accounts.filter { it.type == AccountType.LOAN || (it.type == AccountType.MORTGAGE && it.estimatedValueCents == null) }
             if (loans.isNotEmpty()) {
                 groups.add(
                     AccountGroupDisplay(
                         category = AccountTypeCategory.LOANS,
-                        title = AccountTypeCategory.LOANS.displayName,
+                        title = "Loans & Mortgages",
                         accounts = loans,
                         totalCents = loans.sumOf { it.currentBalanceCents }
                     )
@@ -313,4 +349,11 @@ private data class AccountsActionBundle(
     val showMergeDialog: Boolean,
     val historyAccount: Account?,
     val showHistorySheet: Boolean
+)
+
+private data class SyncReorderBundle(
+    val syncing: Boolean,
+    val err: String?,
+    val showArchived: Boolean,
+    val isReorderMode: Boolean
 )

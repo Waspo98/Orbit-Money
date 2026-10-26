@@ -127,7 +127,7 @@ class DashboardViewModel(
         _isCustomizing.value = false
     }
 
-    fun toggleCardVisibility(type: DashboardCardType) {
+    fun toggleCardVisibility(type: DashboardCardType, isVisible: Boolean? = null) {
         viewModelScope.launch {
             val widgets = repository.preferences.value.dashboardWidgets.toMutableList()
             val index = widgets.indexOfFirst {
@@ -136,9 +136,11 @@ class DashboardViewModel(
             }
             if (index >= 0) {
                 val current = widgets[index]
-                widgets[index] = current.copy(isVisible = !current.isVisible)
+                val newVisibility = isVisible ?: !current.isVisible
+                widgets[index] = current.copy(isVisible = newVisibility)
             } else {
-                widgets.add(DashboardWidgetConfig(type.widgetId, type.defaultTitle, isVisible = false, sortOrder = widgets.size))
+                val newVisibility = isVisible ?: false
+                widgets.add(DashboardWidgetConfig(type.widgetId, type.defaultTitle, isVisible = newVisibility, sortOrder = widgets.size))
             }
             val updated = repository.preferences.value.copy(dashboardWidgets = widgets)
             repository.updatePreferences(updated)

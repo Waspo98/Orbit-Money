@@ -15,7 +15,6 @@ import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.UpcomingItem
 import app.overbay.orbit.data.model.UpcomingKind
 import app.overbay.orbit.data.model.UpcomingStatus
-import kotlin.math.abs
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.TransactionFilterDraft
@@ -25,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 class TransactionsViewModel(
     private val repository: OrbitRepository
@@ -33,8 +33,11 @@ class TransactionsViewModel(
     private val _searchQuery = MutableStateFlow("")
     private val _quickFilter = MutableStateFlow(QuickFilter.ALL)
     private val _filterDraft = MutableStateFlow(TransactionFilterDraft())
+    private val _sortOption = MutableStateFlow(TransactionSortOption.DATE_DESC)
+    private val _isCompactView = MutableStateFlow(false)
     private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
     private val _inspectingId = MutableStateFlow<Long?>(null)
+    private val _expandedId = MutableStateFlow<Long?>(null)
     private val _showEditorSheet = MutableStateFlow(false)
     private val _showSplitSheet = MutableStateFlow(false)
     private val _showCsvImportSheet = MutableStateFlow(false)
@@ -51,29 +54,42 @@ class TransactionsViewModel(
     private val filterFlow = combine(
         _searchQuery,
         _quickFilter,
-        _filterDraft
-    ) { query, quick, draft ->
-        Triple(query, quick, draft)
+        _filterDraft,
+        _sortOption,
+        _isCompactView
+    ) { query, quick, draft, sort, compact ->
+        FilterParams(query, quick, draft, sort, compact)
     }
 
     val uiState: StateFlow<TransactionsUiState> = combine(
         dataFlow,
         filterFlow
-    ) { (txns, categories, accounts), (query, quick, draft) ->
+    ) { (txns, categories, accounts), filterParams ->
         val categoryMap = categories.associateBy { it.id }
         val accountMap = accounts.associateBy { it.id }
 
-        val filtered = filterTransactions(
+        val filteredRaw = filterTransactions(
             transactions = txns,
-            query = query,
-            quick = quick,
-            draft = draft,
+            query = filterParams.query,
+            quick = filterParams.quick,
+            draft = filterParams.draft,
             categoryMap = categoryMap
         )
 
+        val sorted = when (filterParams.sort) {
+            TransactionSortOption.DATE_DESC -> filteredRaw.sortedWith(compareByDescending<Transaction> { it.effectiveDate }.thenByDescending { it.id })
+            TransactionSortOption.DATE_ASC -> filteredRaw.sortedWith(compareBy<Transaction> { it.effectiveDate }.thenBy { it.id })
+            TransactionSortOption.AMOUNT_DESC -> filteredRaw.sortedByDescending { abs(it.effectiveAmountCents) }
+            TransactionSortOption.AMOUNT_ASC -> filteredRaw.sortedBy { abs(it.effectiveAmountCents) }
+            TransactionSortOption.MERCHANT_ASC -> filteredRaw.sortedBy { it.effectiveMerchant.lowercase() }
+        }
+
+        val currentMonthKey = LocalDateUtils.currentYearMonth()
+        val monthlyCount = txns.count { it.effectiveDate.take(7) == currentMonthKey && !it.effectiveIsIgnored }
+
         var totalExpense = 0L
         var totalIncome = 0L
-        for (txn in filtered) {
+        for (txn in sorted) {
             if (!txn.effectiveIsTransfer && !txn.effectiveIsIgnored) {
                 if (txn.effectiveAmountCents < 0) {
                     totalExpense += txn.effectiveAmountCents
@@ -83,16 +99,30 @@ class TransactionsViewModel(
             }
         }
 
+        // Group by month
+        val grouped = sorted.groupBy { it.effectiveDate.take(7) }.map { (monthKey, items) ->
+            MonthTransactionGroup(
+                monthKey = monthKey,
+                monthLabel = LocalDateUtils.formatMonthLabel(monthKey),
+                count = items.size,
+                transactions = items
+            )
+        }
+
         TransactionsUiState(
             transactions = txns,
-            filteredTransactions = filtered,
+            filteredTransactions = sorted,
+            groupedTransactions = grouped,
             categories = categories,
             accounts = accounts,
             categoryMap = categoryMap,
             accountMap = accountMap,
-            searchQuery = query,
-            quickFilter = quick,
-            filterDraft = draft,
+            searchQuery = filterParams.query,
+            quickFilter = filterParams.quick,
+            filterDraft = filterParams.draft,
+            sortOption = filterParams.sort,
+            isCompactView = filterParams.isCompactView,
+            monthlyTransactionCount = monthlyCount,
             totalExpenseCents = totalExpense,
             totalIncomeCents = totalIncome,
             netCashflowCents = totalIncome + totalExpense
@@ -101,6 +131,8 @@ class TransactionsViewModel(
         state.copy(selectedTransactionIds = selected)
     }.combine(_inspectingId) { state, inspecting ->
         state.copy(inspectingTransactionId = inspecting)
+    }.combine(_expandedId) { state, expanded ->
+        state.copy(expandedTransactionId = expanded)
     }.combine(_showEditorSheet) { state, showEditor ->
         state.copy(showEditorSheet = showEditor)
     }.combine(_showSplitSheet) { state, showSplit ->
@@ -121,6 +153,14 @@ class TransactionsViewModel(
 
     fun setQuickFilter(filter: QuickFilter) {
         _quickFilter.value = filter
+    }
+
+    fun setSortOption(sort: TransactionSortOption) {
+        _sortOption.value = sort
+    }
+
+    fun toggleCompactView() {
+        _isCompactView.value = !_isCompactView.value
     }
 
     fun applyFilterDraft(draft: TransactionFilterDraft) {
@@ -145,6 +185,10 @@ class TransactionsViewModel(
 
     fun clearSelection() {
         _selectedIds.value = emptySet()
+    }
+
+    fun toggleExpandTransaction(id: Long) {
+        _expandedId.value = if (_expandedId.value == id) null else id
     }
 
     fun selectTransactionForInspect(id: Long?) {
@@ -183,6 +227,12 @@ class TransactionsViewModel(
 
     fun closeFilterSheet() {
         _showFilterSheet.value = false
+    }
+
+    fun syncSimpleFin() {
+        viewModelScope.launch {
+            repository.sync(force = true)
+        }
     }
 
     fun saveTransaction(
@@ -235,6 +285,65 @@ class TransactionsViewModel(
         }
     }
 
+    fun toggleTransfer(id: Long) {
+        viewModelScope.launch {
+            val txn = uiState.value.transactions.find { it.id == id } ?: return@launch
+            val updated = txn.copy(
+                editedIsTransfer = !txn.effectiveIsTransfer,
+                editedIsTransferSource = "user",
+                editSource = EditSource.USER
+            )
+            repository.saveTransaction(updated)
+        }
+    }
+
+    fun toggleIgnore(id: Long) {
+        viewModelScope.launch {
+            val txn = uiState.value.transactions.find { it.id == id } ?: return@launch
+            val updated = txn.copy(
+                editedIsIgnored = !txn.effectiveIsIgnored,
+                editedIsIgnoredSource = "user",
+                editSource = EditSource.USER
+            )
+            repository.saveTransaction(updated)
+        }
+    }
+
+    fun toggleMha(id: Long) {
+        viewModelScope.launch {
+            val txn = uiState.value.transactions.find { it.id == id } ?: return@launch
+            val isEligible = txn.effectiveMhaEligible == true
+            val updated = txn.copy(
+                editedMhaEligible = !isEligible,
+                editedMhaEligibleSource = "user",
+                editSource = EditSource.USER
+            )
+            repository.saveTransaction(updated)
+        }
+    }
+
+    fun resetMerchant(id: Long) {
+        viewModelScope.launch {
+            val txn = uiState.value.transactions.find { it.id == id } ?: return@launch
+            val updated = txn.copy(
+                editedMerchant = null,
+                editedMerchantSource = null
+            )
+            repository.saveTransaction(updated)
+        }
+    }
+
+    fun resetCategory(id: Long) {
+        viewModelScope.launch {
+            val txn = uiState.value.transactions.find { it.id == id } ?: return@launch
+            val updated = txn.copy(
+                editedCategoryId = null,
+                editedCategoryIdSource = null
+            )
+            repository.saveTransaction(updated)
+        }
+    }
+
     fun resetTransaction(id: Long) {
         viewModelScope.launch {
             repository.resetTransaction(id)
@@ -247,6 +356,9 @@ class TransactionsViewModel(
             repository.deleteTransaction(id)
             if (_inspectingId.value == id) {
                 _inspectingId.value = null
+            }
+            if (_expandedId.value == id) {
+                _expandedId.value = null
             }
             closeTransactionEditor()
             closeSplitSheet()
@@ -353,9 +465,6 @@ class TransactionsViewModel(
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Filtering Logic
-    // -------------------------------------------------------------------------
     private fun filterTransactions(
         transactions: List<Transaction>,
         query: String,
@@ -363,22 +472,16 @@ class TransactionsViewModel(
         draft: TransactionFilterDraft,
         categoryMap: Map<Long, app.overbay.orbit.data.model.Category>
     ): List<Transaction> {
-        val queryLower = query.trim().lowercase()
-
-        val filtered = transactions.filter { txn ->
-            // 1. Text Search
-            if (queryLower.isNotBlank()) {
-                val matchesMerchant = txn.effectiveMerchant.lowercase().contains(queryLower)
-                val matchesOriginalDesc = txn.originalDescription?.lowercase()?.contains(queryLower) == true
-                val matchesNotes = txn.notes?.lowercase()?.contains(queryLower) == true
-                val catName = txn.effectiveCategoryId?.let { categoryMap[it]?.name }
-                val matchesCategory = catName?.lowercase()?.contains(queryLower) == true
-                if (!matchesMerchant && !matchesOriginalDesc && !matchesNotes && !matchesCategory) {
-                    return@filter false
-                }
+        return transactions.filter { txn ->
+            if (query.isNotBlank()) {
+                val q = query.trim().lowercase()
+                val matchMerchant = txn.effectiveMerchant.lowercase().contains(q)
+                val matchDesc = txn.originalDescription?.lowercase()?.contains(q) ?: false
+                val matchNotes = txn.notes?.lowercase()?.contains(q) ?: false
+                val matchCategory = txn.effectiveCategoryId?.let { categoryMap[it]?.name?.lowercase()?.contains(q) } ?: false
+                if (!matchMerchant && !matchDesc && !matchNotes && !matchCategory) return@filter false
             }
 
-            // 2. Quick Filter
             when (quick) {
                 QuickFilter.ALL -> {}
                 QuickFilter.EXPENSES -> if (!txn.isExpense || txn.effectiveIsTransfer) return@filter false
@@ -389,47 +492,21 @@ class TransactionsViewModel(
                 QuickFilter.MHA -> if (txn.effectiveMhaEligible != true) return@filter false
             }
 
-            // 3. Draft Filter: Type
-            when (draft.type) {
-                "expense" -> if (!txn.isExpense || txn.effectiveIsTransfer) return@filter false
-                "income" -> if (!txn.isIncome || txn.effectiveIsTransfer) return@filter false
-                "transfer" -> if (!txn.effectiveIsTransfer) return@filter false
-            }
-
-            // 4. Draft Filter: Account
-            if (draft.accountId != null && txn.accountId != draft.accountId) {
-                return@filter false
-            }
-
-            // 5. Draft Filter: Category
-            if (draft.categoryId != null && txn.effectiveCategoryId != draft.categoryId) {
-                return@filter false
-            }
-
-            // 6. Draft Filter: Date Presets
-            if (draft.datePreset != "all") {
-                val date = txn.effectiveDate
-                val today = LocalDateUtils.todayLocalDate()
-                val currentYear = today.year.toString()
-                val currentMonth = LocalDateUtils.formatYearMonth(today)
-                when (draft.datePreset) {
-                    "this_month" -> if (!date.startsWith(currentMonth)) return@filter false
-                    "this_year" -> if (!date.startsWith(currentYear)) return@filter false
-                    "last_month" -> {
-                        val lastMonthYear = if (today.monthNumber == 1) today.year - 1 else today.year
-                        val lastMonthNum = if (today.monthNumber == 1) 12 else today.monthNumber - 1
-                        val lastMonthPrefix = "$lastMonthYear-${lastMonthNum.toString().padStart(2, '0')}"
-                        if (!date.startsWith(lastMonthPrefix)) return@filter false
-                    }
-                }
-            }
+            if (draft.type == "expenses" && (!txn.isExpense || txn.effectiveIsTransfer)) return@filter false
+            if (draft.type == "income" && (!txn.isIncome || txn.effectiveIsTransfer)) return@filter false
+            if (draft.type == "transfers" && !txn.effectiveIsTransfer) return@filter false
+            if (draft.accountId != null && txn.accountId != draft.accountId) return@filter false
+            if (draft.categoryId != null && txn.effectiveCategoryId != draft.categoryId) return@filter false
 
             true
         }
-
-        // Sort descending by effectiveDate, then by id DESC
-        return filtered.sortedWith(
-            compareByDescending<Transaction> { it.effectiveDate }.thenByDescending { it.id }
-        )
     }
+
+    private data class FilterParams(
+        val query: String,
+        val quick: QuickFilter,
+        val draft: TransactionFilterDraft,
+        val sort: TransactionSortOption,
+        val isCompactView: Boolean
+    )
 }

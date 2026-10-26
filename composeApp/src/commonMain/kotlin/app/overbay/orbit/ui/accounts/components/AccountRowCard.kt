@@ -1,11 +1,11 @@
 package app.overbay.orbit.ui.accounts.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,238 +15,270 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.AccountBox
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitColorTokens
-import kotlin.math.abs
+import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitIcons
+import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.roundToInt
 
+/**
+ * Editorial account list row featuring account badges, credit card limits,
+ * bold balance, compact "See transactions" action pill, and circular 3-dots menu.
+ * Strictly under the 400-line ceiling.
+ */
 @Composable
 fun AccountRowCard(
     account: Account,
-    isSelected: Boolean = false,
-    onClick: () -> Unit,
-    onEditClick: (() -> Unit)? = null,
-    onPerksClick: (() -> Unit)? = null,
+    onSeeTransactions: () -> Unit,
+    onEdit: () -> Unit,
+    onPerks: (() -> Unit)?,
+    onHistory: () -> Unit,
+    onMerge: () -> Unit,
+    onToggleArchive: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptics = LocalOrbitHaptics.current
+    val colors = OrbitTheme.colors
+    var menuExpanded by remember { mutableStateOf(false) }
+
     val isCredit = account.type == AccountType.CREDIT
     val isLiability = account.type.isLiability
     val isMortgage = account.type == AccountType.MORTGAGE
 
-    Card(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-            } else {
-                MaterialTheme.colorScheme.surface
+            .clickable {
+                haptics.tick()
+                onSeeTransactions()
             }
-        ),
-        border = if (isSelected) {
-            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-        } else {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-        }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp)
-        ) {
+        // Left Column: Name, Institution, and Badges
+        Column(modifier = Modifier.weight(1f)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Left: Name, institution, masked last 4
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isCredit) OrbitColorTokens.Purple.copy(alpha = 0.15f)
-                                else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (isCredit) Icons.Default.AccountBox else Icons.Default.Star,
-                            contentDescription = null,
-                            tint = if (isCredit) OrbitColorTokens.Purple else MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                Text(
+                    text = account.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                // Type Badge
+                AccountBadge(text = account.type.displayName)
 
-                    Column {
-                        Text(
-                            text = account.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            account.institution?.let { inst ->
-                                Text(
-                                    text = inst,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            account.accountNumberLast4?.let { last4 ->
-                                Text(
-                                    text = "•••• $last4",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                            }
-                        }
-                    }
+                if (account.isManual) {
+                    AccountBadge(text = "Manual", isAccent = true)
                 }
 
-                // Right: Balance & Chevron / More
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        val displayAmount = if (isMortgage && account.homeEquityCents != null) {
-                            account.homeEquityCents!!
-                        } else {
-                            account.currentBalanceCents
-                        }
+                if (account.isArchived) {
+                    AccountBadge(text = "Archived", isMuted = true)
+                }
+            }
 
-                        val balanceColor = when {
-                            isCredit || isLiability -> {
-                                if (account.currentBalanceCents != 0L) OrbitColorTokens.Red
-                                else MaterialTheme.colorScheme.onSurface
-                            }
-                            displayAmount >= 0L -> OrbitColorTokens.Green
-                            else -> OrbitColorTokens.Red
-                        }
+            Spacer(modifier = Modifier.height(2.dp))
 
-                        Text(
-                            text = MoneyUtils.formatCents(displayAmount),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = balanceColor
-                        )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                account.institution?.let { inst ->
+                    Text(
+                        text = inst,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                account.accountNumberLast4?.let { last4 ->
+                    Text(
+                        text = " •••• $last4",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
 
-                        if (isMortgage && account.estimatedValueCents != null) {
-                            Text(
-                                text = "Home Equity",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                        } else if (isCredit && account.creditCardProfile?.creditLimitCents != null) {
-                            val limit = account.creditCardProfile.creditLimitCents
-                            val ratio = account.creditCardProfile.creditUtilizationRatio(account.currentBalanceCents)
-                            val pct = if (ratio != null) (ratio * 100.0).roundToInt() else null
-                            Text(
-                                text = if (pct != null) "$pct% of ${MoneyUtils.formatCents(limit)}" else "Limit ${MoneyUtils.formatCents(limit)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (pct != null && pct > 30) OrbitColorTokens.Red else MaterialTheme.colorScheme.outline
-                            )
-                        }
+            // Credit card glance chips
+            if (isCredit && account.creditCardProfile?.creditLimitCents != null) {
+                val limit = account.creditCardProfile.creditLimitCents
+                val ratio = account.creditCardProfile.creditUtilizationRatio(account.currentBalanceCents)
+                val pct = if (ratio != null) (ratio * 100.0).roundToInt() else null
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (pct != null) "$pct% of ${MoneyUtils.formatCents(limit)}" else "Limit ${MoneyUtils.formatCents(limit)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 11.sp,
+                    color = if (pct != null && pct > 30) colors.expense else MaterialTheme.colorScheme.outline
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Right Column: Balance, See transactions pill, and circular 3-dots button
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(horizontalAlignment = Alignment.End) {
+                val displayAmount = if (isMortgage && account.homeEquityCents != null) {
+                    account.homeEquityCents!!
+                } else {
+                    account.currentBalanceCents
+                }
+
+                val balanceColor = when {
+                    isCredit || isLiability -> {
+                        if (account.currentBalanceCents != 0L) colors.expense else MaterialTheme.colorScheme.onSurface
                     }
+                    displayAmount >= 0L -> colors.income
+                    else -> colors.expense
+                }
 
-                    if (onEditClick != null || onPerksClick != null) {
-                        IconButton(
-                            onClick = { onEditClick?.invoke() },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Options",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
+                Text(
+                    text = MoneyUtils.formatCents(displayAmount),
+                    style = TabularNumStyle.copy(
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = balanceColor
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Compact "See transactions" button
+                OutlinedButton(
+                    onClick = {
+                        haptics.tick()
+                        onSeeTransactions()
+                    },
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                    modifier = Modifier.height(26.dp)
+                ) {
+                    Text(
+                        text = "See transactions",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // 32dp circular bordered 3-dots menu button
+            Box {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clickable {
+                            haptics.tick()
+                            menuExpanded = true
                         }
-                    } else {
-                        Spacer(modifier = Modifier.width(6.dp))
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                            imageVector = OrbitIcons.MoreHoriz,
+                            contentDescription = "Account Options",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
                     }
                 }
-            }
 
-            // Optional Credit Perks mini pill strip
-            if (isCredit && account.creditCardProfile != null) {
-                val profile = account.creditCardProfile
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
                 ) {
-                    profile.rewardCategories.take(3).forEach { reward ->
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                        ) {
-                            Text(
-                                text = "${reward.multiplier}x ${reward.category}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
+                    DropdownMenuItem(
+                        text = { Text("Edit") },
+                        onClick = { menuExpanded = false; onEdit() }
+                    )
+                    if (onPerks != null) {
+                        DropdownMenuItem(
+                            text = { Text("Credit Card Perks") },
+                            onClick = { menuExpanded = false; onPerks() }
+                        )
                     }
-
-                    profile.annualFeeCents?.let { fee ->
-                        if (fee > 0L) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = OrbitColorTokens.Purple.copy(alpha = 0.12f)
-                            ) {
-                                Text(
-                                    text = "${MoneyUtils.formatCents(fee)}/yr",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = OrbitColorTokens.Purple,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
+                    DropdownMenuItem(
+                        text = { Text("Balance History") },
+                        onClick = { menuExpanded = false; onHistory() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Merge") },
+                        onClick = { menuExpanded = false; onMerge() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (account.isArchived) "Unarchive" else "Archive") },
+                        onClick = { menuExpanded = false; onToggleArchive() }
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Delete", color = colors.expense) },
+                        onClick = { menuExpanded = false; onDelete() }
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AccountBadge(
+    text: String,
+    isAccent: Boolean = false,
+    isMuted: Boolean = false
+) {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = when {
+            isAccent -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+            isMuted -> MaterialTheme.colorScheme.surfaceContainerHigh
+            else -> MaterialTheme.colorScheme.surfaceContainer
+        }
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            color = when {
+                isAccent -> MaterialTheme.colorScheme.onPrimaryContainer
+                isMuted -> MaterialTheme.colorScheme.outline
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
     }
 }

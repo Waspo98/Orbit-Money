@@ -17,7 +17,8 @@ sealed interface OrbitNavKey {
     data class Transactions(
         val transactionId: Long? = null,
         val accountId: Long? = null,
-        val uncategorizedOnly: Boolean = false
+        val uncategorizedOnly: Boolean = false,
+        val categoryId: Long? = null
     ) : OrbitNavKey
 
     @Serializable

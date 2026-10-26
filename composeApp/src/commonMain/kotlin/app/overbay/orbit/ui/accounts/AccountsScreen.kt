@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.accounts
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,20 +12,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -40,19 +31,32 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.ui.accounts.components.AccountGroupSection
 import app.overbay.orbit.ui.accounts.sheets.AccountBalanceHistorySheet
 import app.overbay.orbit.ui.accounts.sheets.AccountEditorSheet
 import app.overbay.orbit.ui.accounts.sheets.AccountMergeDialog
 import app.overbay.orbit.ui.accounts.sheets.CreditCardProfileEditorSheet
+import app.overbay.orbit.ui.components.HeroScrollState
+import app.overbay.orbit.ui.components.HeroStatItem
+import app.overbay.orbit.ui.components.HeroStatTone
+import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitPageActionRow
+import app.overbay.orbit.ui.components.OrbitPrimaryPillButton
+import app.overbay.orbit.ui.components.OrbitSecondaryPillButton
+import app.overbay.orbit.ui.components.OrbitTogglePill
+import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.util.LocalDevicePosture
-import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlin.math.abs
 
+/**
+ * Editorial Accounts screen with curved green canopy hero, 2x2 bento stats grid,
+ * 3-pill action row, and collapsed-by-default white accordion account group cards.
+ * Conforms strictly to <= 6 parameters and < 400-line ceiling.
+ */
 @Composable
 fun AccountsScreen(
     viewModel: AccountsViewModel,
@@ -63,10 +67,9 @@ fun AccountsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val posture = LocalDevicePosture.current
-    val haptics = LocalOrbitHaptics.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val heroScrollState = rememberHeroScrollState(maxHeight = 220.dp, minHeight = 64.dp)
 
-    // Selected account on phone navigation vs tablet 2-pane
     var phoneViewingDetail by remember { mutableStateOf(false) }
 
     LaunchedEffect(initialAccountId) {
@@ -91,7 +94,7 @@ fun AccountsScreen(
         return
     }
 
-    // Detail Screen on Phone
+    // Detail Screen on Phone if directly inspecting an account
     if (phoneViewingDetail && !posture.supportsTwoPane && state.selectedAccount != null) {
         AccountDetailScreen(
             account = state.selectedAccount!!,
@@ -105,19 +108,6 @@ fun AccountsScreen(
     } else {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
-            floatingActionButton = {
-                FloatingActionButton(
-                    onClick = {
-                        haptics.tick()
-                        viewModel.openAddAccount()
-                    },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = CircleShape
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Account")
-                }
-            },
             modifier = modifier
         ) { innerPadding ->
             if (posture.supportsTwoPane) {
@@ -127,27 +117,23 @@ fun AccountsScreen(
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
-                    // Left Pane: Accounts List
                     Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        AccountsMasterList(
+                        AccountsMasterContent(
                             state = state,
-                            onAccountClick = { acct ->
+                            viewModel = viewModel,
+                            heroScrollState = heroScrollState,
+                            onNavigate = onNavigate,
+                            onOpenDetail = { acct ->
                                 viewModel.selectAccount(acct.id)
-                            },
-                            onEditAccount = { viewModel.openEditAccount(it) },
-                            onPerksClick = { viewModel.openCreditCardProfile(it) },
-                            onSync = { viewModel.syncSimpleFin() },
-                            onOpenDrawer = onOpenDrawer
+                            }
                         )
                     }
 
-                    // Divider
                     Surface(
                         modifier = Modifier.width(1.dp).fillMaxHeight(),
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                     ) {}
 
-                    // Right Pane: Detail
                     Box(modifier = Modifier.weight(1.2f).fillMaxHeight()) {
                         val sel = state.selectedAccount
                         if (sel != null) {
@@ -172,17 +158,18 @@ fun AccountsScreen(
                 }
             } else {
                 // Single Pane Phone Layout
-                AccountsMasterList(
+                AccountsMasterContent(
                     state = state,
-                    onAccountClick = { acct ->
+                    viewModel = viewModel,
+                    heroScrollState = heroScrollState,
+                    onNavigate = onNavigate,
+                    onOpenDetail = { acct ->
                         viewModel.selectAccount(acct.id)
                         phoneViewingDetail = true
                     },
-                    onEditAccount = { viewModel.openEditAccount(it) },
-                    onPerksClick = { viewModel.openCreditCardProfile(it) },
-                    onSync = { viewModel.syncSimpleFin() },
-                    onOpenDrawer = onOpenDrawer,
-                    modifier = Modifier.fillMaxSize().padding(innerPadding)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
                 )
             }
         }
@@ -225,92 +212,72 @@ fun AccountsScreen(
 }
 
 @Composable
-private fun AccountsMasterList(
+private fun AccountsMasterContent(
     state: AccountsUiState,
-    onAccountClick: (app.overbay.orbit.data.model.Account) -> Unit,
-    onEditAccount: (app.overbay.orbit.data.model.Account) -> Unit,
-    onPerksClick: (app.overbay.orbit.data.model.Account) -> Unit,
-    onSync: () -> Unit,
-    onOpenDrawer: () -> Unit,
+    viewModel: AccountsViewModel,
+    heroScrollState: HeroScrollState,
+    onNavigate: (OrbitNavKey) -> Unit,
+    onOpenDetail: (app.overbay.orbit.data.model.Account) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .nestedScroll(heroScrollState.nestedScrollConnection)
     ) {
-        // App Bar & Sync Header
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu")
-                    }
-                    Text(
-                        text = "Accounts",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                }
-
-                IconButton(
-                    onClick = onSync,
-                    enabled = !state.isSyncing
-                ) {
-                    if (state.isSyncing) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.Default.Refresh, contentDescription = "Sync SimpleFin", tint = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-        }
-
-        // Summary Hero Card (Total Assets, Liabilities, Net Worth)
-        item {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Assets", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(MoneyUtils.formatCents(state.totalAssetsCents), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = OrbitColorTokens.Green)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Liabilities", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(MoneyUtils.formatCents(state.totalLiabilitiesCents), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = OrbitColorTokens.Red)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Net Worth", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        val netColor = if (state.netWorthCents >= 0L) OrbitColorTokens.Green else OrbitColorTokens.Red
-                        Text(MoneyUtils.formatCents(state.netWorthCents), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = netColor)
-                    }
-                }
-            }
-        }
-
-        // Grouped Account Sections
-        items(state.accountGroups, key = { it.category.name }) { group ->
-            AccountGroupSection(
-                group = group,
-                selectedAccountId = state.selectedAccountId,
-                onAccountClick = onAccountClick,
-                onEditAccount = onEditAccount,
-                onPerksClick = onPerksClick
+        // Edge-to-edge curved green canopy hero with 2x2 Glass Bento Grid
+        MorphingPageHero(
+            kicker = "YOUR MONEY'S HOME BASE",
+            title = "Accounts",
+            subtitle = "${MoneyUtils.formatCents(state.netWorthCents)} Net Worth across ${state.accounts.size} Accounts",
+            scrollState = heroScrollState,
+            onPrimaryAddClick = { viewModel.openAddAccount() },
+            stats = listOf(
+                HeroStatItem("CASH", MoneyUtils.formatCents(state.cashCents), HeroStatTone.GOOD),
+                HeroStatItem("CREDIT CARDS", MoneyUtils.formatCents(abs(state.creditCardCents)), HeroStatTone.CAUTION),
+                HeroStatItem("INVESTMENTS", MoneyUtils.formatCents(state.investmentsCents), HeroStatTone.GOOD),
+                HeroStatItem("TOTAL ACCOUNTS", "${state.accounts.size}", HeroStatTone.DEFAULT)
             )
+        )
+
+        // 3-Pill Action Row Below Hero
+        OrbitPageActionRow {
+            OrbitTogglePill(
+                label = "Show archived",
+                checked = state.showArchived,
+                onCheckedChange = { viewModel.toggleShowArchived() }
+            )
+            OrbitSecondaryPillButton(
+                text = if (state.isReorderMode) "Done" else "Reorder Groups",
+                onClick = { viewModel.toggleReorderMode() }
+            )
+            OrbitPrimaryPillButton(
+                text = "+ Manual Account",
+                onClick = { viewModel.openAddAccount() }
+            )
+        }
+
+        // Account Groups List
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            items(state.accountGroups, key = { it.category.name }) { group ->
+                AccountGroupSection(
+                    group = group,
+                    selectedAccountId = state.selectedAccountId,
+                    onSeeTransactions = { acct ->
+                        onNavigate(OrbitNavKey.Transactions(accountId = acct.id))
+                    },
+                    onEditAccount = { viewModel.openEditAccount(it) },
+                    onPerksClick = { viewModel.openCreditCardProfile(it) },
+                    onHistoryClick = { viewModel.openBalanceHistory(it) },
+                    onMergeClick = { viewModel.openMergeDialog(it) },
+                    onToggleArchive = { viewModel.toggleArchiveAccount(it) },
+                    onDeleteAccount = { viewModel.deleteAccount(it) }
+                )
+            }
         }
     }
 }

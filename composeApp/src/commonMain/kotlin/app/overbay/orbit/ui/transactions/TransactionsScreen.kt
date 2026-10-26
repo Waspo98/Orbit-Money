@@ -9,11 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -59,19 +56,6 @@ fun TransactionsScreen(
         val isTwoPane = maxWidth >= 840.dp || posture.supportsTwoPane
 
         Scaffold(
-            floatingActionButton = {
-                FloatingActionButton(
-                    onClick = {
-                        haptics.tick()
-                        viewModel.openTransactionEditor(null)
-                    },
-                    shape = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = "Add Transaction")
-                }
-            },
             bottomBar = {
                 if (state.isSelectionMode) {
                     TransactionBatchActionBar(

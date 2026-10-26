@@ -458,11 +458,11 @@ object DashboardDataTransform {
             items = top3Bills
         )
 
-        // 15. Recent Transactions (last 10)
+        // 15. Recent Transactions (last 5)
         val recentList = snapshot.transactions
             .filter { !it.effectiveIsIgnored }
             .sortedWith(compareByDescending<Transaction> { it.effectiveDate }.thenByDescending { it.id })
-            .take(10)
+            .take(5)
             .map { txn ->
                 val cat = txn.effectiveCategoryId?.let { categoryById[it] }
                 val acct = accountById[txn.accountId]

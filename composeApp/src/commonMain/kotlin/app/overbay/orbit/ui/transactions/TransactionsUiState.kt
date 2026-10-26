@@ -16,9 +16,25 @@ enum class QuickFilter(val label: String) {
     MHA("MHA")
 }
 
+enum class TransactionSortOption(val label: String) {
+    DATE_DESC("Date: Newest"),
+    DATE_ASC("Date: Oldest"),
+    AMOUNT_DESC("Amount: High to Low"),
+    AMOUNT_ASC("Amount: Low to High"),
+    MERCHANT_ASC("Merchant: A to Z")
+}
+
+data class MonthTransactionGroup(
+    val monthKey: String,
+    val monthLabel: String,
+    val count: Int,
+    val transactions: List<Transaction>
+)
+
 data class TransactionsUiState(
     val transactions: List<Transaction> = emptyList(),
     val filteredTransactions: List<Transaction> = emptyList(),
+    val groupedTransactions: List<MonthTransactionGroup> = emptyList(),
     val categories: List<Category> = emptyList(),
     val accounts: List<Account> = emptyList(),
     val categoryMap: Map<Long, Category> = emptyMap(),
@@ -26,8 +42,12 @@ data class TransactionsUiState(
     val searchQuery: String = "",
     val quickFilter: QuickFilter = QuickFilter.ALL,
     val filterDraft: TransactionFilterDraft = TransactionFilterDraft(),
+    val sortOption: TransactionSortOption = TransactionSortOption.DATE_DESC,
+    val isCompactView: Boolean = false,
     val selectedTransactionIds: Set<Long> = emptySet(),
     val inspectingTransactionId: Long? = null,
+    val expandedTransactionId: Long? = null,
+    val monthlyTransactionCount: Int = 0,
     val showEditorSheet: Boolean = false,
     val showSplitSheet: Boolean = false,
     val showCsvImportSheet: Boolean = false,

@@ -1,11 +1,13 @@
 package app.overbay.orbit.ui.budgets.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,8 +17,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,138 +29,269 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.BudgetPaceStatus
 import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
+import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitCompactListRow
+import app.overbay.orbit.ui.components.OrbitPillProgressBar
+import app.overbay.orbit.util.LocalOrbitHaptics
 
+/**
+ * Editorial category budget row with expandable inline transaction preview
+ * and direct Edit/Delete budget actions.
+ * Strictly under the 400-line ceiling.
+ */
 @Composable
 fun BudgetCategoryRow(
     item: CategoryBudgetOverviewItem,
+    isExpanded: Boolean,
+    transactions: List<Transaction>,
     onClick: () -> Unit,
+    onEditBudget: () -> Unit,
+    onDeleteBudget: () -> Unit,
+    onViewTransactions: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val categoryColor = try {
-        val hex = item.category.color.trim().removePrefix("#")
-        Color(hex.toLong(16) or 0xFF000000)
-    } catch (_: Exception) {
-        MaterialTheme.colorScheme.primary
-    }
+    val haptics = LocalOrbitHaptics.current
+    val colors = OrbitTheme.colors
 
-    val isOverBudget = item.paceStatus == BudgetPaceStatus.OVER_BUDGET
+    val categoryColor = parseHexColor(item.category.color) ?: MaterialTheme.colorScheme.primary
+    val isOverBudget = item.spentCents > item.amountCents && item.amountCents > 0L
     val isWatch = item.paceStatus == BudgetPaceStatus.WATCH
-    val progressColor = when {
-        isOverBudget -> OrbitTheme.colors.expense
-        isWatch -> OrbitTheme.colors.warning
-        else -> OrbitTheme.colors.income
+
+    val statusColor = when {
+        isOverBudget -> colors.expense
+        isWatch -> colors.warning
+        else -> colors.income
     }
 
     Surface(
-        onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
         modifier = modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Top Row: Category Info & Remaining
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Main Summary Header
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        haptics.tick()
+                        onClick()
+                    }
+                    .padding(16.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(categoryColor)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
+                // Top Row: Category dot/icon + name + remaining/over
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(categoryColor)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = item.category.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    // Remaining text
+                    val remainingText = if (isOverBudget) {
+                        "${MoneyUtils.formatCents(item.spentCents - item.amountCents)} over"
+                    } else if (item.amountCents > 0L) {
+                        "${MoneyUtils.formatCents(item.amountCents - item.spentCents)} left"
+                    } else {
+                        "${MoneyUtils.formatCents(item.spentCents)} spent"
+                    }
+
                     Text(
-                        text = item.category.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        text = remainingText,
+                        style = TabularNumStyle.copy(
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = statusColor
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Progress Bar
+                val progress = if (item.amountCents > 0L) {
+                    (item.spentCents.toFloat() / item.amountCents.toFloat()).coerceIn(0f, 1f)
+                } else 1f
+
+                OrbitPillProgressBar(
+                    percent = progress,
+                    overBudget = isOverBudget,
+                    customFillColor = statusColor,
+                    height = 8.dp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Bottom Subtext: Spent vs Budgeted & Txn count
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (item.amountCents > 0L) {
+                            "${MoneyUtils.formatCents(item.spentCents)} of ${MoneyUtils.formatCents(item.amountCents)}"
+                        } else {
+                            "No budget set"
+                        },
+                        style = TabularNumStyle.copy(fontSize = 12.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    if (item.rollover) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
-                        ) {
+                    Text(
+                        text = "${item.transactionCount} transaction${if (item.transactionCount == 1) "" else "s"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+
+            // Inline Expandable Detail Preview
+            AnimatedVisibility(visible = isExpanded) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp)
+                    ) {
+                        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Text(
+                            text = "RECENT TRANSACTIONS",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        if (transactions.isEmpty()) {
                             Text(
-                                text = "ROLLOVER",
+                                text = "No transactions recorded for this category.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            transactions.take(3).forEachIndexed { index, txn ->
+                                OrbitCompactListRow(
+                                    title = txn.effectiveMerchant,
+                                    subtitle = txn.effectiveDate,
+                                    amount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
+                                    amountColor = colors.expense,
+                                    showTopDivider = index > 0
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Action Buttons: Edit Budget, Delete Budget, View in Transactions
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        haptics.tick()
+                                        onEditBudget()
+                                    },
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text(
+                                        text = if (item.amountCents > 0L) "Edit Budget" else "Set Budget",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+
+                                if (item.budgetId != null) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            haptics.reject()
+                                            onDeleteBudget()
+                                        },
+                                        shape = CircleShape,
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                        border = BorderStroke(1.dp, colors.expense),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text(
+                                            text = "Delete Budget",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = colors.expense
+                                        )
+                                    }
+                                }
+                            }
+
+                            Text(
+                                text = "View all in Transactions →",
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable {
+                                    haptics.tick()
+                                    onViewTransactions()
+                                }
                             )
                         }
                     }
                 }
-
-                // Remaining Badge
-                val remainingText = if (isOverBudget) {
-                    "${MoneyUtils.formatCents(-item.remainingCents, showCents = false)} over"
-                } else if (item.amountCents > 0L) {
-                    "${MoneyUtils.formatCents(item.remainingCents, showCents = false)} left"
-                } else {
-                    "${MoneyUtils.formatCents(item.spentCents, showCents = false)} spent"
-                }
-
-                Text(
-                    text = remainingText,
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontFeatureSettings = "tnum"
-                    ),
-                    color = progressColor
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Progress Bar
-            val progress = if (item.amountCents > 0L) {
-                (item.spentCents.toFloat() / item.amountCents.toFloat()).coerceIn(0f, 1f)
-            } else 1f
-
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-                color = progressColor,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Bottom Subtext: Spent vs Budgeted
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (item.amountCents > 0L) {
-                        "${MoneyUtils.formatCents(item.spentCents, showCents = false)} of ${MoneyUtils.formatCents(item.amountCents, showCents = false)}"
-                    } else {
-                        "No budget set"
-                    },
-                    style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Text(
-                    text = "${item.transactionCount} transaction${if (item.transactionCount == 1) "" else "s"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
             }
         }
+    }
+}
+
+private fun parseHexColor(hex: String?): Color? {
+    if (hex.isNullOrBlank() || !hex.startsWith("#")) return null
+    return try {
+        val clean = hex.removePrefix("#")
+        val colorInt = clean.toLong(16)
+        if (clean.length == 6) {
+            Color(0xFF000000 or colorInt)
+        } else if (clean.length == 8) {
+            Color(colorInt)
+        } else null
+    } catch (_: Exception) {
+        null
     }
 }
