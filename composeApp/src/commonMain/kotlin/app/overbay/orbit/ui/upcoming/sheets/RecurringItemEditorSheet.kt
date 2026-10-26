@@ -48,6 +48,7 @@ import app.overbay.orbit.data.model.UpcomingStatus
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.datetime.LocalDate
 import kotlin.math.abs
@@ -77,10 +78,6 @@ fun RecurringItemEditorSheet(
     var frequency by remember(item) { mutableStateOf(item?.frequencyType ?: RecurrenceFrequency.MONTHLY) }
     var selectedCategoryId by remember(item) { mutableStateOf(item?.categoryId) }
     var selectedAccountId by remember(item) { mutableStateOf(item?.accountId) }
-
-    var frequencyDropdownOpen by remember { mutableStateOf(false) }
-    var categoryDropdownOpen by remember { mutableStateOf(false) }
-    var accountDropdownOpen by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -166,142 +163,48 @@ fun RecurringItemEditorSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Frequency Dropdown
-            Box(modifier = Modifier.fillMaxWidth()) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { frequencyDropdownOpen = true },
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    color = MaterialTheme.colorScheme.surface
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-                        Text(text = "Recurrence Frequency", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = frequency.name.lowercase().replaceFirstChar { it.uppercase() },
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                DropdownMenu(
-                    expanded = frequencyDropdownOpen,
-                    onDismissRequest = { frequencyDropdownOpen = false }
-                ) {
-                    listOf(
-                        RecurrenceFrequency.WEEKLY,
-                        RecurrenceFrequency.BIWEEKLY,
-                        RecurrenceFrequency.SEMIMONTHLY,
-                        RecurrenceFrequency.MONTHLY,
-                        RecurrenceFrequency.QUARTERLY,
-                        RecurrenceFrequency.YEARLY
-                    ).forEach { freq ->
-                        DropdownMenuItem(
-                            text = { Text(freq.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                            onClick = {
-                                frequency = freq
-                                frequencyDropdownOpen = false
-                            }
-                        )
-                    }
-                }
-            }
+            OrbitDropdownField(
+                label = "Recurrence Frequency",
+                selectedText = frequency.name.lowercase().replaceFirstChar { it.uppercase() },
+                options = listOf(
+                    RecurrenceFrequency.WEEKLY,
+                    RecurrenceFrequency.BIWEEKLY,
+                    RecurrenceFrequency.SEMIMONTHLY,
+                    RecurrenceFrequency.MONTHLY,
+                    RecurrenceFrequency.QUARTERLY,
+                    RecurrenceFrequency.YEARLY
+                ),
+                optionLabel = { it.name.lowercase().replaceFirstChar { c -> c.uppercase() } },
+                onOptionSelected = { frequency = it }
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
             // Category Dropdown
             val selectedCategory = categories.find { it.id == selectedCategoryId }
-            Box(modifier = Modifier.fillMaxWidth()) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { categoryDropdownOpen = true },
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    color = MaterialTheme.colorScheme.surface
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-                        Text(text = "Category", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = selectedCategory?.name ?: "None / Unassigned",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                DropdownMenu(
-                    expanded = categoryDropdownOpen,
-                    onDismissRequest = { categoryDropdownOpen = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("None") },
-                        onClick = {
-                            selectedCategoryId = null
-                            categoryDropdownOpen = false
-                        }
-                    )
-                    categories.forEach { cat ->
-                        DropdownMenuItem(
-                            text = { Text(cat.name) },
-                            onClick = {
-                                selectedCategoryId = cat.id
-                                categoryDropdownOpen = false
-                            }
-                        )
-                    }
-                }
-            }
+            OrbitDropdownField(
+                label = "Category",
+                selectedText = selectedCategory?.name ?: "None / Unassigned",
+                options = categories,
+                optionLabel = { it.name },
+                onOptionSelected = { selectedCategoryId = it.id },
+                nullOptionLabel = "None",
+                onNullSelected = { selectedCategoryId = null }
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
             // Account Dropdown
             val selectedAccount = accounts.find { it.id == selectedAccountId }
-            Box(modifier = Modifier.fillMaxWidth()) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { accountDropdownOpen = true },
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    color = MaterialTheme.colorScheme.surface
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-                        Text(text = "Payment Account", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = selectedAccount?.name ?: "None / Unassigned",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                DropdownMenu(
-                    expanded = accountDropdownOpen,
-                    onDismissRequest = { accountDropdownOpen = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("None") },
-                        onClick = {
-                            selectedAccountId = null
-                            accountDropdownOpen = false
-                        }
-                    )
-                    accounts.forEach { acct ->
-                        DropdownMenuItem(
-                            text = { Text(acct.name) },
-                            onClick = {
-                                selectedAccountId = acct.id
-                                accountDropdownOpen = false
-                            }
-                        )
-                    }
-                }
-            }
+            OrbitDropdownField(
+                label = "Payment Account",
+                selectedText = selectedAccount?.name ?: "None / Unassigned",
+                options = accounts,
+                optionLabel = { it.name },
+                onOptionSelected = { selectedAccountId = it.id },
+                nullOptionLabel = "None",
+                onNullSelected = { selectedAccountId = null }
+            )
 
             Spacer(modifier = Modifier.height(20.dp))
 

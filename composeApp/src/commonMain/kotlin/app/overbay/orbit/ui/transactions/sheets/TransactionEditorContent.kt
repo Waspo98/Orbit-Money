@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
@@ -98,8 +99,6 @@ fun TransactionEditorContent(
     var isTransfer by remember(transaction) { mutableStateOf(transaction?.effectiveIsTransfer ?: false) }
     var isIgnored by remember(transaction) { mutableStateOf(transaction?.effectiveIsIgnored ?: false) }
     var mhaEligible by remember(transaction) { mutableStateOf(transaction?.effectiveMhaEligible ?: false) }
-
-    var categoryDropdownOpen by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -194,77 +193,32 @@ fun TransactionEditorContent(
         Spacer(modifier = Modifier.height(12.dp))
 
         // Category Picker
-        Box(modifier = Modifier.fillMaxWidth()) {
-            val selectedCategory = categories.find { it.id == selectedCategoryId }
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { categoryDropdownOpen = true },
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                color = MaterialTheme.colorScheme.surface
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = "Category",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = selectedCategory?.name ?: "Uncategorized",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+        val selectedCategory = categories.find { it.id == selectedCategoryId }
+        OrbitDropdownField(
+            label = "Category",
+            selectedText = selectedCategory?.name ?: "Uncategorized",
+            options = categories,
+            optionLabel = { it.name },
+            onOptionSelected = { selectedCategoryId = it.id },
+            nullOptionLabel = "Uncategorized",
+            onNullSelected = { selectedCategoryId = null },
+            leadingIcon = if (selectedCategory != null) {
+                {
+                    val color = try {
+                        val hex = selectedCategory.color.trim().removePrefix("#")
+                        Color(hex.toLong(16) or 0xFF000000)
+                    } catch (_: Exception) {
+                        MaterialTheme.colorScheme.primary
                     }
-
-                    if (selectedCategory != null) {
-                        val color = try {
-                            val hex = selectedCategory.color.trim().removePrefix("#")
-                            Color(hex.toLong(16) or 0xFF000000)
-                        } catch (_: Exception) {
-                            MaterialTheme.colorScheme.primary
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(14.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                        )
-                    }
-                }
-            }
-
-            DropdownMenu(
-                expanded = categoryDropdownOpen,
-                onDismissRequest = { categoryDropdownOpen = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Uncategorized") },
-                    onClick = {
-                        selectedCategoryId = null
-                        categoryDropdownOpen = false
-                    }
-                )
-                categories.forEach { cat ->
-                    DropdownMenuItem(
-                        text = { Text(cat.name) },
-                        onClick = {
-                            selectedCategoryId = cat.id
-                            categoryDropdownOpen = false
-                        }
+                    Box(
+                        modifier = Modifier
+                            .size(14.dp)
+                            .clip(CircleShape)
+                            .background(color)
                     )
                 }
-            }
-        }
+            } else null
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 

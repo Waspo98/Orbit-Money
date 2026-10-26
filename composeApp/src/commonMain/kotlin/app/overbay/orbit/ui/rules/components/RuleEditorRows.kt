@@ -35,6 +35,7 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleAction
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
+import app.overbay.orbit.ui.components.OrbitDropdownField
 
 @Composable
 fun ConditionEditorRow(
@@ -95,7 +96,6 @@ fun ActionEditorRow(
     onActionChanged: (RuleAction) -> Unit,
     onDelete: () -> Unit
 ) {
-    var categoryDropdownOpen by remember { mutableStateOf(false) }
     val selectedCategory = categories.find { it.id == action.targetCategoryId }
 
     Surface(
@@ -133,36 +133,13 @@ fun ActionEditorRow(
 
             when (action.type) {
                 RuleActionType.CATEGORIZE, RuleActionType.SET_CATEGORY -> {
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { categoryDropdownOpen = true },
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                            color = MaterialTheme.colorScheme.surface
-                        ) {
-                            Text(
-                                text = selectedCategory?.name ?: "Select Category",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(12.dp)
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = categoryDropdownOpen,
-                            onDismissRequest = { categoryDropdownOpen = false }
-                        ) {
-                            categories.forEach { cat ->
-                                DropdownMenuItem(
-                                    text = { Text(cat.name) },
-                                    onClick = {
-                                        onActionChanged(action.copy(targetCategoryId = cat.id))
-                                        categoryDropdownOpen = false
-                                    }
-                                )
-                            }
-                        }
-                    }
+                    OrbitDropdownField(
+                        label = "Target Category",
+                        selectedText = selectedCategory?.name ?: "Select Category",
+                        options = categories,
+                        optionLabel = { it.name },
+                        onOptionSelected = { onActionChanged(action.copy(targetCategoryId = it.id)) }
+                    )
                 }
                 RuleActionType.RENAME, RuleActionType.RENAME_MERCHANT -> {
                     OutlinedTextField(

@@ -52,6 +52,7 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
 
@@ -243,7 +244,6 @@ private fun SplitLineRow(
     onCategoryChanged: (Long?) -> Unit,
     onDelete: () -> Unit
 ) {
-    var categoryDropdownOpen by remember { mutableStateOf(false) }
     val selectedCategory = categories.find { it.id == item.categoryId }
 
     Surface(
@@ -295,71 +295,16 @@ private fun SplitLineRow(
                     )
                 }
 
-                Box(modifier = Modifier.weight(0.55f)) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { categoryDropdownOpen = true },
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        color = MaterialTheme.colorScheme.surface
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = selectedCategory?.name ?: "Category",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (selectedCategory != null) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-
-                            if (selectedCategory != null) {
-                                val color = try {
-                                    val hex = selectedCategory.color.trim().removePrefix("#")
-                                    Color(hex.toLong(16) or 0xFF000000)
-                                } catch (_: Exception) {
-                                    MaterialTheme.colorScheme.primary
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .clip(CircleShape)
-                                        .background(color)
-                                )
-                            }
-                        }
-                    }
-
-                    DropdownMenu(
-                        expanded = categoryDropdownOpen,
-                        onDismissRequest = { categoryDropdownOpen = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Uncategorized") },
-                            onClick = {
-                                onCategoryChanged(null)
-                                categoryDropdownOpen = false
-                            }
-                        )
-                        categories.forEach { cat ->
-                            DropdownMenuItem(
-                                text = { Text(cat.name) },
-                                onClick = {
-                                    onCategoryChanged(cat.id)
-                                    categoryDropdownOpen = false
-                                }
-                            )
-                        }
-                    }
-                }
+                OrbitDropdownField(
+                    label = "Category",
+                    selectedText = selectedCategory?.name ?: "Uncategorized",
+                    options = categories,
+                    optionLabel = { it.name },
+                    onOptionSelected = { onCategoryChanged(it.id) },
+                    nullOptionLabel = "Uncategorized",
+                    onNullSelected = { onCategoryChanged(null) },
+                    modifier = Modifier.weight(0.55f)
+                )
             }
         }
     }

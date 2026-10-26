@@ -45,6 +45,7 @@ import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.datetime.LocalDate
 
@@ -70,7 +71,6 @@ fun GoalEditorSheet(
         mutableStateOf(parsed)
     }
     var linkedAccountId by remember(goal) { mutableStateOf(goal?.linkedAccountId) }
-    var accountDropdownOpen by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -145,48 +145,15 @@ fun GoalEditorSheet(
 
             // Linked Account Picker
             val linkedAccount = accounts.find { it.id == linkedAccountId }
-            Box(modifier = Modifier.fillMaxWidth()) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { accountDropdownOpen = true },
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    color = MaterialTheme.colorScheme.surface
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-                        Text(text = "Linked Bank Account", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = linkedAccount?.name ?: "None / Unlinked",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                DropdownMenu(
-                    expanded = accountDropdownOpen,
-                    onDismissRequest = { accountDropdownOpen = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("None / Unlinked") },
-                        onClick = {
-                            linkedAccountId = null
-                            accountDropdownOpen = false
-                        }
-                    )
-                    accounts.forEach { acct ->
-                        DropdownMenuItem(
-                            text = { Text("${acct.name} (${acct.type.name.lowercase().replaceFirstChar { it.uppercase() }})") },
-                            onClick = {
-                                linkedAccountId = acct.id
-                                accountDropdownOpen = false
-                            }
-                        )
-                    }
-                }
-            }
+            OrbitDropdownField(
+                label = "Linked Bank Account",
+                selectedText = linkedAccount?.name ?: "None / Unlinked",
+                options = accounts,
+                optionLabel = { "${it.name} (${it.type.name.lowercase().replaceFirstChar { c -> c.uppercase() }})" },
+                onOptionSelected = { linkedAccountId = it.id },
+                nullOptionLabel = "None / Unlinked",
+                onNullSelected = { linkedAccountId = null }
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 

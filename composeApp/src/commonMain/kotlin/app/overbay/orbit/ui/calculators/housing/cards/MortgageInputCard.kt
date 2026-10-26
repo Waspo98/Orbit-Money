@@ -36,6 +36,7 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.housing.HousingUiState
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
 @Composable
@@ -57,7 +58,6 @@ fun MortgageInputCard(
     onBuyerClosingChange: (Double) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var expandedAccountMenu by remember { mutableStateOf(false) }
     val selectedAccount = uiState.availableMortgageAccounts.find { it.id == uiState.selectedMortgageAccountId }
 
     OrbitSectionCard(
@@ -74,64 +74,15 @@ fun MortgageInputCard(
         )
         Spacer(modifier = Modifier.height(6.dp))
 
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expandedAccountMenu = true }
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = selectedAccount?.name ?: "Manual Estimate / No Linked Mortgage",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    if (selectedAccount?.institution != null) {
-                        Text(
-                            text = selectedAccount.institution,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "Select mortgage",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            DropdownMenu(
-                expanded = expandedAccountMenu,
-                onDismissRequest = { expandedAccountMenu = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Manual Estimate (No Account)") },
-                    onClick = {
-                        onSelectMortgage(null)
-                        expandedAccountMenu = false
-                    }
-                )
-                uiState.availableMortgageAccounts.forEach { account ->
-                    DropdownMenuItem(
-                        text = { Text("${account.name} (${MoneyUtils.formatCents(account.currentBalanceCents)})") },
-                        onClick = {
-                            onSelectMortgage(account.id)
-                            expandedAccountMenu = false
-                        }
-                    )
-                }
-            }
-        }
+        OrbitDropdownField(
+            label = "Mortgage Source",
+            selectedText = selectedAccount?.name ?: "Manual Estimate (No Account)",
+            options = uiState.availableMortgageAccounts,
+            optionLabel = { "${it.name} (${MoneyUtils.formatCents(it.currentBalanceCents)})" },
+            onOptionSelected = { onSelectMortgage(it.id) },
+            nullOptionLabel = "Manual Estimate (No Account)",
+            onNullSelected = { onSelectMortgage(null) }
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
