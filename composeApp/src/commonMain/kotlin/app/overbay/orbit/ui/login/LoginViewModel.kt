@@ -15,6 +15,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -43,11 +44,15 @@ class LoginViewModel(
             fetchAuthConfig(initialUrl)
         }
         scope.launch {
-            repository.isAuthenticated.collect { authed ->
-                if (authed && repository.storageMode.value == StorageMode.SELF_HOSTED) {
-                    _uiState.update { it.copy(isAuthenticated = true, isSubmitting = false) }
+            combine(
+                repository.isAuthenticated,
+                repository.storageMode
+            ) { authed, mode -> authed && mode == StorageMode.SELF_HOSTED }
+                .collect { isSelfHostedAuthed ->
+                    if (isSelfHostedAuthed) {
+                        _uiState.update { it.copy(isAuthenticated = true, isSubmitting = false, errorMessage = null) }
+                    }
                 }
-            }
         }
     }
 
@@ -228,12 +233,7 @@ class LoginViewModel(
         storage.saveString(OidcCallbackBridge.PENDING_SERVER_URL_KEY, normalizedUrl.ifEmpty { "/" })
         _uiState.update { it.copy(serverUrl = normalizedUrl, errorMessage = null) }
         scope.launch {
-            repository.updatePreferences(
-                repository.preferences.value.copy(
-                    storageMode = StorageMode.SELF_HOSTED,
-                    selfHostedServerUrl = normalizedUrl
-                )
-            )
+            repository.prepareForOidcLogin(normalizedUrl)
         }
     }
 

@@ -149,6 +149,16 @@ class OrbitRepository(
         commitSnapshot(activeEngine.loadSnapshot().copy(preferences = updatedPref))
     }
 
+    suspend fun prepareForOidcLogin(serverUrl: String) {
+        val normalizedUrl = ServerUrlNormalizer.normalize(serverUrl)
+        storage.saveString(OidcCallbackBridge.PENDING_SERVER_URL_KEY, normalizedUrl.ifEmpty { "/" })
+        val updatedPref = _preferences.value.copy(storageMode = StorageMode.SELF_HOSTED, selfHostedServerUrl = normalizedUrl)
+        _preferences.value = updatedPref
+        _storageMode.value = StorageMode.SELF_HOSTED
+        _isAuthenticated.value = false
+        localEngine.saveSnapshot(_snapshot.value.copy(preferences = updatedPref))
+    }
+
     suspend fun markAuthenticated(serverUrl: String, userLabel: String) {
         val normalizedUrl = ServerUrlNormalizer.normalize(serverUrl)
         val updatedPref = _preferences.value.copy(
@@ -160,6 +170,7 @@ class OrbitRepository(
         _storageMode.value = StorageMode.SELF_HOSTED
         _isAuthenticated.value = true
         _currentUser.value = userLabel
+        localEngine.saveSnapshot(_snapshot.value.copy(preferences = updatedPref))
         activeEngine = SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
         val fresh = activeEngine.loadSnapshot().copy(preferences = updatedPref)
         commitSnapshot(fresh)
@@ -544,53 +555,38 @@ class OrbitRepository(
     // Preferences & Sync
     suspend fun updatePreferences(preferences: OrbitPreferences) {
         _preferences.value = preferences
+        _storageMode.value = preferences.storageMode
         commitSnapshot(_snapshot.value.copy(preferences = preferences))
         activeEngine.pushPreferences(preferences)
     }
 
-    suspend fun updateMhaTaxProfile(profile: MhaTaxProfile) {
-        commitSnapshot(_snapshot.value.copy(mhaTaxProfile = profile))
-    }
+    suspend fun updateMhaTaxProfile(profile: MhaTaxProfile) = commitSnapshot(_snapshot.value.copy(mhaTaxProfile = profile))
 
     suspend fun sync(force: Boolean = false): SyncResult {
         val result = activeEngine.sync(force)
         _syncStatus.value = result
-        if (result is SyncResult.Success) {
-            val fresh = activeEngine.loadSnapshot()
-            commitSnapshot(fresh)
-        }
+        if (result is SyncResult.Success) commitSnapshot(activeEngine.loadSnapshot())
         return result
     }
 
-    // Backup & Restore
     fun exportBackupJson(): String = json.encodeToString(OrbitWorkspaceSnapshot.serializer(), _snapshot.value)
 
     suspend fun restoreBackupJson(jsonString: String): Result<Unit> = runCatching {
-        val restored = json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString)
-        commitSnapshot(restored)
+        commitSnapshot(json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString))
     }
 
-    suspend fun loadDemoData(snapshot: OrbitWorkspaceSnapshot) {
-        commitSnapshot(snapshot)
-    }
+    suspend fun loadDemoData(snapshot: OrbitWorkspaceSnapshot) = commitSnapshot(snapshot)
 
-    suspend fun updateHouseholdInfo(household: HouseholdInfo) {
-        commitSnapshot(_snapshot.value.copy(household = household))
-    }
+    suspend fun updateHouseholdInfo(household: HouseholdInfo) = commitSnapshot(_snapshot.value.copy(household = household))
 
     suspend fun saveHouseholdMember(member: HouseholdMember) {
         val current = _snapshot.value.members
         val exists = current.any { it.id == member.id && member.id != 0L }
-        val updated = if (exists) {
-            current.map { if (it.id == member.id) member else it }
-        } else {
-            val newId = if (member.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else member.id
-            current + member.copy(id = newId)
-        }
+        val updated = if (exists) current.map { if (it.id == member.id) member else it }
+        else current + member.copy(id = if (member.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else member.id)
         commitSnapshot(_snapshot.value.copy(members = updated))
     }
 
-    suspend fun deleteHouseholdMember(id: Long) {
+    suspend fun deleteHouseholdMember(id: Long) =
         commitSnapshot(_snapshot.value.copy(members = _snapshot.value.members.filterNot { it.id == id }))
-    }
 }

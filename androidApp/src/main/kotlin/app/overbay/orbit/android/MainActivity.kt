@@ -14,6 +14,7 @@ import app.overbay.orbit.App
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.util.DisplayRefreshRateHelper
 import app.overbay.orbit.util.OidcCallbackBridge
+import app.overbay.orbit.util.PlatformStorage
 
 class MainActivity : FragmentActivity() {
 
@@ -23,6 +24,8 @@ class MainActivity : FragmentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        PlatformStorage.baseDir = filesDir
 
         // Configure adaptive high refresh rate (120Hz) without battery-draining locked modes
         DisplayRefreshRateHelper.configureHighRefreshRate(window, display)

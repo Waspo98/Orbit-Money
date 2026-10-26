@@ -51,12 +51,13 @@ fun App(
         isInitialized = true
     }
 
-    val pendingOidcCode by OidcCallbackBridge.pendingCode.collectAsStateWithLifecycle()
-    LaunchedEffect(isInitialized, pendingOidcCode) {
-        val code = pendingOidcCode
-        if (isInitialized && !code.isNullOrBlank()) {
-            OidcCallbackBridge.consumeExchangeCode(code)
-            repo.completeOidcNativeExchange(code)
+    LaunchedEffect(isInitialized, repo) {
+        if (!isInitialized) return@LaunchedEffect
+        OidcCallbackBridge.pendingCode.collect { code ->
+            if (!code.isNullOrBlank()) {
+                OidcCallbackBridge.consumeExchangeCode(code)
+                repo.completeOidcNativeExchange(code)
+            }
         }
     }
 

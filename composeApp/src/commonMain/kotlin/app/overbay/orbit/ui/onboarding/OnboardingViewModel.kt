@@ -170,6 +170,7 @@ class OnboardingViewModel(
                     dynamicColor = _uiState.value.dynamicColorEnabled
                 )
             )
+            repository.prepareForOidcLogin(url)
         }
     }
 

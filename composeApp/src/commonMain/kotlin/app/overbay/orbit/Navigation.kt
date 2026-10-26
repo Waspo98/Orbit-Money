@@ -97,7 +97,7 @@ fun OrbitNavigation(
     val householdViewModel = remember(repo) { HouseholdViewModel(repo) }
     val settingsViewModel = remember(repo) { SettingsViewModel(repo) }
 
-    LaunchedEffect(preferences.storageMode, isAuthenticated) {
+    LaunchedEffect(preferences.storageMode, isAuthenticated, preferences.onboardingCompleted) {
         if (
             preferences.storageMode == StorageMode.SELF_HOSTED &&
             !isAuthenticated &&
@@ -106,6 +106,14 @@ fun OrbitNavigation(
         ) {
             backStack.clear()
             backStack.add(OrbitNavKey.Login)
+        } else if (
+            preferences.storageMode == StorageMode.SELF_HOSTED &&
+            isAuthenticated &&
+            preferences.onboardingCompleted &&
+            (currentKey == OrbitNavKey.Login || currentKey == OrbitNavKey.Onboarding)
+        ) {
+            backStack.clear()
+            backStack.add(OrbitNavKey.Dashboard)
         }
     }
 
