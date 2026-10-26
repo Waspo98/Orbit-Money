@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,10 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
-import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.EmptyStateCard
-import app.overbay.orbit.ui.components.HeroStatItem
-import app.overbay.orbit.ui.components.HeroStatTone
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.trends.components.CategoryBreakdownList
@@ -44,7 +42,7 @@ fun SpendingTrendsScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
-    val heroScrollState = rememberHeroScrollState(maxHeight = 220.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState()
 
     if (state.isLoading) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -53,7 +51,10 @@ fun SpendingTrendsScreen(
         return
     }
 
-    Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    ) { innerPadding ->
         if (!state.hasData) {
             Box(
                 modifier = Modifier
@@ -78,7 +79,6 @@ fun SpendingTrendsScreen(
                 .padding(innerPadding)
                 .nestedScroll(heroScrollState.nestedScrollConnection)
         ) {
-            // Curved Green Canopy Hero
             MorphingPageHero(
                 kicker = "HISTORY",
                 title = "Spending Trends",
@@ -86,12 +86,6 @@ fun SpendingTrendsScreen(
                 canNavigateBack = true,
                 onBack = { onNavigate(OrbitNavKey.Dashboard) },
                 scrollState = heroScrollState,
-                stats = listOf(
-                    HeroStatItem("NET FLOW", (if (state.totalPeriodNetCents > 0L) "+" else "") + MoneyUtils.formatCents(state.totalPeriodNetCents), if (state.totalPeriodNetCents >= 0L) HeroStatTone.GOOD else HeroStatTone.CAUTION),
-                    HeroStatItem("INCOME", MoneyUtils.formatCents(state.overview.totalPeriodIncomeCents), HeroStatTone.GOOD),
-                    HeroStatItem("EXPENSES", MoneyUtils.formatCents(state.overview.totalPeriodSpendingCents), HeroStatTone.CAUTION),
-                    HeroStatItem("SAVINGS RATE", "${state.overallSavingsRatePercent.toInt()}%", if (state.overallSavingsRatePercent >= 20.0) HeroStatTone.GOOD else HeroStatTone.DEFAULT)
-                ),
                 expandedToolbar = {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -138,7 +132,7 @@ fun SpendingTrendsScreen(
             // Scrollable Charts and Details
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Interactive Bar Chart Section

@@ -3,6 +3,7 @@ package app.overbay.orbit.ui.transactions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.RecurrenceFrequency
 import app.overbay.orbit.data.model.RuleAction
@@ -18,6 +19,7 @@ import app.overbay.orbit.data.model.UpcomingStatus
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.TransactionFilterDraft
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -42,6 +44,8 @@ class TransactionsViewModel(
     private val _showSplitSheet = MutableStateFlow(false)
     private val _showCsvImportSheet = MutableStateFlow(false)
     private val _showFilterSheet = MutableStateFlow(false)
+    private val _isSyncing = MutableStateFlow(false)
+    private val _syncToastMessage = MutableStateFlow<String?>(null)
 
     private val dataFlow = combine(
         repository.transactions,
@@ -141,6 +145,10 @@ class TransactionsViewModel(
         state.copy(showCsvImportSheet = showCsv)
     }.combine(_showFilterSheet) { state, showFilter ->
         state.copy(showFilterSheet = showFilter)
+    }.combine(_isSyncing) { state, isSyncing ->
+        state.copy(isSyncing = isSyncing)
+    }.combine(_syncToastMessage) { state, toastMsg ->
+        state.copy(syncToastMessage = toastMsg)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -230,8 +238,19 @@ class TransactionsViewModel(
     }
 
     fun syncSimpleFin() {
+        if (_isSyncing.value) return
         viewModelScope.launch {
-            repository.sync(force = true)
+            _isSyncing.value = true
+            _syncToastMessage.value = "Syncing transactions with SimpleFIN..."
+            val result = repository.sync(force = true)
+            _isSyncing.value = false
+            _syncToastMessage.value = when (result) {
+                is SyncResult.Success -> result.message.ifBlank { "SimpleFIN sync complete" }
+                is SyncResult.Error -> result.message
+                SyncResult.NoOp -> "Transactions up to date"
+            }
+            delay(2600L)
+            _syncToastMessage.value = null
         }
     }
 

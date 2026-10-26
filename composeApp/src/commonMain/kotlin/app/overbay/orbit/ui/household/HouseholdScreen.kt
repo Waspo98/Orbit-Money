@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,13 +37,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.StorageMode
-import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.ui.components.HeroStatItem
-import app.overbay.orbit.ui.components.HeroStatTone
 import app.overbay.orbit.ui.components.MorphingPageHero
-import app.overbay.orbit.ui.components.OrbitPageActionRow
-import app.overbay.orbit.ui.components.OrbitPrimaryPillButton
-import app.overbay.orbit.ui.components.OrbitSecondaryPillButton
+import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.household.components.HouseholdMembersCard
@@ -55,49 +52,40 @@ fun HouseholdScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val heroScrollState = rememberHeroScrollState(maxHeight = 220.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState()
     var editingName by remember(uiState.householdInfo.name) { mutableStateOf(uiState.householdInfo.name) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .nestedScroll(heroScrollState.nestedScrollConnection)
-    ) {
-        // Edge-to-Edge Curved Green Canopy Hero
-        MorphingPageHero(
-            kicker = "INCOME AND BENEFITS",
-            title = "Household",
-            subtitle = "Manage household members, paychecks, benefits, and tax filing profile.",
-            canNavigateBack = true,
-            onBack = { onNavigate(OrbitNavKey.Dashboard) },
-            scrollState = heroScrollState,
-            onPrimaryAddClick = { viewModel.openMemberEditor(null) },
-            stats = listOf(
-                HeroStatItem("MEMBERS", "${uiState.members.size}", HeroStatTone.GOOD),
-                HeroStatItem("GROSS INCOME", MoneyUtils.formatCents(uiState.totalHouseholdGrossIncomeCents), HeroStatTone.DEFAULT),
-                HeroStatItem("SHARES", "${uiState.shares.size}", HeroStatTone.DEFAULT),
-                HeroStatItem("STORAGE", if (uiState.storageMode == StorageMode.LOCAL) "Local" else "Cloud", HeroStatTone.GOOD)
-            )
-        )
-
-        // Action Row Below Canopy Hero
-        OrbitPageActionRow {
-            OrbitPrimaryPillButton(
-                text = "+ New Member",
-                onClick = { viewModel.openMemberEditor(null) }
-            )
-            OrbitSecondaryPillButton(
-                text = "Invite Partner",
-                icon = Icons.Default.Email,
-                onClick = viewModel::openInviteDialog
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        floatingActionButton = {
+            OrbitFloatingActionButton(
+                visible = heroScrollState.isFabVisible,
+                onClick = { viewModel.openMemberEditor(null) },
+                contentDescription = "New Member"
             )
         }
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .nestedScroll(heroScrollState.nestedScrollConnection)
         ) {
+            MorphingPageHero(
+                kicker = "INCOME AND BENEFITS",
+                title = "Household",
+                subtitle = "Manage household members, paychecks, benefits, and tax filing profile.",
+                canNavigateBack = true,
+                onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                scrollState = heroScrollState
+            )
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             // 1. Household Profile Card
             item {
                 OrbitSectionCard(
@@ -225,6 +213,7 @@ fun HouseholdScreen(
             item {
                 Spacer(modifier = Modifier.height(32.dp))
             }
+        }
         }
     }
 

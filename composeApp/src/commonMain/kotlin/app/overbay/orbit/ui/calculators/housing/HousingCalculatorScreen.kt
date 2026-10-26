@@ -15,12 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
-import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.housing.cards.AmortizationSummaryCard
 import app.overbay.orbit.ui.calculators.housing.cards.MonthlyPaymentBreakdownCard
 import app.overbay.orbit.ui.calculators.housing.cards.MortgageInputCard
-import app.overbay.orbit.ui.components.HeroStatItem
-import app.overbay.orbit.ui.components.HeroStatTone
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 
@@ -31,27 +28,20 @@ fun HousingCalculatorScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val heroScrollState = rememberHeroScrollState(maxHeight = 220.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState()
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .nestedScroll(heroScrollState.nestedScrollConnection)
     ) {
-        // Edge-to-Edge Curved Green Canopy Hero
         MorphingPageHero(
             kicker = "HOME PLANNING",
             title = "Housing Calculator",
             subtitle = "Estimate selling proceeds, cash to close, and projected monthly payment.",
             canNavigateBack = true,
             onBack = { onNavigate(OrbitNavKey.Dashboard) },
-            scrollState = heroScrollState,
-            stats = listOf(
-                HeroStatItem("MONTHLY PITI", MoneyUtils.formatCents(uiState.buyingResult.totalMonthlyPaymentCents), HeroStatTone.GOOD),
-                HeroStatItem("LOAN AMOUNT", MoneyUtils.formatCents(uiState.buyingResult.loanAmountCents), HeroStatTone.DEFAULT),
-                HeroStatItem("DOWN PAYMENT", MoneyUtils.formatCents(uiState.downPaymentCents), HeroStatTone.GOOD),
-                HeroStatItem("INTEREST RATE", "${uiState.interestRatePercent}%", HeroStatTone.DEFAULT)
-            )
+            scrollState = heroScrollState
         )
 
         LazyColumn(

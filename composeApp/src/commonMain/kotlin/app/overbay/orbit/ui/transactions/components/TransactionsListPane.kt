@@ -1,5 +1,10 @@
 package app.overbay.orbit.ui.transactions.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -25,6 +31,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,7 +39,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,10 +58,8 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
-import app.overbay.orbit.ui.components.OrbitPageActionRow
-import app.overbay.orbit.ui.components.OrbitPrimaryPillButton
-import app.overbay.orbit.ui.components.OrbitSecondaryPillButton
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.transactions.TransactionSortOption
 import app.overbay.orbit.ui.transactions.TransactionsUiState
@@ -61,10 +68,12 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.coroutines.launch
 
 /**
- * Restored editorial Transactions list pane featuring MorphingPageHero with embedded
- * white pill search input, 3-button toolbar, OrbitPageActionRow, and month group headers.
+ * Editorial Transactions list pane featuring flat MorphingPageHero with embedded
+ * search input, 3-button filter/sort/view toolbar, pull-to-refresh SimpleFIN sync with
+ * top status toast, and scroll-reactive '+' FAB.
  * Strictly under the 400-line ceiling.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsListPane(
     state: TransactionsUiState,
@@ -76,301 +85,273 @@ fun TransactionsListPane(
 ) {
     val haptics = LocalOrbitHaptics.current
     val coroutineScope = rememberCoroutineScope()
-    val heroScrollState = rememberHeroScrollState(maxHeight = 220.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState()
 
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var viewMenuExpanded by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .nestedScroll(heroScrollState.nestedScrollConnection)
-    ) {
-        // Edge-to-edge curved green canopy hero
-        MorphingPageHero(
-            kicker = "MONEY MOVEMENT",
-            title = "Transactions",
-            subtitle = "${state.monthlyTransactionCount} transactions this month",
-            scrollState = heroScrollState,
-            onPrimaryAddClick = { viewModel.openTransactionEditor(null) },
-            expandedToolbar = {
-                // White Pill Search Input
-                OutlinedTextField(
-                    value = state.searchQuery,
-                    onValueChange = { viewModel.setSearchQuery(it) },
-                    placeholder = {
-                        Text(
-                            text = "Search merchant, description, notes...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    trailingIcon = {
-                        if (state.searchQuery.isNotBlank()) {
-                            IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                                Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "Clear",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    },
-                    shape = CircleShape,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = Color(0xFF1A1F1B),
-                        unfocusedTextColor = Color(0xFF1A1F1B)
-                    ),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // 3-Column Equal-Width Toolbar Row (Filter, Sort, View)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // 1. Filter Button
-                    OutlinedButton(
-                        onClick = {
-                            haptics.tick()
-                            viewModel.openFilterSheet()
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            MorphingPageHero(
+                kicker = "MONEY MOVEMENT",
+                title = "Transactions",
+                subtitle = "${state.monthlyTransactionCount} transactions this month",
+                scrollState = heroScrollState,
+                expandedToolbar = {
+                    OutlinedTextField(
+                        value = state.searchQuery,
+                        onValueChange = { viewModel.setSearchQuery(it) },
+                        placeholder = {
+                            Text("Search merchant, description, notes...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.White,
-                            contentColor = Color(0xFF1A1F1B)
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                        },
+                        trailingIcon = {
+                            if (state.searchQuery.isNotBlank()) {
+                                IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        },
+                        shape = CircleShape,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedTextColor = Color(0xFF1A1F1B),
+                            unfocusedTextColor = Color(0xFF1A1F1B)
                         ),
-                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                        modifier = Modifier.weight(1f).height(38.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp)
-                    ) {
-                        BadgedBox(
-                            badge = {
-                                if (state.hasActiveFilters) {
-                                    Badge(containerColor = MaterialTheme.colorScheme.primary)
-                                }
-                            }
-                        ) {
-                            Text("Filter", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    )
 
-                    // 2. Sort Button
-                    Box(modifier = Modifier.weight(1f)) {
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val pillColors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White, contentColor = Color(0xFF1A1F1B))
+                    val pillBorder = BorderStroke(1.dp, OrbitTheme.colors.cardBorder)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         OutlinedButton(
-                            onClick = {
-                                haptics.tick()
-                                sortMenuExpanded = true
-                            },
+                            onClick = { haptics.tick(); viewModel.openFilterSheet() },
                             shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = Color.White,
-                                contentColor = Color(0xFF1A1F1B)
-                            ),
-                            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                            modifier = Modifier.fillMaxWidth().height(38.dp),
+                            colors = pillColors,
+                            border = pillBorder,
+                            modifier = Modifier.weight(1f).height(36.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp)
                         ) {
-                            Text("Sort", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            BadgedBox(
+                                badge = { if (state.hasActiveFilters) Badge(containerColor = MaterialTheme.colorScheme.primary) }
+                            ) {
+                                Text("Filter", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            }
                         }
 
-                        DropdownMenu(
-                            expanded = sortMenuExpanded,
-                            onDismissRequest = { sortMenuExpanded = false }
-                        ) {
-                            TransactionSortOption.entries.forEach { option ->
+                        Box(modifier = Modifier.weight(1f)) {
+                            OutlinedButton(
+                                onClick = { haptics.tick(); sortMenuExpanded = true },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = pillColors,
+                                border = pillBorder,
+                                modifier = Modifier.fillMaxWidth().height(36.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Text("Sort", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            }
+                            DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
+                                TransactionSortOption.entries.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.label) },
+                                        onClick = { viewModel.setSortOption(option); sortMenuExpanded = false }
+                                    )
+                                }
+                            }
+                        }
+
+                        Box(modifier = Modifier.weight(1f)) {
+                            OutlinedButton(
+                                onClick = { haptics.tick(); viewMenuExpanded = true },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = pillColors,
+                                border = pillBorder,
+                                modifier = Modifier.fillMaxWidth().height(36.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Text("View", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            }
+                            DropdownMenu(expanded = viewMenuExpanded, onDismissRequest = { viewMenuExpanded = false }) {
                                 DropdownMenuItem(
-                                    text = { Text(option.label) },
-                                    onClick = {
-                                        viewModel.setSortOption(option)
-                                        sortMenuExpanded = false
-                                    }
+                                    text = { Text(if (state.isCompactView) "Comfortable View" else "Compact View") },
+                                    onClick = { viewModel.toggleCompactView(); viewMenuExpanded = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Import CSV") },
+                                    onClick = { viewMenuExpanded = false; onOpenCsv() }
                                 )
                             }
                         }
                     }
-
-                    // 3. View Button
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = {
-                                haptics.tick()
-                                viewMenuExpanded = true
-                            },
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = Color.White,
-                                contentColor = Color(0xFF1A1F1B)
-                            ),
-                            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                            modifier = Modifier.fillMaxWidth().height(38.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp)
-                        ) {
-                            Text("View", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                        }
-
-                        DropdownMenu(
-                            expanded = viewMenuExpanded,
-                            onDismissRequest = { viewMenuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(if (state.isCompactView) "Comfortable View" else "Compact View") },
-                                onClick = {
-                                    viewModel.toggleCompactView()
-                                    viewMenuExpanded = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Import CSV") },
-                                onClick = {
-                                    viewMenuExpanded = false
-                                    onOpenCsv()
-                                }
-                            )
+                },
+                collapsedActions = {
+                    IconButton(onClick = { coroutineScope.launch { heroScrollState.expand() } }) {
+                        Icon(Icons.Default.Search, contentDescription = "Search", tint = OrbitTheme.colors.onCanopy)
+                    }
+                    BadgedBox(
+                        badge = { if (state.hasActiveFilters) Badge(containerColor = MaterialTheme.colorScheme.primary) }
+                    ) {
+                        IconButton(onClick = { viewModel.openFilterSheet() }) {
+                            Icon(OrbitIcons.Filter, contentDescription = "Filter", tint = OrbitTheme.colors.onCanopy)
                         }
                     }
                 }
-            },
-            collapsedActions = {
-                IconButton(onClick = { coroutineScope.launch { heroScrollState.expand() } }) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        tint = OrbitTheme.colors.onCanopy
-                    )
-                }
-                BadgedBox(
-                    badge = {
-                        if (state.hasActiveFilters) {
-                            Badge(containerColor = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                ) {
-                    IconButton(onClick = { viewModel.openFilterSheet() }) {
-                        Icon(
-                            imageVector = OrbitIcons.Filter,
-                            contentDescription = "Filter",
-                            tint = OrbitTheme.colors.onCanopy
-                        )
-                    }
-                }
-            }
-        )
-
-        // Actions Row Directly Below Hero
-        OrbitPageActionRow {
-            OrbitSecondaryPillButton(
-                text = "SimpleFIN Sync",
-                onClick = { viewModel.syncSimpleFin() },
-                modifier = Modifier.weight(1f)
             )
-            OrbitPrimaryPillButton(
-                text = "+ Manual Transaction",
-                onClick = { viewModel.openTransactionEditor(null) },
-                modifier = Modifier.weight(1f)
-            )
-        }
 
-        // Transactions List or States
-        when {
-            state.isLoading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            state.groupedTransactions.isEmpty() -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    EmptyStateCard(
-                        title = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) {
-                            "No matching transactions"
-                        } else {
-                            "No transactions recorded"
-                        },
-                        description = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) {
-                            "Try clearing your search query or adjusting your filters."
-                        } else {
-                            "Sync with SimpleFIN or record your first manual transaction above."
-                        },
-                        icon = OrbitIcons.Transactions,
-                        actionButtonText = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) "Reset Filters" else null,
-                        onActionClick = {
-                            viewModel.setSearchQuery("")
-                            viewModel.clearFilters()
+            PullToRefreshBox(
+                isRefreshing = state.isSyncing,
+                onRefresh = {
+                    haptics.tick()
+                    viewModel.syncSimpleFin()
+                },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                when {
+                    state.isLoading -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
                         }
-                    )
-                }
-            }
-            else -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    state.groupedTransactions.forEach { group ->
-                        // Sticky / Month Group Header
-                        item(key = "header_${group.monthKey}") {
-                            MonthGroupHeader(monthLabel = group.monthLabel, count = group.count)
-                        }
-
-                        // Transactions in this month
-                        items(
-                            items = group.transactions,
-                            key = { it.id }
-                        ) { txn ->
-                            val isSelected = state.selectedTransactionIds.contains(txn.id)
-                            val isExpanded = state.expandedTransactionId == txn.id
-                            val category = state.categoryMap[txn.effectiveCategoryId]
-                            val account = state.accountMap[txn.accountId]
-
-                            SwipeableTransactionRow(
-                                transaction = txn,
-                                category = category,
-                                accountName = account?.name ?: txn.accountName,
-                                isSelected = isSelected,
-                                isSelectionMode = state.isSelectionMode,
-                                isExpanded = isExpanded,
-                                onClick = {
-                                    if (state.isSelectionMode) {
-                                        viewModel.toggleTransactionSelection(txn.id)
-                                    } else {
-                                        viewModel.toggleExpandTransaction(txn.id)
-                                    }
+                    }
+                    state.groupedTransactions.isEmpty() -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .nestedScroll(heroScrollState.nestedScrollConnection)
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            EmptyStateCard(
+                                title = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) {
+                                    "No matching transactions"
+                                } else {
+                                    "No transactions recorded"
                                 },
-                                onLongClick = { viewModel.toggleTransactionSelection(txn.id) },
-                                onEdit = { viewModel.openTransactionEditor(txn.id) },
-                                onSplit = { viewModel.openSplitSheet(txn.id) },
-                                onCreateRule = { viewModel.createRuleFromTransaction(txn) },
-                                onMarkRecurring = { viewModel.markTransactionRecurring(txn) },
-                                onToggleTransfer = { viewModel.toggleTransfer(txn.id) },
-                                onToggleMha = { viewModel.toggleMha(txn.id) },
-                                onToggleIgnore = { viewModel.toggleIgnore(txn.id) },
-                                onDelete = { viewModel.deleteTransaction(txn.id) },
-                                onResetMerchant = { viewModel.resetMerchant(txn.id) },
-                                onResetCategory = { viewModel.resetCategory(txn.id) }
+                                description = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) {
+                                    "Try clearing your search query or adjusting your filters."
+                                } else {
+                                    "Pull down to sync with SimpleFIN or tap '+' to record a transaction."
+                                },
+                                icon = OrbitIcons.Transactions,
+                                actionButtonText = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) "Reset Filters" else null,
+                                onActionClick = {
+                                    viewModel.setSearchQuery("")
+                                    viewModel.clearFilters()
+                                }
+                            )
+                        }
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .nestedScroll(heroScrollState.nestedScrollConnection),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            state.groupedTransactions.forEach { group ->
+                                item(key = "header_${group.monthKey}") {
+                                    MonthGroupHeader(monthLabel = group.monthLabel, count = group.count)
+                                }
+
+                                items(
+                                    items = group.transactions,
+                                    key = { it.id }
+                                ) { txn ->
+                                    val isSelected = state.selectedTransactionIds.contains(txn.id)
+                                    val isExpanded = state.expandedTransactionId == txn.id
+                                    val category = state.categoryMap[txn.effectiveCategoryId]
+                                    val account = state.accountMap[txn.accountId]
+
+                                    SwipeableTransactionRow(
+                                        transaction = txn,
+                                        category = category,
+                                        accountName = account?.name ?: txn.accountName,
+                                        isSelected = isSelected,
+                                        isSelectionMode = state.isSelectionMode,
+                                        isExpanded = isExpanded,
+                                        onClick = {
+                                            if (state.isSelectionMode) {
+                                                viewModel.toggleTransactionSelection(txn.id)
+                                            } else {
+                                                viewModel.toggleExpandTransaction(txn.id)
+                                            }
+                                        },
+                                        onLongClick = { viewModel.toggleTransactionSelection(txn.id) },
+                                        onEdit = { viewModel.openTransactionEditor(txn.id) },
+                                        onSplit = { viewModel.openSplitSheet(txn.id) },
+                                        onCreateRule = { viewModel.createRuleFromTransaction(txn) },
+                                        onMarkRecurring = { viewModel.markTransactionRecurring(txn) },
+                                        onToggleTransfer = { viewModel.toggleTransfer(txn.id) },
+                                        onToggleMha = { viewModel.toggleMha(txn.id) },
+                                        onToggleIgnore = { viewModel.toggleIgnore(txn.id) },
+                                        onDelete = { viewModel.deleteTransaction(txn.id) },
+                                        onResetMerchant = { viewModel.resetMerchant(txn.id) },
+                                        onResetCategory = { viewModel.resetCategory(txn.id) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Top Toast Notification for Pull-to-Refresh SimpleFIN Sync
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = state.syncToastMessage != null,
+                    enter = slideInVertically { -it } + fadeIn(),
+                    exit = slideOutVertically { -it } + fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 12.dp, start = 16.dp, end = 16.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.inverseSurface,
+                        tonalElevation = 6.dp,
+                        shadowElevation = 6.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (state.isSyncing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.inverseOnSurface
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                            }
+                            Text(
+                                text = state.syncToastMessage ?: "",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.inverseOnSurface,
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
                 }
             }
         }
+
+        OrbitFloatingActionButton(
+            visible = heroScrollState.isFabVisible && !state.isSelectionMode,
+            onClick = { viewModel.openTransactionEditor(null) },
+            contentDescription = "Add Transaction",
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(20.dp)
+        )
     }
 }
 
@@ -379,7 +360,7 @@ private fun MonthGroupHeader(monthLabel: String, count: Int) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 16.dp, bottom = 4.dp)
+            .padding(top = 12.dp, bottom = 4.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),

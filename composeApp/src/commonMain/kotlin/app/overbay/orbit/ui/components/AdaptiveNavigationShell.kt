@@ -3,11 +3,13 @@ package app.overbay.orbit.ui.components
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -89,6 +91,7 @@ fun AdaptiveNavigationShell(
         // Compact Phone Layout (< 720dp)
         Scaffold(
             modifier = modifier.fillMaxSize(),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             bottomBar = {
                 val itemColors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -174,7 +177,7 @@ fun AdaptiveNavigationShell(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
+                    .padding(bottom = paddingValues.calculateBottomPadding())
             ) {
                 content()
             }
@@ -196,6 +199,7 @@ fun AdaptiveNavigationShell(
                         shape = MaterialTheme.shapes.small,
                         color = MaterialTheme.colorScheme.primaryContainer,
                         modifier = Modifier
+                            .statusBarsPadding()
                             .padding(vertical = 12.dp)
                             .size(40.dp)
                     ) {

@@ -98,7 +98,7 @@ fun DashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val posture = LocalDevicePosture.current
-    val heroScrollState = rememberHeroScrollState(maxHeight = 130.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState()
     val scrollState = rememberScrollState()
 
     val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()

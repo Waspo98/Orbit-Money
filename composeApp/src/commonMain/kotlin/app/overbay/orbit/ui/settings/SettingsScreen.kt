@@ -42,7 +42,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val heroScrollState = rememberHeroScrollState(maxHeight = 180.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState()
     val fileHelper = LocalFileImportExportHelper.current
 
     var restoreJsonText by remember { mutableStateOf("") }

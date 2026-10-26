@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,14 +22,13 @@ import app.overbay.orbit.ui.budgets.components.BudgetCategoryGroupList
 import app.overbay.orbit.ui.budgets.components.BudgetSummaryHeroCard
 import app.overbay.orbit.ui.budgets.dialogs.BudgetAmountEditorSheet
 import app.overbay.orbit.ui.components.MorphingPageHero
-import app.overbay.orbit.ui.components.OrbitPageActionRow
-import app.overbay.orbit.ui.components.OrbitPrimaryPillButton
+import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.PeriodNavigatorPill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 
 /**
- * Editorial Budgets screen featuring curved green canopy hero with period navigation,
- * action row, 2x2 snapshot metrics panel, spending mix strip, and inline expandable category rows.
+ * Editorial Budgets screen featuring flat emerald canopy hero with period navigation,
+ * 2x2 snapshot metrics panel, spending mix strip, inline expandable category rows, and scroll-reactive FAB.
  * Conforms strictly to <= 6 parameters and < 400-line ceiling.
  */
 @Composable
@@ -39,10 +39,20 @@ fun BudgetsScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
-    val heroScrollState = rememberHeroScrollState(maxHeight = 200.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState()
 
     Scaffold(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        floatingActionButton = {
+            if (!state.isLoading) {
+                OrbitFloatingActionButton(
+                    visible = heroScrollState.isFabVisible,
+                    onClick = { viewModel.openAddBudget() },
+                    contentDescription = "Add Budget"
+                )
+            }
+        }
     ) { paddingValues ->
         if (state.isLoading) {
             Box(
@@ -60,13 +70,11 @@ fun BudgetsScreen(
                     .padding(paddingValues)
                     .nestedScroll(heroScrollState.nestedScrollConnection)
             ) {
-                // Curved Green Canopy Hero
                 MorphingPageHero(
                     kicker = "BUDGET PLANNING",
                     title = "Budgets",
                     subtitle = "${state.monthLabel} · ${state.daysRemaining} days left",
                     scrollState = heroScrollState,
-                    onPrimaryAddClick = { viewModel.openAddBudget() },
                     expandedToolbar = {
                         PeriodNavigatorPill(
                             label = state.monthLabel,
@@ -87,18 +95,10 @@ fun BudgetsScreen(
                     }
                 )
 
-                // Action Row Directly Below Hero
-                OrbitPageActionRow {
-                    OrbitPrimaryPillButton(
-                        text = "+ Add Budget",
-                        onClick = { viewModel.openAddBudget() }
-                    )
-                }
-
                 // Scrollable Content
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Hero Snapshot Card

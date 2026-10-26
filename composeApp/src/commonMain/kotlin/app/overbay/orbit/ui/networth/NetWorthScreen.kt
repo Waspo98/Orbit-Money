@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,9 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
-import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.ui.components.HeroStatItem
-import app.overbay.orbit.ui.components.HeroStatTone
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.networth.components.AssetLiabilityBreakdownCard
@@ -42,7 +40,7 @@ fun NetWorthScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
-    val heroScrollState = rememberHeroScrollState(maxHeight = 220.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState()
 
     if (state.isLoading) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -51,14 +49,16 @@ fun NetWorthScreen(
         return
     }
 
-    Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .nestedScroll(heroScrollState.nestedScrollConnection)
         ) {
-            // Edge-to-Edge Curved Green Canopy Hero with 2x2 Glass Grid
             MorphingPageHero(
                 kicker = "BALANCE SHEET",
                 title = "Net Worth",
@@ -66,12 +66,6 @@ fun NetWorthScreen(
                 canNavigateBack = true,
                 onBack = { onNavigate(OrbitNavKey.Dashboard) },
                 scrollState = heroScrollState,
-                stats = listOf(
-                    HeroStatItem("NET WORTH", MoneyUtils.formatCents(state.snapshot.netWorthCents), if (state.snapshot.netWorthCents >= 0L) HeroStatTone.GOOD else HeroStatTone.CAUTION),
-                    HeroStatItem("ASSETS", MoneyUtils.formatCents(state.snapshot.totalAssetsCents), HeroStatTone.GOOD),
-                    HeroStatItem("LIABILITIES", MoneyUtils.formatCents(state.snapshot.totalLiabilitiesCents), HeroStatTone.CAUTION),
-                    HeroStatItem("LIQUID CASH", MoneyUtils.formatCents(state.snapshot.cashCents), HeroStatTone.DEFAULT)
-                ),
                 expandedToolbar = {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -118,7 +112,7 @@ fun NetWorthScreen(
             // Scrollable Area Chart and Breakdown Cards
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Interactive Area Chart Card

@@ -53,6 +53,8 @@ data class TransactionsUiState(
     val showCsvImportSheet: Boolean = false,
     val showFilterSheet: Boolean = false,
     val isLoading: Boolean = false,
+    val isSyncing: Boolean = false,
+    val syncToastMessage: String? = null,
     val totalExpenseCents: Cents = 0L,
     val totalIncomeCents: Cents = 0L,
     val netCashflowCents: Cents = 0L

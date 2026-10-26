@@ -1,5 +1,12 @@
 package app.overbay.orbit.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,10 +20,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -52,52 +63,6 @@ fun OrbitPageActionRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         content()
-    }
-}
-
-/**
- * Primary accent pill action button with #059669 emerald fill.
- */
-@Composable
-fun OrbitPrimaryPillButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    enabled: Boolean = true
-) {
-    val haptics = LocalOrbitHaptics.current
-    Button(
-        onClick = {
-            haptics.tick()
-            onClick()
-        },
-        modifier = modifier.heightIn(min = 44.dp),
-        shape = CircleShape,
-        enabled = enabled,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = Color.White,
-            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-            disabledContentColor = Color.White.copy(alpha = 0.6f)
-        ),
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 1.dp)
-    ) {
-        if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-        }
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold
-        )
     }
 }
 
@@ -196,6 +161,52 @@ fun OrbitTogglePill(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+/**
+ * Scroll-reactive Material 3 Expressive Floating Action Button.
+ * Disappears smoothly when scrolling down and springs back into view immediately when scrolling up.
+ */
+@Composable
+fun OrbitFloatingActionButton(
+    visible: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentDescription: String = "Add"
+) {
+    val haptics = LocalOrbitHaptics.current
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = scaleIn(
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioLowBouncy,
+                stiffness = Spring.StiffnessLow
+            )
+        ) + fadeIn(),
+        exit = scaleOut() + fadeOut()
+    ) {
+        FloatingActionButton(
+            onClick = {
+                haptics.tick()
+                onClick()
+            },
+            shape = RoundedCornerShape(16.dp),
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = Color.White,
+            elevation = FloatingActionButtonDefaults.elevation(
+                defaultElevation = 6.dp,
+                pressedElevation = 10.dp
+            ),
+            modifier = Modifier.size(56.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(26.dp)
             )
         }
     }

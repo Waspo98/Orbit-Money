@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,12 +22,9 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.ui.categories.components.CategoryGroupCard
 import app.overbay.orbit.ui.categories.dialogs.CategoryEditorDialog
 import app.overbay.orbit.ui.components.EmptyStateCard
-import app.overbay.orbit.ui.components.HeroStatItem
-import app.overbay.orbit.ui.components.HeroStatTone
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
-import app.overbay.orbit.ui.components.OrbitPageActionRow
-import app.overbay.orbit.ui.components.OrbitPrimaryPillButton
+import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 
 @Composable
@@ -37,11 +35,21 @@ fun CategoriesScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
-    val heroScrollState = rememberHeroScrollState(maxHeight = 200.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState()
     val catCount = if (state.totalCategoriesCount > 0) state.totalCategoriesCount else state.categories.size
 
     Scaffold(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        floatingActionButton = {
+            if (!state.isLoading) {
+                OrbitFloatingActionButton(
+                    visible = heroScrollState.isFabVisible,
+                    onClick = { viewModel.openAddCategory() },
+                    contentDescription = "New Category"
+                )
+            }
+        }
     ) { paddingValues ->
         if (state.isLoading) {
             Box(
@@ -59,28 +67,14 @@ fun CategoriesScreen(
                     .padding(paddingValues)
                     .nestedScroll(heroScrollState.nestedScrollConnection)
             ) {
-                // Curved Green Canopy Hero
                 MorphingPageHero(
                     kicker = "SPENDING CLUSTERS",
                     title = "Category Manager",
                     subtitle = "$catCount categories across ${state.groups.size} groups",
                     canNavigateBack = true,
                     onBack = { onNavigate(OrbitNavKey.Dashboard) },
-                    scrollState = heroScrollState,
-                    onPrimaryAddClick = { viewModel.openAddCategory() },
-                    stats = listOf(
-                        HeroStatItem("CATEGORIES", "$catCount", HeroStatTone.GOOD),
-                        HeroStatItem("GROUPS", "${state.groups.size}", HeroStatTone.DEFAULT)
-                    )
+                    scrollState = heroScrollState
                 )
-
-                // Action Row Below Canopy Hero
-                OrbitPageActionRow {
-                    OrbitPrimaryPillButton(
-                        text = "+ New Category",
-                        onClick = { viewModel.openAddCategory() }
-                    )
-                }
 
                 // Scrollable Content
                 if (state.groups.isEmpty()) {
@@ -100,7 +94,7 @@ fun CategoriesScreen(
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(

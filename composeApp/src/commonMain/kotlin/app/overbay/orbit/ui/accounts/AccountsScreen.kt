@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,16 +42,13 @@ import app.overbay.orbit.ui.accounts.sheets.AccountEditorSheet
 import app.overbay.orbit.ui.accounts.sheets.AccountMergeDialog
 import app.overbay.orbit.ui.accounts.sheets.CreditCardProfileEditorSheet
 import app.overbay.orbit.ui.components.HeroScrollState
-import app.overbay.orbit.ui.components.HeroStatItem
-import app.overbay.orbit.ui.components.HeroStatTone
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitPageActionRow
-import app.overbay.orbit.ui.components.OrbitPrimaryPillButton
 import app.overbay.orbit.ui.components.OrbitSecondaryPillButton
 import app.overbay.orbit.ui.components.OrbitTogglePill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.util.LocalDevicePosture
-import kotlin.math.abs
 
 /**
  * Editorial Accounts screen with curved green canopy hero, 2x2 bento stats grid,
@@ -68,7 +66,7 @@ fun AccountsScreen(
     val state by viewModel.uiState.collectAsState()
     val posture = LocalDevicePosture.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val heroScrollState = rememberHeroScrollState(maxHeight = 220.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState()
 
     var phoneViewingDetail by remember { mutableStateOf(false) }
 
@@ -108,6 +106,14 @@ fun AccountsScreen(
     } else {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            floatingActionButton = {
+                OrbitFloatingActionButton(
+                    visible = heroScrollState.isFabVisible,
+                    onClick = { viewModel.openAddAccount() },
+                    contentDescription = "Add Account"
+                )
+            },
             modifier = modifier
         ) { innerPadding ->
             if (posture.supportsTwoPane) {
@@ -225,22 +231,14 @@ private fun AccountsMasterContent(
             .fillMaxSize()
             .nestedScroll(heroScrollState.nestedScrollConnection)
     ) {
-        // Edge-to-edge curved green canopy hero with 2x2 Glass Bento Grid
         MorphingPageHero(
             kicker = "YOUR MONEY'S HOME BASE",
             title = "Accounts",
             subtitle = "${MoneyUtils.formatCents(state.netWorthCents)} Net Worth across ${state.accounts.size} Accounts",
-            scrollState = heroScrollState,
-            onPrimaryAddClick = { viewModel.openAddAccount() },
-            stats = listOf(
-                HeroStatItem("CASH", MoneyUtils.formatCents(state.cashCents), HeroStatTone.GOOD),
-                HeroStatItem("CREDIT CARDS", MoneyUtils.formatCents(abs(state.creditCardCents)), HeroStatTone.CAUTION),
-                HeroStatItem("INVESTMENTS", MoneyUtils.formatCents(state.investmentsCents), HeroStatTone.GOOD),
-                HeroStatItem("TOTAL ACCOUNTS", "${state.accounts.size}", HeroStatTone.DEFAULT)
-            )
+            scrollState = heroScrollState
         )
 
-        // 3-Pill Action Row Below Hero
+        // Secondary Action Row Below Hero
         OrbitPageActionRow {
             OrbitTogglePill(
                 label = "Show archived",
@@ -250,10 +248,6 @@ private fun AccountsMasterContent(
             OrbitSecondaryPillButton(
                 text = if (state.isReorderMode) "Done" else "Reorder Groups",
                 onClick = { viewModel.toggleReorderMode() }
-            )
-            OrbitPrimaryPillButton(
-                text = "+ Manual Account",
-                onClick = { viewModel.openAddAccount() }
             )
         }
 

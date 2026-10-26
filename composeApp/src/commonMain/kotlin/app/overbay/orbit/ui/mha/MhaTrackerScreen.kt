@@ -5,11 +5,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -25,12 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
-import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.ui.components.HeroStatItem
-import app.overbay.orbit.ui.components.HeroStatTone
 import app.overbay.orbit.ui.components.MorphingPageHero
-import app.overbay.orbit.ui.components.OrbitPageActionRow
-import app.overbay.orbit.ui.components.OrbitSecondaryPillButton
 import app.overbay.orbit.ui.components.PeriodNavigatorPill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.mha.components.MhaTaxSavingsCard
@@ -49,7 +43,7 @@ fun MhaTrackerScreen(
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val posture = LocalDevicePosture.current
-    val heroScrollState = rememberHeroScrollState(maxHeight = 220.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState()
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let {
@@ -67,6 +61,7 @@ fun MhaTrackerScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Column(
@@ -75,7 +70,6 @@ fun MhaTrackerScreen(
                 .padding(innerPadding)
                 .nestedScroll(heroScrollState.nestedScrollConnection)
         ) {
-            // Edge-to-Edge Curved Green Canopy Hero
             MorphingPageHero(
                 kicker = "MINISTERIAL HOUSING ALLOWANCE",
                 title = "MHA Tracker",
@@ -83,12 +77,6 @@ fun MhaTrackerScreen(
                 canNavigateBack = true,
                 onBack = { onNavigate(OrbitNavKey.Dashboard) },
                 scrollState = heroScrollState,
-                stats = listOf(
-                    HeroStatItem("ELIGIBLE SPENT", MoneyUtils.formatCents(state.actualEligibleHousingSpentCents), HeroStatTone.GOOD),
-                    HeroStatItem("EXCLUDABLE CAP", MoneyUtils.formatCents(state.excludableAllowanceCents), HeroStatTone.DEFAULT),
-                    HeroStatItem("TAX SAVINGS", MoneyUtils.formatCents(state.projectedAnnualSavingsCents), HeroStatTone.GOOD),
-                    HeroStatItem("LIMITING FACTOR", state.limitingFactor.displayName.take(15), HeroStatTone.WARN)
-                ),
                 expandedToolbar = {
                     PeriodNavigatorPill(
                         label = "${state.selectedYear}",
@@ -109,21 +97,12 @@ fun MhaTrackerScreen(
                 }
             )
 
-            // Action Row Below Canopy Hero
-            OrbitPageActionRow {
-                OrbitSecondaryPillButton(
-                    text = "MHA Configuration",
-                    icon = Icons.Default.Settings,
-                    onClick = { viewModel.openConfigSheet() }
-                )
-            }
-
             if (posture.supportsTwoPane) {
                 // Foldable / Tablet Two-Pane Split
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Left Pane: Hero 3-Limit Card + Tax Savings Card
@@ -174,7 +153,7 @@ fun MhaTrackerScreen(
                 // Compact Mobile Single-Column Scroll
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {

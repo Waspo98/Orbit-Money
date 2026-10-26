@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,11 +33,8 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.EmptyStateCard
-import app.overbay.orbit.ui.components.HeroStatItem
-import app.overbay.orbit.ui.components.HeroStatTone
 import app.overbay.orbit.ui.components.MorphingPageHero
-import app.overbay.orbit.ui.components.OrbitPageActionRow
-import app.overbay.orbit.ui.components.OrbitPrimaryPillButton
+import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.goals.components.GoalProgressCard
 import app.overbay.orbit.ui.goals.dialogs.GoalAllocationDialog
@@ -50,10 +48,20 @@ fun GoalsScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
-    val heroScrollState = rememberHeroScrollState(maxHeight = 220.dp, minHeight = 64.dp)
+    val heroScrollState = rememberHeroScrollState()
 
     Scaffold(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        floatingActionButton = {
+            if (!state.isLoading) {
+                OrbitFloatingActionButton(
+                    visible = heroScrollState.isFabVisible,
+                    onClick = { viewModel.openAddGoal() },
+                    contentDescription = "New Goal"
+                )
+            }
+        }
     ) { paddingValues ->
         if (state.isLoading) {
             Box(
@@ -71,35 +79,19 @@ fun GoalsScreen(
                     .padding(paddingValues)
                     .nestedScroll(heroScrollState.nestedScrollConnection)
             ) {
-                // Curved Green Canopy Hero
                 MorphingPageHero(
                     kicker = "SAVING TARGETS",
                     title = "Savings Goals",
                     subtitle = "Connect asset accounts, allocate savings, and project when each target lands.",
                     canNavigateBack = true,
                     onBack = { onNavigate(OrbitNavKey.Dashboard) },
-                    scrollState = heroScrollState,
-                    onPrimaryAddClick = { viewModel.openAddGoal() },
-                    stats = listOf(
-                        HeroStatItem("TOTAL SAVED", MoneyUtils.formatCents(state.totalSavedCents), HeroStatTone.GOOD),
-                        HeroStatItem("TOTAL TARGET", MoneyUtils.formatCents(state.totalTargetCents), HeroStatTone.DEFAULT),
-                        HeroStatItem("FUNDED", "${(state.overallProgressRatio * 100).toInt()}%", if (state.overallProgressRatio >= 1.0) HeroStatTone.GOOD else HeroStatTone.DEFAULT),
-                        HeroStatItem("ACTIVE GOALS", "${state.activeGoals.size}", HeroStatTone.DEFAULT)
-                    )
+                    scrollState = heroScrollState
                 )
-
-                // Action Row Directly Below Hero
-                OrbitPageActionRow {
-                    OrbitPrimaryPillButton(
-                        text = "+ New Goal",
-                        onClick = { viewModel.openAddGoal() }
-                    )
-                }
 
                 // Scrollable Content
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Overall Savings Summary Banner
