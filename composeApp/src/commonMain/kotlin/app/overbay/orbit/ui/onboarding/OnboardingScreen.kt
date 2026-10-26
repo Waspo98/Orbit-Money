@@ -55,6 +55,7 @@ import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.onboarding.cards.DataSeedImportCard
 import app.overbay.orbit.ui.onboarding.cards.ThemeStyleCard
 import app.overbay.orbit.ui.onboarding.cards.WelcomeModeCard
+import app.overbay.orbit.util.LocalFileImportExportHelper
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -69,12 +70,18 @@ fun OnboardingScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val fileHelper = LocalFileImportExportHelper.current
+    val resolvedFilePicker = onPickBackupFile ?: {
+        fileHelper.pickAndImportFile("application/json") { content ->
+            viewModel.processIntent(OnboardingIntent.SetBackupFile("orbit-backup.orbit.json", content))
+        }
+    }
 
     OnboardingScreen(
         state = state,
         onIntent = viewModel::processIntent,
         onComplete = onComplete,
-        onPickBackupFile = onPickBackupFile,
+        onPickBackupFile = resolvedFilePicker,
         modifier = modifier
     )
 }

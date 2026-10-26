@@ -55,6 +55,9 @@ fun AdaptiveNavigationShell(
     modifier: Modifier = Modifier,
     canNavigateBack: Boolean = false,
     onBack: () -> Unit = {},
+    mhaEnabled: Boolean = true,
+    externalShowMore: Boolean = false,
+    onDismissExternalMore: () -> Unit = {},
     content: @Composable () -> Unit
 ) {
     val posture = LocalDevicePosture.current
@@ -191,12 +194,15 @@ fun AdaptiveNavigationShell(
         }
     }
 
-    if (showMoreSheet) {
+    if (showMoreSheet || externalShowMore) {
         MoreDestinationsSheet(
             currentKey = currentKey,
             onNavigate = onNavigate,
-            onDismiss = { showMoreSheet = false },
-            mhaEnabled = true
+            onDismiss = {
+                showMoreSheet = false
+                onDismissExternalMore()
+            },
+            mhaEnabled = mhaEnabled
         )
     }
 }

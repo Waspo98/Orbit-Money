@@ -58,6 +58,10 @@ private val PRESET_COLORS = listOf(
     "#689F38"  // Olive
 )
 
+private val PRESET_ICONS = listOf(
+    "🛒", "🍽️", "🏠", "🚗", "⚡", "🎬", "🛍️", "🏥", "✈️", "💰", "🔄", "📦", "🎓", "🐾", "🎁"
+)
+
 @Composable
 fun CategoryEditorDialog(
     category: Category?,
@@ -79,6 +83,7 @@ fun CategoryEditorDialog(
 
     var name by remember(category) { mutableStateOf(category?.name ?: "") }
     var selectedColor by remember(category) { mutableStateOf(category?.color ?: PRESET_COLORS.first()) }
+    var selectedIcon by remember(category) { mutableStateOf(category?.icon ?: PRESET_ICONS.first()) }
     var isTransfer by remember(category) { mutableStateOf(category?.isTransfer ?: false) }
     var isIncome by remember(category) { mutableStateOf(category?.isIncome ?: false) }
     var mhaEligible by remember(category) { mutableStateOf(category?.mhaDefaultEligible ?: false) }
@@ -94,14 +99,56 @@ fun CategoryEditorDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // Name Input
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Category Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Name + Icon Input
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = selectedIcon,
+                        onValueChange = { selectedIcon = it.take(4) },
+                        label = { Text("Icon") },
+                        singleLine = true,
+                        modifier = Modifier.width(76.dp)
+                    )
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Category Name") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Preset Emoji Swatches
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    PRESET_ICONS.forEach { emoji ->
+                        val isIconSelected = selectedIcon == emoji
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isIconSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                            border = if (isIconSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clickable {
+                                    haptics.tick()
+                                    selectedIcon = emoji
+                                }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(text = emoji, style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -204,7 +251,7 @@ fun CategoryEditorDialog(
                         category?.id ?: 0L,
                         name.trim(),
                         selectedColor,
-                        category?.icon,
+                        selectedIcon.trim().ifBlank { null },
                         isTransfer,
                         isIncome,
                         mhaEligible

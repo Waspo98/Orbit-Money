@@ -52,6 +52,9 @@ fun MortgageInputCard(
     onInsuranceChange: (Cents) -> Unit,
     onHoaChange: (Cents) -> Unit,
     onUseNetProceeds: () -> Unit,
+    onAgentCommissionChange: (Double) -> Unit = {},
+    onSellerClosingChange: (Double) -> Unit = {},
+    onBuyerClosingChange: (Double) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var expandedAccountMenu by remember { mutableStateOf(false) }
@@ -161,6 +164,35 @@ fun MortgageInputCard(
                         onCentsChange = { onRemainingMortgageChange(if (it == 0L) null else it) },
                         label = "Mortgage Balance",
                         modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = uiState.agentCommissionPercent.toString(),
+                        onValueChange = { onAgentCommissionChange(it.toDoubleOrNull() ?: 0.0) },
+                        label = { Text("Agent Comm. %") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = uiState.sellerClosingPercent.toString(),
+                        onValueChange = { onSellerClosingChange(it.toDoubleOrNull() ?: 0.0) },
+                        label = { Text("Seller Closing %") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = uiState.buyerClosingPercent.toString(),
+                        onValueChange = { onBuyerClosingChange(it.toDoubleOrNull() ?: 0.0) },
+                        label = { Text("Buyer Closing %") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
                     )
                 }
 

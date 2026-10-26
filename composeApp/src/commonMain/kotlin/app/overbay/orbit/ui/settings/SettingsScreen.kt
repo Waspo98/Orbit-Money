@@ -32,6 +32,7 @@ import app.overbay.orbit.ui.settings.blocks.SecurityBiometricsBlock
 import app.overbay.orbit.ui.settings.blocks.SimpleFinBankSyncBlock
 import app.overbay.orbit.ui.settings.blocks.StorageSyncModeBlock
 import app.overbay.orbit.ui.settings.blocks.ThemeAppearanceBlock
+import app.overbay.orbit.util.LocalFileImportExportHelper
 
 @Composable
 fun SettingsScreen(
@@ -41,6 +42,7 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val fileHelper = LocalFileImportExportHelper.current
 
     var restoreJsonText by remember { mutableStateOf("") }
 
@@ -67,7 +69,8 @@ fun SettingsScreen(
                 syncStatus = uiState.syncStatus,
                 onStorageModeChange = viewModel::setStorageMode,
                 onServerUrlChange = viewModel::setServerUrl,
-                onTriggerSync = viewModel::triggerSync
+                onTriggerSync = viewModel::triggerSync,
+                onAuthenticateServer = viewModel::loginToSelfHostedServer
             )
 
             // 2. SimpleFIN Bank Feeds
@@ -82,7 +85,10 @@ fun SettingsScreen(
                 isDriveSyncEnabled = uiState.preferences.googleDriveSyncEnabled,
                 lastSyncAt = uiState.preferences.lastGoogleDriveSyncAt,
                 onToggleDriveSync = viewModel::setGoogleDriveSync,
-                onExportJsonBackup = { viewModel.exportBackup() },
+                onExportJsonBackup = {
+                    val json = viewModel.exportBackup()
+                    fileHelper.exportFile("orbit-backup.orbit.json", json, "application/json")
+                },
                 onRestoreJsonBackup = viewModel::openRestoreDialog
             )
 
@@ -144,11 +150,21 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text(
-                        text = "Paste a exported .orbit.json workspace snapshot to replace local data:",
+                        text = "Select a .orbit.json backup file or paste a snapshot below to replace local data:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(
+                        onClick = {
+                            fileHelper.pickAndImportFile("application/json") { content ->
+                                restoreJsonText = content
+                            }
+                        }
+                    ) {
+                        Text("Choose .orbit.json File")
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
                     OutlinedTextField(
                         value = restoreJsonText,
                         onValueChange = { restoreJsonText = it },

@@ -61,6 +61,8 @@ fun MhaConfigSheet(
     var simpleStateRate by remember { mutableStateOf(taxProfile.simpleStateRatePercent.toString()) }
     var selectedFilingStatus by remember { mutableStateOf(taxProfile.filingStatus) }
     var stateCode by remember { mutableStateOf(taxProfile.state) }
+    var deductionMode by remember { mutableStateOf(taxProfile.deductionMode) }
+    var itemizedDeductionCents by remember { mutableStateOf(taxProfile.itemizedDeductionCents) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -228,6 +230,38 @@ fun MhaConfigSheet(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = deductionMode == "standard",
+                        onClick = {
+                            haptics.tick()
+                            deductionMode = "standard"
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) {
+                        Text("Standard Deduction")
+                    }
+                    SegmentedButton(
+                        selected = deductionMode == "itemized",
+                        onClick = {
+                            haptics.tick()
+                            deductionMode = "itemized"
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) {
+                        Text("Itemized Deduction")
+                    }
+                }
+
+                if (deductionMode == "itemized") {
+                    CurrencyTextField(
+                        cents = itemizedDeductionCents,
+                        onCentsChange = { itemizedDeductionCents = it },
+                        label = "Annual Itemized Deductions ($)",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -249,7 +283,9 @@ fun MhaConfigSheet(
                             simpleFederalRatePercent = simpleFedRate.toDoubleOrNull() ?: 22.0,
                             simpleStateRatePercent = simpleStateRate.toDoubleOrNull() ?: 4.95,
                             state = stateCode.take(2).uppercase().ifEmpty { "IL" },
-                            filingStatus = selectedFilingStatus
+                            filingStatus = selectedFilingStatus,
+                            deductionMode = deductionMode,
+                            itemizedDeductionCents = itemizedDeductionCents
                         )
                         val cap = if (enableDesignatedCap) max(0L, inputDesignatedCapCents) else null
                         val fmrv = if (enableFmrv) max(0L, inputFmrvCents) else null

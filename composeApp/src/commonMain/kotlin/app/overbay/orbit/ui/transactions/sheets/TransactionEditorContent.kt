@@ -73,6 +73,8 @@ fun TransactionEditorContent(
     onDelete: (Long) -> Unit,
     onSplit: (Long) -> Unit,
     onDismiss: () -> Unit,
+    onCreateRule: ((Transaction) -> Unit)? = null,
+    onMarkRecurring: ((Transaction) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -277,12 +279,14 @@ fun TransactionEditorContent(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Options: Transfer, MHA
+        // Options: Transfer, MHA & Quick Actions
         TransactionOptionsBlock(
             isTransfer = isTransfer,
             onTransferChange = { isTransfer = it },
             mhaEligible = mhaEligible,
-            onMhaEligibleChange = { mhaEligible = it }
+            onMhaEligibleChange = { mhaEligible = it },
+            onCreateRule = if (transaction != null && onCreateRule != null) ({ onCreateRule(transaction) }) else null,
+            onMarkRecurring = if (transaction != null && onMarkRecurring != null) ({ onMarkRecurring(transaction) }) else null
         )
 
         Spacer(modifier = Modifier.height(20.dp))

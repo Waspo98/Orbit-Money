@@ -44,18 +44,44 @@ class SettingsViewModel(
     }
 
     fun setStorageMode(mode: StorageMode) {
+        val currentUrl = _uiState.value.preferences.selfHostedServerUrl
         val updated = _uiState.value.preferences.copy(storageMode = mode)
         _uiState.update { it.copy(preferences = updated, storageMode = mode) }
         scope.launch {
-            repository.updatePreferences(updated)
+            repository.setStorageMode(mode, currentUrl)
         }
     }
 
     fun setServerUrl(url: String) {
-        val updated = _uiState.value.preferences.copy(selfHostedServerUrl = url.trim())
+        val trimmed = url.trim()
+        val updated = _uiState.value.preferences.copy(selfHostedServerUrl = trimmed)
         _uiState.update { it.copy(preferences = updated) }
         scope.launch {
-            repository.updatePreferences(updated)
+            if (_uiState.value.storageMode == StorageMode.SELF_HOSTED) {
+                repository.setStorageMode(StorageMode.SELF_HOSTED, trimmed)
+            } else {
+                repository.updatePreferences(updated)
+            }
+        }
+    }
+
+    fun loginToSelfHostedServer(username: String, password: String) {
+        if (username.isBlank() || password.isBlank()) {
+            _uiState.update { it.copy(statusMessage = "Username and password required") }
+            return
+        }
+        _uiState.update { it.copy(isSyncing = true, statusMessage = "Authenticating...") }
+        scope.launch {
+            val client = repository.createApiClient(_uiState.value.preferences.selfHostedServerUrl)
+            val loginRes = client.login(username.trim(), password)
+            if (loginRes.isSuccess) {
+                repository.setStorageMode(StorageMode.SELF_HOSTED, _uiState.value.preferences.selfHostedServerUrl)
+                _uiState.update { it.copy(isSyncing = false, statusMessage = "Logged in as ${username.trim()}") }
+            } else {
+                _uiState.update {
+                    it.copy(isSyncing = false, statusMessage = "Login failed: ${loginRes.exceptionOrNull()?.message}")
+                }
+            }
         }
     }
 

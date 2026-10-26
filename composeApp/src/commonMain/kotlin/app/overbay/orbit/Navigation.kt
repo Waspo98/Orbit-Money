@@ -14,8 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -63,11 +67,13 @@ fun OrbitNavigation(
     initialKey: OrbitNavKey = OrbitNavKey.Dashboard,
     modifier: Modifier = Modifier
 ) {
-    val backStack = remember { mutableStateListOf<OrbitNavKey>(initialKey) }
+    val backStack = remember(initialKey) { mutableStateListOf<OrbitNavKey>(initialKey) }
     val currentKey = backStack.lastOrNull() ?: OrbitNavKey.Dashboard
     val posture = LocalDevicePosture.current
 
     val repo = repository ?: remember { OrbitRepository(PlatformStorage()) }
+    val preferences by repo.preferences.collectAsState()
+    var showMoreFromHeader by remember { mutableStateOf(false) }
     val onboardingViewModel = remember(repo) { OnboardingViewModel(repo) }
     val dashboardViewModel = remember(repo) { DashboardViewModel(repo) }
     val transactionsViewModel = remember(repo) { TransactionsViewModel(repo) }
@@ -116,6 +122,9 @@ fun OrbitNavigation(
                 backStack.removeAt(backStack.lastIndex)
             }
         },
+        mhaEnabled = preferences.mhaTrackerEnabled,
+        externalShowMore = showMoreFromHeader,
+        onDismissExternalMore = { showMoreFromHeader = false },
         modifier = modifier
     ) {
         AnimatedContent(
@@ -142,6 +151,7 @@ fun OrbitNavigation(
                     }
                     TransactionsScreen(
                         viewModel = transactionsViewModel,
+                        onOpenDrawer = { showMoreFromHeader = true },
                         onNavigate = { destination ->
                             if (destination != currentKey) {
                                 backStack.add(destination)
@@ -153,6 +163,7 @@ fun OrbitNavigation(
                 OrbitNavKey.Budgets -> {
                     BudgetsScreen(
                         viewModel = budgetsViewModel,
+                        onOpenDrawer = { showMoreFromHeader = true },
                         onNavigate = { destination ->
                             if (destination != currentKey) {
                                 backStack.add(destination)
@@ -164,6 +175,7 @@ fun OrbitNavigation(
                 OrbitNavKey.Upcoming -> {
                     UpcomingScreen(
                         viewModel = upcomingViewModel,
+                        onOpenDrawer = { showMoreFromHeader = true },
                         onNavigate = { destination ->
                             if (destination != currentKey) {
                                 backStack.add(destination)
@@ -175,6 +187,7 @@ fun OrbitNavigation(
                 OrbitNavKey.Goals -> {
                     GoalsScreen(
                         viewModel = goalsViewModel,
+                        onOpenDrawer = { showMoreFromHeader = true },
                         onNavigate = { destination ->
                             if (destination != currentKey) {
                                 backStack.add(destination)
@@ -186,6 +199,7 @@ fun OrbitNavigation(
                 OrbitNavKey.Categories -> {
                     CategoriesScreen(
                         viewModel = categoriesViewModel,
+                        onOpenDrawer = { showMoreFromHeader = true },
                         onNavigate = { destination ->
                             if (destination != currentKey) {
                                 backStack.add(destination)
@@ -197,6 +211,7 @@ fun OrbitNavigation(
                 OrbitNavKey.Rules -> {
                     RulesScreen(
                         viewModel = rulesViewModel,
+                        onOpenDrawer = { showMoreFromHeader = true },
                         onNavigate = { destination ->
                             if (destination != currentKey) {
                                 backStack.add(destination)
@@ -220,6 +235,7 @@ fun OrbitNavigation(
                 OrbitNavKey.NetWorth -> {
                     NetWorthScreen(
                         viewModel = netWorthViewModel,
+                        onOpenDrawer = { showMoreFromHeader = true },
                         onNavigate = { destination ->
                             if (destination != currentKey) {
                                 backStack.add(destination)
@@ -242,6 +258,7 @@ fun OrbitNavigation(
                 OrbitNavKey.MhaTracker -> {
                     MhaTrackerScreen(
                         viewModel = mhaTrackerViewModel,
+                        onOpenDrawer = { showMoreFromHeader = true },
                         onNavigate = { destination ->
                             if (destination != currentKey) {
                                 backStack.add(destination)

@@ -33,7 +33,8 @@ import kotlinx.serialization.json.Json
  */
 class SelfHostedApiEngine(
     private val apiClient: OrbitApiClient,
-    private val storage: PlatformStorage
+    private val storage: PlatformStorage,
+    private val preferencesProvider: () -> OrbitPreferences = { OrbitPreferences(storageMode = StorageMode.SELF_HOSTED) }
 ) : OrbitStorageEngine {
 
     override val mode: StorageMode = StorageMode.SELF_HOSTED
@@ -46,17 +47,19 @@ class SelfHostedApiEngine(
     }
 
     override suspend fun loadSnapshot(): OrbitWorkspaceSnapshot {
-        // Attempt network fetch first; fall back to local offline cache
+        // Attempt network fetch first; fall back to local offline cache preserving current preferences
+        val currentPrefs = preferencesProvider().copy(storageMode = StorageMode.SELF_HOSTED)
         return try {
-            fetchRemoteSnapshot().also { freshSnapshot ->
+            fetchRemoteSnapshot(currentPrefs).also { freshSnapshot ->
                 saveSnapshot(freshSnapshot)
             }
         } catch (_: Throwable) {
-            loadCachedSnapshot() ?: OrbitWorkspaceSnapshot.empty()
+            loadCachedSnapshot()?.copy(preferences = currentPrefs)
+                ?: OrbitWorkspaceSnapshot.empty().copy(preferences = currentPrefs)
         }
     }
 
-    private suspend fun fetchRemoteSnapshot(): OrbitWorkspaceSnapshot = coroutineScope {
+    private suspend fun fetchRemoteSnapshot(currentPrefs: OrbitPreferences): OrbitWorkspaceSnapshot = coroutineScope {
         val accountsDeferred = async { apiClient.getAccounts().getOrThrow() }
         val transactionsDeferred = async { apiClient.getTransactions(page = 1, limit = 200).getOrThrow() }
         val categoriesDeferred = async { apiClient.getCategories().getOrThrow() }
@@ -85,11 +88,11 @@ class SelfHostedApiEngine(
             accounts = accountsDto.map { it.toDomain() },
             categories = categoriesDto.map { it.toDomain() },
             transactions = txResponseDto.items.map { it.toDomain() },
-            budgets = budgetsDto?.budgets?.map { it.toDomain() } ?: emptyList(),
+            budgets = budgetsDto?.toDomainList() ?: emptyList(),
             goals = goalsDto.map { it.toDomain() },
             rules = rulesDto.map { it.toDomain() },
             upcomingItems = upcomingDto.map { it.toDomain() },
-            preferences = OrbitPreferences(storageMode = StorageMode.SELF_HOSTED)
+            preferences = currentPrefs
         )
     }
 
@@ -109,7 +112,7 @@ class SelfHostedApiEngine(
     override suspend fun sync(force: Boolean): SyncResult {
         return try {
             val syncResult = apiClient.triggerSimpleFinSync().getOrThrow()
-            val fresh = fetchRemoteSnapshot()
+            val fresh = fetchRemoteSnapshot(preferencesProvider().copy(storageMode = StorageMode.SELF_HOSTED))
             saveSnapshot(fresh)
             SyncResult.Success("Remote sync succeeded: ${syncResult.transactionsInserted} new transactions inserted")
         } catch (e: Throwable) {
@@ -155,6 +158,7 @@ class SelfHostedApiEngine(
             type = account.type.name.lowercase(),
             institution = account.institution,
             accountNumberLast4 = account.accountNumberLast4,
+            balance = MoneyUtils.centsToDollars(account.currentBalanceCents),
             currentBalance = MoneyUtils.centsToDollars(account.currentBalanceCents),
             estimatedValue = account.estimatedValueCents?.let { MoneyUtils.centsToDollars(it) },
             isManual = account.isManual,

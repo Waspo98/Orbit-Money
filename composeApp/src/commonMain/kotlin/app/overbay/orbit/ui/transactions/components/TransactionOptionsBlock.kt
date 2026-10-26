@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +22,8 @@ fun TransactionOptionsBlock(
     onTransferChange: (Boolean) -> Unit,
     mhaEligible: Boolean,
     onMhaEligibleChange: (Boolean) -> Unit,
+    onCreateRule: (() -> Unit)? = null,
+    onMarkRecurring: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -70,6 +73,31 @@ fun TransactionOptionsBlock(
                 checked = mhaEligible,
                 onCheckedChange = onMhaEligibleChange
             )
+        }
+
+        if (onCreateRule != null || onMarkRecurring != null) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (onCreateRule != null) {
+                    OutlinedButton(
+                        onClick = onCreateRule,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Create Rule")
+                    }
+                }
+                if (onMarkRecurring != null) {
+                    OutlinedButton(
+                        onClick = onMarkRecurring,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Mark Recurring")
+                    }
+                }
+            }
         }
     }
 }

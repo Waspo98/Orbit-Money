@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.OrbitPreferences
@@ -40,9 +41,12 @@ fun StorageSyncModeBlock(
     onStorageModeChange: (StorageMode) -> Unit,
     onServerUrlChange: (String) -> Unit,
     onTriggerSync: () -> Unit,
+    onAuthenticateServer: ((String, String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var serverUrl by remember(preferences.selfHostedServerUrl) { mutableStateOf(preferences.selfHostedServerUrl) }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
 
     OrbitSectionCard(
         title = "Data Storage & Sync Environment",
@@ -99,6 +103,37 @@ fun StorageSyncModeBlock(
                     }
                     Spacer(modifier = Modifier.size(6.dp))
                     Text("Sync")
+                }
+            }
+
+            if (onAuthenticateServer != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        label = { Text("Username") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Password") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    Button(
+                        onClick = { onAuthenticateServer(username, password) },
+                        enabled = !isSyncing && username.isNotBlank() && password.isNotBlank()
+                    ) {
+                        Text("Login")
+                    }
                 }
             }
 

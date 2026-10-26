@@ -20,6 +20,7 @@ import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.UpcomingItem
 import app.overbay.orbit.data.network.OrbitApiClient
 import app.overbay.orbit.data.network.SimpleFinDirectClient
+import app.overbay.orbit.data.sync.CloudSyncManager
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.RuleMatcherEngine
 import app.overbay.orbit.domain.TransferMatcherEngine
@@ -39,43 +40,33 @@ class OrbitRepository(
     private val storage: PlatformStorage,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
     private val customApiClient: OrbitApiClient? = null,
-    private val customSimpleFinClient: SimpleFinDirectClient? = null
+    private val customSimpleFinClient: SimpleFinDirectClient? = null,
+    val cloudSyncManager: CloudSyncManager = CloudSyncManager()
 ) {
     private val simpleFinClient = customSimpleFinClient ?: SimpleFinDirectClient()
     private val localEngine = LocalSnapshotEngine(storage, simpleFinClient)
-
     private var activeEngine: OrbitStorageEngine = localEngine
 
     private val _snapshot = MutableStateFlow(OrbitWorkspaceSnapshot.empty())
     val snapshot: StateFlow<OrbitWorkspaceSnapshot> = _snapshot.asStateFlow()
-
     private val _storageMode = MutableStateFlow(StorageMode.LOCAL)
     val storageMode: StateFlow<StorageMode> = _storageMode.asStateFlow()
-
     private val _accounts = MutableStateFlow<List<Account>>(emptyList())
     val accounts: StateFlow<List<Account>> = _accounts.asStateFlow()
-
     private val _transactions = MutableStateFlow<List<Transaction>>(emptyList())
     val transactions: StateFlow<List<Transaction>> = _transactions.asStateFlow()
-
     private val _categories = MutableStateFlow<List<Category>>(emptyList())
     val categories: StateFlow<List<Category>> = _categories.asStateFlow()
-
     private val _budgets = MutableStateFlow<List<CategoryBudget>>(emptyList())
     val budgets: StateFlow<List<CategoryBudget>> = _budgets.asStateFlow()
-
     private val _goals = MutableStateFlow<List<Goal>>(emptyList())
     val goals: StateFlow<List<Goal>> = _goals.asStateFlow()
-
     private val _rules = MutableStateFlow<List<TransactionRule>>(emptyList())
     val rules: StateFlow<List<TransactionRule>> = _rules.asStateFlow()
-
     private val _upcomingItems = MutableStateFlow<List<UpcomingItem>>(emptyList())
     val upcomingItems: StateFlow<List<UpcomingItem>> = _upcomingItems.asStateFlow()
-
     private val _preferences = MutableStateFlow(OrbitPreferences())
     val preferences: StateFlow<OrbitPreferences> = _preferences.asStateFlow()
-
     private val _syncStatus = MutableStateFlow<SyncResult>(SyncResult.NoOp)
     val syncStatus: StateFlow<SyncResult> = _syncStatus.asStateFlow()
 
@@ -85,20 +76,19 @@ class OrbitRepository(
         isLenient = true
     }
 
+    fun createApiClient(serverUrl: String = _preferences.value.selfHostedServerUrl): OrbitApiClient =
+        customApiClient ?: OrbitApiClient({ serverUrl.ifBlank { _preferences.value.selfHostedServerUrl } }, storage)
+
     suspend fun initialize() {
-        // Load initial snapshot from local storage to inspect storageMode preference
         val localSnap = localEngine.loadSnapshot()
         val pref = localSnap.preferences
         _preferences.value = pref
         _storageMode.value = pref.storageMode
-
         activeEngine = if (pref.storageMode == StorageMode.SELF_HOSTED) {
-            val client = customApiClient ?: OrbitApiClient({ pref.selfHostedServerUrl }, storage)
-            SelfHostedApiEngine(client, storage)
+            SelfHostedApiEngine(createApiClient(pref.selfHostedServerUrl), storage) { _preferences.value }
         } else {
             localEngine
         }
-
         val loaded = activeEngine.loadSnapshot()
         updateMemoryState(loaded)
     }
@@ -118,7 +108,11 @@ class OrbitRepository(
 
     private suspend fun commitSnapshot(updated: OrbitWorkspaceSnapshot) {
         updateMemoryState(updated)
-        activeEngine.saveSnapshot(updated)
+        localEngine.saveSnapshot(updated)
+        if (activeEngine !== localEngine) activeEngine.saveSnapshot(updated)
+        if (updated.preferences.googleDriveSyncEnabled) {
+            cloudSyncManager.backupSnapshot(updated)
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -133,17 +127,15 @@ class OrbitRepository(
         _preferences.value = updatedPref
 
         activeEngine = if (mode == StorageMode.SELF_HOSTED) {
-            val client = customApiClient ?: OrbitApiClient({ updatedPref.selfHostedServerUrl }, storage)
-            SelfHostedApiEngine(client, storage)
+            SelfHostedApiEngine(createApiClient(updatedPref.selfHostedServerUrl), storage) { _preferences.value }
         } else {
             localEngine
         }
 
         val snapshotToCommit = _snapshot.value.copy(preferences = updatedPref)
         commitSnapshot(snapshotToCommit)
-
         val fresh = activeEngine.loadSnapshot()
-        updateMemoryState(fresh)
+        updateMemoryState(fresh.copy(preferences = updatedPref))
     }
 
     // -------------------------------------------------------------------------

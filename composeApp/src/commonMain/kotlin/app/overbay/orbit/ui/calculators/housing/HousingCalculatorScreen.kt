@@ -56,7 +56,10 @@ fun HousingCalculatorScreen(
                 onPropertyTaxChange = viewModel::setAnnualPropertyTaxes,
                 onInsuranceChange = viewModel::setAnnualHomeInsurance,
                 onHoaChange = viewModel::setMonthlyHoa,
-                onUseNetProceeds = viewModel::useNetProceedsAsDownPayment
+                onUseNetProceeds = viewModel::useNetProceedsAsDownPayment,
+                onAgentCommissionChange = viewModel::setAgentCommissionPercent,
+                onSellerClosingChange = viewModel::setSellerClosingPercent,
+                onBuyerClosingChange = viewModel::setBuyerClosingPercent
             )
 
             MonthlyPaymentBreakdownCard(

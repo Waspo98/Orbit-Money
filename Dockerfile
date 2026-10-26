@@ -6,9 +6,21 @@
 FROM eclipse-temurin:21-jdk AS build-wasm
 WORKDIR /workspace
 
+ENV ANDROID_HOME=/opt/android-sdk
+RUN apt-get update && apt-get install -y --no-install-recommends unzip wget ca-certificates \
+    && mkdir -p ${ANDROID_HOME}/cmdline-tools \
+    && wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/cmdtools.zip \
+    && unzip -q /tmp/cmdtools.zip -d ${ANDROID_HOME}/cmdline-tools \
+    && mv ${ANDROID_HOME}/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest \
+    && rm /tmp/cmdtools.zip \
+    && yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null \
+    && ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0" >/dev/null \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy Gradle wrapper and build configuration files
 COPY gradlew gradlew.bat settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle/ ./gradle/
+COPY androidApp/build.gradle.kts ./androidApp/
 COPY composeApp/build.gradle.kts ./composeApp/
 COPY composeApp/src/ ./composeApp/src/
 

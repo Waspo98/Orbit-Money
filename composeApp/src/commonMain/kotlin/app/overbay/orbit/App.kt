@@ -39,9 +39,11 @@ fun App(
     val biometricHelper = rememberBiometricAuthHelper()
     val fileHelper = rememberFileImportExportHelper()
     val repo = repository ?: remember { OrbitRepository(PlatformStorage()) }
+    var isInitialized by remember(repo) { mutableStateOf(repository != null) }
 
     LaunchedEffect(repo) {
         repo.initialize()
+        isInitialized = true
     }
 
     val preferences by repo.preferences.collectAsStateWithLifecycle()
@@ -71,7 +73,9 @@ fun App(
             dynamicColor = activeDynamicColor
         ) {
             Surface(modifier = modifier) {
-                if (isBiometricLocked && preferences.biometricLockEnabled) {
+                if (!isInitialized) {
+                    // Wait for initial local preference snapshot load before mounting initial nav key
+                } else if (isBiometricLocked && preferences.biometricLockEnabled) {
                     BiometricLockOverlay(
                         onUnlock = { isBiometricLocked = false }
                     )

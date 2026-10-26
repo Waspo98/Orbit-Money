@@ -256,6 +256,53 @@ fun RecurringItemEditorSheet(
                 }
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Account Dropdown
+            val selectedAccount = accounts.find { it.id == selectedAccountId }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { accountDropdownOpen = true },
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                        Text(text = "Payment Account", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = selectedAccount?.name ?: "None / Unassigned",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = accountDropdownOpen,
+                    onDismissRequest = { accountDropdownOpen = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("None") },
+                        onClick = {
+                            selectedAccountId = null
+                            accountDropdownOpen = false
+                        }
+                    )
+                    accounts.forEach { acct ->
+                        DropdownMenuItem(
+                            text = { Text(acct.name) },
+                            onClick = {
+                                selectedAccountId = acct.id
+                                accountDropdownOpen = false
+                            }
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(20.dp))
 
             // Action Buttons

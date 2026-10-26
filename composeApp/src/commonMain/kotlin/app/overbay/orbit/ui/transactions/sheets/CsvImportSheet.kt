@@ -57,6 +57,7 @@ import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.domain.CandidateImportRule
 import app.overbay.orbit.domain.CsvImportEngine
 import app.overbay.orbit.domain.CsvImportPreview
+import app.overbay.orbit.util.LocalFileImportExportHelper
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,6 +71,7 @@ fun CsvImportSheet(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
+    val fileHelper = LocalFileImportExportHelper.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var csvText by remember { mutableStateOf("") }
@@ -131,12 +133,23 @@ fun CsvImportSheet(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                TextButton(onClick = {
-                    haptics.tick()
-                    csvText = sampleCsv
-                    parseCsv()
-                }) {
-                    Text("Load Sample CSV")
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = {
+                        haptics.tick()
+                        fileHelper.pickAndImportFile("text/csv") { content ->
+                            csvText = content
+                            parseCsv()
+                        }
+                    }) {
+                        Text("Choose CSV File")
+                    }
+                    TextButton(onClick = {
+                        haptics.tick()
+                        csvText = sampleCsv
+                        parseCsv()
+                    }) {
+                        Text("Load Sample CSV")
+                    }
                 }
             }
 

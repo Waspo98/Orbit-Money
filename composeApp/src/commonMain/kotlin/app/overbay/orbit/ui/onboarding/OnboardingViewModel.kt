@@ -109,17 +109,15 @@ class OnboardingViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(authStatus = ServerAuthStatus.Authenticating) }
             try {
-                if (customApiClient != null) {
-                    val meResult = customApiClient.getMe()
-                    if (meResult.isSuccess) {
-                        _uiState.update { it.copy(authStatus = ServerAuthStatus.Success(state.serverUsername)) }
-                    } else {
-                        _uiState.update {
-                            it.copy(authStatus = ServerAuthStatus.Error(meResult.exceptionOrNull()?.message ?: "Authentication failed"))
-                        }
-                    }
+                val client = customApiClient ?: repository.createApiClient(state.serverUrl.trim())
+                val loginResult = client.login(state.serverUsername.trim(), state.serverPassword)
+                if (loginResult.isSuccess) {
+                    val user = loginResult.getOrNull()?.username ?: state.serverUsername.trim()
+                    _uiState.update { it.copy(authStatus = ServerAuthStatus.Success(user)) }
                 } else {
-                    _uiState.update { it.copy(authStatus = ServerAuthStatus.Success(state.serverUsername)) }
+                    _uiState.update {
+                        it.copy(authStatus = ServerAuthStatus.Error(loginResult.exceptionOrNull()?.message ?: "Authentication failed"))
+                    }
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(authStatus = ServerAuthStatus.Error(e.message ?: "Login failed")) }

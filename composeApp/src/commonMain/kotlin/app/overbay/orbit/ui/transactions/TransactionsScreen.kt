@@ -127,7 +127,15 @@ fun TransactionsScreen(
                                 onResetToOriginal = { id -> viewModel.resetTransaction(id) },
                                 onDelete = { id -> showSingleDeleteConfirmId = id },
                                 onSplit = { id -> viewModel.openSplitSheet(id) },
-                                onDismiss = { viewModel.selectTransactionForInspect(null) }
+                                onDismiss = { viewModel.selectTransactionForInspect(null) },
+                                onCreateRule = { txn ->
+                                    viewModel.createRuleFromTransaction(txn)
+                                    onNavigate(OrbitNavKey.Rules)
+                                },
+                                onMarkRecurring = { txn ->
+                                    viewModel.markTransactionRecurring(txn)
+                                    onNavigate(OrbitNavKey.Upcoming)
+                                }
                             )
                         } else {
                             Box(
@@ -168,7 +176,17 @@ fun TransactionsScreen(
             onResetToOriginal = { id -> viewModel.resetTransaction(id) },
             onDelete = { id -> showSingleDeleteConfirmId = id },
             onSplit = { id -> viewModel.openSplitSheet(id) },
-            onDismiss = { viewModel.closeTransactionEditor() }
+            onDismiss = { viewModel.closeTransactionEditor() },
+            onCreateRule = { txn ->
+                viewModel.createRuleFromTransaction(txn)
+                viewModel.closeTransactionEditor()
+                onNavigate(OrbitNavKey.Rules)
+            },
+            onMarkRecurring = { txn ->
+                viewModel.markTransactionRecurring(txn)
+                viewModel.closeTransactionEditor()
+                onNavigate(OrbitNavKey.Upcoming)
+            }
         )
     }
 

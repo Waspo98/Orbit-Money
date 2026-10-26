@@ -28,6 +28,7 @@ data class AccountDto(
     val type: String,
     val institution: String? = null,
     @SerialName("account_number_last4") val accountNumberLast4: String? = null,
+    val balance: Double? = null,
     @SerialName("current_balance") val currentBalance: Double? = null,
     @SerialName("estimated_value") val estimatedValue: Double? = null,
     @SerialName("is_manual") val isManual: Boolean = false,
@@ -43,7 +44,7 @@ data class AccountDto(
         type = AccountType.fromRaw(type),
         institution = institution,
         accountNumberLast4 = accountNumberLast4,
-        currentBalanceCents = MoneyUtils.dollarsToCents(currentBalance ?: 0.0),
+        currentBalanceCents = MoneyUtils.dollarsToCents(currentBalance ?: balance ?: 0.0),
         estimatedValueCents = estimatedValue?.let { MoneyUtils.dollarsToCents(it) },
         isManual = isManual,
         isArchived = isArchived,
@@ -218,14 +219,39 @@ data class BudgetDto(
 }
 
 @Serializable
+data class BudgetOverviewItemDto(
+    @SerialName("budget_id") val budgetId: Long = 0L,
+    val category: CategoryDto? = null,
+    @SerialName("budget_amount") val budgetAmount: Double = 0.0,
+    val spent: Double = 0.0,
+    val rollover: Boolean = false
+) {
+    fun toDomain(): CategoryBudget = CategoryBudget(
+        id = budgetId,
+        categoryId = category?.id ?: 0L,
+        categoryName = category?.name ?: "",
+        categoryColor = category?.color ?: "#888888",
+        categoryIcon = category?.icon,
+        amountCents = MoneyUtils.dollarsToCents(budgetAmount),
+        rollover = rollover,
+        spentCents = MoneyUtils.dollarsToCents(spent)
+    )
+}
+
+@Serializable
 data class MonthlyBudgetOverviewDto(
     val month: String = "",
     val budgets: List<BudgetDto> = emptyList(),
+    val budgeted: List<BudgetOverviewItemDto> = emptyList(),
     @SerialName("total_budgeted") val totalBudgeted: Double = 0.0,
     @SerialName("total_spent") val totalSpent: Double = 0.0,
     @SerialName("daily_safe_spend") val dailySafeSpend: Double = 0.0,
     @SerialName("days_remaining") val daysRemaining: Int = 0
-)
+) {
+    fun toDomainList(): List<CategoryBudget> =
+        if (budgets.isNotEmpty()) budgets.map { it.toDomain() }
+        else budgeted.map { it.toDomain() }
+}
 
 @Serializable
 data class GoalDto(
@@ -349,15 +375,19 @@ data class UpcomingItemDto(
 
 @Serializable
 data class AuthMeResponseDto(
-    val authenticated: Boolean,
+    val authenticated: Boolean = false,
     val mode: String? = null,
+    val username: String? = null,
+    val email: String? = null,
+    val displayName: String? = null,
+    val authProvider: String? = null,
     val user: UserDto? = null,
     val household: HouseholdDto? = null
 )
 
 @Serializable
 data class UserDto(
-    val id: Long,
+    val id: Long = 0L,
     val email: String? = null,
     val username: String? = null,
     @SerialName("display_name") val displayName: String = "",
@@ -366,14 +396,73 @@ data class UserDto(
 
 @Serializable
 data class HouseholdDto(
-    val id: Long,
+    val id: Long = 1L,
     val name: String = "",
     val role: String = "member"
 )
 
 @Serializable
 data class SimpleFinSyncResultDto(
-    val success: Boolean,
+    val success: Boolean = true,
+    val status: String? = null,
     @SerialName("transactions_inserted") val transactionsInserted: Int = 0,
     @SerialName("accounts_unmatched") val accountsUnmatched: Int = 0
+)
+
+@Serializable
+data class LoginRequestDto(
+    val username: String,
+    val password: String
+)
+
+@Serializable
+data class AccountListResponseDto(
+    val items: List<AccountDto> = emptyList()
+)
+
+@Serializable
+data class AccountMutationResponseDto(
+    val success: Boolean = true,
+    val account: AccountDto? = null
+)
+
+@Serializable
+data class TransactionMutationResponseDto(
+    val success: Boolean = true,
+    val transaction: TransactionDto? = null
+)
+
+@Serializable
+data class CategoryMutationResponseDto(
+    val success: Boolean = true,
+    val category: CategoryDto? = null
+)
+
+@Serializable
+data class IdMutationResponseDto(
+    val success: Boolean = true,
+    val id: Long = 0L
+)
+
+@Serializable
+data class GoalsListResponseDto(
+    val goals: List<GoalDto> = emptyList()
+)
+
+@Serializable
+data class UpcomingListResponseDto(
+    val items: List<UpcomingItemDto> = emptyList()
+)
+
+@Serializable
+data class BudgetUpsertRequestDto(
+    @SerialName("category_id") val categoryId: Long,
+    val month: String = "",
+    val amount: Double,
+    val rollover: Boolean = false
+)
+
+@Serializable
+data class ResetTransactionRequestDto(
+    val fields: List<String> = listOf("merchant", "category_id", "is_transfer", "is_ignored", "mha_eligible")
 )

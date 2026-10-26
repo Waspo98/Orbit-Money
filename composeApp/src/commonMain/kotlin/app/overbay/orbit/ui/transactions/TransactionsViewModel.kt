@@ -4,8 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.EditSource
+import app.overbay.orbit.data.model.RecurrenceFrequency
+import app.overbay.orbit.data.model.RuleAction
+import app.overbay.orbit.data.model.RuleActionType
+import app.overbay.orbit.data.model.RuleCondition
+import app.overbay.orbit.data.model.RuleConditionField
+import app.overbay.orbit.data.model.RuleOperator
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
+import app.overbay.orbit.data.model.UpcomingItem
+import app.overbay.orbit.data.model.UpcomingKind
+import app.overbay.orbit.data.model.UpcomingStatus
+import kotlin.math.abs
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.TransactionFilterDraft
@@ -307,6 +317,39 @@ class TransactionsViewModel(
         viewModelScope.launch {
             repository.batchDeleteTransactions(selected)
             clearSelection()
+        }
+    }
+
+    fun createRuleFromTransaction(transaction: Transaction) {
+        viewModelScope.launch {
+            val actions = buildList {
+                transaction.effectiveCategoryId?.let { add(RuleAction(RuleActionType.SET_CATEGORY, it.toString())) }
+                if (transaction.effectiveIsTransfer) add(RuleAction(RuleActionType.MARK_TRANSFER, "true"))
+            }
+            val rule = TransactionRule(
+                name = "${transaction.effectiveMerchant} Rule",
+                conditions = listOf(RuleCondition(RuleConditionField.MERCHANT, RuleOperator.CONTAINS, transaction.originalMerchant.ifBlank { transaction.effectiveMerchant })),
+                actions = actions
+            )
+            repository.saveRule(rule)
+        }
+    }
+
+    fun markTransactionRecurring(transaction: Transaction) {
+        viewModelScope.launch {
+            val item = UpcomingItem(
+                name = transaction.effectiveMerchant,
+                merchant = transaction.effectiveMerchant,
+                amountCents = abs(transaction.effectiveAmountCents),
+                kind = if (transaction.isExpense) UpcomingKind.BILL else UpcomingKind.INCOME,
+                direction = if (transaction.isExpense) "expense" else "income",
+                frequencyType = RecurrenceFrequency.MONTHLY,
+                nextDate = transaction.effectiveDate,
+                categoryId = transaction.effectiveCategoryId,
+                accountId = transaction.accountId,
+                status = UpcomingStatus.ACTIVE
+            )
+            repository.saveUpcoming(item)
         }
     }
 

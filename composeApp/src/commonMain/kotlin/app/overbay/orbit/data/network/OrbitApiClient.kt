@@ -57,7 +57,7 @@ class OrbitApiClient(
         val setCookie = response.headers["Set-Cookie"] ?: response.headers["set-cookie"]
         if (!setCookie.isNullOrBlank()) {
             val cookieValue = setCookie.substringBefore(";").trim()
-            if (cookieValue.contains("connect.sid")) {
+            if (cookieValue.contains("connect.sid") || cookieValue.contains(".sid=")) {
                 sessionCookie = cookieValue
             }
         }
@@ -68,6 +68,19 @@ class OrbitApiClient(
     // -------------------------------------------------------------------------
     // Auth Endpoints
     // -------------------------------------------------------------------------
+    suspend fun login(username: String, password: String): Result<AuthMeResponseDto> = runCatching {
+        val response = client.post(url("/api/auth/login")) {
+            contentType(ContentType.Application.Json)
+            sessionCookie?.let { header("Cookie", it) }
+            setBody(LoginRequestDto(username = username, password = password))
+        }
+        extractSessionCookie(response)
+        if (!response.status.isSuccess()) {
+            throw IllegalStateException("Login failed with HTTP ${response.status.value}")
+        }
+        getMe().getOrDefault(AuthMeResponseDto(authenticated = true, username = username))
+    }
+
     suspend fun getMe(): Result<AuthMeResponseDto> = runCatching {
         val response = client.get(url("/api/auth/me")) {
             sessionCookie?.let { header("Cookie", it) }
@@ -93,7 +106,8 @@ class OrbitApiClient(
             if (includeArchived) parameter("includeArchived", "1")
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching { response.body<AccountListResponseDto>().items }
+            .getOrElse { response.body() }
     }
 
     suspend fun createAccount(account: AccountDto): Result<AccountDto> = runCatching {
@@ -103,17 +117,19 @@ class OrbitApiClient(
             setBody(account)
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching { response.body<AccountMutationResponseDto>().account ?: account }
+            .getOrElse { response.body() }
     }
 
     suspend fun updateAccount(id: Long, account: AccountDto): Result<AccountDto> = runCatching {
-        val response = client.patch(url("/api/accounts/$id")) {
+        val response = client.put(url("/api/accounts/$id")) {
             contentType(ContentType.Application.Json)
             sessionCookie?.let { header("Cookie", it) }
             setBody(account)
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching { response.body<AccountMutationResponseDto>().account ?: account.copy(id = id) }
+            .getOrElse { response.body() }
     }
 
     suspend fun deleteAccount(id: Long): Result<Boolean> = runCatching {
@@ -153,7 +169,8 @@ class OrbitApiClient(
             setBody(transaction)
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching { response.body<TransactionMutationResponseDto>().transaction ?: transaction }
+            .getOrElse { response.body() }
     }
 
     suspend fun updateTransaction(id: Long, transaction: TransactionDto): Result<TransactionDto> = runCatching {
@@ -163,7 +180,8 @@ class OrbitApiClient(
             setBody(transaction)
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching { response.body<TransactionMutationResponseDto>().transaction ?: transaction.copy(id = id) }
+            .getOrElse { response.body() }
     }
 
     suspend fun deleteTransaction(id: Long): Result<Boolean> = runCatching {
@@ -176,10 +194,13 @@ class OrbitApiClient(
 
     suspend fun resetTransaction(id: Long): Result<TransactionDto> = runCatching {
         val response = client.post(url("/api/transactions/$id/reset")) {
+            contentType(ContentType.Application.Json)
             sessionCookie?.let { header("Cookie", it) }
+            setBody(ResetTransactionRequestDto())
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching { response.body<TransactionMutationResponseDto>().transaction ?: throw IllegalStateException("Missing transaction") }
+            .getOrElse { response.body() }
     }
 
     // -------------------------------------------------------------------------
@@ -201,17 +222,19 @@ class OrbitApiClient(
             setBody(category)
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching { response.body<CategoryMutationResponseDto>().category ?: category }
+            .getOrElse { response.body() }
     }
 
     suspend fun updateCategory(id: Long, category: CategoryDto): Result<CategoryDto> = runCatching {
-        val response = client.patch(url("/api/categories/$id")) {
+        val response = client.put(url("/api/categories/$id")) {
             contentType(ContentType.Application.Json)
             sessionCookie?.let { header("Cookie", it) }
             setBody(category)
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching { response.body<CategoryMutationResponseDto>().category ?: category.copy(id = id) }
+            .getOrElse { response.body() }
     }
 
     suspend fun deleteCategory(id: Long): Result<Boolean> = runCatching {
@@ -234,14 +257,17 @@ class OrbitApiClient(
         response.body()
     }
 
-    suspend fun upsertBudget(categoryId: Long, amount: Double, rollover: Boolean): Result<BudgetDto> = runCatching {
+    suspend fun upsertBudget(categoryId: Long, amount: Double, rollover: Boolean, month: String = ""): Result<BudgetDto> = runCatching {
         val response = client.put(url("/api/budgets")) {
             contentType(ContentType.Application.Json)
             sessionCookie?.let { header("Cookie", it) }
-            setBody(mapOf("category_id" to categoryId.toString(), "amount" to amount.toString(), "rollover" to rollover.toString()))
+            setBody(BudgetUpsertRequestDto(categoryId = categoryId, month = month, amount = amount, rollover = rollover))
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching {
+            val res = response.body<IdMutationResponseDto>()
+            BudgetDto(id = res.id, categoryId = categoryId, amount = amount, rollover = rollover)
+        }.getOrElse { response.body() }
     }
 
     suspend fun deleteBudget(id: Long): Result<Boolean> = runCatching {
@@ -260,7 +286,8 @@ class OrbitApiClient(
             sessionCookie?.let { header("Cookie", it) }
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching { response.body<GoalsListResponseDto>().goals }
+            .getOrElse { response.body() }
     }
 
     suspend fun createGoal(goal: GoalDto): Result<GoalDto> = runCatching {
@@ -270,17 +297,23 @@ class OrbitApiClient(
             setBody(goal)
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching {
+            val res = response.body<IdMutationResponseDto>()
+            goal.copy(id = if (res.id > 0L) res.id else goal.id)
+        }.getOrElse { response.body() }
     }
 
     suspend fun updateGoal(id: Long, goal: GoalDto): Result<GoalDto> = runCatching {
-        val response = client.patch(url("/api/goals/$id")) {
+        val response = client.put(url("/api/goals/$id")) {
             contentType(ContentType.Application.Json)
             sessionCookie?.let { header("Cookie", it) }
             setBody(goal)
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching {
+            val res = response.body<IdMutationResponseDto>()
+            goal.copy(id = if (res.id > 0L) res.id else id)
+        }.getOrElse { response.body() }
     }
 
     suspend fun deleteGoal(id: Long): Result<Boolean> = runCatching {
@@ -310,17 +343,23 @@ class OrbitApiClient(
             setBody(rule)
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching {
+            val res = response.body<IdMutationResponseDto>()
+            rule.copy(id = if (res.id > 0L) res.id else rule.id)
+        }.getOrElse { response.body() }
     }
 
     suspend fun updateRule(id: Long, rule: RuleDto): Result<RuleDto> = runCatching {
-        val response = client.patch(url("/api/rules/$id")) {
+        val response = client.put(url("/api/rules/$id")) {
             contentType(ContentType.Application.Json)
             sessionCookie?.let { header("Cookie", it) }
             setBody(rule)
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching {
+            val res = response.body<IdMutationResponseDto>()
+            rule.copy(id = if (res.id > 0L) res.id else id)
+        }.getOrElse { response.body() }
     }
 
     suspend fun deleteRule(id: Long): Result<Boolean> = runCatching {
@@ -332,12 +371,12 @@ class OrbitApiClient(
     }
 
     suspend fun runRules(): Result<Int> = runCatching {
-        val response = client.post(url("/api/rules/run")) {
+        val response = client.post(url("/api/rules/reapply-all")) {
             sessionCookie?.let { header("Cookie", it) }
         }
         extractSessionCookie(response)
         val map: Map<String, Int> = response.body()
-        map["appliedCount"] ?: 0
+        map["updated"] ?: map["appliedCount"] ?: 0
     }
 
     // -------------------------------------------------------------------------
@@ -348,8 +387,8 @@ class OrbitApiClient(
             sessionCookie?.let { header("Cookie", it) }
         }
         extractSessionCookie(response)
-        val container: Map<String, List<UpcomingItemDto>> = response.body()
-        container["items"] ?: emptyList()
+        val container: UpcomingListResponseDto = response.body()
+        container.items
     }
 
     suspend fun createUpcoming(item: UpcomingItemDto): Result<UpcomingItemDto> = runCatching {
@@ -359,17 +398,23 @@ class OrbitApiClient(
             setBody(item)
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching {
+            val res = response.body<IdMutationResponseDto>()
+            item.copy(id = if (res.id > 0L) res.id else item.id)
+        }.getOrElse { response.body() }
     }
 
     suspend fun updateUpcoming(id: Long, item: UpcomingItemDto): Result<UpcomingItemDto> = runCatching {
-        val response = client.patch(url("/api/upcoming/$id")) {
+        val response = client.put(url("/api/upcoming/$id")) {
             contentType(ContentType.Application.Json)
             sessionCookie?.let { header("Cookie", it) }
             setBody(item)
         }
         extractSessionCookie(response)
-        response.body()
+        runCatching {
+            val res = response.body<IdMutationResponseDto>()
+            item.copy(id = if (res.id > 0L) res.id else id)
+        }.getOrElse { response.body() }
     }
 
     suspend fun deleteUpcoming(id: Long): Result<Boolean> = runCatching {

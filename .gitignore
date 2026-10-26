@@ -37,3 +37,6 @@ Thumbs.db
 
 .gradle/
 local.properties
+.kotlin/
+kotlin-js-store/
+.agents/

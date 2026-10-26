@@ -36,6 +36,8 @@ fun TransactionEditorSheet(
     onDelete: (Long) -> Unit,
     onSplit: (Long) -> Unit,
     onDismiss: () -> Unit,
+    onCreateRule: ((Transaction) -> Unit)? = null,
+    onMarkRecurring: ((Transaction) -> Unit)? = null,
     modifier: Modifier = Modifier,
     isInlinePane: Boolean = false
 ) {
@@ -49,6 +51,8 @@ fun TransactionEditorSheet(
             onDelete = onDelete,
             onSplit = onSplit,
             onDismiss = onDismiss,
+            onCreateRule = onCreateRule,
+            onMarkRecurring = onMarkRecurring,
             modifier = modifier
         )
     } else {
@@ -69,6 +73,8 @@ fun TransactionEditorSheet(
                 onDelete = onDelete,
                 onSplit = onSplit,
                 onDismiss = onDismiss,
+                onCreateRule = onCreateRule,
+                onMarkRecurring = onMarkRecurring,
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()

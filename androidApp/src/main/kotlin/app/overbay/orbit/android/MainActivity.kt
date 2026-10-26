@@ -5,6 +5,9 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import app.overbay.orbit.App
@@ -12,6 +15,8 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.util.DisplayRefreshRateHelper
 
 class MainActivity : FragmentActivity() {
+
+    private var currentNavKey by mutableStateOf<OrbitNavKey?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -21,16 +26,17 @@ class MainActivity : FragmentActivity() {
         // Configure adaptive high refresh rate (120Hz) without battery-draining locked modes
         DisplayRefreshRateHelper.configureHighRefreshRate(window, display)
 
-        val navKey = extractNavKeyFromIntent(intent)
+        currentNavKey = extractNavKeyFromIntent(intent)
 
         setContent {
-            App(initialNavKey = navKey)
+            App(initialNavKey = currentNavKey)
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        extractNavKeyFromIntent(intent)?.let { currentNavKey = it }
     }
 
     private fun extractNavKeyFromIntent(intent: Intent?): OrbitNavKey? {
