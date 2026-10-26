@@ -45,6 +45,10 @@ import app.overbay.orbit.ui.trends.SpendingTrendsScreen
 import app.overbay.orbit.ui.trends.SpendingTrendsViewModel
 import app.overbay.orbit.ui.mha.MhaTrackerScreen
 import app.overbay.orbit.ui.mha.MhaTrackerViewModel
+import app.overbay.orbit.ui.calculators.housing.HousingCalculatorScreen
+import app.overbay.orbit.ui.calculators.housing.HousingViewModel
+import app.overbay.orbit.ui.calculators.retirement.RetirementCalculatorScreen
+import app.overbay.orbit.ui.calculators.retirement.RetirementViewModel
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.PlatformStorage
@@ -72,6 +76,8 @@ fun OrbitNavigation(
     val netWorthViewModel = remember(repo) { NetWorthViewModel(repo) }
     val spendingTrendsViewModel = remember(repo) { SpendingTrendsViewModel(repo) }
     val mhaTrackerViewModel = remember(repo) { MhaTrackerViewModel(repo) }
+    val housingViewModel = remember(repo) { HousingViewModel(repo) }
+    val retirementViewModel = remember(repo) { RetirementViewModel(repo) }
 
     if (currentKey == OrbitNavKey.Onboarding) {
         OnboardingScreen(
@@ -230,6 +236,28 @@ fun OrbitNavigation(
                 OrbitNavKey.MhaTracker -> {
                     MhaTrackerScreen(
                         viewModel = mhaTrackerViewModel,
+                        onNavigate = { destination ->
+                            if (destination != currentKey) {
+                                backStack.add(destination)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                OrbitNavKey.HousingCalculator -> {
+                    HousingCalculatorScreen(
+                        viewModel = housingViewModel,
+                        onNavigate = { destination ->
+                            if (destination != currentKey) {
+                                backStack.add(destination)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                OrbitNavKey.RetirementCalculator -> {
+                    RetirementCalculatorScreen(
+                        viewModel = retirementViewModel,
                         onNavigate = { destination ->
                             if (destination != currentKey) {
                                 backStack.add(destination)
