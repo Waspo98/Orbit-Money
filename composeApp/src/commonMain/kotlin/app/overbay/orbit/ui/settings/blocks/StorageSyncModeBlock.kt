@@ -32,6 +32,7 @@ import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.util.LocalOidcAuthLauncher
 
 @Composable
 fun StorageSyncModeBlock(
@@ -44,6 +45,7 @@ fun StorageSyncModeBlock(
     onAuthenticateServer: ((String, String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val oidcLauncher = LocalOidcAuthLauncher.current
     var serverUrl by remember(preferences.selfHostedServerUrl) { mutableStateOf(preferences.selfHostedServerUrl) }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -104,6 +106,18 @@ fun StorageSyncModeBlock(
                     Spacer(modifier = Modifier.size(6.dp))
                     Text("Sync")
                 }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    onServerUrlChange(serverUrl)
+                    oidcLauncher.launchOidcLogin(serverUrl, "/api/auth/oidc/login")
+                },
+                enabled = !isSyncing && serverUrl.isNotBlank(),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Continue with Authentik / SSO")
             }
 
             if (onAuthenticateServer != null) {

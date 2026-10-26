@@ -13,6 +13,7 @@ import androidx.fragment.app.FragmentActivity
 import app.overbay.orbit.App
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.util.DisplayRefreshRateHelper
+import app.overbay.orbit.util.OidcCallbackBridge
 
 class MainActivity : FragmentActivity() {
 
@@ -26,7 +27,7 @@ class MainActivity : FragmentActivity() {
         // Configure adaptive high refresh rate (120Hz) without battery-draining locked modes
         DisplayRefreshRateHelper.configureHighRefreshRate(window, display)
 
-        currentNavKey = extractNavKeyFromIntent(intent)
+        handleIncomingIntent(intent)
 
         setContent {
             App(initialNavKey = currentNavKey)
@@ -36,15 +37,27 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        extractNavKeyFromIntent(intent)?.let { currentNavKey = it }
+        handleIncomingIntent(intent)
     }
 
-    private fun extractNavKeyFromIntent(intent: Intent?): OrbitNavKey? {
-        val uri: Uri = intent?.data ?: return null
+    private fun handleIncomingIntent(intent: Intent?) {
+        val uri: Uri = intent?.data ?: return
         val scheme = uri.scheme?.lowercase()
-        if (scheme != "orbitmoney" && scheme != "orbitbeta") return null
+        if (scheme != "orbitmoney" && scheme != "orbitbeta") return
 
         val hostAndPath = "${uri.host ?: ""}${uri.path ?: ""}"
+        if (hostAndPath.contains("auth/callback")) {
+            val code = uri.getQueryParameter("code")
+            if (!code.isNullOrBlank()) {
+                OidcCallbackBridge.submitExchangeCode(code)
+            }
+            return
+        }
+
+        extractNavKeyFromHostAndPath(hostAndPath)?.let { currentNavKey = it }
+    }
+
+    private fun extractNavKeyFromHostAndPath(hostAndPath: String): OrbitNavKey? {
         return when {
             hostAndPath.contains("add-transaction") -> OrbitNavKey.Transactions()
             hostAndPath.contains("budgets") -> OrbitNavKey.Budgets

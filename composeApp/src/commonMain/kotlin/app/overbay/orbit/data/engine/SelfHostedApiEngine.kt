@@ -61,22 +61,48 @@ class SelfHostedApiEngine(
 
     private suspend fun fetchRemoteSnapshot(currentPrefs: OrbitPreferences): OrbitWorkspaceSnapshot = coroutineScope {
         val accountsDeferred = async { apiClient.getAccounts().getOrThrow() }
-        val transactionsDeferred = async { apiClient.getTransactions(page = 1, limit = 200).getOrThrow() }
+        val transactionsDeferred = async { apiClient.getAllTransactions().getOrThrow() }
         val categoriesDeferred = async { apiClient.getCategories().getOrThrow() }
         val budgetsDeferred = async { apiClient.getBudgets("").getOrNull() }
         val goalsDeferred = async { apiClient.getGoals().getOrNull() ?: emptyList() }
         val rulesDeferred = async { apiClient.getRules().getOrNull() ?: emptyList() }
         val upcomingDeferred = async { apiClient.getUpcoming().getOrNull() ?: emptyList() }
+        val householdDeferred = async { apiClient.getHousehold().getOrNull() }
+        val mhaDeferred = async { apiClient.getMhaOverview().getOrNull() }
         val authMeDeferred = async { apiClient.getMe().getOrNull() }
 
         val accountsDto = accountsDeferred.await()
-        val txResponseDto = transactionsDeferred.await()
+        val txDtos = transactionsDeferred.await()
         val categoriesDto = categoriesDeferred.await()
         val budgetsDto = budgetsDeferred.await()
         val goalsDto = goalsDeferred.await()
         val rulesDto = rulesDeferred.await()
         val upcomingDto = upcomingDeferred.await()
+        val householdDto = householdDeferred.await()
+        val mhaDto = mhaDeferred.await()
         val authMe = authMeDeferred.await()
+
+        val accounts = accountsDto.map { it.toDomain() }
+        val categories = categoriesDto.map { it.toDomain() }
+        val accountsById = accounts.associateBy { it.id }
+        val categoriesById = categories.associateBy { it.id }
+
+        val transactions = txDtos.map { dto ->
+            val tx = dto.toDomain()
+            val cat = tx.effectiveCategoryId?.let { categoriesById[it] }
+            tx.copy(
+                accountName = tx.accountName.ifBlank { accountsById[tx.accountId]?.name ?: "" },
+                categoryName = tx.categoryName ?: cat?.name,
+                categoryColor = tx.categoryColor ?: cat?.color,
+                categoryIcon = tx.categoryIcon ?: cat?.icon
+            )
+        }
+
+        val resolvedPrefs = if (mhaDto != null) {
+            currentPrefs.copy(mhaTrackerEnabled = mhaDto.enabled)
+        } else {
+            currentPrefs
+        }
 
         OrbitWorkspaceSnapshot(
             schemaVersion = OrbitWorkspaceSnapshot.CURRENT_SCHEMA_VERSION,
@@ -85,14 +111,16 @@ class SelfHostedApiEngine(
                 id = authMe?.household?.id ?: 1L,
                 name = authMe?.household?.name ?: "My Household"
             ),
-            accounts = accountsDto.map { it.toDomain() },
-            categories = categoriesDto.map { it.toDomain() },
-            transactions = txResponseDto.items.map { it.toDomain() },
+            members = householdDto?.members?.map { it.toDomain() } ?: emptyList(),
+            accounts = accounts,
+            categories = categories,
+            transactions = transactions,
             budgets = budgetsDto?.toDomainList() ?: emptyList(),
             goals = goalsDto.map { it.toDomain() },
             rules = rulesDto.map { it.toDomain() },
             upcomingItems = upcomingDto.map { it.toDomain() },
-            preferences = currentPrefs
+            preferences = resolvedPrefs,
+            mhaTaxProfile = mhaDto?.taxProfile?.toDomain() ?: app.overbay.orbit.data.model.MhaTaxProfile()
         )
     }
 
@@ -111,10 +139,15 @@ class SelfHostedApiEngine(
 
     override suspend fun sync(force: Boolean): SyncResult {
         return try {
-            val syncResult = apiClient.triggerSimpleFinSync().getOrThrow()
+            val simpleFinRes = apiClient.triggerSimpleFinSync().getOrNull()
             val fresh = fetchRemoteSnapshot(preferencesProvider().copy(storageMode = StorageMode.SELF_HOSTED))
             saveSnapshot(fresh)
-            SyncResult.Success("Remote sync succeeded: ${syncResult.transactionsInserted} new transactions inserted")
+            val suffix = if (simpleFinRes != null && simpleFinRes.transactionsInserted > 0) {
+                " (${simpleFinRes.transactionsInserted} new SimpleFIN transactions)"
+            } else {
+                ""
+            }
+            SyncResult.Success("Synced ${fresh.accounts.size} accounts and ${fresh.transactions.size} transactions$suffix")
         } catch (e: Throwable) {
             SyncResult.Error("Remote sync failed: ${e.message}", e)
         }

@@ -19,11 +19,13 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.UpcomingItem
 import app.overbay.orbit.data.network.OrbitApiClient
+import app.overbay.orbit.data.network.ServerUrlNormalizer
 import app.overbay.orbit.data.network.SimpleFinDirectClient
 import app.overbay.orbit.data.sync.CloudSyncManager
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.RuleMatcherEngine
 import app.overbay.orbit.domain.TransferMatcherEngine
+import app.overbay.orbit.util.OidcCallbackBridge
 import app.overbay.orbit.util.PlatformStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -81,7 +83,16 @@ class OrbitRepository(
 
     suspend fun initialize() {
         val localSnap = localEngine.loadSnapshot()
-        val pref = localSnap.preferences
+        val pendingOidcUrl = storage.loadString(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
+        val pref = if (!pendingOidcUrl.isNullOrBlank()) {
+            localSnap.preferences.copy(
+                storageMode = StorageMode.SELF_HOSTED,
+                selfHostedServerUrl = if (pendingOidcUrl == "/") "" else pendingOidcUrl,
+                onboardingCompleted = true
+            )
+        } else {
+            localSnap.preferences
+        }
         _preferences.value = pref
         _storageMode.value = pref.storageMode
         activeEngine = if (pref.storageMode == StorageMode.SELF_HOSTED) {
@@ -89,8 +100,11 @@ class OrbitRepository(
         } else {
             localEngine
         }
-        val loaded = activeEngine.loadSnapshot()
+        val loaded = activeEngine.loadSnapshot().copy(preferences = pref)
         updateMemoryState(loaded)
+        if (!pendingOidcUrl.isNullOrBlank()) {
+            localEngine.saveSnapshot(loaded)
+        }
     }
 
     private fun updateMemoryState(newSnapshot: OrbitWorkspaceSnapshot) {
@@ -116,26 +130,48 @@ class OrbitRepository(
     }
 
     // -------------------------------------------------------------------------
-    // Storage Mode Switch
+    // Storage Mode Switch & SSO Exchange
     // -------------------------------------------------------------------------
     suspend fun setStorageMode(mode: StorageMode, serverUrl: String? = null) {
+        val normalizedUrl = serverUrl?.let { ServerUrlNormalizer.normalize(it) }
+            ?: ServerUrlNormalizer.normalize(_preferences.value.selfHostedServerUrl)
         val updatedPref = _preferences.value.copy(
             storageMode = mode,
-            selfHostedServerUrl = serverUrl ?: _preferences.value.selfHostedServerUrl
+            selfHostedServerUrl = normalizedUrl
         )
         _storageMode.value = mode
         _preferences.value = updatedPref
 
         activeEngine = if (mode == StorageMode.SELF_HOSTED) {
-            SelfHostedApiEngine(createApiClient(updatedPref.selfHostedServerUrl), storage) { _preferences.value }
+            SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
         } else {
             localEngine
         }
 
-        val snapshotToCommit = _snapshot.value.copy(preferences = updatedPref)
-        commitSnapshot(snapshotToCommit)
-        val fresh = activeEngine.loadSnapshot()
-        updateMemoryState(fresh.copy(preferences = updatedPref))
+        val fresh = activeEngine.loadSnapshot().copy(preferences = updatedPref)
+        commitSnapshot(fresh)
+    }
+
+    suspend fun completeOidcNativeExchange(code: String): Result<String> = runCatching {
+        val pendingUrl = storage.loadString(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
+        storage.delete(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
+        val rawUrl = if (!pendingUrl.isNullOrBlank() && pendingUrl != "/") pendingUrl else _preferences.value.selfHostedServerUrl
+        val serverUrl = ServerUrlNormalizer.normalize(rawUrl)
+        val client = createApiClient(serverUrl)
+        val authMe = client.exchangeOidcCode(code).getOrThrow()
+        val updatedPref = _preferences.value.copy(
+            storageMode = StorageMode.SELF_HOSTED,
+            selfHostedServerUrl = serverUrl,
+            onboardingCompleted = true
+        )
+        _preferences.value = updatedPref
+        _storageMode.value = StorageMode.SELF_HOSTED
+        activeEngine = SelfHostedApiEngine(client, storage) { _preferences.value }
+        val fresh = activeEngine.loadSnapshot().copy(preferences = updatedPref)
+        commitSnapshot(fresh)
+        val userLabel = authMe.displayName ?: authMe.username ?: authMe.email ?: "SSO User"
+        _syncStatus.value = SyncResult.Success("Signed in as $userLabel (${fresh.transactions.size} transactions)")
+        userLabel
     }
 
     // -------------------------------------------------------------------------
@@ -220,57 +256,29 @@ class OrbitRepository(
     }
 
     suspend fun batchEditCategory(ids: Set<Long>, categoryId: Long) {
-        val current = _transactions.value
-        val updatedList = current.map { txn ->
-            if (txn.id in ids) {
-                txn.copy(
-                    editedCategoryId = categoryId,
-                    editedCategoryIdSource = "user",
-                    editSource = EditSource.USER
-                )
-            } else txn
+        val updatedList = _transactions.value.map { txn ->
+            if (txn.id in ids) txn.copy(editedCategoryId = categoryId, editedCategoryIdSource = "user", editSource = EditSource.USER) else txn
         }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
     }
 
     suspend fun batchMarkTransfer(ids: Set<Long>, isTransfer: Boolean) {
-        val current = _transactions.value
-        val updatedList = current.map { txn ->
-            if (txn.id in ids) {
-                txn.copy(
-                    editedIsTransfer = isTransfer,
-                    editedIsTransferSource = "user",
-                    editSource = EditSource.USER
-                )
-            } else txn
+        val updatedList = _transactions.value.map { txn ->
+            if (txn.id in ids) txn.copy(editedIsTransfer = isTransfer, editedIsTransferSource = "user", editSource = EditSource.USER) else txn
         }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
     }
 
     suspend fun batchSetMhaEligible(ids: Set<Long>, eligible: Boolean) {
-        val current = _transactions.value
-        val updatedList = current.map { txn ->
-            if (txn.id in ids) {
-                txn.copy(
-                    editedMhaEligible = eligible,
-                    editedMhaEligibleSource = "user",
-                    editSource = EditSource.USER
-                )
-            } else txn
+        val updatedList = _transactions.value.map { txn ->
+            if (txn.id in ids) txn.copy(editedMhaEligible = eligible, editedMhaEligibleSource = "user", editSource = EditSource.USER) else txn
         }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
     }
 
     suspend fun batchSetIgnored(ids: Set<Long>, ignored: Boolean) {
-        val current = _transactions.value
-        val updatedList = current.map { txn ->
-            if (txn.id in ids) {
-                txn.copy(
-                    editedIsIgnored = ignored,
-                    editedIsIgnoredSource = "user",
-                    editSource = EditSource.USER
-                )
-            } else txn
+        val updatedList = _transactions.value.map { txn ->
+            if (txn.id in ids) txn.copy(editedIsIgnored = ignored, editedIsIgnoredSource = "user", editSource = EditSource.USER) else txn
         }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
     }
@@ -451,9 +459,7 @@ class OrbitRepository(
         activeEngine.deleteBudget(id)
     }
 
-    // -------------------------------------------------------------------------
     // Goals & Rules
-    // -------------------------------------------------------------------------
     suspend fun saveGoal(goal: Goal) {
         val current = _goals.value
         val exists = current.any { it.id == goal.id && goal.id != 0L }
@@ -503,9 +509,7 @@ class OrbitRepository(
         commitSnapshot(_snapshot.value.copy(transactions = paired))
     }
 
-    // -------------------------------------------------------------------------
     // Upcoming Items
-    // -------------------------------------------------------------------------
     suspend fun saveUpcoming(item: UpcomingItem) {
         val current = _upcomingItems.value
         val exists = current.any { it.id == item.id && item.id != 0L }
@@ -525,9 +529,7 @@ class OrbitRepository(
         activeEngine.deleteUpcoming(id)
     }
 
-    // -------------------------------------------------------------------------
     // Preferences & Sync
-    // -------------------------------------------------------------------------
     suspend fun updatePreferences(preferences: OrbitPreferences) {
         _preferences.value = preferences
         commitSnapshot(_snapshot.value.copy(preferences = preferences))
@@ -543,14 +545,12 @@ class OrbitRepository(
         _syncStatus.value = result
         if (result is SyncResult.Success) {
             val fresh = activeEngine.loadSnapshot()
-            updateMemoryState(fresh)
+            commitSnapshot(fresh)
         }
         return result
     }
 
-    // -------------------------------------------------------------------------
     // Backup & Restore
-    // -------------------------------------------------------------------------
     fun exportBackupJson(): String = json.encodeToString(OrbitWorkspaceSnapshot.serializer(), _snapshot.value)
 
     suspend fun restoreBackupJson(jsonString: String): Result<Unit> = runCatching {

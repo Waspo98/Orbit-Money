@@ -35,12 +35,16 @@ sealed interface ServerAuthStatus {
 data class OnboardingUiState(
     val currentStep: OnboardingStep = OnboardingStep.WELCOME,
     val selectedStorageMode: StorageMode = StorageMode.LOCAL,
-    val serverUrl: String = "http://localhost:5019",
+    val serverUrl: String = "",
     val serverConnectionStatus: ServerConnectionStatus = ServerConnectionStatus.Idle,
     val serverUsername: String = "",
     val serverPassword: String = "",
     val isPasswordVisible: Boolean = false,
     val authStatus: ServerAuthStatus = ServerAuthStatus.Idle,
+    val localAuthEnabled: Boolean = true,
+    val oidcAuthEnabled: Boolean = true,
+    val oidcLoginUrl: String = "/api/auth/oidc/login",
+    val oidcLoginLabel: String = "Continue with Authentik / SSO",
     val selectedSeedChoice: SeedChoice = SeedChoice.DEMO,
     val backupJsonContent: String? = null,
     val backupFileName: String? = null,
@@ -62,6 +66,7 @@ sealed interface OnboardingIntent {
     data class UpdateCredentials(val username: String, val password: String) : OnboardingIntent
     data object TogglePasswordVisibility : OnboardingIntent
     data object AuthenticateServer : OnboardingIntent
+    data object PrepareOidcLogin : OnboardingIntent
     data class SelectSeedChoice(val choice: SeedChoice) : OnboardingIntent
     data class SetBackupFile(val fileName: String, val jsonContent: String) : OnboardingIntent
     data class SelectThemePreset(val preset: OrbitThemePreset) : OnboardingIntent

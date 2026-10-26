@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.network.OrbitApiClient
+import app.overbay.orbit.data.network.ServerUrlNormalizer
 import app.overbay.orbit.domain.DemoSeedGenerator
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -41,6 +42,7 @@ class OnboardingViewModel(
                 it.copy(isPasswordVisible = !it.isPasswordVisible)
             }
             OnboardingIntent.AuthenticateServer -> performServerLogin()
+            OnboardingIntent.PrepareOidcLogin -> prepareOidcLogin()
             is OnboardingIntent.SelectSeedChoice -> _uiState.update { it.copy(selectedSeedChoice = intent.choice) }
             is OnboardingIntent.SetBackupFile -> _uiState.update {
                 it.copy(backupFileName = intent.fileName, backupJsonContent = intent.jsonContent)
@@ -54,8 +56,13 @@ class OnboardingViewModel(
     }
 
     private fun advanceStep() {
+        val state = _uiState.value
+        if (state.currentStep == OnboardingStep.STORAGE_MODE && state.selectedStorageMode == StorageMode.SELF_HOSTED) {
+            _uiState.update { it.copy(currentStep = OnboardingStep.THEME_SETUP) }
+            return
+        }
         val steps = OnboardingStep.entries
-        val nextIndex = _uiState.value.currentStep.ordinal + 1
+        val nextIndex = state.currentStep.ordinal + 1
         if (nextIndex < steps.size) {
             _uiState.update { it.copy(currentStep = steps[nextIndex]) }
         } else {
@@ -64,32 +71,72 @@ class OnboardingViewModel(
     }
 
     private fun retreatStep() {
+        val state = _uiState.value
+        if (state.currentStep == OnboardingStep.THEME_SETUP && state.selectedStorageMode == StorageMode.SELF_HOSTED) {
+            _uiState.update { it.copy(currentStep = OnboardingStep.STORAGE_MODE) }
+            return
+        }
         val steps = OnboardingStep.entries
-        val prevIndex = _uiState.value.currentStep.ordinal - 1
+        val prevIndex = state.currentStep.ordinal - 1
         if (prevIndex >= 0) {
             _uiState.update { it.copy(currentStep = steps[prevIndex]) }
         }
     }
 
     private fun performServerPing() {
-        val url = _uiState.value.serverUrl.trim().trimEnd('/')
+        val url = ServerUrlNormalizer.normalize(_uiState.value.serverUrl)
         if (url.isBlank()) {
             _uiState.update { it.copy(serverConnectionStatus = ServerConnectionStatus.Error("Server URL cannot be empty")) }
             return
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(serverConnectionStatus = ServerConnectionStatus.Checking) }
+            _uiState.update {
+                it.copy(
+                    serverUrl = url,
+                    serverConnectionStatus = ServerConnectionStatus.Checking
+                )
+            }
             try {
-                val pingClient = testHttpClient ?: HttpClient()
-                val response = pingClient.get("$url/api/auth/config")
-                if (response.status.isSuccess()) {
+                if (testHttpClient != null) {
+                    val response = testHttpClient.get("$url/api/auth/config")
+                    if (response.status.isSuccess()) {
+                        _uiState.update {
+                            it.copy(serverConnectionStatus = ServerConnectionStatus.Success("Connected successfully to Orbit Money server!"))
+                        }
+                    } else {
+                        _uiState.update {
+                            it.copy(serverConnectionStatus = ServerConnectionStatus.Error("Server returned HTTP ${response.status.value}"))
+                        }
+                    }
+                    return@launch
+                }
+
+                val client = customApiClient ?: repository.createApiClient(url)
+                val cfgResult = client.getAuthConfig()
+                if (cfgResult.isSuccess) {
+                    val cfg = cfgResult.getOrThrow()
+                    repository.updatePreferences(
+                        repository.preferences.value.copy(
+                            selfHostedServerUrl = url
+                        )
+                    )
                     _uiState.update {
-                        it.copy(serverConnectionStatus = ServerConnectionStatus.Success("Connected successfully to Orbit Money server!"))
+                        it.copy(
+                            serverConnectionStatus = ServerConnectionStatus.Success("Connected successfully to Orbit Money server!"),
+                            localAuthEnabled = cfg.localEnabled,
+                            oidcAuthEnabled = cfg.oidcEnabled,
+                            oidcLoginUrl = cfg.oidcLoginUrl ?: "/api/auth/oidc/login",
+                            oidcLoginLabel = cfg.oidcLoginLabel ?: "Continue with Authentik / SSO"
+                        )
                     }
                 } else {
                     _uiState.update {
-                        it.copy(serverConnectionStatus = ServerConnectionStatus.Error("Server returned HTTP ${response.status.value}"))
+                        it.copy(
+                            serverConnectionStatus = ServerConnectionStatus.Error(
+                                cfgResult.exceptionOrNull()?.message ?: "Failed to reach server"
+                            )
+                        )
                     }
                 }
             } catch (e: Exception) {
@@ -100,19 +147,51 @@ class OnboardingViewModel(
         }
     }
 
+    private fun prepareOidcLogin() {
+        val url = ServerUrlNormalizer.normalize(_uiState.value.serverUrl)
+        if (url.isBlank()) {
+            _uiState.update { it.copy(authStatus = ServerAuthStatus.Error("Enter your Server URL first")) }
+            return
+        }
+        _uiState.update {
+            it.copy(
+                serverUrl = url,
+                selectedStorageMode = StorageMode.SELF_HOSTED,
+                authStatus = ServerAuthStatus.Authenticating
+            )
+        }
+        viewModelScope.launch {
+            repository.updatePreferences(
+                repository.preferences.value.copy(
+                    storageMode = StorageMode.SELF_HOSTED,
+                    selfHostedServerUrl = url,
+                    themePreset = _uiState.value.selectedThemePreset,
+                    themeMode = _uiState.value.selectedThemeMode,
+                    dynamicColor = _uiState.value.dynamicColorEnabled
+                )
+            )
+        }
+    }
+
     private fun performServerLogin() {
         val state = _uiState.value
+        val url = ServerUrlNormalizer.normalize(state.serverUrl)
+        if (url.isBlank()) {
+            _uiState.update { it.copy(authStatus = ServerAuthStatus.Error("Server URL is required")) }
+            return
+        }
         if (state.serverUsername.isBlank() || state.serverPassword.isBlank()) {
             _uiState.update { it.copy(authStatus = ServerAuthStatus.Error("Username and password are required")) }
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(authStatus = ServerAuthStatus.Authenticating) }
+            _uiState.update { it.copy(serverUrl = url, authStatus = ServerAuthStatus.Authenticating) }
             try {
-                val client = customApiClient ?: repository.createApiClient(state.serverUrl.trim())
+                val client = customApiClient ?: repository.createApiClient(url)
                 val loginResult = client.login(state.serverUsername.trim(), state.serverPassword)
                 if (loginResult.isSuccess) {
                     val user = loginResult.getOrNull()?.username ?: state.serverUsername.trim()
+                    repository.setStorageMode(StorageMode.SELF_HOSTED, url)
                     _uiState.update { it.copy(authStatus = ServerAuthStatus.Success(user)) }
                 } else {
                     _uiState.update {
@@ -130,41 +209,43 @@ class OnboardingViewModel(
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
             try {
                 val state = _uiState.value
+                val normalizedUrl = ServerUrlNormalizer.normalize(state.serverUrl)
 
-                // 1. Storage Mode
                 if (state.selectedStorageMode == StorageMode.SELF_HOSTED) {
-                    repository.setStorageMode(StorageMode.SELF_HOSTED, state.serverUrl.trim())
+                    if (state.serverUsername.isNotBlank() && state.serverPassword.isNotBlank() && state.authStatus !is ServerAuthStatus.Success) {
+                        val client = customApiClient ?: repository.createApiClient(normalizedUrl)
+                        client.login(state.serverUsername.trim(), state.serverPassword)
+                    }
+                    repository.setStorageMode(StorageMode.SELF_HOSTED, normalizedUrl)
                 } else {
                     repository.setStorageMode(StorageMode.LOCAL)
-                }
-
-                // 2. Data Seed
-                when (state.selectedSeedChoice) {
-                    SeedChoice.DEMO -> {
-                        val snapshot = DemoSeedGenerator.generateDemoSnapshot()
-                        repository.loadDemoData(snapshot)
-                    }
-                    SeedChoice.RESTORE_FILE -> {
-                        state.backupJsonContent?.let { json ->
-                            repository.restoreBackupJson(json)
+                    when (state.selectedSeedChoice) {
+                        SeedChoice.DEMO -> {
+                            val snapshot = DemoSeedGenerator.generateDemoSnapshot()
+                            repository.loadDemoData(snapshot)
                         }
-                    }
-                    SeedChoice.FRESH -> {
-                        // Keeps empty accounts with standard initialized categories
-                    }
-                    SeedChoice.GOOGLE_DRIVE -> {
-                        // Flags Google Drive sync for automatic connection
+                        SeedChoice.RESTORE_FILE -> {
+                            state.backupJsonContent?.let { json ->
+                                repository.restoreBackupJson(json)
+                            }
+                        }
+                        SeedChoice.FRESH -> {
+                            // Keeps empty accounts with standard initialized categories
+                        }
+                        SeedChoice.GOOGLE_DRIVE -> {
+                            // Flags Google Drive sync for automatic connection
+                        }
                     }
                 }
 
                 // 3. Preferences
                 val updatedPref = repository.preferences.value.copy(
                     storageMode = state.selectedStorageMode,
-                    selfHostedServerUrl = state.serverUrl.trim(),
+                    selfHostedServerUrl = normalizedUrl,
                     themePreset = state.selectedThemePreset,
                     themeMode = state.selectedThemeMode,
                     dynamicColor = state.dynamicColorEnabled,
-                    googleDriveSyncEnabled = (state.selectedSeedChoice == SeedChoice.GOOGLE_DRIVE),
+                    googleDriveSyncEnabled = (state.selectedStorageMode == StorageMode.LOCAL && state.selectedSeedChoice == SeedChoice.GOOGLE_DRIVE),
                     onboardingCompleted = true
                 )
                 repository.updatePreferences(updatedPref)

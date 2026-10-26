@@ -19,11 +19,14 @@ import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalBiometricAuthHelper
 import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.LocalFileImportExportHelper
+import app.overbay.orbit.util.LocalOidcAuthLauncher
 import app.overbay.orbit.util.LocalOrbitHaptics
+import app.overbay.orbit.util.OidcCallbackBridge
 import app.overbay.orbit.util.PlatformStorage
 import app.overbay.orbit.util.rememberBiometricAuthHelper
 import app.overbay.orbit.util.rememberDevicePosture
 import app.overbay.orbit.util.rememberFileImportExportHelper
+import app.overbay.orbit.util.rememberOidcAuthLauncher
 import app.overbay.orbit.util.rememberOrbitHaptics
 
 @Composable
@@ -38,12 +41,22 @@ fun App(
     val haptics = rememberOrbitHaptics()
     val biometricHelper = rememberBiometricAuthHelper()
     val fileHelper = rememberFileImportExportHelper()
+    val oidcLauncher = rememberOidcAuthLauncher()
     val repo = repository ?: remember { OrbitRepository(PlatformStorage()) }
     var isInitialized by remember(repo) { mutableStateOf(repository != null) }
 
     LaunchedEffect(repo) {
         repo.initialize()
         isInitialized = true
+    }
+
+    val pendingOidcCode by OidcCallbackBridge.pendingCode.collectAsStateWithLifecycle()
+    LaunchedEffect(isInitialized, pendingOidcCode) {
+        val code = pendingOidcCode
+        if (isInitialized && !code.isNullOrBlank()) {
+            OidcCallbackBridge.consumeExchangeCode(code)
+            repo.completeOidcNativeExchange(code)
+        }
     }
 
     val preferences by repo.preferences.collectAsStateWithLifecycle()
@@ -65,7 +78,8 @@ fun App(
         LocalDevicePosture provides posture,
         LocalOrbitHaptics provides haptics,
         LocalBiometricAuthHelper provides biometricHelper,
-        LocalFileImportExportHelper provides fileHelper
+        LocalFileImportExportHelper provides fileHelper,
+        LocalOidcAuthLauncher provides oidcLauncher
     ) {
         OrbitTheme(
             themePreset = activePreset,

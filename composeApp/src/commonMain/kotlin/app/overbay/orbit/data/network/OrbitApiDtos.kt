@@ -31,10 +31,10 @@ data class AccountDto(
     val balance: Double? = null,
     @SerialName("current_balance") val currentBalance: Double? = null,
     @SerialName("estimated_value") val estimatedValue: Double? = null,
-    @SerialName("is_manual") val isManual: Boolean = false,
-    @SerialName("is_archived") val isArchived: Boolean = false,
+    @SerialName("is_manual") @Serializable(with = FlexibleBooleanSerializer::class) val isManual: Boolean = false,
+    @SerialName("is_archived") @Serializable(with = FlexibleBooleanSerializer::class) val isArchived: Boolean = false,
     @SerialName("sort_order") val sortOrder: Int = 0,
-    @SerialName("mha_default_eligible") val mhaDefaultEligible: Boolean = false,
+    @SerialName("mha_default_eligible") @Serializable(with = FlexibleBooleanSerializer::class) val mhaDefaultEligible: Boolean = false,
     @SerialName("simplefin_account_id") val simplefinAccountId: String? = null,
     @SerialName("credit_card_profile") val creditCardProfile: CreditCardProfileDto? = null
 ) {
@@ -84,34 +84,43 @@ data class TransactionDto(
     @SerialName("account_id") val accountId: Long,
     @SerialName("account_name") val accountName: String? = null,
     val date: String,
+    @SerialName("original_date") val originalDate: String? = null,
+    @SerialName("edited_date") val editedDate: String? = null,
     val amount: Double,
+    @SerialName("original_amount") val originalAmount: Double? = null,
+    @SerialName("edited_amount") val editedAmount: Double? = null,
     val merchant: String? = null,
     @SerialName("category_id") val categoryId: Long? = null,
     @SerialName("category_name") val categoryName: String? = null,
     @SerialName("category_color") val categoryColor: String? = null,
     @SerialName("category_icon") val categoryIcon: String? = null,
-    @SerialName("is_transfer") val isTransfer: Boolean = false,
-    @SerialName("is_ignored") val isIgnored: Boolean = false,
+    @SerialName("is_transfer") @Serializable(with = FlexibleBooleanSerializer::class) val isTransfer: Boolean = false,
+    @SerialName("is_ignored") @Serializable(with = FlexibleBooleanSerializer::class) val isIgnored: Boolean = false,
     @SerialName("original_merchant") val originalMerchant: String? = null,
     @SerialName("original_description") val originalDescription: String? = null,
     @SerialName("original_category_id") val originalCategoryId: Long? = null,
+    @SerialName("original_is_transfer") @Serializable(with = FlexibleNullableBooleanSerializer::class) val originalIsTransfer: Boolean? = null,
+    @SerialName("original_is_ignored") @Serializable(with = FlexibleNullableBooleanSerializer::class) val originalIsIgnored: Boolean? = null,
     @SerialName("edited_merchant") val editedMerchant: String? = null,
     @SerialName("edited_merchant_source") val editedMerchantSource: String? = null,
     @SerialName("edited_category_id") val editedCategoryId: Long? = null,
     @SerialName("edited_category_id_source") val editedCategoryIdSource: String? = null,
-    @SerialName("edited_is_transfer") val editedIsTransfer: Boolean? = null,
+    @SerialName("edited_is_transfer") @Serializable(with = FlexibleNullableBooleanSerializer::class) val editedIsTransfer: Boolean? = null,
     @SerialName("edited_is_transfer_source") val editedIsTransferSource: String? = null,
-    @SerialName("edited_is_ignored") val editedIsIgnored: Boolean? = null,
+    @SerialName("edited_is_ignored") @Serializable(with = FlexibleNullableBooleanSerializer::class) val editedIsIgnored: Boolean? = null,
     @SerialName("edited_is_ignored_source") val editedIsIgnoredSource: String? = null,
-    @SerialName("edited_mha_eligible") val editedMhaEligible: Boolean? = null,
+    @SerialName("mha_eligible") @Serializable(with = FlexibleNullableBooleanSerializer::class) val mhaEligible: Boolean? = null,
+    @SerialName("edited_mha_eligible") @Serializable(with = FlexibleNullableBooleanSerializer::class) val editedMhaEligible: Boolean? = null,
     @SerialName("edited_mha_eligible_source") val editedMhaEligibleSource: String? = null,
     val notes: String? = null,
     @SerialName("transfer_pair_id") val transferPairId: Long? = null,
-    @SerialName("is_pending") val isPending: Boolean = false
+    @SerialName("is_pending") @Serializable(with = FlexibleBooleanSerializer::class) val isPending: Boolean = false,
+    @SerialName("external_id") val externalId: String? = null,
+    val source: String = "manual"
 ) {
     fun toDomain(): Transaction {
         val origMerchant = originalMerchant ?: merchant ?: ""
-        val origAmountCents = MoneyUtils.dollarsToCents(amount)
+        val origAmountCents = MoneyUtils.dollarsToCents(originalAmount ?: amount)
         val editSrc = when {
             editedMerchantSource?.lowercase() == "user" || editedCategoryIdSource?.lowercase() == "user" -> EditSource.USER
             editedMerchantSource?.startsWith("rule", ignoreCase = true) == true || editedCategoryIdSource?.startsWith("rule", ignoreCase = true) == true -> EditSource.RULE
@@ -123,7 +132,7 @@ data class TransactionDto(
             id = id,
             accountId = accountId,
             accountName = accountName ?: "",
-            originalDate = date,
+            originalDate = originalDate ?: date,
             originalMerchant = origMerchant,
             originalDescription = originalDescription,
             originalAmountCents = origAmountCents,
@@ -131,24 +140,26 @@ data class TransactionDto(
             categoryName = categoryName,
             categoryColor = categoryColor,
             categoryIcon = categoryIcon,
-            isTransfer = isTransfer,
-            isIgnored = isIgnored,
+            isTransfer = originalIsTransfer ?: isTransfer,
+            isIgnored = originalIsIgnored ?: isIgnored,
             transferPairId = transferPairId,
             isPending = isPending,
             notes = notes,
-            editedDate = null,
-            editedMerchant = editedMerchant,
+            editedDate = editedDate,
+            editedMerchant = editedMerchant ?: if (editedMerchantSource != null) merchant else null,
             editedMerchantSource = editedMerchantSource,
-            editedAmountCents = null,
-            editedCategoryId = editedCategoryId,
+            editedAmountCents = editedAmount?.let { MoneyUtils.dollarsToCents(it) },
+            editedCategoryId = editedCategoryId ?: if (editedCategoryIdSource != null) categoryId else null,
             editedCategoryIdSource = editedCategoryIdSource,
-            editedIsTransfer = editedIsTransfer,
+            editedIsTransfer = editedIsTransfer ?: if (editedIsTransferSource != null) isTransfer else null,
             editedIsTransferSource = editedIsTransferSource,
-            editedIsIgnored = editedIsIgnored,
+            editedIsIgnored = editedIsIgnored ?: if (editedIsIgnoredSource != null) isIgnored else null,
             editedIsIgnoredSource = editedIsIgnoredSource,
-            editedMhaEligible = editedMhaEligible,
+            editedMhaEligible = editedMhaEligible ?: mhaEligible,
             editedMhaEligibleSource = editedMhaEligibleSource,
-            editSource = editSrc
+            externalId = externalId,
+            editSource = editSrc,
+            source = source
         )
     }
 }
@@ -159,6 +170,7 @@ data class TransactionListResponseDto(
     val total: Int = 0,
     val page: Int = 1,
     val limit: Int = 50,
+    @SerialName("totalPages") val totalPages: Int = 1,
     @SerialName("grandTotal") val grandTotal: Int = 0,
     @SerialName("monthlyIncome") val monthlyIncome: Double = 0.0,
     @SerialName("monthlyExpenses") val monthlyExpenses: Double = 0.0,
@@ -171,11 +183,11 @@ data class CategoryDto(
     val name: String,
     val color: String = "#888888",
     val icon: String? = null,
-    @SerialName("is_transfer") val isTransfer: Boolean = false,
-    @SerialName("is_income") val isIncome: Boolean = false,
+    @SerialName("is_transfer") @Serializable(with = FlexibleBooleanSerializer::class) val isTransfer: Boolean = false,
+    @SerialName("is_income") @Serializable(with = FlexibleBooleanSerializer::class) val isIncome: Boolean = false,
     @SerialName("sort_order") val sortOrder: Int = 0,
-    @SerialName("mha_default_eligible") val mhaDefaultEligible: Boolean = false,
-    @SerialName("mha_default_ignored") val mhaDefaultIgnored: Boolean = false
+    @SerialName("mha_default_eligible") @Serializable(with = FlexibleBooleanSerializer::class) val mhaDefaultEligible: Boolean = false,
+    @SerialName("mha_default_ignored") @Serializable(with = FlexibleBooleanSerializer::class) val mhaDefaultIgnored: Boolean = false
 ) {
     fun toDomain(): Category = Category(
         id = id,
@@ -204,7 +216,7 @@ data class BudgetDto(
     @SerialName("category_icon") val categoryIcon: String? = null,
     val amount: Double = 0.0,
     val spent: Double = 0.0,
-    val rollover: Boolean = false
+    @Serializable(with = FlexibleBooleanSerializer::class) val rollover: Boolean = false
 ) {
     fun toDomain(): CategoryBudget = CategoryBudget(
         id = id,
@@ -220,20 +232,21 @@ data class BudgetDto(
 
 @Serializable
 data class BudgetOverviewItemDto(
-    @SerialName("budget_id") val budgetId: Long = 0L,
+    @SerialName("budget_id") val budgetId: Long? = null,
     val category: CategoryDto? = null,
-    @SerialName("budget_amount") val budgetAmount: Double = 0.0,
+    val amount: Double? = null,
+    @SerialName("budget_amount") val budgetAmount: Double? = null,
     val spent: Double = 0.0,
-    val rollover: Boolean = false
+    @Serializable(with = FlexibleNullableBooleanSerializer::class) val rollover: Boolean? = false
 ) {
     fun toDomain(): CategoryBudget = CategoryBudget(
-        id = budgetId,
+        id = budgetId ?: category?.id ?: 0L,
         categoryId = category?.id ?: 0L,
         categoryName = category?.name ?: "",
         categoryColor = category?.color ?: "#888888",
         categoryIcon = category?.icon,
-        amountCents = MoneyUtils.dollarsToCents(budgetAmount),
-        rollover = rollover,
+        amountCents = MoneyUtils.dollarsToCents(amount ?: budgetAmount ?: 0.0),
+        rollover = rollover ?: false,
         spentCents = MoneyUtils.dollarsToCents(spent)
     )
 }
@@ -276,9 +289,9 @@ data class GoalDto(
 
 @Serializable
 data class RuleConditionDto(
-    val field: String,
-    val operator: String,
-    val value: String
+    val field: String = "merchant",
+    val operator: String = "contains",
+    @Serializable(with = FlexibleStringSerializer::class) val value: String = ""
 ) {
     fun toDomain(): RuleCondition = RuleCondition(
         field = when (field.lowercase()) {
@@ -307,8 +320,8 @@ data class RuleConditionDto(
 
 @Serializable
 data class RuleActionDto(
-    val type: String,
-    val value: String
+    val type: String = "categorize",
+    @Serializable(with = FlexibleStringSerializer::class) val value: String = ""
 ) {
     fun toDomain(): RuleAction = RuleAction(
         type = when (type.lowercase()) {
@@ -330,7 +343,7 @@ data class RuleDto(
     val conditions: List<RuleConditionDto> = emptyList(),
     val actions: List<RuleActionDto> = emptyList(),
     val priority: Int = 0,
-    val enabled: Boolean = true
+    @Serializable(with = FlexibleBooleanSerializer::class) val enabled: Boolean = true
 ) {
     fun toDomain(): TransactionRule = TransactionRule(
         id = id,

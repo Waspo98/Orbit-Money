@@ -8,6 +8,7 @@ import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.StorageMode
+import app.overbay.orbit.data.network.ServerUrlNormalizer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -57,11 +58,7 @@ class SettingsViewModel(
         val updated = _uiState.value.preferences.copy(selfHostedServerUrl = trimmed)
         _uiState.update { it.copy(preferences = updated) }
         scope.launch {
-            if (_uiState.value.storageMode == StorageMode.SELF_HOSTED) {
-                repository.setStorageMode(StorageMode.SELF_HOSTED, trimmed)
-            } else {
-                repository.updatePreferences(updated)
-            }
+            repository.updatePreferences(updated)
         }
     }
 
@@ -70,16 +67,29 @@ class SettingsViewModel(
             _uiState.update { it.copy(statusMessage = "Username and password required") }
             return
         }
+        val normalizedUrl = ServerUrlNormalizer.normalize(_uiState.value.preferences.selfHostedServerUrl)
         _uiState.update { it.copy(isSyncing = true, statusMessage = "Authenticating...") }
         scope.launch {
-            val client = repository.createApiClient(_uiState.value.preferences.selfHostedServerUrl)
+            val client = repository.createApiClient(normalizedUrl)
             val loginRes = client.login(username.trim(), password)
             if (loginRes.isSuccess) {
-                repository.setStorageMode(StorageMode.SELF_HOSTED, _uiState.value.preferences.selfHostedServerUrl)
-                _uiState.update { it.copy(isSyncing = false, statusMessage = "Logged in as ${username.trim()}") }
-            } else {
+                repository.setStorageMode(StorageMode.SELF_HOSTED, normalizedUrl)
+                val txCount = repository.transactions.value.size
                 _uiState.update {
-                    it.copy(isSyncing = false, statusMessage = "Login failed: ${loginRes.exceptionOrNull()?.message}")
+                    it.copy(
+                        isSyncing = false,
+                        syncStatus = SyncResult.Success("Signed in as ${username.trim()} ($txCount transactions)"),
+                        statusMessage = "Logged in as ${username.trim()}"
+                    )
+                }
+            } else {
+                val errMsg = loginRes.exceptionOrNull()?.message ?: "Authentication failed"
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        syncStatus = SyncResult.Error(errMsg),
+                        statusMessage = "Login failed: $errMsg"
+                    )
                 }
             }
         }

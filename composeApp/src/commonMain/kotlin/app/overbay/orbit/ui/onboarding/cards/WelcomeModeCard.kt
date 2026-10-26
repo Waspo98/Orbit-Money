@@ -42,6 +42,7 @@ import app.overbay.orbit.ui.onboarding.OnboardingIntent
 import app.overbay.orbit.ui.onboarding.OnboardingUiState
 import app.overbay.orbit.ui.onboarding.ServerAuthStatus
 import app.overbay.orbit.ui.onboarding.ServerConnectionStatus
+import app.overbay.orbit.util.LocalOidcAuthLauncher
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -55,6 +56,7 @@ fun WelcomeModeCard(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
+    val oidcLauncher = LocalOidcAuthLauncher.current
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
@@ -196,37 +198,86 @@ fun WelcomeModeCard(
                         )
                     }
 
-                    // Optional Credentials
-                    OutlinedTextField(
-                        value = state.serverUsername,
-                        onValueChange = {
-                            onIntent(OnboardingIntent.UpdateCredentials(it, state.serverPassword))
-                        },
-                        label = { Text("Username (Optional)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                    if (state.oidcAuthEnabled) {
+                        Button(
+                            onClick = {
+                                haptics.confirm()
+                                onIntent(OnboardingIntent.PrepareOidcLogin)
+                                oidcLauncher.launchOidcLogin(state.serverUrl, state.oidcLoginUrl)
+                            },
+                            enabled = state.serverUrl.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(state.oidcLoginLabel)
+                        }
+                    }
 
-                    OutlinedTextField(
-                        value = state.serverPassword,
-                        onValueChange = {
-                            onIntent(OnboardingIntent.UpdateCredentials(state.serverUsername, it))
-                        },
-                        label = { Text("Password (Optional)") },
-                        singleLine = true,
-                        visualTransformation = if (state.isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { onIntent(OnboardingIntent.TogglePasswordVisibility) }) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "Toggle Password Visibility"
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                    if (state.localAuthEnabled) {
+                        OutlinedTextField(
+                            value = state.serverUsername,
+                            onValueChange = {
+                                onIntent(OnboardingIntent.UpdateCredentials(it, state.serverPassword))
+                            },
+                            label = { Text("Username") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        OutlinedTextField(
+                            value = state.serverPassword,
+                            onValueChange = {
+                                onIntent(OnboardingIntent.UpdateCredentials(state.serverUsername, it))
+                            },
+                            label = { Text("Password") },
+                            singleLine = true,
+                            visualTransformation = if (state.isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { onIntent(OnboardingIntent.TogglePasswordVisibility) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = "Toggle Password Visibility"
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        Button(
+                            onClick = {
+                                haptics.confirm()
+                                onIntent(OnboardingIntent.AuthenticateServer)
+                            },
+                            enabled = state.serverUrl.isNotBlank() && state.serverUsername.isNotBlank() && state.serverPassword.isNotBlank() && state.authStatus !is ServerAuthStatus.Authenticating,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(if (state.authStatus is ServerAuthStatus.Authenticating) "Signing In..." else "Sign In with Password")
+                        }
+                    }
+
+                    when (val auth = state.authStatus) {
+                        is ServerAuthStatus.Success -> {
+                            Text(
+                                text = "Signed in as ${auth.displayName}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.income,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+                        is ServerAuthStatus.Error -> {
+                            Text(
+                                text = auth.message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.expense,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+                        else -> {}
+                    }
                 }
             }
         }

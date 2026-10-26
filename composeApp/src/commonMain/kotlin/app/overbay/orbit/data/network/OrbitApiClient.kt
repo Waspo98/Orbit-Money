@@ -54,20 +54,56 @@ class OrbitApiClient(
         }
 
     private fun extractSessionCookie(response: HttpResponse) {
-        val setCookie = response.headers["Set-Cookie"] ?: response.headers["set-cookie"]
-        if (!setCookie.isNullOrBlank()) {
-            val cookieValue = setCookie.substringBefore(";").trim()
-            if (cookieValue.contains("connect.sid") || cookieValue.contains(".sid=")) {
-                sessionCookie = cookieValue
+        val allCookies = response.headers.getAll("Set-Cookie")
+            ?: response.headers.getAll("set-cookie")
+            ?: listOfNotNull(response.headers["Set-Cookie"] ?: response.headers["set-cookie"])
+        for (raw in allCookies) {
+            val pair = raw.substringBefore(";").trim()
+            val eqIdx = pair.indexOf('=')
+            if (eqIdx > 0 && eqIdx < pair.length - 1) {
+                sessionCookie = pair
             }
         }
     }
 
-    private fun url(path: String): String = "${baseUrlProvider().trimEnd('/')}${if (path.startsWith("/")) path else "/$path"}"
+    private fun ensureSuccess(response: HttpResponse) {
+        if (!response.status.isSuccess()) {
+            if (response.status.value == 401) {
+                throw IllegalStateException("Unauthorized (HTTP 401) — please sign in to the server")
+            }
+            throw IllegalStateException("Server returned HTTP ${response.status.value}")
+        }
+    }
+
+    private fun url(path: String): String {
+        val base = ServerUrlNormalizer.normalize(baseUrlProvider())
+        val normalizedPath = if (path.startsWith("/")) path else "/$path"
+        return if (base.isNotEmpty()) "$base$normalizedPath" else normalizedPath
+    }
 
     // -------------------------------------------------------------------------
     // Auth Endpoints
     // -------------------------------------------------------------------------
+    suspend fun getAuthConfig(): Result<AuthConfigResponseDto> = runCatching {
+        val response = client.get(url("/api/auth/config")) {
+            sessionCookie?.let { header("Cookie", it) }
+        }
+        extractSessionCookie(response)
+        ensureSuccess(response)
+        response.body()
+    }
+
+    suspend fun exchangeOidcCode(code: String): Result<AuthMeResponseDto> = runCatching {
+        val response = client.post(url("/api/auth/oidc/native-exchange")) {
+            contentType(ContentType.Application.Json)
+            sessionCookie?.let { header("Cookie", it) }
+            setBody(OidcNativeExchangeRequestDto(code = code))
+        }
+        extractSessionCookie(response)
+        ensureSuccess(response)
+        response.body()
+    }
+
     suspend fun login(username: String, password: String): Result<AuthMeResponseDto> = runCatching {
         val response = client.post(url("/api/auth/login")) {
             contentType(ContentType.Application.Json)
@@ -75,9 +111,7 @@ class OrbitApiClient(
             setBody(LoginRequestDto(username = username, password = password))
         }
         extractSessionCookie(response)
-        if (!response.status.isSuccess()) {
-            throw IllegalStateException("Login failed with HTTP ${response.status.value}")
-        }
+        ensureSuccess(response)
         getMe().getOrDefault(AuthMeResponseDto(authenticated = true, username = username))
     }
 
@@ -86,6 +120,7 @@ class OrbitApiClient(
             sessionCookie?.let { header("Cookie", it) }
         }
         extractSessionCookie(response)
+        ensureSuccess(response)
         response.body()
     }
 
@@ -106,6 +141,7 @@ class OrbitApiClient(
             if (includeArchived) parameter("includeArchived", "1")
         }
         extractSessionCookie(response)
+        ensureSuccess(response)
         runCatching { response.body<AccountListResponseDto>().items }
             .getOrElse { response.body() }
     }
@@ -159,7 +195,22 @@ class OrbitApiClient(
             if (filter.categoryIds.isNotEmpty()) parameter("categories", filter.categoryIds.joinToString(","))
         }
         extractSessionCookie(response)
+        ensureSuccess(response)
         response.body()
+    }
+
+    suspend fun getAllTransactions(maxPages: Int = 50): Result<List<TransactionDto>> = runCatching {
+        val firstPage = getTransactions(page = 1, limit = 200).getOrThrow()
+        val totalPages = firstPage.totalPages.coerceIn(1, maxPages)
+        if (totalPages <= 1) return@runCatching firstPage.items
+        val allItems = ArrayList<TransactionDto>(firstPage.total.coerceAtLeast(firstPage.items.size))
+        allItems.addAll(firstPage.items)
+        for (page in 2..totalPages) {
+            val nextPage = getTransactions(page = page, limit = 200).getOrNull() ?: break
+            if (nextPage.items.isEmpty()) break
+            allItems.addAll(nextPage.items)
+        }
+        allItems
     }
 
     suspend fun createTransaction(transaction: TransactionDto): Result<TransactionDto> = runCatching {
@@ -211,6 +262,7 @@ class OrbitApiClient(
             sessionCookie?.let { header("Cookie", it) }
         }
         extractSessionCookie(response)
+        ensureSuccess(response)
         val container: CategoryListResponseDto = response.body()
         container.items
     }
@@ -254,6 +306,7 @@ class OrbitApiClient(
             if (month.isNotBlank()) parameter("month", month)
         }
         extractSessionCookie(response)
+        ensureSuccess(response)
         response.body()
     }
 
@@ -286,6 +339,7 @@ class OrbitApiClient(
             sessionCookie?.let { header("Cookie", it) }
         }
         extractSessionCookie(response)
+        ensureSuccess(response)
         runCatching { response.body<GoalsListResponseDto>().goals }
             .getOrElse { response.body() }
     }
@@ -332,8 +386,9 @@ class OrbitApiClient(
             sessionCookie?.let { header("Cookie", it) }
         }
         extractSessionCookie(response)
-        val container: Map<String, List<RuleDto>> = response.body()
-        container["items"] ?: emptyList()
+        ensureSuccess(response)
+        runCatching { response.body<RuleListResponseDto>().items }
+            .getOrElse { response.body() }
     }
 
     suspend fun createRule(rule: RuleDto): Result<RuleDto> = runCatching {
@@ -387,8 +442,27 @@ class OrbitApiClient(
             sessionCookie?.let { header("Cookie", it) }
         }
         extractSessionCookie(response)
+        ensureSuccess(response)
         val container: UpcomingListResponseDto = response.body()
         container.items
+    }
+
+    suspend fun getHousehold(): Result<HouseholdResponseDto> = runCatching {
+        val response = client.get(url("/api/household")) {
+            sessionCookie?.let { header("Cookie", it) }
+        }
+        extractSessionCookie(response)
+        ensureSuccess(response)
+        response.body()
+    }
+
+    suspend fun getMhaOverview(): Result<MhaOverviewResponseDto> = runCatching {
+        val response = client.get(url("/api/mha")) {
+            sessionCookie?.let { header("Cookie", it) }
+        }
+        extractSessionCookie(response)
+        ensureSuccess(response)
+        response.body()
     }
 
     suspend fun createUpcoming(item: UpcomingItemDto): Result<UpcomingItemDto> = runCatching {
