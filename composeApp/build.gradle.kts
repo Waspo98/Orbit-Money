@@ -88,6 +88,7 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.window)
             implementation(libs.androidx.biometric)
+            implementation(libs.androidx.browser)
             implementation(libs.play.services.auth)
             implementation(libs.ktor.client.okhttp)
         }

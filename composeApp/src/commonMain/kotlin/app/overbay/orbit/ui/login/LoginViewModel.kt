@@ -54,6 +54,20 @@ class LoginViewModel(
                     }
                 }
         }
+        scope.launch {
+            combine(
+                OidcCallbackBridge.isExchanging,
+                OidcCallbackBridge.exchangeError
+            ) { exchanging, err -> exchanging to err }
+                .collect { (exchanging, err) ->
+                    _uiState.update {
+                        it.copy(
+                            isSubmitting = exchanging || it.isSubmitting,
+                            errorMessage = err ?: it.errorMessage
+                        )
+                    }
+                }
+        }
     }
 
     fun processIntent(intent: LoginIntent) {

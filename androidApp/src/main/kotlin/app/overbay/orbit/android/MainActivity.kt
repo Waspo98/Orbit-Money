@@ -46,7 +46,7 @@ class MainActivity : FragmentActivity() {
     private fun handleIncomingIntent(intent: Intent?) {
         val uri: Uri = intent?.data ?: return
         val scheme = uri.scheme?.lowercase()
-        if (scheme != "orbitmoney" && scheme != "orbitbeta") return
+        if (scheme != "orbitmoney" && scheme != "orbitbeta" && scheme != "orbitmoneybeta") return
 
         val hostAndPath = "${uri.host ?: ""}${uri.path ?: ""}"
         if (hostAndPath.contains("auth/callback")) {

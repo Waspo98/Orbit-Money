@@ -56,7 +56,7 @@ android {
         versionCode = 70
         versionName = if (isBeta) "0.7.0-beta" else "0.7.0"
         manifestPlaceholders["appName"] = if (isBeta) "Orbit Beta" else "Orbit Money"
-        manifestPlaceholders["appScheme"] = if (isBeta) "orbitbeta" else "orbitmoney"
+        manifestPlaceholders["appScheme"] = if (isBeta) "orbitmoneybeta" else "orbitmoney"
     }
 
     sourceSets {

@@ -22,12 +22,29 @@ object OidcCallbackBridge {
     private val _pendingCode = MutableStateFlow<String?>(null)
     val pendingCode: StateFlow<String?> = _pendingCode.asStateFlow()
 
+    private val _isExchanging = MutableStateFlow(false)
+    val isExchanging: StateFlow<Boolean> = _isExchanging.asStateFlow()
+
+    private val _exchangeError = MutableStateFlow<String?>(null)
+    val exchangeError: StateFlow<String?> = _exchangeError.asStateFlow()
+
     fun submitExchangeCode(code: String) {
-        if (code.isNotBlank()) _pendingCode.value = code.trim()
+        if (code.isNotBlank()) {
+            _exchangeError.value = null
+            _pendingCode.value = code.trim()
+        }
     }
 
     fun consumeExchangeCode(code: String) {
         if (_pendingCode.value == code) _pendingCode.value = null
+    }
+
+    fun setExchanging(exchanging: Boolean) {
+        _isExchanging.value = exchanging
+    }
+
+    fun setExchangeError(message: String?) {
+        _exchangeError.value = message
     }
 }
 
