@@ -35,6 +35,7 @@ import app.overbay.orbit.ui.transactions.sheets.CsvImportSheet
 import app.overbay.orbit.ui.transactions.sheets.SplitTransactionSheet
 import app.overbay.orbit.ui.transactions.sheets.TransactionEditorContent
 import app.overbay.orbit.ui.transactions.sheets.TransactionEditorSheet
+import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -48,6 +49,16 @@ fun TransactionsScreen(
     val state by viewModel.uiState.collectAsState()
     val posture = LocalDevicePosture.current
     val haptics = LocalOrbitHaptics.current
+
+    BackHandler(enabled = state.isSelectionMode) {
+        haptics.tick()
+        viewModel.clearSelection()
+    }
+
+    BackHandler(enabled = state.isSearchActive) {
+        haptics.tick()
+        viewModel.setSearchActive(false)
+    }
 
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
     var showSingleDeleteConfirmId by remember { mutableStateOf<Long?>(null) }

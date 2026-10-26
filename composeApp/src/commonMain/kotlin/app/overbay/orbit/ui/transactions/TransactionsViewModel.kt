@@ -33,6 +33,7 @@ class TransactionsViewModel(
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
+    private val _isSearchActive = MutableStateFlow(false)
     private val _quickFilter = MutableStateFlow(QuickFilter.ALL)
     private val _filterDraft = MutableStateFlow(TransactionFilterDraft())
     private val _sortOption = MutableStateFlow(TransactionSortOption.DATE_DESC)
@@ -131,6 +132,8 @@ class TransactionsViewModel(
             totalIncomeCents = totalIncome,
             netCashflowCents = totalIncome + totalExpense
         )
+    }.combine(_isSearchActive) { state, searchActive ->
+        state.copy(isSearchActive = searchActive)
     }.combine(_selectedIds) { state, selected ->
         state.copy(selectedTransactionIds = selected)
     }.combine(_inspectingId) { state, inspecting ->
@@ -157,6 +160,13 @@ class TransactionsViewModel(
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
+    }
+
+    fun setSearchActive(active: Boolean) {
+        _isSearchActive.value = active
+        if (!active) {
+            _searchQuery.value = ""
+        }
     }
 
     fun setQuickFilter(filter: QuickFilter) {

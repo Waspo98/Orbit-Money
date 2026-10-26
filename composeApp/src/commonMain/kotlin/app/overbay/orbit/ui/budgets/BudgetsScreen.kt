@@ -83,15 +83,6 @@ fun BudgetsScreen(
                             canGoNext = state.canGoNextMonth,
                             onClickLabel = { viewModel.onResetToCurrentMonth() }
                         )
-                    },
-                    collapsedActions = {
-                        PeriodNavigatorPill(
-                            label = state.monthLabel,
-                            onPrevious = { viewModel.onPreviousMonth() },
-                            onNext = { viewModel.onNextMonth() },
-                            canGoNext = state.canGoNextMonth,
-                            onClickLabel = { viewModel.onResetToCurrentMonth() }
-                        )
                     }
                 )
 

@@ -85,15 +85,6 @@ fun MhaTrackerScreen(
                         canGoNext = state.selectedYear < 2030,
                         onClickLabel = { viewModel.setYear(2026) }
                     )
-                },
-                collapsedActions = {
-                    PeriodNavigatorPill(
-                        label = "${state.selectedYear}",
-                        onPrevious = { viewModel.setYear(state.selectedYear - 1) },
-                        onNext = { viewModel.setYear(state.selectedYear + 1) },
-                        canGoNext = state.selectedYear < 2030,
-                        onClickLabel = { viewModel.setYear(2026) }
-                    )
                 }
             )
 

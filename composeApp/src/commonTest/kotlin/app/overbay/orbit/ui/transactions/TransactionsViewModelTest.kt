@@ -151,7 +151,19 @@ class TransactionsViewModelTest {
         testScheduler.advanceUntilIdle()
         assertEquals(2, viewModel.uiState.value.filteredTransactions.size)
 
-        // 4. Clear filter
+        // 4. Active search mode toggle and exit clears query
+        viewModel.setSearchActive(true)
+        viewModel.setSearchQuery("target")
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isSearchActive)
+        assertEquals("target", viewModel.uiState.value.searchQuery)
+
+        viewModel.setSearchActive(false)
+        testScheduler.advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.isSearchActive)
+        assertEquals("", viewModel.uiState.value.searchQuery)
+
+        // 5. Clear filter
         viewModel.clearFilters()
         testScheduler.advanceUntilIdle()
         assertEquals(3, viewModel.uiState.value.filteredTransactions.size)

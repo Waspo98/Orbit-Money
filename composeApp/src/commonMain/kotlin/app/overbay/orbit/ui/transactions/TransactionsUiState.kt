@@ -40,6 +40,7 @@ data class TransactionsUiState(
     val categoryMap: Map<Long, Category> = emptyMap(),
     val accountMap: Map<Long, Account> = emptyMap(),
     val searchQuery: String = "",
+    val isSearchActive: Boolean = false,
     val quickFilter: QuickFilter = QuickFilter.ALL,
     val filterDraft: TransactionFilterDraft = TransactionFilterDraft(),
     val sortOption: TransactionSortOption = TransactionSortOption.DATE_DESC,
