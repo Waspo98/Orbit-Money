@@ -131,6 +131,16 @@ data class OidcNativeExchangeRequestDto(
 )
 
 @Serializable
+data class SampleLoginRequestDto(
+    val deviceId: String
+)
+
+@Serializable
+data class HealthResponseDto(
+    val status: String = ""
+)
+
+@Serializable
 data class RuleListResponseDto(
     val items: List<RuleDto> = emptyList(),
     val total: Int = 0

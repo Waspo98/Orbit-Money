@@ -5,6 +5,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed interface OrbitNavKey {
     @Serializable
+    data object Login : OrbitNavKey
+
+    @Serializable
     data object Onboarding : OrbitNavKey
 
     @Serializable
@@ -54,6 +57,7 @@ sealed interface OrbitNavKey {
 
     val title: String
         get() = when (this) {
+            Login -> "Sign In"
             Onboarding -> "Welcome"
             Dashboard -> "Dashboard"
             is Transactions -> "Transactions"

@@ -71,12 +71,12 @@ class OrbitRepository(
     val preferences: StateFlow<OrbitPreferences> = _preferences.asStateFlow()
     private val _syncStatus = MutableStateFlow<SyncResult>(SyncResult.NoOp)
     val syncStatus: StateFlow<SyncResult> = _syncStatus.asStateFlow()
+    private val _isAuthenticated = MutableStateFlow(true)
+    val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
+    private val _currentUser = MutableStateFlow<String?>(null)
+    val currentUser: StateFlow<String?> = _currentUser.asStateFlow()
 
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
+    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true; isLenient = true }
 
     fun createApiClient(serverUrl: String = _preferences.value.selfHostedServerUrl): OrbitApiClient =
         customApiClient ?: OrbitApiClient({ serverUrl.ifBlank { _preferences.value.selfHostedServerUrl } }, storage)
@@ -90,20 +90,29 @@ class OrbitRepository(
                 selfHostedServerUrl = if (pendingOidcUrl == "/") "" else pendingOidcUrl,
                 onboardingCompleted = true
             )
-        } else {
-            localSnap.preferences
-        }
+        } else localSnap.preferences
         _preferences.value = pref
         _storageMode.value = pref.storageMode
-        activeEngine = if (pref.storageMode == StorageMode.SELF_HOSTED) {
-            SelfHostedApiEngine(createApiClient(pref.selfHostedServerUrl), storage) { _preferences.value }
+        if (pref.storageMode == StorageMode.SELF_HOSTED) {
+            val client = createApiClient(pref.selfHostedServerUrl)
+            activeEngine = SelfHostedApiEngine(client, storage) { _preferences.value }
+            val me = client.getMe().getOrNull()
+            if (me != null && me.authenticated) {
+                storage.delete(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
+                _isAuthenticated.value = true
+                _currentUser.value = me.displayName ?: me.username ?: me.email
+                val loaded = activeEngine.loadSnapshot().copy(preferences = pref)
+                updateMemoryState(loaded)
+                if (!pendingOidcUrl.isNullOrBlank()) localEngine.saveSnapshot(loaded)
+            } else {
+                _isAuthenticated.value = false
+                _currentUser.value = null
+                updateMemoryState(localSnap.copy(preferences = pref))
+            }
         } else {
-            localEngine
-        }
-        val loaded = activeEngine.loadSnapshot().copy(preferences = pref)
-        updateMemoryState(loaded)
-        if (!pendingOidcUrl.isNullOrBlank()) {
-            localEngine.saveSnapshot(loaded)
+            _isAuthenticated.value = true
+            activeEngine = localEngine
+            updateMemoryState(activeEngine.loadSnapshot().copy(preferences = pref))
         }
     }
 
@@ -124,32 +133,45 @@ class OrbitRepository(
         updateMemoryState(updated)
         localEngine.saveSnapshot(updated)
         if (activeEngine !== localEngine) activeEngine.saveSnapshot(updated)
-        if (updated.preferences.googleDriveSyncEnabled) {
-            cloudSyncManager.backupSnapshot(updated)
-        }
+        if (updated.preferences.googleDriveSyncEnabled) cloudSyncManager.backupSnapshot(updated)
     }
 
-    // -------------------------------------------------------------------------
-    // Storage Mode Switch & SSO Exchange
-    // -------------------------------------------------------------------------
     suspend fun setStorageMode(mode: StorageMode, serverUrl: String? = null) {
         val normalizedUrl = serverUrl?.let { ServerUrlNormalizer.normalize(it) }
             ?: ServerUrlNormalizer.normalize(_preferences.value.selfHostedServerUrl)
-        val updatedPref = _preferences.value.copy(
-            storageMode = mode,
-            selfHostedServerUrl = normalizedUrl
-        )
+        val updatedPref = _preferences.value.copy(storageMode = mode, selfHostedServerUrl = normalizedUrl)
         _storageMode.value = mode
         _preferences.value = updatedPref
-
+        if (mode == StorageMode.LOCAL) _isAuthenticated.value = true
         activeEngine = if (mode == StorageMode.SELF_HOSTED) {
             SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
-        } else {
-            localEngine
-        }
+        } else localEngine
+        commitSnapshot(activeEngine.loadSnapshot().copy(preferences = updatedPref))
+    }
 
+    suspend fun markAuthenticated(serverUrl: String, userLabel: String) {
+        val normalizedUrl = ServerUrlNormalizer.normalize(serverUrl)
+        val updatedPref = _preferences.value.copy(
+            storageMode = StorageMode.SELF_HOSTED,
+            selfHostedServerUrl = normalizedUrl,
+            onboardingCompleted = true
+        )
+        _preferences.value = updatedPref
+        _storageMode.value = StorageMode.SELF_HOSTED
+        _isAuthenticated.value = true
+        _currentUser.value = userLabel
+        activeEngine = SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
         val fresh = activeEngine.loadSnapshot().copy(preferences = updatedPref)
         commitSnapshot(fresh)
+        _syncStatus.value = SyncResult.Success("Signed in as $userLabel (${fresh.transactions.size} transactions)")
+    }
+
+    suspend fun logout() {
+        runCatching { createApiClient().logout() }
+        activeEngine.clear()
+        _isAuthenticated.value = false
+        _currentUser.value = null
+        _syncStatus.value = SyncResult.NoOp
     }
 
     suspend fun completeOidcNativeExchange(code: String): Result<String> = runCatching {
@@ -159,18 +181,8 @@ class OrbitRepository(
         val serverUrl = ServerUrlNormalizer.normalize(rawUrl)
         val client = createApiClient(serverUrl)
         val authMe = client.exchangeOidcCode(code).getOrThrow()
-        val updatedPref = _preferences.value.copy(
-            storageMode = StorageMode.SELF_HOSTED,
-            selfHostedServerUrl = serverUrl,
-            onboardingCompleted = true
-        )
-        _preferences.value = updatedPref
-        _storageMode.value = StorageMode.SELF_HOSTED
-        activeEngine = SelfHostedApiEngine(client, storage) { _preferences.value }
-        val fresh = activeEngine.loadSnapshot().copy(preferences = updatedPref)
-        commitSnapshot(fresh)
         val userLabel = authMe.displayName ?: authMe.username ?: authMe.email ?: "SSO User"
-        _syncStatus.value = SyncResult.Success("Signed in as $userLabel (${fresh.transactions.size} transactions)")
+        markAuthenticated(serverUrl, userLabel)
         userLabel
     }
 

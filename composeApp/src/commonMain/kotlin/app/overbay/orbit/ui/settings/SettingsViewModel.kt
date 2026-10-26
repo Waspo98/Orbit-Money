@@ -108,6 +108,19 @@ class SettingsViewModel(
         }
     }
 
+    fun logout() {
+        scope.launch {
+            repository.logout()
+            _uiState.update {
+                it.copy(
+                    isSyncing = false,
+                    syncStatus = SyncResult.NoOp,
+                    statusMessage = "Signed out of server"
+                )
+            }
+        }
+    }
+
     fun setThemePreset(preset: OrbitThemePreset) {
         val updated = _uiState.value.preferences.copy(themePreset = preset)
         _uiState.update { it.copy(preferences = updated) }

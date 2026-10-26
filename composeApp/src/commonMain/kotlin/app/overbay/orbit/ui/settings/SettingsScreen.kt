@@ -70,7 +70,12 @@ fun SettingsScreen(
                 onStorageModeChange = viewModel::setStorageMode,
                 onServerUrlChange = viewModel::setServerUrl,
                 onTriggerSync = viewModel::triggerSync,
-                onAuthenticateServer = viewModel::loginToSelfHostedServer
+                onAuthenticateServer = viewModel::loginToSelfHostedServer,
+                onOpenLoginScreen = { onNavigate(OrbitNavKey.Login) },
+                onLogout = {
+                    viewModel.logout()
+                    onNavigate(OrbitNavKey.Login)
+                }
             )
 
             // 2. SimpleFIN Bank Feeds

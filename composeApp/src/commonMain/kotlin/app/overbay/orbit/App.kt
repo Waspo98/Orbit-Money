@@ -13,6 +13,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
+import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.BiometricLockOverlay
 import app.overbay.orbit.util.DevicePosture
@@ -60,6 +61,7 @@ fun App(
     }
 
     val preferences by repo.preferences.collectAsStateWithLifecycle()
+    val isAuthenticated by repo.isAuthenticated.collectAsStateWithLifecycle()
     var isBiometricLocked by remember(preferences.biometricLockEnabled) {
         mutableStateOf(preferences.biometricLockEnabled)
     }
@@ -68,10 +70,13 @@ fun App(
     val activeMode = themeMode ?: preferences.themeMode
     val activeDynamicColor = preferences.dynamicColor
 
-    val targetInitialNavKey = initialNavKey ?: if (preferences.onboardingCompleted) {
-        OrbitNavKey.Dashboard
+    val targetInitialNavKey = initialNavKey ?: if (
+        !preferences.onboardingCompleted ||
+        (preferences.storageMode == StorageMode.SELF_HOSTED && !isAuthenticated)
+    ) {
+        OrbitNavKey.Login
     } else {
-        OrbitNavKey.Onboarding
+        OrbitNavKey.Dashboard
     }
 
     CompositionLocalProvider(

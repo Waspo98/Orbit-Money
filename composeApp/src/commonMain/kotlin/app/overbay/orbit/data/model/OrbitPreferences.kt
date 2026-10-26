@@ -29,7 +29,7 @@ data class DashboardWidgetConfig(
 @Serializable
 data class OrbitPreferences(
     val storageMode: StorageMode = StorageMode.LOCAL,
-    val selfHostedServerUrl: String = "http://localhost:5019",
+    val selfHostedServerUrl: String = "",
     val themePreset: OrbitThemePreset = OrbitThemePreset.ORBIT_EMERALD,
     val themeMode: OrbitThemeMode = OrbitThemeMode.SYSTEM,
     val dynamicColor: Boolean = true,

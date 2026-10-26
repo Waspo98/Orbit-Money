@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -24,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.ui.accounts.AccountsScreen
 import app.overbay.orbit.ui.accounts.AccountsViewModel
 import app.overbay.orbit.ui.networth.NetWorthScreen
@@ -37,6 +39,8 @@ import app.overbay.orbit.ui.dashboard.DashboardScreen
 import app.overbay.orbit.ui.dashboard.DashboardViewModel
 import app.overbay.orbit.ui.goals.GoalsScreen
 import app.overbay.orbit.ui.goals.GoalsViewModel
+import app.overbay.orbit.ui.login.LoginScreen
+import app.overbay.orbit.ui.login.LoginViewModel
 import app.overbay.orbit.ui.onboarding.OnboardingScreen
 import app.overbay.orbit.ui.onboarding.OnboardingViewModel
 import app.overbay.orbit.ui.rules.RulesScreen
@@ -73,7 +77,9 @@ fun OrbitNavigation(
 
     val repo = repository ?: remember { OrbitRepository(PlatformStorage()) }
     val preferences by repo.preferences.collectAsState()
+    val isAuthenticated by repo.isAuthenticated.collectAsState()
     var showMoreFromHeader by remember { mutableStateOf(false) }
+    val loginViewModel = remember(repo) { LoginViewModel(repo) }
     val onboardingViewModel = remember(repo) { OnboardingViewModel(repo) }
     val dashboardViewModel = remember(repo) { DashboardViewModel(repo) }
     val transactionsViewModel = remember(repo) { TransactionsViewModel(repo) }
@@ -90,6 +96,38 @@ fun OrbitNavigation(
     val retirementViewModel = remember(repo) { RetirementViewModel(repo) }
     val householdViewModel = remember(repo) { HouseholdViewModel(repo) }
     val settingsViewModel = remember(repo) { SettingsViewModel(repo) }
+
+    LaunchedEffect(preferences.storageMode, isAuthenticated) {
+        if (
+            preferences.storageMode == StorageMode.SELF_HOSTED &&
+            !isAuthenticated &&
+            currentKey != OrbitNavKey.Login &&
+            currentKey != OrbitNavKey.Onboarding
+        ) {
+            backStack.clear()
+            backStack.add(OrbitNavKey.Login)
+        }
+    }
+
+    if (currentKey == OrbitNavKey.Login) {
+        LoginScreen(
+            viewModel = loginViewModel,
+            onLoginSuccess = {
+                backStack.clear()
+                backStack.add(OrbitNavKey.Dashboard)
+            },
+            onUseOfflineStorage = {
+                backStack.clear()
+                if (preferences.onboardingCompleted) {
+                    backStack.add(OrbitNavKey.Dashboard)
+                } else {
+                    backStack.add(OrbitNavKey.Onboarding)
+                }
+            },
+            modifier = modifier.fillMaxSize()
+        )
+        return
+    }
 
     if (currentKey == OrbitNavKey.Onboarding) {
         OnboardingScreen(

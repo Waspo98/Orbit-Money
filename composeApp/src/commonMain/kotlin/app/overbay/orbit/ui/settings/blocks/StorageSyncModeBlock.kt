@@ -15,6 +15,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,6 +44,8 @@ fun StorageSyncModeBlock(
     onServerUrlChange: (String) -> Unit,
     onTriggerSync: () -> Unit,
     onAuthenticateServer: ((String, String) -> Unit)? = null,
+    onOpenLoginScreen: (() -> Unit)? = null,
+    onLogout: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val oidcLauncher = LocalOidcAuthLauncher.current
@@ -147,6 +150,31 @@ fun StorageSyncModeBlock(
                         enabled = !isSyncing && username.isNotBlank() && password.isNotBlank()
                     ) {
                         Text("Login")
+                    }
+                }
+            }
+
+            if (onOpenLoginScreen != null || onLogout != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (onOpenLoginScreen != null) {
+                        OutlinedButton(
+                            onClick = onOpenLoginScreen,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Sign In / Switch Account")
+                        }
+                    }
+                    if (onLogout != null) {
+                        OutlinedButton(
+                            onClick = onLogout,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Log Out")
+                        }
                     }
                 }
             }

@@ -115,6 +115,24 @@ class OrbitApiClient(
         getMe().getOrDefault(AuthMeResponseDto(authenticated = true, username = username))
     }
 
+    suspend fun loginWithSampleData(deviceId: String): Result<AuthMeResponseDto> = runCatching {
+        val response = client.post(url("/api/auth/sample")) {
+            contentType(ContentType.Application.Json)
+            sessionCookie?.let { header("Cookie", it) }
+            setBody(SampleLoginRequestDto(deviceId = deviceId))
+        }
+        extractSessionCookie(response)
+        ensureSuccess(response)
+        response.body()
+    }
+
+    suspend fun checkHealth(): Result<Boolean> = runCatching {
+        val response = client.get(url("/api/health"))
+        ensureSuccess(response)
+        val body = response.body<HealthResponseDto>()
+        body.status.equals("ok", ignoreCase = true)
+    }
+
     suspend fun getMe(): Result<AuthMeResponseDto> = runCatching {
         val response = client.get(url("/api/auth/me")) {
             sessionCookie?.let { header("Cookie", it) }
