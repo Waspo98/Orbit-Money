@@ -1,0 +1,173 @@
+package app.overbay.orbit.ui.household.dialogs
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.HouseholdMember
+import app.overbay.orbit.ui.components.CurrencyTextField
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HouseholdMemberEditorSheet(
+    member: HouseholdMember?,
+    onDismiss: () -> Unit,
+    onSave: (HouseholdMember) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var name by remember(member) { mutableStateOf(member?.name ?: "") }
+    var role by remember(member) { mutableStateOf(member?.role ?: "adult") }
+    var employer by remember(member) { mutableStateOf(member?.employer ?: "") }
+    var jobTitle by remember(member) { mutableStateOf(member?.jobTitle ?: "") }
+    var grossIncomeCents by remember(member) { mutableStateOf(member?.grossIncomeAnnualCents ?: 0L) }
+    var retirementType by remember(member) { mutableStateOf(member?.retirementAccountType ?: "401k") }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                text = if (member == null) "Add Household Member" else "Edit Member Profile",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Full Name") },
+                placeholder = { Text("e.g. Alex Overbay") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Family Role",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("adult" to "Adult / Partner", "child" to "Child", "dependent" to "Dependent").forEach { (key, label) ->
+                    FilterChip(
+                        selected = role == key,
+                        onClick = { role = key },
+                        label = { Text(label) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            CurrencyTextField(
+                cents = grossIncomeCents,
+                onCentsChange = { grossIncomeCents = it },
+                label = "Gross Annual Income",
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = employer,
+                    onValueChange = { employer = it },
+                    label = { Text("Employer (Optional)") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = jobTitle,
+                    onValueChange = { jobTitle = it },
+                    label = { Text("Job Title (Optional)") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+                Button(
+                    onClick = {
+                        if (name.isNotBlank()) {
+                            val saved = member?.copy(
+                                name = name.trim(),
+                                role = role,
+                                employer = employer.ifBlank { null },
+                                jobTitle = jobTitle.ifBlank { null },
+                                grossIncomeAnnualCents = grossIncomeCents,
+                                retirementAccountType = retirementType.ifBlank { null }
+                            ) ?: HouseholdMember(
+                                name = name.trim(),
+                                role = role,
+                                employer = employer.ifBlank { null },
+                                jobTitle = jobTitle.ifBlank { null },
+                                grossIncomeAnnualCents = grossIncomeCents,
+                                retirementAccountType = retirementType.ifBlank { null }
+                            )
+                            onSave(saved)
+                        }
+                    },
+                    enabled = name.isNotBlank()
+                ) {
+                    Text("Save Member")
+                }
+            }
+        }
+    }
+}

@@ -9,6 +9,8 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryBudget
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Goal
+import app.overbay.orbit.data.model.HouseholdInfo
+import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
@@ -566,5 +568,25 @@ class OrbitRepository(
 
     suspend fun loadDemoData(snapshot: OrbitWorkspaceSnapshot) {
         commitSnapshot(snapshot)
+    }
+
+    suspend fun updateHouseholdInfo(household: HouseholdInfo) {
+        commitSnapshot(_snapshot.value.copy(household = household))
+    }
+
+    suspend fun saveHouseholdMember(member: HouseholdMember) {
+        val current = _snapshot.value.members
+        val exists = current.any { it.id == member.id && member.id != 0L }
+        val updated = if (exists) {
+            current.map { if (it.id == member.id) member else it }
+        } else {
+            val newId = if (member.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else member.id
+            current + member.copy(id = newId)
+        }
+        commitSnapshot(_snapshot.value.copy(members = updated))
+    }
+
+    suspend fun deleteHouseholdMember(id: Long) {
+        commitSnapshot(_snapshot.value.copy(members = _snapshot.value.members.filterNot { it.id == id }))
     }
 }
