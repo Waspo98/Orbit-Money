@@ -75,7 +75,7 @@ fun MoreDestinationsSheet(
         add(DestinationItem(OrbitNavKey.SpendingTrends, "Spending Trends", "Income vs expense breakdown & velocity", Icons.Default.Info))
         add(DestinationItem(OrbitNavKey.NetWorth, "Net Worth", "Historical assets, liabilities & trajectory", Icons.Default.AccountCircle))
         if (mhaEnabled) {
-            add(DestinationItem(OrbitNavKey.MhaTracker, "MHA Tracker", "Military housing allowance & tax tracking", Icons.Default.Check))
+            add(DestinationItem(OrbitNavKey.MhaTracker, "MHA Tracker", "Ministerial housing allowance & tax tracking", Icons.Default.Check))
         }
     }
 

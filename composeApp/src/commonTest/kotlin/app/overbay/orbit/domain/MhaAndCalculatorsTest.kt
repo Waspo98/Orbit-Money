@@ -43,6 +43,26 @@ class MhaAndCalculatorsTest {
     }
 
     @Test
+    fun testMhaTaxEngine_parsonage3LimitRule_zeroDesignationCap() {
+        val cap = MhaTaxEngine.calculateParsonageCap(
+            actualExpensesCents = 25_000_00L,
+            designatedCapCents = 0L,
+            fairMarketRentalValueCents = 30_000_00L
+        )
+        assertEquals(0L, cap)
+    }
+
+    @Test
+    fun testMhaTaxEngine_parsonage3LimitRule_zeroFmrv() {
+        val cap = MhaTaxEngine.calculateParsonageCap(
+            actualExpensesCents = 25_000_00L,
+            designatedCapCents = 30_000_00L,
+            fairMarketRentalValueCents = 0L
+        )
+        assertEquals(0L, cap)
+    }
+
+    @Test
     fun testMhaTaxEngine_simpleModeTaxSavings() {
         val profile = MhaTaxProfile(
             mode = "simple",

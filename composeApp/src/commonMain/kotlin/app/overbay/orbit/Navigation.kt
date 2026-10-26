@@ -41,6 +41,10 @@ import app.overbay.orbit.ui.transactions.TransactionsScreen
 import app.overbay.orbit.ui.transactions.TransactionsViewModel
 import app.overbay.orbit.ui.upcoming.UpcomingScreen
 import app.overbay.orbit.ui.upcoming.UpcomingViewModel
+import app.overbay.orbit.ui.trends.SpendingTrendsScreen
+import app.overbay.orbit.ui.trends.SpendingTrendsViewModel
+import app.overbay.orbit.ui.mha.MhaTrackerScreen
+import app.overbay.orbit.ui.mha.MhaTrackerViewModel
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.PlatformStorage
@@ -66,6 +70,8 @@ fun OrbitNavigation(
     val goalsViewModel = remember(repo) { GoalsViewModel(repo) }
     val accountsViewModel = remember(repo) { AccountsViewModel(repo) }
     val netWorthViewModel = remember(repo) { NetWorthViewModel(repo) }
+    val spendingTrendsViewModel = remember(repo) { SpendingTrendsViewModel(repo) }
+    val mhaTrackerViewModel = remember(repo) { MhaTrackerViewModel(repo) }
 
     if (currentKey == OrbitNavKey.Onboarding) {
         OnboardingScreen(
@@ -202,6 +208,28 @@ fun OrbitNavigation(
                 OrbitNavKey.NetWorth -> {
                     NetWorthScreen(
                         viewModel = netWorthViewModel,
+                        onNavigate = { destination ->
+                            if (destination != currentKey) {
+                                backStack.add(destination)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                OrbitNavKey.SpendingTrends -> {
+                    SpendingTrendsScreen(
+                        viewModel = spendingTrendsViewModel,
+                        onNavigate = { destination ->
+                            if (destination != currentKey) {
+                                backStack.add(destination)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                OrbitNavKey.MhaTracker -> {
+                    MhaTrackerScreen(
+                        viewModel = mhaTrackerViewModel,
                         onNavigate = { destination ->
                             if (destination != currentKey) {
                                 backStack.add(destination)

@@ -195,7 +195,8 @@ fun AdaptiveNavigationShell(
         MoreDestinationsSheet(
             currentKey = currentKey,
             onNavigate = onNavigate,
-            onDismiss = { showMoreSheet = false }
+            onDismiss = { showMoreSheet = false },
+            mhaEnabled = true
         )
     }
 }

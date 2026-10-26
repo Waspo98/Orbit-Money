@@ -108,11 +108,11 @@ object MhaTaxEngine {
         designatedCapCents: Cents? = null,
         fairMarketRentalValueCents: Cents? = null
     ): Cents {
-        var cap = actualExpensesCents
-        if (designatedCapCents != null && designatedCapCents > 0L) {
+        var cap = max(0L, actualExpensesCents)
+        if (designatedCapCents != null && designatedCapCents >= 0L) {
             cap = min(cap, designatedCapCents)
         }
-        if (fairMarketRentalValueCents != null && fairMarketRentalValueCents > 0L) {
+        if (fairMarketRentalValueCents != null && fairMarketRentalValueCents >= 0L) {
             cap = min(cap, fairMarketRentalValueCents)
         }
         return max(0L, cap)
