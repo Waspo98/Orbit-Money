@@ -77,8 +77,11 @@ object NetWorthEngine {
                     if (contribution >= 0) assets += contribution else liabilities += abs(contribution)
                 }
                 NetWorthBucket.REAL_ESTATE -> {
-                    realEstate += contribution
-                    if (contribution >= 0) assets += contribution else liabilities += abs(contribution)
+                    val propertyValue = acct.estimatedValueCents ?: 0L
+                    val loanBalance = abs(acct.currentBalanceCents)
+                    realEstate += (propertyValue - loanBalance)
+                    assets += propertyValue
+                    liabilities += loanBalance
                 }
                 NetWorthBucket.CREDIT -> {
                     credit += contribution

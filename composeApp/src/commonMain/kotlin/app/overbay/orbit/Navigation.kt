@@ -20,6 +20,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.ui.accounts.AccountsScreen
+import app.overbay.orbit.ui.accounts.AccountsViewModel
+import app.overbay.orbit.ui.networth.NetWorthScreen
+import app.overbay.orbit.ui.networth.NetWorthViewModel
 import app.overbay.orbit.ui.budgets.BudgetsScreen
 import app.overbay.orbit.ui.budgets.BudgetsViewModel
 import app.overbay.orbit.ui.categories.CategoriesScreen
@@ -60,6 +64,8 @@ fun OrbitNavigation(
     val budgetsViewModel = remember(repo) { BudgetsViewModel(repo) }
     val upcomingViewModel = remember(repo) { UpcomingViewModel(repo) }
     val goalsViewModel = remember(repo) { GoalsViewModel(repo) }
+    val accountsViewModel = remember(repo) { AccountsViewModel(repo) }
+    val netWorthViewModel = remember(repo) { NetWorthViewModel(repo) }
 
     if (currentKey == OrbitNavKey.Onboarding) {
         OnboardingScreen(
@@ -173,6 +179,29 @@ fun OrbitNavigation(
                 OrbitNavKey.Rules -> {
                     RulesScreen(
                         viewModel = rulesViewModel,
+                        onNavigate = { destination ->
+                            if (destination != currentKey) {
+                                backStack.add(destination)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                is OrbitNavKey.Accounts -> {
+                    AccountsScreen(
+                        viewModel = accountsViewModel,
+                        initialAccountId = key.accountId,
+                        onNavigate = { destination ->
+                            if (destination != currentKey) {
+                                backStack.add(destination)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                OrbitNavKey.NetWorth -> {
+                    NetWorthScreen(
+                        viewModel = netWorthViewModel,
                         onNavigate = { destination ->
                             if (destination != currentKey) {
                                 backStack.add(destination)
