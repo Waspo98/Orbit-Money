@@ -18,6 +18,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -39,6 +40,7 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -59,8 +61,8 @@ fun AccountEditorSheet(
     var selectedType by remember { mutableStateOf(account.type) }
     var typeDropdownExpanded by remember { mutableStateOf(false) }
     var accountNumberLast4 by remember { mutableStateOf(account.accountNumberLast4 ?: "") }
-    var balanceText by remember { mutableStateOf(if (account.currentBalanceCents != 0L) (account.currentBalanceCents / 100.0).toString() else "0") }
-    var estimatedValueText by remember { mutableStateOf(if (account.estimatedValueCents != null) (account.estimatedValueCents!! / 100.0).toString() else "") }
+    var balanceCents by remember { mutableStateOf(account.currentBalanceCents) }
+    var estimatedValueCents by remember { mutableStateOf(account.estimatedValueCents ?: 0L) }
     var mhaEligible by remember { mutableStateOf(account.mhaDefaultEligible) }
 
     ModalBottomSheet(
@@ -113,7 +115,7 @@ fun AccountEditorSheet(
                     readOnly = true,
                     label = { Text("Account Type") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeDropdownExpanded) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor()
+                    modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
                 )
                 ExposedDropdownMenu(
                     expanded = typeDropdownExpanded,
@@ -132,12 +134,11 @@ fun AccountEditorSheet(
             }
 
             // Current Balance
-            OutlinedTextField(
-                value = balanceText,
-                onValueChange = { balanceText = it },
-                label = { Text("Current Balance ($)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
+            CurrencyTextField(
+                cents = balanceCents,
+                onCentsChange = { balanceCents = it },
+                label = "Current Balance",
+                allowNegative = true,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -153,12 +154,10 @@ fun AccountEditorSheet(
 
             // Estimated Property Value (for mortgage or real estate)
             if (selectedType == AccountType.MORTGAGE || selectedType == AccountType.OTHER) {
-                OutlinedTextField(
-                    value = estimatedValueText,
-                    onValueChange = { estimatedValueText = it },
-                    label = { Text("Estimated Property / Asset Value ($)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
+                CurrencyTextField(
+                    cents = estimatedValueCents,
+                    onCentsChange = { estimatedValueCents = it },
+                    label = "Estimated Property / Asset Value",
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -188,14 +187,13 @@ fun AccountEditorSheet(
                 Button(
                     onClick = {
                         haptics.confirm()
-                        val balCents = MoneyUtils.dollarsToCents(balanceText)
-                        val estCents = if (estimatedValueText.isNotBlank()) MoneyUtils.dollarsToCents(estimatedValueText) else null
+                        val estCents = if (estimatedValueCents > 0L) estimatedValueCents else null
 
                         val updated = account.copy(
                             name = name.trim(),
                             institution = institution.trim().ifBlank { null },
                             type = selectedType,
-                            currentBalanceCents = balCents,
+                            currentBalanceCents = balanceCents,
                             estimatedValueCents = estCents,
                             accountNumberLast4 = accountNumberLast4.trim().ifBlank { null },
                             mhaDefaultEligible = mhaEligible

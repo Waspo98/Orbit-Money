@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.settings.blocks.GoogleDriveBackupBlock
 import app.overbay.orbit.ui.settings.blocks.SecurityBiometricsBlock
@@ -139,6 +140,8 @@ fun SettingsScreen(
     if (uiState.showBackupExportDialog && uiState.backupExportJson != null) {
         AlertDialog(
             onDismissRequest = viewModel::closeBackupExportDialog,
+            shape = MaterialTheme.shapes.extraLarge,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             title = { Text("Workspace Backup Export") },
             text = {
                 Column {
@@ -168,6 +171,8 @@ fun SettingsScreen(
     if (uiState.showRestoreDialog) {
         AlertDialog(
             onDismissRequest = viewModel::closeRestoreDialog,
+            shape = MaterialTheme.shapes.extraLarge,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             title = { Text("Restore Workspace Backup") },
             text = {
                 Column {
@@ -213,28 +218,13 @@ fun SettingsScreen(
 
     // Reset Confirmation Dialog
     if (uiState.showResetConfirmation) {
-        AlertDialog(
-            onDismissRequest = viewModel::closeResetConfirmation,
-            title = { Text("Reset Workspace?", fontWeight = FontWeight.Bold) },
-            text = {
-                Text(
-                    text = "This will erase all accounts, transactions, budgets and rules on this device and reset to a clean empty state. This cannot be undone.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = viewModel::resetToDemoData,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Reset Everything")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::closeResetConfirmation) {
-                    Text("Cancel")
-                }
-            }
+        OrbitConfirmationDialog(
+            title = "Reset Workspace?",
+            message = "This will erase all accounts, transactions, budgets and rules on this device and reset to a clean empty state. This cannot be undone.",
+            confirmText = "Reset Everything",
+            isDestructive = true,
+            onConfirm = viewModel::resetToDemoData,
+            onDismiss = viewModel::closeResetConfirmation
         )
     }
 }

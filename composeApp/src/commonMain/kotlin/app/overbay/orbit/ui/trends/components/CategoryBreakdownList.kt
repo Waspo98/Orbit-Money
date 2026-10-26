@@ -27,6 +27,7 @@ import app.overbay.orbit.domain.CategorySpendingTrend
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -46,11 +47,9 @@ fun CategoryBreakdownList(
         modifier = modifier
     ) {
         if (categoryTrends.isEmpty()) {
-            Text(
-                text = "No category spending recorded in this period",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(vertical = 8.dp)
+            EmptyStateCard(
+                title = "No Category Spending",
+                description = "No category spending recorded in this period."
             )
             return@OrbitSectionCard
         }

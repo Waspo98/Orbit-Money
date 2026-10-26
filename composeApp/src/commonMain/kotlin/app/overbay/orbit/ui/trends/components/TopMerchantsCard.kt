@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MerchantSpendingSummary
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
@@ -40,11 +41,9 @@ fun TopMerchantsCard(
         modifier = modifier
     ) {
         if (topMerchants.isEmpty()) {
-            Text(
-                text = "No merchant spending recorded in this period",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(vertical = 8.dp)
+            EmptyStateCard(
+                title = "No Merchant Spending",
+                description = "No merchant spending recorded in this period."
             )
             return@OrbitSectionCard
         }

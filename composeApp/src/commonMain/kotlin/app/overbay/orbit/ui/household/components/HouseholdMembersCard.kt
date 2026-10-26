@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
 @Composable
@@ -103,11 +104,9 @@ fun HouseholdMembersCard(
         Spacer(modifier = Modifier.height(12.dp))
 
         if (members.isEmpty()) {
-            Text(
-                text = "No household members added yet. Tap '+ Add Member' above to record income earners or family members.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 12.dp)
+            EmptyStateCard(
+                title = "No Household Members",
+                description = "Add partners, children, or dependents to track household allowances."
             )
         } else {
             members.forEach { member ->

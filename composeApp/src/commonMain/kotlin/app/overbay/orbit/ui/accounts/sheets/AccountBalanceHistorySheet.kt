@@ -27,6 +27,7 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.ui.components.EmptyStateCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,11 +77,9 @@ fun AccountBalanceHistorySheet(
             Spacer(modifier = Modifier.height(16.dp))
 
             if (transactions.isEmpty()) {
-                Text(
-                    text = "No recent transactions found for this account.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(vertical = 24.dp)
+                EmptyStateCard(
+                    title = "No Balance History",
+                    description = "Balance snapshots will appear here as this account updates."
                 )
             } else {
                 LazyColumn(

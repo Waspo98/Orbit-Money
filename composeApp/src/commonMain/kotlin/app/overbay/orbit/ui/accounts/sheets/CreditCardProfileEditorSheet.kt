@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.accounts.sheets
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -31,8 +33,12 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.RewardCategory
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlinx.datetime.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,9 +54,13 @@ fun CreditCardProfileEditorSheet(
     var cardName by remember { mutableStateOf(profile.cardName ?: "") }
     var issuerName by remember { mutableStateOf(profile.issuerName ?: "") }
     var network by remember { mutableStateOf(profile.network ?: "") }
-    var annualFeeText by remember { mutableStateOf(if (profile.annualFeeCents != null) (profile.annualFeeCents!! / 100.0).toString() else "") }
-    var annualFeePostDate by remember { mutableStateOf(profile.annualFeePostDate ?: "") }
-    var creditLimitText by remember { mutableStateOf(if (profile.creditLimitCents != null) (profile.creditLimitCents!! / 100.0).toString() else "") }
+    var annualFeeCents by remember { mutableStateOf(profile.annualFeeCents ?: 0L) }
+    var annualFeeDate by remember {
+        val parsed = profile.annualFeePostDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        mutableStateOf(parsed ?: LocalDateUtils.todayLocalDate())
+    }
+    var hasAnnualFeeDate by remember { mutableStateOf(profile.annualFeePostDate != null) }
+    var creditLimitCents by remember { mutableStateOf(profile.creditLimitCents ?: 0L) }
     var statementClosingDayText by remember { mutableStateOf(profile.statementClosingDay?.toString() ?: "") }
     var paymentDueDayText by remember { mutableStateOf(profile.paymentDueDay?.toString() ?: "") }
 
@@ -61,7 +71,7 @@ fun CreditCardProfileEditorSheet(
 
     var benefitList by remember { mutableStateOf(profile.benefits) }
     var newBenefitTitle by remember { mutableStateOf("") }
-    var newBenefitAmount by remember { mutableStateOf("") }
+    var newBenefitAmountCents by remember { mutableStateOf(0L) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -110,32 +120,32 @@ fun CreditCardProfileEditorSheet(
             }
 
             // Credit Limit
-            OutlinedTextField(
-                value = creditLimitText,
-                onValueChange = { creditLimitText = it },
-                label = { Text("Credit Limit ($)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
+            CurrencyTextField(
+                cents = creditLimitCents,
+                onCentsChange = { creditLimitCents = it },
+                label = "Credit Limit",
                 modifier = Modifier.fillMaxWidth()
             )
 
             // Annual Fee & Post Date
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = annualFeeText,
-                    onValueChange = { annualFeeText = it },
-                    label = { Text("Annual Fee ($)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = annualFeePostDate,
-                    onValueChange = { annualFeePostDate = it },
-                    label = { Text("Fee Post Date (YYYY-MM-DD)") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
+                Box(modifier = Modifier.weight(1f)) {
+                    CurrencyTextField(
+                        cents = annualFeeCents,
+                        onCentsChange = { annualFeeCents = it },
+                        label = "Annual Fee"
+                    )
+                }
+                Box(modifier = Modifier.weight(1f)) {
+                    DateFieldButton(
+                        date = annualFeeDate,
+                        onDateSelected = {
+                            annualFeeDate = it
+                            hasAnnualFeeDate = true
+                        },
+                        label = "Fee Post Date"
+                    )
+                }
             }
 
             // Statement Cycle Days
@@ -200,7 +210,7 @@ fun CreditCardProfileEditorSheet(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = newBenefitTitle,
                     onValueChange = { newBenefitTitle = it },
@@ -208,27 +218,25 @@ fun CreditCardProfileEditorSheet(
                     singleLine = true,
                     modifier = Modifier.weight(2f)
                 )
-                OutlinedTextField(
-                    value = newBenefitAmount,
-                    onValueChange = { newBenefitAmount = it },
-                    label = { Text("Amount ($)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
+                Box(modifier = Modifier.weight(1f)) {
+                    CurrencyTextField(
+                        cents = newBenefitAmountCents,
+                        onCentsChange = { newBenefitAmountCents = it },
+                        label = "Amount"
+                    )
+                }
                 Button(
                     onClick = {
-                        val amtCents = if (newBenefitAmount.isNotBlank()) MoneyUtils.dollarsToCents(newBenefitAmount) else null
+                        val amtCents = if (newBenefitAmountCents > 0L) newBenefitAmountCents else null
                         if (newBenefitTitle.isNotBlank()) {
                             benefitList = benefitList + CardBenefit(
                                 title = newBenefitTitle.trim(),
                                 annualCreditValueCents = amtCents
                             )
                             newBenefitTitle = ""
-                            newBenefitAmount = ""
+                            newBenefitAmountCents = 0L
                         }
-                    },
-                    modifier = Modifier.padding(top = 8.dp)
+                    }
                 ) {
                     Text("Add")
                 }
@@ -244,15 +252,16 @@ fun CreditCardProfileEditorSheet(
                 Button(
                     onClick = {
                         haptics.confirm()
-                        val feeCents = if (annualFeeText.isNotBlank()) MoneyUtils.dollarsToCents(annualFeeText) else null
-                        val limitCents = if (creditLimitText.isNotBlank()) MoneyUtils.dollarsToCents(creditLimitText) else null
+                        val feeCents = if (annualFeeCents > 0L) annualFeeCents else null
+                        val limitCents = if (creditLimitCents > 0L) creditLimitCents else null
+                        val feePostDate = if (hasAnnualFeeDate || annualFeeCents > 0L) LocalDateUtils.formatIsoDate(annualFeeDate) else null
 
                         val updated = profile.copy(
                             cardName = cardName.trim().ifBlank { null },
                             issuerName = issuerName.trim().ifBlank { null },
                             network = network.trim().ifBlank { null },
                             annualFeeCents = feeCents,
-                            annualFeePostDate = annualFeePostDate.trim().ifBlank { null },
+                            annualFeePostDate = feePostDate,
                             creditLimitCents = limitCents,
                             statementClosingDay = statementClosingDayText.toIntOrNull(),
                             paymentDueDay = paymentDueDayText.toIntOrNull(),
