@@ -88,6 +88,13 @@ if not "%GITHUB_TOKEN%"=="" (
   echo GITHUB_TOKEN is not set; docker push will use existing Docker registry credentials.
 )
 
+echo Ensuring Web PWA bundle is built on host...
+call scripts\build-frontend.cmd
+if errorlevel 1 (
+  popd
+  exit /b 1
+)
+
 echo Building beta Docker image for %DEPLOY_SHA%...
 docker build -t %IMAGE%:beta -t %IMAGE%:beta-%DEPLOY_SHA% .
 if errorlevel 1 (
@@ -106,14 +113,8 @@ if errorlevel 1 (
   echo WARNING: Could not push beta SHA image to ghcr.io. Continuing with local deployment.
 )
 
-echo Building local Compose image from the checked-out Beta branch...
-%COMPOSE_CMD% build orbit-money-beta
-if errorlevel 1 (
-  popd
-  exit /b 1
-)
-
-%COMPOSE_CMD% up -d --no-deps orbit-money-beta
+echo Starting orbit-money-beta container from built image...
+%COMPOSE_CMD% up -d --no-deps --force-recreate orbit-money-beta
 if errorlevel 1 (
   popd
   exit /b 1

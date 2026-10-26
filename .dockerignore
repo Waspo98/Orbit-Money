@@ -2,8 +2,15 @@ node_modules
 **/node_modules
 .tools
 .tools/
-dist
-**/dist
+.gradle
+*.apk
+androidApp/build
+composeApp/build/*
+!composeApp/build/dist
+composeApp/build/dist/*
+!composeApp/build/dist/wasmJs
+composeApp/build/dist/wasmJs/*
+!composeApp/build/dist/wasmJs/productionExecutable
 .git
 .env
 *.env.local
