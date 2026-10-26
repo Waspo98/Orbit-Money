@@ -39,6 +39,7 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -163,28 +164,12 @@ fun AccountEditorSheet(
             }
 
             // MHA Default Eligible Switch
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "MHA Expense Eligible",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = "Treat transactions from this account as household-eligible by default",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-                Switch(
-                    checked = mhaEligible,
-                    onCheckedChange = { mhaEligible = it }
-                )
-            }
+            OrbitSwitchRow(
+                title = "MHA Expense Eligible",
+                subtitle = "Treat transactions from this account as household-eligible by default",
+                checked = mhaEligible,
+                onCheckedChange = { mhaEligible = it }
+            )
 
             Spacer(modifier = Modifier.height(10.dp))
 

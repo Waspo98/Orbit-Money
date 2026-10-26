@@ -44,6 +44,7 @@ import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -169,31 +170,12 @@ fun BudgetAmountEditorSheet(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                        Text(
-                            text = "Rollover Unspent Room",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = "Add remaining balance from previous month to this category's budget",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Switch(
-                        checked = rollover,
-                        onCheckedChange = { rollover = it }
-                    )
-                }
+                OrbitSwitchRow(
+                    title = "Rollover Unspent Room",
+                    subtitle = "Add remaining balance from previous month to this category's budget",
+                    checked = rollover,
+                    onCheckedChange = { rollover = it }
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))

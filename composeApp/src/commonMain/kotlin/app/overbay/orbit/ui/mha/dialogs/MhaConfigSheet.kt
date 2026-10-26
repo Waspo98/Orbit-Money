@@ -36,6 +36,7 @@ import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 
@@ -98,31 +99,12 @@ fun MhaConfigSheet(
                 fontWeight = FontWeight.SemiBold
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Church Designation Cap",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = if (enableDesignatedCap) "Enforcing official advance designation" else "Uncapped (tracking actual expenses)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-                Switch(
-                    checked = enableDesignatedCap,
-                    onCheckedChange = {
-                        haptics.tick()
-                        enableDesignatedCap = it
-                    }
-                )
-            }
+            OrbitSwitchRow(
+                title = "Church Designation Cap",
+                subtitle = if (enableDesignatedCap) "Enforcing official advance designation" else "Uncapped (tracking actual expenses)",
+                checked = enableDesignatedCap,
+                onCheckedChange = { enableDesignatedCap = it }
+            )
 
             if (enableDesignatedCap) {
                 CurrencyTextField(
@@ -135,31 +117,12 @@ fun MhaConfigSheet(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Fair Market Rental Value (FMRV)",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = if (enableFmrv) "Enforcing annual rental value limit" else "Uncapped (no FMRV limit)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-                Switch(
-                    checked = enableFmrv,
-                    onCheckedChange = {
-                        haptics.tick()
-                        enableFmrv = it
-                    }
-                )
-            }
+            OrbitSwitchRow(
+                title = "Fair Market Rental Value (FMRV)",
+                subtitle = if (enableFmrv) "Enforcing annual rental value limit" else "Uncapped (no FMRV limit)",
+                checked = enableFmrv,
+                onCheckedChange = { enableFmrv = it }
+            )
 
             if (enableFmrv) {
                 CurrencyTextField(

@@ -23,6 +23,7 @@ import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitSwitchRow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,28 +99,11 @@ fun ThemeAppearanceBlock(
         Spacer(modifier = Modifier.height(14.dp))
 
         // Dynamic Color Switch
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Dynamic Material You Colors",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Harmonize with device wallpaper palette (Android 12+)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = preferences.dynamicColor,
-                onCheckedChange = onDynamicColorChange
-            )
-        }
+        OrbitSwitchRow(
+            title = "Dynamic Material You Colors",
+            subtitle = "Harmonize with device wallpaper palette (Android 12+)",
+            checked = preferences.dynamicColor,
+            onCheckedChange = onDynamicColorChange
+        )
     }
 }

@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitSwitchRow
 
 @Composable
 fun SecurityBiometricsBlock(
@@ -36,83 +37,32 @@ fun SecurityBiometricsBlock(
         modifier = modifier
     ) {
         // Biometric App Lock
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Biometric App Lock",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Require fingerprint or face unlock upon app resume",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = preferences.biometricLockEnabled,
-                onCheckedChange = onBiometricLockChange
-            )
-        }
+        OrbitSwitchRow(
+            title = "Biometric App Lock",
+            subtitle = "Require fingerprint or face unlock upon app resume",
+            checked = preferences.biometricLockEnabled,
+            onCheckedChange = onBiometricLockChange
+        )
 
         Spacer(modifier = Modifier.height(14.dp))
 
         // Haptics Switch
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Kinetic Haptic Feedback",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Physics vibrations on sliders, chart scrubbing & keypad entries",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = preferences.hapticsEnabled,
-                onCheckedChange = onHapticsChange
-            )
-        }
+        OrbitSwitchRow(
+            title = "Kinetic Haptic Feedback",
+            subtitle = "Physics vibrations on sliders, chart scrubbing & keypad entries",
+            checked = preferences.hapticsEnabled,
+            onCheckedChange = onHapticsChange
+        )
 
         Spacer(modifier = Modifier.height(14.dp))
 
         // MHA Tracker Switch
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Ministerial Housing Allowance (MHA)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Enable IRC § 107 parsonage deduction tracker in navigation",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = preferences.mhaTrackerEnabled,
-                onCheckedChange = onMhaTrackerChange
-            )
-        }
+        OrbitSwitchRow(
+            title = "Ministerial Housing Allowance (MHA)",
+            subtitle = "Enable IRC § 107 parsonage deduction tracker in navigation",
+            checked = preferences.mhaTrackerEnabled,
+            onCheckedChange = onMhaTrackerChange
+        )
 
         Spacer(modifier = Modifier.height(18.dp))
 

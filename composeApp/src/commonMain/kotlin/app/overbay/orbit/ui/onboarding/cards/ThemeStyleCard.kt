@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.onboarding.OnboardingIntent
 import app.overbay.orbit.ui.onboarding.OnboardingUiState
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -138,32 +139,12 @@ fun ThemeStyleCard(
             }
 
             // Material You Dynamic Color Switch
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Dynamic Color (Material You)",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = "Derive theme accents from your wallpaper (Android 12+)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Switch(
-                    checked = state.dynamicColorEnabled,
-                    onCheckedChange = {
-                        haptics.tick()
-                        onIntent(OnboardingIntent.SetDynamicColor(it))
-                    }
-                )
-            }
+            OrbitSwitchRow(
+                title = "Dynamic Color (Material You)",
+                subtitle = "Derive theme accents from your wallpaper (Android 12+)",
+                checked = state.dynamicColorEnabled,
+                onCheckedChange = { onIntent(OnboardingIntent.SetDynamicColor(it)) }
+            )
 
             // Live Miniature Preview
             Surface(

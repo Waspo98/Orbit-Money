@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 private val PRESET_COLORS = listOf(
@@ -196,51 +197,33 @@ fun CategoryEditorDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Type Switches
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(text = "Income Category", style = MaterialTheme.typography.bodyMedium)
-                    Switch(
-                        checked = isIncome,
-                        onCheckedChange = {
-                            isIncome = it
-                            if (it) isTransfer = false
-                        }
-                    )
-                }
+                OrbitSwitchRow(
+                    title = "Income Category",
+                    checked = isIncome,
+                    onCheckedChange = {
+                        isIncome = it
+                        if (it) isTransfer = false
+                    }
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(text = "Transfer Category", style = MaterialTheme.typography.bodyMedium)
-                    Switch(
-                        checked = isTransfer,
-                        onCheckedChange = {
-                            isTransfer = it
-                            if (it) isIncome = false
-                        }
-                    )
-                }
+                OrbitSwitchRow(
+                    title = "Transfer Category",
+                    checked = isTransfer,
+                    onCheckedChange = {
+                        isTransfer = it
+                        if (it) isIncome = false
+                    }
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(text = "Default MHA Eligible", style = MaterialTheme.typography.bodyMedium)
-                    Switch(
-                        checked = mhaEligible,
-                        onCheckedChange = { mhaEligible = it }
-                    )
-                }
+                OrbitSwitchRow(
+                    title = "Default MHA Eligible",
+                    checked = mhaEligible,
+                    onCheckedChange = { mhaEligible = it }
+                )
             }
         },
         confirmButton = {

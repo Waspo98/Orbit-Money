@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitSwitchRow
 
 @Composable
 fun GoogleDriveBackupBlock(
@@ -34,33 +35,16 @@ fun GoogleDriveBackupBlock(
         modifier = modifier
     ) {
         // Google Drive Switch
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Google Drive Private Sync",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = if (isDriveSyncEnabled) {
-                        "Backs up to hidden appDataFolder ${if (lastSyncAt != null) "• Last synced: $lastSyncAt" else ""}"
-                    } else {
-                        "Store encrypted snapshot in personal Google Drive"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = isDriveSyncEnabled,
-                onCheckedChange = onToggleDriveSync
-            )
-        }
+        OrbitSwitchRow(
+            title = "Google Drive Private Sync",
+            subtitle = if (isDriveSyncEnabled) {
+                "Backs up to hidden appDataFolder ${if (lastSyncAt != null) "• Last synced: $lastSyncAt" else ""}"
+            } else {
+                "Store encrypted snapshot in personal Google Drive"
+            },
+            checked = isDriveSyncEnabled,
+            onCheckedChange = onToggleDriveSync
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
