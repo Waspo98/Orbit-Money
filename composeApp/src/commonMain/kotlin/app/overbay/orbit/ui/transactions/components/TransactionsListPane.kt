@@ -304,10 +304,11 @@ private fun TransactionsGroupedLazyList(
     modifier: Modifier = Modifier,
     onInteraction: () -> Unit = {}
 ) {
-    val horizontalPadding = if (isWideScreen) 20.dp else 16.dp
+    val startPadding = if (isWideScreen) 20.dp else 16.dp
+    val endPadding = if (isWideScreen) 0.dp else 16.dp
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(start = horizontalPadding, end = horizontalPadding, top = 8.dp, bottom = 88.dp),
+        contentPadding = PaddingValues(start = startPadding, end = endPadding, top = 8.dp, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         state.groupedTransactions.forEach { group ->

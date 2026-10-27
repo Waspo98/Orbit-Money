@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -30,11 +31,10 @@ import app.overbay.orbit.util.BackHandler
 /**
  * Reusable morphing master-detail split layout template for unfolded phones, tablets, and desktops.
  *
- * - When [isDetailOpen] is false, [masterContent] spans 100% of the container width.
+ * - When [isDetailOpen] is false, [masterContent] spans 100% of the container width (with a 20dp right gutter).
  * - When [isDetailOpen] is true, [masterContent] smoothly morphs to the left column ([masterWeightWhenOpen])
  *   while [detailContent] glides into the right column as a floating bordered card.
- * - Pressing the system Back button while [isDetailOpen] is true invokes [onDismissDetail],
- *   closing the right pane and re-stretching [masterContent] back to full width.
+ * - Both opening (0f -> 1f) and closing (1f -> 0f) preserve full spring overshoot and rebound.
  */
 @Composable
 fun OrbitMorphingSplitLayout(
@@ -57,7 +57,7 @@ fun OrbitMorphingSplitLayout(
     val splitProgress by animateFloatAsState(
         targetValue = if (isDetailOpen) 1f else 0f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
+            dampingRatio = 0.48f,
             stiffness = Spring.StiffnessLow
         ),
         label = "orbitMorphingSplitProgress"
@@ -73,25 +73,42 @@ fun OrbitMorphingSplitLayout(
                 .fillMaxSize()
         ) {
             val totalWidth = maxWidth
-            val rightEdgePadding = 16.dp * splitProgress
-            val effectiveOpenWidth = (totalWidth - paneSpacing - rightEdgePadding).coerceAtLeast(320.dp)
+            val closedRightGutter = 20.dp
+            val openRightGutter = 20.dp
+
+            val restingClosedMasterWidth = (totalWidth - closedRightGutter).coerceAtLeast(320.dp)
+            val effectiveOpenWidth = (totalWidth - paneSpacing - openRightGutter).coerceAtLeast(320.dp)
             val openMasterWidth = effectiveOpenWidth * masterWeightWhenOpen
             val openDetailWidth = effectiveOpenWidth * (1f - masterWeightWhenOpen)
 
-            val currentMasterWidth = lerp(totalWidth, openMasterWidth, splitProgress)
-            val detailOffsetX = currentMasterWidth + (paneSpacing * splitProgress)
+            // When splitProgress >= 0f (including > 1f open bounce), interpolate layout width directly.
+            // When splitProgress < 0f (closing overshoot past 0f), expand into the right gutter AND
+            // apply GPU-accelerated left-anchored elastic stretch so BoxWithConstraints never clips the bounce!
+            val closeOvershoot = (-splitProgress).coerceAtLeast(0f)
+            val gutterOvershootFraction = (closeOvershoot / 0.22f).coerceIn(0f, 1f)
+            val currentMasterWidth = if (splitProgress >= 0f) {
+                lerp(restingClosedMasterWidth, openMasterWidth, splitProgress)
+            } else {
+                lerp(restingClosedMasterWidth, totalWidth - 2.dp, gutterOvershootFraction)
+            }
 
-            // Left Master Pane (morphs smoothly between 100% width and 55% width)
+            val detailOffsetX = currentMasterWidth + (paneSpacing * splitProgress.coerceAtLeast(0f))
+
+            // Left Master Pane (bounces on both open and close)
             Box(
                 modifier = Modifier
                     .width(currentMasterWidth)
                     .fillMaxHeight()
+                    .graphicsLayer {
+                        transformOrigin = TransformOrigin(0f, 0.5f)
+                        scaleX = 1f + (closeOvershoot * 0.08f)
+                    }
             ) {
                 masterContent()
             }
 
-            // Right Floating Detail Pane (slides and fades in when open)
-            if (splitProgress > 0.005f) {
+            // Right Floating Detail Pane (stays mounted with cached content until completely off-screen)
+            if (splitProgress > 0.001f || isDetailOpen) {
                 Box(
                     modifier = Modifier
                         .offset { IntOffset(detailOffsetX.roundToPx(), 0) }
