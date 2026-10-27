@@ -230,7 +230,8 @@ object DashboardDataTransform {
                     categoryColor = null,
                     categoryIcon = null,
                     accountName = acct?.name ?: txn.accountName,
-                    isPending = txn.isPending
+                    isPending = txn.isPending,
+                    merchantLogoUrl = txn.merchantLogo?.url?.takeIf { it.isNotBlank() && txn.merchantLogo.status != "hidden" && txn.merchantLogo.status != "failed" }
                 )
             }
         )
@@ -482,7 +483,8 @@ object DashboardDataTransform {
                     categoryColor = cat?.color ?: txn.categoryColor,
                     categoryIcon = cat?.icon ?: txn.categoryIcon,
                     accountName = acct?.name ?: txn.accountName,
-                    isPending = txn.isPending
+                    isPending = txn.isPending,
+                    merchantLogoUrl = txn.merchantLogo?.url?.takeIf { it.isNotBlank() && txn.merchantLogo.status != "hidden" && txn.merchantLogo.status != "failed" }
                 )
             }
         val recentState = RecentTransactionsState(transactions = recentList)

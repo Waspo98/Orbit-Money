@@ -7,6 +7,7 @@ import app.overbay.orbit.data.model.CategoryBudget
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Goal
+import app.overbay.orbit.data.model.MerchantLogo
 import app.overbay.orbit.data.model.RecurrenceFrequency
 import app.overbay.orbit.data.model.RuleAction
 import app.overbay.orbit.data.model.RuleActionType
@@ -116,7 +117,8 @@ data class TransactionDto(
     @SerialName("transfer_pair_id") val transferPairId: Long? = null,
     @SerialName("is_pending") @Serializable(with = FlexibleBooleanSerializer::class) val isPending: Boolean = false,
     @SerialName("external_id") val externalId: String? = null,
-    val source: String = "manual"
+    val source: String = "manual",
+    @SerialName("merchant_logo") val merchantLogo: MerchantLogoDto? = null
 ) {
     fun toDomain(): Transaction {
         val origMerchant = originalMerchant ?: merchant ?: ""
@@ -159,6 +161,7 @@ data class TransactionDto(
             editedMhaEligibleSource = editedMhaEligibleSource,
             externalId = externalId,
             editSource = editSrc,
+            merchantLogo = merchantLogo?.toDomain(),
             source = source
         )
     }
@@ -478,4 +481,63 @@ data class BudgetUpsertRequestDto(
 @Serializable
 data class ResetTransactionRequestDto(
     val fields: List<String> = listOf("merchant", "category_id", "is_transfer", "is_ignored", "mha_eligible")
+)
+
+@Serializable
+data class MerchantLogoDto(
+    @SerialName("merchant_key") val merchantKey: String = "",
+    @SerialName("merchant_name") val merchantName: String = "",
+    val provider: String = "logo_dev",
+    @SerialName("provider_query") val providerQuery: String = "",
+    val url: String? = null,
+    val status: String = "candidate"
+) {
+    fun toDomain(): MerchantLogo? =
+        if (merchantKey.isBlank()) null
+        else MerchantLogo(merchantKey, merchantName, provider, providerQuery, url, status)
+}
+
+@Serializable
+data class MerchantLogoCandidateDto(
+    val name: String = "",
+    val domain: String = "",
+    @SerialName("logo_url") val logoUrl: String? = null
+)
+
+@Serializable
+data class MerchantLogoReportRequestDto(
+    @SerialName("merchant_key") val merchantKey: String,
+    val status: String
+)
+
+@Serializable
+data class MerchantLogoEnsureRequestDto(
+    @SerialName("transaction_id") val transactionId: Long
+)
+
+@Serializable
+data class MerchantLogoOverrideRequestDto(
+    @SerialName("merchant_key") val merchantKey: String,
+    @SerialName("logo_url") val logoUrl: String? = null,
+    @SerialName("use_category_icon") val useCategoryIcon: Boolean = false
+)
+
+@Serializable
+data class MerchantLogoSearchRequestDto(
+    @SerialName("transaction_id") val transactionId: Long,
+    val query: String
+)
+
+@Serializable
+data class MerchantLogoMutationResponseDto(
+    val success: Boolean = true,
+    @SerialName("merchant_logo") val merchantLogo: MerchantLogoDto? = null
+)
+
+@Serializable
+data class MerchantLogoSearchResponseDto(
+    val success: Boolean = true,
+    val configured: Boolean = true,
+    @SerialName("merchant_logo") val merchantLogo: MerchantLogoDto? = null,
+    val candidates: List<MerchantLogoCandidateDto> = emptyList()
 )

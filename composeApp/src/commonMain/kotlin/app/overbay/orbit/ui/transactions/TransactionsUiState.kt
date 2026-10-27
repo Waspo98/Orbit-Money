@@ -53,6 +53,7 @@ data class TransactionsUiState(
     val showSplitSheet: Boolean = false,
     val showCsvImportSheet: Boolean = false,
     val showFilterSheet: Boolean = false,
+    val logoFinderTransactionId: Long? = null,
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
     val syncToastMessage: String? = null,
@@ -65,6 +66,9 @@ data class TransactionsUiState(
 
     val inspectingTransaction: Transaction?
         get() = transactions.find { it.id == inspectingTransactionId }
+
+    val logoFinderTransaction: Transaction?
+        get() = transactions.find { it.id == logoFinderTransactionId }
 
     val hasActiveFilters: Boolean
         get() = searchQuery.isNotBlank() ||

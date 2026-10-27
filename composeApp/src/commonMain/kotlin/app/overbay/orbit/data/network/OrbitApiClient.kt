@@ -518,6 +518,64 @@ class OrbitApiClient(
     }
 
     // -------------------------------------------------------------------------
+    // Merchant Logos Endpoints
+    // -------------------------------------------------------------------------
+    suspend fun reportMerchantLogoStatus(merchantKey: String, status: String): Result<Boolean> = runCatching {
+        val response = client.post(url("/api/merchant-logos/report")) {
+            contentType(ContentType.Application.Json)
+            sessionCookie?.let { header("Cookie", it) }
+            setBody(MerchantLogoReportRequestDto(merchantKey = merchantKey, status = status))
+        }
+        extractSessionCookie(response)
+        response.status.isSuccess()
+    }
+
+    suspend fun ensureMerchantLogo(transactionId: Long): Result<MerchantLogoDto> = runCatching {
+        val response = client.post(url("/api/merchant-logos/ensure")) {
+            contentType(ContentType.Application.Json)
+            sessionCookie?.let { header("Cookie", it) }
+            setBody(MerchantLogoEnsureRequestDto(transactionId = transactionId))
+        }
+        extractSessionCookie(response)
+        ensureSuccess(response)
+        response.body<MerchantLogoMutationResponseDto>().merchantLogo
+            ?: throw IllegalStateException("This transaction does not have a merchant name to override.")
+    }
+
+    suspend fun searchMerchantLogos(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> = runCatching {
+        val response = client.post(url("/api/merchant-logos/search")) {
+            contentType(ContentType.Application.Json)
+            sessionCookie?.let { header("Cookie", it) }
+            setBody(MerchantLogoSearchRequestDto(transactionId = transactionId, query = query))
+        }
+        extractSessionCookie(response)
+        ensureSuccess(response)
+        response.body()
+    }
+
+    suspend fun overrideMerchantLogo(
+        merchantKey: String,
+        logoUrl: String? = null,
+        useCategoryIcon: Boolean = false
+    ): Result<MerchantLogoDto> = runCatching {
+        val response = client.post(url("/api/merchant-logos/override")) {
+            contentType(ContentType.Application.Json)
+            sessionCookie?.let { header("Cookie", it) }
+            setBody(
+                MerchantLogoOverrideRequestDto(
+                    merchantKey = merchantKey,
+                    logoUrl = logoUrl?.takeIf { it.isNotBlank() },
+                    useCategoryIcon = useCategoryIcon
+                )
+            )
+        }
+        extractSessionCookie(response)
+        ensureSuccess(response)
+        response.body<MerchantLogoMutationResponseDto>().merchantLogo
+            ?: throw IllegalStateException("Merchant logo override failed.")
+    }
+
+    // -------------------------------------------------------------------------
     // SimpleFIN Sync Trigger
     // -------------------------------------------------------------------------
     suspend fun triggerSimpleFinSync(): Result<SimpleFinSyncResultDto> = runCatching {

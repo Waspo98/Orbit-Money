@@ -11,6 +11,7 @@ import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.data.model.HouseholdInfo
 import app.overbay.orbit.data.model.HouseholdMember
+import app.overbay.orbit.data.model.MerchantLogo
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
@@ -18,6 +19,9 @@ import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.UpcomingItem
+import app.overbay.orbit.data.model.cleanMerchantNameForLogo
+import app.overbay.orbit.data.model.merchantLogoKey
+import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.data.network.OrbitApiClient
 import app.overbay.orbit.data.network.ServerUrlNormalizer
 import app.overbay.orbit.data.network.SimpleFinDirectClient
@@ -224,15 +228,13 @@ class OrbitRepository(
     suspend fun saveTransaction(transaction: Transaction) {
         val current = _transactions.value
         val exists = current.any { it.id == transaction.id && transaction.id != 0L }
-        val updatedList = if (exists) {
-            current.map { if (it.id == transaction.id) transaction else it }
-        } else {
-            val newId = if (transaction.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else transaction.id
-            current + transaction.copy(id = newId)
-        }
-
+        val updatedList = if (exists) current.map { if (it.id == transaction.id) transaction else it }
+        else current + transaction.copy(id = if (transaction.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else transaction.id)
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
-        activeEngine.pushTransaction(transaction)
+        val pushed = activeEngine.pushTransaction(transaction).getOrNull()
+        if (pushed != null && pushed.merchantLogo != transaction.merchantLogo && exists) {
+            commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.map { if (it.id == transaction.id) it.copy(merchantLogo = pushed.merchantLogo) else it }))
+        }
     }
 
     /**
@@ -290,7 +292,10 @@ class OrbitRepository(
 
         val updatedList = current.map { if (it.id == id) reset else it }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
-        activeEngine.resetTransaction(id)
+        val pushed = activeEngine.resetTransaction(id).getOrNull()
+        if (pushed != null && pushed.merchantLogo != reset.merchantLogo) {
+            commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.map { if (it.id == id) it.copy(merchantLogo = pushed.merchantLogo) else it }))
+        }
     }
 
     suspend fun deleteTransaction(id: Long) {
@@ -300,36 +305,80 @@ class OrbitRepository(
     }
 
     suspend fun batchEditCategory(ids: Set<Long>, categoryId: Long) {
-        val updatedList = _transactions.value.map { txn ->
-            if (txn.id in ids) txn.copy(editedCategoryId = categoryId, editedCategoryIdSource = "user", editSource = EditSource.USER) else txn
-        }
+        val updatedList = _transactions.value.map { if (it.id in ids) it.copy(editedCategoryId = categoryId, editedCategoryIdSource = "user", editSource = EditSource.USER) else it }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
     }
 
     suspend fun batchMarkTransfer(ids: Set<Long>, isTransfer: Boolean) {
-        val updatedList = _transactions.value.map { txn ->
-            if (txn.id in ids) txn.copy(editedIsTransfer = isTransfer, editedIsTransferSource = "user", editSource = EditSource.USER) else txn
-        }
+        val updatedList = _transactions.value.map { if (it.id in ids) it.copy(editedIsTransfer = isTransfer, editedIsTransferSource = "user", editSource = EditSource.USER) else it }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
     }
 
     suspend fun batchSetMhaEligible(ids: Set<Long>, eligible: Boolean) {
-        val updatedList = _transactions.value.map { txn ->
-            if (txn.id in ids) txn.copy(editedMhaEligible = eligible, editedMhaEligibleSource = "user", editSource = EditSource.USER) else txn
-        }
+        val updatedList = _transactions.value.map { if (it.id in ids) it.copy(editedMhaEligible = eligible, editedMhaEligibleSource = "user", editSource = EditSource.USER) else it }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
     }
 
     suspend fun batchSetIgnored(ids: Set<Long>, ignored: Boolean) {
-        val updatedList = _transactions.value.map { txn ->
-            if (txn.id in ids) txn.copy(editedIsIgnored = ignored, editedIsIgnoredSource = "user", editSource = EditSource.USER) else txn
-        }
+        val updatedList = _transactions.value.map { if (it.id in ids) it.copy(editedIsIgnored = ignored, editedIsIgnoredSource = "user", editSource = EditSource.USER) else it }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
     }
 
     suspend fun batchDeleteTransactions(ids: Set<Long>) {
-        val updatedList = _transactions.value.filterNot { it.id in ids }
+        commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.filterNot { it.id in ids }))
+    }
+
+    suspend fun reportMerchantLogoStatus(merchantKey: String, status: String) {
+        if (merchantKey.isBlank()) return
+        if (_storageMode.value == StorageMode.SELF_HOSTED) {
+            runCatching { createApiClient().reportMerchantLogoStatus(merchantKey, status) }
+        }
+        val updatedList = _transactions.value.map { txn ->
+            val currentLogo = txn.merchantLogo
+            if (currentLogo?.merchantKey == merchantKey && currentLogo.status == "candidate") {
+                txn.copy(merchantLogo = currentLogo.copy(status = status, url = if (status == "failed") null else currentLogo.url))
+            } else txn
+        }
+        if (updatedList != _transactions.value) commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+    }
+
+    suspend fun searchMerchantLogos(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> = runCatching {
+        if (_storageMode.value != StorageMode.SELF_HOSTED) {
+            MerchantLogoSearchResponseDto(configured = false, candidates = emptyList())
+        } else {
+            createApiClient().searchMerchantLogos(transactionId, query).getOrThrow()
+        }
+    }
+
+    suspend fun overrideMerchantLogo(transactionId: Long, logoUrl: String? = null, useCategoryIcon: Boolean = false): Result<MerchantLogo> = runCatching {
+        val target = _transactions.value.find { it.id == transactionId }
+            ?: throw IllegalStateException("Transaction not found.")
+        val cleanedName = cleanMerchantNameForLogo(target.effectiveMerchant.ifBlank { target.originalMerchant })
+        val fallbackKey = target.resolvedMerchantKey
+        if (fallbackKey.isBlank()) throw IllegalStateException("This merchant does not have a logo entry to update yet.")
+        val updatedLogo = if (_storageMode.value == StorageMode.SELF_HOSTED) {
+            val client = createApiClient()
+            val ensuredKey = target.merchantLogo?.merchantKey?.takeIf { it.isNotBlank() }
+                ?: client.ensureMerchantLogo(transactionId).getOrNull()?.merchantKey
+                ?: fallbackKey
+            client.overrideMerchantLogo(ensuredKey, logoUrl, useCategoryIcon).getOrThrow().toDomain()
+                ?: MerchantLogo(ensuredKey, cleanedName, url = if (useCategoryIcon) null else logoUrl, status = if (useCategoryIcon) "hidden" else "manual")
+        } else {
+            MerchantLogo(
+                merchantKey = fallbackKey,
+                merchantName = cleanedName,
+                providerQuery = cleanedName,
+                url = if (useCategoryIcon) null else logoUrl?.trim(),
+                status = if (useCategoryIcon) "hidden" else "manual"
+            )
+        }
+        val updatedList = _transactions.value.map { txn ->
+            if (txn.id == transactionId || txn.resolvedMerchantKey == updatedLogo.merchantKey || merchantLogoKey(txn.effectiveMerchant) == updatedLogo.merchantKey) {
+                txn.copy(merchantLogo = updatedLogo)
+            } else txn
+        }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        updatedLogo
     }
 
     suspend fun importTransactions(
@@ -337,50 +386,30 @@ class OrbitRepository(
         newRules: List<TransactionRule> = emptyList()
     ) {
         val currentTxns = _transactions.value
-        val currentMaxId = currentTxns.maxOfOrNull { it.id } ?: 0L
-        var nextId = currentMaxId + 1L
+        var nextId = (currentTxns.maxOfOrNull { it.id } ?: 0L) + 1L
         val assignedTxns = newTransactions.map { txn ->
-            if (txn.id <= 0L || currentTxns.any { it.id == txn.id }) {
-                txn.copy(id = nextId++)
-            } else {
+            if (txn.id <= 0L || currentTxns.any { it.id == txn.id }) txn.copy(id = nextId++)
+            else {
                 if (txn.id >= nextId) nextId = txn.id + 1L
                 txn
             }
         }
-        val combinedTxns = currentTxns + assignedTxns
-
         val currentRules = _rules.value
         var nextRuleId = (currentRules.maxOfOrNull { it.id } ?: 0L) + 1L
         val assignedRules = newRules.map { rule ->
-            if (rule.id <= 0L || currentRules.any { it.id == rule.id }) {
-                rule.copy(id = nextRuleId++)
-            } else rule
+            if (rule.id <= 0L || currentRules.any { it.id == rule.id }) rule.copy(id = nextRuleId++) else rule
         }
-        val combinedRules = currentRules + assignedRules
-
-        commitSnapshot(_snapshot.value.copy(
-            transactions = combinedTxns,
-            rules = combinedRules
-        ))
+        commitSnapshot(_snapshot.value.copy(transactions = currentTxns + assignedTxns, rules = currentRules + assignedRules))
     }
 
-    suspend fun splitTransaction(
-        parentTransactionId: Long,
-        splits: List<Pair<Cents, Long?>>
-    ) {
+    suspend fun splitTransaction(parentTransactionId: Long, splits: List<Pair<Cents, Long?>>) {
         val current = _transactions.value
         val parent = current.find { it.id == parentTransactionId } ?: return
         if (splits.isEmpty()) return
-
         var nextId = (current.maxOfOrNull { it.id } ?: 0L) + 1L
         val newTransactions = splits.mapIndexed { index, (amount, categoryId) ->
             if (index == 0) {
-                parent.copy(
-                    editedAmountCents = amount,
-                    editedCategoryId = categoryId,
-                    editedCategoryIdSource = "user",
-                    editSource = EditSource.USER
-                )
+                parent.copy(editedAmountCents = amount, editedCategoryId = categoryId, editedCategoryIdSource = "user", editSource = EditSource.USER)
             } else {
                 Transaction(
                     id = nextId++,
@@ -398,31 +427,22 @@ class OrbitRepository(
                 )
             }
         }
-
         val updatedList = current.map { if (it.id == parentTransactionId) newTransactions[0] else it } + newTransactions.drop(1)
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
     }
 
-
-    // -------------------------------------------------------------------------
     // Accounts
-    // -------------------------------------------------------------------------
     suspend fun saveAccount(account: Account) {
         val current = _accounts.value
         val exists = current.any { it.id == account.id && account.id != 0L }
-        val updatedList = if (exists) {
-            current.map { if (it.id == account.id) account else it }
-        } else {
-            val newId = if (account.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else account.id
-            current + account.copy(id = newId)
-        }
+        val updatedList = if (exists) current.map { if (it.id == account.id) account else it }
+        else current + account.copy(id = if (account.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else account.id)
         commitSnapshot(_snapshot.value.copy(accounts = updatedList))
         activeEngine.pushAccount(account)
     }
 
     suspend fun deleteAccount(id: Long) {
-        val updatedList = _accounts.value.filterNot { it.id == id }
-        commitSnapshot(_snapshot.value.copy(accounts = updatedList))
+        commitSnapshot(_snapshot.value.copy(accounts = _accounts.value.filterNot { it.id == id }))
         activeEngine.deleteAccount(id)
     }
 
@@ -430,51 +450,28 @@ class OrbitRepository(
         val currentAccounts = _accounts.value
         val source = currentAccounts.find { it.id == sourceAccountId } ?: return
         val target = currentAccounts.find { it.id == targetAccountId } ?: return
-
         val updatedTxns = _transactions.value.map { txn ->
-            if (txn.accountId == sourceAccountId) {
-                txn.copy(
-                    accountId = targetAccountId,
-                    accountName = target.name
-                )
-            } else txn
+            if (txn.accountId == sourceAccountId) txn.copy(accountId = targetAccountId, accountName = target.name) else txn
         }
-
-        val updatedTarget = if (combineBalances) {
-            target.copy(currentBalanceCents = target.currentBalanceCents + source.currentBalanceCents)
-        } else target
-
-        val remainingAccounts = currentAccounts
-            .filterNot { it.id == sourceAccountId }
-            .map { if (it.id == targetAccountId) updatedTarget else it }
-
-        commitSnapshot(_snapshot.value.copy(
-            accounts = remainingAccounts,
-            transactions = updatedTxns
-        ))
+        val updatedTarget = if (combineBalances) target.copy(currentBalanceCents = target.currentBalanceCents + source.currentBalanceCents) else target
+        val remainingAccounts = currentAccounts.filterNot { it.id == sourceAccountId }.map { if (it.id == targetAccountId) updatedTarget else it }
+        commitSnapshot(_snapshot.value.copy(accounts = remainingAccounts, transactions = updatedTxns))
         activeEngine.deleteAccount(sourceAccountId)
         activeEngine.pushAccount(updatedTarget)
     }
 
-    // -------------------------------------------------------------------------
     // Categories & Budgets
-    // -------------------------------------------------------------------------
     suspend fun saveCategory(category: Category) {
         val current = _categories.value
         val exists = current.any { it.id == category.id && category.id != 0L }
-        val updatedList = if (exists) {
-            current.map { if (it.id == category.id) category else it }
-        } else {
-            val newId = if (category.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else category.id
-            current + category.copy(id = newId)
-        }
+        val updatedList = if (exists) current.map { if (it.id == category.id) category else it }
+        else current + category.copy(id = if (category.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else category.id)
         commitSnapshot(_snapshot.value.copy(categories = updatedList))
         activeEngine.pushCategory(category)
     }
 
     suspend fun deleteCategory(id: Long) {
-        val updatedList = _categories.value.filterNot { it.id == id }
-        commitSnapshot(_snapshot.value.copy(categories = updatedList))
+        commitSnapshot(_snapshot.value.copy(categories = _categories.value.filterNot { it.id == id }))
         activeEngine.deleteCategory(id)
     }
 

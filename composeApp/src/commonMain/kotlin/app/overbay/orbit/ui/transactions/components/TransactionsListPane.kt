@@ -345,7 +345,10 @@ private fun TransactionsGroupedLazyList(
                     onToggleIgnore = { viewModel.toggleIgnore(txn.id) },
                     onDelete = { viewModel.deleteTransaction(txn.id) },
                     onResetMerchant = { viewModel.resetMerchant(txn.id) },
-                    onResetCategory = { viewModel.resetCategory(txn.id) }
+                    onResetCategory = { viewModel.resetCategory(txn.id) },
+                    onFindLogo = { viewModel.openLogoFinder(txn.id) },
+                    onUseCategoryIcon = { viewModel.useCategoryIconForTransaction(txn.id) },
+                    onReportLogoStatus = { key, status -> viewModel.reportMerchantLogoStatus(key, status) }
                 )
             }
         }

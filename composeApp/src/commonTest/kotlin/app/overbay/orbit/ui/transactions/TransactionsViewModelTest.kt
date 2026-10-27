@@ -6,6 +6,7 @@ import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.merchantLogoKey
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.TransactionFilterDraft
 import app.overbay.orbit.util.PlatformStorage
@@ -447,6 +448,62 @@ class TransactionsViewModelTest {
         testScheduler.advanceUntilIdle()
 
         assertEquals(2, repository.transactions.value.size)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testMerchantLogoOverride_propagatesAcrossMatchingMerchantTransactions() = runTest(testDispatcher) {
+        val checking = Account(id = 1L, name = "Checking", type = AccountType.CHECKING)
+        repository.saveAccount(checking)
+        repository.saveTransaction(
+            Transaction(id = 1L, accountId = 1L, originalDate = "2026-05-01", originalMerchant = "Target", originalAmountCents = -2500L)
+        )
+        repository.saveTransaction(
+            Transaction(id = 2L, accountId = 1L, originalDate = "2026-05-04", originalMerchant = "SQ *Target #1234", editedMerchant = "Target", editedMerchantSource = "user", originalAmountCents = -4200L)
+        )
+        repository.saveTransaction(
+            Transaction(id = 3L, accountId = 1L, originalDate = "2026-05-05", originalMerchant = "AT&T", originalAmountCents = -8500L)
+        )
+
+        assertEquals("target", merchantLogoKey("SQ *Target #1234"))
+        assertEquals("at-and-t", merchantLogoKey("AT&T"))
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        viewModel.openLogoFinder(1L)
+        testScheduler.advanceUntilIdle()
+        assertEquals(1L, viewModel.uiState.value.logoFinderTransactionId)
+        assertNotNull(viewModel.uiState.value.logoFinderTransaction)
+
+        val saveRes = viewModel.saveMerchantLogoOverride(1L, "https://img.logo.dev/target.com?format=png")
+        assertTrue(saveRes.isSuccess)
+        viewModel.closeLogoFinder()
+        testScheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.logoFinderTransactionId)
+
+        val t1 = repository.transactions.value.first { it.id == 1L }
+        val t2 = repository.transactions.value.first { it.id == 2L }
+        val t3 = repository.transactions.value.first { it.id == 3L }
+        assertEquals("https://img.logo.dev/target.com?format=png", t1.merchantLogo?.url)
+        assertEquals("manual", t1.merchantLogo?.status)
+        assertEquals("https://img.logo.dev/target.com?format=png", t2.merchantLogo?.url)
+        assertNull(t3.merchantLogo)
+
+        // Switching to category icon hides the logo across matching merchant transactions
+        val hideRes = viewModel.useCategoryIconSuspend(2L)
+        assertTrue(hideRes.isSuccess)
+        testScheduler.advanceUntilIdle()
+
+        val t1AfterHide = repository.transactions.value.first { it.id == 1L }
+        val t2AfterHide = repository.transactions.value.first { it.id == 2L }
+        assertEquals("hidden", t1AfterHide.merchantLogo?.status)
+        assertNull(t1AfterHide.merchantLogo?.url)
+        assertEquals("hidden", t2AfterHide.merchantLogo?.status)
+        assertNull(t2AfterHide.merchantLogo?.url)
 
         collectJob.cancel()
     }

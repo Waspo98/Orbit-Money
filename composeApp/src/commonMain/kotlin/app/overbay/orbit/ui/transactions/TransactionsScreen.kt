@@ -23,6 +23,7 @@ import app.overbay.orbit.ui.transactions.components.TransactionBatchActionBar
 import app.overbay.orbit.ui.transactions.components.TransactionDetailInspectorPane
 import app.overbay.orbit.ui.transactions.components.TransactionsListPane
 import app.overbay.orbit.ui.transactions.sheets.CsvImportSheet
+import app.overbay.orbit.ui.transactions.sheets.MerchantLogoFinderDialog
 import app.overbay.orbit.ui.transactions.sheets.SplitTransactionSheet
 import app.overbay.orbit.ui.transactions.sheets.TransactionEditorSheet
 import app.overbay.orbit.util.BackHandler
@@ -181,6 +182,17 @@ fun TransactionsScreen(
             onDismiss = { viewModel.closeFilterSheet() },
             accountNames = state.accounts.associate { it.id to it.name },
             categoryNames = state.categories.associate { it.id to it.name }
+        )
+    }
+
+    val logoFinderTxn = state.logoFinderTransaction
+    if (logoFinderTxn != null) {
+        MerchantLogoFinderDialog(
+            transaction = logoFinderTxn,
+            onSearchBrands = { query -> viewModel.searchMerchantLogos(logoFinderTxn.id, query) },
+            onSaveLogoUrl = { url -> viewModel.saveMerchantLogoOverride(logoFinderTxn.id, url) },
+            onUseCategoryIcon = { viewModel.useCategoryIconSuspend(logoFinderTxn.id) },
+            onDismiss = { viewModel.closeLogoFinder() }
         )
     }
 

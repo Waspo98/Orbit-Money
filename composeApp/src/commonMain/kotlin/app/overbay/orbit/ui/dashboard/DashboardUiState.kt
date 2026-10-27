@@ -234,7 +234,8 @@ data class DashboardRecentTransactionItem(
     val categoryColor: String? = null,
     val categoryIcon: String? = null,
     val accountName: String = "",
-    val isPending: Boolean = false
+    val isPending: Boolean = false,
+    val merchantLogoUrl: String? = null
 )
 
 data class RecentTransactionsState(

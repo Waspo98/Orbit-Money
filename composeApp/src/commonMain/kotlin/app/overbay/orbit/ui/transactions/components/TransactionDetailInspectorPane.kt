@@ -144,7 +144,10 @@ fun TransactionDetailInspectorPane(
                         onToggleIgnore = { viewModel.toggleIgnore(inspecting.id) },
                         onDelete = { onRequestDelete(inspecting.id) },
                         onResetMerchant = { viewModel.resetMerchant(inspecting.id) },
-                        onResetCategory = { viewModel.resetCategory(inspecting.id) }
+                        onResetCategory = { viewModel.resetCategory(inspecting.id) },
+                        onFindLogo = { viewModel.openLogoFinder(inspecting.id) },
+                        onUseCategoryIcon = { viewModel.useCategoryIconForTransaction(inspecting.id) },
+                        onReportLogoStatus = { key, status -> viewModel.reportMerchantLogoStatus(key, status) }
                     )
                 }
             }
@@ -170,7 +173,10 @@ private fun TransactionReadOnlyDetailContent(
     onToggleIgnore: () -> Unit,
     onDelete: () -> Unit,
     onResetMerchant: () -> Unit,
-    onResetCategory: () -> Unit
+    onResetCategory: () -> Unit,
+    onFindLogo: () -> Unit = {},
+    onUseCategoryIcon: () -> Unit = {},
+    onReportLogoStatus: (String, String) -> Unit = { _, _ -> }
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
@@ -188,20 +194,16 @@ private fun TransactionReadOnlyDetailContent(
             .padding(20.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = catColor.copy(alpha = 0.15f),
-                modifier = Modifier.size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = categoryIcon ?: transaction.effectiveMerchant.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = catColor
-                    )
-                }
-            }
+            TransactionMerchantMark(
+                transaction = transaction,
+                categoryIcon = categoryIcon,
+                categoryColor = catColor,
+                size = 44.dp,
+                cornerRadius = 12.dp,
+                onFindLogo = onFindLogo,
+                onUseCategoryIcon = onUseCategoryIcon,
+                onReportLogoStatus = onReportLogoStatus
+            )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

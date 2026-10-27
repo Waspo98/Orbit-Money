@@ -80,7 +80,10 @@ fun SwipeableTransactionRow(
     onResetMerchant: () -> Unit,
     onResetCategory: () -> Unit,
     modifier: Modifier = Modifier,
-    isInspected: Boolean = false
+    isInspected: Boolean = false,
+    onFindLogo: (() -> Unit)? = null,
+    onUseCategoryIcon: (() -> Unit)? = null,
+    onReportLogoStatus: ((String, String) -> Unit)? = null
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
@@ -121,21 +124,17 @@ fun SwipeableTransactionRow(
                     Spacer(modifier = Modifier.width(10.dp))
                 }
 
-                // 40dp Avatar
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = catColor.copy(alpha = 0.15f),
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = category?.icon ?: transaction.effectiveMerchant.take(1).uppercase(),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = catColor
-                        )
-                    }
-                }
+                // 40dp Avatar / Vendor Logo Mark
+                TransactionMerchantMark(
+                    transaction = transaction,
+                    categoryIcon = category?.icon,
+                    categoryColor = catColor,
+                    size = 40.dp,
+                    cornerRadius = 10.dp,
+                    onFindLogo = onFindLogo,
+                    onUseCategoryIcon = onUseCategoryIcon,
+                    onReportLogoStatus = onReportLogoStatus
+                )
 
                 Spacer(modifier = Modifier.width(12.dp))
 

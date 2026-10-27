@@ -21,6 +21,46 @@ enum class TransactionSource {
 }
 
 @Serializable
+data class MerchantLogo(
+    val merchantKey: String,
+    val merchantName: String = "",
+    val provider: String = "logo_dev",
+    val providerQuery: String = "",
+    val url: String? = null,
+    val status: String = "candidate"
+)
+
+private val PAYMENT_PREFIX_REGEX = Regex("^(sq|tst|sp|paypal|pp|stripe|sumup|toast|clover)[\\s*.-]+", RegexOption.IGNORE_CASE)
+private val TRAILING_STORE_NUM_REGEX = Regex("\\s+#?\\d{3,}\\b.*$", RegexOption.IGNORE_CASE)
+private val LOCATION_WORD_REGEX = Regex("\\b(store|location|terminal|auth|pending)\\s*#?\\d*\\b", RegexOption.IGNORE_CASE)
+private val DATE_TOKEN_REGEX = Regex("\\b\\d{2}/\\d{2}(/\\d{2,4})?\\b")
+private val LONG_DIGITS_REGEX = Regex("\\b\\d{4,}\\b")
+private val CORP_SUFFIX_REGEX = Regex("\\s+(inc|llc|ltd|co|corp|corporation)\\.?$", RegexOption.IGNORE_CASE)
+private val NON_ALPHANUM_REGEX = Regex("[^a-z0-9]+")
+private val MULTI_SPACE_REGEX = Regex("\\s+")
+
+fun cleanMerchantNameForLogo(value: String?): String =
+    (value ?: "")
+        .trim()
+        .replace(MULTI_SPACE_REGEX, " ")
+        .replace(PAYMENT_PREFIX_REGEX, "")
+        .replace(TRAILING_STORE_NUM_REGEX, "")
+        .replace(LOCATION_WORD_REGEX, " ")
+        .replace(DATE_TOKEN_REGEX, " ")
+        .replace(LONG_DIGITS_REGEX, " ")
+        .replace(CORP_SUFFIX_REGEX, "")
+        .replace(MULTI_SPACE_REGEX, " ")
+        .trim()
+
+fun merchantLogoKey(value: String?): String =
+    cleanMerchantNameForLogo(value)
+        .lowercase()
+        .replace("&", " and ")
+        .replace(NON_ALPHANUM_REGEX, " ")
+        .trim()
+        .replace(MULTI_SPACE_REGEX, "-")
+
+@Serializable
 data class Transaction(
     val id: Long = 0L,
     val householdId: Long = 1L,
@@ -57,10 +97,13 @@ data class Transaction(
     val editedMhaEligible: Boolean? = null,
     val editedMhaEligibleSource: String? = null,
     val editSource: EditSource = EditSource.NONE,
+    val merchantLogo: MerchantLogo? = null,
 
     val importedAt: String = "",
     val updatedAt: String = ""
 ) {
+    val resolvedMerchantKey: String
+        get() = merchantLogo?.merchantKey?.takeIf { it.isNotBlank() } ?: merchantLogoKey(effectiveMerchant)
     // Derived effective accessors
     val effectiveDate: String get() = editedDate ?: originalDate
     val effectiveMerchant: String get() = editedMerchant ?: originalMerchant

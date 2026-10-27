@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.engine.SyncResult
+import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.RecurrenceFrequency
 import app.overbay.orbit.data.model.RuleAction
@@ -45,6 +46,7 @@ class TransactionsViewModel(
     private val _showSplitSheet = MutableStateFlow(false)
     private val _showCsvImportSheet = MutableStateFlow(false)
     private val _showFilterSheet = MutableStateFlow(false)
+    private val _logoFinderTransactionId = MutableStateFlow<Long?>(null)
     private val _isSyncing = MutableStateFlow(false)
     private val _syncToastMessage = MutableStateFlow<String?>(null)
 
@@ -148,6 +150,8 @@ class TransactionsViewModel(
         state.copy(showCsvImportSheet = showCsv)
     }.combine(_showFilterSheet) { state, showFilter ->
         state.copy(showFilterSheet = showFilter)
+    }.combine(_logoFinderTransactionId) { state, logoFinderId ->
+        state.copy(logoFinderTransactionId = logoFinderId)
     }.combine(_isSyncing) { state, isSyncing ->
         state.copy(isSyncing = isSyncing)
     }.combine(_syncToastMessage) { state, toastMsg ->
@@ -258,6 +262,31 @@ class TransactionsViewModel(
     fun closeFilterSheet() {
         _showFilterSheet.value = false
     }
+
+    fun openLogoFinder(transactionId: Long) {
+        _logoFinderTransactionId.value = transactionId
+    }
+
+    fun closeLogoFinder() {
+        _logoFinderTransactionId.value = null
+    }
+
+    fun reportMerchantLogoStatus(merchantKey: String, status: String) {
+        viewModelScope.launch { repository.reportMerchantLogoStatus(merchantKey, status) }
+    }
+
+    fun useCategoryIconForTransaction(transactionId: Long) {
+        viewModelScope.launch { repository.overrideMerchantLogo(transactionId, useCategoryIcon = true) }
+    }
+
+    suspend fun searchMerchantLogos(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> =
+        repository.searchMerchantLogos(transactionId, query)
+
+    suspend fun saveMerchantLogoOverride(transactionId: Long, logoUrl: String): Result<Unit> =
+        repository.overrideMerchantLogo(transactionId, logoUrl = logoUrl, useCategoryIcon = false).map {}
+
+    suspend fun useCategoryIconSuspend(transactionId: Long): Result<Unit> =
+        repository.overrideMerchantLogo(transactionId, useCategoryIcon = true).map {}
 
     fun syncSimpleFin() {
         if (_isSyncing.value) return
