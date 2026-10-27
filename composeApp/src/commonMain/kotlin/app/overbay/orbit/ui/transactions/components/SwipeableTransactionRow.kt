@@ -79,24 +79,30 @@ fun SwipeableTransactionRow(
     onDelete: () -> Unit,
     onResetMerchant: () -> Unit,
     onResetCategory: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isInspected: Boolean = false
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
     var menuExpanded by remember { mutableStateOf(false) }
 
     val catColor = parseHexColor(category?.color) ?: MaterialTheme.colorScheme.primary
-    val rowBgColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+    val rowBgColor = when {
+        isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+        isInspected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+        else -> MaterialTheme.colorScheme.surface
+    }
+    val rowBorderColor = if (isInspected || isSelected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
     } else {
-        MaterialTheme.colorScheme.surface
+        OrbitTheme.colors.cardBorder
     }
 
     Surface(
         modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)),
         color = rowBgColor,
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder)
+        border = BorderStroke(if (isInspected) 1.5.dp else 1.dp, rowBorderColor)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Main 3-line summary row

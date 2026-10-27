@@ -1,19 +1,11 @@
 package app.overbay.orbit.ui.transactions
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,18 +14,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
-import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.FilterBottomSheet
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.transactions.components.TransactionBatchActionBar
+import app.overbay.orbit.ui.transactions.components.TransactionDetailInspectorPane
 import app.overbay.orbit.ui.transactions.components.TransactionsListPane
 import app.overbay.orbit.ui.transactions.sheets.CsvImportSheet
 import app.overbay.orbit.ui.transactions.sheets.SplitTransactionSheet
-import app.overbay.orbit.ui.transactions.sheets.TransactionEditorContent
 import app.overbay.orbit.ui.transactions.sheets.TransactionEditorSheet
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalDevicePosture
@@ -65,7 +55,12 @@ fun TransactionsScreen(
     var showCategoryBatchPicker by remember { mutableStateOf(false) }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val isTwoPane = maxWidth >= 840.dp || posture.supportsTwoPane
+        val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
+        val isDetailOpen = isTwoPane && (
+            state.inspectingTransaction != null ||
+                state.showEditorSheet ||
+                (state.showSplitSheet && state.inspectingTransaction != null)
+            )
 
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -84,133 +79,87 @@ fun TransactionsScreen(
                 }
             }
         ) { paddingValues ->
-            if (isTwoPane) {
-                // Two-Pane Responsive Layout (Foldable / Tablet / Desktop)
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {
-                    // Left Pane: Master List
-                    Box(modifier = Modifier.weight(0.55f).fillMaxHeight()) {
-                        TransactionsListPane(
+            TransactionsListPane(
+                state = state,
+                viewModel = viewModel,
+                onOpenDrawer = onOpenDrawer,
+                onOpenCsv = { viewModel.openCsvImportSheet() },
+                onSelectForInspect = { id ->
+                    if (isTwoPane) {
+                        viewModel.selectTransactionForInspect(id)
+                    } else {
+                        viewModel.toggleExpandTransaction(id)
+                    }
+                },
+                isWideScreen = isTwoPane,
+                isDetailOpen = isDetailOpen,
+                onDismissDetail = { viewModel.dismissInspectorPane() },
+                detailPane = if (isTwoPane) {
+                    {
+                        TransactionDetailInspectorPane(
                             state = state,
                             viewModel = viewModel,
-                            onOpenDrawer = onOpenDrawer,
-                            onOpenCsv = { viewModel.openCsvImportSheet() },
-                            onSelectForInspect = { id -> viewModel.selectTransactionForInspect(id) }
+                            onNavigate = onNavigate,
+                            onRequestDelete = { id -> showSingleDeleteConfirmId = id },
+                            onClosePane = { viewModel.dismissInspectorPane() }
                         )
                     }
-
-                    // Divider
-                    Box(
-                        modifier = Modifier
-                            .width(1.dp)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    )
-
-                    // Right Pane: Detail Inspector
-                    Box(modifier = Modifier.weight(0.45f).fillMaxHeight()) {
-                        val inspecting = state.inspectingTransaction
-                        if (inspecting != null) {
-                            TransactionEditorContent(
-                                transaction = inspecting,
-                                categories = state.categories,
-                                accounts = state.accounts,
-                                onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha ->
-                                    viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha)
-                                },
-                                onResetToOriginal = { id -> viewModel.resetTransaction(id) },
-                                onDelete = { id -> showSingleDeleteConfirmId = id },
-                                onSplit = { id -> viewModel.openSplitSheet(id) },
-                                onDismiss = { viewModel.selectTransactionForInspect(null) },
-                                onCreateRule = { txn ->
-                                    viewModel.createRuleFromTransaction(txn)
-                                    onNavigate(OrbitNavKey.Rules)
-                                },
-                                onMarkRecurring = { txn ->
-                                    viewModel.markTransactionRecurring(txn)
-                                    onNavigate(OrbitNavKey.Upcoming)
-                                }
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier.fillMaxSize().padding(32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                EmptyStateCard(
-                                    title = "Transaction Details",
-                                    description = "Select a transaction from the list to view provenance, edit, or split."
-                                )
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Single-Pane Phone Layout
-                TransactionsListPane(
-                    state = state,
-                    viewModel = viewModel,
-                    onOpenDrawer = onOpenDrawer,
-                    onOpenCsv = { viewModel.openCsvImportSheet() },
-                    onSelectForInspect = { id -> viewModel.openTransactionEditor(id) },
-                    modifier = Modifier.padding(paddingValues)
-                )
-            }
+                } else null,
+                modifier = Modifier.padding(paddingValues)
+            )
         }
-    }
 
-    // Modal Sheets and Dialogs
-    if (state.showEditorSheet && state.inspectingTransactionId != null) {
-        TransactionEditorSheet(
-            transaction = state.inspectingTransaction,
-            categories = state.categories,
-            accounts = state.accounts,
-            onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha ->
-                viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha)
-            },
-            onResetToOriginal = { id -> viewModel.resetTransaction(id) },
-            onDelete = { id -> showSingleDeleteConfirmId = id },
-            onSplit = { id -> viewModel.openSplitSheet(id) },
-            onDismiss = { viewModel.closeTransactionEditor() },
-            onCreateRule = { txn ->
-                viewModel.createRuleFromTransaction(txn)
-                viewModel.closeTransactionEditor()
-                onNavigate(OrbitNavKey.Rules)
-            },
-            onMarkRecurring = { txn ->
-                viewModel.markTransactionRecurring(txn)
-                viewModel.closeTransactionEditor()
-                onNavigate(OrbitNavKey.Upcoming)
-            }
-        )
-    }
+        // Compact Phone Modal Sheets (on wide screens these open inside the right morphing pane)
+        if (!isTwoPane && state.showEditorSheet && state.inspectingTransactionId != null) {
+            TransactionEditorSheet(
+                transaction = state.inspectingTransaction,
+                categories = state.categories,
+                accounts = state.accounts,
+                onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha ->
+                    viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha)
+                },
+                onResetToOriginal = { id -> viewModel.resetTransaction(id) },
+                onDelete = { id -> showSingleDeleteConfirmId = id },
+                onSplit = { id -> viewModel.openSplitSheet(id) },
+                onDismiss = { viewModel.closeTransactionEditor() },
+                onCreateRule = { txn ->
+                    viewModel.createRuleFromTransaction(txn)
+                    viewModel.closeTransactionEditor()
+                    onNavigate(OrbitNavKey.Rules)
+                },
+                onMarkRecurring = { txn ->
+                    viewModel.markTransactionRecurring(txn)
+                    viewModel.closeTransactionEditor()
+                    onNavigate(OrbitNavKey.Upcoming)
+                }
+            )
+        }
 
-    if (state.showEditorSheet && state.inspectingTransactionId == null) {
-        TransactionEditorSheet(
-            transaction = null,
-            categories = state.categories,
-            accounts = state.accounts,
-            onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha ->
-                viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha)
-            },
-            onResetToOriginal = {},
-            onDelete = {},
-            onSplit = {},
-            onDismiss = { viewModel.closeTransactionEditor() }
-        )
-    }
+        if (!isTwoPane && state.showEditorSheet && state.inspectingTransactionId == null) {
+            TransactionEditorSheet(
+                transaction = null,
+                categories = state.categories,
+                accounts = state.accounts,
+                onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha ->
+                    viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha)
+                },
+                onResetToOriginal = {},
+                onDelete = {},
+                onSplit = {},
+                onDismiss = { viewModel.closeTransactionEditor() }
+            )
+        }
 
-    if (state.showSplitSheet && state.inspectingTransaction != null) {
-        SplitTransactionSheet(
-            transaction = state.inspectingTransaction!!,
-            categories = state.categories,
-            onSplitConfirmed = { parentId, splits ->
-                viewModel.splitTransaction(parentId, splits)
-            },
-            onDismiss = { viewModel.closeSplitSheet() }
-        )
+        if (!isTwoPane && state.showSplitSheet && state.inspectingTransaction != null) {
+            SplitTransactionSheet(
+                transaction = state.inspectingTransaction!!,
+                categories = state.categories,
+                onSplitConfirmed = { parentId, splits ->
+                    viewModel.splitTransaction(parentId, splits)
+                },
+                onDismiss = { viewModel.closeSplitSheet() }
+            )
+        }
     }
 
     if (state.showCsvImportSheet) {

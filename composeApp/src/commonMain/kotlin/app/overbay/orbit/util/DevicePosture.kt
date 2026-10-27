@@ -18,9 +18,9 @@ data class DevicePosture(
 ) {
     val mode: PostureMode
         get() = when {
-            screenWidthDp >= 1100 || (screenWidthDp >= 720 && isLandscape) -> PostureMode.TABLET_DESKTOP
+            screenWidthDp >= 1100 || (screenWidthDp >= 840 && isLandscape) -> PostureMode.TABLET_DESKTOP
             isFoldable && !isFolded -> PostureMode.UNFOLDED_FOLDABLE
-            screenWidthDp >= 720 -> PostureMode.UNFOLDED_FOLDABLE
+            screenWidthDp >= 600 -> PostureMode.UNFOLDED_FOLDABLE
             else -> PostureMode.COMPACT_PHONE
         }
 

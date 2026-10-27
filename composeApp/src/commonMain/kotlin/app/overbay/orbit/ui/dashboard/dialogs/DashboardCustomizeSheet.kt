@@ -1,48 +1,51 @@
 package app.overbay.orbit.ui.dashboard.dialogs
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.dashboard.DashboardAction
 import app.overbay.orbit.ui.dashboard.DashboardCardConfigItem
 import app.overbay.orbit.ui.dashboard.DashboardCardType
+import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlin.math.roundToInt
 
 /**
- * Modal bottom sheet allowing users to reorder dashboard cards (move up/down)
- * and toggle visibility with tactile switch haptics.
+ * Centered Customize Dashboard modal matching the main branch design:
+ * - '⋮⋮' drag-handle reordering
+ * - Animated 2-button column width picker (standard left/right placement vs full-width span) on wide screens
+ * - Tactile visibility toggle switch
+ * Strictly under the 400-line ceiling.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardCustomizeSheet(
     cards: List<DashboardCardConfigItem>,
@@ -53,189 +56,196 @@ fun DashboardCustomizeSheet(
     DashboardCustomizeSheet(
         cards = cards,
         onToggleVisibility = { onAction(DashboardAction.ToggleCardVisibility(it)) },
-        onMoveUp = { onAction(DashboardAction.MoveCardUp(it)) },
-        onMoveDown = { onAction(DashboardAction.MoveCardDown(it)) },
+        onSetWideSpan = { type, span -> onAction(DashboardAction.SetCardWideSpan(type, span)) },
+        onMoveCard = { from, to -> onAction(DashboardAction.MoveCard(from, to)) },
         onReset = { onAction(DashboardAction.ResetCardsToDefault) },
         onDismiss = onDismiss,
         modifier = modifier
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardCustomizeSheet(
     cards: List<DashboardCardConfigItem>,
     onToggleVisibility: (DashboardCardType) -> Unit,
-    onMoveUp: (DashboardCardType) -> Unit,
-    onMoveDown: (DashboardCardType) -> Unit,
+    onSetWideSpan: (DashboardCardType, Int) -> Unit = { _, _ -> },
+    onMoveCard: (Int, Int) -> Unit = { _, _ -> },
     onReset: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val posture = LocalDevicePosture.current
+    val showWidthPicker = posture.supportsTwoPane
+    val standardPlacements = remember(cards) { computeStandardPlacements(cards) }
 
-    ModalBottomSheet(
+    var draggingIndex by remember { mutableIntStateOf(-1) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    var rowHeightPx by remember { mutableFloatStateOf(160f) }
+    val currentCards by rememberUpdatedState(cards)
+
+    Dialog(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        modifier = modifier,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
-            modifier = Modifier
+        Surface(
+            modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 24.dp)
+                .widthIn(max = 640.dp),
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+            tonalElevation = 6.dp,
+            shadowElevation = 12.dp
         ) {
-            // Header Bar
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
+            Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = "Customize Dashboard",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Text(
-                        text = "Show, hide, and reorder cards",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                TextButton(
-                    onClick = {
-                        haptics.tick()
-                        onReset()
-                    }
-                ) {
-                    Text(
-                        text = "Reset to Default",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Card Reorder & Visibility List
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                cards.forEachIndexed { index, config ->
-                    CustomizeCardItem(
-                        config = config,
-                        isFirst = index == 0,
-                        isLast = index == cards.lastIndex,
-                        onToggle = {
-                            haptics.tap()
-                            onToggleVisibility(config.type)
-                        },
-                        onMoveUp = {
-                            haptics.tick()
-                            onMoveUp(config.type)
-                        },
-                        onMoveDown = {
-                            haptics.tick()
-                            onMoveDown(config.type)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { haptics.tick(); onReset() }) {
+                            Text("Reset", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                         }
-                    )
+                        IconButton(onClick = { haptics.tick(); onDismiss() }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 480.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    cards.forEachIndexed { index, config ->
+                        val isDragging = draggingIndex == index
+                        CustomizeCardRow(
+                            config = config,
+                            showWidthPicker = showWidthPicker,
+                            isRightPlacement = standardPlacements[config.type] == true,
+                            isDragging = isDragging,
+                            dragOffsetY = if (isDragging) dragOffsetY else 0f,
+                            onMeasuredHeight = { h -> if (h > 0) rowHeightPx = h.toFloat() },
+                            onDragStart = {
+                                haptics.tick()
+                                draggingIndex = index
+                                dragOffsetY = 0f
+                            },
+                            onDragDelta = { dy ->
+                                if (draggingIndex in currentCards.indices) {
+                                    dragOffsetY += dy
+                                    val step = (rowHeightPx + 16f).coerceAtLeast(80f)
+                                    val indexShift = (dragOffsetY / step).roundToInt()
+                                    val targetIndex = (draggingIndex + indexShift).coerceIn(0, currentCards.lastIndex)
+                                    if (targetIndex != draggingIndex) {
+                                        haptics.tick()
+                                        onMoveCard(draggingIndex, targetIndex)
+                                        dragOffsetY -= (targetIndex - draggingIndex) * step
+                                        draggingIndex = targetIndex
+                                    }
+                                }
+                            },
+                            onDragEnd = {
+                                draggingIndex = -1
+                                dragOffsetY = 0f
+                            },
+                            onToggle = { haptics.tap(); onToggleVisibility(config.type) },
+                            onWideSpanChange = { span -> haptics.tick(); onSetWideSpan(config.type, span) }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Button(
+                        onClick = { haptics.confirm(); onDismiss() },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(42.dp)
+                    ) {
+                        Text("Done", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Done CTA
-            Button(
-                onClick = {
-                    haptics.confirm()
-                    onDismiss()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = "Done",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
-private fun CustomizeCardItem(
+private fun CustomizeCardRow(
     config: DashboardCardConfigItem,
-    isFirst: Boolean,
-    isLast: Boolean,
+    showWidthPicker: Boolean,
+    isRightPlacement: Boolean,
+    isDragging: Boolean,
+    dragOffsetY: Float,
+    onMeasuredHeight: (Int) -> Unit,
+    onDragStart: () -> Unit,
+    onDragDelta: (Float) -> Unit,
+    onDragEnd: () -> Unit,
     onToggle: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit
+    onWideSpanChange: (Int) -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .zIndex(if (isDragging) 10f else 0f)
+            .onGloballyPositioned { onMeasuredHeight(it.size.height) }
+            .graphicsLayer {
+                translationY = dragOffsetY
+                alpha = if (isDragging) 0.85f else 1f
+                shadowElevation = if (isDragging) 12f else 0f
+            },
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, if (isDragging) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Reorder controls: Up / Down arrow buttons
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onMoveUp,
-                    enabled = !isFirst,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                        contentDescription = "Move Up",
-                        tint = if (!isFirst) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .rotate(90f)
-                    )
-                }
-
-                IconButton(
-                    onClick = onMoveDown,
-                    enabled = !isLast,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = "Move Down",
-                        tint = if (!isLast) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .rotate(90f)
-                    )
-                }
+            Box(
+                modifier = Modifier
+                    .size(width = 26.dp, height = 38.dp)
+                    .pointerInput(config.type) {
+                        detectDragGestures(
+                            onDragStart = { onDragStart() },
+                            onDragEnd = { onDragEnd() },
+                            onDragCancel = { onDragEnd() },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                onDragDelta(dragAmount.y)
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("⋮⋮", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Title and Description
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = config.title,
                     style = MaterialTheme.typography.bodyLarge,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = if (config.isVisible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
@@ -243,16 +253,111 @@ private fun CustomizeCardItem(
                     Text(
                         text = config.description,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (config.isVisible) 0.8f else 0.4f)
+                        fontSize = 12.5.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (config.isVisible) 0.85f else 0.45f)
                     )
                 }
             }
 
-            // Visibility Switch
-            Switch(
-                checked = config.isVisible,
-                onCheckedChange = { onToggle() }
-            )
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (showWidthPicker) {
+                    DashboardColumnWidthPicker(
+                        wideSpan = config.wideSpan,
+                        isRightPlacement = isRightPlacement,
+                        onWideSpanChange = onWideSpanChange
+                    )
+                }
+                Switch(checked = config.isVisible, onCheckedChange = { onToggle() })
+            }
         }
     }
+}
+
+@Composable
+private fun DashboardColumnWidthPicker(
+    wideSpan: Int,
+    isRightPlacement: Boolean,
+    onWideSpanChange: (Int) -> Unit
+) {
+    val activeBg = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+    val activeColor = MaterialTheme.colorScheme.primary
+    val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Row(
+        modifier = Modifier
+            .height(34.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, OrbitTheme.colors.cardBorder, RoundedCornerShape(10.dp)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(44.dp)
+                .fillMaxHeight()
+                .background(if (wideSpan == 1) activeBg else Color.Transparent)
+                .clickable { onWideSpanChange(1) },
+            contentAlignment = Alignment.Center
+        ) {
+            DashboardWidthIcon(isWide = false, isRightPlacement = isRightPlacement, tint = if (wideSpan == 1) activeColor else inactiveColor)
+        }
+        Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(OrbitTheme.colors.cardBorder))
+        Box(
+            modifier = Modifier
+                .width(44.dp)
+                .fillMaxHeight()
+                .background(if (wideSpan == 2) activeBg else Color.Transparent)
+                .clickable { onWideSpanChange(2) },
+            contentAlignment = Alignment.Center
+        ) {
+            DashboardWidthIcon(isWide = true, isRightPlacement = false, tint = if (wideSpan == 2) activeColor else inactiveColor)
+        }
+    }
+}
+
+@Composable
+private fun DashboardWidthIcon(isWide: Boolean, isRightPlacement: Boolean, tint: Color) {
+    val pillOffsetX by animateDpAsState(
+        targetValue = if (!isWide && isRightPlacement) 16.dp else 3.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+        label = "dashboardWidthIconOffset"
+    )
+    val pillWidth = if (isWide) 22.dp else 9.dp
+
+    Box(
+        modifier = Modifier
+            .size(width = 28.dp, height = 18.dp)
+            .border(1.5.dp, tint.copy(alpha = 0.92f), RoundedCornerShape(5.dp))
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .width(1.dp)
+                .fillMaxHeight()
+                .alpha(0.36f)
+                .background(tint)
+        )
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(pillOffsetX.roundToPx(), 3.dp.roundToPx()) }
+                .size(width = pillWidth, height = 12.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(tint)
+        )
+    }
+}
+
+private fun computeStandardPlacements(cards: List<DashboardCardConfigItem>): Map<DashboardCardType, Boolean> {
+    val placements = mutableMapOf<DashboardCardType, Boolean>()
+    var filledColumns = 0
+    for (item in cards) {
+        val isRight = filledColumns != 0
+        placements[item.type] = isRight
+        if (!item.isVisible) continue
+        filledColumns = if (item.wideSpan == 2) 0 else if (!isRight) 1 else 0
+    }
+    return placements
 }

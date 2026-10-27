@@ -501,7 +501,8 @@ object DashboardDataTransform {
                 title = existing?.title ?: type.defaultTitle,
                 description = type.defaultDescription,
                 isVisible = existing?.isVisible ?: true,
-                sortOrder = existing?.sortOrder ?: type.defaultSortOrder
+                sortOrder = existing?.sortOrder ?: type.defaultSortOrder,
+                wideSpan = (existing?.wideSpan ?: type.defaultWideSpan).let { if (it == 2) 2 else 1 }
             )
         }.sortedBy { it.sortOrder }
 

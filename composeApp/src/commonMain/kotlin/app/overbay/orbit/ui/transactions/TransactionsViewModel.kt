@@ -210,7 +210,19 @@ class TransactionsViewModel(
     }
 
     fun selectTransactionForInspect(id: Long?) {
-        _inspectingId.value = id
+        if (id != null && _inspectingId.value == id && !_showEditorSheet.value && !_showSplitSheet.value) {
+            _inspectingId.value = null
+        } else {
+            _inspectingId.value = id
+            _showEditorSheet.value = false
+            _showSplitSheet.value = false
+        }
+    }
+
+    fun dismissInspectorPane() {
+        _inspectingId.value = null
+        _showEditorSheet.value = false
+        _showSplitSheet.value = false
     }
 
     fun openTransactionEditor(id: Long? = null) {

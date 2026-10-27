@@ -68,10 +68,48 @@ fun SplitTransactionSheet(
     categories: List<Category>,
     onSplitConfirmed: (parentId: Long, splits: List<Pair<Cents, Long?>>) -> Unit,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    isInlinePane: Boolean = false
+) {
+    if (isInlinePane) {
+        SplitTransactionContent(
+            transaction = transaction,
+            categories = categories,
+            onSplitConfirmed = onSplitConfirmed,
+            onDismiss = onDismiss,
+            modifier = modifier
+        )
+    } else {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = sheetState,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = modifier
+        ) {
+            SplitTransactionContent(
+                transaction = transaction,
+                categories = categories,
+                onSplitConfirmed = onSplitConfirmed,
+                onDismiss = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+            )
+        }
+    }
+}
+
+@Composable
+fun SplitTransactionContent(
+    transaction: Transaction,
+    categories: List<Category>,
+    onSplitConfirmed: (parentId: Long, splits: List<Pair<Cents, Long?>>) -> Unit,
+    onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val parentAbsAmount = abs(transaction.effectiveAmountCents)
     val isExpense = transaction.isExpense
@@ -89,148 +127,139 @@ fun SplitTransactionSheet(
     val remaining = parentAbsAmount - totalAllocated
     val isBalanced = remaining == 0L && splitItems.all { it.amountCents > 0L }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    Column(
         modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .verticalScroll(rememberScrollState())
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
+        Text(
+            text = "Split Transaction",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "${transaction.effectiveMerchant} • Total: ${MoneyUtils.formatCents(parentAbsAmount)}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Balance Indicator Banner
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = if (isBalanced) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+            } else {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+            },
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                text = "Split Transaction",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "${transaction.effectiveMerchant} • Total: ${MoneyUtils.formatCents(parentAbsAmount)}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Balance Indicator Banner
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = if (isBalanced) {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                } else {
-                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = if (isBalanced) Icons.Default.CheckCircle else Icons.Default.Warning,
-                        contentDescription = "Status",
-                        tint = if (isBalanced) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isBalanced) {
-                            "Balanced (100% Allocated)"
-                        } else {
-                            "Remaining to allocate: ${MoneyUtils.formatCents(remaining)}"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isBalanced) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onErrorContainer
-                        }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Split Line Items
-            splitItems.forEachIndexed { index, item ->
-                SplitLineRow(
-                    index = index,
-                    item = item,
-                    categories = categories,
-                    canDelete = splitItems.size > 2,
-                    onAmountChanged = { newAmount ->
-                        splitItems[index] = item.copy(amountCents = newAmount)
-                    },
-                    onCategoryChanged = { newCatId ->
-                        splitItems[index] = item.copy(categoryId = newCatId)
-                    },
-                    onDelete = {
-                        haptics.reject()
-                        splitItems.removeAt(index)
-                    }
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-
-            // + Add Split Button (Title Case)
-            OutlinedButton(
-                onClick = {
-                    haptics.tick()
-                    val nextAmount = if (remaining > 0L) remaining else 0L
-                    splitItems.add(SplitItemState(nextAmount, null))
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Split",
-                    modifier = Modifier.size(18.dp)
+                    imageVector = if (isBalanced) Icons.Default.CheckCircle else Icons.Default.Warning,
+                    contentDescription = "Status",
+                    tint = if (isBalanced) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Add Split Line")
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Action Buttons (Title Case)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Cancel")
-                }
-
-                Button(
-                    onClick = {
-                        haptics.confirm()
-                        val splits = splitItems.map { split ->
-                            val signed = if (isExpense) -split.amountCents else split.amountCents
-                            Pair(signed, split.categoryId)
-                        }
-                        onSplitConfirmed(transaction.id, splits)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isBalanced) {
+                        "Balanced (100% Allocated)"
+                    } else {
+                        "Remaining to allocate: ${MoneyUtils.formatCents(remaining)}"
                     },
-                    enabled = isBalanced,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Save Split")
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isBalanced) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Split Line Items
+        splitItems.forEachIndexed { index, item ->
+            SplitLineRow(
+                index = index,
+                item = item,
+                categories = categories,
+                canDelete = splitItems.size > 2,
+                onAmountChanged = { newAmount ->
+                    splitItems[index] = item.copy(amountCents = newAmount)
+                },
+                onCategoryChanged = { newCatId ->
+                    splitItems[index] = item.copy(categoryId = newCatId)
+                },
+                onDelete = {
+                    haptics.reject()
+                    splitItems.removeAt(index)
                 }
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        // + Add Split Button (Title Case)
+        OutlinedButton(
+            onClick = {
+                haptics.tick()
+                val nextAmount = if (remaining > 0L) remaining else 0L
+                splitItems.add(SplitItemState(nextAmount, null))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "Add Split",
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Add Split Line")
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Action Buttons (Title Case)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Cancel")
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    haptics.confirm()
+                    val splits = splitItems.map { split ->
+                        val signed = if (isExpense) -split.amountCents else split.amountCents
+                        Pair(signed, split.categoryId)
+                    }
+                    onSplitConfirmed(transaction.id, splits)
+                },
+                enabled = isBalanced,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Save Split")
+            }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 

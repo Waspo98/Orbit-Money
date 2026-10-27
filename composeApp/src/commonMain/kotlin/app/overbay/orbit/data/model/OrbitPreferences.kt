@@ -23,7 +23,8 @@ data class DashboardWidgetConfig(
     val widgetId: String,
     val title: String,
     val isVisible: Boolean = true,
-    val sortOrder: Int = 0
+    val sortOrder: Int = 0,
+    val wideSpan: Int = 1
 )
 
 @Serializable
@@ -62,7 +63,7 @@ data class OrbitPreferences(
             DashboardWidgetConfig("mha", "MHA Tracker Summary", isVisible = true, sortOrder = 12),
             DashboardWidgetConfig("upcoming_bills", "Upcoming: Bills and Income", isVisible = true, sortOrder = 13),
             DashboardWidgetConfig("mortgage", "Mortgage Snapshot", isVisible = true, sortOrder = 14),
-            DashboardWidgetConfig("recent_transactions", "Recent Transactions", isVisible = true, sortOrder = 15)
+            DashboardWidgetConfig("recent_transactions", "Recent Transactions", isVisible = true, sortOrder = 15, wideSpan = 2)
         )
     }
 }

@@ -39,6 +39,7 @@ import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
+import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.transactions.TransactionsUiState
 import app.overbay.orbit.ui.transactions.TransactionsViewModel
@@ -59,7 +60,11 @@ fun TransactionsListPane(
     onOpenDrawer: () -> Unit,
     onOpenCsv: () -> Unit,
     onSelectForInspect: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isWideScreen: Boolean = false,
+    isDetailOpen: Boolean = false,
+    onDismissDetail: () -> Unit = {},
+    detailPane: (@Composable () -> Unit)? = null
 ) {
     val haptics = LocalOrbitHaptics.current
     val density = LocalDensity.current
@@ -137,127 +142,145 @@ fun TransactionsListPane(
                 }
             )
 
-            AnimatedContent(
-                targetState = state.isSearchActive,
-                transitionSpec = {
-                    fadeIn(OrbitSprings.effectsDefault()) togetherWith fadeOut(OrbitSprings.effectsDefault())
-                },
-                modifier = Modifier.fillMaxSize(),
-                label = "transactionsMainToSearchTransition"
-            ) { searching ->
-                if (searching) {
-                    val searchStage = when {
-                        state.searchQuery.isBlank() -> "PROMPT"
-                        state.groupedTransactions.isEmpty() -> "EMPTY"
-                        else -> "RESULTS"
-                    }
-                    AnimatedContent(
-                        targetState = searchStage,
-                        transitionSpec = {
-                            fadeIn(OrbitSprings.effectsDefault()) togetherWith fadeOut(OrbitSprings.effectsDefault())
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                        label = "transactionsSearchStageTransition"
-                    ) { stage ->
-                        if (stage == "PROMPT" || stage == "EMPTY") {
-                            TransactionsSearchPromptOrEmpty(searchQuery = state.searchQuery)
-                        } else {
-                            TransactionsGroupedLazyList(
-                                state = state,
-                                viewModel = viewModel,
-                                onInteraction = { keyboardController?.hide() },
-                                modifier = Modifier.fillMaxSize()
-                            )
+            val listBody: @Composable () -> Unit = {
+                AnimatedContent(
+                    targetState = state.isSearchActive,
+                    transitionSpec = {
+                        fadeIn(OrbitSprings.effectsDefault()) togetherWith fadeOut(OrbitSprings.effectsDefault())
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    label = "transactionsMainToSearchTransition"
+                ) { searching ->
+                    if (searching) {
+                        val searchStage = when {
+                            state.searchQuery.isBlank() -> "PROMPT"
+                            state.groupedTransactions.isEmpty() -> "EMPTY"
+                            else -> "RESULTS"
                         }
-                    }
-                } else {
-                    PullToRefreshBox(
-                        isRefreshing = state.isSyncing,
-                        onRefresh = { haptics.tick(); viewModel.syncSimpleFin() },
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        when {
-                            state.isLoading -> {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator()
-                                }
-                            }
-                            state.groupedTransactions.isEmpty() -> {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .nestedScroll(heroScrollState.nestedScrollConnection)
-                                        .padding(24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    EmptyStateCard(
-                                        title = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) {
-                                            "No matching transactions"
-                                        } else {
-                                            "No transactions recorded"
-                                        },
-                                        description = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) {
-                                            "Try clearing your search query or adjusting your filters."
-                                        } else {
-                                            "Pull down to sync with SimpleFIN or tap '+' to record a transaction."
-                                        },
-                                        icon = OrbitIcons.Transactions,
-                                        actionButtonText = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) "Reset Filters" else null,
-                                        onActionClick = {
-                                            viewModel.setSearchQuery("")
-                                            viewModel.clearFilters()
-                                        }
-                                    )
-                                }
-                            }
-                            else -> {
+                        AnimatedContent(
+                            targetState = searchStage,
+                            transitionSpec = {
+                                fadeIn(OrbitSprings.effectsDefault()) togetherWith fadeOut(OrbitSprings.effectsDefault())
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                            label = "transactionsSearchStageTransition"
+                        ) { stage ->
+                            if (stage == "PROMPT" || stage == "EMPTY") {
+                                TransactionsSearchPromptOrEmpty(searchQuery = state.searchQuery)
+                            } else {
                                 TransactionsGroupedLazyList(
                                     state = state,
                                     viewModel = viewModel,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .nestedScroll(heroScrollState.nestedScrollConnection)
+                                    isWideScreen = isWideScreen,
+                                    onSelectForInspect = onSelectForInspect,
+                                    onInteraction = { keyboardController?.hide() },
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             }
                         }
-
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = state.syncToastMessage != null,
-                            enter = slideInVertically { -it } + fadeIn(),
-                            exit = slideOutVertically { -it } + fadeOut(),
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 12.dp, start = 16.dp, end = 16.dp)
+                    } else {
+                        PullToRefreshBox(
+                            isRefreshing = state.isSyncing,
+                            onRefresh = { haptics.tick(); viewModel.syncSimpleFin() },
+                            modifier = Modifier.fillMaxSize()
                         ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.inverseSurface,
-                                tonalElevation = 6.dp,
-                                shadowElevation = 6.dp
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    if (state.isSyncing) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(16.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.inverseOnSurface
-                                        )
-                                        Spacer(modifier = Modifier.width(10.dp))
+                            when {
+                                state.isLoading -> {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator()
                                     }
-                                    Text(
-                                        text = state.syncToastMessage ?: "",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.inverseOnSurface,
-                                        fontWeight = FontWeight.SemiBold
+                                }
+                                state.groupedTransactions.isEmpty() -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .nestedScroll(heroScrollState.nestedScrollConnection)
+                                            .padding(24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        EmptyStateCard(
+                                            title = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) {
+                                                "No matching transactions"
+                                            } else {
+                                                "No transactions recorded"
+                                            },
+                                            description = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) {
+                                                "Try clearing your search query or adjusting your filters."
+                                            } else {
+                                                "Pull down to sync with SimpleFIN or tap '+' to record a transaction."
+                                            },
+                                            icon = OrbitIcons.Transactions,
+                                            actionButtonText = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) "Reset Filters" else null,
+                                            onActionClick = {
+                                                viewModel.setSearchQuery("")
+                                                viewModel.clearFilters()
+                                            }
+                                        )
+                                    }
+                                }
+                                else -> {
+                                    TransactionsGroupedLazyList(
+                                        state = state,
+                                        viewModel = viewModel,
+                                        isWideScreen = isWideScreen,
+                                        onSelectForInspect = onSelectForInspect,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .nestedScroll(heroScrollState.nestedScrollConnection)
                                     )
+                                }
+                            }
+
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = state.syncToastMessage != null,
+                                enter = slideInVertically { -it } + fadeIn(),
+                                exit = slideOutVertically { -it } + fadeOut(),
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = 12.dp, start = 16.dp, end = 16.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.inverseSurface,
+                                    tonalElevation = 6.dp,
+                                    shadowElevation = 6.dp
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (state.isSyncing) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp,
+                                                color = MaterialTheme.colorScheme.inverseOnSurface
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                        }
+                                        Text(
+                                            text = state.syncToastMessage ?: "",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
+            }
+
+            if (isWideScreen && detailPane != null) {
+                OrbitMorphingSplitLayout(
+                    isDetailOpen = isDetailOpen,
+                    onDismissDetail = onDismissDetail,
+                    masterContent = listBody,
+                    detailContent = detailPane,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                listBody()
             }
         }
 
@@ -276,12 +299,15 @@ fun TransactionsListPane(
 private fun TransactionsGroupedLazyList(
     state: TransactionsUiState,
     viewModel: TransactionsViewModel,
+    isWideScreen: Boolean,
+    onSelectForInspect: (Long) -> Unit,
     modifier: Modifier = Modifier,
     onInteraction: () -> Unit = {}
 ) {
+    val horizontalPadding = if (isWideScreen) 20.dp else 16.dp
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+        contentPadding = PaddingValues(start = horizontalPadding, end = horizontalPadding, top = 8.dp, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         state.groupedTransactions.forEach { group ->
@@ -296,11 +322,17 @@ private fun TransactionsGroupedLazyList(
                     accountName = state.accountMap[txn.accountId]?.name ?: txn.accountName,
                     isSelected = state.selectedTransactionIds.contains(txn.id),
                     isSelectionMode = state.isSelectionMode,
-                    isExpanded = state.expandedTransactionId == txn.id,
+                    isExpanded = !isWideScreen && state.expandedTransactionId == txn.id,
+                    isInspected = isWideScreen && state.inspectingTransactionId == txn.id,
                     onClick = {
                         onInteraction()
-                        if (state.isSelectionMode) viewModel.toggleTransactionSelection(txn.id)
-                        else viewModel.toggleExpandTransaction(txn.id)
+                        if (state.isSelectionMode) {
+                            viewModel.toggleTransactionSelection(txn.id)
+                        } else if (isWideScreen) {
+                            onSelectForInspect(txn.id)
+                        } else {
+                            viewModel.toggleExpandTransaction(txn.id)
+                        }
                     },
                     onLongClick = { onInteraction(); viewModel.toggleTransactionSelection(txn.id) },
                     onEdit = { viewModel.openTransactionEditor(txn.id) },

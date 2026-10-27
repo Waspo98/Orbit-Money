@@ -12,7 +12,8 @@ enum class DashboardCardType(
     val widgetId: String,
     val defaultTitle: String,
     val defaultDescription: String,
-    val defaultSortOrder: Int
+    val defaultSortOrder: Int,
+    val defaultWideSpan: Int = 1
 ) {
     ACCOUNTS_OVERVIEW("accounts", "Accounts", "Net worth and account balance groups.", 0),
     BUDGET_PULSE("budget_pulse", "Budget Pulse", "Budget usage, pace, and categories to watch.", 1),
@@ -29,7 +30,7 @@ enum class DashboardCardType(
     MHA_SUMMARY("mha", "MHA Tracker Summary", "Year-to-date MHA eligible spending.", 12),
     UPCOMING_BILLS("upcoming_bills", "Upcoming: Bills and Income", "Saved bills, subscriptions, and income.", 13),
     MORTGAGE_SNAPSHOT("mortgage", "Mortgage Snapshot", "Home value, balance, and equity.", 14),
-    RECENT_TRANSACTIONS("recent_transactions", "Recent Transactions", "Latest activity with full transaction actions.", 15);
+    RECENT_TRANSACTIONS("recent_transactions", "Recent Transactions", "Latest activity with full transaction actions.", 15, defaultWideSpan = 2);
 
     companion object {
         fun fromWidgetId(widgetId: String): DashboardCardType? {
@@ -66,7 +67,8 @@ data class DashboardCardConfigItem(
     val title: String,
     val description: String,
     val isVisible: Boolean,
-    val sortOrder: Int
+    val sortOrder: Int,
+    val wideSpan: Int = 1
 )
 
 data class CashflowHeroState(
@@ -323,6 +325,8 @@ sealed interface DashboardAction {
     data object OpenCustomizeSheet : DashboardAction
     data object CloseCustomizeSheet : DashboardAction
     data class ToggleCardVisibility(val cardType: DashboardCardType) : DashboardAction
+    data class SetCardWideSpan(val cardType: DashboardCardType, val wideSpan: Int) : DashboardAction
+    data class MoveCard(val fromIndex: Int, val toIndex: Int) : DashboardAction
     data class MoveCardUp(val cardType: DashboardCardType) : DashboardAction
     data class MoveCardDown(val cardType: DashboardCardType) : DashboardAction
     data object ResetCardsToDefault : DashboardAction

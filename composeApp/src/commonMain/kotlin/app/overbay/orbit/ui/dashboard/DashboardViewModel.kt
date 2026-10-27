@@ -127,30 +127,58 @@ class DashboardViewModel(
         _isCustomizing.value = false
     }
 
+    private fun normalizedWidgets(): MutableList<DashboardWidgetConfig> {
+        val raw = repository.preferences.value.dashboardWidgets.ifEmpty {
+            OrbitPreferences.defaultDashboardWidgets()
+        }
+        return DashboardCardType.entries.map { type ->
+            val existing = raw.find {
+                it.widgetId.equals(type.widgetId, ignoreCase = true) ||
+                    DashboardCardType.fromWidgetId(it.widgetId) == type
+            }
+            DashboardWidgetConfig(
+                widgetId = type.widgetId,
+                title = existing?.title ?: type.defaultTitle,
+                isVisible = existing?.isVisible ?: true,
+                sortOrder = existing?.sortOrder ?: type.defaultSortOrder,
+                wideSpan = (existing?.wideSpan ?: type.defaultWideSpan).let { if (it == 2) 2 else 1 }
+            )
+        }.sortedBy { it.sortOrder }
+            .mapIndexed { idx, item -> item.copy(sortOrder = idx) }
+            .toMutableList()
+    }
+
     fun toggleCardVisibility(type: DashboardCardType, isVisible: Boolean? = null) {
         viewModelScope.launch {
-            val widgets = repository.preferences.value.dashboardWidgets.toMutableList()
-            val index = widgets.indexOfFirst {
-                it.widgetId.equals(type.widgetId, ignoreCase = true) ||
-                DashboardCardType.fromWidgetId(it.widgetId) == type
-            }
+            val widgets = normalizedWidgets()
+            val index = widgets.indexOfFirst { DashboardCardType.fromWidgetId(it.widgetId) == type }
             if (index >= 0) {
                 val current = widgets[index]
                 val newVisibility = isVisible ?: !current.isVisible
                 widgets[index] = current.copy(isVisible = newVisibility)
-            } else {
-                val newVisibility = isVisible ?: false
-                widgets.add(DashboardWidgetConfig(type.widgetId, type.defaultTitle, isVisible = newVisibility, sortOrder = widgets.size))
             }
             val updated = repository.preferences.value.copy(dashboardWidgets = widgets)
             repository.updatePreferences(updated)
         }
     }
 
+    fun setCardWideSpan(type: DashboardCardType, wideSpan: Int) {
+        viewModelScope.launch {
+            val normalizedSpan = if (wideSpan == 2) 2 else 1
+            val widgets = normalizedWidgets()
+            val index = widgets.indexOfFirst { DashboardCardType.fromWidgetId(it.widgetId) == type }
+            if (index >= 0) {
+                widgets[index] = widgets[index].copy(wideSpan = normalizedSpan)
+                val updated = repository.preferences.value.copy(dashboardWidgets = widgets)
+                repository.updatePreferences(updated)
+            }
+        }
+    }
+
     fun moveCard(fromIndex: Int, toIndex: Int) {
         viewModelScope.launch {
-            val current = repository.preferences.value.dashboardWidgets.sortedBy { it.sortOrder }.toMutableList()
-            if (fromIndex in current.indices && toIndex in current.indices) {
+            val current = normalizedWidgets()
+            if (fromIndex in current.indices && toIndex in current.indices && fromIndex != toIndex) {
                 val item = current.removeAt(fromIndex)
                 current.add(toIndex, item)
                 val reordered = current.mapIndexed { idx, config -> config.copy(sortOrder = idx) }
@@ -161,22 +189,16 @@ class DashboardViewModel(
     }
 
     fun moveCardUp(cardType: DashboardCardType) {
-        val currentWidgets = repository.preferences.value.dashboardWidgets.sortedBy { it.sortOrder }
-        val index = currentWidgets.indexOfFirst {
-            it.widgetId.equals(cardType.widgetId, ignoreCase = true) ||
-            DashboardCardType.fromWidgetId(it.widgetId) == cardType
-        }
+        val currentWidgets = normalizedWidgets()
+        val index = currentWidgets.indexOfFirst { DashboardCardType.fromWidgetId(it.widgetId) == cardType }
         if (index > 0) {
             moveCard(index, index - 1)
         }
     }
 
     fun moveCardDown(cardType: DashboardCardType) {
-        val currentWidgets = repository.preferences.value.dashboardWidgets.sortedBy { it.sortOrder }
-        val index = currentWidgets.indexOfFirst {
-            it.widgetId.equals(cardType.widgetId, ignoreCase = true) ||
-            DashboardCardType.fromWidgetId(it.widgetId) == cardType
-        }
+        val currentWidgets = normalizedWidgets()
+        val index = currentWidgets.indexOfFirst { DashboardCardType.fromWidgetId(it.widgetId) == cardType }
         if (index >= 0 && index < currentWidgets.lastIndex) {
             moveCard(index, index + 1)
         }
