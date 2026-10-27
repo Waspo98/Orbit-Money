@@ -1,9 +1,6 @@
 package app.overbay.orbit
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -175,9 +172,10 @@ fun OrbitNavigation(
     ) {
         AnimatedContent(
             targetState = currentKey,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            transitionSpec = { orbitNavigationTransitionSpec() },
+            contentKey = { key -> key.primaryTabIndex ?: key },
             modifier = Modifier.fillMaxSize(),
-            label = "OrbitNavigationCrossfade"
+            label = "OrbitNavigationTransition"
         ) { key ->
             when (key) {
                 OrbitNavKey.Dashboard -> {
