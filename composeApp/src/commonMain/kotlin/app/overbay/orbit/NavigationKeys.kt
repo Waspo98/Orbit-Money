@@ -3,6 +3,7 @@ package app.overbay.orbit
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -48,41 +49,45 @@ fun resolveOrbitTransitionDirection(
 
 fun AnimatedContentTransitionScope<OrbitNavKey>.orbitNavigationTransitionSpec(): ContentTransform {
     val direction = resolveOrbitTransitionDirection(initialState, targetState)
-    val expressiveOffsetSpring = spring<IntOffset>(
-        dampingRatio = Spring.DampingRatioLowBouncy,
-        stiffness = Spring.StiffnessLow
+    val snappySlideSpring = spring<IntOffset>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = 650f,
+        visibilityThreshold = IntOffset.VisibilityThreshold
     )
-    val fadeSpring = spring<Float>(stiffness = Spring.StiffnessLow)
+    val fadeSpring = spring<Float>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMediumLow
+    )
 
     return when (direction) {
         OrbitTransitionDirection.VIEWFINDER_RIGHT -> {
             slideInHorizontally(
-                animationSpec = expressiveOffsetSpring,
+                animationSpec = snappySlideSpring,
                 initialOffsetX = { fullWidth -> fullWidth }
             ) togetherWith slideOutHorizontally(
-                animationSpec = expressiveOffsetSpring,
+                animationSpec = snappySlideSpring,
                 targetOffsetX = { fullWidth -> -fullWidth }
             )
         }
         OrbitTransitionDirection.VIEWFINDER_LEFT -> {
             slideInHorizontally(
-                animationSpec = expressiveOffsetSpring,
+                animationSpec = snappySlideSpring,
                 initialOffsetX = { fullWidth -> -fullWidth }
             ) togetherWith slideOutHorizontally(
-                animationSpec = expressiveOffsetSpring,
+                animationSpec = snappySlideSpring,
                 targetOffsetX = { fullWidth -> fullWidth }
             )
         }
         OrbitTransitionDirection.MORE_PUSH -> {
             (fadeIn(animationSpec = fadeSpring) + slideInVertically(
-                animationSpec = expressiveOffsetSpring,
+                animationSpec = snappySlideSpring,
                 initialOffsetY = { fullHeight -> fullHeight / 12 }
             )) togetherWith fadeOut(animationSpec = fadeSpring)
         }
         OrbitTransitionDirection.MORE_POP -> {
             fadeIn(animationSpec = fadeSpring) togetherWith (
                 fadeOut(animationSpec = fadeSpring) + slideOutVertically(
-                    animationSpec = expressiveOffsetSpring,
+                    animationSpec = snappySlideSpring,
                     targetOffsetY = { fullHeight -> fullHeight / 12 }
                 )
             )
