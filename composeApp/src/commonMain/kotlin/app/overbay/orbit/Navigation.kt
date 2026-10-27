@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -20,6 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.StorageMode
@@ -32,6 +35,9 @@ import app.overbay.orbit.ui.budgets.BudgetsViewModel
 import app.overbay.orbit.ui.categories.CategoriesScreen
 import app.overbay.orbit.ui.categories.CategoriesViewModel
 import app.overbay.orbit.ui.components.AdaptiveNavigationShell
+import app.overbay.orbit.ui.components.LocalCanopyScreenKeyId
+import app.overbay.orbit.ui.components.LocalCanopyTransitionCoordinator
+import app.overbay.orbit.ui.components.rememberCanopyTransitionCoordinator
 import app.overbay.orbit.ui.dashboard.DashboardScreen
 import app.overbay.orbit.ui.dashboard.DashboardViewModel
 import app.overbay.orbit.ui.goals.GoalsScreen
@@ -152,235 +158,187 @@ fun OrbitNavigation(
         }
     }
 
-    AdaptiveNavigationShell(
-        currentKey = currentKey,
-        onNavigate = { key ->
-            if (key != currentKey) {
-                backStack.add(key)
-            }
-        },
-        canNavigateBack = backStack.size > 1,
-        onBack = {
-            if (backStack.size > 1) {
-                backStack.removeAt(backStack.lastIndex)
-            }
-        },
-        mhaEnabled = preferences.mhaTrackerEnabled,
-        externalShowMore = showMoreFromHeader,
-        onDismissExternalMore = { showMoreFromHeader = false },
-        modifier = modifier
-    ) {
-        AnimatedContent(
-            targetState = currentKey,
-            transitionSpec = { orbitNavigationTransitionSpec() },
-            contentKey = { key -> key.primaryTabIndex ?: key },
-            modifier = Modifier.fillMaxSize(),
-            label = "OrbitNavigationTransition"
-        ) { key ->
-            when (key) {
-                OrbitNavKey.Dashboard -> {
-                    DashboardScreen(
-                        viewModel = dashboardViewModel,
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
+    val navigateTo: (OrbitNavKey) -> Unit = { destination ->
+        if (destination != currentKey) {
+            backStack.add(destination)
+        }
+    }
+    val canopyCoordinator = rememberCanopyTransitionCoordinator(currentKey.primaryTabIndex ?: currentKey)
+
+    CompositionLocalProvider(LocalCanopyTransitionCoordinator provides canopyCoordinator) {
+        AdaptiveNavigationShell(
+            currentKey = currentKey,
+            onNavigate = navigateTo,
+            canNavigateBack = backStack.size > 1,
+            onBack = {
+                if (backStack.size > 1) {
+                    backStack.removeAt(backStack.lastIndex)
                 }
-                is OrbitNavKey.Transactions -> {
-                    if (key.transactionId != null) {
-                        transactionsViewModel.selectTransactionForInspect(key.transactionId)
-                    }
-                    TransactionsScreen(
-                        viewModel = transactionsViewModel,
-                        onOpenDrawer = { showMoreFromHeader = true },
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                OrbitNavKey.Budgets -> {
-                    BudgetsScreen(
-                        viewModel = budgetsViewModel,
-                        onOpenDrawer = { showMoreFromHeader = true },
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                OrbitNavKey.Upcoming -> {
-                    UpcomingScreen(
-                        viewModel = upcomingViewModel,
-                        onOpenDrawer = { showMoreFromHeader = true },
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                OrbitNavKey.Goals -> {
-                    GoalsScreen(
-                        viewModel = goalsViewModel,
-                        onOpenDrawer = { showMoreFromHeader = true },
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                OrbitNavKey.Categories -> {
-                    CategoriesScreen(
-                        viewModel = categoriesViewModel,
-                        onOpenDrawer = { showMoreFromHeader = true },
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                OrbitNavKey.Rules -> {
-                    RulesScreen(
-                        viewModel = rulesViewModel,
-                        onOpenDrawer = { showMoreFromHeader = true },
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                is OrbitNavKey.Accounts -> {
-                    AccountsScreen(
-                        viewModel = accountsViewModel,
-                        initialAccountId = key.accountId,
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                OrbitNavKey.NetWorth -> {
-                    NetWorthScreen(
-                        viewModel = netWorthViewModel,
-                        onOpenDrawer = { showMoreFromHeader = true },
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                OrbitNavKey.SpendingTrends -> {
-                    SpendingTrendsScreen(
-                        viewModel = spendingTrendsViewModel,
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                OrbitNavKey.MhaTracker -> {
-                    MhaTrackerScreen(
-                        viewModel = mhaTrackerViewModel,
-                        onOpenDrawer = { showMoreFromHeader = true },
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                OrbitNavKey.HousingCalculator -> {
-                    HousingCalculatorScreen(
-                        viewModel = housingViewModel,
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                OrbitNavKey.RetirementCalculator -> {
-                    RetirementCalculatorScreen(
-                        viewModel = retirementViewModel,
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                OrbitNavKey.Household -> {
-                    HouseholdScreen(
-                        viewModel = householdViewModel,
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                OrbitNavKey.Settings -> {
-                    SettingsScreen(
-                        viewModel = settingsViewModel,
-                        onNavigate = { destination ->
-                            if (destination != currentKey) {
-                                backStack.add(destination)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                else -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.background)
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Orbit Money",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.primary
+            },
+            mhaEnabled = preferences.mhaTrackerEnabled,
+            externalShowMore = showMoreFromHeader,
+            onDismissExternalMore = { showMoreFromHeader = false },
+            modifier = modifier
+        ) {
+            AnimatedContent(
+                targetState = currentKey,
+                transitionSpec = { orbitNavigationTransitionSpec() },
+                contentKey = { key -> key.primaryTabIndex ?: key },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onGloballyPositioned { coords ->
+                        canopyCoordinator.containerRootX = coords.positionInRoot().x
+                        canopyCoordinator.containerWidthPx = coords.size.width.toFloat()
+                    },
+                label = "OrbitNavigationTransition"
+            ) { key ->
+                CompositionLocalProvider(LocalCanopyScreenKeyId provides (key.primaryTabIndex ?: key)) {
+                    when (key) {
+                        OrbitNavKey.Dashboard -> {
+                            DashboardScreen(
+                                viewModel = dashboardViewModel,
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = key.title,
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onBackground
+                        }
+                        is OrbitNavKey.Transactions -> {
+                            if (key.transactionId != null) {
+                                transactionsViewModel.selectTransactionForInspect(key.transactionId)
+                            }
+                            TransactionsScreen(
+                                viewModel = transactionsViewModel,
+                                onOpenDrawer = { showMoreFromHeader = true },
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Mode: ${posture.mode.name}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.outline
+                        }
+                        OrbitNavKey.Budgets -> {
+                            BudgetsScreen(
+                                viewModel = budgetsViewModel,
+                                onOpenDrawer = { showMoreFromHeader = true },
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
                             )
+                        }
+                        OrbitNavKey.Upcoming -> {
+                            UpcomingScreen(
+                                viewModel = upcomingViewModel,
+                                onOpenDrawer = { showMoreFromHeader = true },
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        OrbitNavKey.Goals -> {
+                            GoalsScreen(
+                                viewModel = goalsViewModel,
+                                onOpenDrawer = { showMoreFromHeader = true },
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        OrbitNavKey.Categories -> {
+                            CategoriesScreen(
+                                viewModel = categoriesViewModel,
+                                onOpenDrawer = { showMoreFromHeader = true },
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        OrbitNavKey.Rules -> {
+                            RulesScreen(
+                                viewModel = rulesViewModel,
+                                onOpenDrawer = { showMoreFromHeader = true },
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        is OrbitNavKey.Accounts -> {
+                            AccountsScreen(
+                                viewModel = accountsViewModel,
+                                initialAccountId = key.accountId,
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        OrbitNavKey.NetWorth -> {
+                            NetWorthScreen(
+                                viewModel = netWorthViewModel,
+                                onOpenDrawer = { showMoreFromHeader = true },
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        OrbitNavKey.SpendingTrends -> {
+                            SpendingTrendsScreen(
+                                viewModel = spendingTrendsViewModel,
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        OrbitNavKey.MhaTracker -> {
+                            MhaTrackerScreen(
+                                viewModel = mhaTrackerViewModel,
+                                onOpenDrawer = { showMoreFromHeader = true },
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        OrbitNavKey.HousingCalculator -> {
+                            HousingCalculatorScreen(
+                                viewModel = housingViewModel,
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        OrbitNavKey.RetirementCalculator -> {
+                            RetirementCalculatorScreen(
+                                viewModel = retirementViewModel,
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        OrbitNavKey.Household -> {
+                            HouseholdScreen(
+                                viewModel = householdViewModel,
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        OrbitNavKey.Settings -> {
+                            SettingsScreen(
+                                viewModel = settingsViewModel,
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        else -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.background)
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "Orbit Money",
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = key.title,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Mode: ${posture.mode.name}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                            }
                         }
                     }
                 }

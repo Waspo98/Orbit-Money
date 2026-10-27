@@ -164,37 +164,22 @@ fun MorphingPageHero(
 
     val restingZoneHeightDp = lerp(with(density) { expandedMorphHeightPx.toDp() }, minBarHeightDp, fraction)
     val currentZoneHeightDp = activeHeightOverrideDp ?: restingZoneHeightDp
+    val canopyCoordinator = LocalCanopyTransitionCoordinator.current
+    val canopyScreenKeyId = LocalCanopyScreenKeyId.current
+    var heroCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .shadow(elevation = (fraction * 6f).dp, shape = RectangleShape, clip = false)
-            .drawBehind {
-                val w = size.width
-                val h = size.height
-                drawRect(
-                    brush = Brush.linearGradient(
-                        colors = listOf(canopyColors.canopyStart, canopyColors.canopyMid, canopyColors.canopyEnd),
-                        start = Offset.Zero,
-                        end = Offset(w, h)
-                    )
-                )
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(canopyColors.canopyGlow, Color.Transparent),
-                        center = Offset(w * 0.92f, 0f),
-                        radius = (w * 0.7f).coerceAtLeast(100f)
-                    )
-                )
-                val strokePx = 1.dp.toPx()
-                drawLine(
-                    color = Color.White.copy(alpha = 0.16f),
-                    start = Offset(0f, h - strokePx / 2f),
-                    end = Offset(w, h - strokePx / 2f),
-                    strokeWidth = strokePx
-                )
-            }
-            .statusBarsPadding()
+        modifier = modifier.stationaryCanopyBackdrop(
+            canopyStart = canopyColors.canopyStart,
+            canopyMid = canopyColors.canopyMid,
+            canopyEnd = canopyColors.canopyEnd,
+            canopyGlow = canopyColors.canopyGlow,
+            elevationDp = (fraction * 6f).dp,
+            coordinator = canopyCoordinator,
+            screenKeyId = canopyScreenKeyId,
+            getHeroCoordinates = { heroCoordinates },
+            setHeroCoordinates = { heroCoordinates = it }
+        )
     ) {
         BoxWithConstraints(
             modifier = Modifier

@@ -1,8 +1,11 @@
 package app.overbay.orbit
 
+import app.overbay.orbit.ui.components.CanopyTransitionCoordinator
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class NavigationTransitionTest {
 
@@ -122,5 +125,40 @@ class NavigationTransitionTest {
             OrbitTransitionDirection.MORE_POP,
             resolveOrbitTransitionDirection(OrbitNavKey.NetWorth, OrbitNavKey.Accounts())
         )
+    }
+
+    @Test
+    fun `canopy coordinator synchronizes outgoing and incoming header heights across transitions`() = runTest {
+        val coordinator = CanopyTransitionCoordinator(initialKeyId = 0)
+
+        // At rest on Dashboard (key 0, height 280px)
+        assertEquals(280, coordinator.resolveDisplayHeightPx(screenKeyId = 0, naturalHeightPx = 280))
+        assertEquals(280, coordinator.sharedDisplayHeightPx)
+
+        // Scroll collapse on Dashboard (280px -> 180px) snaps immediately with zero lag
+        assertEquals(180, coordinator.resolveDisplayHeightPx(screenKeyId = 0, naturalHeightPx = 180))
+
+        // Navigate to Transactions (key 1, height 520px)
+        coordinator.onTargetKeyChanged(newKeyId = 1)
+        assertEquals(0f, coordinator.transitionFraction)
+
+        // Frame 0: both Dashboard (0) and Transactions (1) resolve to the starting height (180px)
+        val outFrame0 = coordinator.resolveDisplayHeightPx(screenKeyId = 0, naturalHeightPx = 180)
+        val inFrame0 = coordinator.resolveDisplayHeightPx(screenKeyId = 1, naturalHeightPx = 520)
+        assertEquals(180, outFrame0)
+        assertEquals(180, inFrame0)
+        assertEquals(520, coordinator.targetHeightPx)
+
+        // Mid-transition (50%): both Dashboard and Transactions resolve to 350px
+        coordinator.updateTransitionFraction(0.5f)
+        assertEquals(350, coordinator.resolveDisplayHeightPx(screenKeyId = 0, naturalHeightPx = 180))
+        assertEquals(350, coordinator.resolveDisplayHeightPx(screenKeyId = 1, naturalHeightPx = 520))
+
+        // Complete transition animation
+        coordinator.updateTransitionFraction(1f)
+        assertEquals(1f, coordinator.transitionFraction)
+        assertEquals(520, coordinator.resolveDisplayHeightPx(screenKeyId = 0, naturalHeightPx = 180))
+        assertEquals(520, coordinator.resolveDisplayHeightPx(screenKeyId = 1, naturalHeightPx = 520))
+        assertTrue(!coordinator.isTransitioning)
     }
 }

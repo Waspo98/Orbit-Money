@@ -54,38 +54,36 @@ fun BudgetsScreen(
             }
         }
     ) { paddingValues ->
-        if (state.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .nestedScroll(heroScrollState.nestedScrollConnection)
-            ) {
-                MorphingPageHero(
-                    kicker = "BUDGET PLANNING",
-                    title = "Budgets",
-                    subtitle = "${state.monthLabel} · ${state.daysRemaining} days left",
-                    scrollState = heroScrollState,
-                    expandedToolbar = {
-                        PeriodNavigatorPill(
-                            label = state.monthLabel,
-                            onPrevious = { viewModel.onPreviousMonth() },
-                            onNext = { viewModel.onNextMonth() },
-                            canGoNext = state.canGoNextMonth,
-                            onClickLabel = { viewModel.onResetToCurrentMonth() }
-                        )
-                    }
-                )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .nestedScroll(heroScrollState.nestedScrollConnection)
+        ) {
+            MorphingPageHero(
+                kicker = "BUDGET PLANNING",
+                title = "Budgets",
+                subtitle = "${state.monthLabel} · ${state.daysRemaining} days left",
+                scrollState = heroScrollState,
+                expandedToolbar = {
+                    PeriodNavigatorPill(
+                        label = state.monthLabel,
+                        onPrevious = { viewModel.onPreviousMonth() },
+                        onNext = { viewModel.onNextMonth() },
+                        canGoNext = state.canGoNextMonth,
+                        onClickLabel = { viewModel.onResetToCurrentMonth() }
+                    )
+                }
+            )
 
+            if (state.isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
                 // Scrollable Content
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),

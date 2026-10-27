@@ -85,13 +85,6 @@ fun AccountsScreen(
         }
     }
 
-    if (state.isLoading) {
-        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-        }
-        return
-    }
-
     // Detail Screen on Phone if directly inspecting an account
     if (phoneViewingDetail && !posture.supportsTwoPane && state.selectedAccount != null) {
         AccountDetailScreen(
@@ -237,6 +230,13 @@ private fun AccountsMasterContent(
             subtitle = "${MoneyUtils.formatCents(state.netWorthCents)} Net Worth across ${state.accounts.size} Accounts",
             scrollState = heroScrollState
         )
+
+        if (state.isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            }
+            return@Column
+        }
 
         // Secondary Action Row Below Hero
         OrbitPageActionRow {
