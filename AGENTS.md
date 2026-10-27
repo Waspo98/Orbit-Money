@@ -41,7 +41,7 @@ This repo lives inside the `C:\Docker` workspace as an **app & self-hosted stack
   - While iterating on UI/domain code, validate with `.\gradlew.bat compileDebugKotlinAndroid` or `.\gradlew.bat testDebugUnitTest`.
   - For Web PWA bundle compilation, validate with `cmd /c scripts\build-frontend.cmd` (runs `.\gradlew.bat :composeApp:wasmJsBrowserDistribution`).
   - After backend edits, validate with `cmd /c scripts\check-backend.cmd` from the repo root plus relevant test suites (`node --test`).
-  - Only run the full Android APK pipeline (`scripts\build-apk.cmd`) or Docker beta deploy (`cmd /c scripts\deploy-beta.cmd`) once all code edits and tests for the task are complete.
+  - Once all code edits and tests for an app/UI/domain task are complete, **automatically run `cmd /c scripts\build-apk.cmd`** (do not wait to be asked) so the latest APK is always built and uploaded to GitHub Releases. Run `cmd /c scripts\deploy-beta.cmd` when deploying Docker beta.
 - **Compiler & Test Circuit-Breaker:** If compilation or a test fails twice consecutively with the same or related error, STOP making speculative code edits. Inspect the exact stack trace, component props, contract, or schema definition before making further changes.
 - **Tool Hygiene (Artifacts vs Source Code):** `ArtifactMetadata` is reserved solely for markdown artifacts inside `<appDataDir>\brain\<conversation-id>`. When writing Kotlin, JS, CSS, SQL, XML, or Gradle repository files with `write_file`, never supply `ArtifactMetadata`.
 - **Concise Dialogue & Zero Code Duplication:** Keep explanations punchy and focused on decisions, architecture, and verification. Never paste verbatim code blocks or large diffs into chat dialogue—the user can inspect file edits directly in their diff viewer.
@@ -127,8 +127,9 @@ This repo lives inside the `C:\Docker` workspace as an **app & self-hosted stack
     2. Upload to GitHub Releases (`gh release upload --clobber`):
        - `main` / feature branches -> tag `debug-latest` (`OrbitMoney-debug.apk`)
        - `beta` / `Beta` branch -> tag `beta-latest` (`OrbitBeta-debug.apk`)
-  - **MANDATORY DELIVERY RULE (Final Turn of Any Built APK):**
-    - Whenever a new APK is compiled and uploaded to GitHub Releases, the agent's **final completion response** MUST explicitly include the direct download link:
+  - **MANDATORY AUTOMATIC APK BUILD & DELIVERY RULE (Final Turn of Every App/UI/Domain Change):**
+    - At the conclusion of **every** task that modifies `:composeApp` or `:androidApp` code, you **MUST automatically run `cmd /c scripts\build-apk.cmd`** to compile and upload the APK to GitHub Releases without waiting for the user to ask.
+    - Your **final completion response** MUST always include the direct download link:
       - **Beta Branch:**
         ```markdown
         📥 **[Download OrbitBeta-debug.apk](https://github.com/Waspo98/Orbit-Money/releases/download/beta-latest/OrbitBeta-debug.apk)**
