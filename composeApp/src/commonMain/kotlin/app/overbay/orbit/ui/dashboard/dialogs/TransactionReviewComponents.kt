@@ -283,7 +283,7 @@ internal fun ReviewTransactionCardContent(
     val catColor = parseReviewHexColor(category?.color ?: txn.categoryColor) ?: primary
     val borderColor = when (cardTone) {
         "yes" -> primary.copy(alpha = 0.65f)
-        "no" -> colors.expense.copy(alpha = 0.65f)
+        "no" -> colors.danger.copy(alpha = 0.65f)
         else -> colors.cardBorder
     }
 

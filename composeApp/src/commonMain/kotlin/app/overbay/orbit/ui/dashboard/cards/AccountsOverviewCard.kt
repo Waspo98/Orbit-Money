@@ -49,61 +49,56 @@ fun AccountsOverviewCard(
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = "Net worth",
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = MoneyUtils.formatCents(accounts.totalNetWorthCents, showCents = true),
                 style = TabularNumStyle.copy(
-                    fontSize = 32.sp,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Bold
                 ),
-                color = colors.income
+                color = if (accounts.totalNetWorthCents >= 0L) colors.income else colors.expense
             )
             Text(
-                text = "Across ${accounts.accountCount} accounts",
+                text = "Across ${accounts.accountCount} ${if (accounts.accountCount == 1) "account" else "accounts"}",
                 style = MaterialTheme.typography.bodySmall,
+                fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Divided ledger rows
-            OrbitMiniStatRow(
-                label = "Cash",
-                value = MoneyUtils.formatCents(accounts.cashCents)
-            )
-            OrbitMiniStatRow(
-                label = "Investments",
-                value = MoneyUtils.formatCents(accounts.investmentsCents)
-            )
-            if (accounts.creditCardsOwedCents > 0L) {
-                OrbitMiniStatRow(
-                    label = "Credit cards",
-                    value = "-${MoneyUtils.formatCents(accounts.creditCardsOwedCents)}",
-                    valueColor = colors.expense
-                )
+            val rows = buildList {
+                if (accounts.cashCents != 0L) {
+                    add(Triple("Cash", MoneyUtils.formatCents(accounts.cashCents), MaterialTheme.colorScheme.onSurface))
+                }
+                if (accounts.investmentsCents != 0L) {
+                    add(Triple("Investments", MoneyUtils.formatCents(accounts.investmentsCents), MaterialTheme.colorScheme.onSurface))
+                }
+                if (accounts.creditCardsOwedCents > 0L) {
+                    add(Triple("Credit cards", "-${MoneyUtils.formatCents(accounts.creditCardsOwedCents)}", colors.expense))
+                }
+                if (accounts.loansOwedCents > 0L) {
+                    add(Triple("Loans", "-${MoneyUtils.formatCents(accounts.loansOwedCents)}", colors.expense))
+                }
+                if (accounts.realEstateEquityCents != 0L) {
+                    add(Triple("Real Estate", MoneyUtils.formatCents(accounts.realEstateEquityCents), MaterialTheme.colorScheme.onSurface))
+                }
+                if (accounts.otherCents != 0L) {
+                    add(Triple("Other", MoneyUtils.formatCents(accounts.otherCents), MaterialTheme.colorScheme.onSurface))
+                }
             }
-            if (accounts.loansOwedCents > 0L) {
+
+            rows.forEachIndexed { index, (label, value, valueColor) ->
                 OrbitMiniStatRow(
-                    label = "Loans",
-                    value = "-${MoneyUtils.formatCents(accounts.loansOwedCents)}",
-                    valueColor = colors.expense
-                )
-            }
-            if (accounts.realEstateEquityCents != 0L) {
-                OrbitMiniStatRow(
-                    label = "Real Estate",
-                    value = MoneyUtils.formatCents(accounts.realEstateEquityCents)
-                )
-            }
-            if (accounts.otherCents != 0L) {
-                OrbitMiniStatRow(
-                    label = "Other",
-                    value = MoneyUtils.formatCents(accounts.otherCents)
+                    label = label,
+                    value = value,
+                    valueColor = valueColor,
+                    showTopDivider = index > 0
                 )
             }
         }

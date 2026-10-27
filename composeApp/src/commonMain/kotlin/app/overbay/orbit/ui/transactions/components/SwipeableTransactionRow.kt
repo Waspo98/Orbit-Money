@@ -243,7 +243,7 @@ fun SwipeableTransactionRow(
                                 onClick = { menuExpanded = false; onToggleIgnore() }
                             )
                             HorizontalDivider()
-                            DropdownMenuItem(text = { Text("Delete", color = colors.expense) }, onClick = { menuExpanded = false; onDelete() })
+                            DropdownMenuItem(text = { Text("Delete", color = colors.danger) }, onClick = { menuExpanded = false; onDelete() })
                         }
                     }
                 }
@@ -338,7 +338,7 @@ private fun CompactPillAction(
         onClick = { haptics.tick(); onClick() },
         shape = CircleShape,
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-        border = BorderStroke(1.dp, if (isDestructive) OrbitTheme.colors.expense else OrbitTheme.colors.cardBorder),
+        border = BorderStroke(1.dp, if (isDestructive) OrbitTheme.colors.danger else OrbitTheme.colors.cardBorder),
         modifier = Modifier.height(30.dp)
     ) {
         Text(
@@ -346,7 +346,7 @@ private fun CompactPillAction(
             style = MaterialTheme.typography.labelSmall,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
-            color = if (isDestructive) OrbitTheme.colors.expense else MaterialTheme.colorScheme.onSurface
+            color = if (isDestructive) OrbitTheme.colors.danger else MaterialTheme.colorScheme.onSurface
         )
     }
 }

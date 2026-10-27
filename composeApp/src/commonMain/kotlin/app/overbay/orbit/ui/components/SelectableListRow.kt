@@ -21,11 +21,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
  * Standardized two-line selectable row for category, account, and goal pickers.
- * Shows an active green tinted container when [selected] is true.
+ * Matches main branch `.selectable-list-item` (`--surface-2` background, `--border` 1dp stroke,
+ * and `--accent-soft` active state).
  */
 @Composable
 fun SelectableListRow(
@@ -41,14 +43,14 @@ fun SelectableListRow(
 ) {
     val haptics = LocalOrbitHaptics.current
     val containerColor = if (selected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        MaterialTheme.colorScheme.primaryContainer
     } else {
-        MaterialTheme.colorScheme.surface
+        MaterialTheme.colorScheme.surfaceContainerLow
     }
     val border = if (selected) {
-        BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
     } else {
-        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+        BorderStroke(1.dp, OrbitTheme.colors.cardBorder)
     }
 
     Surface(

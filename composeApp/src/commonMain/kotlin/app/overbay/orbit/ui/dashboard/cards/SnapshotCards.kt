@@ -60,17 +60,18 @@ fun RetirementSnapshotCard(
         Column(modifier = Modifier.fillMaxWidth()) {
             OrbitMiniStatRow(
                 label = "Current Retirement Balance",
-                value = MoneyUtils.formatCents(state.currentBalanceCents),
-                valueColor = colors.income
+                value = MoneyUtils.formatCents(state.currentBalanceCents)
             )
             OrbitMiniStatRow(
                 label = "Estimated Monthly Addition",
-                value = MoneyUtils.formatCents(state.monthlyContributionCents)
+                value = MoneyUtils.formatCents(state.monthlyContributionCents),
+                showTopDivider = true
             )
             OrbitMiniStatRow(
                 label = "Projected at Age ${state.targetAge}",
                 value = MoneyUtils.formatCents(state.projectedAtRetirementCents),
-                valueColor = MaterialTheme.colorScheme.primary
+                valueColor = MaterialTheme.colorScheme.primary,
+                showTopDivider = true
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -171,11 +172,13 @@ fun MhaSummaryCard(
             OrbitMiniStatRow(
                 label = "Estimated tax savings",
                 value = MoneyUtils.formatCents(state.estimatedTaxSavingsCents),
-                valueColor = MaterialTheme.colorScheme.primary
+                valueColor = MaterialTheme.colorScheme.primary,
+                showTopDivider = true
             )
             OrbitMiniStatRow(
                 label = "Transactions YTD",
-                value = "${state.ytdTransactionCount} items"
+                value = "${state.ytdTransactionCount} items",
+                showTopDivider = true
             )
         }
     }
@@ -212,13 +215,15 @@ fun MortgageSnapshotCard(
             OrbitMiniStatRow(
                 label = "Mortgage balance",
                 value = "-${MoneyUtils.formatCents(state.mortgageBalanceCents)}",
-                valueColor = colors.expense
+                valueColor = colors.expense,
+                showTopDivider = true
             )
             OrbitMiniStatRow(
                 label = "Estimated equity",
                 detail = "${state.equityPercent.toInt()}% equity",
                 value = MoneyUtils.formatCents(state.estimatedEquityCents),
-                valueColor = colors.income
+                valueColor = colors.income,
+                showTopDivider = true
             )
         }
     }

@@ -219,7 +219,8 @@ fun GoalsProgressCard(
                         label = goal.name,
                         detail = if (goal.targetDate != null) "Target ${goal.targetDate}" else null,
                         value = "${MoneyUtils.formatCents(goal.currentAmountCents)} (${(goal.progressRatio * 100).toInt()}%)",
-                        valueColor = if (goal.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        valueColor = if (goal.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        showTopDivider = index > 0
                     )
                 }
             }

@@ -79,7 +79,7 @@ fun AccountGroupSection(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder)
     ) {
@@ -100,10 +100,10 @@ fun AccountGroupSection(
                 Column {
                     Text(
                         text = group.title.uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 12.sp,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.8.sp,
+                        letterSpacing = 0.78.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(2.dp))

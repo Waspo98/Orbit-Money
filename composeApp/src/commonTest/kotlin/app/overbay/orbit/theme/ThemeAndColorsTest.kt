@@ -29,6 +29,8 @@ class ThemeAndColorsTest {
             assertNotNull(customDark.income)
             assertNotNull(customLight.expense)
             assertNotNull(customDark.expense)
+            assertNotNull(customLight.danger)
+            assertNotNull(customDark.danger)
             assertNotNull(customLight.canopyStart)
             assertNotNull(customDark.canopyEnd)
         }

@@ -79,7 +79,7 @@ fun BudgetPulseCard(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         ),
-                        color = if (summary.isOverBudget) colors.expense else if (summary.percentUsed >= 85) colors.warning else colors.income
+                        color = if (summary.isOverBudget) colors.danger else if (summary.percentUsed >= 85) colors.warning else colors.income
                     )
                 }
 
@@ -100,14 +100,14 @@ fun BudgetPulseCard(
                         label = "Over Budget",
                         detail = "${summary.daysRemaining} days left in month",
                         value = MoneyUtils.formatCents(summary.overBudgetCents),
-                        valueColor = colors.expense
+                        valueColor = colors.danger
                     )
                 } else {
                     OrbitMiniStatRow(
                         label = "Daily Spend Remaining",
                         detail = "${summary.daysRemaining} days left in month",
                         value = "${MoneyUtils.formatCents(summary.dailySafeSpendCents)} / day",
-                        valueColor = MaterialTheme.colorScheme.primary
+                        valueColor = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
@@ -122,7 +122,7 @@ fun BudgetPulseCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
                     )
-                    summary.attentionCategories.take(2).forEach { item ->
+                    summary.attentionCategories.take(2).forEachIndexed { index, item ->
                         val isOver = item.spentCents > item.amountCents
                         val alertText = if (isOver) {
                             "${MoneyUtils.formatCents(item.spentCents - item.amountCents)} over"
@@ -132,7 +132,8 @@ fun BudgetPulseCard(
                         OrbitMiniStatRow(
                             label = item.category.name,
                             value = alertText,
-                            valueColor = if (isOver) colors.expense else colors.warning
+                            valueColor = if (isOver) colors.danger else colors.warning,
+                            showTopDivider = index > 0
                         )
                     }
                 }

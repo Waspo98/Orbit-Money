@@ -308,7 +308,7 @@ fun MonthComparisonCard(
                     Text(
                         text = deltaText,
                         style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold),
-                        color = if (row.isPositiveImprovement) colors.income else colors.expense,
+                        color = if (row.isPositiveImprovement) colors.income else colors.danger,
                         modifier = Modifier.weight(1f)
                     )
                 }

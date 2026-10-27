@@ -29,9 +29,9 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * Editorial Material Design 3 Expressive section card for Orbit Money.
- * Features 20dp rounded corners, crisp white surface, subtle 1dp cardBorder,
- * tracked uppercase header, optional action link, and a header divider.
+ * Editorial Material Design 3 Expressive section card for Orbit Money matching main branch `.dashboard-card`.
+ * Features 16dp rounded corners, crisp surface, subtle 1dp cardBorder,
+ * DM Sans SemiBold tracked uppercase header, optional action link, and a header divider.
  */
 @Composable
 fun OrbitSectionCard(
@@ -41,10 +41,10 @@ fun OrbitSectionCard(
     actionText: String? = null,
     onActionClick: (() -> Unit)? = null,
     action: (@Composable () -> Unit)? = null,
-    shape: Shape = RoundedCornerShape(20.dp),
+    shape: Shape = RoundedCornerShape(16.dp),
     containerColor: Color = MaterialTheme.colorScheme.surface,
     border: BorderStroke? = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-    contentPadding: PaddingValues = PaddingValues(16.dp),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
     content: @Composable ColumnScope.() -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -71,10 +71,10 @@ fun OrbitSectionCard(
                         if (title != null) {
                             Text(
                                 text = title.uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.9.sp,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.78.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -93,7 +93,7 @@ fun OrbitSectionCard(
                             text = actionText,
                             style = MaterialTheme.typography.labelMedium,
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
                                 .padding(start = 8.dp)

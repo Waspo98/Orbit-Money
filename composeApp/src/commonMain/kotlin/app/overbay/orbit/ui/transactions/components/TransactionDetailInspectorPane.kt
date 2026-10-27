@@ -335,7 +335,7 @@ private fun InspectorPillAction(label: String, onClick: () -> Unit, isDestructiv
         onClick = { haptics.tick(); onClick() },
         shape = CircleShape,
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-        border = BorderStroke(1.dp, if (isDestructive) OrbitTheme.colors.expense else OrbitTheme.colors.cardBorder),
+        border = BorderStroke(1.dp, if (isDestructive) OrbitTheme.colors.danger else OrbitTheme.colors.cardBorder),
         modifier = Modifier.height(34.dp)
     ) {
         Text(
@@ -343,7 +343,7 @@ private fun InspectorPillAction(label: String, onClick: () -> Unit, isDestructiv
             style = MaterialTheme.typography.labelMedium,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
-            color = if (isDestructive) OrbitTheme.colors.expense else MaterialTheme.colorScheme.onSurface
+            color = if (isDestructive) OrbitTheme.colors.danger else MaterialTheme.colorScheme.onSurface
         )
     }
 }

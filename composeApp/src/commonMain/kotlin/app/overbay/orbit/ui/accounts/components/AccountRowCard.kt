@@ -136,7 +136,7 @@ fun AccountRowCard(
                     text = if (pct != null) "$pct% of ${MoneyUtils.formatCents(limit)}" else "Limit ${MoneyUtils.formatCents(limit)}",
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = 11.sp,
-                    color = if (pct != null && pct > 30) colors.expense else MaterialTheme.colorScheme.outline
+                    color = if (pct != null && pct > 30) colors.danger else MaterialTheme.colorScheme.outline
                 )
             }
         }
@@ -245,7 +245,7 @@ fun AccountRowCard(
                     )
                     HorizontalDivider()
                     DropdownMenuItem(
-                        text = { Text("Delete", color = colors.expense) },
+                        text = { Text("Delete", color = colors.danger) },
                         onClick = { menuExpanded = false; onDelete() }
                     )
                 }

@@ -71,7 +71,7 @@ fun BudgetSummaryHeroCard(
                         style = MaterialTheme.typography.displayMedium.copy(
                             fontSize = 34.sp,
                             lineHeight = 40.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontWeight = FontWeight.Bold
                         ),
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -94,7 +94,7 @@ fun BudgetSummaryHeroCard(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     ),
-                    color = if (isOverBudget) colors.expense else colors.income
+                    color = if (isOverBudget) colors.danger else colors.income
                 )
             }
 
@@ -119,7 +119,7 @@ fun BudgetSummaryHeroCard(
                     label = "BUDGETED",
                     primaryText = "${MoneyUtils.formatCents(spentInBudget)} / ${MoneyUtils.formatCents(totalBudgeted)}",
                     subText = "$budgetPercent% used",
-                    subTextColor = if (spentInBudget > totalBudgeted && totalBudgeted > 0L) colors.expense else MaterialTheme.colorScheme.onSurfaceVariant,
+                    subTextColor = if (spentInBudget > totalBudgeted && totalBudgeted > 0L) colors.danger else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -142,7 +142,7 @@ fun BudgetSummaryHeroCard(
                 SnapshotStatTile(
                     label = "CASH FLOW",
                     primaryText = MoneyUtils.formatCents(netCashflow, signed = true),
-                    primaryColor = if (netCashflow >= 0L) colors.income else colors.expense,
+                    primaryColor = if (netCashflow >= 0L) colors.income else colors.danger,
                     subText = "${MoneyUtils.formatCents(totalIncome)} income",
                     modifier = Modifier.weight(1f)
                 )

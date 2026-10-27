@@ -154,7 +154,7 @@ private fun ReviewLaunchGraphic(
         // Left ghost card (-17dp X, -22deg, danger soft background)
         Surface(
             shape = cardShape,
-            color = colors.expense.copy(alpha = 0.14f),
+            color = colors.danger.copy(alpha = 0.14f),
             border = BorderStroke(1.dp, cardBorderColor),
             shadowElevation = 1.dp,
             modifier = Modifier

@@ -64,7 +64,7 @@ fun BudgetCategoryRow(
     val isWatch = item.paceStatus == BudgetPaceStatus.WATCH
 
     val statusColor = when {
-        isOverBudget -> colors.expense
+        isOverBudget -> colors.danger
         isWatch -> colors.warning
         else -> colors.income
     }
@@ -248,7 +248,7 @@ fun BudgetCategoryRow(
                                         },
                                         shape = CircleShape,
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                        border = BorderStroke(1.dp, colors.expense),
+                                        border = BorderStroke(1.dp, colors.danger),
                                         modifier = Modifier.height(32.dp)
                                     ) {
                                         Text(
@@ -256,7 +256,7 @@ fun BudgetCategoryRow(
                                             style = MaterialTheme.typography.labelSmall,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = colors.expense
+                                            color = colors.danger
                                         )
                                     }
                                 }

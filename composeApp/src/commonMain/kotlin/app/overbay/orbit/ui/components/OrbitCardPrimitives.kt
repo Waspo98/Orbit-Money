@@ -45,7 +45,7 @@ fun OrbitPillProgressBar(
 ) {
     val clampedPercent = percent.coerceIn(0f, 1f)
     val fillColor = customFillColor ?: if (overBudget) {
-        OrbitTheme.colors.expense
+        OrbitTheme.colors.danger
     } else if (percent >= 0.85f) {
         OrbitTheme.colors.warning
     } else {
@@ -67,7 +67,8 @@ fun OrbitPillProgressBar(
 }
 
 /**
- * Recreates `.dash-mini-stat-row` with left label (plus optional detail) and right tabular bold value.
+ * Recreates `.dash-mini-stat-row` and `.dash-balance-row` with muted left label
+ * (plus optional detail) and right tabular bold value, plus optional 1dp top border.
  */
 @Composable
 fun OrbitMiniStatRow(
@@ -75,44 +76,53 @@ fun OrbitMiniStatRow(
     value: String,
     modifier: Modifier = Modifier,
     detail: String? = null,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    showTopDivider: Boolean = false
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f, fill = false)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (showTopDivider) {
+            HorizontalDivider(
+                thickness = 1.dp,
+                color = OrbitTheme.colors.cardBorder
             )
-            if (detail != null) {
-                Spacer(modifier = Modifier.height(1.dp))
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 7.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f, fill = false)) {
                 Text(
-                    text = detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.sp,
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (detail != null) {
+                    Spacer(modifier = Modifier.height(1.dp))
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Text(
+                text = value,
+                style = TabularNumStyle.copy(
+                    fontSize = 14.5.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = valueColor
+            )
         }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Text(
-            text = value,
-            style = TabularNumStyle.copy(
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            ),
-            color = valueColor
-        )
     }
 }
 
@@ -144,11 +154,11 @@ fun OrbitCompactListRow(
             Modifier
                 .fillMaxWidth()
                 .clickable { onClick() }
-                .padding(vertical = 9.dp)
+                .padding(vertical = 10.dp)
         } else {
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 9.dp)
+                .padding(vertical = 10.dp)
         }
 
         Row(
@@ -164,18 +174,18 @@ fun OrbitCompactListRow(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontSize = 13.sp,
+                    fontSize = 14.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 if (subtitle != null) {
-                    Spacer(modifier = Modifier.height(1.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -189,17 +199,17 @@ fun OrbitCompactListRow(
                 Text(
                     text = amount,
                     style = TabularNumStyle.copy(
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.SemiBold
                     ),
                     color = amountColor
                 )
                 if (amountDetail != null) {
-                    Spacer(modifier = Modifier.height(1.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = amountDetail,
                         style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
