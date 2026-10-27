@@ -72,9 +72,9 @@ fun OrbitSectionCard(
                             Text(
                                 text = title.uppercase(),
                                 style = MaterialTheme.typography.labelSmall,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.8.sp,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.9.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

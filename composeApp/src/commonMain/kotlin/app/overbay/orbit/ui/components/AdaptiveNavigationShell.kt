@@ -115,13 +115,14 @@ fun AdaptiveNavigationShell(
                             },
                             label = {
                                 Text(
-                                    text = tab.title.uppercase(),
+                                    text = tab.title,
+                                    style = MaterialTheme.typography.labelSmall,
                                     maxLines = 1,
                                     softWrap = false,
                                     overflow = TextOverflow.Visible,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    letterSpacing = 0.5.sp
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    letterSpacing = (-0.1).sp
                                 )
                             },
                             colors = itemColors
@@ -144,13 +145,14 @@ fun AdaptiveNavigationShell(
                         },
                         label = {
                             Text(
-                                text = "MORE",
+                                text = "More",
+                                style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1,
                                 softWrap = false,
                                 overflow = TextOverflow.Visible,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.5.sp
+                                fontSize = 11.sp,
+                                fontWeight = if (isSecondaryRoute) FontWeight.Bold else FontWeight.Medium,
+                                letterSpacing = (-0.1).sp
                             )
                         },
                         colors = itemColors

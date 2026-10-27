@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
-import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.dashboard.CashflowHeroState
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -96,8 +95,8 @@ private fun MonthStatColumn(
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = amount,
-            style = TabularNumStyle.copy(
-                fontSize = 17.sp,
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             ),
             color = color

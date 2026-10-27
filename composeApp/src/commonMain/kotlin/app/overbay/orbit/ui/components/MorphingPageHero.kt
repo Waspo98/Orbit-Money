@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.layout.*
@@ -150,8 +151,8 @@ fun MorphingPageHero(
     var colToolbarWidthPx by remember { mutableFloatStateOf(with(density) { 100.dp.toPx() }) }
     var colToolbarHeightPx by remember { mutableFloatStateOf(with(density) { 32.dp.toPx() }) }
 
-    val expandedFontSize = if (title.length > 17) 28.sp else 32.sp
-    val collapsedTitleScale = 19f / expandedFontSize.value
+    val expandedFontSize = if (title.length > 17) 26.sp else 30.sp
+    val collapsedTitleScale = 18.5f / expandedFontSize.value
     val titleScale = lerp(1f, collapsedTitleScale, fraction)
 
     val extraMorphSlotPx = when {
@@ -235,18 +236,19 @@ fun MorphingPageHero(
 
                 Column(modifier = Modifier.weight(1f)) {
                     if (kicker != null) {
+                        val kickerTint = lerp(canopyColors.onCanopy, canopyColors.heroStatGood, 0.32f).copy(alpha = 0.84f)
                         Text(
                             text = kicker.uppercase(),
                             style = MaterialTheme.typography.labelSmall,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
-                            color = canopyColors.onCanopy.copy(alpha = 0.72f),
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.4.sp,
+                            color = kickerTint,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.graphicsLayer { alpha = secondaryAlpha; translationY = -fraction * 12f }
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
                     }
 
                     if (heroContent != null) {
@@ -264,9 +266,9 @@ fun MorphingPageHero(
                             text = title,
                             style = MaterialTheme.typography.displayMedium,
                             fontSize = expandedFontSize,
-                            lineHeight = (expandedFontSize.value + 4f).sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-0.8).sp,
+                            lineHeight = (expandedFontSize.value + 6f).sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-0.45).sp,
                             color = canopyColors.onCanopy,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -288,12 +290,14 @@ fun MorphingPageHero(
                     }
 
                     if (subtitle != null) {
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
                         Text(
                             text = subtitle,
                             style = MaterialTheme.typography.bodyMedium,
-                            fontSize = 13.sp,
-                            color = canopyColors.onCanopy.copy(alpha = 0.85f),
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = (-0.1).sp,
+                            color = canopyColors.onCanopy.copy(alpha = 0.84f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.graphicsLayer { alpha = secondaryAlpha; translationY = -fraction * 12f }

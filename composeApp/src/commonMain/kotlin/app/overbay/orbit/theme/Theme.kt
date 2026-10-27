@@ -234,12 +234,14 @@ fun OrbitTheme(
         getPresetCustomColors(themePreset, darkTheme)
     }
 
+    val typography = rememberOrbitTypography()
+
     CompositionLocalProvider(
         LocalCustomThemeColors provides customColors
     ) {
         MaterialTheme(
             colorScheme = finalColorScheme,
-            typography = OrbitTypography,
+            typography = typography,
             content = content
         )
     }

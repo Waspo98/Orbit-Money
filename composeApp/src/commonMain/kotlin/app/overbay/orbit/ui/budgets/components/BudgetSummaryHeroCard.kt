@@ -68,9 +68,10 @@ fun BudgetSummaryHeroCard(
                 Column {
                     Text(
                         text = MoneyUtils.formatCents(totalSpent),
-                        style = TabularNumStyle.copy(
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontSize = 34.sp,
+                            lineHeight = 40.sp,
+                            fontWeight = FontWeight.ExtraBold
                         ),
                         color = MaterialTheme.colorScheme.onSurface
                     )

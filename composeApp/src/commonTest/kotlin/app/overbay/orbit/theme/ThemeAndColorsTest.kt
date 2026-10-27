@@ -89,6 +89,10 @@ class ThemeAndColorsTest {
         assertEquals("tnum", TabularNumStyle.fontFeatureSettings)
         assertEquals("tnum", OrbitTypography.displayLarge.fontFeatureSettings)
         assertEquals("tnum", OrbitTypography.headlineMedium.fontFeatureSettings)
+        assertEquals("tnum", OrbitTypography.titleLarge.fontFeatureSettings)
         assertEquals("tnum", OrbitTypography.labelMedium.fontFeatureSettings)
+        assertTrue(OrbitTypography.bodyLarge.letterSpacing.value <= 0f)
+        assertTrue(OrbitTypography.bodyMedium.letterSpacing.value <= 0f)
+        assertTrue(OrbitTypography.titleMedium.letterSpacing.value <= 0f)
     }
 }
