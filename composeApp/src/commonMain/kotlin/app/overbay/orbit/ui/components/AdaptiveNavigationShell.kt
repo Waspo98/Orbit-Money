@@ -115,14 +115,14 @@ fun AdaptiveNavigationShell(
                             },
                             label = {
                                 Text(
-                                    text = tab.title,
+                                    text = tab.title.uppercase(),
                                     style = MaterialTheme.typography.labelSmall,
                                     maxLines = 1,
                                     softWrap = false,
                                     overflow = TextOverflow.Visible,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                    letterSpacing = (-0.1).sp
+                                    fontSize = 10.5.sp,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                    letterSpacing = 0.3.sp
                                 )
                             },
                             colors = itemColors
@@ -145,14 +145,14 @@ fun AdaptiveNavigationShell(
                         },
                         label = {
                             Text(
-                                text = "More",
+                                text = "MORE",
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1,
                                 softWrap = false,
                                 overflow = TextOverflow.Visible,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSecondaryRoute) FontWeight.Bold else FontWeight.Medium,
-                                letterSpacing = (-0.1).sp
+                                fontSize = 10.5.sp,
+                                fontWeight = if (isSecondaryRoute) FontWeight.SemiBold else FontWeight.Medium,
+                                letterSpacing = 0.3.sp
                             )
                         },
                         colors = itemColors

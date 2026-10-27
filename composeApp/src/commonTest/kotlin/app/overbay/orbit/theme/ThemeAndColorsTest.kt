@@ -88,7 +88,7 @@ class ThemeAndColorsTest {
 
     @Test
     fun testTabularNumStyleHasTnumFeatureSetting() {
-        assertEquals("tnum", TabularNumStyle.fontFeatureSettings)
+        assertEquals("tnum", DefaultTabularNumStyle.fontFeatureSettings)
         assertEquals("tnum", OrbitTypography.displayLarge.fontFeatureSettings)
         assertEquals("tnum", OrbitTypography.headlineMedium.fontFeatureSettings)
         assertEquals("tnum", OrbitTypography.titleLarge.fontFeatureSettings)

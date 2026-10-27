@@ -58,7 +58,8 @@ fun AccountsOverviewCard(
             Text(
                 text = MoneyUtils.formatCents(accounts.totalNetWorthCents, showCents = true),
                 style = TabularNumStyle.copy(
-                    fontSize = 28.sp,
+                    fontSize = 27.sp,
+                    lineHeight = 32.sp,
                     fontWeight = FontWeight.Bold
                 ),
                 color = if (accounts.totalNetWorthCents >= 0L) colors.income else colors.expense
@@ -67,7 +68,7 @@ fun AccountsOverviewCard(
                 text = "Across ${accounts.accountCount} ${if (accounts.accountCount == 1) "account" else "accounts"}",
                 style = MaterialTheme.typography.bodySmall,
                 fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.outline
             )
 
             Spacer(modifier = Modifier.height(10.dp))

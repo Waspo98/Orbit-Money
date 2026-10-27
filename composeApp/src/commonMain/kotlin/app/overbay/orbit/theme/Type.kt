@@ -1,7 +1,9 @@
 package app.overbay.orbit.theme
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -40,13 +42,25 @@ fun rememberBodyFontFamily(): FontFamily = FontFamily(
 )
 
 /**
- * Tabular numeral style helper ensuring financial figures and rolling tickers never jitter horizontally.
- * Inherits the active theme font family (Inter Tight inside OrbitTheme) while enforcing OpenType 'tnum'.
+ * Non-composable fallback tabular numeral style for unit tests.
  */
-val TabularNumStyle = TextStyle(
+val DefaultTabularNumStyle = TextStyle(
     fontFeatureSettings = "tnum",
     letterSpacing = 0.sp
 )
+
+/**
+ * Tabular numeral style helper ensuring financial figures and rolling tickers never jitter horizontally.
+ * Crucially reads [MaterialTheme.typography.bodyLarge] so passing `style = TabularNumStyle.copy(...)`
+ * to `Text(...)` preserves the active `Inter Tight` fontFamily instead of resetting `fontFamily` to null (Roboto).
+ */
+val TabularNumStyle: TextStyle
+    @Composable
+    @ReadOnlyComposable
+    get() = MaterialTheme.typography.bodyLarge.copy(
+        fontFeatureSettings = "tnum",
+        letterSpacing = 0.sp
+    )
 
 /**
  * Builds the Orbit Money typography scale matching main branch DM Sans titles & Inter Tight body.

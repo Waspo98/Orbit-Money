@@ -45,7 +45,7 @@ fun OrbitPillProgressBar(
 ) {
     val clampedPercent = percent.coerceIn(0f, 1f)
     val fillColor = customFillColor ?: if (overBudget) {
-        OrbitTheme.colors.danger
+        OrbitTheme.colors.expense
     } else if (percent >= 0.85f) {
         OrbitTheme.colors.warning
     } else {
@@ -89,7 +89,7 @@ fun OrbitMiniStatRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 7.dp),
+                .padding(vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -97,8 +97,8 @@ fun OrbitMiniStatRow(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (detail != null) {
@@ -117,8 +117,8 @@ fun OrbitMiniStatRow(
             Text(
                 text = value,
                 style = TabularNumStyle.copy(
-                    fontSize = 14.5.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
                 ),
                 color = valueColor
             )

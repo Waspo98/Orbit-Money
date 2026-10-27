@@ -68,18 +68,20 @@ fun BudgetPulseCard(
                     Column {
                         Text(
                             text = "${MoneyUtils.formatCents(summary.totalSpentCents)} of ${MoneyUtils.formatCents(summary.totalBudgetedCents)} used",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            style = TabularNumStyle.copy(
+                                fontSize = 14.25.sp,
+                                fontWeight = FontWeight.Normal
+                            ),
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     Text(
                         text = "${summary.percentUsed}%",
                         style = TabularNumStyle.copy(
-                            fontSize = 18.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         ),
-                        color = if (summary.isOverBudget) colors.danger else if (summary.percentUsed >= 85) colors.warning else colors.income
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
 
@@ -97,15 +99,15 @@ fun BudgetPulseCard(
                 // Daily Spend Pace Row
                 if (summary.isOverBudget) {
                     OrbitMiniStatRow(
-                        label = "Over Budget",
-                        detail = "${summary.daysRemaining} days left in month",
-                        value = MoneyUtils.formatCents(summary.overBudgetCents),
-                        valueColor = colors.danger
+                        label = "Daily Spend Remaining",
+                        detail = "${summary.daysRemaining} days left",
+                        value = "${MoneyUtils.formatCents(summary.overBudgetCents)} over",
+                        valueColor = colors.expense
                     )
                 } else {
                     OrbitMiniStatRow(
                         label = "Daily Spend Remaining",
-                        detail = "${summary.daysRemaining} days left in month",
+                        detail = "${summary.daysRemaining} days left",
                         value = "${MoneyUtils.formatCents(summary.dailySafeSpendCents)} / day",
                         valueColor = MaterialTheme.colorScheme.onSurface
                     )
@@ -132,7 +134,7 @@ fun BudgetPulseCard(
                         OrbitMiniStatRow(
                             label = item.category.name,
                             value = alertText,
-                            valueColor = if (isOver) colors.danger else colors.warning,
+                            valueColor = if (isOver) colors.expense else colors.warning,
                             showTopDivider = index > 0
                         )
                     }
