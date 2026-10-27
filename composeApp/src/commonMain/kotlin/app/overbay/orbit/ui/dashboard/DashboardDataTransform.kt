@@ -34,7 +34,7 @@ object DashboardDataTransform {
         focusedGoalId: Long?,
         retirementAge: Int,
         retirementPreset: String,
-        isReviewModalOpen: Boolean
+        categorizeReview: CategorizeReviewState
     ): DashboardUiState {
         val today = LocalDateUtils.todayLocalDate()
         val todayIso = LocalDateUtils.formatIsoDate(today)
@@ -526,7 +526,12 @@ object DashboardDataTransform {
             daysRemaining = daysRemaining,
             selectedMonth = selectedMonth,
             mhaEnabled = snapshot.preferences.mhaTrackerEnabled,
-            isReviewModalOpen = isReviewModalOpen,
+            isReviewModalOpen = categorizeReview.isOpen,
+            categorizeReview = categorizeReview.copy(
+                categories = snapshot.categories,
+                accounts = snapshot.accounts,
+                allTransactions = snapshot.transactions
+            ),
             cashflow = cashflowState,
             budgetPulse = budgetPulseState,
             topSpending = topSpendingState,

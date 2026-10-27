@@ -66,30 +66,7 @@ fun DashboardScreen(
 
     DashboardScreen(
         uiState = uiState,
-        onAction = { action ->
-            when (action) {
-                DashboardAction.Refresh -> viewModel.refresh()
-                DashboardAction.PreviousMonth -> viewModel.onPreviousMonth()
-                DashboardAction.NextMonth -> viewModel.onNextMonth()
-                DashboardAction.OpenCustomizeSheet -> viewModel.openCustomization()
-                DashboardAction.CloseCustomizeSheet -> viewModel.closeCustomization()
-                is DashboardAction.ToggleCardVisibility -> viewModel.toggleCardVisibility(action.cardType)
-                is DashboardAction.SetCardWideSpan -> viewModel.setCardWideSpan(action.cardType, action.wideSpan)
-                is DashboardAction.MoveCard -> viewModel.moveCard(action.fromIndex, action.toIndex)
-                is DashboardAction.MoveCardUp -> viewModel.moveCardUp(action.cardType)
-                is DashboardAction.MoveCardDown -> viewModel.moveCardDown(action.cardType)
-                DashboardAction.ResetCardsToDefault -> viewModel.resetCardsToDefault()
-                is DashboardAction.MarkBillPaid -> viewModel.markUpcomingPaid(action.upcomingItemId, action.dueDateIso)
-                is DashboardAction.HideBiggestTransaction -> viewModel.hideBiggestTransaction(action.transactionId)
-                DashboardAction.ResetHiddenBiggestTransactions -> viewModel.resetHiddenBiggestTransactions()
-                is DashboardAction.SetGoalFocus -> viewModel.setGoalFocus(action.goalId)
-                is DashboardAction.SetRetirementAge -> viewModel.setRetirementAge(action.age)
-                is DashboardAction.SetRetirementPreset -> viewModel.setRetirementPreset(action.presetKey)
-                DashboardAction.OpenCategorizeReview -> viewModel.openCategorizeReview()
-                DashboardAction.CloseCategorizeReview -> viewModel.closeCategorizeReview()
-                is DashboardAction.ApplyCategory -> viewModel.applyCategory(action.transactionId, action.categoryId)
-            }
-        },
+        onAction = viewModel::onAction,
         onNavigate = onNavigate,
         modifier = modifier
     )
@@ -256,13 +233,8 @@ fun DashboardScreen(
             )
         }
 
-        // Category Review Bottom Sheet
         if (uiState.isReviewModalOpen) {
-            TransactionReviewSheet(
-                transactions = uiState.uncategorized.transactions,
-                onApplyCategory = { txnId, catId -> onAction(DashboardAction.ApplyCategory(txnId, catId)) },
-                onDismiss = { onAction(DashboardAction.CloseCategorizeReview) }
-            )
+            TransactionReviewSheet(state = uiState.categorizeReview, onAction = onAction)
         }
     }
 }

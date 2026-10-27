@@ -7,8 +7,12 @@ import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.DashboardWidgetConfig
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.OrbitPreferences
+import app.overbay.orbit.data.model.RuleCondition
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.domain.ReviewQueueEngine
+import app.overbay.orbit.domain.RuleMatcherEngine
 import app.overbay.orbit.domain.UpcomingEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,7 +39,7 @@ class DashboardViewModel(
     private val _focusedGoalId = MutableStateFlow<Long?>(null)
     private val _retirementAge = MutableStateFlow(67)
     private val _retirementPreset = MutableStateFlow("balanced")
-    private val _isReviewModalOpen = MutableStateFlow(false)
+    private val _reviewState = MutableStateFlow(CategorizeReviewState())
 
     val uiState: StateFlow<DashboardUiState> = combine(
         combine(
@@ -52,9 +56,9 @@ class DashboardViewModel(
             _focusedGoalId,
             _retirementAge,
             _retirementPreset,
-            _isReviewModalOpen
-        ) { hiddenBiggestIds, focusedGoalId, retirementAge, retirementPreset, isReviewModalOpen ->
-            TransformInput2(hiddenBiggestIds, focusedGoalId, retirementAge, retirementPreset, isReviewModalOpen)
+            _reviewState
+        ) { hiddenBiggestIds, focusedGoalId, retirementAge, retirementPreset, reviewState ->
+            TransformInput2(hiddenBiggestIds, focusedGoalId, retirementAge, retirementPreset, reviewState)
         }
     ) { input1, input2 ->
         DashboardDataTransform.buildDashboardUiState(
@@ -68,7 +72,7 @@ class DashboardViewModel(
             focusedGoalId = input2.focusedGoalId,
             retirementAge = input2.retirementAge,
             retirementPreset = input2.retirementPreset,
-            isReviewModalOpen = input2.isReviewModalOpen
+            categorizeReview = input2.reviewState
         )
     }.stateIn(
         scope = viewModelScope,
@@ -260,21 +264,224 @@ class DashboardViewModel(
     }
 
     fun openCategorizeReview() {
-        _isReviewModalOpen.value = true
+        loadReviewQueue(funMode = false)
     }
 
     fun closeCategorizeReview() {
-        _isReviewModalOpen.value = false
+        _reviewState.value = CategorizeReviewState(isOpen = false)
+    }
+
+    private fun loadReviewQueue(
+        funMode: Boolean,
+        handledOverride: Set<Long>? = null
+    ) {
+        val snap = repository.snapshot.value
+        val excluded = handledOverride ?: snap.preferences.handledReviewTransactionIds.toSet()
+        val items = ReviewQueueEngine.buildReviewQueue(
+            transactions = snap.transactions,
+            categories = snap.categories,
+            accounts = snap.accounts,
+            excludedIds = excluded,
+            funMode = funMode,
+            limit = 10
+        )
+        _reviewState.value = CategorizeReviewState(
+            isOpen = true,
+            funMode = funMode,
+            items = items,
+            currentIndex = 0,
+            batchReviewed = 0,
+            allDone = items.isEmpty(),
+            isCategoryPickerOpen = false,
+            pendingConfirmCategoryId = null,
+            ruleDraftTransaction = null
+        )
+    }
+
+    private suspend fun recordHandledReviewId(transactionId: Long): Set<Long> {
+        val currentPrefs = repository.preferences.value
+        val existing = currentPrefs.handledReviewTransactionIds
+        val updatedIds = if (transactionId in existing) existing else existing + transactionId
+        if (updatedIds != existing) {
+            repository.updatePreferences(currentPrefs.copy(handledReviewTransactionIds = updatedIds))
+        }
+        return updatedIds.toSet()
+    }
+
+    fun approveReviewTransaction() {
+        val state = _reviewState.value
+        val current = state.currentTxn ?: return
+        viewModelScope.launch {
+            recordHandledReviewId(current.id)
+        }
+        _reviewState.value = state.copy(
+            currentIndex = state.currentIndex + 1,
+            batchReviewed = state.batchReviewed + 1,
+            isCategoryPickerOpen = false,
+            pendingConfirmCategoryId = null,
+            ruleDraftTransaction = null
+        )
+    }
+
+    fun rejectReviewTransaction() {
+        val state = _reviewState.value
+        if (state.currentTxn == null) return
+        _reviewState.value = state.copy(
+            isCategoryPickerOpen = true,
+            pendingConfirmCategoryId = null
+        )
+    }
+
+    fun closeReviewCategoryPicker() {
+        val state = _reviewState.value
+        _reviewState.value = state.copy(
+            isCategoryPickerOpen = false,
+            pendingConfirmCategoryId = null
+        )
+    }
+
+    fun requestConfirmReviewCategory(categoryId: Long) {
+        val state = _reviewState.value
+        if (state.currentTxn == null) return
+        _reviewState.value = state.copy(pendingConfirmCategoryId = categoryId)
+    }
+
+    fun cancelConfirmReviewCategory() {
+        _reviewState.value = _reviewState.value.copy(pendingConfirmCategoryId = null)
+    }
+
+    fun confirmReviewCategory() {
+        val state = _reviewState.value
+        val current = state.currentTxn ?: return
+        val categoryId = state.pendingConfirmCategoryId ?: return
+        applyCategoryAndAdvance(current.id, categoryId)
     }
 
     fun applyCategory(transactionId: Long, categoryId: Long) {
+        applyCategoryAndAdvance(transactionId, categoryId)
+    }
+
+    private fun applyCategoryAndAdvance(transactionId: Long, categoryId: Long) {
+        val state = _reviewState.value
+        val category = repository.categories.value.find { it.id == categoryId }
+        val updatedItems = state.items.map { item ->
+            if (item.id == transactionId) {
+                item.copy(
+                    categoryId = categoryId,
+                    categoryName = category?.name ?: item.categoryName,
+                    categoryColor = category?.color ?: item.categoryColor,
+                    categoryIcon = category?.icon ?: item.categoryIcon
+                )
+            } else {
+                item
+            }
+        }
+        val shouldAdvance = state.currentTxn?.id == transactionId
+        _reviewState.value = state.copy(
+            items = updatedItems,
+            currentIndex = if (shouldAdvance) state.currentIndex + 1 else state.currentIndex,
+            batchReviewed = if (shouldAdvance) state.batchReviewed + 1 else state.batchReviewed,
+            isCategoryPickerOpen = false,
+            pendingConfirmCategoryId = null
+        )
         viewModelScope.launch {
-            val txn = repository.transactions.value.find { it.id == transactionId } ?: return@launch
-            val updated = txn.copy(
-                editedCategoryId = categoryId,
-                editSource = EditSource.USER
-            )
-            repository.saveTransaction(updated)
+            repository.editTransaction(id = transactionId, categoryId = categoryId)
+            recordHandledReviewId(transactionId)
+        }
+    }
+
+    fun skipReviewTransaction() {
+        approveReviewTransaction()
+    }
+
+    fun goBackReviewTransaction() {
+        val state = _reviewState.value
+        if (state.currentIndex <= 0) return
+        _reviewState.value = state.copy(
+            currentIndex = (state.currentIndex - 1).coerceAtLeast(0),
+            batchReviewed = (state.batchReviewed - 1).coerceAtLeast(0),
+            isCategoryPickerOpen = false,
+            pendingConfirmCategoryId = null
+        )
+    }
+
+    fun loadMoreReviewTransactions() {
+        loadReviewQueue(funMode = _reviewState.value.funMode)
+    }
+
+    fun startFunReviewMode() {
+        loadReviewQueue(funMode = true)
+    }
+
+    fun openReviewRuleCreator() {
+        val state = _reviewState.value
+        val current = state.currentTxn ?: return
+        _reviewState.value = state.copy(ruleDraftTransaction = current)
+    }
+
+    fun closeReviewRuleCreator() {
+        _reviewState.value = _reviewState.value.copy(ruleDraftTransaction = null)
+    }
+
+    fun saveReviewRule(rule: TransactionRule) {
+        val state = _reviewState.value
+        val current = state.currentTxn
+        _reviewState.value = state.copy(
+            currentIndex = if (current != null) state.currentIndex + 1 else state.currentIndex,
+            batchReviewed = if (current != null) state.batchReviewed + 1 else state.batchReviewed,
+            ruleDraftTransaction = null,
+            isCategoryPickerOpen = false,
+            pendingConfirmCategoryId = null
+        )
+        viewModelScope.launch {
+            repository.saveRule(rule)
+            repository.runRulesOnAllTransactions()
+            if (current != null) {
+                recordHandledReviewId(current.id)
+            }
+        }
+    }
+
+    fun previewRuleMatchCount(conditions: List<RuleCondition>): Int {
+        if (conditions.isEmpty()) return 0
+        return RuleMatcherEngine.countMatches(repository.transactions.value, conditions)
+    }
+
+    fun onAction(action: DashboardAction) {
+        when (action) {
+            DashboardAction.Refresh -> refresh()
+            DashboardAction.PreviousMonth -> onPreviousMonth()
+            DashboardAction.NextMonth -> onNextMonth()
+            DashboardAction.OpenCustomizeSheet -> openCustomization()
+            DashboardAction.CloseCustomizeSheet -> closeCustomization()
+            is DashboardAction.ToggleCardVisibility -> toggleCardVisibility(action.cardType)
+            is DashboardAction.SetCardWideSpan -> setCardWideSpan(action.cardType, action.wideSpan)
+            is DashboardAction.MoveCard -> moveCard(action.fromIndex, action.toIndex)
+            is DashboardAction.MoveCardUp -> moveCardUp(action.cardType)
+            is DashboardAction.MoveCardDown -> moveCardDown(action.cardType)
+            DashboardAction.ResetCardsToDefault -> resetCardsToDefault()
+            is DashboardAction.MarkBillPaid -> markUpcomingPaid(action.upcomingItemId, action.dueDateIso)
+            is DashboardAction.HideBiggestTransaction -> hideBiggestTransaction(action.transactionId)
+            DashboardAction.ResetHiddenBiggestTransactions -> resetHiddenBiggestTransactions()
+            is DashboardAction.SetGoalFocus -> setGoalFocus(action.goalId)
+            is DashboardAction.SetRetirementAge -> setRetirementAge(action.age)
+            is DashboardAction.SetRetirementPreset -> setRetirementPreset(action.presetKey)
+            DashboardAction.OpenCategorizeReview -> openCategorizeReview()
+            DashboardAction.CloseCategorizeReview -> closeCategorizeReview()
+            is DashboardAction.ApplyCategory -> applyCategory(action.transactionId, action.categoryId)
+            DashboardAction.ApproveReviewTransaction -> approveReviewTransaction()
+            DashboardAction.RejectReviewTransaction -> rejectReviewTransaction()
+            DashboardAction.CloseReviewCategoryPicker -> closeReviewCategoryPicker()
+            is DashboardAction.RequestConfirmReviewCategory -> requestConfirmReviewCategory(action.categoryId)
+            DashboardAction.CancelConfirmReviewCategory -> cancelConfirmReviewCategory()
+            DashboardAction.ConfirmReviewCategory -> confirmReviewCategory()
+            DashboardAction.SkipReviewTransaction -> skipReviewTransaction()
+            DashboardAction.GoBackReviewTransaction -> goBackReviewTransaction()
+            DashboardAction.LoadMoreReviewTransactions -> loadMoreReviewTransactions()
+            DashboardAction.StartFunReviewMode -> startFunReviewMode()
+            DashboardAction.OpenReviewRuleCreator -> openReviewRuleCreator()
+            DashboardAction.CloseReviewRuleCreator -> closeReviewRuleCreator()
+            is DashboardAction.SaveReviewRule -> saveReviewRule(action.rule)
         }
     }
 
@@ -291,6 +498,6 @@ class DashboardViewModel(
         val focusedGoalId: Long?,
         val retirementAge: Int,
         val retirementPreset: String,
-        val isReviewModalOpen: Boolean
+        val reviewState: CategorizeReviewState
     )
 }

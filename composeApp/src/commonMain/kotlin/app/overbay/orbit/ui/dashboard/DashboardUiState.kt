@@ -1,8 +1,13 @@
 package app.overbay.orbit.ui.dashboard
 
+import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.BudgetPaceStatus
+import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
+import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.ReviewQueueCandidate
 
 /**
  * Enumeration of all 16 customizable dashboard cards from original Orbit Money.
@@ -280,6 +285,24 @@ data class DashboardCustomizationState(
     val cardConfigs: List<DashboardCardConfigItem> = emptyList()
 )
 
+data class CategorizeReviewState(
+    val isOpen: Boolean = false,
+    val funMode: Boolean = false,
+    val items: List<ReviewQueueCandidate> = emptyList(),
+    val currentIndex: Int = 0,
+    val batchReviewed: Int = 0,
+    val allDone: Boolean = false,
+    val isCategoryPickerOpen: Boolean = false,
+    val pendingConfirmCategoryId: Long? = null,
+    val ruleDraftTransaction: ReviewQueueCandidate? = null,
+    val categories: List<Category> = emptyList(),
+    val accounts: List<Account> = emptyList(),
+    val allTransactions: List<Transaction> = emptyList()
+) {
+    val currentTxn: ReviewQueueCandidate? get() = items.getOrNull(currentIndex)
+    val isBatchComplete: Boolean get() = batchReviewed >= 10 || (currentTxn == null && items.isNotEmpty())
+}
+
 data class DashboardUiState(
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
@@ -292,6 +315,7 @@ data class DashboardUiState(
     val selectedMonth: String = "",
     val mhaEnabled: Boolean = false,
     val isReviewModalOpen: Boolean = false,
+    val categorizeReview: CategorizeReviewState = CategorizeReviewState(),
     val cashflow: CashflowHeroState = CashflowHeroState(),
     val budgetPulse: BudgetPulseState = BudgetPulseState(),
     val topSpending: TopSpendingState = TopSpendingState(),
@@ -340,4 +364,17 @@ sealed interface DashboardAction {
     data object OpenCategorizeReview : DashboardAction
     data object CloseCategorizeReview : DashboardAction
     data class ApplyCategory(val transactionId: Long, val categoryId: Long) : DashboardAction
+    data object ApproveReviewTransaction : DashboardAction
+    data object RejectReviewTransaction : DashboardAction
+    data object CloseReviewCategoryPicker : DashboardAction
+    data class RequestConfirmReviewCategory(val categoryId: Long) : DashboardAction
+    data object CancelConfirmReviewCategory : DashboardAction
+    data object ConfirmReviewCategory : DashboardAction
+    data object SkipReviewTransaction : DashboardAction
+    data object GoBackReviewTransaction : DashboardAction
+    data object LoadMoreReviewTransactions : DashboardAction
+    data object StartFunReviewMode : DashboardAction
+    data object OpenReviewRuleCreator : DashboardAction
+    data object CloseReviewRuleCreator : DashboardAction
+    data class SaveReviewRule(val rule: TransactionRule) : DashboardAction
 }

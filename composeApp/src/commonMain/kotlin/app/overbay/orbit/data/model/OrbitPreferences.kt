@@ -44,6 +44,7 @@ data class OrbitPreferences(
     val lastGoogleDriveSyncAt: String? = null,
     val simpleFinToken: String? = null,
     val dashboardWidgets: List<DashboardWidgetConfig> = defaultDashboardWidgets(),
+    val handledReviewTransactionIds: List<Long> = emptyList(),
     val onboardingCompleted: Boolean = false
 ) {
     companion object {
