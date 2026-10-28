@@ -42,6 +42,7 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.network.MerchantLogoCandidateDto
 import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.transactions.components.MerchantLogoImageCache
 import app.overbay.orbit.util.LocalOrbitHaptics
 import io.ktor.http.encodeURLQueryComponent
@@ -65,7 +66,6 @@ fun MerchantLogoFinderDialog(
     val haptics = LocalOrbitHaptics.current
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val initialQuery = remember(transaction.id) {
         transaction.effectiveMerchant.ifBlank { transaction.merchantLogo?.merchantName ?: "" }
@@ -116,10 +116,8 @@ fun MerchantLogoFinderDialog(
         }
     }
 
-    ModalBottomSheet(
+    OrbitModalSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(

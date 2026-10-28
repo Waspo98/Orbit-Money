@@ -84,104 +84,93 @@ fun DashboardCustomizeSheet(
     var rowHeightPx by remember { mutableFloatStateOf(160f) }
     val currentCards by rememberUpdatedState(cards)
 
-    Dialog(
+    app.overbay.orbit.ui.components.OrbitModalSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
-        Surface(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 24.dp)
-                .widthIn(max = 640.dp),
-            shape = RoundedCornerShape(22.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-            tonalElevation = 6.dp,
-            shadowElevation = 12.dp
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Customize Dashboard",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = { haptics.tick(); onReset() }) {
-                            Text("Reset", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                        }
-                        IconButton(onClick = { haptics.tick(); onDismiss() }, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Customize Dashboard",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { haptics.tick(); onReset() }) {
+                        Text("Reset", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(onClick = { haptics.tick(); onDismiss() }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+            Spacer(modifier = Modifier.height(12.dp))
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 480.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    cards.forEachIndexed { index, config ->
-                        val isDragging = draggingIndex == index
-                        CustomizeCardRow(
-                            config = config,
-                            showWidthPicker = showWidthPicker,
-                            isRightPlacement = standardPlacements[config.type] == true,
-                            isDragging = isDragging,
-                            dragOffsetY = if (isDragging) dragOffsetY else 0f,
-                            onMeasuredHeight = { h -> if (h > 0) rowHeightPx = h.toFloat() },
-                            onDragStart = {
-                                haptics.tick()
-                                draggingIndex = index
-                                dragOffsetY = 0f
-                            },
-                            onDragDelta = { dy ->
-                                if (draggingIndex in currentCards.indices) {
-                                    dragOffsetY += dy
-                                    val step = (rowHeightPx + 16f).coerceAtLeast(80f)
-                                    val indexShift = (dragOffsetY / step).roundToInt()
-                                    val targetIndex = (draggingIndex + indexShift).coerceIn(0, currentCards.lastIndex)
-                                    if (targetIndex != draggingIndex) {
-                                        haptics.tick()
-                                        onMoveCard(draggingIndex, targetIndex)
-                                        dragOffsetY -= (targetIndex - draggingIndex) * step
-                                        draggingIndex = targetIndex
-                                    }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                cards.forEachIndexed { index, config ->
+                    val isDragging = draggingIndex == index
+                    CustomizeCardRow(
+                        config = config,
+                        showWidthPicker = showWidthPicker,
+                        isRightPlacement = standardPlacements[config.type] == true,
+                        isDragging = isDragging,
+                        dragOffsetY = if (isDragging) dragOffsetY else 0f,
+                        onMeasuredHeight = { h -> if (h > 0) rowHeightPx = h.toFloat() },
+                        onDragStart = {
+                            haptics.tick()
+                            draggingIndex = index
+                            dragOffsetY = 0f
+                        },
+                        onDragDelta = { dy ->
+                            if (draggingIndex in currentCards.indices) {
+                                dragOffsetY += dy
+                                val step = (rowHeightPx + 16f).coerceAtLeast(80f)
+                                val indexShift = (dragOffsetY / step).roundToInt()
+                                val targetIndex = (draggingIndex + indexShift).coerceIn(0, currentCards.lastIndex)
+                                if (targetIndex != draggingIndex) {
+                                    haptics.tick()
+                                    onMoveCard(draggingIndex, targetIndex)
+                                    dragOffsetY -= (targetIndex - draggingIndex) * step
+                                    draggingIndex = targetIndex
                                 }
-                            },
-                            onDragEnd = {
-                                draggingIndex = -1
-                                dragOffsetY = 0f
-                            },
-                            onToggle = { haptics.tap(); onToggleVisibility(config.type) },
-                            onWideSpanChange = { span -> haptics.tick(); onSetWideSpan(config.type, span) }
-                        )
-                    }
+                            }
+                        },
+                        onDragEnd = {
+                            draggingIndex = -1
+                            dragOffsetY = 0f
+                        },
+                        onToggle = { haptics.tap(); onToggleVisibility(config.type) },
+                        onWideSpanChange = { span -> haptics.tick(); onSetWideSpan(config.type, span) }
+                    )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+            Spacer(modifier = Modifier.height(14.dp))
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    Button(
-                        onClick = { haptics.confirm(); onDismiss() },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.height(42.dp)
-                    ) {
-                        Text("Done", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Button(
+                    onClick = { haptics.confirm(); onDismiss() },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(42.dp)
+                ) {
+                    Text("Done", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 }
             }
         }

@@ -33,27 +33,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitModalSheet
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HouseholdMemberEditorSheet(
     member: HouseholdMember?,
     onDismiss: () -> Unit,
     onSave: (HouseholdMember) -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    OrbitModalSheet(
+        onDismissRequest = onDismiss
     ) {
         HouseholdMemberEditorContent(
             member = member,
             onDismiss = onDismiss,
-            onSave = onSave,
-            modifier = Modifier.navigationBarsPadding()
+            onSave = onSave
         )
     }
 }

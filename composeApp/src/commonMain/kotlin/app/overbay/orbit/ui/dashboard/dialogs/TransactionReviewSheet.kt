@@ -96,106 +96,96 @@ fun TransactionReviewSheet(
         else -> ""
     }
 
-    Dialog(
+    app.overbay.orbit.ui.components.OrbitModalSheet(
         onDismissRequest = { onAction(DashboardAction.CloseCategorizeReview) },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, colors.cardBorder),
-            shadowElevation = 12.dp,
-            modifier = modifier
-                .widthIn(max = 520.dp)
+        Column(
+            modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 24.dp)
+                .padding(20.dp)
+                .verticalScroll(rememberScrollState())
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState())
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Is this category correct?",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, colors.cardBorder),
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .clickable {
-                                haptics.tick()
-                                onAction(DashboardAction.CloseCategorizeReview)
-                            }
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text("x", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = "Is this category correct?",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, colors.cardBorder),
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .clickable {
+                            haptics.tick()
+                            onAction(DashboardAction.CloseCategorizeReview)
                         }
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Text("x", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = colors.cardBorder)
-                Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = colors.cardBorder)
+            Spacer(modifier = Modifier.height(14.dp))
 
-                when {
-                    state.allDone -> ReviewEmptyStateContent(
-                        badgeText = "!",
-                        title = "PHEW all transactions are categorized for now.",
-                        subtitle = "Want to go through more transactions just for fun, ya sicko?",
-                        primaryButtonText = "Yes I Need The Dopamine",
-                        secondaryButtonText = "No Thanks, I Have Self-Control",
-                        onPrimaryClick = { onAction(DashboardAction.StartFunReviewMode) },
-                        onSecondaryClick = { onAction(DashboardAction.CloseCategorizeReview) }
-                    )
+            when {
+                state.allDone -> ReviewEmptyStateContent(
+                    badgeText = "!",
+                    title = "PHEW all transactions are categorized for now.",
+                    subtitle = "Want to go through more transactions just for fun, ya sicko?",
+                    primaryButtonText = "Yes I Need The Dopamine",
+                    secondaryButtonText = "No Thanks, I Have Self-Control",
+                    onPrimaryClick = { onAction(DashboardAction.StartFunReviewMode) },
+                    onSecondaryClick = { onAction(DashboardAction.CloseCategorizeReview) }
+                )
 
-                    state.isBatchComplete -> ReviewEmptyStateContent(
-                        badgeText = "10",
-                        title = "Ten down.",
-                        subtitle = "Want another stack, or are we calling that a responsible little victory?",
-                        primaryButtonText = "View More Transactions",
-                        secondaryButtonText = "Done For Now",
-                        onPrimaryClick = { onAction(DashboardAction.LoadMoreReviewTransactions) },
-                        onSecondaryClick = { onAction(DashboardAction.CloseCategorizeReview) }
-                    )
+                state.isBatchComplete -> ReviewEmptyStateContent(
+                    badgeText = "10",
+                    title = "Ten down.",
+                    subtitle = "Want another stack, or are we calling that a responsible little victory?",
+                    primaryButtonText = "View More Transactions",
+                    secondaryButtonText = "Done For Now",
+                    onPrimaryClick = { onAction(DashboardAction.LoadMoreReviewTransactions) },
+                    onSecondaryClick = { onAction(DashboardAction.CloseCategorizeReview) }
+                )
 
-                    currentTxn != null && state.isCategoryPickerOpen -> CategoryReviewPickerContent(
-                        txn = currentTxn,
-                        categories = state.categories,
-                        onChooseCategory = { catId -> onAction(DashboardAction.RequestConfirmReviewCategory(catId)) },
-                        onBack = { onAction(DashboardAction.CloseReviewCategoryPicker) }
-                    )
+                currentTxn != null && state.isCategoryPickerOpen -> CategoryReviewPickerContent(
+                    txn = currentTxn,
+                    categories = state.categories,
+                    onChooseCategory = { catId -> onAction(DashboardAction.RequestConfirmReviewCategory(catId)) },
+                    onBack = { onAction(DashboardAction.CloseReviewCategoryPicker) }
+                )
 
-                    currentTxn != null -> ReviewSwipeStage(
-                        currentTxn = currentTxn,
-                        currentIndex = state.currentIndex,
-                        batchReviewed = state.batchReviewed,
-                        category = currentTxn.categoryId?.let { categoryById[it] },
-                        cardTone = cardTone,
-                        effectiveDragX = effectiveDragX,
-                        cardRotation = cardRotation,
-                        thresholdPx = thresholdPx,
-                        rawDragX = rawDragX,
-                        readySide = readySide,
-                        onUpdateDragState = { dragging, nextX, nextSide ->
-                            isDragging = dragging
-                            rawDragX = nextX
-                            readySide = nextSide
-                        },
-                        onAction = onAction
-                    )
-                }
+                currentTxn != null -> ReviewSwipeStage(
+                    currentTxn = currentTxn,
+                    currentIndex = state.currentIndex,
+                    batchReviewed = state.batchReviewed,
+                    category = currentTxn.categoryId?.let { categoryById[it] },
+                    cardTone = cardTone,
+                    effectiveDragX = effectiveDragX,
+                    cardRotation = cardRotation,
+                    thresholdPx = thresholdPx,
+                    rawDragX = rawDragX,
+                    readySide = readySide,
+                    onUpdateDragState = { dragging, nextX, nextSide ->
+                        isDragging = dragging
+                        rawDragX = nextX
+                        readySide = nextSide
+                    },
+                    onAction = onAction
+                )
             }
         }
     }

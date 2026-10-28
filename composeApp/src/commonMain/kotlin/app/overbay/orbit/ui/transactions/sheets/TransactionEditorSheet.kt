@@ -1,21 +1,14 @@
 package app.overbay.orbit.ui.transactions.sheets
 
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.ui.components.OrbitModalSheet
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionEditorSheet(
     transaction: Transaction?,
@@ -59,12 +52,8 @@ fun TransactionEditorSheet(
             modifier = modifier
         )
     } else {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
+        OrbitModalSheet(
             onDismissRequest = onDismiss,
-            sheetState = sheetState,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = modifier
         ) {
             TransactionEditorContent(
@@ -79,9 +68,7 @@ fun TransactionEditorSheet(
                 onCreateRule = onCreateRule,
                 onMarkRecurring = onMarkRecurring,
                 onImportCsv = onImportCsv,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }

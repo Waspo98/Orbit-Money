@@ -106,7 +106,7 @@ fun AccountDetailInspectorPane(
     AnimatedContent(
         targetState = subMode,
         transitionSpec = { fadeIn(OrbitSprings.effectsDefault()) togetherWith fadeOut(OrbitSprings.effectsDefault()) },
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxWidth(),
         label = "accountInspectorSubModeTransition"
     ) { mode ->
         when (mode) {
@@ -158,7 +158,7 @@ fun AccountDetailInspectorPane(
                         onHistory = { viewModel.openBalanceHistory(inspecting) },
                         onMerge = { viewModel.openMergeDialog(inspecting) },
                         onToggleArchive = { viewModel.toggleArchiveAccount(inspecting) },
-                        onDelete = { viewModel.deleteAccount(inspecting) },
+                        onDelete = { viewModel.requestDeleteAccount(inspecting.id) },
                         onSeeTransactions = { onNavigate(OrbitNavKey.Transactions(accountId = inspecting.id)) }
                     )
                 }
@@ -192,7 +192,7 @@ private fun AccountReadOnlyDetailContent(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {

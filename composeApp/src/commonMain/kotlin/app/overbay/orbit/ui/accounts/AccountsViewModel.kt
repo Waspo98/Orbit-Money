@@ -358,7 +358,7 @@ class AccountsViewModel(
                 groups.add(
                     AccountGroupDisplay(
                         category = AccountTypeCategory.INVESTMENTS,
-                        title = "Investments & Retirement",
+                        title = "Investments",
                         accounts = investments,
                         totalCents = investments.sumOf { it.currentBalanceCents }
                     )

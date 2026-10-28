@@ -84,18 +84,15 @@ fun MoreDestinationsSheet(
         DestinationItem(OrbitNavKey.Settings, "Settings", "Data storage, Google Drive & theme presets", OrbitIcons.Settings)
     )
 
-    ModalBottomSheet(
+    OrbitModalSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
         modifier = modifier,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = MaterialTheme.colorScheme.background
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
         ) {
             Text(

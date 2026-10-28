@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,108 +50,116 @@ fun AccountMergeDialog(
     var dropdownExpanded by remember { mutableStateOf(false) }
     var combineBalances by remember { mutableStateOf(true) }
 
-    AlertDialog(
+    OrbitModalSheet(
         onDismissRequest = onDismiss,
-        title = {
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
             Text(
                 text = "Merge Account",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+
+            Text(
+                text = "Merge \"${sourceAccount.name}\" into another account. All transactions will be reassigned safely to the target account.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (eligibleTargets.isEmpty()) {
                 Text(
-                    text = "Merge \"${sourceAccount.name}\" into another account. All transactions will be reassigned safely to the target account.",
+                    text = "No other eligible accounts available to merge into.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = OrbitColorTokens.Red
                 )
-
-                if (eligibleTargets.isEmpty()) {
-                    Text(
-                        text = "No other eligible accounts available to merge into.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = OrbitColorTokens.Red
+            } else {
+                ExposedDropdownMenuBox(
+                    expanded = dropdownExpanded,
+                    onExpandedChange = { dropdownExpanded = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedTarget?.name ?: "Select Target Account",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Merge Into") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
                     )
-                } else {
-                    ExposedDropdownMenuBox(
+                    ExposedDropdownMenu(
                         expanded = dropdownExpanded,
-                        onExpandedChange = { dropdownExpanded = it },
-                        modifier = Modifier.fillMaxWidth()
+                        onDismissRequest = { dropdownExpanded = false }
                     ) {
-                        OutlinedTextField(
-                            value = selectedTarget?.name ?: "Select Target Account",
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Merge Into") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = dropdownExpanded,
-                            onDismissRequest = { dropdownExpanded = false }
-                        ) {
-                            eligibleTargets.forEach { target ->
-                                DropdownMenuItem(
-                                    text = { Text("${target.name} (${target.type.displayName})") },
-                                    onClick = {
-                                        selectedTarget = target
-                                        dropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { combineBalances = !combineBalances }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(
-                            checked = combineBalances,
-                            onCheckedChange = { combineBalances = it }
-                        )
-                        Column(modifier = Modifier.padding(start = 8.dp)) {
-                            Text(
-                                text = "Combine account balances",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = "Add source balance to destination balance",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline
+                        eligibleTargets.forEach { target ->
+                            DropdownMenuItem(
+                                text = { Text("${target.name} (${target.type.displayName})") },
+                                onClick = {
+                                    selectedTarget = target
+                                    dropdownExpanded = false
+                                }
                             )
                         }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    haptics.confirm()
-                    selectedTarget?.let { target ->
-                        onMerge(sourceAccount.id, target.id, combineBalances)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { combineBalances = !combineBalances }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = combineBalances,
+                        onCheckedChange = { combineBalances = it }
+                    )
+                    Column(modifier = Modifier.padding(start = 8.dp)) {
+                        Text(
+                            text = "Combine account balances",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "Add source balance to destination balance",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
                     }
-                },
-                enabled = selectedTarget != null
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("Merge Accounts")
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Cancel")
+                }
+                Button(
+                    onClick = {
+                        haptics.confirm()
+                        selectedTarget?.let { target ->
+                            onMerge(sourceAccount.id, target.id, combineBalances)
+                        }
+                    },
+                    enabled = selectedTarget != null,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Merge Accounts")
+                }
             }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-        shape = RoundedCornerShape(24.dp),
-        modifier = modifier
-    )
+        }
+    }
 }

@@ -57,6 +57,7 @@ import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.domain.CandidateImportRule
 import app.overbay.orbit.domain.CsvImportEngine
 import app.overbay.orbit.domain.CsvImportPreview
+import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalFileImportExportHelper
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -72,7 +73,6 @@ fun CsvImportSheet(
 ) {
     val haptics = LocalOrbitHaptics.current
     val fileHelper = LocalFileImportExportHelper.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var csvText by remember { mutableStateOf("") }
     var selectedAccountId by remember { mutableStateOf(accounts.firstOrNull()?.id ?: 1L) }
@@ -107,18 +107,14 @@ fun CsvImportSheet(
         }
     }
 
-    ModalBottomSheet(
+    OrbitModalSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 12.dp)
-                .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
         ) {
             Row(

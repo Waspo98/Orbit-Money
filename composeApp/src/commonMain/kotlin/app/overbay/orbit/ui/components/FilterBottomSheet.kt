@@ -53,21 +53,16 @@ fun FilterBottomSheet(
     categoryNames: Map<Long, String> = emptyMap()
 ) {
     val haptics = LocalOrbitHaptics.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var draft by remember(initialFilter) { mutableStateOf(initialFilter) }
 
-    ModalBottomSheet(
+    OrbitModalSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        modifier = modifier,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        modifier = modifier
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
         ) {
             Text(

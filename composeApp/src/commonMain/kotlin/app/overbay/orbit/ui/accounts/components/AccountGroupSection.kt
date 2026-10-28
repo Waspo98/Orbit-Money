@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
@@ -98,23 +99,29 @@ fun AccountGroupSection(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 // Left Column: Tracked uppercase title + account count
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = group.title.uppercase(),
                         style = MaterialTheme.typography.titleSmall,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.78.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "${group.accounts.size} ${if (group.accounts.size == 1) "account" else "accounts"}",
                         style = MaterialTheme.typography.bodySmall,
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+
+                Spacer(modifier = Modifier.width(12.dp))
 
                 // Right Column: Bold colored balance + 30dp circular bordered chevron
                 Row(verticalAlignment = Alignment.CenterVertically) {

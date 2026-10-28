@@ -28,26 +28,22 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.accounts.components.AccountDetailInspectorPane
 import app.overbay.orbit.ui.accounts.components.AccountGroupSection
-import app.overbay.orbit.ui.accounts.sheets.AccountBalanceHistorySheet
-import app.overbay.orbit.ui.accounts.sheets.AccountEditorSheet
 import app.overbay.orbit.ui.accounts.sheets.AccountMergeDialog
-import app.overbay.orbit.ui.accounts.sheets.CreditCardProfileEditorSheet
-import app.overbay.orbit.ui.components.HeroScrollState
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
+import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.OrbitPageActionRow
 import app.overbay.orbit.ui.components.OrbitSecondaryPillButton
 import app.overbay.orbit.ui.components.OrbitTogglePill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
-import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalDevicePosture
 
 /**
  * Editorial Accounts screen with curved green canopy hero, 2x2 bento stats grid,
  * 3-pill action row, collapsed-by-default white accordion account group cards,
- * and morphing dual-screen inspector pane.
+ * and morphing dual-screen inspector pane / phone OrbitModalSheet.
  * Conforms strictly to <= 6 parameters and < 400-line ceiling.
  */
 @Composable
@@ -65,10 +61,7 @@ fun AccountsScreen(
 
     LaunchedEffect(initialAccountId) {
         if (initialAccountId != null) {
-            viewModel.selectAccount(initialAccountId)
-            if (!posture.supportsTwoPane) {
-                viewModel.setPhoneViewingDetail(true)
-            }
+            viewModel.selectAccountForInspect(initialAccountId)
         }
     }
 
@@ -80,117 +73,81 @@ fun AccountsScreen(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
-        val isDetailOpen = isTwoPane && (
-            state.selectedAccount != null ||
-                state.showEditorSheet ||
-                state.showCardProfileSheet ||
-                state.showHistorySheet
-            )
+        val isInspectorActive = state.selectedAccount != null ||
+            state.showEditorSheet ||
+            state.showCardProfileSheet ||
+            state.showHistorySheet
+        val isDetailOpen = isTwoPane && isInspectorActive
 
-        BackHandler(enabled = state.isPhoneViewingDetail && !isTwoPane && state.selectedAccount != null) {
-            viewModel.setPhoneViewingDetail(false)
-        }
-
-        // Detail Screen on Phone if directly inspecting an account
-        if (state.isPhoneViewingDetail && !isTwoPane && state.selectedAccount != null) {
-            AccountDetailScreen(
-                account = state.selectedAccount!!,
-                transactions = state.selectedAccountTransactions,
-                actions = AccountDetailActions(
-                    onBack = { viewModel.setPhoneViewingDetail(false) },
-                    onEditAccount = { viewModel.openEditAccount(state.selectedAccount!!) },
-                    onEditPerks = { viewModel.openCreditCardProfile(state.selectedAccount!!) },
-                    onMergeAccount = { viewModel.openMergeDialog(state.selectedAccount!!) }
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            floatingActionButton = {
+                OrbitFloatingActionButton(
+                    visible = heroScrollState.isFabVisible,
+                    onClick = { viewModel.openAddAccount() },
+                    contentDescription = "Add Account"
                 )
-            )
-        } else {
-            Scaffold(
-                snackbarHost = { SnackbarHost(snackbarHostState) },
-                contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                floatingActionButton = {
-                    OrbitFloatingActionButton(
-                        visible = heroScrollState.isFabVisible,
-                        onClick = { viewModel.openAddAccount() },
-                        contentDescription = "Add Account"
+            }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .nestedScroll(heroScrollState.nestedScrollConnection)
+            ) {
+                MorphingPageHero(
+                    kicker = "YOUR MONEY'S HOME BASE",
+                    title = "Accounts",
+                    subtitle = "${MoneyUtils.formatCents(state.netWorthCents)} Net Worth across ${state.accounts.size} Accounts",
+                    scrollState = heroScrollState
+                )
+
+                val masterList: @Composable () -> Unit = {
+                    AccountsMasterContent(
+                        state = state,
+                        viewModel = viewModel,
+                        isWideScreen = isTwoPane,
+                        onNavigate = onNavigate,
+                        onOpenDetail = { acct ->
+                            viewModel.selectAccountForInspect(acct.id)
+                        }
                     )
                 }
-            ) { innerPadding ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .nestedScroll(heroScrollState.nestedScrollConnection)
-                ) {
-                    MorphingPageHero(
-                        kicker = "YOUR MONEY'S HOME BASE",
-                        title = "Accounts",
-                        subtitle = "${MoneyUtils.formatCents(state.netWorthCents)} Net Worth across ${state.accounts.size} Accounts",
-                        scrollState = heroScrollState
+
+                if (isTwoPane) {
+                    OrbitMorphingSplitLayout(
+                        isDetailOpen = isDetailOpen,
+                        onDismissDetail = { viewModel.dismissInspectorPane() },
+                        masterContent = masterList,
+                        detailContent = {
+                            AccountDetailInspectorPane(
+                                state = state,
+                                viewModel = viewModel,
+                                onNavigate = onNavigate,
+                                onClosePane = { viewModel.dismissInspectorPane() }
+                            )
+                        },
+                        modifier = Modifier.fillMaxSize()
                     )
-
-                    val masterList: @Composable () -> Unit = {
-                        AccountsMasterContent(
-                            state = state,
-                            viewModel = viewModel,
-                            isWideScreen = isTwoPane,
-                            onNavigate = onNavigate,
-                            onOpenDetail = { acct ->
-                                if (isTwoPane) {
-                                    viewModel.selectAccountForInspect(acct.id)
-                                } else {
-                                    viewModel.selectAccount(acct.id)
-                                    viewModel.setPhoneViewingDetail(true)
-                                }
-                            }
-                        )
-                    }
-
-                    if (isTwoPane) {
-                        OrbitMorphingSplitLayout(
-                            isDetailOpen = isDetailOpen,
-                            onDismissDetail = { viewModel.dismissInspectorPane() },
-                            masterContent = masterList,
-                            detailContent = {
-                                AccountDetailInspectorPane(
-                                    state = state,
-                                    viewModel = viewModel,
-                                    onNavigate = onNavigate,
-                                    onClosePane = { viewModel.dismissInspectorPane() }
-                                )
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        masterList()
-                    }
+                } else {
+                    masterList()
                 }
             }
         }
 
-        // Compact Phone Modal Sheets & Dialogs
-        if (!isTwoPane && state.showEditorSheet && state.editingAccount != null) {
-            AccountEditorSheet(
-                account = state.editingAccount!!,
-                onSave = { viewModel.saveAccount(it) },
-                onDelete = { viewModel.requestDeleteAccount(it) },
-                onDismiss = { viewModel.closeEditorSheet() }
-            )
-        }
-
-        if (!isTwoPane && state.showCardProfileSheet && state.editingCardProfile != null) {
-            CreditCardProfileEditorSheet(
-                profile = state.editingCardProfile!!,
-                onSave = { viewModel.saveCreditCardProfile(it) },
-                onDismiss = { viewModel.closeCreditCardProfile() }
-            )
-        }
-
-        if (!isTwoPane && state.showHistorySheet && state.historyAccount != null) {
-            AccountBalanceHistorySheet(
-                account = state.historyAccount!!,
-                transactions = state.selectedAccountTransactions,
-                onDismiss = { viewModel.closeBalanceHistory() }
-            )
+        // Compact Phone Modal Sheet hosting AccountDetailInspectorPane
+        if (!isTwoPane && isInspectorActive) {
+            OrbitModalSheet(
+                onDismissRequest = { viewModel.dismissInspectorPane() }
+            ) {
+                AccountDetailInspectorPane(
+                    state = state,
+                    viewModel = viewModel,
+                    onNavigate = onNavigate,
+                    onClosePane = { viewModel.dismissInspectorPane() }
+                )
+            }
         }
     }
 

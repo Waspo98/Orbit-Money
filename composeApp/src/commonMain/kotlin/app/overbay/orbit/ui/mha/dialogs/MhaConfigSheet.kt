@@ -36,11 +36,11 @@ import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MhaConfigSheet(
     taxProfile: MhaTaxProfile,
@@ -50,14 +50,9 @@ fun MhaConfigSheet(
     onSave: (MhaTaxProfile, Cents?, Cents?) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
+    OrbitModalSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        modifier = modifier,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        modifier = modifier
     ) {
         MhaConfigContent(
             taxProfile = taxProfile,

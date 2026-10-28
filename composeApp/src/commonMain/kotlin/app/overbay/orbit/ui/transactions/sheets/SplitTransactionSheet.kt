@@ -54,6 +54,7 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
 
@@ -62,7 +63,6 @@ data class SplitItemState(
     var categoryId: Long?
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SplitTransactionSheet(
     transaction: Transaction,
@@ -81,12 +81,8 @@ fun SplitTransactionSheet(
             modifier = modifier
         )
     } else {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
+        OrbitModalSheet(
             onDismissRequest = onDismiss,
-            sheetState = sheetState,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = modifier
         ) {
             SplitTransactionContent(
@@ -94,9 +90,7 @@ fun SplitTransactionSheet(
                 categories = categories,
                 onSplitConfirmed = onSplitConfirmed,
                 onDismiss = onDismiss,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }

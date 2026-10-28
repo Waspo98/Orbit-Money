@@ -27,51 +27,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HouseholdRole
+import app.overbay.orbit.ui.components.OrbitModalSheet
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InviteMemberDialog(
     onDismiss: () -> Unit,
     onInvite: (email: String, role: HouseholdRole) -> Unit
 ) {
-    var email by remember { mutableStateOf("") }
-    var selectedRole by remember { mutableStateOf(HouseholdRole.MEMBER) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "Invite Household Member",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            InviteMemberFormFields(
-                email = email,
-                onEmailChange = { email = it },
-                selectedRole = selectedRole,
-                onRoleChange = { selectedRole = it }
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (email.isNotBlank()) {
-                        onInvite(email, selectedRole)
-                    }
-                },
-                enabled = email.contains("@") && email.contains(".")
-            ) {
-                Text("Send Invite")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
+    OrbitModalSheet(
+        onDismissRequest = onDismiss
+    ) {
+        InviteMemberContent(
+            onDismiss = onDismiss,
+            onInvite = onInvite
+        )
+    }
 }
 
 @Composable

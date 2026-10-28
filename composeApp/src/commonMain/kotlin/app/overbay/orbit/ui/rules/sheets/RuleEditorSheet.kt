@@ -45,11 +45,11 @@ import app.overbay.orbit.data.model.RuleCondition
 import app.overbay.orbit.data.model.RuleConditionField
 import app.overbay.orbit.data.model.RuleOperator
 import app.overbay.orbit.data.model.TransactionRule
+import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.rules.components.ActionEditorRow
 import app.overbay.orbit.ui.rules.components.ConditionEditorRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RuleEditorSheet(
     rule: TransactionRule?,
@@ -60,13 +60,8 @@ fun RuleEditorSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
+    OrbitModalSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier
     ) {
         RuleEditorContent(
@@ -75,8 +70,7 @@ fun RuleEditorSheet(
             accounts = accounts,
             onSave = onSave,
             onPreviewCount = onPreviewCount,
-            onDismiss = onDismiss,
-            modifier = Modifier.navigationBarsPadding()
+            onDismiss = onDismiss
         )
     }
 }

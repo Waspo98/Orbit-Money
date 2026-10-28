@@ -28,8 +28,8 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitModalSheet
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountBalanceHistorySheet(
     account: Account,
@@ -37,12 +37,8 @@ fun AccountBalanceHistorySheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
+    OrbitModalSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         modifier = modifier
     ) {
         AccountBalanceHistoryContent(

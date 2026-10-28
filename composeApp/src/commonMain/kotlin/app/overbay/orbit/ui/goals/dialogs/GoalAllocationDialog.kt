@@ -28,6 +28,7 @@ import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -36,42 +37,15 @@ fun GoalAllocationDialog(
     onConfirmDeposit: (goalId: Long, amountCents: Cents) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val haptics = LocalOrbitHaptics.current
-    var depositCents by remember(goal) { mutableStateOf(5000L) } // default $50
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "Deposit to ${goal.name}",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            GoalAllocationFields(
-                goal = goal,
-                depositCents = depositCents,
-                onDepositCentsChange = { depositCents = it }
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    haptics.confirm()
-                    onConfirmDeposit(goal.id, depositCents)
-                },
-                enabled = depositCents > 0L
-            ) {
-                Text("Deposit")
-            }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
+    OrbitModalSheet(
+        onDismissRequest = onDismiss
+    ) {
+        GoalAllocationContent(
+            goal = goal,
+            onConfirmDeposit = onConfirmDeposit,
+            onDismiss = onDismiss
+        )
+    }
 }
 
 @Composable

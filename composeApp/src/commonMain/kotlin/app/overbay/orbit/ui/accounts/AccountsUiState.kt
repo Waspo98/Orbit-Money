@@ -8,7 +8,7 @@ import app.overbay.orbit.domain.Cents
 enum class AccountTypeCategory(val displayName: String) {
     CASH_AND_CHECKING("Cash & Checking"),
     CREDIT_CARDS("Credit Cards"),
-    INVESTMENTS("Investments & Retirement"),
+    INVESTMENTS("Investments"),
     REAL_ESTATE("Real Estate & Property"),
     LOANS("Loans & Mortgages")
 }

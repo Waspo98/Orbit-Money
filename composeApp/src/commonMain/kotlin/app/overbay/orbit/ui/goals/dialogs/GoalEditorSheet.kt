@@ -48,10 +48,10 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.datetime.LocalDate
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalEditorSheet(
     goal: Goal?,
@@ -61,13 +61,8 @@ fun GoalEditorSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
+    OrbitModalSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier
     ) {
         GoalEditorContent(
@@ -75,8 +70,7 @@ fun GoalEditorSheet(
             accounts = accounts,
             onSave = onSave,
             onDelete = onDelete,
-            onDismiss = onDismiss,
-            modifier = Modifier.navigationBarsPadding()
+            onDismiss = onDismiss
         )
     }
 }
