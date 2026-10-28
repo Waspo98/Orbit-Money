@@ -42,6 +42,8 @@ data class AccountsUiState(
     val showMergeDialog: Boolean = false,
     val historyAccount: Account? = null,
     val showHistorySheet: Boolean = false,
+    val isPhoneViewingDetail: Boolean = false,
+    val deleteConfirmAccountId: Long? = null,
     val isSyncing: Boolean = false,
     val syncErrorMessage: String? = null,
     val isLoading: Boolean = false

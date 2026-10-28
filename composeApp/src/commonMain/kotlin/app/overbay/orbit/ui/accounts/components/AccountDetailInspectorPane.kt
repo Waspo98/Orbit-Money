@@ -116,7 +116,7 @@ fun AccountDetailInspectorPane(
                     AccountEditorContent(
                         account = editTarget,
                         onSave = { viewModel.saveAccount(it) },
-                        onDelete = { viewModel.deleteAccount(it) },
+                        onDelete = { viewModel.requestDeleteAccount(it) },
                         onDismiss = {
                             if (state.selectedAccount != null) viewModel.closeEditorSheet() else onClosePane()
                         }

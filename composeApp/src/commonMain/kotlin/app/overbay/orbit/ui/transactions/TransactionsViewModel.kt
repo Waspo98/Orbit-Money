@@ -46,6 +46,9 @@ class TransactionsViewModel(
     private val _showSplitSheet = MutableStateFlow(false)
     private val _showCsvImportSheet = MutableStateFlow(false)
     private val _showFilterSheet = MutableStateFlow(false)
+    private val _showBatchDeleteConfirm = MutableStateFlow(false)
+    private val _singleDeleteConfirmId = MutableStateFlow<Long?>(null)
+    private val _showCategoryBatchPicker = MutableStateFlow(false)
     private val _logoFinderTransactionId = MutableStateFlow<Long?>(null)
     private val _isSyncing = MutableStateFlow(false)
     private val _syncToastMessage = MutableStateFlow<String?>(null)
@@ -150,6 +153,12 @@ class TransactionsViewModel(
         state.copy(showCsvImportSheet = showCsv)
     }.combine(_showFilterSheet) { state, showFilter ->
         state.copy(showFilterSheet = showFilter)
+    }.combine(_showBatchDeleteConfirm) { state, showBatchDel ->
+        state.copy(showBatchDeleteConfirm = showBatchDel)
+    }.combine(_singleDeleteConfirmId) { state, singleDelId ->
+        state.copy(singleDeleteConfirmId = singleDelId)
+    }.combine(_showCategoryBatchPicker) { state, showCatPicker ->
+        state.copy(showCategoryBatchPicker = showCatPicker)
     }.combine(_logoFinderTransactionId) { state, logoFinderId ->
         state.copy(logoFinderTransactionId = logoFinderId)
     }.combine(_isSyncing) { state, isSyncing ->
@@ -162,32 +171,18 @@ class TransactionsViewModel(
         initialValue = TransactionsUiState(isLoading = true)
     )
 
-    fun setSearchQuery(query: String) {
-        _searchQuery.value = query
-    }
-
+    fun setSearchQuery(query: String) { _searchQuery.value = query }
     fun setSearchActive(active: Boolean) {
         _isSearchActive.value = active
-        if (!active) {
-            _searchQuery.value = ""
-        }
+        if (!active) _searchQuery.value = ""
     }
-
-    fun setQuickFilter(filter: QuickFilter) {
-        _quickFilter.value = filter
-    }
-
-    fun setSortOption(sort: TransactionSortOption) {
-        _sortOption.value = sort
-    }
-
-    fun toggleCompactView() {
-        _isCompactView.value = !_isCompactView.value
-    }
-
-    fun applyFilterDraft(draft: TransactionFilterDraft) {
-        _filterDraft.value = draft
-    }
+    fun setQuickFilter(filter: QuickFilter) { _quickFilter.value = filter }
+    fun setSortOption(sort: TransactionSortOption) { _sortOption.value = sort }
+    fun toggleCompactView() { _isCompactView.value = !_isCompactView.value }
+    fun applyFilterDraft(draft: TransactionFilterDraft) { _filterDraft.value = draft }
+    fun setShowBatchDeleteConfirm(show: Boolean) { _showBatchDeleteConfirm.value = show }
+    fun setSingleDeleteConfirmId(id: Long?) { _singleDeleteConfirmId.value = id }
+    fun setShowCategoryBatchPicker(show: Boolean) { _showCategoryBatchPicker.value = show }
 
     fun clearFilters() {
         _searchQuery.value = ""
@@ -247,29 +242,12 @@ class TransactionsViewModel(
         _showSplitSheet.value = false
     }
 
-    fun openCsvImportSheet() {
-        _showCsvImportSheet.value = true
-    }
-
-    fun closeCsvImportSheet() {
-        _showCsvImportSheet.value = false
-    }
-
-    fun openFilterSheet() {
-        _showFilterSheet.value = true
-    }
-
-    fun closeFilterSheet() {
-        _showFilterSheet.value = false
-    }
-
-    fun openLogoFinder(transactionId: Long) {
-        _logoFinderTransactionId.value = transactionId
-    }
-
-    fun closeLogoFinder() {
-        _logoFinderTransactionId.value = null
-    }
+    fun openCsvImportSheet() { _showCsvImportSheet.value = true }
+    fun closeCsvImportSheet() { _showCsvImportSheet.value = false }
+    fun openFilterSheet() { _showFilterSheet.value = true }
+    fun closeFilterSheet() { _showFilterSheet.value = false }
+    fun openLogoFinder(transactionId: Long) { _logoFinderTransactionId.value = transactionId }
+    fun closeLogoFinder() { _logoFinderTransactionId.value = null }
 
     fun reportMerchantLogoStatus(merchantKey: String, status: String) {
         viewModelScope.launch { repository.reportMerchantLogoStatus(merchantKey, status) }
@@ -314,7 +292,8 @@ class TransactionsViewModel(
         notes: String?,
         isTransfer: Boolean,
         isIgnored: Boolean,
-        mhaEligible: Boolean?
+        mhaEligible: Boolean?,
+        accountId: Long? = null
     ) {
         viewModelScope.launch {
             val existing = uiState.value.transactions.find { it.id == id }
@@ -337,9 +316,12 @@ class TransactionsViewModel(
                 )
                 repository.saveTransaction(updated)
             } else {
+                val resolvedAccountId = accountId ?: uiState.value.accounts.firstOrNull()?.id ?: 1L
+                val accountName = uiState.value.accounts.find { it.id == resolvedAccountId }?.name ?: ""
                 val newTxn = Transaction(
                     id = 0L,
-                    accountId = uiState.value.accounts.firstOrNull()?.id ?: 1L,
+                    accountId = resolvedAccountId,
+                    accountName = accountName,
                     originalDate = date,
                     originalMerchant = merchant,
                     originalAmountCents = amountCents,

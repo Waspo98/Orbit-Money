@@ -11,6 +11,7 @@ import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.data.model.HouseholdInfo
 import app.overbay.orbit.data.model.HouseholdMember
+import app.overbay.orbit.data.model.HouseholdShare
 import app.overbay.orbit.data.model.MerchantLogo
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.OrbitPreferences
@@ -37,6 +38,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
 /**
@@ -82,9 +85,21 @@ class OrbitRepository(
     val currentUser: StateFlow<String?> = _currentUser.asStateFlow()
 
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true; isLenient = true }
+    private val snapshotMutex = Mutex()
+    private var defaultApiClient: OrbitApiClient? = null
+    private var defaultClientUrl: String? = null
 
-    fun createApiClient(serverUrl: String = _preferences.value.selfHostedServerUrl): OrbitApiClient =
-        customApiClient ?: OrbitApiClient({ serverUrl.ifBlank { _preferences.value.selfHostedServerUrl } }, storage)
+    fun createApiClient(serverUrl: String = _preferences.value.selfHostedServerUrl): OrbitApiClient {
+        customApiClient?.let { return it }
+        val resolvedUrl = serverUrl.ifBlank { _preferences.value.selfHostedServerUrl }
+        val existing = defaultApiClient
+        if (existing != null && defaultClientUrl == resolvedUrl) return existing
+        existing?.close()
+        return OrbitApiClient({ resolvedUrl.ifBlank { _preferences.value.selfHostedServerUrl } }, storage).also {
+            defaultApiClient = it
+            defaultClientUrl = resolvedUrl
+        }
+    }
 
     suspend fun initialize() {
         val localSnap = localEngine.loadSnapshot()
@@ -154,7 +169,7 @@ class OrbitRepository(
         _storageMode.value = newSnapshot.preferences.storageMode
     }
 
-    private suspend fun commitSnapshot(updated: OrbitWorkspaceSnapshot) {
+    private suspend fun commitSnapshot(updated: OrbitWorkspaceSnapshot) = snapshotMutex.withLock {
         updateMemoryState(updated)
         localEngine.saveSnapshot(updated)
         if (activeEngine !== localEngine) activeEngine.saveSnapshot(updated)
@@ -222,35 +237,27 @@ class OrbitRepository(
         userLabel
     }
 
-    // -------------------------------------------------------------------------
     // Transactions (with Strict Provenance Preservation)
-    // -------------------------------------------------------------------------
     suspend fun saveTransaction(transaction: Transaction) {
         val current = _transactions.value
         val exists = current.any { it.id == transaction.id && transaction.id != 0L }
-        val updatedList = if (exists) current.map { if (it.id == transaction.id) transaction else it }
-        else current + transaction.copy(id = if (transaction.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else transaction.id)
+        val localId = if (exists) transaction.id else if (transaction.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else transaction.id
+        val updatedList = if (exists) current.map { if (it.id == transaction.id) transaction else it } else current + transaction.copy(id = localId)
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
-        val pushed = activeEngine.pushTransaction(transaction).getOrNull()
-        if (pushed != null && pushed.merchantLogo != transaction.merchantLogo && exists) {
-            commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.map { if (it.id == transaction.id) it.copy(merchantLogo = pushed.merchantLogo) else it }))
+        val pushed = activeEngine.pushTransaction(if (exists) transaction else transaction.copy(id = 0L)).getOrNull()
+        if (pushed != null && (pushed.id != localId || pushed.merchantLogo != transaction.merchantLogo)) {
+            val syncedId = if (pushed.id > 0L) pushed.id else localId
+            commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.map { if (it.id == localId) it.copy(id = syncedId, merchantLogo = pushed.merchantLogo ?: it.merchantLogo) else it }))
         }
     }
 
-    /**
-     * User edit: Strictly preserves original_* fields and writes to edited_* fields with editSource = USER.
-     */
+    /** User edit: Strictly preserves original_* fields and writes to edited_* fields with editSource = USER. */
     suspend fun editTransaction(
-        id: Long,
-        merchant: String? = null,
-        amountCents: Cents? = null,
-        date: String? = null,
-        categoryId: Long? = null,
-        notes: String? = null
+        id: Long, merchant: String? = null, amountCents: Cents? = null,
+        date: String? = null, categoryId: Long? = null, notes: String? = null
     ) {
         val current = _transactions.value
         val target = current.find { it.id == id } ?: return
-
         val updated = target.copy(
             editedMerchant = merchant ?: target.editedMerchant,
             editedMerchantSource = if (merchant != null) "user" else target.editedMerchantSource,
@@ -261,37 +268,21 @@ class OrbitRepository(
             notes = notes ?: target.notes,
             editSource = EditSource.USER
         )
-
-        val updatedList = current.map { if (it.id == id) updated else it }
-        commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        commitSnapshot(_snapshot.value.copy(transactions = current.map { if (it.id == id) updated else it }))
         activeEngine.pushTransaction(updated)
     }
 
-    /**
-     * Resets user edits: Clears all edited_* fields and resets editSource to NONE.
-     */
+    /** Resets user edits: Clears all edited_* fields and resets editSource to NONE. */
     suspend fun resetTransaction(id: Long) {
         val current = _transactions.value
         val target = current.find { it.id == id } ?: return
-
         val reset = target.copy(
-            editedMerchant = null,
-            editedMerchantSource = null,
-            editedAmountCents = null,
-            editedDate = null,
-            editedCategoryId = null,
-            editedCategoryIdSource = null,
-            editedIsTransfer = null,
-            editedIsTransferSource = null,
-            editedIsIgnored = null,
-            editedIsIgnoredSource = null,
-            editedMhaEligible = null,
-            editedMhaEligibleSource = null,
+            editedMerchant = null, editedMerchantSource = null, editedAmountCents = null, editedDate = null,
+            editedCategoryId = null, editedCategoryIdSource = null, editedIsTransfer = null, editedIsTransferSource = null,
+            editedIsIgnored = null, editedIsIgnoredSource = null, editedMhaEligible = null, editedMhaEligibleSource = null,
             editSource = EditSource.NONE
         )
-
-        val updatedList = current.map { if (it.id == id) reset else it }
-        commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        commitSnapshot(_snapshot.value.copy(transactions = current.map { if (it.id == id) reset else it }))
         val pushed = activeEngine.resetTransaction(id).getOrNull()
         if (pushed != null && pushed.merchantLogo != reset.merchantLogo) {
             commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.map { if (it.id == id) it.copy(merchantLogo = pushed.merchantLogo) else it }))
@@ -307,25 +298,30 @@ class OrbitRepository(
     suspend fun batchEditCategory(ids: Set<Long>, categoryId: Long) {
         val updatedList = _transactions.value.map { if (it.id in ids) it.copy(editedCategoryId = categoryId, editedCategoryIdSource = "user", editSource = EditSource.USER) else it }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        updatedList.filter { it.id in ids }.forEach { activeEngine.pushTransaction(it) }
     }
 
     suspend fun batchMarkTransfer(ids: Set<Long>, isTransfer: Boolean) {
         val updatedList = _transactions.value.map { if (it.id in ids) it.copy(editedIsTransfer = isTransfer, editedIsTransferSource = "user", editSource = EditSource.USER) else it }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        updatedList.filter { it.id in ids }.forEach { activeEngine.pushTransaction(it) }
     }
 
     suspend fun batchSetMhaEligible(ids: Set<Long>, eligible: Boolean) {
         val updatedList = _transactions.value.map { if (it.id in ids) it.copy(editedMhaEligible = eligible, editedMhaEligibleSource = "user", editSource = EditSource.USER) else it }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        updatedList.filter { it.id in ids }.forEach { activeEngine.pushTransaction(it) }
     }
 
     suspend fun batchSetIgnored(ids: Set<Long>, ignored: Boolean) {
         val updatedList = _transactions.value.map { if (it.id in ids) it.copy(editedIsIgnored = ignored, editedIsIgnoredSource = "user", editSource = EditSource.USER) else it }
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        updatedList.filter { it.id in ids }.forEach { activeEngine.pushTransaction(it) }
     }
 
     suspend fun batchDeleteTransactions(ids: Set<Long>) {
         commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.filterNot { it.id in ids }))
+        ids.forEach { activeEngine.deleteTransaction(it) }
     }
 
     suspend fun reportMerchantLogoStatus(merchantKey: String, status: String) {
@@ -429,16 +425,21 @@ class OrbitRepository(
         }
         val updatedList = current.map { if (it.id == parentTransactionId) newTransactions[0] else it } + newTransactions.drop(1)
         commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        activeEngine.pushTransaction(newTransactions[0])
+        newTransactions.drop(1).forEach { activeEngine.pushTransaction(it.copy(id = 0L)) }
     }
 
     // Accounts
     suspend fun saveAccount(account: Account) {
         val current = _accounts.value
         val exists = current.any { it.id == account.id && account.id != 0L }
-        val updatedList = if (exists) current.map { if (it.id == account.id) account else it }
-        else current + account.copy(id = if (account.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else account.id)
+        val localId = if (exists) account.id else if (account.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else account.id
+        val updatedList = if (exists) current.map { if (it.id == account.id) account else it } else current + account.copy(id = localId)
         commitSnapshot(_snapshot.value.copy(accounts = updatedList))
-        activeEngine.pushAccount(account)
+        val pushed = activeEngine.pushAccount(if (exists) account else account.copy(id = 0L)).getOrNull()
+        if (pushed != null && pushed.id > 0L && pushed.id != localId) {
+            commitSnapshot(_snapshot.value.copy(accounts = _accounts.value.map { if (it.id == localId) it.copy(id = pushed.id) else it }))
+        }
     }
 
     suspend fun deleteAccount(id: Long) {
@@ -456,7 +457,7 @@ class OrbitRepository(
         val updatedTarget = if (combineBalances) target.copy(currentBalanceCents = target.currentBalanceCents + source.currentBalanceCents) else target
         val remainingAccounts = currentAccounts.filterNot { it.id == sourceAccountId }.map { if (it.id == targetAccountId) updatedTarget else it }
         commitSnapshot(_snapshot.value.copy(accounts = remainingAccounts, transactions = updatedTxns))
-        activeEngine.deleteAccount(sourceAccountId)
+        activeEngine.mergeAccounts(sourceAccountId, targetAccountId)
         activeEngine.pushAccount(updatedTarget)
     }
 
@@ -464,10 +465,13 @@ class OrbitRepository(
     suspend fun saveCategory(category: Category) {
         val current = _categories.value
         val exists = current.any { it.id == category.id && category.id != 0L }
-        val updatedList = if (exists) current.map { if (it.id == category.id) category else it }
-        else current + category.copy(id = if (category.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else category.id)
+        val localId = if (exists) category.id else if (category.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else category.id
+        val updatedList = if (exists) current.map { if (it.id == category.id) category else it } else current + category.copy(id = localId)
         commitSnapshot(_snapshot.value.copy(categories = updatedList))
-        activeEngine.pushCategory(category)
+        val pushed = activeEngine.pushCategory(if (exists) category else category.copy(id = 0L)).getOrNull()
+        if (pushed != null && pushed.id > 0L && pushed.id != localId) {
+            commitSnapshot(_snapshot.value.copy(categories = _categories.value.map { if (it.id == localId) it.copy(id = pushed.id) else it }))
+        }
     }
 
     suspend fun deleteCategory(id: Long) {
@@ -494,10 +498,13 @@ class OrbitRepository(
     suspend fun saveGoal(goal: Goal) {
         val current = _goals.value
         val exists = current.any { it.id == goal.id && goal.id != 0L }
-        val updatedList = if (exists) current.map { if (it.id == goal.id) goal else it }
-        else current + goal.copy(id = if (goal.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else goal.id)
+        val localId = if (exists) goal.id else if (goal.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else goal.id
+        val updatedList = if (exists) current.map { if (it.id == goal.id) goal else it } else current + goal.copy(id = localId)
         commitSnapshot(_snapshot.value.copy(goals = updatedList))
-        activeEngine.pushGoal(goal)
+        val pushed = activeEngine.pushGoal(if (exists) goal else goal.copy(id = 0L)).getOrNull()
+        if (pushed != null && pushed.id > 0L && pushed.id != localId) {
+            commitSnapshot(_snapshot.value.copy(goals = _goals.value.map { if (it.id == localId) it.copy(id = pushed.id) else it }))
+        }
     }
 
     suspend fun deleteGoal(id: Long) {
@@ -508,10 +515,13 @@ class OrbitRepository(
     suspend fun saveRule(rule: TransactionRule) {
         val current = _rules.value
         val exists = current.any { it.id == rule.id && rule.id != 0L }
-        val updatedList = if (exists) current.map { if (it.id == rule.id) rule else it }
-        else current + rule.copy(id = if (rule.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else rule.id)
+        val localId = if (exists) rule.id else if (rule.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else rule.id
+        val updatedList = if (exists) current.map { if (it.id == rule.id) rule else it } else current + rule.copy(id = localId)
         commitSnapshot(_snapshot.value.copy(rules = updatedList))
-        activeEngine.pushRule(rule)
+        val pushed = activeEngine.pushRule(if (exists) rule else rule.copy(id = 0L)).getOrNull()
+        if (pushed != null && pushed.id > 0L && pushed.id != localId) {
+            commitSnapshot(_snapshot.value.copy(rules = _rules.value.map { if (it.id == localId) it.copy(id = pushed.id) else it }))
+        }
     }
 
     suspend fun deleteRule(id: Long) {
@@ -533,10 +543,13 @@ class OrbitRepository(
     suspend fun saveUpcoming(item: UpcomingItem) {
         val current = _upcomingItems.value
         val exists = current.any { it.id == item.id && item.id != 0L }
-        val updatedList = if (exists) current.map { if (it.id == item.id) item else it }
-        else current + item.copy(id = if (item.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else item.id)
+        val localId = if (exists) item.id else if (item.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else item.id
+        val updatedList = if (exists) current.map { if (it.id == item.id) item else it } else current + item.copy(id = localId)
         commitSnapshot(_snapshot.value.copy(upcomingItems = updatedList))
-        activeEngine.pushUpcoming(item)
+        val pushed = activeEngine.pushUpcoming(if (exists) item else item.copy(id = 0L)).getOrNull()
+        if (pushed != null && pushed.id > 0L && pushed.id != localId) {
+            commitSnapshot(_snapshot.value.copy(upcomingItems = _upcomingItems.value.map { if (it.id == localId) it.copy(id = pushed.id) else it }))
+        }
     }
 
     suspend fun deleteUpcoming(id: Long) {
@@ -562,13 +575,8 @@ class OrbitRepository(
     }
 
     fun exportBackupJson(): String = json.encodeToString(OrbitWorkspaceSnapshot.serializer(), _snapshot.value)
-
-    suspend fun restoreBackupJson(jsonString: String): Result<Unit> = runCatching {
-        commitSnapshot(json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString))
-    }
-
+    suspend fun restoreBackupJson(jsonString: String): Result<Unit> = runCatching { commitSnapshot(json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString)) }
     suspend fun loadDemoData(snapshot: OrbitWorkspaceSnapshot) = commitSnapshot(snapshot)
-
     suspend fun updateHouseholdInfo(household: HouseholdInfo) = commitSnapshot(_snapshot.value.copy(household = household))
 
     suspend fun saveHouseholdMember(member: HouseholdMember) {
@@ -579,6 +587,7 @@ class OrbitRepository(
         commitSnapshot(_snapshot.value.copy(members = updated))
     }
 
-    suspend fun deleteHouseholdMember(id: Long) =
-        commitSnapshot(_snapshot.value.copy(members = _snapshot.value.members.filterNot { it.id == id }))
+    suspend fun deleteHouseholdMember(id: Long) = commitSnapshot(_snapshot.value.copy(members = _snapshot.value.members.filterNot { it.id == id }))
+    suspend fun saveHouseholdShare(share: HouseholdShare) = commitSnapshot(_snapshot.value.copy(shares = _snapshot.value.shares + share))
+    suspend fun deleteHouseholdShare(id: Long) = commitSnapshot(_snapshot.value.copy(shares = _snapshot.value.shares.filterNot { it.id == id }))
 }

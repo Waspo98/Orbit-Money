@@ -6,6 +6,7 @@ import app.overbay.orbit.data.model.HouseholdInfo
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.HouseholdRole
 import app.overbay.orbit.data.model.HouseholdShare
+import app.overbay.orbit.domain.LocalDateUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,7 @@ class HouseholdViewModel(
                     current.copy(
                         householdInfo = snapshot.household,
                         members = snapshot.members,
+                        shares = snapshot.shares,
                         totalHouseholdGrossIncomeCents = totalIncome,
                         isLoading = false
                     )
@@ -101,7 +103,7 @@ class HouseholdViewModel(
             householdId = _uiState.value.householdInfo.id,
             invitedEmail = email.trim(),
             role = role,
-            createdAt = "2026-10-26T00:00:00Z"
+            createdAt = LocalDateUtils.todayIsoDate()
         )
         _uiState.update {
             it.copy(
@@ -109,12 +111,14 @@ class HouseholdViewModel(
                 showInviteDialog = false
             )
         }
+        scope.launch { repository.saveHouseholdShare(newShare) }
     }
 
     fun revokeInvite(shareId: Long) {
         _uiState.update { current ->
             current.copy(shares = current.shares.filterNot { it.id == shareId })
         }
+        scope.launch { repository.deleteHouseholdShare(shareId) }
     }
 
     fun openInviteDialog() {

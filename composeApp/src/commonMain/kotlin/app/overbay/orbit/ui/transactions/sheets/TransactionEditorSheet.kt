@@ -30,7 +30,8 @@ fun TransactionEditorSheet(
         notes: String?,
         isTransfer: Boolean,
         isIgnored: Boolean,
-        mhaEligible: Boolean?
+        mhaEligible: Boolean?,
+        accountId: Long?
     ) -> Unit,
     onResetToOriginal: (Long) -> Unit,
     onDelete: (Long) -> Unit,

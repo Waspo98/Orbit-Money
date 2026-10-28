@@ -140,7 +140,7 @@ fun CategoriesScreen(
                                 },
                                 onCloseEdit = { viewModel.closeEditorDialog() },
                                 onDeleteCategory = { id -> viewModel.requestDeleteCategory(id) },
-                                onViewTransactions = { onNavigate(OrbitNavKey.Transactions()) },
+                                onViewTransactions = { onNavigate(OrbitNavKey.Transactions(categoryId = state.inspectingCategoryId)) },
                                 onDismissPane = { viewModel.dismissInspectorPane() }
                             )
                         }

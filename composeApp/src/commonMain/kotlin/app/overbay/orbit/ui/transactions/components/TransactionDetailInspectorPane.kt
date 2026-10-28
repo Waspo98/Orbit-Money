@@ -37,6 +37,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.transactions.TransactionsUiState
 import app.overbay.orbit.ui.transactions.TransactionsViewModel
 import app.overbay.orbit.ui.transactions.sheets.SplitTransactionContent
@@ -98,11 +99,11 @@ fun TransactionDetailInspectorPane(
             }
             InspectorSubMode.EDIT -> {
                 TransactionEditorContent(
-                    transaction = inspecting,
+                    transaction = state.inspectingTransaction,
                     categories = state.categories,
                     accounts = state.accounts,
-                    onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha ->
-                        viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha)
+                    onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha, acctId ->
+                        viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha, acctId)
                     },
                     onResetToOriginal = { id -> viewModel.resetTransaction(id) },
                     onDelete = { id -> onRequestDelete(id) },
@@ -110,7 +111,7 @@ fun TransactionDetailInspectorPane(
                         viewModel.closeTransactionEditor()
                         viewModel.openSplitSheet(id)
                     },
-                    onDismiss = { if (inspecting != null) viewModel.closeTransactionEditor() else onClosePane() },
+                    onDismiss = { if (state.inspectingTransaction != null) viewModel.closeTransactionEditor() else onClosePane() },
                     onCreateRule = { txn ->
                         viewModel.createRuleFromTransaction(txn)
                         viewModel.closeTransactionEditor()
@@ -191,7 +192,7 @@ private fun TransactionReadOnlyDetailContent(
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
-    val catColor = parseInspectorHexColor(categoryColorHex) ?: MaterialTheme.colorScheme.primary
+    val catColor = categoryColorHex.toComposeColor(MaterialTheme.colorScheme.primary)
     val amountColor = when {
         transaction.effectiveIsTransfer -> MaterialTheme.colorScheme.secondary
         transaction.isIncome -> colors.income
@@ -284,10 +285,10 @@ private fun TransactionReadOnlyDetailContent(
         ) {
             InspectorPillAction(label = "Edit", onClick = onEdit)
             InspectorPillAction(label = "Split", onClick = onSplit)
-            InspectorPillAction(label = "Create rule", onClick = onCreateRule)
+            InspectorPillAction(label = "Create Rule", onClick = onCreateRule)
             InspectorPillAction(label = "Recurring", onClick = onMarkRecurring)
             InspectorPillAction(label = if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Transfer", onClick = onToggleTransfer)
-            InspectorPillAction(label = if (transaction.effectiveMhaEligible == true) "Remove MHA" else "MHA eligible", onClick = onToggleMha)
+            InspectorPillAction(label = if (transaction.effectiveMhaEligible == true) "Remove MHA" else "MHA Eligible", onClick = onToggleMha)
             InspectorPillAction(label = if (transaction.effectiveIsIgnored) "Unignore" else "Ignore", onClick = onToggleIgnore)
             InspectorPillAction(label = "Delete", isDestructive = true, onClick = onDelete)
         }
@@ -362,17 +363,3 @@ private fun InspectorPillAction(label: String, onClick: () -> Unit, isDestructiv
     }
 }
 
-private fun parseInspectorHexColor(hex: String?): Color? {
-    if (hex.isNullOrBlank() || !hex.startsWith("#")) return null
-    return try {
-        val clean = hex.removePrefix("#")
-        val colorInt = clean.toLong(16)
-        when (clean.length) {
-            6 -> Color(0xFF000000 or colorInt)
-            8 -> Color(colorInt)
-            else -> null
-        }
-    } catch (_: Exception) {
-        null
-    }
-}

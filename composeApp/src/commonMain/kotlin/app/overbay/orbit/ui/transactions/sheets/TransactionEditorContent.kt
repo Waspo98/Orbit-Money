@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.domain.Cents
@@ -75,7 +76,8 @@ fun TransactionEditorContent(
         notes: String?,
         isTransfer: Boolean,
         isIgnored: Boolean,
-        mhaEligible: Boolean?
+        mhaEligible: Boolean?,
+        accountId: Long?
     ) -> Unit,
     onResetToOriginal: (Long) -> Unit,
     onDelete: (Long) -> Unit,
@@ -102,6 +104,9 @@ fun TransactionEditorContent(
     }
     var selectedCategoryId by remember(transaction) {
         mutableStateOf(transaction?.effectiveCategoryId)
+    }
+    var selectedAccountId by remember(transaction, accounts) {
+        mutableStateOf(transaction?.accountId ?: accounts.firstOrNull()?.id ?: 1L)
     }
     var notes by remember(transaction) { mutableStateOf(transaction?.notes ?: "") }
     var isTransfer by remember(transaction) { mutableStateOf(transaction?.effectiveIsTransfer ?: false) }
@@ -214,6 +219,18 @@ fun TransactionEditorContent(
             label = "Transaction Date"
         )
 
+        if (!isEditing && accounts.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            val selectedAccount = accounts.find { it.id == selectedAccountId } ?: accounts.first()
+            OrbitDropdownField(
+                label = "Account",
+                selectedText = selectedAccount.name,
+                options = accounts,
+                optionLabel = { it.name },
+                onOptionSelected = { selectedAccountId = it.id }
+            )
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
 
         // Category Picker
@@ -228,12 +245,7 @@ fun TransactionEditorContent(
             onNullSelected = { selectedCategoryId = null },
             leadingIcon = if (selectedCategory != null) {
                 {
-                    val color = try {
-                        val hex = selectedCategory.color.trim().removePrefix("#")
-                        Color(hex.toLong(16) or 0xFF000000)
-                    } catch (_: Exception) {
-                        MaterialTheme.colorScheme.primary
-                    }
+                    val color = selectedCategory.color.toComposeColor(MaterialTheme.colorScheme.primary)
                     Box(
                         modifier = Modifier
                             .size(14.dp)
@@ -295,7 +307,8 @@ fun TransactionEditorContent(
                         notes.ifBlank { null },
                         isTransfer,
                         isIgnored,
-                        mhaEligible
+                        mhaEligible,
+                        selectedAccountId
                     )
                 },
                 enabled = merchant.isNotBlank() && rawAmountCents > 0L,

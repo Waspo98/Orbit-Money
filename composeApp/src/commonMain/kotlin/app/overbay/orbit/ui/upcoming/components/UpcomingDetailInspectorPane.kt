@@ -97,7 +97,7 @@ fun UpcomingDetailInspectorPane(
         when (mode) {
             UpcomingInspectorSubMode.EDIT -> {
                 RecurringItemEditorContent(
-                    item = state.editingItem ?: inspecting,
+                    item = state.editingItem,
                     categories = state.categories,
                     accounts = state.accounts,
                     onSave = { viewModel.saveUpcoming(it) },

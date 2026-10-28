@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
@@ -236,7 +237,7 @@ fun RecentTransactionsCard(
 
     OrbitSectionCard(
         title = "RECENT TRANSACTIONS",
-        actionText = "See all",
+        actionText = "See All",
         onActionClick = onViewAll,
         modifier = modifier
             .clip(MaterialTheme.shapes.large)
@@ -254,7 +255,7 @@ fun RecentTransactionsCard(
         } else {
             Column(modifier = Modifier.fillMaxWidth()) {
                 transactions.take(10).forEachIndexed { index, txn ->
-                    val catColor = parseHexColor(txn.categoryColor) ?: MaterialTheme.colorScheme.primary
+                    val catColor = txn.categoryColor.toComposeColor(MaterialTheme.colorScheme.primary)
                     val catPrefix = CategoryEmojiMapper.resolveEmoji(txn.categoryIcon)?.let { "$it " } ?: ""
                     val catLabel = txn.categoryName?.let { "$catPrefix$it" } ?: "❓ Uncategorized"
                     OrbitCompactListRow(
@@ -284,17 +285,3 @@ fun RecentTransactionsCard(
     }
 }
 
-private fun parseHexColor(hex: String?): Color? {
-    if (hex.isNullOrBlank() || !hex.startsWith("#")) return null
-    return try {
-        val clean = hex.removePrefix("#")
-        val colorInt = clean.toLong(16)
-        if (clean.length == 6) {
-            Color(0xFF000000 or colorInt)
-        } else if (clean.length == 8) {
-            Color(colorInt)
-        } else null
-    } catch (_: Exception) {
-        null
-    }
-}

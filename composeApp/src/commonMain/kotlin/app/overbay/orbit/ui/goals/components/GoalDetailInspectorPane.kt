@@ -106,7 +106,7 @@ fun GoalDetailInspectorPane(
         when (mode) {
             GoalInspectorSubMode.EDIT -> {
                 GoalEditorContent(
-                    goal = state.editingGoal ?: inspecting,
+                    goal = state.editingGoal,
                     accounts = state.accounts,
                     onSave = { viewModel.saveGoal(it) },
                     onDelete = { viewModel.deleteGoal(it) },

@@ -1,6 +1,7 @@
 package app.overbay.orbit.domain
 
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Transaction
 import kotlin.math.abs
 
@@ -73,7 +74,8 @@ object TransferMatcherEngine {
                 txn.copy(
                     transferPairId = peerId,
                     editedIsTransfer = true,
-                    editedIsTransferSource = "system:transfer_matcher"
+                    editedIsTransferSource = "system:transfer_matcher",
+                    editSource = if (txn.editSource == EditSource.NONE) EditSource.SYSTEM else txn.editSource
                 )
             } else {
                 txn

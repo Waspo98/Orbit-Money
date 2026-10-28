@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -47,7 +46,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleCondition
+import app.overbay.orbit.domain.ReviewQueueCandidate
 import app.overbay.orbit.domain.RuleMatcherEngine
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
@@ -74,9 +75,7 @@ fun TransactionReviewSheet(
     val density = LocalDensity.current
     val currentTxn = state.currentTxn
 
-    val categoryById = remember(state.categories) {
-        state.categories.associateBy { it.id }
-    }
+    val categoryById = remember(state.categories) { state.categories.associateBy { it.id } }
 
     var rawDragX by remember(currentTxn?.id, state.currentIndex) { mutableFloatStateOf(0f) }
     var isDragging by remember(currentTxn?.id, state.currentIndex) { mutableStateOf(false) }
@@ -84,10 +83,7 @@ fun TransactionReviewSheet(
 
     val animatedDragX by animateFloatAsState(
         targetValue = rawDragX,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
         label = "reviewCardDragX"
     )
     val effectiveDragX = if (isDragging) rawDragX else animatedDragX
@@ -120,7 +116,6 @@ fun TransactionReviewSheet(
                     .padding(20.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                // Modal Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -145,12 +140,7 @@ fun TransactionReviewSheet(
                             }
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text(
-                                text = "x",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Text("x", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -160,257 +150,56 @@ fun TransactionReviewSheet(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 when {
-                    state.allDone -> {
-                        ReviewEmptyStateContent(
-                            badgeText = "!",
-                            title = "PHEW all transactions are categorized for now.",
-                            subtitle = "Want to go through more transactions just for fun, ya sicko?",
-                            primaryButtonText = "Yes I need the dopamine",
-                            secondaryButtonText = "No thanks, I have self-control",
-                            onPrimaryClick = { onAction(DashboardAction.StartFunReviewMode) },
-                            onSecondaryClick = { onAction(DashboardAction.CloseCategorizeReview) }
-                        )
-                    }
+                    state.allDone -> ReviewEmptyStateContent(
+                        badgeText = "!",
+                        title = "PHEW all transactions are categorized for now.",
+                        subtitle = "Want to go through more transactions just for fun, ya sicko?",
+                        primaryButtonText = "Yes I Need The Dopamine",
+                        secondaryButtonText = "No Thanks, I Have Self-Control",
+                        onPrimaryClick = { onAction(DashboardAction.StartFunReviewMode) },
+                        onSecondaryClick = { onAction(DashboardAction.CloseCategorizeReview) }
+                    )
 
-                    state.isBatchComplete -> {
-                        ReviewEmptyStateContent(
-                            badgeText = "10",
-                            title = "Ten down.",
-                            subtitle = "Want another stack, or are we calling that a responsible little victory?",
-                            primaryButtonText = "View More Transactions",
-                            secondaryButtonText = "Done For Now",
-                            onPrimaryClick = { onAction(DashboardAction.LoadMoreReviewTransactions) },
-                            onSecondaryClick = { onAction(DashboardAction.CloseCategorizeReview) }
-                        )
-                    }
+                    state.isBatchComplete -> ReviewEmptyStateContent(
+                        badgeText = "10",
+                        title = "Ten down.",
+                        subtitle = "Want another stack, or are we calling that a responsible little victory?",
+                        primaryButtonText = "View More Transactions",
+                        secondaryButtonText = "Done For Now",
+                        onPrimaryClick = { onAction(DashboardAction.LoadMoreReviewTransactions) },
+                        onSecondaryClick = { onAction(DashboardAction.CloseCategorizeReview) }
+                    )
 
-                    currentTxn != null && state.isCategoryPickerOpen -> {
-                        CategoryReviewPickerContent(
-                            txn = currentTxn,
-                            categories = state.categories,
-                            onChooseCategory = { catId ->
-                                onAction(DashboardAction.RequestConfirmReviewCategory(catId))
-                            },
-                            onBack = { onAction(DashboardAction.CloseReviewCategoryPicker) }
-                        )
-                    }
+                    currentTxn != null && state.isCategoryPickerOpen -> CategoryReviewPickerContent(
+                        txn = currentTxn,
+                        categories = state.categories,
+                        onChooseCategory = { catId -> onAction(DashboardAction.RequestConfirmReviewCategory(catId)) },
+                        onBack = { onAction(DashboardAction.CloseReviewCategoryPicker) }
+                    )
 
-                    currentTxn != null -> {
-                        val canGoBack = state.currentIndex > 0
-
-                        // Progress Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.surface,
-                                    border = BorderStroke(1.dp, colors.cardBorder),
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .alpha(if (canGoBack) 1f else 0.36f)
-                                        .clip(CircleShape)
-                                        .clickable(enabled = canGoBack) {
-                                            haptics.tick()
-                                            onAction(DashboardAction.GoBackReviewTransaction)
-                                        }
-                                ) {
-                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                        Text(
-                                            text = "←",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-                                Text(
-                                    text = "${minOf(state.batchReviewed + 1, 10)} of 10",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Text(
-                                text = "Is this category correct?",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Swipe Stage
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Change",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                )
-                                Text(
-                                    text = "Confirm",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                )
-                            }
-
-                            ReviewTransactionCardContent(
-                                txn = currentTxn,
-                                category = currentTxn.categoryId?.let { categoryById[it] },
-                                cardTone = cardTone,
-                                modifier = Modifier
-                                    .widthIn(max = 390.dp)
-                                    .offset { IntOffset(effectiveDragX.roundToInt(), 0) }
-                                    .graphicsLayer { rotationZ = cardRotation }
-                                    .pointerInput(currentTxn.id, state.currentIndex) {
-                                        detectHorizontalDragGestures(
-                                            onDragStart = {
-                                                isDragging = true
-                                                readySide = null
-                                            },
-                                            onHorizontalDrag = { change, dragAmount ->
-                                                change.consume()
-                                                val nextX = rawDragX + dragAmount
-                                                val nextSide = when {
-                                                    nextX > thresholdPx -> "yes"
-                                                    nextX < -thresholdPx -> "no"
-                                                    else -> null
-                                                }
-                                                if (nextSide != null && nextSide != readySide) {
-                                                    haptics.tick()
-                                                }
-                                                readySide = nextSide
-                                                rawDragX = nextX
-                                            },
-                                            onDragEnd = {
-                                                isDragging = false
-                                                val finalX = rawDragX
-                                                rawDragX = 0f
-                                                readySide = null
-                                                if (finalX > thresholdPx) {
-                                                    haptics.confirm()
-                                                    onAction(DashboardAction.ApproveReviewTransaction)
-                                                } else if (finalX < -thresholdPx) {
-                                                    haptics.tick()
-                                                    onAction(DashboardAction.RejectReviewTransaction)
-                                                }
-                                            },
-                                            onDragCancel = {
-                                                isDragging = false
-                                                rawDragX = 0f
-                                                readySide = null
-                                            }
-                                        )
-                                    }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Swipe Hint Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "← Change",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.expense,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        haptics.tick()
-                                        onAction(DashboardAction.RejectReviewTransaction)
-                                    }
-                                    .padding(vertical = 4.dp, horizontal = 6.dp)
-                            )
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                border = BorderStroke(1.dp, colors.cardBorder)
-                            ) {
-                                Text(
-                                    text = "‹  ›",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                                )
-                            }
-                            Text(
-                                text = "Confirm →",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        haptics.confirm()
-                                        onAction(DashboardAction.ApproveReviewTransaction)
-                                    }
-                                    .padding(vertical = 4.dp, horizontal = 6.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-                        HorizontalDivider(color = colors.cardBorder)
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Bottom Actions ("Create A Rule" & "Skip For Now")
-                        OutlinedButton(
-                            onClick = {
-                                haptics.tick()
-                                onAction(DashboardAction.OpenReviewRuleCreator)
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                        ) {
-                            Text("Create A Rule", fontWeight = FontWeight.SemiBold)
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedButton(
-                            onClick = {
-                                haptics.tick()
-                                onAction(DashboardAction.SkipReviewTransaction)
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                        ) {
-                            Text("Skip For Now", fontWeight = FontWeight.SemiBold)
-                        }
-                    }
+                    currentTxn != null -> ReviewSwipeStage(
+                        currentTxn = currentTxn,
+                        currentIndex = state.currentIndex,
+                        batchReviewed = state.batchReviewed,
+                        category = currentTxn.categoryId?.let { categoryById[it] },
+                        cardTone = cardTone,
+                        effectiveDragX = effectiveDragX,
+                        cardRotation = cardRotation,
+                        thresholdPx = thresholdPx,
+                        rawDragX = rawDragX,
+                        readySide = readySide,
+                        onUpdateDragState = { dragging, nextX, nextSide ->
+                            isDragging = dragging
+                            rawDragX = nextX
+                            readySide = nextSide
+                        },
+                        onAction = onAction
+                    )
                 }
             }
         }
     }
 
-    // Confirmation Dialog when picking a replacement category
     val pendingCategoryId = state.pendingConfirmCategoryId
     if (pendingCategoryId != null && currentTxn != null) {
         val nextCategory = categoryById[pendingCategoryId]
@@ -424,18 +213,166 @@ fun TransactionReviewSheet(
         )
     }
 
-    // Rule Editor Sheet launched from "Create A Rule"
     val ruleTxn = state.ruleDraftTransaction
     if (ruleTxn != null) {
         RuleEditorSheet(
-            rule = remember(ruleTxn, state.categories) {
-                makeReviewRuleDraft(ruleTxn, state.categories)
-            },
+            rule = remember(ruleTxn, state.categories) { makeReviewRuleDraft(ruleTxn, state.categories) },
             categories = state.categories,
             accounts = state.accounts,
             onSave = { savedRule -> onAction(DashboardAction.SaveReviewRule(savedRule)) },
             onPreviewCount = onPreviewRuleMatches,
             onDismiss = { onAction(DashboardAction.CloseReviewRuleCreator) }
         )
+    }
+}
+
+@Composable
+private fun ReviewSwipeStage(
+    currentTxn: ReviewQueueCandidate,
+    currentIndex: Int,
+    batchReviewed: Int,
+    category: Category?,
+    cardTone: String,
+    effectiveDragX: Float,
+    cardRotation: Float,
+    thresholdPx: Float,
+    rawDragX: Float,
+    readySide: String?,
+    onUpdateDragState: (isDragging: Boolean, rawX: Float, readySide: String?) -> Unit,
+    onAction: (DashboardAction) -> Unit
+) {
+    val haptics = LocalOrbitHaptics.current
+    val colors = OrbitTheme.colors
+    val canGoBack = currentIndex > 0
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, colors.cardBorder),
+                modifier = Modifier
+                    .size(30.dp)
+                    .alpha(if (canGoBack) 1f else 0.36f)
+                    .clip(CircleShape)
+                    .clickable(enabled = canGoBack) {
+                        haptics.tick()
+                        onAction(DashboardAction.GoBackReviewTransaction)
+                    }
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Text("←", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+            Text("${minOf(batchReviewed + 1, 10)} of 10", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text("Is this category correct?", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+    }
+
+    Spacer(modifier = Modifier.height(14.dp))
+
+    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Change", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+            Text("Confirm", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+        }
+
+        ReviewTransactionCardContent(
+            txn = currentTxn,
+            category = category,
+            cardTone = cardTone,
+            modifier = Modifier
+                .widthIn(max = 390.dp)
+                .offset { IntOffset(effectiveDragX.roundToInt(), 0) }
+                .graphicsLayer { rotationZ = cardRotation }
+                .pointerInput(currentTxn.id, currentIndex) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { onUpdateDragState(true, rawDragX, null) },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            val nextX = rawDragX + dragAmount
+                            val nextSide = when {
+                                nextX > thresholdPx -> "yes"
+                                nextX < -thresholdPx -> "no"
+                                else -> null
+                            }
+                            if (nextSide != null && nextSide != readySide) haptics.tick()
+                            onUpdateDragState(true, nextX, nextSide)
+                        },
+                        onDragEnd = {
+                            val finalX = rawDragX
+                            onUpdateDragState(false, 0f, null)
+                            if (finalX > thresholdPx) {
+                                haptics.confirm()
+                                onAction(DashboardAction.ApproveReviewTransaction)
+                            } else if (finalX < -thresholdPx) {
+                                haptics.tick()
+                                onAction(DashboardAction.RejectReviewTransaction)
+                            }
+                        },
+                        onDragCancel = { onUpdateDragState(false, 0f, null) }
+                    )
+                }
+        )
+    }
+
+    Spacer(modifier = Modifier.height(14.dp))
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "← Change",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = colors.expense,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { haptics.tick(); onAction(DashboardAction.RejectReviewTransaction) }
+                .padding(vertical = 4.dp, horizontal = 6.dp)
+        )
+        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerLow, border = BorderStroke(1.dp, colors.cardBorder)) {
+            Text("‹  ›", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+        }
+        Text(
+            text = "Confirm →",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { haptics.confirm(); onAction(DashboardAction.ApproveReviewTransaction) }
+                .padding(vertical = 4.dp, horizontal = 6.dp)
+        )
+    }
+
+    Spacer(modifier = Modifier.height(14.dp))
+    HorizontalDivider(color = colors.cardBorder)
+    Spacer(modifier = Modifier.height(12.dp))
+
+    OutlinedButton(
+        onClick = { haptics.tick(); onAction(DashboardAction.OpenReviewRuleCreator) },
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+    ) {
+        Text("Create A Rule", fontWeight = FontWeight.SemiBold)
+    }
+    Spacer(modifier = Modifier.height(10.dp))
+    OutlinedButton(
+        onClick = { haptics.tick(); onAction(DashboardAction.SkipReviewTransaction) },
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+    ) {
+        Text("Skip For Now", fontWeight = FontWeight.SemiBold)
     }
 }

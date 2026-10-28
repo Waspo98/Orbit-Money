@@ -11,9 +11,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
@@ -52,10 +49,6 @@ fun TransactionsScreen(
         viewModel.setSearchActive(false)
     }
 
-    var showBatchDeleteConfirm by remember { mutableStateOf(false) }
-    var showSingleDeleteConfirmId by remember { mutableStateOf<Long?>(null) }
-    var showCategoryBatchPicker by remember { mutableStateOf(false) }
-
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
         val isDetailOpen = isTwoPane && (
@@ -73,10 +66,10 @@ fun TransactionsScreen(
                         totalCount = state.filteredTransactions.size,
                         onSelectAll = { viewModel.selectAll() },
                         onClearSelection = { viewModel.clearSelection() },
-                        onCategorize = { showCategoryBatchPicker = true },
+                        onCategorize = { viewModel.setShowCategoryBatchPicker(true) },
                         onMarkTransfer = { viewModel.batchMarkTransfer(true) },
                         onToggleMha = { viewModel.batchToggleMha() },
-                        onDelete = { showBatchDeleteConfirm = true }
+                        onDelete = { viewModel.setShowBatchDeleteConfirm(true) }
                     )
                 }
             }
@@ -101,7 +94,7 @@ fun TransactionsScreen(
                             state = state,
                             viewModel = viewModel,
                             onNavigate = onNavigate,
-                            onRequestDelete = { id -> showSingleDeleteConfirmId = id },
+                            onRequestDelete = { id -> viewModel.setSingleDeleteConfirmId(id) },
                             onClosePane = { viewModel.dismissInspectorPane() }
                         )
                     }
@@ -116,11 +109,11 @@ fun TransactionsScreen(
                 transaction = state.inspectingTransaction,
                 categories = state.categories,
                 accounts = state.accounts,
-                onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha ->
-                    viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha)
+                onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha, acctId ->
+                    viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha, acctId)
                 },
                 onResetToOriginal = { id -> viewModel.resetTransaction(id) },
-                onDelete = { id -> showSingleDeleteConfirmId = id },
+                onDelete = { id -> viewModel.setSingleDeleteConfirmId(id) },
                 onSplit = { id -> viewModel.openSplitSheet(id) },
                 onDismiss = { viewModel.closeTransactionEditor() },
                 onCreateRule = { txn ->
@@ -141,8 +134,8 @@ fun TransactionsScreen(
                 transaction = null,
                 categories = state.categories,
                 accounts = state.accounts,
-                onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha ->
-                    viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha)
+                onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha, acctId ->
+                    viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha, acctId)
                 },
                 onResetToOriginal = {},
                 onDelete = {},
@@ -200,7 +193,7 @@ fun TransactionsScreen(
         )
     }
 
-    if (showBatchDeleteConfirm) {
+    if (state.showBatchDeleteConfirm) {
         OrbitConfirmationDialog(
             title = "Delete ${state.selectedCount} Transactions?",
             message = "Are you sure you want to delete these transactions? This action cannot be undone.",
@@ -208,37 +201,38 @@ fun TransactionsScreen(
             isDestructive = true,
             onConfirm = {
                 viewModel.batchDelete()
-                showBatchDeleteConfirm = false
+                viewModel.setShowBatchDeleteConfirm(false)
             },
-            onDismiss = { showBatchDeleteConfirm = false }
+            onDismiss = { viewModel.setShowBatchDeleteConfirm(false) }
         )
     }
 
-    if (showSingleDeleteConfirmId != null) {
+    if (state.singleDeleteConfirmId != null) {
+        val deleteId = state.singleDeleteConfirmId!!
         OrbitConfirmationDialog(
             title = "Delete Transaction?",
             message = "Are you sure you want to permanently delete this transaction?",
             confirmText = "Delete",
             isDestructive = true,
             onConfirm = {
-                viewModel.deleteTransaction(showSingleDeleteConfirmId!!)
-                showSingleDeleteConfirmId = null
+                viewModel.deleteTransaction(deleteId)
+                viewModel.setSingleDeleteConfirmId(null)
             },
-            onDismiss = { showSingleDeleteConfirmId = null }
+            onDismiss = { viewModel.setSingleDeleteConfirmId(null) }
         )
     }
 
-    if (showCategoryBatchPicker) {
+    if (state.showCategoryBatchPicker) {
         DropdownMenu(
-            expanded = showCategoryBatchPicker,
-            onDismissRequest = { showCategoryBatchPicker = false }
+            expanded = state.showCategoryBatchPicker,
+            onDismissRequest = { viewModel.setShowCategoryBatchPicker(false) }
         ) {
             state.categories.forEach { cat ->
                 DropdownMenuItem(
                     text = { Text(cat.labelWithEmoji) },
                     onClick = {
                         viewModel.batchCategorize(cat.id)
-                        showCategoryBatchPicker = false
+                        viewModel.setShowCategoryBatchPicker(false)
                     }
                 )
             }

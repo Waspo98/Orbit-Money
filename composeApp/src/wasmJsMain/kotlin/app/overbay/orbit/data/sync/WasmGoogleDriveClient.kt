@@ -34,8 +34,8 @@ class WasmGoogleDriveClient(
     }
 
     override suspend fun uploadTextFile(fileName: String, content: String): Boolean {
-        runCatching { localStorage.setItem("orbit_gdrive_backup_$fileName", content) }
-        return !accessToken.isNullOrBlank() || email != null
+        val storedOk = runCatching { localStorage.setItem("orbit_gdrive_backup_$fileName", content) }.isSuccess
+        return storedOk && (!accessToken.isNullOrBlank() || email != null)
     }
 
     override suspend fun deleteFile(fileName: String): Boolean {

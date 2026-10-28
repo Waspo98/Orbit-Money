@@ -183,7 +183,7 @@ fun AccountRowCard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Compact "See transactions" button
+                // Compact "See Transactions" button
                 OutlinedButton(
                     onClick = {
                         haptics.tick()
@@ -195,7 +195,7 @@ fun AccountRowCard(
                     modifier = Modifier.height(26.dp)
                 ) {
                     Text(
-                        text = "See transactions",
+                        text = "See Transactions",
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,

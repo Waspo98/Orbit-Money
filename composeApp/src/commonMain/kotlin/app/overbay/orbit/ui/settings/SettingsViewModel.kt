@@ -200,7 +200,15 @@ class SettingsViewModel(
     }
 
     fun closeRestoreDialog() {
-        _uiState.update { it.copy(showRestoreDialog = false) }
+        _uiState.update { it.copy(showRestoreDialog = false, restoreJsonText = "") }
+    }
+
+    fun setRestoreJsonText(text: String) {
+        _uiState.update { it.copy(restoreJsonText = text) }
+    }
+
+    fun setShowDonateDialog(show: Boolean) {
+        _uiState.update { it.copy(showDonateDialog = show) }
     }
 
     fun restoreBackup(jsonString: String) {

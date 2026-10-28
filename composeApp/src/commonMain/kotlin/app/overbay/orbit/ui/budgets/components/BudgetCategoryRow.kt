@@ -37,6 +37,7 @@ import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -61,7 +62,7 @@ fun BudgetCategoryRow(
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
 
-    val categoryColor = parseHexColor(item.category.color) ?: MaterialTheme.colorScheme.primary
+    val categoryColor = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
     val isOverBudget = item.spentCents > item.amountCents && item.amountCents > 0L
     val isWatch = item.paceStatus == BudgetPaceStatus.WATCH
 
@@ -294,17 +295,3 @@ fun BudgetCategoryRow(
     }
 }
 
-private fun parseHexColor(hex: String?): Color? {
-    if (hex.isNullOrBlank() || !hex.startsWith("#")) return null
-    return try {
-        val clean = hex.removePrefix("#")
-        val colorInt = clean.toLong(16)
-        if (clean.length == 6) {
-            Color(0xFF000000 or colorInt)
-        } else if (clean.length == 8) {
-            Color(colorInt)
-        } else null
-    } catch (_: Exception) {
-        null
-    }
-}

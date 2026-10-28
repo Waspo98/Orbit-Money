@@ -69,7 +69,7 @@ class BudgetsViewModel(
 
         // Map transactions for this month grouped by category
         val monthTxns = transactions.filter {
-            it.effectiveDate.take(7) == control.month && !it.effectiveIsIgnored && it.isExpense
+            it.effectiveDate.take(7) == control.month && !it.effectiveIsIgnored && !it.effectiveIsTransfer && it.isExpense
         }
         val categoryTransactions = monthTxns.groupBy { it.effectiveCategoryId ?: 0L }
 

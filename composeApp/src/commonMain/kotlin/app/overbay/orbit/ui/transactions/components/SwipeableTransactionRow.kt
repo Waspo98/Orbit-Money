@@ -52,6 +52,7 @@ import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -91,7 +92,7 @@ fun SwipeableTransactionRow(
     val colors = OrbitTheme.colors
     var menuExpanded by remember { mutableStateOf(false) }
 
-    val catColor = parseHexColor(category?.color) ?: MaterialTheme.colorScheme.primary
+    val catColor = category?.color.toComposeColor(MaterialTheme.colorScheme.primary)
     val rowBgColor = when {
         isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
         isInspected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
@@ -230,14 +231,14 @@ fun SwipeableTransactionRow(
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                             DropdownMenuItem(text = { Text("Edit") }, onClick = { menuExpanded = false; onEdit() })
                             DropdownMenuItem(text = { Text("Split") }, onClick = { menuExpanded = false; onSplit() })
-                            DropdownMenuItem(text = { Text("Create rule") }, onClick = { menuExpanded = false; onCreateRule() })
-                            DropdownMenuItem(text = { Text("Mark as recurring") }, onClick = { menuExpanded = false; onMarkRecurring() })
+                            DropdownMenuItem(text = { Text("Create Rule") }, onClick = { menuExpanded = false; onCreateRule() })
+                            DropdownMenuItem(text = { Text("Mark as Recurring") }, onClick = { menuExpanded = false; onMarkRecurring() })
                             DropdownMenuItem(
-                                text = { Text(if (transaction.effectiveIsTransfer) "Unmark transfer" else "Mark as transfer") },
+                                text = { Text(if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Mark as Transfer") },
                                 onClick = { menuExpanded = false; onToggleTransfer() }
                             )
                             DropdownMenuItem(
-                                text = { Text(if (transaction.effectiveMhaEligible == true) "Remove MHA" else "MHA eligible") },
+                                text = { Text(if (transaction.effectiveMhaEligible == true) "Remove MHA" else "MHA Eligible") },
                                 onClick = { menuExpanded = false; onToggleMha() }
                             )
                             DropdownMenuItem(
@@ -296,7 +297,7 @@ fun SwipeableTransactionRow(
                         ) {
                             CompactPillAction(label = "Edit", onClick = onEdit)
                             CompactPillAction(label = "Split", onClick = onSplit)
-                            CompactPillAction(label = "Create rule", onClick = onCreateRule)
+                            CompactPillAction(label = "Create Rule", onClick = onCreateRule)
                             CompactPillAction(label = "Recurring", onClick = onMarkRecurring)
                             CompactPillAction(label = if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Transfer", onClick = onToggleTransfer)
                             CompactPillAction(label = if (transaction.effectiveIsIgnored) "Unignore" else "Ignore", onClick = onToggleIgnore)
@@ -353,17 +354,3 @@ private fun CompactPillAction(
     }
 }
 
-private fun parseHexColor(hex: String?): Color? {
-    if (hex.isNullOrBlank() || !hex.startsWith("#")) return null
-    return try {
-        val clean = hex.removePrefix("#")
-        val colorInt = clean.toLong(16)
-        if (clean.length == 6) {
-            Color(0xFF000000 or colorInt)
-        } else if (clean.length == 8) {
-            Color(colorInt)
-        } else null
-    } catch (_: Exception) {
-        null
-    }
-}

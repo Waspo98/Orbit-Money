@@ -81,9 +81,7 @@ class OrbitApiClient(
         return if (base.isNotEmpty()) "$base$normalizedPath" else normalizedPath
     }
 
-    // -------------------------------------------------------------------------
     // Auth Endpoints
-    // -------------------------------------------------------------------------
     suspend fun getAuthConfig(): Result<AuthConfigResponseDto> = runCatching {
         val response = client.get(url("/api/auth/config")) {
             sessionCookie?.let { header("Cookie", it) }
@@ -150,9 +148,7 @@ class OrbitApiClient(
         response.status.isSuccess()
     }
 
-    // -------------------------------------------------------------------------
     // Accounts Endpoints
-    // -------------------------------------------------------------------------
     suspend fun getAccounts(includeArchived: Boolean = true): Result<List<AccountDto>> = runCatching {
         val response = client.get(url("/api/accounts")) {
             sessionCookie?.let { header("Cookie", it) }
@@ -194,9 +190,17 @@ class OrbitApiClient(
         response.status.isSuccess()
     }
 
-    // -------------------------------------------------------------------------
+    suspend fun mergeAccounts(sourceId: Long, targetId: Long): Result<Boolean> = runCatching {
+        val response = client.post(url("/api/accounts/$sourceId/merge")) {
+            contentType(ContentType.Application.Json)
+            sessionCookie?.let { header("Cookie", it) }
+            setBody(MergeAccountRequestDto(targetId = targetId))
+        }
+        extractSessionCookie(response)
+        response.status.isSuccess()
+    }
+
     // Transactions Endpoints
-    // -------------------------------------------------------------------------
     suspend fun getTransactions(
         page: Int = 1,
         limit: Int = 50,
@@ -272,9 +276,7 @@ class OrbitApiClient(
             .getOrElse { response.body() }
     }
 
-    // -------------------------------------------------------------------------
     // Categories Endpoints
-    // -------------------------------------------------------------------------
     suspend fun getCategories(): Result<List<CategoryDto>> = runCatching {
         val response = client.get(url("/api/categories")) {
             sessionCookie?.let { header("Cookie", it) }
@@ -315,9 +317,7 @@ class OrbitApiClient(
         response.status.isSuccess()
     }
 
-    // -------------------------------------------------------------------------
     // Budgets Endpoints
-    // -------------------------------------------------------------------------
     suspend fun getBudgets(month: String): Result<MonthlyBudgetOverviewDto> = runCatching {
         val response = client.get(url("/api/budgets")) {
             sessionCookie?.let { header("Cookie", it) }
@@ -349,9 +349,7 @@ class OrbitApiClient(
         response.status.isSuccess()
     }
 
-    // -------------------------------------------------------------------------
     // Goals Endpoints
-    // -------------------------------------------------------------------------
     suspend fun getGoals(): Result<List<GoalDto>> = runCatching {
         val response = client.get(url("/api/goals")) {
             sessionCookie?.let { header("Cookie", it) }
@@ -396,9 +394,7 @@ class OrbitApiClient(
         response.status.isSuccess()
     }
 
-    // -------------------------------------------------------------------------
     // Rules Endpoints
-    // -------------------------------------------------------------------------
     suspend fun getRules(): Result<List<RuleDto>> = runCatching {
         val response = client.get(url("/api/rules")) {
             sessionCookie?.let { header("Cookie", it) }
@@ -448,13 +444,15 @@ class OrbitApiClient(
             sessionCookie?.let { header("Cookie", it) }
         }
         extractSessionCookie(response)
-        val map: Map<String, Int> = response.body()
-        map["updated"] ?: map["appliedCount"] ?: 0
+        val res: ReapplyRulesResponseDto = response.body()
+        if (res.updated > 0) res.updated else res.appliedCount
     }
 
-    // -------------------------------------------------------------------------
+    fun close() {
+        if (customHttpClient == null) runCatching { client.close() }
+    }
+
     // Upcoming Endpoints
-    // -------------------------------------------------------------------------
     suspend fun getUpcoming(): Result<List<UpcomingItemDto>> = runCatching {
         val response = client.get(url("/api/upcoming")) {
             sessionCookie?.let { header("Cookie", it) }

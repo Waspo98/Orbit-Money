@@ -143,13 +143,13 @@ object CsvImportEngine {
                 rulesMap[merchant] = customName
             }
 
-            val amountVal = amountStr.replace("$", "").replace(",", "").toDoubleOrNull()
-            if (amountVal == null || date.isBlank()) {
+            val cleanedAmount = amountStr.replace("$", "").replace(",", "").trim()
+            if (cleanedAmount.toDoubleOrNull() == null || date.isBlank()) {
                 invalidRows++
                 continue
             }
 
-            val amountCents = (amountVal * 100.0).roundToLong()
+            val amountCents = MoneyUtils.dollarsToCents(cleanedAmount)
             val extId = computeContentHash(date, amountCents, description, acctKey)
 
             if (existingExternalIds.contains(extId)) {

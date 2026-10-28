@@ -37,7 +37,7 @@ fun AccountsOverviewCard(
 
     OrbitSectionCard(
         title = "ACCOUNTS",
-        actionText = "See all",
+        actionText = "See All",
         onActionClick = onClick,
         modifier = modifier
             .clip(MaterialTheme.shapes.large)

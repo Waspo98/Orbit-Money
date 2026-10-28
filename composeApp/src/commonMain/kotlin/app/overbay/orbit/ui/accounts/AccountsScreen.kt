@@ -19,9 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -36,12 +34,14 @@ import app.overbay.orbit.ui.accounts.sheets.AccountMergeDialog
 import app.overbay.orbit.ui.accounts.sheets.CreditCardProfileEditorSheet
 import app.overbay.orbit.ui.components.HeroScrollState
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.OrbitPageActionRow
 import app.overbay.orbit.ui.components.OrbitSecondaryPillButton
 import app.overbay.orbit.ui.components.OrbitTogglePill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalDevicePosture
 
 /**
@@ -63,13 +63,11 @@ fun AccountsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val heroScrollState = rememberHeroScrollState()
 
-    var phoneViewingDetail by remember { mutableStateOf(false) }
-
     LaunchedEffect(initialAccountId) {
         if (initialAccountId != null) {
             viewModel.selectAccount(initialAccountId)
             if (!posture.supportsTwoPane) {
-                phoneViewingDetail = true
+                viewModel.setPhoneViewingDetail(true)
             }
         }
     }
@@ -89,15 +87,21 @@ fun AccountsScreen(
                 state.showHistorySheet
             )
 
+        BackHandler(enabled = state.isPhoneViewingDetail && !isTwoPane && state.selectedAccount != null) {
+            viewModel.setPhoneViewingDetail(false)
+        }
+
         // Detail Screen on Phone if directly inspecting an account
-        if (phoneViewingDetail && !isTwoPane && state.selectedAccount != null) {
+        if (state.isPhoneViewingDetail && !isTwoPane && state.selectedAccount != null) {
             AccountDetailScreen(
                 account = state.selectedAccount!!,
                 transactions = state.selectedAccountTransactions,
-                onBack = { phoneViewingDetail = false },
-                onEditAccount = { viewModel.openEditAccount(state.selectedAccount!!) },
-                onEditPerks = { viewModel.openCreditCardProfile(state.selectedAccount!!) },
-                onMergeAccount = { viewModel.openMergeDialog(state.selectedAccount!!) }
+                actions = AccountDetailActions(
+                    onBack = { viewModel.setPhoneViewingDetail(false) },
+                    onEditAccount = { viewModel.openEditAccount(state.selectedAccount!!) },
+                    onEditPerks = { viewModel.openCreditCardProfile(state.selectedAccount!!) },
+                    onMergeAccount = { viewModel.openMergeDialog(state.selectedAccount!!) }
+                )
             )
         } else {
             Scaffold(
@@ -135,7 +139,7 @@ fun AccountsScreen(
                                     viewModel.selectAccountForInspect(acct.id)
                                 } else {
                                     viewModel.selectAccount(acct.id)
-                                    phoneViewingDetail = true
+                                    viewModel.setPhoneViewingDetail(true)
                                 }
                             }
                         )
@@ -168,7 +172,7 @@ fun AccountsScreen(
             AccountEditorSheet(
                 account = state.editingAccount!!,
                 onSave = { viewModel.saveAccount(it) },
-                onDelete = { viewModel.deleteAccount(it) },
+                onDelete = { viewModel.requestDeleteAccount(it) },
                 onDismiss = { viewModel.closeEditorSheet() }
             )
         }
@@ -198,6 +202,18 @@ fun AccountsScreen(
             onDismiss = { viewModel.closeMergeDialog() }
         )
     }
+
+    if (state.deleteConfirmAccountId != null) {
+        val delId = state.deleteConfirmAccountId!!
+        OrbitConfirmationDialog(
+            title = "Delete Account?",
+            message = "Are you sure you want to permanently delete this account?",
+            confirmText = "Delete",
+            isDestructive = true,
+            onConfirm = { viewModel.deleteAccount(delId) },
+            onDismiss = { viewModel.dismissDeleteAccount() }
+        )
+    }
 }
 
 @Composable
@@ -220,7 +236,7 @@ private fun AccountsMasterContent(
         // Secondary Action Row Below Hero
         OrbitPageActionRow {
             OrbitTogglePill(
-                label = "Show archived",
+                label = "Show Archived",
                 checked = state.showArchived,
                 onCheckedChange = { viewModel.toggleShowArchived() }
             )
@@ -252,7 +268,7 @@ private fun AccountsMasterContent(
                     onHistoryClick = { viewModel.openBalanceHistory(it) },
                     onMergeClick = { viewModel.openMergeDialog(it) },
                     onToggleArchive = { viewModel.toggleArchiveAccount(it) },
-                    onDeleteAccount = { viewModel.deleteAccount(it) }
+                    onDeleteAccount = { viewModel.requestDeleteAccount(it.id) }
                 )
             }
         }

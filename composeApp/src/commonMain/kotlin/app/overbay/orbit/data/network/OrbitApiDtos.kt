@@ -123,10 +123,17 @@ data class TransactionDto(
     fun toDomain(): Transaction {
         val origMerchant = originalMerchant ?: merchant ?: ""
         val origAmountCents = MoneyUtils.dollarsToCents(originalAmount ?: amount)
+        val sources = listOfNotNull(
+            editedMerchantSource,
+            editedCategoryIdSource,
+            editedIsTransferSource,
+            editedIsIgnoredSource,
+            editedMhaEligibleSource
+        )
         val editSrc = when {
-            editedMerchantSource?.lowercase() == "user" || editedCategoryIdSource?.lowercase() == "user" -> EditSource.USER
-            editedMerchantSource?.startsWith("rule", ignoreCase = true) == true || editedCategoryIdSource?.startsWith("rule", ignoreCase = true) == true -> EditSource.RULE
-            editedMerchantSource?.startsWith("system", ignoreCase = true) == true || editedCategoryIdSource?.startsWith("system", ignoreCase = true) == true -> EditSource.SYSTEM
+            sources.any { it.equals("user", ignoreCase = true) } -> EditSource.USER
+            sources.any { it.startsWith("rule", ignoreCase = true) } -> EditSource.RULE
+            sources.any { it.startsWith("system", ignoreCase = true) } -> EditSource.SYSTEM
             else -> EditSource.NONE
         }
 
@@ -544,4 +551,17 @@ data class MerchantLogoSearchResponseDto(
     val configured: Boolean = true,
     @SerialName("merchant_logo") val merchantLogo: MerchantLogoDto? = null,
     val candidates: List<MerchantLogoCandidateDto> = emptyList()
+)
+
+@Serializable
+data class ReapplyRulesResponseDto(
+    @Serializable(with = FlexibleBooleanSerializer::class) val success: Boolean = true,
+    val updated: Int = 0,
+    val appliedCount: Int = 0,
+    val processed: Int = 0
+)
+
+@Serializable
+data class MergeAccountRequestDto(
+    val targetId: Long
 )

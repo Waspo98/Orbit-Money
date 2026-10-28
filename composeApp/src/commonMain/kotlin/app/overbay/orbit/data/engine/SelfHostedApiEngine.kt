@@ -208,6 +208,7 @@ class SelfHostedApiEngine(
     }
 
     override suspend fun deleteAccount(id: Long): Result<Boolean> = apiClient.deleteAccount(id)
+    override suspend fun mergeAccounts(sourceId: Long, targetId: Long): Result<Boolean> = apiClient.mergeAccounts(sourceId, targetId)
 
     override suspend fun pushCategory(category: Category): Result<Category> {
         val dto = CategoryDto(

@@ -29,6 +29,7 @@ import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
@@ -78,7 +79,7 @@ fun TopSpendingCard(
                 )
             } else {
                 state.categories.forEachIndexed { index, cat ->
-                    val color = parseHexColor(cat.categoryColor) ?: MaterialTheme.colorScheme.primary
+                    val color = cat.categoryColor.toComposeColor(MaterialTheme.colorScheme.primary)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -321,17 +322,3 @@ fun MonthComparisonCard(
     }
 }
 
-private fun parseHexColor(hex: String?): Color? {
-    if (hex.isNullOrBlank() || !hex.startsWith("#")) return null
-    return try {
-        val clean = hex.removePrefix("#")
-        val colorInt = clean.toLong(16)
-        if (clean.length == 6) {
-            Color(0xFF000000 or colorInt)
-        } else if (clean.length == 8) {
-            Color(colorInt)
-        } else null
-    } catch (_: Exception) {
-        null
-    }
-}

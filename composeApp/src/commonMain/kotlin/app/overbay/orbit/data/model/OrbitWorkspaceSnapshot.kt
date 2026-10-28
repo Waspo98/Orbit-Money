@@ -15,6 +15,7 @@ data class OrbitWorkspaceSnapshot(
     val exportedAt: String = "", // ISO UTC timestamp
     val household: HouseholdInfo = HouseholdInfo(),
     val members: List<HouseholdMember> = emptyList(),
+    val shares: List<HouseholdShare> = emptyList(),
     val accounts: List<Account> = emptyList(),
     val creditCardProfiles: List<CreditCardProfile> = emptyList(),
     val balanceRecords: List<BalanceRecord> = emptyList(),

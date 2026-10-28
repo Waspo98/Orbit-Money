@@ -30,6 +30,8 @@ class AccountsViewModel(
     private val _showMergeDialog = MutableStateFlow(false)
     private val _historyAccount = MutableStateFlow<Account?>(null)
     private val _showHistorySheet = MutableStateFlow(false)
+    private val _isPhoneViewingDetail = MutableStateFlow(false)
+    private val _deleteConfirmAccountId = MutableStateFlow<Long?>(null)
     private val _showArchived = MutableStateFlow(false)
     private val _isReorderMode = MutableStateFlow(false)
     private val _isSyncing = MutableStateFlow(false)
@@ -122,6 +124,10 @@ class AccountsViewModel(
             syncErrorMessage = syncReorder.err,
             isLoading = false
         )
+    }.combine(_isPhoneViewingDetail) { state, phoneDetail ->
+        state.copy(isPhoneViewingDetail = phoneDetail)
+    }.combine(_deleteConfirmAccountId) { state, delId ->
+        state.copy(deleteConfirmAccountId = delId)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -130,6 +136,18 @@ class AccountsViewModel(
 
     fun selectAccount(accountId: Long?) {
         _selectedAccountId.value = accountId
+    }
+
+    fun setPhoneViewingDetail(viewing: Boolean) {
+        _isPhoneViewingDetail.value = viewing
+    }
+
+    fun requestDeleteAccount(accountId: Long) {
+        _deleteConfirmAccountId.value = accountId
+    }
+
+    fun dismissDeleteAccount() {
+        _deleteConfirmAccountId.value = null
     }
 
     fun selectAccountForInspect(accountId: Long?) {
@@ -202,7 +220,9 @@ class AccountsViewModel(
             repository.deleteAccount(accountId)
             if (_selectedAccountId.value == accountId) {
                 _selectedAccountId.value = null
+                _isPhoneViewingDetail.value = false
             }
+            _deleteConfirmAccountId.value = null
             closeEditorSheet()
         }
     }

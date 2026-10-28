@@ -73,7 +73,10 @@ class LocalSnapshotEngine(
     // In Local Mode, state mutations are committed through OrbitRepository saving the snapshot.
     override suspend fun pushTransaction(transaction: Transaction): Result<Transaction> = Result.success(transaction)
     override suspend fun deleteTransaction(id: Long): Result<Boolean> = Result.success(true)
-    override suspend fun resetTransaction(id: Long): Result<Transaction> = Result.success(transaction)
+    override suspend fun resetTransaction(id: Long): Result<Transaction> {
+        val found = loadSnapshot().transactions.find { it.id == id }
+        return if (found != null) Result.success(found) else Result.failure(NoSuchElementException("Transaction $id not found"))
+    }
     override suspend fun pushAccount(account: Account): Result<Account> = Result.success(account)
     override suspend fun deleteAccount(id: Long): Result<Boolean> = Result.success(true)
     override suspend fun pushCategory(category: Category): Result<Category> = Result.success(category)
@@ -91,6 +94,5 @@ class LocalSnapshotEngine(
 
     companion object {
         const val SNAPSHOT_KEY = "orbit_workspace_snapshot.json"
-        private val transaction = Transaction(accountId = 0L, originalDate = "", originalMerchant = "", originalAmountCents = 0L)
     }
 }

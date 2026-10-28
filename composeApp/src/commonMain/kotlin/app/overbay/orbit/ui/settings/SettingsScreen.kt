@@ -55,9 +55,6 @@ fun SettingsScreen(
     val heroScrollState = rememberHeroScrollState()
     val fileHelper = LocalFileImportExportHelper.current
 
-    var restoreJsonText by remember { mutableStateOf("") }
-    var showDonatePlaceholderDialog by remember { mutableStateOf(false) }
-
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
 
@@ -147,7 +144,7 @@ fun SettingsScreen(
                                 )
 
                                 AboutSupportBlock(
-                                    onDonateClick = { showDonatePlaceholderDialog = true }
+                                    onDonateClick = { viewModel.setShowDonateDialog(true) }
                                 )
                             }
                         }
@@ -218,7 +215,7 @@ fun SettingsScreen(
                     // 6. About & Support ("☕ Donate")
                     item {
                         AboutSupportBlock(
-                            onDonateClick = { showDonatePlaceholderDialog = true }
+                            onDonateClick = { viewModel.setShowDonateDialog(true) }
                         )
                     }
                 }
@@ -279,7 +276,7 @@ fun SettingsScreen(
                     TextButton(
                         onClick = {
                             fileHelper.pickAndImportFile("application/json") { content ->
-                                restoreJsonText = content
+                                viewModel.setRestoreJsonText(content)
                             }
                         }
                     ) {
@@ -287,8 +284,8 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     OutlinedTextField(
-                        value = restoreJsonText,
-                        onValueChange = { restoreJsonText = it },
+                        value = uiState.restoreJsonText,
+                        onValueChange = viewModel::setRestoreJsonText,
                         placeholder = { Text("Paste JSON here...") },
                         modifier = Modifier.fillMaxWidth().height(180.dp)
                     )
@@ -296,8 +293,8 @@ fun SettingsScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = { viewModel.restoreBackup(restoreJsonText) },
-                    enabled = restoreJsonText.isNotBlank()
+                    onClick = { viewModel.restoreBackup(uiState.restoreJsonText) },
+                    enabled = uiState.restoreJsonText.isNotBlank()
                 ) {
                     Text("Restore")
                 }
@@ -322,12 +319,12 @@ fun SettingsScreen(
         )
     }
 
-    if (showDonatePlaceholderDialog) {
+    if (uiState.showDonateDialog) {
         OrbitAlertDialog(
             title = "☕ Donate",
             message = "Donation link is not configured yet.",
             confirmText = "OK",
-            onDismiss = { showDonatePlaceholderDialog = false }
+            onDismiss = { viewModel.setShowDonateDialog(false) }
         )
     }
 }

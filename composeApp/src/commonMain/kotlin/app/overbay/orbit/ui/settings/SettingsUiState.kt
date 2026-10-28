@@ -12,6 +12,8 @@ data class SettingsUiState(
     val backupExportJson: String? = null,
     val showBackupExportDialog: Boolean = false,
     val showRestoreDialog: Boolean = false,
+    val restoreJsonText: String = "",
     val showResetConfirmation: Boolean = false,
+    val showDonateDialog: Boolean = false,
     val statusMessage: String? = null
 )

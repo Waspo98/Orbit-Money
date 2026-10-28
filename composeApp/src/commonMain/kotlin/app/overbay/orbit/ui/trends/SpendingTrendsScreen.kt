@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.rememberHeroScrollState
@@ -110,7 +111,7 @@ fun SpendingTrendsScreen(
                                         text = period.label,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (selected) Color(0xFF064E3B) else Color.White,
+                                        color = if (selected) OrbitTheme.colors.canopyStart else Color.White,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                                     )
                                 }

@@ -47,19 +47,23 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.accounts.components.CreditCardPerksPanel
 import kotlin.math.roundToInt
+
+data class AccountDetailActions(
+    val onBack: (() -> Unit)? = null,
+    val onEditAccount: () -> Unit = {},
+    val onEditPerks: () -> Unit = {},
+    val onMergeAccount: () -> Unit = {}
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountDetailScreen(
     account: Account,
     transactions: List<Transaction>,
-    onBack: (() -> Unit)? = null,
-    onEditAccount: () -> Unit = {},
-    onEditPerks: () -> Unit = {},
-    onMergeAccount: () -> Unit = {},
+    actions: AccountDetailActions = AccountDetailActions(),
     modifier: Modifier = Modifier
 ) {
     val isCredit = account.type == AccountType.CREDIT
@@ -69,14 +73,14 @@ fun AccountDetailScreen(
             TopAppBar(
                 title = { Text(account.name, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
+                    if (actions.onBack != null) {
+                        IconButton(onClick = actions.onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
                 },
                 actions = {
-                    IconButton(onClick = onEditAccount) {
+                    IconButton(onClick = actions.onEditAccount) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit Account")
                     }
                 }
@@ -139,10 +143,10 @@ fun AccountDetailScreen(
 
                         val isLiability = account.type.isLiability
                         val balanceColor = if (isLiability && account.currentBalanceCents != 0L) {
-                            OrbitColorTokens.Red
+                            OrbitTheme.colors.expense
                         } else if (account.currentBalanceCents >= 0L) {
-                            OrbitColorTokens.Green
-                        } else OrbitColorTokens.Red
+                            OrbitTheme.colors.income
+                        } else OrbitTheme.colors.expense
 
                         Text(
                             text = MoneyUtils.formatCents(account.currentBalanceCents),
@@ -165,7 +169,7 @@ fun AccountDetailScreen(
                                 Text(
                                     text = "Credit Utilization: $pct%",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (pct > 30) OrbitColorTokens.Red else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (pct > 30) OrbitTheme.colors.expense else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     text = "Limit ${MoneyUtils.formatCents(limit)}",
@@ -177,7 +181,7 @@ fun AccountDetailScreen(
                             LinearProgressIndicator(
                                 progress = { (pct / 100f).coerceIn(0f, 1f) },
                                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
-                                color = if (pct > 30) OrbitColorTokens.Red else MaterialTheme.colorScheme.primary
+                                color = if (pct > 30) OrbitTheme.colors.expense else MaterialTheme.colorScheme.primary
                             )
                         }
 
@@ -187,7 +191,7 @@ fun AccountDetailScreen(
                             Text(
                                 text = "Home Equity: ${MoneyUtils.formatCents(account.homeEquityCents!!)} (Est. Property ${MoneyUtils.formatCents(account.estimatedValueCents ?: 0L)})",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = OrbitColorTokens.Green,
+                                color = OrbitTheme.colors.income,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -203,7 +207,7 @@ fun AccountDetailScreen(
                 ) {
                     if (isCredit) {
                         OutlinedButton(
-                            onClick = onEditPerks,
+                            onClick = actions.onEditPerks,
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -213,7 +217,7 @@ fun AccountDetailScreen(
                     }
 
                     OutlinedButton(
-                        onClick = onMergeAccount,
+                        onClick = actions.onMergeAccount,
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -228,7 +232,7 @@ fun AccountDetailScreen(
                 item {
                     CreditCardPerksPanel(
                         profile = account.creditCardProfile,
-                        onEditPerks = onEditPerks
+                        onEditPerks = actions.onEditPerks
                     )
                 }
             }
@@ -290,7 +294,7 @@ fun AccountDetailScreen(
                                 text = MoneyUtils.formatCents(txn.effectiveAmountCents),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isIncome) OrbitColorTokens.Green else MaterialTheme.colorScheme.onSurface
+                                color = if (isIncome) OrbitTheme.colors.income else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }

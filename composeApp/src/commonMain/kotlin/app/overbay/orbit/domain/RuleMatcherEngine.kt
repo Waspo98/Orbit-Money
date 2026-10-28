@@ -257,9 +257,11 @@ object RuleMatcherEngine {
         }
         val parts = cleaned.split(delimiter, limit = 2).map { it.trim() }
         if (parts.size != 2) return null
-        val first = abs(MoneyUtils.dollarsToCents(parts[0], fallback = Long.MIN_VALUE))
-        val second = abs(MoneyUtils.dollarsToCents(parts[1], fallback = Long.MIN_VALUE))
-        if (first == Long.MIN_VALUE || second == Long.MIN_VALUE) return null
+        val rawFirst = MoneyUtils.dollarsToCents(parts[0], fallback = Long.MIN_VALUE)
+        val rawSecond = MoneyUtils.dollarsToCents(parts[1], fallback = Long.MIN_VALUE)
+        if (rawFirst == Long.MIN_VALUE || rawSecond == Long.MIN_VALUE) return null
+        val first = abs(rawFirst)
+        val second = abs(rawSecond)
         return Pair(minOf(first, second), maxOf(first, second))
     }
 

@@ -39,6 +39,7 @@ interface OrbitStorageEngine {
 
     suspend fun pushAccount(account: Account): Result<Account>
     suspend fun deleteAccount(id: Long): Result<Boolean>
+    suspend fun mergeAccounts(sourceId: Long, targetId: Long): Result<Boolean> = deleteAccount(sourceId)
 
     suspend fun pushCategory(category: Category): Result<Category>
     suspend fun deleteCategory(id: Long): Result<Boolean>

@@ -1,8 +1,6 @@
 package app.overbay.orbit.ui.login.components
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,7 +55,7 @@ fun LoginBrandLockup(
 
     LaunchedEffect(Unit) {
         launch {
-            iconAlpha.animateTo(1f, tween(durationMillis = 320, easing = FastOutSlowInEasing))
+            iconAlpha.animateTo(1f, OrbitSprings.effectsDefault())
         }
         launch {
             iconScale.animateTo(1f, OrbitSprings.spatialDefault())
@@ -68,7 +66,7 @@ fun LoginBrandLockup(
         launch {
             delay(140)
             launch {
-                wordmarkAlpha.animateTo(1f, tween(durationMillis = 420, easing = FastOutSlowInEasing))
+                wordmarkAlpha.animateTo(1f, OrbitSprings.effectsDefault())
             }
             launch {
                 wordmarkOffsetY.animateTo(0f, OrbitSprings.spatialDefault())

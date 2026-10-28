@@ -48,6 +48,7 @@ import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.roundToInt
@@ -260,7 +261,7 @@ private fun SpendingMixPanel(
             ) {
                 sorted.forEach { item ->
                     val weight = (item.spentCents.toFloat() / totalSpent.toFloat()).coerceAtLeast(0.01f)
-                    val color = parseHexColor(item.category.color) ?: MaterialTheme.colorScheme.primary
+                    val color = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
                     Box(
                         modifier = Modifier
                             .weight(weight)
@@ -280,7 +281,7 @@ private fun SpendingMixPanel(
             ) {
                 sorted.take(5).forEach { item ->
                     val pct = ((item.spentCents.toDouble() / totalSpent.toDouble()) * 100.0).roundToInt()
-                    val color = parseHexColor(item.category.color) ?: MaterialTheme.colorScheme.primary
+                    val color = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
@@ -343,17 +344,3 @@ private fun SortFilterChip(
     )
 }
 
-private fun parseHexColor(hex: String?): Color? {
-    if (hex.isNullOrBlank() || !hex.startsWith("#")) return null
-    return try {
-        val clean = hex.removePrefix("#")
-        val colorInt = clean.toLong(16)
-        if (clean.length == 6) {
-            Color(0xFF000000 or colorInt)
-        } else if (clean.length == 8) {
-            Color(colorInt)
-        } else null
-    } catch (_: Exception) {
-        null
-    }
-}

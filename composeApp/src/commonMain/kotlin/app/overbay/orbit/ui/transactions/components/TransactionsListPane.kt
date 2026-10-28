@@ -49,11 +49,7 @@ import app.overbay.orbit.ui.transactions.TransactionsViewModel
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * Editorial Transactions list pane featuring flat MorphingPageHero with a physical-glide
- * search bar and flanking circular Filter/Sort buttons that shrink beside the title on collapse,
- * an auto-appearing active-filter chip strip, pull-to-refresh SimpleFIN sync,
- * and scroll-reactive '+' FAB.
- * Strictly under the 400-line ceiling.
+ * Editorial Transactions list pane with MorphingPageHero, filter chips, and pull-to-refresh.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
