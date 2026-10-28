@@ -10,6 +10,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -208,6 +210,7 @@ fun TransactionsListPane(
                         PullToRefreshBox(
                             isRefreshing = state.isSyncing,
                             onRefresh = { haptics.tick(); viewModel.syncSimpleFin() },
+                            indicator = {},
                             modifier = Modifier.fillMaxSize()
                         ) {
                             when {
@@ -245,31 +248,6 @@ fun TransactionsListPane(
                                     )
                                 }
                             }
-
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = state.syncToastMessage != null,
-                                enter = slideInVertically { -it } + fadeIn(),
-                                exit = slideOutVertically { -it } + fadeOut(),
-                                modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp, start = 16.dp, end = 16.dp)
-                            ) {
-                                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.inverseSurface, tonalElevation = 6.dp, shadowElevation = 6.dp) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        if (state.isSyncing) {
-                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.inverseOnSurface)
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                        }
-                                        Text(
-                                            text = state.syncToastMessage ?: "",
-                                            style = MaterialTheme.typography.labelLarge,
-                                            color = MaterialTheme.colorScheme.inverseOnSurface,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-                                }
-                            }
                         }
                     }
                 }
@@ -288,6 +266,31 @@ fun TransactionsListPane(
             }
         }
 
+        androidx.compose.animation.AnimatedVisibility(
+            visible = state.syncToastMessage != null,
+            enter = slideInVertically { -it } + fadeIn(),
+            exit = slideOutVertically { -it } + fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp, start = 16.dp, end = 16.dp)
+        ) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.inverseSurface, tonalElevation = 6.dp, shadowElevation = 6.dp) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (state.isSyncing) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.inverseOnSurface)
+                        Spacer(modifier = Modifier.width(10.dp))
+                    }
+                    Text(
+                        text = state.syncToastMessage ?: "",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
         OrbitFloatingActionButton(
             visible = heroScrollState.isFabVisible && !state.isSelectionMode && !state.isSearchActive,
             onClick = { viewModel.openTransactionEditor(null) },
@@ -299,6 +302,7 @@ fun TransactionsListPane(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TransactionsGroupedLazyList(
     state: TransactionsUiState,
@@ -312,11 +316,11 @@ private fun TransactionsGroupedLazyList(
     val endPadding = if (isWideScreen) 0.dp else 16.dp
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(start = startPadding, end = endPadding, top = 8.dp, bottom = 88.dp),
+        contentPadding = PaddingValues(start = startPadding, end = endPadding, top = 0.dp, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         state.groupedTransactions.forEach { group ->
-            item(key = "header_${group.monthKey}") {
+            stickyHeader(key = "header_${group.monthKey}") {
                 MonthGroupHeader(monthLabel = group.monthLabel, count = group.count)
             }
 
@@ -361,7 +365,12 @@ private fun TransactionsGroupedLazyList(
 
 @Composable
 private fun MonthGroupHeader(monthLabel: String, count: Int) {
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(top = 10.dp, bottom = 4.dp)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
