@@ -34,6 +34,7 @@ class AccountsViewModel(
     private val _deleteConfirmAccountId = MutableStateFlow<Long?>(null)
     private val _showArchived = MutableStateFlow(false)
     private val _isReorderMode = MutableStateFlow(false)
+    private val _groupOrder = MutableStateFlow(AccountTypeCategory.entries.toList())
     private val _isSyncing = MutableStateFlow(false)
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
 
@@ -68,9 +69,10 @@ class AccountsViewModel(
         _isSyncing,
         _syncErrorMessage,
         _showArchived,
-        _isReorderMode
-    ) { syncing, err, showArchived, reorder ->
-        SyncReorderBundle(syncing, err, showArchived, reorder)
+        _isReorderMode,
+        _groupOrder
+    ) { syncing, err, showArchived, reorder, order ->
+        SyncReorderBundle(syncing, err, showArchived, reorder, order)
     }
 
     val uiState: StateFlow<AccountsUiState> = combine(
@@ -87,7 +89,10 @@ class AccountsViewModel(
         val sortedAccounts = filteredAccounts.sortedWith(
             compareBy<Account> { it.isArchived }.thenBy { it.sortOrder }.thenBy { it.name }
         )
-        val groups = groupAccounts(sortedAccounts)
+        val groups = groupAccounts(sortedAccounts).sortedBy { grp ->
+            val idx = syncReorder.groupOrder.indexOf(grp.category)
+            if (idx >= 0) idx else Int.MAX_VALUE
+        }
         val snapshot = NetWorthEngine.computeCurrentSnapshot(data.accounts)
 
         val selId = action.selectedAccountId
@@ -148,6 +153,16 @@ class AccountsViewModel(
 
     fun dismissDeleteAccount() {
         _deleteConfirmAccountId.value = null
+    }
+
+    fun openAccountDeepLink(accountId: Long) {
+        _selectedAccountId.value = accountId
+        _showEditorSheet.value = false
+        _editingAccount.value = null
+        _showCardProfileSheet.value = false
+        _editingCardProfile.value = null
+        _showHistorySheet.value = false
+        _historyAccount.value = null
     }
 
     fun selectAccountForInspect(accountId: Long?) {
@@ -237,6 +252,18 @@ class AccountsViewModel(
 
     fun toggleReorderMode() {
         _isReorderMode.value = !_isReorderMode.value
+    }
+
+    fun moveGroup(category: AccountTypeCategory, direction: Int) {
+        val visibleCategories = uiState.value.accountGroups.map { it.category }.toMutableList()
+        val idx = visibleCategories.indexOf(category)
+        val targetIdx = idx + direction
+        if (idx !in visibleCategories.indices || targetIdx !in visibleCategories.indices) return
+        val swapped = visibleCategories[idx]
+        visibleCategories[idx] = visibleCategories[targetIdx]
+        visibleCategories[targetIdx] = swapped
+        val remaining = _groupOrder.value.filter { it !in visibleCategories }
+        _groupOrder.value = visibleCategories + remaining
     }
 
     fun toggleArchiveAccount(account: Account) {
@@ -418,5 +445,6 @@ private data class SyncReorderBundle(
     val syncing: Boolean,
     val err: String?,
     val showArchived: Boolean,
-    val isReorderMode: Boolean
+    val isReorderMode: Boolean,
+    val groupOrder: List<AccountTypeCategory> = AccountTypeCategory.entries.toList()
 )

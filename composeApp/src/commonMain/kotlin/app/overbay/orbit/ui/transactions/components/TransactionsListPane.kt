@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
+import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.EmptyStateCard
@@ -56,9 +57,9 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 fun TransactionsListPane(
     state: TransactionsUiState,
     viewModel: TransactionsViewModel,
-    onOpenDrawer: () -> Unit,
     onSelectForInspect: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    onNavigate: (OrbitNavKey) -> Unit = {},
     isWideScreen: Boolean = false,
     isDetailOpen: Boolean = false,
     onDismissDetail: () -> Unit = {},
@@ -193,12 +194,9 @@ fun TransactionsListPane(
                                 TransactionsSearchPromptOrEmpty(searchQuery = state.searchQuery)
                             } else {
                                 TransactionsGroupedLazyList(
-                                    state = state,
-                                    viewModel = viewModel,
-                                    isWideScreen = isWideScreen,
-                                    onSelectForInspect = onSelectForInspect,
-                                    onInteraction = { keyboardController?.hide() },
-                                    modifier = Modifier.fillMaxSize()
+                                    state = state, viewModel = viewModel, isWideScreen = isWideScreen,
+                                    onSelectForInspect = onSelectForInspect, onNavigate = onNavigate,
+                                    onInteraction = { keyboardController?.hide() }, modifier = Modifier.fillMaxSize()
                                 )
                             }
                         }
@@ -240,6 +238,7 @@ fun TransactionsListPane(
                                         viewModel = viewModel,
                                         isWideScreen = isWideScreen,
                                         onSelectForInspect = onSelectForInspect,
+                                        onNavigate = onNavigate,
                                         modifier = Modifier.fillMaxSize().nestedScroll(heroScrollState.nestedScrollConnection)
                                     )
                                 }
@@ -305,6 +304,7 @@ private fun TransactionsGroupedLazyList(
     viewModel: TransactionsViewModel,
     isWideScreen: Boolean,
     onSelectForInspect: (Long) -> Unit,
+    onNavigate: (OrbitNavKey) -> Unit,
     modifier: Modifier = Modifier,
     onInteraction: () -> Unit = {}
 ) {
@@ -342,12 +342,12 @@ private fun TransactionsGroupedLazyList(
                     onLongClick = { onInteraction(); viewModel.toggleTransactionSelection(txn.id) },
                     onEdit = { viewModel.openTransactionEditor(txn.id) },
                     onSplit = { viewModel.openSplitSheet(txn.id) },
-                    onCreateRule = { viewModel.createRuleFromTransaction(txn) },
-                    onMarkRecurring = { viewModel.markTransactionRecurring(txn) },
+                    onCreateRule = { viewModel.createRuleFromTransaction(txn); onNavigate(OrbitNavKey.Rules) },
+                    onMarkRecurring = { viewModel.markTransactionRecurring(txn); onNavigate(OrbitNavKey.Upcoming) },
                     onToggleTransfer = { viewModel.toggleTransfer(txn.id) },
                     onToggleMha = { viewModel.toggleMha(txn.id) },
                     onToggleIgnore = { viewModel.toggleIgnore(txn.id) },
-                    onDelete = { viewModel.deleteTransaction(txn.id) },
+                    onDelete = { viewModel.setSingleDeleteConfirmId(txn.id) },
                     onResetMerchant = { viewModel.resetMerchant(txn.id) },
                     onResetCategory = { viewModel.resetCategory(txn.id) },
                     onFindLogo = { viewModel.openLogoFinder(txn.id) },

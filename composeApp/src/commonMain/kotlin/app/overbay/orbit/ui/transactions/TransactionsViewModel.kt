@@ -190,6 +190,27 @@ class TransactionsViewModel(
         _filterDraft.value = TransactionFilterDraft()
     }
 
+    fun applyDeepLink(
+        transactionId: Long? = null,
+        accountId: Long? = null,
+        categoryId: Long? = null,
+        uncategorizedOnly: Boolean = false
+    ) {
+        val hasDeepLink = transactionId != null || accountId != null || categoryId != null || uncategorizedOnly
+        if (!hasDeepLink) return
+        _searchQuery.value = ""
+        _isSearchActive.value = false
+        _quickFilter.value = if (uncategorizedOnly) QuickFilter.UNCATEGORIZED else QuickFilter.ALL
+        _filterDraft.value = TransactionFilterDraft(
+            accountId = accountId,
+            categoryId = categoryId
+        )
+        _inspectingId.value = transactionId
+        _expandedId.value = transactionId
+        _showEditorSheet.value = false
+        _showSplitSheet.value = false
+    }
+
     fun toggleTransactionSelection(id: Long) {
         val current = _selectedIds.value
         _selectedIds.value = if (current.contains(id)) current - id else current + id

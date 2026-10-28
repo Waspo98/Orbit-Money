@@ -35,7 +35,7 @@ import app.overbay.orbit.util.LocalDevicePosture
 fun UpcomingScreen(
     viewModel: UpcomingViewModel,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onOpenDrawer: () -> Unit = {},
+    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -80,7 +80,7 @@ fun UpcomingScreen(
                         title = "Upcoming",
                         subtitle = "Projected bills, subscriptions, income, and cash flow.",
                         canNavigateBack = true,
-                        onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                        onBack = onBack,
                         scrollState = heroScrollState
                     )
 

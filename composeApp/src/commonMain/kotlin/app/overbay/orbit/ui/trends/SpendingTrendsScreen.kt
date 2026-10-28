@@ -44,7 +44,7 @@ fun SpendingTrendsScreen(
     viewModel: SpendingTrendsViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onOpenDrawer: () -> Unit = {},
+    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -93,7 +93,7 @@ fun SpendingTrendsScreen(
                     title = "Spending Trends",
                     subtitle = "Spending patterns and category breakdown over time",
                     canNavigateBack = true,
-                    onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                    onBack = onBack,
                     scrollState = heroScrollState,
                     expandedToolbar = {
                         Row(

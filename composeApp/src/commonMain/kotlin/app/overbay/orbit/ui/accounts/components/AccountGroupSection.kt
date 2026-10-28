@@ -18,14 +18,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -64,11 +67,22 @@ fun AccountGroupSection(
     onMergeClick: (Account) -> Unit,
     onToggleArchive: (Account) -> Unit,
     onDeleteAccount: (Account) -> Unit,
+    isReorderMode: Boolean = false,
+    canMoveUp: Boolean = false,
+    canMoveDown: Boolean = false,
+    onMoveUp: () -> Unit = {},
+    onMoveDown: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
     var expanded by rememberSaveable(group.category.name) { mutableStateOf(false) }
+
+    LaunchedEffect(selectedAccountId) {
+        if (selectedAccountId != null && group.accounts.any { it.id == selectedAccountId }) {
+            expanded = true
+        }
+    }
 
     val isLiability = group.category in setOf(AccountTypeCategory.CREDIT_CARDS, AccountTypeCategory.LOANS)
     val totalColor = if (isLiability) {
@@ -136,21 +150,48 @@ fun AccountGroupSection(
 
                     Spacer(modifier = Modifier.width(10.dp))
 
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                        modifier = Modifier.size(30.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (expanded) "Collapse" else "Expand",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .rotate(chevronRotation)
-                            )
+                    if (isReorderMode) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { haptics.tick(); onMoveUp() },
+                                enabled = canMoveUp,
+                                modifier = Modifier.size(30.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowUp,
+                                    contentDescription = "Move Group Up",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = { haptics.tick(); onMoveDown() },
+                                enabled = canMoveDown,
+                                modifier = Modifier.size(30.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Move Group Down",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = if (expanded) "Collapse" else "Expand",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .rotate(chevronRotation)
+                                )
+                            }
                         }
                     }
                 }

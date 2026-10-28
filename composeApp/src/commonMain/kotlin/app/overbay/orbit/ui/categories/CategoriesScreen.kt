@@ -37,7 +37,7 @@ fun CategoriesScreen(
     viewModel: CategoriesViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onOpenDrawer: () -> Unit = {},
+    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -82,7 +82,7 @@ fun CategoriesScreen(
                         title = "Category Manager",
                         subtitle = "$catCount categories across ${state.groups.size} groups",
                         canNavigateBack = true,
-                        onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                        onBack = onBack,
                         scrollState = heroScrollState
                     )
 
@@ -156,6 +156,10 @@ fun CategoriesScreen(
                     viewModel.saveCategory(id, name, color, icon, isTrans, isInc, mha)
                 },
                 onDelete = { id -> viewModel.requestDeleteCategory(id) },
+                onViewTransactions = { id ->
+                    viewModel.closeEditorDialog()
+                    onNavigate(OrbitNavKey.Transactions(categoryId = id))
+                },
                 onDismiss = { viewModel.closeEditorDialog() }
             )
         }

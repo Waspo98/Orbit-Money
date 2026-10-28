@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -51,7 +51,6 @@ fun AccountsScreen(
     viewModel: AccountsViewModel,
     initialAccountId: Long? = null,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onOpenDrawer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -61,7 +60,7 @@ fun AccountsScreen(
 
     LaunchedEffect(initialAccountId) {
         if (initialAccountId != null) {
-            viewModel.selectAccountForInspect(initialAccountId)
+            viewModel.openAccountDeepLink(initialAccountId)
         }
     }
 
@@ -212,10 +211,10 @@ private fun AccountsMasterContent(
             contentPadding = PaddingValues(start = startPad, end = endPad, top = 4.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            items(state.accountGroups, key = { it.category.name }) { group ->
+            itemsIndexed(state.accountGroups, key = { _, it -> it.category.name }) { index, group ->
                 AccountGroupSection(
                     group = group,
-                    selectedAccountId = if (isWideScreen) state.selectedAccountId else null,
+                    selectedAccountId = state.selectedAccountId,
                     onInspectAccount = { acct -> onOpenDetail(acct) },
                     onSeeTransactions = { acct ->
                         onNavigate(OrbitNavKey.Transactions(accountId = acct.id))
@@ -225,7 +224,12 @@ private fun AccountsMasterContent(
                     onHistoryClick = { viewModel.openBalanceHistory(it) },
                     onMergeClick = { viewModel.openMergeDialog(it) },
                     onToggleArchive = { viewModel.toggleArchiveAccount(it) },
-                    onDeleteAccount = { viewModel.requestDeleteAccount(it.id) }
+                    onDeleteAccount = { viewModel.requestDeleteAccount(it.id) },
+                    isReorderMode = state.isReorderMode,
+                    canMoveUp = index > 0,
+                    canMoveDown = index < state.accountGroups.lastIndex,
+                    onMoveUp = { viewModel.moveGroup(group.category, -1) },
+                    onMoveDown = { viewModel.moveGroup(group.category, 1) }
                 )
             }
         }

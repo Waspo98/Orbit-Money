@@ -218,11 +218,11 @@ class OrbitRepository(
     }
 
     suspend fun logout() {
-        runCatching { createApiClient().logout() }
-        activeEngine.clear()
         _isAuthenticated.value = false
         _currentUser.value = null
         _syncStatus.value = SyncResult.NoOp
+        runCatching { createApiClient().logout() }
+        activeEngine.clear()
     }
 
     suspend fun completeOidcNativeExchange(code: String): Result<String> = runCatching {

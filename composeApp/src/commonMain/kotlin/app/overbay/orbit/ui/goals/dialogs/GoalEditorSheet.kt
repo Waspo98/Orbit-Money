@@ -59,6 +59,7 @@ fun GoalEditorSheet(
     onSave: (Goal) -> Unit,
     onDelete: (Long) -> Unit,
     onDismiss: () -> Unit,
+    onOpenLinkedAccount: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     OrbitModalSheet(
@@ -70,7 +71,8 @@ fun GoalEditorSheet(
             accounts = accounts,
             onSave = onSave,
             onDelete = onDelete,
-            onDismiss = onDismiss
+            onDismiss = onDismiss,
+            onOpenLinkedAccount = onOpenLinkedAccount
         )
     }
 }
@@ -82,6 +84,7 @@ fun GoalEditorContent(
     onSave: (Goal) -> Unit,
     onDelete: (Long) -> Unit,
     onDismiss: () -> Unit,
+    onOpenLinkedAccount: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -263,6 +266,19 @@ fun GoalEditorContent(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Save")
+                }
+            }
+
+            if (isEditing && linkedAccountId != null && onOpenLinkedAccount != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedButton(
+                    onClick = {
+                        haptics.tick()
+                        onOpenLinkedAccount(linkedAccountId!!)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("View Linked Account")
                 }
             }
 

@@ -413,6 +413,7 @@ object DashboardDataTransform {
         val equityPct = if (homeValue > 0L) (estimatedEquity.toDouble() / homeValue.toDouble()) * 100.0 else 0.0
         val mortgageState = MortgageSnapshotState(
             hasMortgage = mortgageAccount != null || mortgageBalance > 0L,
+            mortgageAccountId = mortgageAccount?.id,
             estimatedHomeValueCents = homeValue,
             mortgageBalanceCents = mortgageBalance,
             estimatedEquityCents = estimatedEquity,

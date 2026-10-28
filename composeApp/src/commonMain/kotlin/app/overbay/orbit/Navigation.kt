@@ -16,9 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -81,7 +79,6 @@ fun OrbitNavigation(
     val repo = repository ?: remember { OrbitRepository(PlatformStorage()) }
     val preferences by repo.preferences.collectAsState()
     val isAuthenticated by repo.isAuthenticated.collectAsState()
-    var showMoreFromHeader by remember { mutableStateOf(false) }
     val loginViewModel = remember(repo) { LoginViewModel(repo) }
     val onboardingViewModel = remember(repo) { OnboardingViewModel(repo) }
     val dashboardViewModel = remember(repo) { DashboardViewModel(repo) }
@@ -159,8 +156,48 @@ fun OrbitNavigation(
     }
 
     val navigateTo: (OrbitNavKey) -> Unit = { destination ->
+        if (destination is OrbitNavKey.Transactions) {
+            if (
+                destination.transactionId != null ||
+                destination.accountId != null ||
+                destination.categoryId != null ||
+                destination.uncategorizedOnly
+            ) {
+                transactionsViewModel.applyDeepLink(
+                    transactionId = destination.transactionId,
+                    accountId = destination.accountId,
+                    categoryId = destination.categoryId,
+                    uncategorizedOnly = destination.uncategorizedOnly
+                )
+            } else {
+                transactionsViewModel.clearFilters()
+                transactionsViewModel.dismissInspectorPane()
+            }
+        } else if (destination is OrbitNavKey.Accounts) {
+            if (destination.accountId != null) {
+                accountsViewModel.openAccountDeepLink(destination.accountId)
+            } else if (currentKey is OrbitNavKey.Accounts) {
+                accountsViewModel.dismissInspectorPane()
+            }
+        }
+
         if (destination != currentKey) {
-            backStack.add(destination)
+            if (
+                destination.primaryTabIndex != null &&
+                destination.primaryTabIndex == currentKey.primaryTabIndex &&
+                backStack.isNotEmpty()
+            ) {
+                backStack[backStack.lastIndex] = destination
+            } else {
+                backStack.add(destination)
+            }
+        }
+    }
+    val popBackOrDashboard: () -> Unit = {
+        if (backStack.size > 1) {
+            backStack.removeAt(backStack.lastIndex)
+        } else if (currentKey != OrbitNavKey.Dashboard) {
+            backStack[0] = OrbitNavKey.Dashboard
         }
     }
     val canopyCoordinator = rememberCanopyTransitionCoordinator(currentKey.primaryTabIndex ?: currentKey)
@@ -170,14 +207,8 @@ fun OrbitNavigation(
             currentKey = currentKey,
             onNavigate = navigateTo,
             canNavigateBack = backStack.size > 1,
-            onBack = {
-                if (backStack.size > 1) {
-                    backStack.removeAt(backStack.lastIndex)
-                }
-            },
+            onBack = popBackOrDashboard,
             mhaEnabled = preferences.mhaTrackerEnabled,
-            externalShowMore = showMoreFromHeader,
-            onDismissExternalMore = { showMoreFromHeader = false },
             modifier = modifier
         ) {
             AnimatedContent(
@@ -202,12 +233,16 @@ fun OrbitNavigation(
                             )
                         }
                         is OrbitNavKey.Transactions -> {
-                            if (key.transactionId != null) {
-                                transactionsViewModel.selectTransactionForInspect(key.transactionId)
+                            LaunchedEffect(key) {
+                                transactionsViewModel.applyDeepLink(
+                                    transactionId = key.transactionId,
+                                    accountId = key.accountId,
+                                    categoryId = key.categoryId,
+                                    uncategorizedOnly = key.uncategorizedOnly
+                                )
                             }
                             TransactionsScreen(
                                 viewModel = transactionsViewModel,
-                                onOpenDrawer = { showMoreFromHeader = true },
                                 onNavigate = navigateTo,
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -215,7 +250,6 @@ fun OrbitNavigation(
                         OrbitNavKey.Budgets -> {
                             BudgetsScreen(
                                 viewModel = budgetsViewModel,
-                                onOpenDrawer = { showMoreFromHeader = true },
                                 onNavigate = navigateTo,
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -223,32 +257,32 @@ fun OrbitNavigation(
                         OrbitNavKey.Upcoming -> {
                             UpcomingScreen(
                                 viewModel = upcomingViewModel,
-                                onOpenDrawer = { showMoreFromHeader = true },
                                 onNavigate = navigateTo,
+                                onBack = popBackOrDashboard,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
                         OrbitNavKey.Goals -> {
                             GoalsScreen(
                                 viewModel = goalsViewModel,
-                                onOpenDrawer = { showMoreFromHeader = true },
                                 onNavigate = navigateTo,
+                                onBack = popBackOrDashboard,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
                         OrbitNavKey.Categories -> {
                             CategoriesScreen(
                                 viewModel = categoriesViewModel,
-                                onOpenDrawer = { showMoreFromHeader = true },
                                 onNavigate = navigateTo,
+                                onBack = popBackOrDashboard,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
                         OrbitNavKey.Rules -> {
                             RulesScreen(
                                 viewModel = rulesViewModel,
-                                onOpenDrawer = { showMoreFromHeader = true },
                                 onNavigate = navigateTo,
+                                onBack = popBackOrDashboard,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -263,8 +297,8 @@ fun OrbitNavigation(
                         OrbitNavKey.NetWorth -> {
                             NetWorthScreen(
                                 viewModel = netWorthViewModel,
-                                onOpenDrawer = { showMoreFromHeader = true },
                                 onNavigate = navigateTo,
+                                onBack = popBackOrDashboard,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -272,14 +306,15 @@ fun OrbitNavigation(
                             SpendingTrendsScreen(
                                 viewModel = spendingTrendsViewModel,
                                 onNavigate = navigateTo,
+                                onBack = popBackOrDashboard,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
                         OrbitNavKey.MhaTracker -> {
                             MhaTrackerScreen(
                                 viewModel = mhaTrackerViewModel,
-                                onOpenDrawer = { showMoreFromHeader = true },
                                 onNavigate = navigateTo,
+                                onBack = popBackOrDashboard,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -287,6 +322,7 @@ fun OrbitNavigation(
                             HousingCalculatorScreen(
                                 viewModel = housingViewModel,
                                 onNavigate = navigateTo,
+                                onBack = popBackOrDashboard,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -294,6 +330,7 @@ fun OrbitNavigation(
                             RetirementCalculatorScreen(
                                 viewModel = retirementViewModel,
                                 onNavigate = navigateTo,
+                                onBack = popBackOrDashboard,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -301,6 +338,7 @@ fun OrbitNavigation(
                             HouseholdScreen(
                                 viewModel = householdViewModel,
                                 onNavigate = navigateTo,
+                                onBack = popBackOrDashboard,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -308,6 +346,7 @@ fun OrbitNavigation(
                             SettingsScreen(
                                 viewModel = settingsViewModel,
                                 onNavigate = navigateTo,
+                                onBack = popBackOrDashboard,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

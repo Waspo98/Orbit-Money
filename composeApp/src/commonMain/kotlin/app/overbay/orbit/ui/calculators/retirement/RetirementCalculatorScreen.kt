@@ -30,6 +30,7 @@ fun RetirementCalculatorScreen(
     viewModel: RetirementViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
+    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -48,7 +49,7 @@ fun RetirementCalculatorScreen(
                 title = "Retirement Calculator",
                 subtitle = "All projections are shown in today's dollars",
                 canNavigateBack = true,
-                onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                onBack = onBack,
                 scrollState = heroScrollState
             )
 

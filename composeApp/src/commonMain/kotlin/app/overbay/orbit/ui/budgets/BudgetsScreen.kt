@@ -40,7 +40,6 @@ import app.overbay.orbit.util.LocalDevicePosture
 fun BudgetsScreen(
     viewModel: BudgetsViewModel,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onOpenDrawer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()

@@ -47,8 +47,6 @@ fun AdaptiveNavigationShell(
     canNavigateBack: Boolean = false,
     onBack: () -> Unit = {},
     mhaEnabled: Boolean = true,
-    externalShowMore: Boolean = false,
-    onDismissExternalMore: () -> Unit = {},
     content: @Composable () -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -170,14 +168,11 @@ fun AdaptiveNavigationShell(
         }
     }
 
-    if (showMoreSheet || externalShowMore) {
+    if (showMoreSheet) {
         MoreDestinationsSheet(
             currentKey = currentKey,
             onNavigate = onNavigate,
-            onDismiss = {
-                showMoreSheet = false
-                onDismissExternalMore()
-            },
+            onDismiss = { showMoreSheet = false },
             mhaEnabled = mhaEnabled
         )
     }

@@ -4,10 +4,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,7 +29,6 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 fun TransactionsScreen(
     viewModel: TransactionsViewModel,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onOpenDrawer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -69,7 +65,14 @@ fun TransactionsScreen(
                         onCategorize = { viewModel.setShowCategoryBatchPicker(true) },
                         onMarkTransfer = { viewModel.batchMarkTransfer(true) },
                         onToggleMha = { viewModel.batchToggleMha() },
-                        onDelete = { viewModel.setShowBatchDeleteConfirm(true) }
+                        onDelete = { viewModel.setShowBatchDeleteConfirm(true) },
+                        categories = state.categories,
+                        showCategoryPicker = state.showCategoryBatchPicker,
+                        onDismissCategoryPicker = { viewModel.setShowCategoryBatchPicker(false) },
+                        onSelectCategory = { catId ->
+                            viewModel.batchCategorize(catId)
+                            viewModel.setShowCategoryBatchPicker(false)
+                        }
                     )
                 }
             }
@@ -77,7 +80,7 @@ fun TransactionsScreen(
             TransactionsListPane(
                 state = state,
                 viewModel = viewModel,
-                onOpenDrawer = onOpenDrawer,
+                onNavigate = onNavigate,
                 onSelectForInspect = { id ->
                     if (isTwoPane) {
                         viewModel.selectTransactionForInspect(id)
@@ -220,22 +223,5 @@ fun TransactionsScreen(
             },
             onDismiss = { viewModel.setSingleDeleteConfirmId(null) }
         )
-    }
-
-    if (state.showCategoryBatchPicker) {
-        DropdownMenu(
-            expanded = state.showCategoryBatchPicker,
-            onDismissRequest = { viewModel.setShowCategoryBatchPicker(false) }
-        ) {
-            state.categories.forEach { cat ->
-                DropdownMenuItem(
-                    text = { Text(cat.labelWithEmoji) },
-                    onClick = {
-                        viewModel.batchCategorize(cat.id)
-                        viewModel.setShowCategoryBatchPicker(false)
-                    }
-                )
-            }
-        }
     }
 }

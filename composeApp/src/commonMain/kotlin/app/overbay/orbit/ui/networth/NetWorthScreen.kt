@@ -41,7 +41,7 @@ fun NetWorthScreen(
     viewModel: NetWorthViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onOpenDrawer: () -> Unit = {},
+    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -72,7 +72,7 @@ fun NetWorthScreen(
                     title = "Net Worth",
                     subtitle = "Assets minus liabilities",
                     canNavigateBack = true,
-                    onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                    onBack = onBack,
                     scrollState = heroScrollState,
                     expandedToolbar = {
                         Row(

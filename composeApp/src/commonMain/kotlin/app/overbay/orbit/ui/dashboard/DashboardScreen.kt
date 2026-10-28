@@ -294,7 +294,8 @@ private fun DashboardCardItem(
         )
         DashboardCardType.TOP_SPENDING -> TopSpendingCard(
             state = uiState.topSpending,
-            onClick = { onNavigate(OrbitNavKey.Budgets) },
+            onClick = { onNavigate(OrbitNavKey.SpendingTrends) },
+            onCategoryClick = { catId -> onNavigate(OrbitNavKey.Transactions(categoryId = catId)) },
             modifier = modifier
         )
         DashboardCardType.CASHFLOW_HERO -> NetCashflowHeroCard(
@@ -359,7 +360,7 @@ private fun DashboardCardItem(
         )
         DashboardCardType.MORTGAGE_SNAPSHOT -> MortgageSnapshotCard(
             state = uiState.mortgage,
-            onClick = { onNavigate(OrbitNavKey.Accounts()) },
+            onClick = { onNavigate(OrbitNavKey.Accounts(accountId = uiState.mortgage.mortgageAccountId)) },
             modifier = modifier
         )
         DashboardCardType.RECENT_TRANSACTIONS -> RecentTransactionsCard(

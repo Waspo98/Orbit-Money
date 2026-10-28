@@ -49,8 +49,12 @@ class LoginViewModel(
                 repository.storageMode
             ) { authed, mode -> authed && mode == StorageMode.SELF_HOSTED }
                 .collect { isSelfHostedAuthed ->
-                    if (isSelfHostedAuthed) {
-                        _uiState.update { it.copy(isAuthenticated = true, isSubmitting = false, errorMessage = null) }
+                    _uiState.update {
+                        it.copy(
+                            isAuthenticated = isSelfHostedAuthed,
+                            isSubmitting = if (isSelfHostedAuthed) false else it.isSubmitting,
+                            errorMessage = if (isSelfHostedAuthed) null else it.errorMessage
+                        )
                     }
                 }
         }

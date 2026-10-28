@@ -30,6 +30,7 @@ fun HousingCalculatorScreen(
     viewModel: HousingViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
+    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -48,7 +49,7 @@ fun HousingCalculatorScreen(
                 title = "Housing Calculator",
                 subtitle = "Estimate selling proceeds, cash to close, and projected monthly payment.",
                 canNavigateBack = true,
-                onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                onBack = onBack,
                 scrollState = heroScrollState
             )
 

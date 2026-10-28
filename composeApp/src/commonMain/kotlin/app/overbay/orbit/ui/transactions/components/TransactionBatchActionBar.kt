@@ -5,6 +5,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +23,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -46,6 +51,10 @@ fun TransactionBatchActionBar(
     onMarkTransfer: () -> Unit,
     onToggleMha: () -> Unit,
     onDelete: () -> Unit,
+    categories: List<Category> = emptyList(),
+    showCategoryPicker: Boolean = false,
+    onDismissCategoryPicker: () -> Unit = {},
+    onSelectCategory: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -121,19 +130,36 @@ fun TransactionBatchActionBar(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    FilledTonalButton(
-                        onClick = {
-                            haptics.tick()
-                            onCategorize()
-                        },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Categorize",
-                            modifier = Modifier.padding(end = 6.dp)
-                        )
-                        Text("Categorize")
+                    Box {
+                        FilledTonalButton(
+                            onClick = {
+                                haptics.tick()
+                                onCategorize()
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Categorize",
+                                modifier = Modifier.padding(end = 6.dp)
+                            )
+                            Text("Categorize")
+                        }
+
+                        DropdownMenu(
+                            expanded = showCategoryPicker,
+                            onDismissRequest = onDismissCategoryPicker
+                        ) {
+                            categories.forEach { cat ->
+                                DropdownMenuItem(
+                                    text = { Text(cat.labelWithEmoji) },
+                                    onClick = {
+                                        haptics.tick()
+                                        onSelectCategory(cat.id)
+                                    }
+                                )
+                            }
+                        }
                     }
 
                     FilledTonalButton(

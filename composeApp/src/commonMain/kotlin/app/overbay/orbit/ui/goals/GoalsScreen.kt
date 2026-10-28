@@ -48,7 +48,7 @@ import app.overbay.orbit.util.LocalDevicePosture
 fun GoalsScreen(
     viewModel: GoalsViewModel,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onOpenDrawer: () -> Unit = {},
+    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -97,7 +97,7 @@ fun GoalsScreen(
                         title = "Savings Goals",
                         subtitle = "Connect asset accounts, allocate savings, and project when each target lands.",
                         canNavigateBack = true,
-                        onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                        onBack = onBack,
                         scrollState = heroScrollState
                     )
 
@@ -279,7 +279,11 @@ fun GoalsScreen(
                 accounts = state.accounts,
                 onSave = { viewModel.saveGoal(it) },
                 onDelete = { viewModel.deleteGoal(it) },
-                onDismiss = { viewModel.closeEditorSheet() }
+                onDismiss = { viewModel.closeEditorSheet() },
+                onOpenLinkedAccount = { acctId ->
+                    viewModel.closeEditorSheet()
+                    onNavigate(OrbitNavKey.Accounts(accountId = acctId))
+                }
             )
         }
 

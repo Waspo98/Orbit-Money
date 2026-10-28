@@ -68,6 +68,7 @@ fun CategoryEditorDialog(
     category: Category?,
     onSave: (Long, String, String, String?, Boolean, Boolean, Boolean) -> Unit,
     onDelete: ((Long) -> Unit)? = null,
+    onViewTransactions: ((Long) -> Unit)? = null,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -79,6 +80,7 @@ fun CategoryEditorDialog(
             category = category,
             onSave = onSave,
             onDelete = onDelete,
+            onViewTransactions = onViewTransactions,
             onDismiss = onDismiss
         )
     }
@@ -89,6 +91,7 @@ fun CategoryEditorContent(
     category: Category?,
     onSave: (Long, String, String, String?, Boolean, Boolean, Boolean) -> Unit,
     onDelete: ((Long) -> Unit)? = null,
+    onViewTransactions: ((Long) -> Unit)? = null,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -154,6 +157,16 @@ fun CategoryEditorContent(
                 enabled = name.isNotBlank(),
                 modifier = Modifier.weight(1f)
             ) { Text("Save Category") }
+        }
+
+        if (isEditing && onViewTransactions != null) {
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = { haptics.tick(); onViewTransactions(category.id) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("See Transactions")
+            }
         }
 
         if (isEditing && onDelete != null) {

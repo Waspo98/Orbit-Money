@@ -198,6 +198,7 @@ data class MhaSummaryState(
 
 data class MortgageSnapshotState(
     val hasMortgage: Boolean = false,
+    val mortgageAccountId: Long? = null,
     val estimatedHomeValueCents: Cents = 0L,
     val mortgageBalanceCents: Cents = 0L,
     val estimatedEquityCents: Cents = 0L,

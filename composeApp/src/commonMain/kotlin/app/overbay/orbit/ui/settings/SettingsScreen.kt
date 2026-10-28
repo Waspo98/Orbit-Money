@@ -49,6 +49,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
+    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -69,7 +70,7 @@ fun SettingsScreen(
                 title = "Settings",
                 subtitle = "Preferences, sync connections, backups, and appearance.",
                 canNavigateBack = true,
-                onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                onBack = onBack,
                 scrollState = heroScrollState
             )
 
@@ -98,7 +99,10 @@ fun SettingsScreen(
                                     onServerUrlChange = viewModel::setServerUrl,
                                     onTriggerSync = viewModel::triggerSync,
                                     onAuthenticateServer = viewModel::loginToSelfHostedServer,
-                                    onOpenLoginScreen = { onNavigate(OrbitNavKey.Login) },
+                                    onOpenLoginScreen = {
+                                        viewModel.logout()
+                                        onNavigate(OrbitNavKey.Login)
+                                    },
                                     onLogout = {
                                         viewModel.logout()
                                         onNavigate(OrbitNavKey.Login)
@@ -160,7 +164,10 @@ fun SettingsScreen(
                             onServerUrlChange = viewModel::setServerUrl,
                             onTriggerSync = viewModel::triggerSync,
                             onAuthenticateServer = viewModel::loginToSelfHostedServer,
-                            onOpenLoginScreen = { onNavigate(OrbitNavKey.Login) },
+                            onOpenLoginScreen = {
+                                viewModel.logout()
+                                onNavigate(OrbitNavKey.Login)
+                            },
                             onLogout = {
                                 viewModel.logout()
                                 onNavigate(OrbitNavKey.Login)

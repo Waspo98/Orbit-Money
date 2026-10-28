@@ -47,6 +47,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 fun TopSpendingCard(
     state: TopSpendingState,
     onClick: () -> Unit,
+    onCategoryClick: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -83,6 +84,11 @@ fun TopSpendingCard(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable {
+                                haptics.tick()
+                                onCategoryClick(cat.categoryId)
+                            }
                             .padding(vertical = 4.dp)
                     ) {
                         Row(
