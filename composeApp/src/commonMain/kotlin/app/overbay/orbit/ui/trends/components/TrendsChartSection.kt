@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.toComposeColor
@@ -201,7 +202,7 @@ fun TrendsChartSection(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = selectedTrend.category.name,
+                                text = selectedTrend.category.labelWithEmoji,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1

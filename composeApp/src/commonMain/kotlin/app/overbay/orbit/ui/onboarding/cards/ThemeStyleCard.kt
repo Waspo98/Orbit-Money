@@ -132,7 +132,7 @@ fun ThemeStyleCard(
                             },
                             shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
                             icon = {},
-                            label = { Text(mode.displayName, style = MaterialTheme.typography.labelMedium) }
+                            label = { Text(mode.labelWithEmoji, style = MaterialTheme.typography.labelMedium) }
                         )
                     }
                 }

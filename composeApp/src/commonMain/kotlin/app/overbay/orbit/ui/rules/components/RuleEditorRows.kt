@@ -35,6 +35,7 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleAction
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.ui.components.OrbitDropdownField
 
 @Composable
@@ -135,9 +136,9 @@ fun ActionEditorRow(
                 RuleActionType.CATEGORIZE, RuleActionType.SET_CATEGORY -> {
                     OrbitDropdownField(
                         label = "Target Category",
-                        selectedText = selectedCategory?.name ?: "Select Category",
+                        selectedText = selectedCategory?.labelWithEmoji ?: "Select Category",
                         options = categories,
-                        optionLabel = { it.name },
+                        optionLabel = { it.labelWithEmoji },
                         onOptionSelected = { onActionChanged(action.copy(targetCategoryId = it.id)) }
                     )
                 }

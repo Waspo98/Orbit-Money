@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitSectionCard
@@ -182,7 +183,7 @@ private fun MhaTransactionRow(
                     }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${item.date} • ${item.category?.name ?: "Uncategorized"} • ${item.account?.name ?: ""}",
+                        text = "${item.date} • ${item.category?.labelWithEmoji ?: "❓ Uncategorized"} • ${item.account?.name ?: ""}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
                         maxLines = 1,

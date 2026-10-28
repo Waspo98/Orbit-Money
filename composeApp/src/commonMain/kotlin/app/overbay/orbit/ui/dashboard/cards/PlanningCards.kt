@@ -28,6 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.data.model.CategoryEmojiMapper
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
@@ -73,9 +75,11 @@ fun SubscriptionsCard(
                 )
             } else {
                 state.items.forEachIndexed { index, item ->
+                    val catPrefix = CategoryEmojiMapper.resolveEmoji(item.categoryIcon)?.let { "$it " } ?: ""
+                    val catLabel = item.categoryName?.let { "$catPrefix$it" } ?: "Subscription"
                     OrbitCompactListRow(
                         title = item.merchant ?: item.name,
-                        subtitle = "${item.categoryName ?: "Subscription"} · ${item.frequencyLabel}",
+                        subtitle = "$catLabel · ${item.frequencyLabel}",
                         amount = MoneyUtils.formatCents(item.amountCents),
                         amountDetail = if (item.nextDateDisplay.isNotBlank()) "Next ${item.nextDateDisplay}" else null,
                         amountColor = colors.expense,
@@ -127,9 +131,11 @@ fun UpcomingBillsCard(
                         "+${MoneyUtils.formatCents(bill.amountCents)}"
                     }
 
+                    val catPrefix = CategoryEmojiMapper.resolveEmoji(bill.categoryIcon)?.let { "$it " } ?: ""
+                    val catLabel = bill.categoryName?.let { "$catPrefix$it" } ?: "General"
                     OrbitCompactListRow(
                         title = bill.merchant ?: bill.name,
-                        subtitle = "${bill.categoryName ?: "General"} · ${bill.dueLabel}",
+                        subtitle = "$catLabel · ${bill.dueLabel}",
                         amount = formattedAmt,
                         amountColor = amtColor,
                         showTopDivider = index > 0,
@@ -216,7 +222,7 @@ fun GoalsProgressCard(
 
                 state.goals.take(4).forEachIndexed { index, goal ->
                     OrbitMiniStatRow(
-                        label = goal.name,
+                        label = goal.labelWithEmoji,
                         detail = if (goal.targetDate != null) "Target ${goal.targetDate}" else null,
                         value = "${MoneyUtils.formatCents(goal.currentAmountCents)} (${(goal.progressRatio * 100).toInt()}%)",
                         valueColor = if (goal.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
@@ -269,7 +275,7 @@ fun GoalFocusCard(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = goal.name,
+                            text = goal.labelWithEmoji,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -334,7 +340,7 @@ fun GoalFocusCard(
                                 }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = item.name, style = MaterialTheme.typography.bodyLarge)
+                            Text(text = item.labelWithEmoji, style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 }

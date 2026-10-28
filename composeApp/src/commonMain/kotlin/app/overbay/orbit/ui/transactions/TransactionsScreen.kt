@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.ui.components.FilterBottomSheet
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.transactions.components.TransactionBatchActionBar
@@ -184,7 +185,7 @@ fun TransactionsScreen(
             onApply = { draft -> viewModel.applyFilterDraft(draft) },
             onDismiss = { viewModel.closeFilterSheet() },
             accountNames = state.accounts.associate { it.id to it.name },
-            categoryNames = state.categories.associate { it.id to it.name }
+            categoryNames = state.categories.associate { it.id to it.labelWithEmoji }
         )
     }
 
@@ -234,7 +235,7 @@ fun TransactionsScreen(
         ) {
             state.categories.forEach { cat ->
                 DropdownMenuItem(
-                    text = { Text(cat.name) },
+                    text = { Text(cat.labelWithEmoji) },
                     onClick = {
                         viewModel.batchCategorize(cat.id)
                         showCategoryBatchPicker = false

@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -59,9 +60,7 @@ private val PRESET_COLORS = listOf(
     "#689F38"  // Olive
 )
 
-private val PRESET_ICONS = listOf(
-    "🛒", "🍽️", "🏠", "🚗", "⚡", "🎬", "🛍️", "🏥", "✈️", "💰", "🔄", "📦", "🎓", "🐾", "🎁"
-)
+private val PRESET_ICONS = CategoryEmojiMapper.PRESET_EMOJIS
 
 @Composable
 fun CategoryEditorDialog(
@@ -84,7 +83,9 @@ fun CategoryEditorDialog(
 
     var name by remember(category) { mutableStateOf(category?.name ?: "") }
     var selectedColor by remember(category) { mutableStateOf(category?.color ?: PRESET_COLORS.first()) }
-    var selectedIcon by remember(category) { mutableStateOf(category?.icon ?: PRESET_ICONS.first()) }
+    var selectedIcon by remember(category) {
+        mutableStateOf(CategoryEmojiMapper.resolveEmoji(category?.icon) ?: PRESET_ICONS.first())
+    }
     var isTransfer by remember(category) { mutableStateOf(category?.isTransfer ?: false) }
     var isIncome by remember(category) { mutableStateOf(category?.isIncome ?: false) }
     var mhaEligible by remember(category) { mutableStateOf(category?.mhaDefaultEligible ?: false) }
@@ -108,10 +109,10 @@ fun CategoryEditorDialog(
                 ) {
                     OutlinedTextField(
                         value = selectedIcon,
-                        onValueChange = { selectedIcon = it.take(4) },
-                        label = { Text("Icon") },
+                        onValueChange = { selectedIcon = it.take(16) },
+                        label = { Text("Emoji") },
                         singleLine = true,
-                        modifier = Modifier.width(76.dp)
+                        modifier = Modifier.width(84.dp)
                     )
                     OutlinedTextField(
                         value = name,

@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
 import app.overbay.orbit.data.model.CategorySortOption
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
@@ -286,7 +287,7 @@ private fun SpendingMixPanel(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = item.category.name,
+                            text = item.category.labelWithEmoji,
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurface

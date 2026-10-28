@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
@@ -121,7 +122,7 @@ fun BudgetAmountEditorSheet(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = item.category.name,
+                            text = item.category.labelWithEmoji,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface

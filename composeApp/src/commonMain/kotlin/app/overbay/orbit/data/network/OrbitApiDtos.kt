@@ -277,6 +277,8 @@ data class GoalDto(
     @SerialName("current_amount") val currentAmount: Double = 0.0,
     @SerialName("target_date") val targetDate: String? = null,
     @SerialName("linked_account_id") val linkedAccountId: Long? = null,
+    @SerialName("kind") val kind: String = "custom",
+    @SerialName("icon") val icon: String? = null,
     @SerialName("sort_order") val sortOrder: Int = 0
 ) {
     fun toDomain(): Goal = Goal(
@@ -286,6 +288,8 @@ data class GoalDto(
         currentAmountCents = MoneyUtils.dollarsToCents(currentAmount),
         targetDate = targetDate,
         linkedAccountId = linkedAccountId,
+        kind = kind,
+        icon = icon,
         sortOrder = sortOrder
     )
 }

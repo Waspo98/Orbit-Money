@@ -18,6 +18,42 @@ data class Category(
     val createdAt: String = ""
 )
 
+object CategoryEmojiMapper {
+    val PRESET_EMOJIS: List<String> = listOf(
+        "🚗", "👶", "💡", "💵", "💝", "💳", "🍽️", "🎓",
+        "🎬", "👨‍👩‍👧", "💸", "🎉", "🎁", "🛒", "💪", "🏠",
+        "💰", "🔄", "📈", "⚖️", "🏦", "🏥", "💆", "🐾",
+        "💹", "🛍️", "💻", "🧾", "✈️", "❓", "💱", "💼"
+    )
+
+    private val LEGACY_ICON_TO_EMOJI: Map<String, String> = mapOf(
+        "payments" to "💰",
+        "shopping_cart" to "🛒",
+        "restaurant" to "🍽️",
+        "home" to "🏠",
+        "bolt" to "💡",
+        "directions_car" to "🚗",
+        "medical_services" to "🏥",
+        "volunteer_activism" to "💝",
+        "movie" to "🎬",
+        "swap_horiz" to "💳",
+        "sync_alt" to "🔄",
+        "help_outline" to "❓"
+    )
+
+    fun resolveEmoji(rawIcon: String?): String? {
+        val trimmed = rawIcon?.trim().orEmpty()
+        if (trimmed.isEmpty()) return null
+        return LEGACY_ICON_TO_EMOJI[trimmed] ?: trimmed
+    }
+}
+
+val Category.displayEmoji: String?
+    get() = CategoryEmojiMapper.resolveEmoji(icon)
+
+val Category.labelWithEmoji: String
+    get() = displayEmoji?.let { "$it $name" } ?: name
+
 @Serializable
 data class CategoryGroup(
     val name: String,

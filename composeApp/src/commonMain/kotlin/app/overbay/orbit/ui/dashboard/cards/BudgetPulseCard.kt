@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
@@ -132,7 +133,7 @@ fun BudgetPulseCard(
                             "${((item.spentCents.toDouble() / item.amountCents.toDouble()) * 100).toInt()}% used"
                         }
                         OrbitMiniStatRow(
-                            label = item.category.name,
+                            label = item.category.labelWithEmoji,
                             value = alertText,
                             valueColor = if (isOver) colors.expense else colors.warning,
                             showTopDivider = index > 0

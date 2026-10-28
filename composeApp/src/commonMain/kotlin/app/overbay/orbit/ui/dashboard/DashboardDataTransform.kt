@@ -2,12 +2,15 @@ package app.overbay.orbit.ui.dashboard
 
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.BudgetPaceStatus
+import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.data.model.DashboardWidgetConfig
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.UpcomingKind
 import app.overbay.orbit.data.model.UpcomingStatus
+import app.overbay.orbit.data.model.displayEmoji
+import app.overbay.orbit.data.model.resolvedEmoji
 import app.overbay.orbit.domain.BudgetEngine
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
@@ -43,9 +46,9 @@ object DashboardDataTransform {
         val now = Clock.System.now()
         val hour = now.toLocalDateTime(TimeZone.currentSystemDefault()).hour
         val greeting = when {
-            hour < 12 -> "Good morning"
-            hour < 17 -> "Good afternoon"
-            else -> "Good evening"
+            hour < 12 -> "🌅 Good morning"
+            hour < 17 -> "☀️ Good afternoon"
+            else -> "🌙 Good evening"
         }
         val dayName = today.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }
         val dateLabel = "$dayName, ${LocalDateUtils.monthName(today.monthNumber)} ${today.dayOfMonth}"
@@ -153,7 +156,7 @@ object DashboardDataTransform {
                     categoryId = entry.key,
                     categoryName = cat?.name ?: if (entry.key == 0L) "Uncategorized" else "Category #${entry.key}",
                     categoryColor = cat?.color,
-                    categoryIcon = cat?.icon,
+                    categoryIcon = cat?.displayEmoji ?: if (entry.key == 0L) "❓" else null,
                     spentCents = spent,
                     percentOfTotal = pct
                 )
@@ -181,7 +184,7 @@ object DashboardDataTransform {
                     dateDisplay = dateDisplay,
                     categoryName = cat?.name ?: t.categoryName,
                     categoryColor = cat?.color ?: t.categoryColor,
-                    categoryIcon = cat?.icon ?: t.categoryIcon,
+                    categoryIcon = cat?.displayEmoji ?: CategoryEmojiMapper.resolveEmoji(t.categoryIcon),
                     accountName = acct?.name ?: t.accountName
                 )
             }
@@ -204,7 +207,7 @@ object DashboardDataTransform {
                     frequencyLabel = item.frequency.name.lowercase().replaceFirstChar { it.uppercase() },
                     categoryName = cat?.name,
                     categoryColor = cat?.color,
-                    categoryIcon = cat?.icon,
+                    categoryIcon = cat?.displayEmoji,
                     nextDateDisplay = item.nextDate
                 )
             }
@@ -282,7 +285,8 @@ object DashboardDataTransform {
                 progressRatio = g.progressRatio,
                 remainingAmountCents = g.remainingAmountCents,
                 isCompleted = g.isCompleted,
-                targetDate = g.targetDate
+                targetDate = g.targetDate,
+                icon = g.resolvedEmoji
             )
         }
         val goalsState = GoalsProgressState(
@@ -446,7 +450,7 @@ object DashboardDataTransform {
                         isOverdue = days < 0,
                         categoryName = cat?.name,
                         categoryColor = cat?.color,
-                        categoryIcon = cat?.icon
+                        categoryIcon = cat?.displayEmoji
                     )
                 )
             }
@@ -481,7 +485,7 @@ object DashboardDataTransform {
                     dateDisplay = dateDisplay,
                     categoryName = cat?.name ?: txn.categoryName ?: "Uncategorized",
                     categoryColor = cat?.color ?: txn.categoryColor,
-                    categoryIcon = cat?.icon ?: txn.categoryIcon,
+                    categoryIcon = cat?.displayEmoji ?: CategoryEmojiMapper.resolveEmoji(txn.categoryIcon),
                     accountName = acct?.name ?: txn.accountName,
                     isPending = txn.isPending,
                     merchantLogoUrl = txn.merchantLogo?.url?.takeIf { it.isNotBlank() && txn.merchantLogo.status != "hidden" && txn.merchantLogo.status != "failed" }

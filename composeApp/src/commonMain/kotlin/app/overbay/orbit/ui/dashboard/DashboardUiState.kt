@@ -268,8 +268,12 @@ data class DashboardGoalItem(
     val progressRatio: Double,
     val remainingAmountCents: Cents,
     val isCompleted: Boolean,
-    val targetDate: String? = null
-)
+    val targetDate: String? = null,
+    val icon: String = "🎯"
+) {
+    val labelWithEmoji: String
+        get() = "$icon $name"
+}
 
 data class GoalsProgressState(
     val activeGoalsCount: Int = 0,

@@ -48,6 +48,7 @@ import app.overbay.orbit.data.model.RecurrenceFrequency
 import app.overbay.orbit.data.model.UpcomingItem
 import app.overbay.orbit.data.model.UpcomingKind
 import app.overbay.orbit.data.model.UpcomingStatus
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
@@ -188,9 +189,9 @@ fun RecurringItemEditorSheet(
             val selectedCategory = categories.find { it.id == selectedCategoryId }
             OrbitDropdownField(
                 label = "Category",
-                selectedText = selectedCategory?.name ?: "None / Unassigned",
+                selectedText = selectedCategory?.labelWithEmoji ?: "None / Unassigned",
                 options = categories,
-                optionLabel = { it.name },
+                optionLabel = { it.labelWithEmoji },
                 onOptionSelected = { selectedCategoryId = it.id },
                 nullOptionLabel = "None",
                 onNullSelected = { selectedCategoryId = null }

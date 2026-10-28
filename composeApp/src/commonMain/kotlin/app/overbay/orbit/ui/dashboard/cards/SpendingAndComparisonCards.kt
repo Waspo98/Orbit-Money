@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
@@ -96,8 +97,9 @@ fun TopSpendingCard(
                                         .background(color)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
+                                val iconPrefix = CategoryEmojiMapper.resolveEmoji(cat.categoryIcon)?.let { "$it " } ?: ""
                                 Text(
-                                    text = cat.categoryName,
+                                    text = "$iconPrefix${cat.categoryName}",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -159,9 +161,11 @@ fun BiggestTransactionsCard(
                 )
             } else {
                 state.transactions.forEachIndexed { index, txn ->
+                    val catPrefix = CategoryEmojiMapper.resolveEmoji(txn.categoryIcon)?.let { "$it " } ?: ""
+                    val catLabel = txn.categoryName?.let { "$catPrefix$it" } ?: "❓ Uncategorized"
                     OrbitCompactListRow(
                         title = txn.merchant,
-                        subtitle = "${txn.dateDisplay} · ${txn.categoryName ?: "Uncategorized"}",
+                        subtitle = "${txn.dateDisplay} · $catLabel",
                         amount = txn.formattedAmount,
                         amountColor = colors.expense,
                         showTopDivider = index > 0,

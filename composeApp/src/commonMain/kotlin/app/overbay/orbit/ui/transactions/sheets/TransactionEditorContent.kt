@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
@@ -219,11 +220,11 @@ fun TransactionEditorContent(
         val selectedCategory = categories.find { it.id == selectedCategoryId }
         OrbitDropdownField(
             label = "Category",
-            selectedText = selectedCategory?.name ?: "Uncategorized",
+            selectedText = selectedCategory?.labelWithEmoji ?: "❓ Uncategorized",
             options = categories,
-            optionLabel = { it.name },
+            optionLabel = { it.labelWithEmoji },
             onOptionSelected = { selectedCategoryId = it.id },
-            nullOptionLabel = "Uncategorized",
+            nullOptionLabel = "❓ Uncategorized",
             onNullSelected = { selectedCategoryId = null },
             leadingIcon = if (selectedCategory != null) {
                 {

@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.displayEmoji
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
@@ -127,7 +129,7 @@ fun SwipeableTransactionRow(
                 // 40dp Avatar / Vendor Logo Mark
                 TransactionMerchantMark(
                     transaction = transaction,
-                    categoryIcon = category?.icon,
+                    categoryIcon = category?.displayEmoji,
                     categoryColor = catColor,
                     size = 40.dp,
                     cornerRadius = 10.dp,
@@ -167,7 +169,7 @@ fun SwipeableTransactionRow(
                         Text(transaction.effectiveDate, style = MaterialTheme.typography.bodySmall, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(" • ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outlineVariant)
                         Text(
-                            text = category?.name ?: if (transaction.effectiveIsTransfer) "Transfer" else "Uncategorized",
+                            text = category?.labelWithEmoji ?: if (transaction.effectiveIsTransfer) "🔄 Transfer" else "❓ Uncategorized",
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
@@ -272,7 +274,7 @@ fun SwipeableTransactionRow(
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    MetaItem(label = "CATEGORY", value = category?.name ?: "Uncategorized")
+                                    MetaItem(label = "CATEGORY", value = category?.labelWithEmoji ?: "❓ Uncategorized")
                                     if (transaction.editedCategoryId != null) {
                                         Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetCategory() }.padding(start = 6.dp))
                                     }

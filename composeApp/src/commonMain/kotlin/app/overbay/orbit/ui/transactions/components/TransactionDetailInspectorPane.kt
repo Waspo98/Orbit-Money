@@ -28,8 +28,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.displayEmoji
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
@@ -126,11 +129,14 @@ fun TransactionDetailInspectorPane(
             }
             InspectorSubMode.DETAIL -> {
                 if (inspecting != null) {
+                    val cat = state.categoryMap[inspecting.effectiveCategoryId]
+                    val origCat = inspecting.originalCategoryId?.let { state.categoryMap[it] }
                     TransactionReadOnlyDetailContent(
                         transaction = inspecting,
-                        categoryName = state.categoryMap[inspecting.effectiveCategoryId]?.name,
-                        categoryIcon = state.categoryMap[inspecting.effectiveCategoryId]?.icon,
-                        categoryColorHex = state.categoryMap[inspecting.effectiveCategoryId]?.color,
+                        categoryName = cat?.labelWithEmoji,
+                        categoryIcon = cat?.displayEmoji,
+                        categoryColorHex = cat?.color,
+                        originalCategoryLabel = origCat?.labelWithEmoji,
                         accountName = state.accountMap[inspecting.accountId]?.name ?: inspecting.accountName,
                         onClose = onClosePane,
                         onEdit = { viewModel.openTransactionEditor(inspecting.id) },
@@ -166,6 +172,7 @@ private fun TransactionReadOnlyDetailContent(
     categoryName: String?,
     categoryIcon: String?,
     categoryColorHex: String?,
+    originalCategoryLabel: String? = null,
     accountName: String,
     onClose: () -> Unit,
     onEdit: () -> Unit,
@@ -250,8 +257,11 @@ private fun TransactionReadOnlyDetailContent(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 InspectorMetaItem(
                     label = "CATEGORY",
-                    value = categoryName ?: if (transaction.effectiveIsTransfer) "Transfer" else "Uncategorized",
+                    value = categoryName ?: if (transaction.effectiveIsTransfer) "🔄 Transfer" else "❓ Uncategorized",
                     valueColor = catColor,
+                    subtitle = if (transaction.editedCategoryId != null && originalCategoryLabel != null) {
+                        "Originally: $originalCategoryLabel"
+                    } else null,
                     onReset = if (transaction.editedCategoryId != null) onResetCategory else null
                 )
                 InspectorMetaItem(

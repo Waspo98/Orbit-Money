@@ -16,7 +16,7 @@ object BudgetEngine {
         id = -1L,
         name = "Uncategorized",
         color = "#9E9E9E",
-        icon = "help_outline",
+        icon = "❓",
         isIncome = false,
         isTransfer = false
     )

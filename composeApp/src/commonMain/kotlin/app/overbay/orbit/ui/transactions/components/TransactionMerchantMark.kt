@@ -28,6 +28,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -271,8 +272,9 @@ private fun FallbackCategoryMarkText(
     merchant: String,
     color: Color
 ) {
+    val resolvedEmoji = CategoryEmojiMapper.resolveEmoji(categoryIcon)
     Text(
-        text = categoryIcon?.takeIf { it.isNotBlank() } ?: merchant.take(1).uppercase().ifBlank { "$" },
+        text = resolvedEmoji?.takeIf { it.isNotBlank() } ?: merchant.take(1).uppercase().ifBlank { "$" },
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = color

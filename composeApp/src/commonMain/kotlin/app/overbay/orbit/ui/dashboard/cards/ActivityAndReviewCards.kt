@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
@@ -254,9 +255,11 @@ fun RecentTransactionsCard(
             Column(modifier = Modifier.fillMaxWidth()) {
                 transactions.take(10).forEachIndexed { index, txn ->
                     val catColor = parseHexColor(txn.categoryColor) ?: MaterialTheme.colorScheme.primary
+                    val catPrefix = CategoryEmojiMapper.resolveEmoji(txn.categoryIcon)?.let { "$it " } ?: ""
+                    val catLabel = txn.categoryName?.let { "$catPrefix$it" } ?: "❓ Uncategorized"
                     OrbitCompactListRow(
                         title = txn.merchant,
-                        subtitle = "${txn.dateDisplay} · ${txn.categoryName ?: "Uncategorized"}",
+                        subtitle = "${txn.dateDisplay} · $catLabel",
                         amount = txn.formattedAmount,
                         amountDetail = txn.accountName,
                         amountColor = if (txn.isExpense) colors.expense else colors.income,

@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.CategorySpendingTrend
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
@@ -99,7 +100,7 @@ fun CategoryBreakdownList(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column {
                                     Text(
-                                        text = trend.category.name,
+                                        text = trend.category.labelWithEmoji,
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface

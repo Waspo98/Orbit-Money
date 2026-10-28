@@ -36,17 +36,17 @@ object DemoSeedGenerator {
         )
 
         val categories = listOf(
-            Category(id = 1L, name = "Income", color = "#10B981", icon = "payments", isIncome = true, isTransfer = false),
-            Category(id = 2L, name = "Groceries", color = "#3B82F6", icon = "shopping_cart", isIncome = false, isTransfer = false),
-            Category(id = 3L, name = "Dining & Drinks", color = "#F59E0B", icon = "restaurant", isIncome = false, isTransfer = false),
-            Category(id = 4L, name = "Housing & Mortgage", color = "#6366F1", icon = "home", isIncome = false, isTransfer = false, mhaDefaultEligible = true),
-            Category(id = 5L, name = "Bills & Utilities", color = "#06B6D4", icon = "bolt", isIncome = false, isTransfer = false, mhaDefaultEligible = true),
-            Category(id = 6L, name = "Transportation", color = "#EC4899", icon = "directions_car", isIncome = false, isTransfer = false),
-            Category(id = 7L, name = "Healthcare", color = "#EF4444", icon = "medical_services", isIncome = false, isTransfer = false),
-            Category(id = 8L, name = "Giving & Tithe", color = "#8B5CF6", icon = "volunteer_activism", isIncome = false, isTransfer = false),
-            Category(id = 9L, name = "Entertainment", color = "#14B8A6", icon = "movie", isIncome = false, isTransfer = false),
-            Category(id = 10L, name = "Credit Card Payment", color = "#64748B", icon = "swap_horiz", isIncome = false, isTransfer = true),
-            Category(id = 11L, name = "Internal Transfer", color = "#64748B", icon = "sync_alt", isIncome = false, isTransfer = true)
+            Category(id = 1L, name = "Income", color = "#10B981", icon = "💰", isIncome = true, isTransfer = false),
+            Category(id = 2L, name = "Groceries", color = "#3B82F6", icon = "🛒", isIncome = false, isTransfer = false),
+            Category(id = 3L, name = "Dining & Drinks", color = "#F59E0B", icon = "🍽️", isIncome = false, isTransfer = false),
+            Category(id = 4L, name = "Housing & Mortgage", color = "#6366F1", icon = "🏠", isIncome = false, isTransfer = false, mhaDefaultEligible = true),
+            Category(id = 5L, name = "Bills & Utilities", color = "#06B6D4", icon = "💡", isIncome = false, isTransfer = false, mhaDefaultEligible = true),
+            Category(id = 6L, name = "Transportation", color = "#EC4899", icon = "🚗", isIncome = false, isTransfer = false),
+            Category(id = 7L, name = "Healthcare", color = "#EF4444", icon = "🏥", isIncome = false, isTransfer = false),
+            Category(id = 8L, name = "Giving & Tithe", color = "#8B5CF6", icon = "💝", isIncome = false, isTransfer = false),
+            Category(id = 9L, name = "Entertainment", color = "#14B8A6", icon = "🎬", isIncome = false, isTransfer = false),
+            Category(id = 10L, name = "Credit Card Payment", color = "#64748B", icon = "💳", isIncome = false, isTransfer = true),
+            Category(id = 11L, name = "Internal Transfer", color = "#64748B", icon = "🔄", isIncome = false, isTransfer = true)
         )
 
         val budgets = listOf(

@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.data.model.RuleAction
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
@@ -230,7 +231,7 @@ internal fun CategoryReviewPickerContent(
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Text(
-                                    text = category.icon ?: "$",
+                                    text = CategoryEmojiMapper.resolveEmoji(category.icon) ?: "$",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = catColor
@@ -348,7 +349,7 @@ internal fun ReviewTransactionCardContent(
                                 modifier = Modifier.fillMaxSize(),
                                 fallback = {
                                     Text(
-                                        text = category?.icon ?: txn.categoryIcon ?: "?",
+                                        text = CategoryEmojiMapper.resolveEmoji(category?.icon ?: txn.categoryIcon) ?: "?",
                                         fontSize = 22.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = catColor
@@ -398,7 +399,7 @@ internal fun ReviewTransactionCardContent(
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Text(
-                                    text = category?.icon ?: txn.categoryIcon ?: "?",
+                                    text = CategoryEmojiMapper.resolveEmoji(category?.icon ?: txn.categoryIcon) ?: "?",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = catColor

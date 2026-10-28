@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.TransactionRule
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -191,7 +192,7 @@ fun RuleItemCard(
                     )
                 } else {
                     rule.actions.forEach { act ->
-                        val targetCatName = act.targetCategoryId?.let { categoryMap[it]?.name }
+                        val targetCatName = act.targetCategoryId?.let { categoryMap[it]?.labelWithEmoji }
                         val label = when (act.type) {
                             RuleActionType.CATEGORIZE, RuleActionType.SET_CATEGORY -> {
                                 "Set Category -> ${targetCatName ?: act.value}"

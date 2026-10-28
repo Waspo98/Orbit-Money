@@ -245,6 +245,8 @@ class SelfHostedApiEngine(
             currentAmount = MoneyUtils.centsToDollars(goal.currentAmountCents),
             targetDate = goal.targetDate,
             linkedAccountId = goal.linkedAccountId,
+            kind = goal.kind,
+            icon = goal.icon,
             sortOrder = goal.sortOrder
         )
         return if (goal.id == 0L) {

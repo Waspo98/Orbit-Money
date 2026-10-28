@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitIcons
@@ -62,7 +63,7 @@ fun rememberActiveFilterChips(
                 add("Account: $accName" to { viewModel.applyFilterDraft(state.filterDraft.copy(accountId = null)) })
             }
             state.filterDraft.categoryId?.let { catId ->
-                val catName = state.categoryMap[catId]?.name ?: "Category"
+                val catName = state.categoryMap[catId]?.labelWithEmoji ?: "Category"
                 add("Category: $catName" to { viewModel.applyFilterDraft(state.filterDraft.copy(categoryId = null)) })
             }
         }

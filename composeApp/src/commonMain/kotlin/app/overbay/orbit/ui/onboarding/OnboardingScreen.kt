@@ -251,7 +251,7 @@ fun OnboardingScreen(
                 // Primary Next / Finish Button
                 val buttonText = when (state.currentStep) {
                     OnboardingStep.WELCOME -> "Get Started"
-                    OnboardingStep.THEME_SETUP -> "Launch Orbit Money"
+                    OnboardingStep.THEME_SETUP -> "Launch Orbit Money 🚀"
                     else -> "Next"
                 }
 
@@ -326,9 +326,10 @@ private fun WelcomeIntroCard() {
                     modifier = Modifier.padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    IntroValueRow(icon = "🔒", title = "100% Private", desc = "Zero mandatory cloud accounts or tracking.")
-                    IntroValueRow(icon = "⚡", title = "Tactile & Fast", desc = "Instant offline queries with 60fps spring physics.")
-                    IntroValueRow(icon = "🎯", title = "Mathematically Exact", desc = "Integer-cents calculation precision for every budget.")
+                    IntroValueRow(icon = "🔒", title = "Local & Private by Default", desc = "All your accounts and transactions live securely right on this device.")
+                    IntroValueRow(icon = "⚡", title = "Instant & Offline", desc = "Instant load times with 60fps spring physics and zero network lag.")
+                    IntroValueRow(icon = "🏦", title = "SimpleFIN Bank Sync", desc = "Automatically sync bank and credit card accounts on your schedule.")
+                    IntroValueRow(icon = "☁️", title = "Google Drive or Self-Hosted", desc = "Backup silently to your private Google Drive or connect a household server.")
                 }
             }
         }

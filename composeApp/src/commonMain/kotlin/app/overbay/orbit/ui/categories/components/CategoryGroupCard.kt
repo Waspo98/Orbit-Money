@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.categories.CategoryGroupDisplay
 import app.overbay.orbit.ui.categories.CategorySummary
@@ -131,13 +132,21 @@ private fun CategoryRowItem(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Color Swatch Circle
+            // Tinted Emoji Badge
             Box(
                 modifier = Modifier
-                    .size(14.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
-                    .background(catColor)
-            )
+                    .background(catColor.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = cat.displayEmoji ?: "#",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = catColor
+                )
+            }
 
             Spacer(modifier = Modifier.width(12.dp))
 

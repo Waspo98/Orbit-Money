@@ -123,6 +123,8 @@ data class Goal(
     val currentAmountCents: Cents = 0L,
     val targetDate: String? = null, // YYYY-MM-DD
     val linkedAccountId: Long? = null,
+    val kind: String = "custom",
+    val icon: String? = "🎯",
     val sortOrder: Int = 0,
     val allocations: List<GoalAllocation> = emptyList(),
     val createdAt: String = "",
@@ -136,3 +138,24 @@ data class Goal(
     val remainingAmountCents: Cents get() = (targetAmountCents - currentAmountCents).coerceAtLeast(0L)
     val isCompleted: Boolean get() = currentAmountCents >= targetAmountCents
 }
+
+data class GoalPreset(val kind: String, val label: String, val emoji: String)
+
+val GOAL_PRESETS: List<GoalPreset> = listOf(
+    GoalPreset(kind = "college", label = "Kids College", emoji = "🎓"),
+    GoalPreset(kind = "car", label = "New Car", emoji = "🚗"),
+    GoalPreset(kind = "home", label = "Home", emoji = "🏠"),
+    GoalPreset(kind = "emergency", label = "Emergency Fund", emoji = "🛡️"),
+    GoalPreset(kind = "travel", label = "Travel", emoji = "✈️"),
+    GoalPreset(kind = "custom", label = "Something Else", emoji = "🎯")
+)
+
+val Goal.resolvedEmoji: String
+    get() {
+        val raw = icon?.trim().orEmpty()
+        if (raw.isNotEmpty() && raw != "?" && raw != "??" && raw != "target") return raw
+        return GOAL_PRESETS.firstOrNull { it.kind == kind }?.emoji ?: "🎯"
+    }
+
+val Goal.labelWithEmoji: String
+    get() = "$resolvedEmoji $name"

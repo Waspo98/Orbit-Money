@@ -60,7 +60,7 @@ fun DataSeedImportCard(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             SelectableListRow(
-                title = "Load Demo Household (Recommended)",
+                title = "🎯 Load Demo Household (Recommended)",
                 subtitle = "Explore with 9 realistic accounts, budgets, recurring bills, and transactions.",
                 selected = state.selectedSeedChoice == SeedChoice.DEMO,
                 onClick = {
@@ -70,7 +70,7 @@ fun DataSeedImportCard(
             )
 
             SelectableListRow(
-                title = "Start Fresh with Empty Accounts",
+                title = "⚡ Start Fresh with Empty Accounts",
                 subtitle = "Initialize clean accounts and default categories. Ready for manual entry or CSV.",
                 selected = state.selectedSeedChoice == SeedChoice.FRESH,
                 onClick = {
@@ -80,7 +80,7 @@ fun DataSeedImportCard(
             )
 
             SelectableListRow(
-                title = "Restore Backup File",
+                title = "💾 Restore Backup File",
                 subtitle = "Restore all your data from an Orbit Money JSON backup export.",
                 selected = state.selectedSeedChoice == SeedChoice.RESTORE_FILE,
                 onClick = {
@@ -90,8 +90,8 @@ fun DataSeedImportCard(
             )
 
             SelectableListRow(
-                title = "Google Drive Cloud Backup",
-                subtitle = "Enable private cloud sync in Google Drive's hidden appDataFolder.",
+                title = "🛡️ Google Drive Cloud Backup",
+                subtitle = "📲 Seamless device restore in Google Drive's hidden appDataFolder sandbox.",
                 selected = state.selectedSeedChoice == SeedChoice.GOOGLE_DRIVE,
                 onClick = {
                     haptics.tick()
