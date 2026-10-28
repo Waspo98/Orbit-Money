@@ -142,7 +142,7 @@ fun MorphingPageHero(
     val hasGlidingToolbar = expandedToolbar != null && morphingContent == null
     val hasMorphingSlot = morphingContent != null
 
-    var textBlockHeightPx by remember { mutableFloatStateOf(with(density) { 92.dp.toPx() }) }
+    var textBlockHeightPx by remember { mutableFloatStateOf(with(density) { 104.dp.toPx() }) }
     var titleTopInColumnPx by remember { mutableFloatStateOf(with(density) { if (kicker != null) 16.dp.toPx() else 0.dp.toPx() }) }
     var titleHeightPx by remember { mutableFloatStateOf(with(density) { 38.dp.toPx() }) }
     var rawTitleWidthPx by remember { mutableFloatStateOf(with(density) { 180.dp.toPx() }) }
@@ -152,12 +152,12 @@ fun MorphingPageHero(
     var colToolbarHeightPx by remember { mutableFloatStateOf(with(density) { 32.dp.toPx() }) }
 
     val expandedFontSize = if (title.length > 17) 26.sp else 30.sp
-    val collapsedTitleScale = 18.5f / expandedFontSize.value
+    val collapsedTitleScale = 21f / expandedFontSize.value
     val titleScale = lerp(1f, collapsedTitleScale, fraction)
 
     val extraMorphSlotPx = when {
-        hasMorphingSlot -> with(density) { 56.dp.toPx() }
-        hasGlidingToolbar -> expToolbarHeightPx + with(density) { 12.dp.toPx() }
+        hasMorphingSlot -> with(density) { 58.dp.toPx() }
+        hasGlidingToolbar -> expToolbarHeightPx + with(density) { 16.dp.toPx() }
         else -> 0f
     }
     val expandedMorphHeightPx = (textBlockHeightPx + extraMorphSlotPx).coerceAtLeast(minBarHeightPx)
@@ -190,8 +190,9 @@ fun MorphingPageHero(
         ) {
             val totalWidth = maxWidth
             val secondaryAlpha = ((1f - fraction * 2.2f).coerceIn(0f, 1f) * contentAlpha).coerceIn(0f, 1f)
-            val topPadPx = with(density) { 12.dp.toPx() }
-            val bottomPadDp = if (hasMorphingSlot || hasGlidingToolbar || persistentBottomBar != null) 6.dp else 12.dp
+            val topPadDp = 18.dp
+            val topPadPx = with(density) { topPadDp.toPx() }
+            val bottomPadDp = if (hasMorphingSlot || hasGlidingToolbar || persistentBottomBar != null) 10.dp else 18.dp
 
             val expandedTitleCenterY = topPadPx + titleTopInColumnPx + (titleHeightPx / 2f)
             val titleTranslationY = ((minBarHeightPx / 2f) - expandedTitleCenterY) * fraction
@@ -209,9 +210,11 @@ fun MorphingPageHero(
                     .layout { measurable, constraints ->
                         val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
                         textBlockHeightPx = placeable.height.toFloat()
-                        layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
+                        layout(placeable.width, placeable.height.coerceAtMost(constraints.maxHeight)) {
+                            placeable.placeRelative(0, 0)
+                        }
                     }
-                    .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = bottomPadDp),
+                    .padding(start = 20.dp, end = 20.dp, top = topPadDp, bottom = bottomPadDp),
                 verticalAlignment = Alignment.Top
             ) {
                 val iconTopOffsetDp = with(density) {
