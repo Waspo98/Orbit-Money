@@ -270,7 +270,7 @@ fun TransactionsListPane(
             visible = state.syncToastMessage != null,
             enter = slideInVertically { -it } + fadeIn(),
             exit = slideOutVertically { -it } + fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp, start = 16.dp, end = 16.dp)
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 12.dp, start = 16.dp, end = 16.dp)
         ) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.inverseSurface, tonalElevation = 6.dp, shadowElevation = 6.dp) {
                 Row(
