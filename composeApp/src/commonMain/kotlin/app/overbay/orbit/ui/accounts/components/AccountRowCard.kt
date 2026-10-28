@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -49,6 +51,7 @@ import kotlin.math.roundToInt
  * bold balance, compact "See transactions" action pill, and circular 3-dots menu.
  * Strictly under the 400-line ceiling.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AccountRowCard(
     account: Account,
@@ -94,46 +97,58 @@ fun AccountRowCard(
     ) {
         // Left Column: Name, Institution, and Badges
         Column(modifier = Modifier.weight(1f)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            Text(
+                text = account.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    text = account.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                val institutionMeta = buildString {
+                    account.institution?.takeIf { it.isNotBlank() }?.let { append(it) }
+                    account.accountNumberLast4?.takeIf { it.isNotBlank() }?.let { last4 ->
+                        if (isNotEmpty()) append(" ")
+                        append("•••• $last4")
+                    }
+                }
+                if (institutionMeta.isNotEmpty()) {
+                    Text(
+                        text = institutionMeta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.align(Alignment.CenterVertically)
+                    )
+                }
 
                 // Type Badge
-                AccountBadge(text = account.type.displayName)
+                AccountBadge(
+                    text = account.type.displayName,
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                )
 
-                if (account.isManual) {
-                    AccountBadge(text = "Manual", isAccent = true)
+                if (account.isManual && account.simplefinAccountId.isNullOrBlank()) {
+                    AccountBadge(
+                        text = "Manual",
+                        isAccent = true,
+                        modifier = Modifier.align(Alignment.CenterVertically)
+                    )
                 }
 
                 if (account.isArchived) {
-                    AccountBadge(text = "Archived", isMuted = true)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                account.institution?.let { inst ->
-                    Text(
-                        text = inst,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                account.accountNumberLast4?.let { last4 ->
-                    Text(
-                        text = " •••• $last4",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
+                    AccountBadge(
+                        text = "Archived",
+                        isMuted = true,
+                        modifier = Modifier.align(Alignment.CenterVertically)
                     )
                 }
             }
@@ -271,9 +286,11 @@ fun AccountRowCard(
 private fun AccountBadge(
     text: String,
     isAccent: Boolean = false,
-    isMuted: Boolean = false
+    isMuted: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
     Surface(
+        modifier = modifier,
         shape = RoundedCornerShape(6.dp),
         color = when {
             isAccent -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
@@ -286,6 +303,8 @@ private fun AccountBadge(
             style = MaterialTheme.typography.labelSmall,
             fontSize = 10.sp,
             fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
             color = when {
                 isAccent -> MaterialTheme.colorScheme.onPrimaryContainer
                 isMuted -> MaterialTheme.colorScheme.outline
