@@ -61,8 +61,36 @@ fun GoalEditorSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = modifier
+    ) {
+        GoalEditorContent(
+            goal = goal,
+            accounts = accounts,
+            onSave = onSave,
+            onDelete = onDelete,
+            onDismiss = onDismiss,
+            modifier = Modifier.navigationBarsPadding()
+        )
+    }
+}
+
+@Composable
+fun GoalEditorContent(
+    goal: Goal?,
+    accounts: List<Account>,
+    onSave: (Goal) -> Unit,
+    onDelete: (Long) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalOrbitHaptics.current
     val isEditing = goal != null && goal.id > 0L
 
     var name by remember(goal) { mutableStateOf(goal?.name ?: "") }
@@ -76,20 +104,12 @@ fun GoalEditorSheet(
     }
     var linkedAccountId by remember(goal) { mutableStateOf(goal?.linkedAccountId) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    Column(
         modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .verticalScroll(rememberScrollState())
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 12.dp)
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-        ) {
             Text(
                 text = if (isEditing) "Edit Savings Goal" else "New Savings Goal",
                 style = MaterialTheme.typography.titleLarge,
@@ -269,5 +289,4 @@ fun GoalEditorSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
         }
-    }
 }

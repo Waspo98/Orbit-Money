@@ -112,7 +112,19 @@ class BudgetsViewModel(
     }
 
     fun toggleExpandCategory(categoryId: Long) {
-        _expandedCategoryId.value = if (_expandedCategoryId.value == categoryId) null else categoryId
+        if (_expandedCategoryId.value == categoryId && !_showEditorSheet.value) {
+            _expandedCategoryId.value = null
+        } else {
+            _expandedCategoryId.value = categoryId
+            _showEditorSheet.value = false
+            _editingItem.value = null
+        }
+    }
+
+    fun dismissInspectorPane() {
+        _expandedCategoryId.value = null
+        _showEditorSheet.value = false
+        _editingItem.value = null
     }
 
     fun openAddBudget() {
@@ -128,6 +140,7 @@ class BudgetsViewModel(
     }
 
     fun openBudgetEditor(item: CategoryBudgetOverviewItem) {
+        _expandedCategoryId.value = item.category.id
         _editingItem.value = item
         _showEditorSheet.value = true
     }

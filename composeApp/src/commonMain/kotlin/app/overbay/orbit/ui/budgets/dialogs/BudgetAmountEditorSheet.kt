@@ -58,8 +58,36 @@ fun BudgetAmountEditorSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = modifier
+    ) {
+        BudgetAmountEditorContent(
+            item = item,
+            threeMonthAvgCents = threeMonthAvgCents,
+            onSave = onSave,
+            onDelete = onDelete,
+            onDismiss = onDismiss,
+            modifier = Modifier.navigationBarsPadding()
+        )
+    }
+}
+
+@Composable
+fun BudgetAmountEditorContent(
+    item: CategoryBudgetOverviewItem,
+    threeMonthAvgCents: Cents,
+    onSave: (categoryId: Long, amountCents: Cents, rollover: Boolean) -> Unit,
+    onDelete: (budgetId: Long) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalOrbitHaptics.current
 
     var amountCents by remember(item) { mutableStateOf(item.amountCents) }
     var rollover by remember(item) { mutableStateOf(item.rollover) }
@@ -71,19 +99,11 @@ fun BudgetAmountEditorSheet(
         MaterialTheme.colorScheme.primary
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    Column(
         modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-                .navigationBarsPadding()
-        ) {
             // Header with Category Chip
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -228,5 +248,4 @@ fun BudgetAmountEditorSheet(
 
             Spacer(modifier = Modifier.height(8.dp))
         }
-    }
 }

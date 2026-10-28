@@ -1,5 +1,7 @@
 package app.overbay.orbit.ui.rules.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,18 +45,32 @@ fun RuleItemCard(
     onToggleEnabled: (Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    isInspected: Boolean = false,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable {
+                        haptics.tick()
+                        onClick()
+                    }
+                } else {
+                    Modifier
+                }
+            ),
         shape = RoundedCornerShape(16.dp),
+        border = if (isInspected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
-            containerColor = if (rule.enabled) {
-                MaterialTheme.colorScheme.surfaceContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.6f)
+            containerColor = when {
+                isInspected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                rule.enabled -> MaterialTheme.colorScheme.surfaceContainer
+                else -> MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.6f)
             }
         )
     ) {

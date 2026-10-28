@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.categories.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +44,8 @@ fun CategoryGroupCard(
     group: CategoryGroupDisplay,
     onEditCategory: (Category) -> Unit,
     onDeleteCategory: (Long) -> Unit,
+    inspectingCategoryId: Long? = null,
+    onInspectCategory: ((Category) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -89,6 +92,15 @@ fun CategoryGroupCard(
             group.items.forEachIndexed { index, summary ->
                 CategoryRowItem(
                     summary = summary,
+                    isInspected = inspectingCategoryId == summary.category.id,
+                    onClick = {
+                        haptics.tick()
+                        if (onInspectCategory != null) {
+                            onInspectCategory(summary.category)
+                        } else {
+                            onEditCategory(summary.category)
+                        }
+                    },
                     onEdit = {
                         haptics.tick()
                         onEditCategory(summary.category)
@@ -109,6 +121,8 @@ fun CategoryGroupCard(
 @Composable
 private fun CategoryRowItem(
     summary: CategorySummary,
+    isInspected: Boolean,
+    onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -121,9 +135,10 @@ private fun CategoryRowItem(
     }
 
     Surface(
-        onClick = onEdit,
+        onClick = onClick,
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = if (isInspected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surface,
+        border = if (isInspected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(

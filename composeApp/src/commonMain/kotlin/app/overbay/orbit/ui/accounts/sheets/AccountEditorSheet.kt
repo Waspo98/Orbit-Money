@@ -53,17 +53,7 @@ fun AccountEditorSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    var name by remember { mutableStateOf(account.name) }
-    var institution by remember { mutableStateOf(account.institution ?: "") }
-    var selectedType by remember { mutableStateOf(account.type) }
-    var typeDropdownExpanded by remember { mutableStateOf(false) }
-    var accountNumberLast4 by remember { mutableStateOf(account.accountNumberLast4 ?: "") }
-    var balanceCents by remember { mutableStateOf(account.currentBalanceCents) }
-    var estimatedValueCents by remember { mutableStateOf(account.estimatedValueCents ?: 0L) }
-    var mhaEligible by remember { mutableStateOf(account.mhaDefaultEligible) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -71,13 +61,42 @@ fun AccountEditorSheet(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         modifier = modifier
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 12.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
+        AccountEditorContent(
+            account = account,
+            onSave = onSave,
+            onDelete = onDelete,
+            onDismiss = onDismiss
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AccountEditorContent(
+    account: Account,
+    onSave: (Account) -> Unit,
+    onDelete: ((Long) -> Unit)? = null,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalOrbitHaptics.current
+
+    var name by remember(account) { mutableStateOf(account.name) }
+    var institution by remember(account) { mutableStateOf(account.institution ?: "") }
+    var selectedType by remember(account) { mutableStateOf(account.type) }
+    var typeDropdownExpanded by remember(account) { mutableStateOf(false) }
+    var accountNumberLast4 by remember(account) { mutableStateOf(account.accountNumberLast4 ?: "") }
+    var balanceCents by remember(account) { mutableStateOf(account.currentBalanceCents) }
+    var estimatedValueCents by remember(account) { mutableStateOf(account.estimatedValueCents ?: 0L) }
+    var mhaEligible by remember(account) { mutableStateOf(account.mhaDefaultEligible) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
             Text(
                 text = if (account.id == 0L) "Add New Account" else "Edit Account",
                 style = MaterialTheme.typography.titleLarge,
@@ -226,5 +245,4 @@ fun AccountEditorSheet(
 
             Spacer(modifier = Modifier.height(20.dp))
         }
-    }
 }

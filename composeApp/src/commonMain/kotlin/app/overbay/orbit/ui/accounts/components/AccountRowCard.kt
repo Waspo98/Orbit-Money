@@ -52,6 +52,7 @@ import kotlin.math.roundToInt
 @Composable
 fun AccountRowCard(
     account: Account,
+    onInspect: () -> Unit = {},
     onSeeTransactions: () -> Unit,
     onEdit: () -> Unit,
     onPerks: (() -> Unit)?,
@@ -59,6 +60,7 @@ fun AccountRowCard(
     onMerge: () -> Unit,
     onToggleArchive: () -> Unit,
     onDelete: () -> Unit,
+    isInspected: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -69,12 +71,22 @@ fun AccountRowCard(
     val isLiability = account.type.isLiability
     val isMortgage = account.type == AccountType.MORTGAGE
 
+    val rowBgColor = if (isInspected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+    } else {
+        androidx.compose.ui.graphics.Color.Transparent
+    }
+
+    Surface(
+        color = rowBgColor,
+        modifier = modifier.fillMaxWidth()
+    ) {
     Row(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .clickable {
                 haptics.tick()
-                onSeeTransactions()
+                onInspect()
             }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -251,6 +263,7 @@ fun AccountRowCard(
                 }
             }
         }
+    }
     }
 }
 

@@ -9,6 +9,7 @@ data class RulesUiState(
     val categories: List<Category> = emptyList(),
     val accounts: List<Account> = emptyList(),
     val categoryMap: Map<Long, Category> = emptyMap(),
+    val inspectingRuleId: Long? = null,
     val editingRule: TransactionRule? = null,
     val showEditorSheet: Boolean = false,
     val deleteConfirmRuleId: Long? = null,
@@ -16,4 +17,5 @@ data class RulesUiState(
     val isLoading: Boolean = false
 ) {
     val enabledRulesCount: Int get() = rules.count { it.enabled }
+    val inspectingRule: TransactionRule? get() = rules.find { it.id == inspectingRuleId }
 }

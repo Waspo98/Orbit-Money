@@ -28,6 +28,7 @@ class UpcomingViewModel(
 
     private val _filterOption = MutableStateFlow(UpcomingFilterOption.ALL)
     private val _selectedDateFilter = MutableStateFlow<String?>(null)
+    private val _inspectingItemId = MutableStateFlow<Long?>(null)
     private val _editingItem = MutableStateFlow<UpcomingItem?>(null)
     private val _showEditorSheet = MutableStateFlow(false)
     private val _reconcilingItem = MutableStateFlow<UpcomingItem?>(null)
@@ -56,9 +57,10 @@ class UpcomingViewModel(
     val uiState: StateFlow<UpcomingUiState> = combine(
         dataFlow,
         controlFlow,
+        _inspectingItemId,
         _showReconcileDialog,
         _dismissedMerchants
-    ) { data, control, showReconcile, dismissed ->
+    ) { data, control, inspectingId, showReconcile, dismissed ->
         val todayIso = LocalDateUtils.todayIsoDate()
         val categoryMap = data.categories.associateBy { it.id }
         val accountMap = data.accounts.associateBy { it.id }
@@ -116,6 +118,7 @@ class UpcomingViewModel(
             totalUpcomingExpenseCents = totalExpense,
             totalUpcomingIncomeCents = totalIncome,
             netCashflowProjectionCents = totalIncome - totalExpense,
+            inspectingItemId = inspectingId,
             editingItem = control.editing,
             showEditorSheet = control.showSheet,
             reconcilingItem = control.reconciling,
@@ -136,6 +139,22 @@ class UpcomingViewModel(
         _selectedDateFilter.value = if (_selectedDateFilter.value == date) null else date
     }
 
+    fun selectUpcomingForInspect(id: Long?) {
+        if (id != null && _inspectingItemId.value == id && !_showEditorSheet.value) {
+            _inspectingItemId.value = null
+        } else {
+            _inspectingItemId.value = id
+            _showEditorSheet.value = false
+            _editingItem.value = null
+        }
+    }
+
+    fun dismissInspectorPane() {
+        _inspectingItemId.value = null
+        _showEditorSheet.value = false
+        _editingItem.value = null
+    }
+
     fun openAddUpcoming(kind: UpcomingKind = UpcomingKind.BILL) {
         val today = LocalDateUtils.todayIsoDate()
         val isIncome = kind == UpcomingKind.INCOME
@@ -152,6 +171,7 @@ class UpcomingViewModel(
     }
 
     fun openEditUpcoming(item: UpcomingItem) {
+        _inspectingItemId.value = item.id
         _editingItem.value = item
         _showEditorSheet.value = true
     }
@@ -171,6 +191,9 @@ class UpcomingViewModel(
     fun deleteUpcoming(id: Long) {
         viewModelScope.launch {
             repository.deleteUpcoming(id)
+            if (_inspectingItemId.value == id) {
+                _inspectingItemId.value = null
+            }
             closeEditorSheet()
         }
     }

@@ -3,6 +3,7 @@ package app.overbay.orbit.ui.goals
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -35,10 +36,13 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
+import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.goals.components.GoalDetailInspectorPane
 import app.overbay.orbit.ui.goals.components.GoalProgressCard
 import app.overbay.orbit.ui.goals.dialogs.GoalAllocationDialog
 import app.overbay.orbit.ui.goals.dialogs.GoalEditorSheet
+import app.overbay.orbit.util.LocalDevicePosture
 
 @Composable
 fun GoalsScreen(
@@ -48,204 +52,246 @@ fun GoalsScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val posture = LocalDevicePosture.current
     val heroScrollState = rememberHeroScrollState()
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        floatingActionButton = {
-            if (!state.isLoading) {
-                OrbitFloatingActionButton(
-                    visible = heroScrollState.isFabVisible,
-                    onClick = { viewModel.openAddGoal() },
-                    contentDescription = "New Goal"
-                )
-            }
-        }
-    ) { paddingValues ->
-        if (state.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .nestedScroll(heroScrollState.nestedScrollConnection)
-            ) {
-                MorphingPageHero(
-                    kicker = "SAVING TARGETS",
-                    title = "Savings Goals",
-                    subtitle = "Connect asset accounts, allocate savings, and project when each target lands.",
-                    canNavigateBack = true,
-                    onBack = { onNavigate(OrbitNavKey.Dashboard) },
-                    scrollState = heroScrollState
-                )
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
+        val isDetailOpen = isTwoPane && (
+            state.inspectingGoal != null ||
+                state.showEditorSheet ||
+                state.showAllocationDialog
+            )
 
-                // Scrollable Content
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            floatingActionButton = {
+                if (!state.isLoading) {
+                    OrbitFloatingActionButton(
+                        visible = heroScrollState.isFabVisible,
+                        onClick = { viewModel.openAddGoal() },
+                        contentDescription = "New Goal"
+                    )
+                }
+            }
+        ) { paddingValues ->
+            if (state.isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Overall Savings Summary Banner
-                    if (state.totalTargetCents > 0L) {
-                        item {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(18.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column {
-                                            Text(
-                                                text = "TOTAL SAVED",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = MoneyUtils.formatCents(state.totalSavedCents, showCents = false),
-                                                style = MaterialTheme.typography.headlineMedium.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontFeatureSettings = "tnum"
-                                                ),
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                        }
+                    CircularProgressIndicator()
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .nestedScroll(heroScrollState.nestedScrollConnection)
+                ) {
+                    MorphingPageHero(
+                        kicker = "SAVING TARGETS",
+                        title = "Savings Goals",
+                        subtitle = "Connect asset accounts, allocate savings, and project when each target lands.",
+                        canNavigateBack = true,
+                        onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                        scrollState = heroScrollState
+                    )
 
-                                        Column(horizontalAlignment = Alignment.End) {
-                                            Text(
-                                                text = "TOTAL TARGET",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = MoneyUtils.formatCents(state.totalTargetCents, showCents = false),
-                                                style = MaterialTheme.typography.titleMedium.copy(
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    fontFeatureSettings = "tnum"
-                                                ),
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                    val startPad = if (isTwoPane) 20.dp else 16.dp
+                    val endPad = if (isTwoPane) 0.dp else 16.dp
+
+                    val masterList: @Composable () -> Unit = {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            if (state.totalTargetCents > 0L) {
+                                item {
+                                    Surface(
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(18.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column {
+                                                    Text(
+                                                        text = "TOTAL SAVED",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = MoneyUtils.formatCents(state.totalSavedCents, showCents = false),
+                                                        style = MaterialTheme.typography.headlineMedium.copy(
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontFeatureSettings = "tnum"
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+
+                                                Column(horizontalAlignment = Alignment.End) {
+                                                    Text(
+                                                        text = "TOTAL TARGET",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = MoneyUtils.formatCents(state.totalTargetCents, showCents = false),
+                                                        style = MaterialTheme.typography.titleMedium.copy(
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            fontFeatureSettings = "tnum"
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(12.dp))
+
+                                            LinearProgressIndicator(
+                                                progress = { state.overallProgressRatio.toFloat().coerceIn(0f, 1f) },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(8.dp)
+                                                    .clip(RoundedCornerShape(4.dp)),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                             )
                                         }
                                     }
+                                }
+                            }
 
-                                    Spacer(modifier = Modifier.height(12.dp))
+                            if (state.activeGoals.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        text = "Active Goals (${state.activeGoals.size})",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
 
-                                    LinearProgressIndicator(
-                                        progress = { state.overallProgressRatio.toFloat().coerceIn(0f, 1f) },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(8.dp)
-                                            .clip(RoundedCornerShape(4.dp)),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                items(state.activeGoals, key = { it.id }) { goal ->
+                                    val acct = goal.linkedAccountId?.let { state.accountMap[it] }
+                                    val monthlyNeeded = viewModel.calculateMonthlyRequiredCents(goal)
+                                    GoalProgressCard(
+                                        goal = goal,
+                                        accountName = acct?.name,
+                                        monthlyNeededCents = monthlyNeeded,
+                                        isInspected = isTwoPane && state.inspectingGoalId == goal.id,
+                                        onClick = {
+                                            if (isTwoPane) {
+                                                viewModel.selectGoalForInspect(goal.id)
+                                            } else {
+                                                viewModel.openEditGoal(goal)
+                                            }
+                                        },
+                                        onDepositClick = { viewModel.openAllocationDialog(goal) }
+                                    )
+                                }
+                            }
+
+                            if (state.completedGoals.isNotEmpty()) {
+                                item {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Completed Goals (${state.completedGoals.size})",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                items(state.completedGoals, key = { it.id }) { goal ->
+                                    val acct = goal.linkedAccountId?.let { state.accountMap[it] }
+                                    GoalProgressCard(
+                                        goal = goal,
+                                        accountName = acct?.name,
+                                        monthlyNeededCents = null,
+                                        isInspected = isTwoPane && state.inspectingGoalId == goal.id,
+                                        onClick = {
+                                            if (isTwoPane) {
+                                                viewModel.selectGoalForInspect(goal.id)
+                                            } else {
+                                                viewModel.openEditGoal(goal)
+                                            }
+                                        },
+                                        onDepositClick = {}
+                                    )
+                                }
+                            }
+
+                            if (state.goals.isEmpty()) {
+                                item {
+                                    EmptyStateCard(
+                                        title = "No Goals Yet",
+                                        description = "Set targets for emergency funds, major purchases, or future vacations.",
+                                        actionButtonText = "+ Add First Goal",
+                                        onActionClick = { viewModel.openAddGoal() }
                                     )
                                 }
                             }
                         }
                     }
 
-                    // Active Goals Section
-                    if (state.activeGoals.isNotEmpty()) {
-                        item {
-                            Text(
-                                text = "Active Goals (${state.activeGoals.size})",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        items(state.activeGoals, key = { it.id }) { goal ->
-                            val acct = goal.linkedAccountId?.let { state.accountMap[it] }
-                            val monthlyNeeded = viewModel.calculateMonthlyRequiredCents(goal)
-                            GoalProgressCard(
-                                goal = goal,
-                                accountName = acct?.name,
-                                monthlyNeededCents = monthlyNeeded,
-                                onClick = { viewModel.openEditGoal(goal) },
-                                onDepositClick = { viewModel.openAllocationDialog(goal) }
-                            )
-                        }
-                    }
-
-                    // Completed Goals Section
-                    if (state.completedGoals.isNotEmpty()) {
-                        item {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Completed Goals (${state.completedGoals.size})",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        items(state.completedGoals, key = { it.id }) { goal ->
-                            val acct = goal.linkedAccountId?.let { state.accountMap[it] }
-                            GoalProgressCard(
-                                goal = goal,
-                                accountName = acct?.name,
-                                monthlyNeededCents = null,
-                                onClick = { viewModel.openEditGoal(goal) },
-                                onDepositClick = {}
-                            )
-                        }
-                    }
-
-                    // Empty State
-                    if (state.goals.isEmpty()) {
-                        item {
-                            EmptyStateCard(
-                                title = "No Goals Yet",
-                                description = "Set targets for emergency funds, major purchases, or future vacations.",
-                                actionButtonText = "+ Add First Goal",
-                                onActionClick = { viewModel.openAddGoal() }
-                            )
-                        }
+                    if (isTwoPane) {
+                        OrbitMorphingSplitLayout(
+                            isDetailOpen = isDetailOpen,
+                            onDismissDetail = { viewModel.dismissInspectorPane() },
+                            masterContent = masterList,
+                            detailContent = {
+                                GoalDetailInspectorPane(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    onNavigate = onNavigate,
+                                    onClosePane = { viewModel.dismissInspectorPane() }
+                                )
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        masterList()
                     }
                 }
             }
         }
-    }
 
-    // Modal Editor Sheet
-    if (state.showEditorSheet) {
-        GoalEditorSheet(
-            goal = state.editingGoal,
-            accounts = state.accounts,
-            onSave = { viewModel.saveGoal(it) },
-            onDelete = { viewModel.deleteGoal(it) },
-            onDismiss = { viewModel.closeEditorSheet() }
-        )
-    }
+        // Compact Phone Modal Editor Sheet & Allocation Dialog
+        if (!isTwoPane && state.showEditorSheet) {
+            GoalEditorSheet(
+                goal = state.editingGoal,
+                accounts = state.accounts,
+                onSave = { viewModel.saveGoal(it) },
+                onDelete = { viewModel.deleteGoal(it) },
+                onDismiss = { viewModel.closeEditorSheet() }
+            )
+        }
 
-    // Modal Allocation / Deposit Dialog
-    val allocatingGoal = state.allocatingGoal
-    if (state.showAllocationDialog && allocatingGoal != null) {
-        GoalAllocationDialog(
-            goal = allocatingGoal,
-            onConfirmDeposit = { goalId, amount ->
-                viewModel.depositToGoal(goalId, amount)
-            },
-            onDismiss = { viewModel.closeAllocationDialog() }
-        )
+        val allocatingGoal = state.allocatingGoal
+        if (!isTwoPane && state.showAllocationDialog && allocatingGoal != null) {
+            GoalAllocationDialog(
+                goal = allocatingGoal,
+                onConfirmDeposit = { goalId, amount ->
+                    viewModel.depositToGoal(goalId, amount)
+                },
+                onDismiss = { viewModel.closeAllocationDialog() }
+            )
+        }
     }
 }

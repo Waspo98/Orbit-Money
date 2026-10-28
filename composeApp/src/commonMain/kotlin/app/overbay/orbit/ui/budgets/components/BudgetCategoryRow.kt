@@ -55,6 +55,7 @@ fun BudgetCategoryRow(
     onEditBudget: () -> Unit,
     onDeleteBudget: () -> Unit,
     onViewTransactions: () -> Unit,
+    isInspected: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -70,10 +71,21 @@ fun BudgetCategoryRow(
         else -> colors.income
     }
 
+    val rowBgColor = if (isInspected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val rowBorderColor = if (isInspected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+    } else {
+        OrbitTheme.colors.cardBorder
+    }
+
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+        color = rowBgColor,
+        border = BorderStroke(if (isInspected) 1.5.dp else 1.dp, rowBorderColor),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {

@@ -3,11 +3,13 @@ package app.overbay.orbit.ui.trends
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -33,10 +35,13 @@ import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.trends.components.CategoryBreakdownList
 import app.overbay.orbit.ui.trends.components.TopMerchantsCard
 import app.overbay.orbit.ui.trends.components.TrendsChartSection
+import app.overbay.orbit.util.DevicePosture
+import app.overbay.orbit.util.LocalDevicePosture
 
 @Composable
 fun SpendingTrendsScreen(
     viewModel: SpendingTrendsViewModel,
+    posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
     onOpenDrawer: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -51,118 +56,147 @@ fun SpendingTrendsScreen(
         return
     }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
-    ) { innerPadding ->
-        if (!state.hasData) {
-            Box(
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
+
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        ) { innerPadding ->
+            if (!state.hasData) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    EmptyStateCard(
+                        title = "No Spending Trends Yet",
+                        description = "Import or add transactions to see income, expenses, and category history over time.",
+                        actionButtonText = "Go to Transactions",
+                        onActionClick = { onNavigate(OrbitNavKey.Transactions()) }
+                    )
+                }
+                return@Scaffold
+            }
+
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
+                    .nestedScroll(heroScrollState.nestedScrollConnection)
             ) {
-                EmptyStateCard(
-                    title = "No Spending Trends Yet",
-                    description = "Import or add transactions to see income, expenses, and category history over time.",
-                    actionButtonText = "Go to Transactions",
-                    onActionClick = { onNavigate(OrbitNavKey.Transactions()) }
+                MorphingPageHero(
+                    kicker = "HISTORY",
+                    title = "Spending Trends",
+                    subtitle = "Spending patterns and category breakdown over time",
+                    canNavigateBack = true,
+                    onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                    scrollState = heroScrollState,
+                    expandedToolbar = {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TrendsPeriod.entries.forEach { period ->
+                                val selected = period == state.selectedPeriod
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (selected) Color.White else Color.White.copy(alpha = 0.18f),
+                                    modifier = Modifier.clickable { viewModel.setPeriod(period) }
+                                ) {
+                                    Text(
+                                        text = period.label,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (selected) Color(0xFF064E3B) else Color.White,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    collapsedActions = {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.White.copy(alpha = 0.2f),
+                            modifier = Modifier.clickable {
+                                val nextIdx = (state.selectedPeriod.ordinal + 1) % TrendsPeriod.entries.size
+                                viewModel.setPeriod(TrendsPeriod.entries[nextIdx])
+                            }
+                        ) {
+                            Text(
+                                text = state.selectedPeriod.label,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
                 )
-            }
-            return@Scaffold
-        }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .nestedScroll(heroScrollState.nestedScrollConnection)
-        ) {
-            MorphingPageHero(
-                kicker = "HISTORY",
-                title = "Spending Trends",
-                subtitle = "Spending patterns and category breakdown over time",
-                canNavigateBack = true,
-                onBack = { onNavigate(OrbitNavKey.Dashboard) },
-                scrollState = heroScrollState,
-                expandedToolbar = {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TrendsPeriod.entries.forEach { period ->
-                            val selected = period == state.selectedPeriod
-                            Surface(
-                                shape = CircleShape,
-                                color = if (selected) Color.White else Color.White.copy(alpha = 0.18f),
-                                modifier = Modifier.clickable { viewModel.setPeriod(period) }
+                // Scrollable Charts and Details
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Interactive Bar Chart Section (Full Width)
+                    item {
+                        TrendsChartSection(
+                            state = state,
+                            onSelectPeriod = { viewModel.setPeriod(it) },
+                            onSelectChartMode = { viewModel.setChartMode(it) },
+                            onSelectCategory = { viewModel.selectCategory(it) },
+                            onScrubBar = { idx, item -> viewModel.onScrubBar(idx, item) }
+                        )
+                    }
+
+                    if (isTwoPane) {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                verticalAlignment = Alignment.Top
                             ) {
-                                Text(
-                                    text = period.label,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (selected) Color(0xFF064E3B) else Color.White,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                CategoryBreakdownList(
+                                    categoryTrends = state.overview.categoryTrends,
+                                    selectedCategoryId = state.selectedCategoryId,
+                                    onSelectCategory = { categoryId ->
+                                        viewModel.selectCategory(categoryId)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                TopMerchantsCard(
+                                    topMerchants = state.overview.topMerchants,
+                                    totalPeriodSpendingCents = state.overview.totalPeriodSpendingCents,
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
                         }
-                    }
-                },
-                collapsedActions = {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.2f),
-                        modifier = Modifier.clickable {
-                            val nextIdx = (state.selectedPeriod.ordinal + 1) % TrendsPeriod.entries.size
-                            viewModel.setPeriod(TrendsPeriod.entries[nextIdx])
+                    } else {
+                        // Category Breakdown List
+                        item {
+                            CategoryBreakdownList(
+                                categoryTrends = state.overview.categoryTrends,
+                                selectedCategoryId = state.selectedCategoryId,
+                                onSelectCategory = { categoryId ->
+                                    viewModel.selectCategory(categoryId)
+                                }
+                            )
                         }
-                    ) {
-                        Text(
-                            text = state.selectedPeriod.label,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            )
 
-            // Scrollable Charts and Details
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Interactive Bar Chart Section
-                item {
-                    TrendsChartSection(
-                        state = state,
-                        onSelectPeriod = { viewModel.setPeriod(it) },
-                        onSelectChartMode = { viewModel.setChartMode(it) },
-                        onSelectCategory = { viewModel.selectCategory(it) },
-                        onScrubBar = { idx, item -> viewModel.onScrubBar(idx, item) }
-                    )
-                }
-
-                // Category Breakdown List
-                item {
-                    CategoryBreakdownList(
-                        categoryTrends = state.overview.categoryTrends,
-                        selectedCategoryId = state.selectedCategoryId,
-                        onSelectCategory = { categoryId ->
-                            viewModel.selectCategory(categoryId)
+                        // Top Merchants Card
+                        item {
+                            TopMerchantsCard(
+                                topMerchants = state.overview.topMerchants,
+                                totalPeriodSpendingCents = state.overview.totalPeriodSpendingCents
+                            )
                         }
-                    )
-                }
-
-                // Top Merchants Card
-                item {
-                    TopMerchantsCard(
-                        topMerchants = state.overview.topMerchants,
-                        totalPeriodSpendingCents = state.overview.totalPeriodSpendingCents
-                    )
+                    }
                 }
             }
         }

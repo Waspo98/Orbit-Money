@@ -68,8 +68,39 @@ fun RecurringItemEditorSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = modifier
+    ) {
+        RecurringItemEditorContent(
+            item = item,
+            categories = categories,
+            accounts = accounts,
+            onSave = onSave,
+            onDelete = onDelete,
+            onDismiss = onDismiss,
+            modifier = Modifier.navigationBarsPadding()
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RecurringItemEditorContent(
+    item: UpcomingItem?,
+    categories: List<Category>,
+    accounts: List<Account>,
+    onSave: (UpcomingItem) -> Unit,
+    onDelete: (Long) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalOrbitHaptics.current
     val isEditing = item != null && item.id > 0L
 
     var name by remember(item) { mutableStateOf(item?.name ?: "") }
@@ -83,20 +114,12 @@ fun RecurringItemEditorSheet(
     var selectedCategoryId by remember(item) { mutableStateOf(item?.categoryId) }
     var selectedAccountId by remember(item) { mutableStateOf(item?.accountId) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    Column(
         modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .verticalScroll(rememberScrollState())
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 12.dp)
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-        ) {
             Text(
                 text = if (isEditing) "Edit Recurring Schedule" else "New Recurring Schedule",
                 style = MaterialTheme.typography.titleLarge,
@@ -277,5 +300,4 @@ fun RecurringItemEditorSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
         }
-    }
 }

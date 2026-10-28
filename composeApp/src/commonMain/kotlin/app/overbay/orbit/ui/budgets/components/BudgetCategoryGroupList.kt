@@ -70,6 +70,7 @@ fun BudgetCategoryGroupList(
     onEditBudget: (CategoryBudgetOverviewItem) -> Unit,
     onDeleteBudget: (Long) -> Unit,
     onViewTransactions: (Long) -> Unit,
+    isWideScreen: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -131,7 +132,8 @@ fun BudgetCategoryGroupList(
             budgeted.forEach { item ->
                 BudgetCategoryRow(
                     item = item,
-                    isExpanded = item.category.id == expandedCategoryId,
+                    isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
+                    isInspected = isWideScreen && item.category.id == expandedCategoryId,
                     transactions = categoryTransactions[item.category.id] ?: emptyList(),
                     onClick = { onToggleExpand(item.category.id) },
                     onEditBudget = { onEditBudget(item) },
@@ -157,7 +159,8 @@ fun BudgetCategoryGroupList(
             unbudgeted.forEach { item ->
                 BudgetCategoryRow(
                     item = item,
-                    isExpanded = item.category.id == expandedCategoryId,
+                    isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
+                    isInspected = isWideScreen && item.category.id == expandedCategoryId,
                     transactions = categoryTransactions[item.category.id] ?: emptyList(),
                     onClick = { onToggleExpand(item.category.id) },
                     onEditBudget = { onEditBudget(item) },
@@ -213,7 +216,8 @@ fun BudgetCategoryGroupList(
                     inactive.forEach { item ->
                         BudgetCategoryRow(
                             item = item,
-                            isExpanded = item.category.id == expandedCategoryId,
+                            isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
+                            isInspected = isWideScreen && item.category.id == expandedCategoryId,
                             transactions = categoryTransactions[item.category.id] ?: emptyList(),
                             onClick = { onToggleExpand(item.category.id) },
                             onEditBudget = { onEditBudget(item) },

@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -40,11 +40,14 @@ import app.overbay.orbit.ui.settings.blocks.SecurityBiometricsBlock
 import app.overbay.orbit.ui.settings.blocks.SimpleFinBankSyncBlock
 import app.overbay.orbit.ui.settings.blocks.StorageSyncModeBlock
 import app.overbay.orbit.ui.settings.blocks.ThemeAppearanceBlock
+import app.overbay.orbit.util.DevicePosture
+import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.LocalFileImportExportHelper
 
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -55,124 +58,174 @@ fun SettingsScreen(
     var restoreJsonText by remember { mutableStateOf("") }
     var showDonatePlaceholderDialog by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .nestedScroll(heroScrollState.nestedScrollConnection)
-    ) {
-        // Edge-to-Edge Curved Green Canopy Hero
-        MorphingPageHero(
-            kicker = "CONTROL CENTER",
-            title = "Settings",
-            subtitle = "Preferences, sync connections, backups, and appearance.",
-            canNavigateBack = true,
-            onBack = { onNavigate(OrbitNavKey.Dashboard) },
-            scrollState = heroScrollState
-        )
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(heroScrollState.nestedScrollConnection)
         ) {
-            // 1. Storage & Server Sync
-            item {
-                StorageSyncModeBlock(
-                    preferences = uiState.preferences,
-                    isSyncing = uiState.isSyncing,
-                    syncStatus = uiState.syncStatus,
-                    onStorageModeChange = viewModel::setStorageMode,
-                    onServerUrlChange = viewModel::setServerUrl,
-                    onTriggerSync = viewModel::triggerSync,
-                    onAuthenticateServer = viewModel::loginToSelfHostedServer,
-                    onOpenLoginScreen = { onNavigate(OrbitNavKey.Login) },
-                    onLogout = {
-                        viewModel.logout()
-                        onNavigate(OrbitNavKey.Login)
-                    }
-                )
-            }
+            // Edge-to-Edge Curved Green Canopy Hero
+            MorphingPageHero(
+                kicker = "CONTROL CENTER",
+                title = "Settings",
+                subtitle = "Preferences, sync connections, backups, and appearance.",
+                canNavigateBack = true,
+                onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                scrollState = heroScrollState
+            )
 
-            // 2. SimpleFIN Bank Feeds
-            item {
-                SimpleFinBankSyncBlock(
-                    token = uiState.preferences.simpleFinToken,
-                    onTokenChange = viewModel::setSimpleFinToken,
-                    onTriggerSync = viewModel::triggerSync
-                )
-            }
-
-            // 3. Google Drive & File Backup
-            item {
-                GoogleDriveBackupBlock(
-                    isDriveSyncEnabled = uiState.preferences.googleDriveSyncEnabled,
-                    lastSyncAt = uiState.preferences.lastGoogleDriveSyncAt,
-                    onToggleDriveSync = viewModel::setGoogleDriveSync,
-                    onExportJsonBackup = {
-                        val json = viewModel.exportBackup()
-                        fileHelper.exportFile("orbit-backup.orbit.json", json, "application/json")
-                    },
-                    onRestoreJsonBackup = viewModel::openRestoreDialog
-                )
-            }
-
-            // 4. Appearance & Theme
-            item {
-                ThemeAppearanceBlock(
-                    preferences = uiState.preferences,
-                    onPresetChange = viewModel::setThemePreset,
-                    onThemeModeChange = viewModel::setThemeMode,
-                    onDynamicColorChange = viewModel::setDynamicColor
-                )
-            }
-
-            // 5. Security & Biometrics
-            item {
-                SecurityBiometricsBlock(
-                    preferences = uiState.preferences,
-                    onBiometricLockChange = viewModel::setBiometricLock,
-                    onHapticsChange = viewModel::setHapticsEnabled,
-                    onMhaTrackerChange = viewModel::setMhaTrackerEnabled,
-                    onResetData = viewModel::openResetConfirmation
-                )
-            }
-
-            // 6. About & Support ("☕ Donate")
-            item {
-                OrbitSectionCard(
-                    title = "About & Support",
-                    subtitle = "Orbit Money — Open source, private household finance"
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Support Development",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Help keep Orbit Money free and independent.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        FilledTonalButton(
-                            onClick = { showDonatePlaceholderDialog = true },
-                            shape = RoundedCornerShape(12.dp)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (isTwoPane) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.Top
                         ) {
-                            Text("☕ Donate")
+                            // Left Column: Sync & Backups
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                StorageSyncModeBlock(
+                                    preferences = uiState.preferences,
+                                    isSyncing = uiState.isSyncing,
+                                    syncStatus = uiState.syncStatus,
+                                    onStorageModeChange = viewModel::setStorageMode,
+                                    onServerUrlChange = viewModel::setServerUrl,
+                                    onTriggerSync = viewModel::triggerSync,
+                                    onAuthenticateServer = viewModel::loginToSelfHostedServer,
+                                    onOpenLoginScreen = { onNavigate(OrbitNavKey.Login) },
+                                    onLogout = {
+                                        viewModel.logout()
+                                        onNavigate(OrbitNavKey.Login)
+                                    }
+                                )
+
+                                SimpleFinBankSyncBlock(
+                                    token = uiState.preferences.simpleFinToken,
+                                    onTokenChange = viewModel::setSimpleFinToken,
+                                    onTriggerSync = viewModel::triggerSync
+                                )
+
+                                GoogleDriveBackupBlock(
+                                    isDriveSyncEnabled = uiState.preferences.googleDriveSyncEnabled,
+                                    lastSyncAt = uiState.preferences.lastGoogleDriveSyncAt,
+                                    onToggleDriveSync = viewModel::setGoogleDriveSync,
+                                    onExportJsonBackup = {
+                                        val json = viewModel.exportBackup()
+                                        fileHelper.exportFile("orbit-backup.orbit.json", json, "application/json")
+                                    },
+                                    onRestoreJsonBackup = viewModel::openRestoreDialog
+                                )
+                            }
+
+                            // Right Column: Appearance, Security & Support
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                ThemeAppearanceBlock(
+                                    preferences = uiState.preferences,
+                                    onPresetChange = viewModel::setThemePreset,
+                                    onThemeModeChange = viewModel::setThemeMode,
+                                    onDynamicColorChange = viewModel::setDynamicColor
+                                )
+
+                                SecurityBiometricsBlock(
+                                    preferences = uiState.preferences,
+                                    onBiometricLockChange = viewModel::setBiometricLock,
+                                    onHapticsChange = viewModel::setHapticsEnabled,
+                                    onMhaTrackerChange = viewModel::setMhaTrackerEnabled,
+                                    onResetData = viewModel::openResetConfirmation
+                                )
+
+                                AboutSupportBlock(
+                                    onDonateClick = { showDonatePlaceholderDialog = true }
+                                )
+                            }
                         }
+                    }
+                } else {
+                    // 1. Storage & Server Sync
+                    item {
+                        StorageSyncModeBlock(
+                            preferences = uiState.preferences,
+                            isSyncing = uiState.isSyncing,
+                            syncStatus = uiState.syncStatus,
+                            onStorageModeChange = viewModel::setStorageMode,
+                            onServerUrlChange = viewModel::setServerUrl,
+                            onTriggerSync = viewModel::triggerSync,
+                            onAuthenticateServer = viewModel::loginToSelfHostedServer,
+                            onOpenLoginScreen = { onNavigate(OrbitNavKey.Login) },
+                            onLogout = {
+                                viewModel.logout()
+                                onNavigate(OrbitNavKey.Login)
+                            }
+                        )
+                    }
+
+                    // 2. SimpleFIN Bank Feeds
+                    item {
+                        SimpleFinBankSyncBlock(
+                            token = uiState.preferences.simpleFinToken,
+                            onTokenChange = viewModel::setSimpleFinToken,
+                            onTriggerSync = viewModel::triggerSync
+                        )
+                    }
+
+                    // 3. Google Drive & File Backup
+                    item {
+                        GoogleDriveBackupBlock(
+                            isDriveSyncEnabled = uiState.preferences.googleDriveSyncEnabled,
+                            lastSyncAt = uiState.preferences.lastGoogleDriveSyncAt,
+                            onToggleDriveSync = viewModel::setGoogleDriveSync,
+                            onExportJsonBackup = {
+                                val json = viewModel.exportBackup()
+                                fileHelper.exportFile("orbit-backup.orbit.json", json, "application/json")
+                            },
+                            onRestoreJsonBackup = viewModel::openRestoreDialog
+                        )
+                    }
+
+                    // 4. Appearance & Theme
+                    item {
+                        ThemeAppearanceBlock(
+                            preferences = uiState.preferences,
+                            onPresetChange = viewModel::setThemePreset,
+                            onThemeModeChange = viewModel::setThemeMode,
+                            onDynamicColorChange = viewModel::setDynamicColor
+                        )
+                    }
+
+                    // 5. Security & Biometrics
+                    item {
+                        SecurityBiometricsBlock(
+                            preferences = uiState.preferences,
+                            onBiometricLockChange = viewModel::setBiometricLock,
+                            onHapticsChange = viewModel::setHapticsEnabled,
+                            onMhaTrackerChange = viewModel::setMhaTrackerEnabled,
+                            onResetData = viewModel::openResetConfirmation
+                        )
+                    }
+
+                    // 6. About & Support ("☕ Donate")
+                    item {
+                        AboutSupportBlock(
+                            onDonateClick = { showDonatePlaceholderDialog = true }
+                        )
                     }
                 }
-            }
 
-            item {
-                Spacer(modifier = Modifier.height(32.dp))
+                item {
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
             }
         }
     }
@@ -276,5 +329,43 @@ fun SettingsScreen(
             confirmText = "OK",
             onDismiss = { showDonatePlaceholderDialog = false }
         )
+    }
+}
+
+@Composable
+private fun AboutSupportBlock(
+    onDonateClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OrbitSectionCard(
+        title = "About & Support",
+        subtitle = "Orbit Money — Open source, private household finance",
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Support Development",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Help keep Orbit Money free and independent.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            FilledTonalButton(
+                onClick = onDonateClick,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("☕ Donate")
+            }
+        }
     }
 }

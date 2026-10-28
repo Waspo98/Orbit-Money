@@ -26,4 +26,6 @@ data class BudgetsUiState(
     val budgetedItems get() = overview?.budgeted ?: emptyList()
     val unbudgetedItems get() = overview?.unbudgeted ?: emptyList()
     val inactiveItems get() = overview?.inactive ?: emptyList()
+    val inspectingItem: CategoryBudgetOverviewItem?
+        get() = (budgetedItems + unbudgetedItems + inactiveItems).find { it.category.id == expandedCategoryId } ?: editingItem
 }

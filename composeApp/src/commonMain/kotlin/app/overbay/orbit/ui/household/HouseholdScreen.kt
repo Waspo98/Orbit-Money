@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.household
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -39,15 +40,20 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
+import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.household.components.HouseholdInspectorPane
 import app.overbay.orbit.ui.household.components.HouseholdMembersCard
 import app.overbay.orbit.ui.household.dialogs.HouseholdMemberEditorSheet
 import app.overbay.orbit.ui.household.dialogs.InviteMemberDialog
+import app.overbay.orbit.util.DevicePosture
+import app.overbay.orbit.util.LocalDevicePosture
 
 @Composable
 fun HouseholdScreen(
     viewModel: HouseholdViewModel,
+    posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -55,180 +61,215 @@ fun HouseholdScreen(
     val heroScrollState = rememberHeroScrollState()
     var editingName by remember(uiState.householdInfo.name) { mutableStateOf(uiState.householdInfo.name) }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        floatingActionButton = {
-            OrbitFloatingActionButton(
-                visible = heroScrollState.isFabVisible,
-                onClick = { viewModel.openMemberEditor(null) },
-                contentDescription = "New Member"
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .nestedScroll(heroScrollState.nestedScrollConnection)
-        ) {
-            MorphingPageHero(
-                kicker = "INCOME AND BENEFITS",
-                title = "Household",
-                subtitle = "Manage household members, paychecks, benefits, and tax filing profile.",
-                canNavigateBack = true,
-                onBack = { onNavigate(OrbitNavKey.Dashboard) },
-                scrollState = heroScrollState
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
+        val isDetailOpen = isTwoPane && (
+            uiState.inspectingMember != null ||
+                uiState.showMemberEditor ||
+                uiState.showInviteDialog
             )
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-            // 1. Household Profile Card
-            item {
-                OrbitSectionCard(
-                    title = "Household Profile",
-                    subtitle = "Workspace identity and synchronization mode"
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = editingName,
-                            onValueChange = { editingName = it },
-                            label = { Text("Household Name") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                        Button(
-                            onClick = { viewModel.updateHouseholdName(editingName) },
-                            enabled = editingName.isNotBlank() && editingName != uiState.householdInfo.name
-                        ) {
-                            Text("Save")
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Surface(
-                        shape = MaterialTheme.shapes.small,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Storage Environment",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = if (uiState.storageMode == StorageMode.LOCAL) "Local Device (Offline)" else "Self-Hosted Multi-User Server",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 2. Household Members List
-            item {
-                HouseholdMembersCard(
-                    members = uiState.members,
-                    totalGrossIncomeCents = uiState.totalHouseholdGrossIncomeCents,
-                    onAddMember = { viewModel.openMemberEditor(null) },
-                    onEditMember = { viewModel.openMemberEditor(it) },
-                    onDeleteMember = viewModel::deleteMember
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            floatingActionButton = {
+                OrbitFloatingActionButton(
+                    visible = heroScrollState.isFabVisible,
+                    onClick = { viewModel.openMemberEditor(null) },
+                    contentDescription = "New Member"
                 )
             }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .nestedScroll(heroScrollState.nestedScrollConnection)
+            ) {
+                MorphingPageHero(
+                    kicker = "INCOME AND BENEFITS",
+                    title = "Household",
+                    subtitle = "Manage household members, paychecks, benefits, and tax filing profile.",
+                    canNavigateBack = true,
+                    onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                    scrollState = heroScrollState
+                )
 
-            // 3. Multi-User Collaboration / Shared Invites
-            item {
-                OrbitSectionCard(
-                    title = "Shared Access & Invites",
-                    subtitle = "Collaborate with partners or financial advisors",
-                    action = {
-                        Button(onClick = viewModel::openInviteDialog) {
-                            Icon(imageVector = Icons.Default.Email, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.size(6.dp))
-                            Text("Invite Partner", style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
-                ) {
-                    if (uiState.shares.isEmpty()) {
-                        Text(
-                            text = "No active invites or shared members. Invite a spouse or co-planner to share access to this household.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    } else {
-                        uiState.shares.forEach { share ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(
-                                        text = share.invitedEmail,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "Role: ${share.role.name} • Status: ${if (share.acceptedAt != null) "Accepted" else "Pending Invite"}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                IconButton(onClick = { viewModel.revokeInvite(share.id) }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = "Revoke",
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                OrbitMorphingSplitLayout(
+                    isDetailOpen = isDetailOpen,
+                    onDismissDetail = viewModel::dismissInspectorPane,
+                    masterWeightWhenOpen = 0.56f,
+                    modifier = Modifier.fillMaxSize(),
+                    masterContent = {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            // 1. Household Profile Card
+                            item {
+                                OrbitSectionCard(
+                                    title = "Household Profile",
+                                    subtitle = "Workspace identity and synchronization mode"
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        OutlinedTextField(
+                                            value = editingName,
+                                            onValueChange = { editingName = it },
+                                            label = { Text("Household Name") },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true
+                                        )
+                                        Button(
+                                            onClick = { viewModel.updateHouseholdName(editingName) },
+                                            enabled = editingName.isNotBlank() && editingName != uiState.householdInfo.name
+                                        ) {
+                                            Text("Save")
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    Surface(
+                                        shape = MaterialTheme.shapes.small,
+                                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Storage Environment",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = if (uiState.storageMode == StorageMode.LOCAL) "Local Device (Offline)" else "Self-Hosted Multi-User Server",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
                                 }
                             }
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+
+                            // 2. Household Members List
+                            item {
+                                HouseholdMembersCard(
+                                    members = uiState.members,
+                                    totalGrossIncomeCents = uiState.totalHouseholdGrossIncomeCents,
+                                    inspectingMemberId = if (isTwoPane) uiState.inspectingMemberId else null,
+                                    onInspectMember = if (isTwoPane) {
+                                        { member -> viewModel.selectMemberForInspect(member.id) }
+                                    } else {
+                                        null
+                                    },
+                                    onAddMember = { viewModel.openMemberEditor(null) },
+                                    onEditMember = { viewModel.openMemberEditor(it) },
+                                    onDeleteMember = viewModel::deleteMember
+                                )
+                            }
+
+                            // 3. Multi-User Collaboration / Shared Invites
+                            item {
+                                OrbitSectionCard(
+                                    title = "Shared Access & Invites",
+                                    subtitle = "Collaborate with partners or financial advisors",
+                                    action = {
+                                        Button(onClick = viewModel::openInviteDialog) {
+                                            Icon(imageVector = Icons.Default.Email, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.size(6.dp))
+                                            Text("Invite Partner", style = MaterialTheme.typography.labelMedium)
+                                        }
+                                    }
+                                ) {
+                                    if (uiState.shares.isEmpty()) {
+                                        Text(
+                                            text = "No active invites or shared members. Invite a spouse or co-planner to share access to this household.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(vertical = 8.dp)
+                                        )
+                                    } else {
+                                        uiState.shares.forEach { share ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 8.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column {
+                                                    Text(
+                                                        text = share.invitedEmail,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        text = "Role: ${share.role.name} • Status: ${if (share.acceptedAt != null) "Accepted" else "Pending Invite"}",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                                IconButton(onClick = { viewModel.revokeInvite(share.id) }) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Person,
+                                                        contentDescription = "Revoke",
+                                                        tint = MaterialTheme.colorScheme.error,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
+                                            }
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                                        }
+                                    }
+                                }
+                            }
+
+                            item {
+                                Spacer(modifier = Modifier.height(32.dp))
+                            }
                         }
+                    },
+                    detailContent = {
+                        HouseholdInspectorPane(
+                            state = uiState,
+                            onOpenEditMember = { member -> viewModel.openMemberEditor(member) },
+                            onSaveMember = viewModel::saveMember,
+                            onCloseEditMember = viewModel::closeMemberEditor,
+                            onDeleteMember = viewModel::deleteMember,
+                            onInviteMember = viewModel::inviteMember,
+                            onCloseInvite = viewModel::closeInviteDialog,
+                            onDismissPane = viewModel::dismissInspectorPane
+                        )
                     }
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(32.dp))
+                )
             }
         }
+
+        if (!isTwoPane && uiState.showInviteDialog) {
+            InviteMemberDialog(
+                onDismiss = viewModel::closeInviteDialog,
+                onInvite = viewModel::inviteMember
+            )
         }
-    }
 
-    if (uiState.showInviteDialog) {
-        InviteMemberDialog(
-            onDismiss = viewModel::closeInviteDialog,
-            onInvite = viewModel::inviteMember
-        )
-    }
-
-    if (uiState.showMemberEditor) {
-        HouseholdMemberEditorSheet(
-            member = uiState.editingMember,
-            onDismiss = viewModel::closeMemberEditor,
-            onSave = viewModel::saveMember
-        )
+        if (!isTwoPane && uiState.showMemberEditor) {
+            HouseholdMemberEditorSheet(
+                member = uiState.editingMember,
+                onDismiss = viewModel::closeMemberEditor,
+                onSave = viewModel::saveMember
+            )
+        }
     }
 }

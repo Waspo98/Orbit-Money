@@ -11,9 +11,13 @@ data class HouseholdUiState(
     val members: List<HouseholdMember> = emptyList(),
     val storageMode: StorageMode = StorageMode.LOCAL,
     val shares: List<HouseholdShare> = emptyList(),
+    val inspectingMemberId: Long? = null,
     val showInviteDialog: Boolean = false,
     val showMemberEditor: Boolean = false,
     val editingMember: HouseholdMember? = null,
     val isLoading: Boolean = false,
     val totalHouseholdGrossIncomeCents: Cents = 0L
-)
+) {
+    val inspectingMember: HouseholdMember?
+        get() = members.find { it.id == inspectingMemberId }
+}

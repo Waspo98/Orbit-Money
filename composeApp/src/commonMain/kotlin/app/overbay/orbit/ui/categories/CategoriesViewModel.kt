@@ -17,17 +17,30 @@ class CategoriesViewModel(
     private val repository: OrbitRepository
 ) : ViewModel() {
 
+    private val _inspectingCategoryId = MutableStateFlow<Long?>(null)
     private val _editingCategory = MutableStateFlow<Category?>(null)
     private val _showEditorDialog = MutableStateFlow(false)
     private val _deleteConfirmId = MutableStateFlow<Long?>(null)
 
-    val uiState: StateFlow<CategoriesUiState> = combine(
-        repository.categories,
-        repository.transactions,
+    private val dialogFlow = combine(
+        _inspectingCategoryId,
         _editingCategory,
         _showEditorDialog,
         _deleteConfirmId
-    ) { categories, transactions, editing, showDialog, deleteId ->
+    ) { inspectingId, editing, showDialog, deleteId ->
+        CategoriesUiState(
+            inspectingCategoryId = inspectingId,
+            editingCategory = editing,
+            showEditorDialog = showDialog,
+            deleteConfirmCategoryId = deleteId
+        )
+    }
+
+    val uiState: StateFlow<CategoriesUiState> = combine(
+        repository.categories,
+        repository.transactions,
+        dialogFlow
+    ) { categories, transactions, dialogState ->
         // Count and sum per category
         val txnCountMap = mutableMapOf<Long, Int>()
         val txnSumMap = mutableMapOf<Long, Cents>()
@@ -71,12 +84,9 @@ class CategoriesViewModel(
             CategoryGroupDisplay("Transfers & Savings", transferList, transferList.sumOf { it.totalAmountCents })
         ).filter { it.items.isNotEmpty() }
 
-        CategoriesUiState(
+        dialogState.copy(
             categories = categories,
             groups = groups,
-            editingCategory = editing,
-            showEditorDialog = showDialog,
-            deleteConfirmCategoryId = deleteId,
             totalCategoriesCount = categories.size
         )
     }.stateIn(
@@ -85,12 +95,28 @@ class CategoriesViewModel(
         initialValue = CategoriesUiState(isLoading = true)
     )
 
+    fun selectCategoryForInspect(id: Long?) {
+        val nextId = if (_inspectingCategoryId.value == id) null else id
+        _inspectingCategoryId.value = nextId
+        if (nextId != null && _showEditorDialog.value && _editingCategory.value?.id != nextId) {
+            _showEditorDialog.value = false
+            _editingCategory.value = null
+        }
+    }
+
+    fun dismissInspectorPane() {
+        _inspectingCategoryId.value = null
+        _showEditorDialog.value = false
+        _editingCategory.value = null
+    }
+
     fun openAddCategory() {
         _editingCategory.value = null
         _showEditorDialog.value = true
     }
 
     fun openEditCategory(category: Category) {
+        _inspectingCategoryId.value = category.id
         _editingCategory.value = category
         _showEditorDialog.value = true
     }
@@ -135,6 +161,9 @@ class CategoriesViewModel(
     fun deleteCategory(id: Long) {
         viewModelScope.launch {
             repository.deleteCategory(id)
+            if (_inspectingCategoryId.value == id) {
+                _inspectingCategoryId.value = null
+            }
             _deleteConfirmId.value = null
         }
     }

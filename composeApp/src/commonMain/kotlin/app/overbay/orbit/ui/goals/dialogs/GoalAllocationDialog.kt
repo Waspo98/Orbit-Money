@@ -37,7 +37,7 @@ fun GoalAllocationDialog(
     onDismiss: () -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
-    var depositCents by remember { mutableStateOf(5000L) } // default $50
+    var depositCents by remember(goal) { mutableStateOf(5000L) } // default $50
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -49,49 +49,11 @@ fun GoalAllocationDialog(
             )
         },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Current: ${MoneyUtils.formatCents(goal.currentAmountCents, showCents = false)} of ${MoneyUtils.formatCents(goal.targetAmountCents, showCents = false)} (${MoneyUtils.formatCents(goal.remainingAmountCents, showCents = false)} remaining)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                CurrencyTextField(
-                    cents = depositCents,
-                    onCentsChange = { depositCents = it },
-                    label = "Deposit Amount"
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Quick Increment Pills
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf(2500L, 5000L, 10000L, 25000L).forEach { quickCents ->
-                        Surface(
-                            onClick = {
-                                haptics.tick()
-                                depositCents = quickCents
-                            },
-                            shape = RoundedCornerShape(999.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh
-                        ) {
-                            Text(
-                                text = "+${MoneyUtils.formatCents(quickCents, showCents = false)}",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            )
-                        }
-                    }
-                }
-            }
+            GoalAllocationFields(
+                goal = goal,
+                depositCents = depositCents,
+                onDepositCentsChange = { depositCents = it }
+            )
         },
         confirmButton = {
             Button(
@@ -110,4 +72,104 @@ fun GoalAllocationDialog(
             }
         }
     )
+}
+
+@Composable
+fun GoalAllocationContent(
+    goal: Goal,
+    onConfirmDeposit: (goalId: Long, amountCents: Cents) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalOrbitHaptics.current
+    var depositCents by remember(goal) { mutableStateOf(5000L) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(24.dp)
+    ) {
+        Text(
+            text = "Deposit to ${goal.name}",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        GoalAllocationFields(
+            goal = goal,
+            depositCents = depositCents,
+            onDepositCentsChange = { depositCents = it }
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                Text("Cancel")
+            }
+            Button(
+                onClick = {
+                    haptics.confirm()
+                    onConfirmDeposit(goal.id, depositCents)
+                },
+                enabled = depositCents > 0L,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Deposit")
+            }
+        }
+    }
+}
+
+@Composable
+private fun GoalAllocationFields(
+    goal: Goal,
+    depositCents: Cents,
+    onDepositCentsChange: (Cents) -> Unit
+) {
+    val haptics = LocalOrbitHaptics.current
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Current: ${MoneyUtils.formatCents(goal.currentAmountCents, showCents = false)} of ${MoneyUtils.formatCents(goal.targetAmountCents, showCents = false)} (${MoneyUtils.formatCents(goal.remainingAmountCents, showCents = false)} remaining)",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        CurrencyTextField(
+            cents = depositCents,
+            onCentsChange = onDepositCentsChange,
+            label = "Deposit Amount"
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(2500L, 5000L, 10000L, 25000L).forEach { quickCents ->
+                Surface(
+                    onClick = {
+                        haptics.tick()
+                        onDepositCentsChange(quickCents)
+                    },
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh
+                ) {
+                    Text(
+                        text = "+${MoneyUtils.formatCents(quickCents, showCents = false)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
+    }
 }

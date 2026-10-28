@@ -30,104 +30,143 @@ import app.overbay.orbit.ui.components.OrbitSectionCard
 @Composable
 fun AssetLiabilityBreakdownCard(
     snapshot: NetWorthSnapshot,
+    isTwoPane: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    OrbitSectionCard(
-        title = "Asset & Liability Breakdown",
-        modifier = modifier
-    ) {
-
-            // Total Assets Row
+    if (isTwoPane) {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    text = "Total Assets",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = OrbitColorTokens.Green
-                )
-                Text(
-                    text = MoneyUtils.formatCents(snapshot.totalAssetsCents),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = OrbitColorTokens.Green
-                )
+                OrbitSectionCard(
+                    title = "Assets Breakdown",
+                    modifier = Modifier.weight(1f)
+                ) {
+                    AssetsSectionContent(snapshot = snapshot)
+                }
+
+                OrbitSectionCard(
+                    title = "Liabilities Breakdown",
+                    modifier = Modifier.weight(1f)
+                ) {
+                    LiabilitiesSectionContent(snapshot = snapshot)
+                }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Asset lines
-            BreakdownRow("Cash & Checking", snapshot.cashCents)
-            BreakdownRow("Investments & Retirement", snapshot.investmentsCents)
-            BreakdownRow("Real Estate Equity", snapshot.realEstateEquityCents)
-            if (snapshot.otherCents != 0L) {
-                BreakdownRow("Other Assets", snapshot.otherCents)
-            }
+            NetWorthSummaryBanner(snapshot = snapshot)
+        }
+    } else {
+        OrbitSectionCard(
+            title = "Asset & Liability Breakdown",
+            modifier = modifier
+        ) {
+            AssetsSectionContent(snapshot = snapshot)
 
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.4f))
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Total Liabilities Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Total Liabilities",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = OrbitColorTokens.Red
-                )
-                Text(
-                    text = MoneyUtils.formatCents(snapshot.totalLiabilitiesCents),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = OrbitColorTokens.Red
-                )
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Liability lines
-            BreakdownRow("Credit Card Debt", snapshot.creditDebtCents, isNegative = true)
-            BreakdownRow("Loans & Mortgages", snapshot.loanDebtCents, isNegative = true)
+            LiabilitiesSectionContent(snapshot = snapshot)
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Net Worth Summary Banner
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Net Worth",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    val netColor = if (snapshot.netWorthCents >= 0L) OrbitColorTokens.Green else OrbitColorTokens.Red
-                    Text(
-                        text = MoneyUtils.formatCents(snapshot.netWorthCents),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = netColor
-                    )
-                }
-            }
+            NetWorthSummaryBanner(snapshot = snapshot)
         }
     }
+}
+
+@Composable
+private fun AssetsSectionContent(snapshot: NetWorthSnapshot) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "Total Assets",
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+            color = OrbitColorTokens.Green
+        )
+        Text(
+            text = MoneyUtils.formatCents(snapshot.totalAssetsCents),
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+            color = OrbitColorTokens.Green
+        )
+    }
+
+    Spacer(modifier = Modifier.height(6.dp))
+
+    BreakdownRow("Cash & Checking", snapshot.cashCents)
+    BreakdownRow("Investments & Retirement", snapshot.investmentsCents)
+    BreakdownRow("Real Estate Equity", snapshot.realEstateEquityCents)
+    if (snapshot.otherCents != 0L) {
+        BreakdownRow("Other Assets", snapshot.otherCents)
+    }
+}
+
+@Composable
+private fun LiabilitiesSectionContent(snapshot: NetWorthSnapshot) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "Total Liabilities",
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+            color = OrbitColorTokens.Red
+        )
+        Text(
+            text = MoneyUtils.formatCents(snapshot.totalLiabilitiesCents),
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+            color = OrbitColorTokens.Red
+        )
+    }
+
+    Spacer(modifier = Modifier.height(6.dp))
+
+    BreakdownRow("Credit Card Debt", snapshot.creditDebtCents, isNegative = true)
+    BreakdownRow("Loans & Mortgages", snapshot.loanDebtCents, isNegative = true)
+}
+
+@Composable
+private fun NetWorthSummaryBanner(snapshot: NetWorthSnapshot) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Net Worth",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            val netColor = if (snapshot.netWorthCents >= 0L) OrbitColorTokens.Green else OrbitColorTokens.Red
+            Text(
+                text = MoneyUtils.formatCents(snapshot.netWorthCents),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = netColor
+            )
+        }
+    }
+}
 
 @Composable
 private fun BreakdownRow(

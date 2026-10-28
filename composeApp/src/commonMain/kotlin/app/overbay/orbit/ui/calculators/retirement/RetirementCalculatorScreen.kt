@@ -1,11 +1,14 @@
 package app.overbay.orbit.ui.calculators.retirement
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -19,66 +22,125 @@ import app.overbay.orbit.ui.calculators.retirement.cards.RetirementAccountsListC
 import app.overbay.orbit.ui.calculators.retirement.cards.RetirementProjectionHeroCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.util.DevicePosture
+import app.overbay.orbit.util.LocalDevicePosture
 
 @Composable
 fun RetirementCalculatorScreen(
     viewModel: RetirementViewModel,
+    posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val heroScrollState = rememberHeroScrollState()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .nestedScroll(heroScrollState.nestedScrollConnection)
-    ) {
-        MorphingPageHero(
-            kicker = "LONG-RANGE PLANNING",
-            title = "Retirement Calculator",
-            subtitle = "All projections are shown in today's dollars",
-            canNavigateBack = true,
-            onBack = { onNavigate(OrbitNavKey.Dashboard) },
-            scrollState = heroScrollState
-        )
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(heroScrollState.nestedScrollConnection)
         ) {
-            item {
-                RetirementProjectionHeroCard(
-                    uiState = uiState,
-                    onAgeScrubbed = viewModel::onAgeScrubbed
-                )
-            }
+            MorphingPageHero(
+                kicker = "LONG-RANGE PLANNING",
+                title = "Retirement Calculator",
+                subtitle = "All projections are shown in today's dollars",
+                canNavigateBack = true,
+                onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                scrollState = heroScrollState
+            )
 
-            item {
-                HouseholdIncomeAssumptionsCard(
-                    uiState = uiState,
-                    onCurrentAgeChange = viewModel::setCurrentAge,
-                    onRetirementAgeChange = viewModel::setRetirementAge,
-                    onPresetChange = viewModel::setPreset,
-                    onTargetModeChange = viewModel::setTargetMode,
-                    onAnnualSpendingChange = viewModel::setAnnualSpending,
-                    onCustomTargetChange = viewModel::setCustomTarget,
-                    onLegacyAmountChange = viewModel::setLegacyAmount
-                )
-            }
+            if (isTwoPane) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Left Column: Assumptions & Retirement Accounts Inputs
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxSize(),
+                        contentPadding = PaddingValues(top = 12.dp, bottom = 88.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item {
+                            HouseholdIncomeAssumptionsCard(
+                                uiState = uiState,
+                                onCurrentAgeChange = viewModel::setCurrentAge,
+                                onRetirementAgeChange = viewModel::setRetirementAge,
+                                onPresetChange = viewModel::setPreset,
+                                onTargetModeChange = viewModel::setTargetMode,
+                                onAnnualSpendingChange = viewModel::setAnnualSpending,
+                                onCustomTargetChange = viewModel::setCustomTarget,
+                                onLegacyAmountChange = viewModel::setLegacyAmount
+                            )
+                        }
 
-            item {
-                RetirementAccountsListCard(
-                    uiState = uiState,
-                    onCurrentBalanceChange = viewModel::setCurrentBalance,
-                    onMonthlySavingsChange = viewModel::setMonthlySavings,
-                    onToggleUseConnectedAccounts = viewModel::setUseConnectedAccounts
-                )
-            }
+                        item {
+                            RetirementAccountsListCard(
+                                uiState = uiState,
+                                onCurrentBalanceChange = viewModel::setCurrentBalance,
+                                onMonthlySavingsChange = viewModel::setMonthlySavings,
+                                onToggleUseConnectedAccounts = viewModel::setUseConnectedAccounts
+                            )
+                        }
+                    }
 
-            item {
-                Spacer(modifier = Modifier.height(32.dp))
+                    // Right Column: Live Projection Hero Chart & Results
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxSize(),
+                        contentPadding = PaddingValues(top = 12.dp, bottom = 88.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item {
+                            RetirementProjectionHeroCard(
+                                uiState = uiState,
+                                onAgeScrubbed = viewModel::onAgeScrubbed
+                            )
+                        }
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        RetirementProjectionHeroCard(
+                            uiState = uiState,
+                            onAgeScrubbed = viewModel::onAgeScrubbed
+                        )
+                    }
+
+                    item {
+                        HouseholdIncomeAssumptionsCard(
+                            uiState = uiState,
+                            onCurrentAgeChange = viewModel::setCurrentAge,
+                            onRetirementAgeChange = viewModel::setRetirementAge,
+                            onPresetChange = viewModel::setPreset,
+                            onTargetModeChange = viewModel::setTargetMode,
+                            onAnnualSpendingChange = viewModel::setAnnualSpending,
+                            onCustomTargetChange = viewModel::setCustomTarget,
+                            onLegacyAmountChange = viewModel::setLegacyAmount
+                        )
+                    }
+
+                    item {
+                        RetirementAccountsListCard(
+                            uiState = uiState,
+                            onCurrentBalanceChange = viewModel::setCurrentBalance,
+                            onMonthlySavingsChange = viewModel::setMonthlySavings,
+                            onToggleUseConnectedAccounts = viewModel::setUseConnectedAccounts
+                        )
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(32.dp))
+                    }
+                }
             }
         }
     }

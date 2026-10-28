@@ -45,11 +45,26 @@ fun AccountBalanceHistorySheet(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         modifier = modifier
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 12.dp)
-        ) {
+        AccountBalanceHistoryContent(
+            account = account,
+            transactions = transactions,
+            onDismiss = onDismiss
+        )
+    }
+}
+
+@Composable
+fun AccountBalanceHistoryContent(
+    account: Account,
+    transactions: List<Transaction>,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 16.dp)
+    ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -123,5 +138,4 @@ fun AccountBalanceHistorySheet(
 
             Spacer(modifier = Modifier.height(20.dp))
         }
-    }
 }

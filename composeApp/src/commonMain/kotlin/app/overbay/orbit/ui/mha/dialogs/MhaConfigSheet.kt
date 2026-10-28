@@ -50,20 +50,7 @@ fun MhaConfigSheet(
     onSave: (MhaTaxProfile, Cents?, Cents?) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    var mode by remember { mutableStateOf(taxProfile.mode) }
-    var enableDesignatedCap by remember { mutableStateOf(designatedCapCents != null) }
-    var inputDesignatedCapCents by remember { mutableStateOf(designatedCapCents ?: 0L) }
-    var enableFmrv by remember { mutableStateOf(fairMarketRentalValueCents != null) }
-    var inputFmrvCents by remember { mutableStateOf(fairMarketRentalValueCents ?: 0L) }
-    var simpleFedRate by remember { mutableStateOf(taxProfile.simpleFederalRatePercent.toString()) }
-    var simpleStateRate by remember { mutableStateOf(taxProfile.simpleStateRatePercent.toString()) }
-    var selectedFilingStatus by remember { mutableStateOf(taxProfile.filingStatus) }
-    var stateCode by remember { mutableStateOf(taxProfile.state) }
-    var deductionMode by remember { mutableStateOf(taxProfile.deductionMode) }
-    var itemizedDeductionCents by remember { mutableStateOf(taxProfile.itemizedDeductionCents) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -72,191 +59,224 @@ fun MhaConfigSheet(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 36.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "MHA & Parsonage Settings",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+        MhaConfigContent(
+            taxProfile = taxProfile,
+            designatedCapCents = designatedCapCents,
+            fairMarketRentalValueCents = fairMarketRentalValueCents,
+            onDismiss = onDismiss,
+            onSave = onSave,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MhaConfigContent(
+    taxProfile: MhaTaxProfile,
+    designatedCapCents: Cents? = null,
+    fairMarketRentalValueCents: Cents? = null,
+    onDismiss: () -> Unit,
+    onSave: (MhaTaxProfile, Cents?, Cents?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalOrbitHaptics.current
+
+    var mode by remember(taxProfile) { mutableStateOf(taxProfile.mode) }
+    var enableDesignatedCap by remember(designatedCapCents) { mutableStateOf(designatedCapCents != null) }
+    var inputDesignatedCapCents by remember(designatedCapCents) { mutableStateOf(designatedCapCents ?: 0L) }
+    var enableFmrv by remember(fairMarketRentalValueCents) { mutableStateOf(fairMarketRentalValueCents != null) }
+    var inputFmrvCents by remember(fairMarketRentalValueCents) { mutableStateOf(fairMarketRentalValueCents ?: 0L) }
+    var simpleFedRate by remember(taxProfile) { mutableStateOf(taxProfile.simpleFederalRatePercent.toString()) }
+    var simpleStateRate by remember(taxProfile) { mutableStateOf(taxProfile.simpleStateRatePercent.toString()) }
+    var selectedFilingStatus by remember(taxProfile) { mutableStateOf(taxProfile.filingStatus) }
+    var stateCode by remember(taxProfile) { mutableStateOf(taxProfile.state) }
+    var deductionMode by remember(taxProfile) { mutableStateOf(taxProfile.deductionMode) }
+    var itemizedDeductionCents by remember(taxProfile) { mutableStateOf(taxProfile.itemizedDeductionCents) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "MHA & Parsonage Settings",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            text = "Configure your official advance Church Designation and Fair Market Rental Value to enforce the 3-Limit IRS test under IRC Section 107.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.outline
+        )
+
+        // Section 1: Designation & FMRV
+        Text(
+            text = "1. Section 107 Caps",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        OrbitSwitchRow(
+            title = "Church Designation Cap",
+            subtitle = if (enableDesignatedCap) "Enforcing official advance designation" else "Uncapped (tracking actual expenses)",
+            checked = enableDesignatedCap,
+            onCheckedChange = { enableDesignatedCap = it }
+        )
+
+        if (enableDesignatedCap) {
+            CurrencyTextField(
+                cents = inputDesignatedCapCents,
+                onCentsChange = { inputDesignatedCapCents = it },
+                label = "Annual Church Designation Cap ($)",
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        OrbitSwitchRow(
+            title = "Fair Market Rental Value (FMRV)",
+            subtitle = if (enableFmrv) "Enforcing annual rental value limit" else "Uncapped (no FMRV limit)",
+            checked = enableFmrv,
+            onCheckedChange = { enableFmrv = it }
+        )
+
+        if (enableFmrv) {
+            CurrencyTextField(
+                cents = inputFmrvCents,
+                onCentsChange = { inputFmrvCents = it },
+                label = "Fair Market Rental Value (Furnished + Utilities) ($)",
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Section 2: Mode Selector
+        Text(
+            text = "2. Tax Calculation Mode",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = mode == "simple",
+                onClick = {
+                    haptics.tick()
+                    mode = "simple"
+                },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+            ) {
+                Text("Simple Flat Rates")
+            }
+            SegmentedButton(
+                selected = mode == "household",
+                onClick = {
+                    haptics.tick()
+                    mode = "household"
+                },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+            ) {
+                Text("Household Brackets")
+            }
+        }
+
+        if (mode == "simple") {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = simpleFedRate,
+                    onValueChange = { simpleFedRate = it },
+                    label = { Text("Federal Rate (%)") },
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = simpleStateRate,
+                    onValueChange = { simpleStateRate = it },
+                    label = { Text("State Rate (%)") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        } else {
+            OutlinedTextField(
+                value = stateCode,
+                onValueChange = { stateCode = it.uppercase() },
+                label = { Text("State (e.g. IL, NC, CA)") },
+                modifier = Modifier.fillMaxWidth()
             )
 
             Text(
-                text = "Configure your official advance Church Designation and Fair Market Rental Value to enforce the 3-Limit IRS test under IRC Section 107.",
+                text = "Filing Status: ${selectedFilingStatus.displayName}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.outline
-            )
-
-            // Section 1: Designation & FMRV
-            Text(
-                text = "1. Section 107 Caps",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            OrbitSwitchRow(
-                title = "Church Designation Cap",
-                subtitle = if (enableDesignatedCap) "Enforcing official advance designation" else "Uncapped (tracking actual expenses)",
-                checked = enableDesignatedCap,
-                onCheckedChange = { enableDesignatedCap = it }
-            )
-
-            if (enableDesignatedCap) {
-                CurrencyTextField(
-                    cents = inputDesignatedCapCents,
-                    onCentsChange = { inputDesignatedCapCents = it },
-                    label = "Annual Church Designation Cap ($)",
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            OrbitSwitchRow(
-                title = "Fair Market Rental Value (FMRV)",
-                subtitle = if (enableFmrv) "Enforcing annual rental value limit" else "Uncapped (no FMRV limit)",
-                checked = enableFmrv,
-                onCheckedChange = { enableFmrv = it }
-            )
-
-            if (enableFmrv) {
-                CurrencyTextField(
-                    cents = inputFmrvCents,
-                    onCentsChange = { inputFmrvCents = it },
-                    label = "Fair Market Rental Value (Furnished + Utilities) ($)",
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Section 2: Mode Selector
-            Text(
-                text = "2. Tax Calculation Mode",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(
-                    selected = mode == "simple",
+                    selected = deductionMode == "standard",
                     onClick = {
                         haptics.tick()
-                        mode = "simple"
+                        deductionMode = "standard"
                     },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                 ) {
-                    Text("Simple Flat Rates")
+                    Text("Standard Deduction")
                 }
                 SegmentedButton(
-                    selected = mode == "household",
+                    selected = deductionMode == "itemized",
                     onClick = {
                         haptics.tick()
-                        mode = "household"
+                        deductionMode = "itemized"
                     },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                 ) {
-                    Text("Household Brackets")
+                    Text("Itemized Deduction")
                 }
             }
 
-            if (mode == "simple") {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = simpleFedRate,
-                        onValueChange = { simpleFedRate = it },
-                        label = { Text("Federal Rate (%)") },
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = simpleStateRate,
-                        onValueChange = { simpleStateRate = it },
-                        label = { Text("State Rate (%)") },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            } else {
-                OutlinedTextField(
-                    value = stateCode,
-                    onValueChange = { stateCode = it.uppercase() },
-                    label = { Text("State (e.g. IL, NC, CA)") },
+            if (deductionMode == "itemized") {
+                CurrencyTextField(
+                    cents = itemizedDeductionCents,
+                    onCentsChange = { itemizedDeductionCents = it },
+                    label = "Annual Itemized Deductions ($)",
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                Text(
-                    text = "Filing Status: ${selectedFilingStatus.displayName}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = deductionMode == "standard",
-                        onClick = {
-                            haptics.tick()
-                            deductionMode = "standard"
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) {
-                        Text("Standard Deduction")
-                    }
-                    SegmentedButton(
-                        selected = deductionMode == "itemized",
-                        onClick = {
-                            haptics.tick()
-                            deductionMode = "itemized"
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) {
-                        Text("Itemized Deduction")
-                    }
-                }
-
-                if (deductionMode == "itemized") {
-                    CurrencyTextField(
-                        cents = itemizedDeductionCents,
-                        onCentsChange = { itemizedDeductionCents = it },
-                        label = "Annual Itemized Deductions ($)",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
             }
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-            // Actions
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+        // Actions
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Button(
+                onClick = {
+                    haptics.tick()
+                    val updated = taxProfile.copy(
+                        mode = mode,
+                        simpleFederalRatePercent = simpleFedRate.toDoubleOrNull() ?: 22.0,
+                        simpleStateRatePercent = simpleStateRate.toDoubleOrNull() ?: 4.95,
+                        state = stateCode.take(2).uppercase().ifEmpty { "IL" },
+                        filingStatus = selectedFilingStatus,
+                        deductionMode = deductionMode,
+                        itemizedDeductionCents = itemizedDeductionCents
+                    )
+                    val cap = if (enableDesignatedCap) max(0L, inputDesignatedCapCents) else null
+                    val fmrv = if (enableFmrv) max(0L, inputFmrvCents) else null
+                    onSave(updated, cap, fmrv)
+                }
             ) {
-                OutlinedButton(onClick = onDismiss) {
-                    Text("Cancel")
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Button(
-                    onClick = {
-                        haptics.tick()
-                        val updated = taxProfile.copy(
-                            mode = mode,
-                            simpleFederalRatePercent = simpleFedRate.toDoubleOrNull() ?: 22.0,
-                            simpleStateRatePercent = simpleStateRate.toDoubleOrNull() ?: 4.95,
-                            state = stateCode.take(2).uppercase().ifEmpty { "IL" },
-                            filingStatus = selectedFilingStatus,
-                            deductionMode = deductionMode,
-                            itemizedDeductionCents = itemizedDeductionCents
-                        )
-                        val cap = if (enableDesignatedCap) max(0L, inputDesignatedCapCents) else null
-                        val fmrv = if (enableFmrv) max(0L, inputFmrvCents) else null
-                        onSave(updated, cap, fmrv)
-                    }
-                ) {
-                    Text("Save Settings")
-                }
+                Text("Save Settings")
             }
         }
     }

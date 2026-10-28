@@ -3,6 +3,7 @@ package app.overbay.orbit.ui.networth
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -31,10 +32,13 @@ import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.networth.components.AssetLiabilityBreakdownCard
 import app.overbay.orbit.ui.networth.components.NetWorthChartCard
+import app.overbay.orbit.util.DevicePosture
+import app.overbay.orbit.util.LocalDevicePosture
 
 @Composable
 fun NetWorthScreen(
     viewModel: NetWorthViewModel,
+    posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
     onOpenDrawer: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -49,86 +53,93 @@ fun NetWorthScreen(
         return
     }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .nestedScroll(heroScrollState.nestedScrollConnection)
-        ) {
-            MorphingPageHero(
-                kicker = "BALANCE SHEET",
-                title = "Net Worth",
-                subtitle = "Assets minus liabilities",
-                canNavigateBack = true,
-                onBack = { onNavigate(OrbitNavKey.Dashboard) },
-                scrollState = heroScrollState,
-                expandedToolbar = {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        NetWorthPeriod.entries.forEach { period ->
-                            val selected = period == state.selectedPeriod
-                            Surface(
-                                shape = CircleShape,
-                                color = if (selected) Color.White else Color.White.copy(alpha = 0.18f),
-                                modifier = Modifier.clickable { viewModel.setPeriod(period) }
-                            ) {
-                                Text(
-                                    text = period.label,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (selected) Color(0xFF064E3B) else Color.White,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                                )
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
+
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .nestedScroll(heroScrollState.nestedScrollConnection)
+            ) {
+                MorphingPageHero(
+                    kicker = "BALANCE SHEET",
+                    title = "Net Worth",
+                    subtitle = "Assets minus liabilities",
+                    canNavigateBack = true,
+                    onBack = { onNavigate(OrbitNavKey.Dashboard) },
+                    scrollState = heroScrollState,
+                    expandedToolbar = {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            NetWorthPeriod.entries.forEach { period ->
+                                val selected = period == state.selectedPeriod
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (selected) Color.White else Color.White.copy(alpha = 0.18f),
+                                    modifier = Modifier.clickable { viewModel.setPeriod(period) }
+                                ) {
+                                    Text(
+                                        text = period.label,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (selected) Color(0xFF064E3B) else Color.White,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                    )
+                                }
                             }
                         }
-                    }
-                },
-                collapsedActions = {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.2f),
-                        modifier = Modifier.clickable {
-                            val nextIdx = (state.selectedPeriod.ordinal + 1) % NetWorthPeriod.entries.size
-                            viewModel.setPeriod(NetWorthPeriod.entries[nextIdx])
+                    },
+                    collapsedActions = {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.White.copy(alpha = 0.2f),
+                            modifier = Modifier.clickable {
+                                val nextIdx = (state.selectedPeriod.ordinal + 1) % NetWorthPeriod.entries.size
+                                viewModel.setPeriod(NetWorthPeriod.entries[nextIdx])
+                            }
+                        ) {
+                            Text(
+                                text = state.selectedPeriod.label,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
                         }
-                    ) {
-                        Text(
-                            text = state.selectedPeriod.label,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    }
+                )
+
+                // Scrollable Area Chart and Breakdown Cards
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Interactive Area Chart Card (Full Width)
+                    item {
+                        NetWorthChartCard(
+                            points = state.filteredPoints,
+                            selectedPeriod = state.selectedPeriod,
+                            scrubbedPoint = state.scrubbedPoint,
+                            onSelectPeriod = { viewModel.setPeriod(it) },
+                            onPointScrubbed = { viewModel.selectScrubPoint(it) }
                         )
                     }
-                }
-            )
 
-            // Scrollable Area Chart and Breakdown Cards
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Interactive Area Chart Card
-                item {
-                    NetWorthChartCard(
-                        points = state.filteredPoints,
-                        selectedPeriod = state.selectedPeriod,
-                        scrubbedPoint = state.scrubbedPoint,
-                        onSelectPeriod = { viewModel.setPeriod(it) },
-                        onPointScrubbed = { viewModel.selectScrubPoint(it) }
-                    )
-                }
-
-                // Asset & Liability Breakdown Card
-                item {
-                    AssetLiabilityBreakdownCard(snapshot = state.snapshot)
+                    // Asset & Liability Breakdown Card (2-column split on wide screens)
+                    item {
+                        AssetLiabilityBreakdownCard(
+                            snapshot = state.snapshot,
+                            isTwoPane = isTwoPane
+                        )
+                    }
                 }
             }
         }

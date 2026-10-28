@@ -63,6 +63,35 @@ class HouseholdViewModel(
         scope.launch {
             repository.deleteHouseholdMember(id)
         }
+        _uiState.update { current ->
+            if (current.inspectingMemberId == id) {
+                current.copy(inspectingMemberId = null, showMemberEditor = false, editingMember = null)
+            } else {
+                current
+            }
+        }
+    }
+
+    fun selectMemberForInspect(id: Long?) {
+        _uiState.update { current ->
+            val nextId = if (current.inspectingMemberId == id) null else id
+            current.copy(
+                inspectingMemberId = nextId,
+                showMemberEditor = if (nextId != null && current.editingMember?.id != nextId) false else current.showMemberEditor,
+                showInviteDialog = false
+            )
+        }
+    }
+
+    fun dismissInspectorPane() {
+        _uiState.update {
+            it.copy(
+                inspectingMemberId = null,
+                showMemberEditor = false,
+                editingMember = null,
+                showInviteDialog = false
+            )
+        }
     }
 
     fun inviteMember(email: String, role: HouseholdRole) {
@@ -89,7 +118,12 @@ class HouseholdViewModel(
     }
 
     fun openInviteDialog() {
-        _uiState.update { it.copy(showInviteDialog = true) }
+        _uiState.update {
+            it.copy(
+                showInviteDialog = true,
+                showMemberEditor = false
+            )
+        }
     }
 
     fun closeInviteDialog() {
@@ -97,7 +131,14 @@ class HouseholdViewModel(
     }
 
     fun openMemberEditor(member: HouseholdMember? = null) {
-        _uiState.update { it.copy(showMemberEditor = true, editingMember = member) }
+        _uiState.update {
+            it.copy(
+                inspectingMemberId = member?.id ?: it.inspectingMemberId,
+                showMemberEditor = true,
+                editingMember = member,
+                showInviteDialog = false
+            )
+        }
     }
 
     fun closeMemberEditor() {

@@ -43,6 +43,29 @@ fun HouseholdMemberEditorSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        HouseholdMemberEditorContent(
+            member = member,
+            onDismiss = onDismiss,
+            onSave = onSave,
+            modifier = Modifier.navigationBarsPadding()
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HouseholdMemberEditorContent(
+    member: HouseholdMember?,
+    onDismiss: () -> Unit,
+    onSave: (HouseholdMember) -> Unit,
+    modifier: Modifier = Modifier
+) {
     var name by remember(member) { mutableStateOf(member?.name ?: "") }
     var role by remember(member) { mutableStateOf(member?.role ?: "adult") }
     var employer by remember(member) { mutableStateOf(member?.employer ?: "") }
@@ -50,126 +73,118 @@ fun HouseholdMemberEditorSheet(
     var grossIncomeCents by remember(member) { mutableStateOf(member?.grossIncomeAnnualCents ?: 0L) }
     var retirementType by remember(member) { mutableStateOf(member?.retirementAccountType ?: "401k") }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .verticalScroll(rememberScrollState())
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-        ) {
-            Text(
-                text = if (member == null) "Add Household Member" else "Edit Member Profile",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = if (member == null) "Add Household Member" else "Edit Member Profile",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(16.dp))
 
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Full Name") },
+            placeholder = { Text("e.g. Alex Overbay") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = "Family Role",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            val roles = listOf("adult" to "Adult / Partner", "child" to "Child", "dependent" to "Dependent")
+            roles.forEachIndexed { index, (key, label) ->
+                SegmentedButton(
+                    selected = role == key,
+                    onClick = { role = key },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = roles.size),
+                    icon = {},
+                    label = { Text(label, style = MaterialTheme.typography.labelMedium) }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        CurrencyTextField(
+            cents = grossIncomeCents,
+            onCentsChange = { grossIncomeCents = it },
+            label = "Gross Annual Income",
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Full Name") },
-                placeholder = { Text("e.g. Alex Overbay") },
-                modifier = Modifier.fillMaxWidth(),
+                value = employer,
+                onValueChange = { employer = it },
+                label = { Text("Employer (Optional)") },
+                modifier = Modifier.weight(1f),
                 singleLine = true
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "Family Role",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+            OutlinedTextField(
+                value = jobTitle,
+                onValueChange = { jobTitle = it },
+                label = { Text("Job Title (Optional)") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
             )
-            Spacer(modifier = Modifier.height(6.dp))
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                val roles = listOf("adult" to "Adult / Partner", "child" to "Child", "dependent" to "Dependent")
-                roles.forEachIndexed { index, (key, label) ->
-                    SegmentedButton(
-                        selected = role == key,
-                        onClick = { role = key },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = roles.size),
-                        icon = {},
-                        label = { Text(label, style = MaterialTheme.typography.labelMedium) }
-                    )
-                }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            CurrencyTextField(
-                cents = grossIncomeCents,
-                onCentsChange = { grossIncomeCents = it },
-                label = "Gross Annual Income",
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+            Button(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        val saved = member?.copy(
+                            name = name.trim(),
+                            role = role,
+                            employer = employer.ifBlank { null },
+                            jobTitle = jobTitle.ifBlank { null },
+                            grossIncomeAnnualCents = grossIncomeCents,
+                            retirementAccountType = retirementType.ifBlank { null }
+                        ) ?: HouseholdMember(
+                            name = name.trim(),
+                            role = role,
+                            employer = employer.ifBlank { null },
+                            jobTitle = jobTitle.ifBlank { null },
+                            grossIncomeAnnualCents = grossIncomeCents,
+                            retirementAccountType = retirementType.ifBlank { null }
+                        )
+                        onSave(saved)
+                    }
+                },
+                enabled = name.isNotBlank()
             ) {
-                OutlinedTextField(
-                    value = employer,
-                    onValueChange = { employer = it },
-                    label = { Text("Employer (Optional)") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = jobTitle,
-                    onValueChange = { jobTitle = it },
-                    label = { Text("Job Title (Optional)") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel")
-                }
-                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                Button(
-                    onClick = {
-                        if (name.isNotBlank()) {
-                            val saved = member?.copy(
-                                name = name.trim(),
-                                role = role,
-                                employer = employer.ifBlank { null },
-                                jobTitle = jobTitle.ifBlank { null },
-                                grossIncomeAnnualCents = grossIncomeCents,
-                                retirementAccountType = retirementType.ifBlank { null }
-                            ) ?: HouseholdMember(
-                                name = name.trim(),
-                                role = role,
-                                employer = employer.ifBlank { null },
-                                jobTitle = jobTitle.ifBlank { null },
-                                grossIncomeAnnualCents = grossIncomeCents,
-                                retirementAccountType = retirementType.ifBlank { null }
-                            )
-                            onSave(saved)
-                        }
-                    },
-                    enabled = name.isNotBlank()
-                ) {
-                    Text("Save Member")
-                }
+                Text("Save Member")
             }
         }
     }

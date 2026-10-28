@@ -48,30 +48,7 @@ fun CreditCardProfileEditorSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    var cardName by remember { mutableStateOf(profile.cardName ?: "") }
-    var issuerName by remember { mutableStateOf(profile.issuerName ?: "") }
-    var network by remember { mutableStateOf(profile.network ?: "") }
-    var annualFeeCents by remember { mutableStateOf(profile.annualFeeCents ?: 0L) }
-    var annualFeeDate by remember {
-        val parsed = profile.annualFeePostDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-        mutableStateOf(parsed ?: LocalDateUtils.todayLocalDate())
-    }
-    var hasAnnualFeeDate by remember { mutableStateOf(profile.annualFeePostDate != null) }
-    var creditLimitCents by remember { mutableStateOf(profile.creditLimitCents ?: 0L) }
-    var statementClosingDayText by remember { mutableStateOf(profile.statementClosingDay?.toString() ?: "") }
-    var paymentDueDayText by remember { mutableStateOf(profile.paymentDueDay?.toString() ?: "") }
-
-    // Rewards & benefits state
-    var rewardList by remember { mutableStateOf(profile.rewardCategories) }
-    var newRewardCat by remember { mutableStateOf("") }
-    var newRewardMultiplier by remember { mutableStateOf("2.0") }
-
-    var benefitList by remember { mutableStateOf(profile.benefits) }
-    var newBenefitTitle by remember { mutableStateOf("") }
-    var newBenefitAmountCents by remember { mutableStateOf(0L) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -79,13 +56,52 @@ fun CreditCardProfileEditorSheet(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         modifier = modifier
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 12.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
+        CreditCardProfileEditorContent(
+            profile = profile,
+            onSave = onSave,
+            onDismiss = onDismiss
+        )
+    }
+}
+
+@Composable
+fun CreditCardProfileEditorContent(
+    profile: CreditCardProfile,
+    onSave: (CreditCardProfile) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalOrbitHaptics.current
+
+    var cardName by remember(profile) { mutableStateOf(profile.cardName ?: "") }
+    var issuerName by remember(profile) { mutableStateOf(profile.issuerName ?: "") }
+    var network by remember(profile) { mutableStateOf(profile.network ?: "") }
+    var annualFeeCents by remember(profile) { mutableStateOf(profile.annualFeeCents ?: 0L) }
+    var annualFeeDate by remember(profile) {
+        val parsed = profile.annualFeePostDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        mutableStateOf(parsed ?: LocalDateUtils.todayLocalDate())
+    }
+    var hasAnnualFeeDate by remember(profile) { mutableStateOf(profile.annualFeePostDate != null) }
+    var creditLimitCents by remember(profile) { mutableStateOf(profile.creditLimitCents ?: 0L) }
+    var statementClosingDayText by remember(profile) { mutableStateOf(profile.statementClosingDay?.toString() ?: "") }
+    var paymentDueDayText by remember(profile) { mutableStateOf(profile.paymentDueDay?.toString() ?: "") }
+
+    // Rewards & benefits state
+    var rewardList by remember(profile) { mutableStateOf(profile.rewardCategories) }
+    var newRewardCat by remember(profile) { mutableStateOf("") }
+    var newRewardMultiplier by remember(profile) { mutableStateOf("2.0") }
+
+    var benefitList by remember(profile) { mutableStateOf(profile.benefits) }
+    var newBenefitTitle by remember(profile) { mutableStateOf("") }
+    var newBenefitAmountCents by remember(profile) { mutableStateOf(0L) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
             Text(
                 text = "Credit Card Perks & Profile",
                 style = MaterialTheme.typography.titleLarge,
@@ -278,5 +294,4 @@ fun CreditCardProfileEditorSheet(
 
             Spacer(modifier = Modifier.height(20.dp))
         }
-    }
 }

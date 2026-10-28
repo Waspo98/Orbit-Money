@@ -52,6 +52,7 @@ fun UpcomingTimelineList(
     onItemClick: (UpcomingItem) -> Unit,
     onMarkPaid: (UpcomingItem) -> Unit,
     onAddClick: () -> Unit,
+    inspectingItemId: Long? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -94,6 +95,7 @@ fun UpcomingTimelineList(
                     item = item,
                     category = item.categoryId?.let { categoryMap[it] },
                     accountName = item.accountId?.let { accountMap[it]?.name },
+                    isInspected = item.id == inspectingItemId,
                     onClick = { onItemClick(item) },
                     onMarkPaid = {
                         haptics.confirm()
@@ -112,7 +114,8 @@ private fun UpcomingItemRow(
     category: Category?,
     accountName: String?,
     onClick: () -> Unit,
-    onMarkPaid: () -> Unit
+    onMarkPaid: () -> Unit,
+    isInspected: Boolean = false
 ) {
     val isExpense = item.direction.lowercase() != "income"
     val amountColor = if (isExpense) OrbitTheme.colors.expense else OrbitTheme.colors.income
@@ -124,11 +127,22 @@ private fun UpcomingItemRow(
         MaterialTheme.colorScheme.primary
     }
 
+    val rowBgColor = if (isInspected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val rowBorderColor = if (isInspected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+    } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+    }
+
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        color = rowBgColor,
+        border = BorderStroke(if (isInspected) 1.5.dp else 1.dp, rowBorderColor),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(

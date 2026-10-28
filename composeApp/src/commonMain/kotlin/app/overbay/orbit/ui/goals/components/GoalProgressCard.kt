@@ -41,6 +41,7 @@ fun GoalProgressCard(
     monthlyNeededCents: Cents?,
     onClick: () -> Unit,
     onDepositClick: () -> Unit,
+    isInspected: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -48,11 +49,22 @@ fun GoalProgressCard(
     val isDone = goal.isCompleted
     val progressColor = if (isDone) OrbitTheme.colors.income else MaterialTheme.colorScheme.primary
 
+    val cardBgColor = if (isInspected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val cardBorderColor = if (isInspected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+    } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+    }
+
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        color = cardBgColor,
+        border = BorderStroke(if (isInspected) 1.5.dp else 1.dp, cardBorderColor),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(18.dp)) {

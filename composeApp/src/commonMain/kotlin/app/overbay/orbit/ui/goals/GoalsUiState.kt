@@ -10,6 +10,7 @@ data class GoalsUiState(
     val accountMap: Map<Long, Account> = emptyMap(),
     val totalSavedCents: Cents = 0L,
     val totalTargetCents: Cents = 0L,
+    val inspectingGoalId: Long? = null,
     val editingGoal: Goal? = null,
     val showEditorSheet: Boolean = false,
     val allocatingGoal: Goal? = null,
@@ -19,4 +20,6 @@ data class GoalsUiState(
     val activeGoals get() = goals.filter { !it.isCompleted }
     val completedGoals get() = goals.filter { it.isCompleted }
     val overallProgressRatio get() = if (totalTargetCents > 0L) totalSavedCents.toDouble() / totalTargetCents.toDouble() else 0.0
+    val inspectingGoal: Goal?
+        get() = goals.find { it.id == inspectingGoalId } ?: editingGoal ?: allocatingGoal
 }

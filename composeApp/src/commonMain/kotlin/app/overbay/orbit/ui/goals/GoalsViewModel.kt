@@ -18,6 +18,7 @@ class GoalsViewModel(
     private val repository: OrbitRepository
 ) : ViewModel() {
 
+    private val _inspectingGoalId = MutableStateFlow<Long?>(null)
     private val _editingGoal = MutableStateFlow<Goal?>(null)
     private val _showEditorSheet = MutableStateFlow(false)
     private val _allocatingGoal = MutableStateFlow<Goal?>(null)
@@ -41,8 +42,9 @@ class GoalsViewModel(
 
     val uiState: StateFlow<GoalsUiState> = combine(
         dataFlow,
-        dialogFlow
-    ) { (goals, accounts), dialog ->
+        dialogFlow,
+        _inspectingGoalId
+    ) { (goals, accounts), dialog, inspectingId ->
         val sortedGoals = goals.sortedWith(
             compareBy<Goal> { it.isCompleted }.thenBy { it.sortOrder }.thenBy { it.id }
         )
@@ -55,6 +57,7 @@ class GoalsViewModel(
             accountMap = accounts.associateBy { it.id },
             totalSavedCents = totalSaved,
             totalTargetCents = totalTarget,
+            inspectingGoalId = inspectingId,
             editingGoal = dialog.editing,
             showEditorSheet = dialog.showSheet,
             allocatingGoal = dialog.allocating,
@@ -67,7 +70,29 @@ class GoalsViewModel(
         initialValue = GoalsUiState(isLoading = true)
     )
 
+    fun selectGoalForInspect(id: Long?) {
+        if (id != null && _inspectingGoalId.value == id && !_showEditorSheet.value && !_showAllocationDialog.value) {
+            _inspectingGoalId.value = null
+        } else {
+            _inspectingGoalId.value = id
+            _showEditorSheet.value = false
+            _editingGoal.value = null
+            _showAllocationDialog.value = false
+            _allocatingGoal.value = null
+        }
+    }
+
+    fun dismissInspectorPane() {
+        _inspectingGoalId.value = null
+        _showEditorSheet.value = false
+        _editingGoal.value = null
+        _showAllocationDialog.value = false
+        _allocatingGoal.value = null
+    }
+
     fun openAddGoal() {
+        _showAllocationDialog.value = false
+        _allocatingGoal.value = null
         _editingGoal.value = Goal(
             id = 0L,
             name = "",
@@ -78,6 +103,9 @@ class GoalsViewModel(
     }
 
     fun openEditGoal(goal: Goal) {
+        _inspectingGoalId.value = goal.id
+        _showAllocationDialog.value = false
+        _allocatingGoal.value = null
         _editingGoal.value = goal
         _showEditorSheet.value = true
     }
@@ -97,11 +125,17 @@ class GoalsViewModel(
     fun deleteGoal(id: Long) {
         viewModelScope.launch {
             repository.deleteGoal(id)
+            if (_inspectingGoalId.value == id) {
+                _inspectingGoalId.value = null
+            }
             closeEditorSheet()
         }
     }
 
     fun openAllocationDialog(goal: Goal) {
+        _inspectingGoalId.value = goal.id
+        _showEditorSheet.value = false
+        _editingGoal.value = null
         _allocatingGoal.value = goal
         _showAllocationDialog.value = true
     }

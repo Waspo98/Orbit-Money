@@ -26,6 +26,7 @@ data class UpcomingUiState(
     val totalUpcomingExpenseCents: Cents = 0L,
     val totalUpcomingIncomeCents: Cents = 0L,
     val netCashflowProjectionCents: Cents = 0L,
+    val inspectingItemId: Long? = null,
     val editingItem: UpcomingItem? = null,
     val showEditorSheet: Boolean = false,
     val reconcilingItem: UpcomingItem? = null,
@@ -33,4 +34,6 @@ data class UpcomingUiState(
     val isLoading: Boolean = false
 ) {
     val activeItems get() = items.filter { it.status == app.overbay.orbit.data.model.UpcomingStatus.ACTIVE }
+    val inspectingItem: UpcomingItem?
+        get() = items.find { it.id == inspectingItemId } ?: editingItem
 }

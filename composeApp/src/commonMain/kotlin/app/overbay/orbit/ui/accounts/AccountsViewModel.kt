@@ -88,10 +88,11 @@ class AccountsViewModel(
         val groups = groupAccounts(sortedAccounts)
         val snapshot = NetWorthEngine.computeCurrentSnapshot(data.accounts)
 
-        val selId = action.selectedAccountId ?: sortedAccounts.firstOrNull()?.id
-        val selectedTxns = if (selId != null) {
+        val selId = action.selectedAccountId
+        val activeTxnsAccountId = selId ?: action.historyAccount?.id
+        val selectedTxns = if (activeTxnsAccountId != null) {
             data.transactions
-                .filter { it.accountId == selId }
+                .filter { it.accountId == activeTxnsAccountId }
                 .sortedByDescending { it.effectiveDate }
         } else emptyList()
 
@@ -131,7 +132,40 @@ class AccountsViewModel(
         _selectedAccountId.value = accountId
     }
 
+    fun selectAccountForInspect(accountId: Long?) {
+        if (
+            accountId != null &&
+            _selectedAccountId.value == accountId &&
+            !_showEditorSheet.value &&
+            !_showCardProfileSheet.value &&
+            !_showHistorySheet.value
+        ) {
+            _selectedAccountId.value = null
+        } else {
+            _selectedAccountId.value = accountId
+            _showEditorSheet.value = false
+            _editingAccount.value = null
+            _showCardProfileSheet.value = false
+            _editingCardProfile.value = null
+            _showHistorySheet.value = false
+            _historyAccount.value = null
+        }
+    }
+
+    fun dismissInspectorPane() {
+        _selectedAccountId.value = null
+        _showEditorSheet.value = false
+        _editingAccount.value = null
+        _showCardProfileSheet.value = false
+        _editingCardProfile.value = null
+        _cardProfileAccountId.value = null
+        _showHistorySheet.value = false
+        _historyAccount.value = null
+    }
+
     fun openAddAccount(defaultType: AccountType = AccountType.CHECKING) {
+        _showCardProfileSheet.value = false
+        _showHistorySheet.value = false
         _editingAccount.value = Account(
             id = 0L,
             name = "",
@@ -144,6 +178,9 @@ class AccountsViewModel(
     }
 
     fun openEditAccount(account: Account) {
+        _selectedAccountId.value = account.id
+        _showCardProfileSheet.value = false
+        _showHistorySheet.value = false
         _editingAccount.value = account
         _showEditorSheet.value = true
     }
@@ -189,6 +226,9 @@ class AccountsViewModel(
     }
 
     fun openCreditCardProfile(account: Account) {
+        _selectedAccountId.value = account.id
+        _showEditorSheet.value = false
+        _showHistorySheet.value = false
         _cardProfileAccountId.value = account.id
         _editingCardProfile.value = account.creditCardProfile ?: CreditCardProfile(accountId = account.id)
         _showCardProfileSheet.value = true
@@ -237,6 +277,9 @@ class AccountsViewModel(
     }
 
     fun openBalanceHistory(account: Account) {
+        _selectedAccountId.value = account.id
+        _showEditorSheet.value = false
+        _showCardProfileSheet.value = false
         _historyAccount.value = account
         _showHistorySheet.value = true
     }

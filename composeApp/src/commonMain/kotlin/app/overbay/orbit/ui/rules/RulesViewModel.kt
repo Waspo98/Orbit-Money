@@ -17,6 +17,7 @@ class RulesViewModel(
     private val repository: OrbitRepository
 ) : ViewModel() {
 
+    private val _inspectingRuleId = MutableStateFlow<Long?>(null)
     private val _editingRule = MutableStateFlow<TransactionRule?>(null)
     private val _showEditorSheet = MutableStateFlow(false)
     private val _deleteConfirmId = MutableStateFlow<Long?>(null)
@@ -35,12 +36,14 @@ class RulesViewModel(
     }
 
     private val editorFlow = combine(
+        _inspectingRuleId,
         _editingRule,
         _showEditorSheet,
         _deleteConfirmId,
         _isApplying
-    ) { editing, showSheet, deleteId, isApplying ->
+    ) { inspectingId, editing, showSheet, deleteId, isApplying ->
         RulesUiState(
+            inspectingRuleId = inspectingId,
             editingRule = editing,
             showEditorSheet = showSheet,
             deleteConfirmRuleId = deleteId,
@@ -64,6 +67,21 @@ class RulesViewModel(
         initialValue = RulesUiState(isLoading = true)
     )
 
+    fun selectRuleForInspect(id: Long?) {
+        val nextId = if (_inspectingRuleId.value == id) null else id
+        _inspectingRuleId.value = nextId
+        if (nextId != null && _showEditorSheet.value && _editingRule.value?.id != nextId) {
+            _showEditorSheet.value = false
+            _editingRule.value = null
+        }
+    }
+
+    fun dismissInspectorPane() {
+        _inspectingRuleId.value = null
+        _showEditorSheet.value = false
+        _editingRule.value = null
+    }
+
     fun openAddRule() {
         val nextPriority = (uiState.value.rules.maxOfOrNull { it.priority } ?: 0) + 10
         _editingRule.value = TransactionRule(
@@ -76,6 +94,7 @@ class RulesViewModel(
     }
 
     fun openEditRule(rule: TransactionRule) {
+        _inspectingRuleId.value = rule.id
         _editingRule.value = rule
         _showEditorSheet.value = true
     }
@@ -110,6 +129,9 @@ class RulesViewModel(
     fun deleteRule(id: Long) {
         viewModelScope.launch {
             repository.deleteRule(id)
+            if (_inspectingRuleId.value == id) {
+                _inspectingRuleId.value = null
+            }
             _deleteConfirmId.value = null
         }
     }

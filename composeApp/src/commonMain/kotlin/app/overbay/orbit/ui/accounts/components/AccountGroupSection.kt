@@ -55,6 +55,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 fun AccountGroupSection(
     group: AccountGroupDisplay,
     selectedAccountId: Long?,
+    onInspectAccount: (Account) -> Unit = {},
     onSeeTransactions: (Account) -> Unit,
     onEditAccount: (Account) -> Unit,
     onPerksClick: (Account) -> Unit,
@@ -158,6 +159,8 @@ fun AccountGroupSection(
                         )
                         AccountRowCard(
                             account = account,
+                            isInspected = selectedAccountId == account.id,
+                            onInspect = { onInspectAccount(account) },
                             onSeeTransactions = { onSeeTransactions(account) },
                             onEdit = { onEditAccount(account) },
                             onPerks = if (account.type == AccountType.CREDIT) {
