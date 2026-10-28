@@ -1,9 +1,7 @@
 package app.overbay.orbit.ui.rules.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,19 +12,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -37,6 +28,7 @@ import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitTextField
 
 @Composable
 fun ConditionEditorRow(
@@ -46,12 +38,12 @@ fun ConditionEditorRow(
     onDelete: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -78,7 +70,7 @@ fun ConditionEditorRow(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            OutlinedTextField(
+            OrbitTextField(
                 value = condition.value,
                 onValueChange = { onConditionChanged(condition.copy(value = it)) },
                 placeholder = { Text("Match text (e.g. Amazon)") },
@@ -100,12 +92,12 @@ fun ActionEditorRow(
     val selectedCategory = categories.find { it.id == action.targetCategoryId }
 
     Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -143,7 +135,7 @@ fun ActionEditorRow(
                     )
                 }
                 RuleActionType.RENAME, RuleActionType.RENAME_MERCHANT -> {
-                    OutlinedTextField(
+                    OrbitTextField(
                         value = action.textValue ?: action.value,
                         onValueChange = { onActionChanged(action.copy(value = it, textValue = it)) },
                         placeholder = { Text("New merchant name") },

@@ -13,16 +13,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitTextField
 
 @Composable
 fun HouseholdMemberEditorSheet(
@@ -81,7 +78,7 @@ fun HouseholdMemberEditorContent(
         )
         Spacer(modifier = Modifier.height(16.dp))
 
-        OutlinedTextField(
+        OrbitTextField(
             value = name,
             onValueChange = { name = it },
             label = { Text("Full Name") },
@@ -127,14 +124,14 @@ fun HouseholdMemberEditorContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            OutlinedTextField(
+            OrbitTextField(
                 value = employer,
                 onValueChange = { employer = it },
                 label = { Text("Employer (Optional)") },
                 modifier = Modifier.weight(1f),
                 singleLine = true
             )
-            OutlinedTextField(
+            OrbitTextField(
                 value = jobTitle,
                 onValueChange = { jobTitle = it },
                 label = { Text("Job Title (Optional)") },
@@ -143,18 +140,21 @@ fun HouseholdMemberEditorContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.End
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+            ) {
+                Text("Cancel", fontWeight = FontWeight.SemiBold)
             }
-            Spacer(modifier = Modifier.padding(horizontal = 4.dp))
             Button(
                 onClick = {
                     if (name.isNotBlank()) {
@@ -176,10 +176,15 @@ fun HouseholdMemberEditorContent(
                         onSave(saved)
                     }
                 },
-                enabled = name.isNotBlank()
+                enabled = name.isNotBlank(),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
             ) {
-                Text("Save Member")
+                Text("Save Member", fontWeight = FontWeight.Bold)
             }
         }
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }

@@ -38,6 +38,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.datetime.LocalDate
 
@@ -106,7 +107,7 @@ fun CreditCardProfileEditorContent(
             )
 
             // Card Name & Issuer
-            OutlinedTextField(
+            OrbitTextField(
                 value = cardName,
                 onValueChange = { cardName = it },
                 label = { Text("Card Product Name (e.g. Sapphire Reserve)") },
@@ -115,14 +116,14 @@ fun CreditCardProfileEditorContent(
             )
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                OrbitTextField(
                     value = issuerName,
                     onValueChange = { issuerName = it },
                     label = { Text("Issuer (e.g. Chase)") },
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
-                OutlinedTextField(
+                OrbitTextField(
                     value = network,
                     onValueChange = { network = it },
                     label = { Text("Network (e.g. Visa)") },
@@ -162,7 +163,7 @@ fun CreditCardProfileEditorContent(
 
             // Statement Cycle Days
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                OrbitTextField(
                     value = statementClosingDayText,
                     onValueChange = { statementClosingDayText = it },
                     label = { Text("Closing Day (1-31)") },
@@ -170,7 +171,7 @@ fun CreditCardProfileEditorContent(
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
-                OutlinedTextField(
+                OrbitTextField(
                     value = paymentDueDayText,
                     onValueChange = { paymentDueDayText = it },
                     label = { Text("Due Day (1-31)") },
@@ -187,14 +188,14 @@ fun CreditCardProfileEditorContent(
                 fontWeight = FontWeight.SemiBold
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                OrbitTextField(
                     value = newRewardCat,
                     onValueChange = { newRewardCat = it },
                     label = { Text("Category (e.g. Dining)") },
                     singleLine = true,
                     modifier = Modifier.weight(2f)
                 )
-                OutlinedTextField(
+                OrbitTextField(
                     value = newRewardMultiplier,
                     onValueChange = { newRewardMultiplier = it },
                     label = { Text("Multiplier (e.g. 3.0)") },
@@ -223,7 +224,7 @@ fun CreditCardProfileEditorContent(
                 fontWeight = FontWeight.SemiBold
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
+                OrbitTextField(
                     value = newBenefitTitle,
                     onValueChange = { newBenefitTitle = it },
                     label = { Text("Credit Name (e.g. Travel Credit)") },

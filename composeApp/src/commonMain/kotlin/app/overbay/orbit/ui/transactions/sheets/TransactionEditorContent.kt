@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,17 +22,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,19 +36,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.Transaction
-import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.data.model.labelWithEmoji
-import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
-import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitAmountTypeCard
+import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.transactions.components.TransactionOptionsBlock
 import app.overbay.orbit.ui.transactions.components.TransactionProvenanceCard
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -116,10 +110,10 @@ fun TransactionEditorContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(horizontal = 20.dp, vertical = 10.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        // Title Header + Optional Import CSV Action
+        // Title Header + Top-Right Quick Actions (Import CSV when new, Split & Delete when editing)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -131,6 +125,7 @@ fun TransactionEditorContent(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
+
             if (!isEditing && onImportCsv != null) {
                 OutlinedButton(
                     onClick = {
@@ -147,22 +142,98 @@ fun TransactionEditorContent(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+            } else if (transaction != null && transaction.id > 0L) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable {
+                                haptics.tick()
+                                onSplit(transaction.id)
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Split",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "Split",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable {
+                                haptics.reject()
+                                onDelete(transaction.id)
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Delete",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
             }
         }
 
-        // Provenance Card (if imported original values exist)
+        // Compact Provenance Pill (if imported original values exist)
         if (transaction != null && transaction.id > 0L) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             TransactionProvenanceCard(
                 transaction = transaction,
                 onResetToOriginal = onResetToOriginal
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Centerpiece Amount + Expense/Income Hero Card
+        OrbitAmountTypeCard(
+            cents = rawAmountCents,
+            onCentsChange = { rawAmountCents = it },
+            isExpense = isExpense,
+            onIsExpenseChange = { isExpense = it }
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Merchant Name Input
-        OutlinedTextField(
+        OrbitTextField(
             value = merchant,
             onValueChange = { merchant = it },
             label = { Text("Merchant") },
@@ -170,57 +241,47 @@ fun TransactionEditorContent(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Amount Input + Expense/Income Pill
+        // 2-Column Bento Row: Date + Category
+        val selectedCategory = categories.find { it.id == selectedCategoryId }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(modifier = Modifier.weight(1f)) {
-                CurrencyTextField(
-                    cents = rawAmountCents,
-                    onCentsChange = { rawAmountCents = it },
-                    label = "Amount"
-                )
-            }
+            DateFieldButton(
+                date = selectedDate,
+                onDateSelected = { selectedDate = it },
+                label = "Date",
+                modifier = Modifier.weight(0.45f)
+            )
 
-            SingleChoiceSegmentedButtonRow {
-                SegmentedButton(
-                    selected = isExpense,
-                    onClick = {
-                        haptics.tick()
-                        isExpense = true
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    icon = {},
-                    label = { Text("Expense") }
-                )
-                SegmentedButton(
-                    selected = !isExpense,
-                    onClick = {
-                        haptics.tick()
-                        isExpense = false
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    icon = {},
-                    label = { Text("Income") }
-                )
-            }
+            OrbitDropdownField(
+                label = "Category",
+                selectedText = selectedCategory?.labelWithEmoji ?: "❓ Uncategorized",
+                options = categories,
+                optionLabel = { it.labelWithEmoji },
+                onOptionSelected = { selectedCategoryId = it.id },
+                nullOptionLabel = "❓ Uncategorized",
+                onNullSelected = { selectedCategoryId = null },
+                leadingIcon = if (selectedCategory != null) {
+                    {
+                        val color = selectedCategory.color.toComposeColor(MaterialTheme.colorScheme.primary)
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                        )
+                    }
+                } else null,
+                modifier = Modifier.weight(0.55f)
+            )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Date Picker Button
-        DateFieldButton(
-            date = selectedDate,
-            onDateSelected = { selectedDate = it },
-            label = "Transaction Date"
-        )
-
         if (!isEditing && accounts.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             val selectedAccount = accounts.find { it.id == selectedAccountId } ?: accounts.first()
             OrbitDropdownField(
                 label = "Account",
@@ -231,45 +292,20 @@ fun TransactionEditorContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Category Picker
-        val selectedCategory = categories.find { it.id == selectedCategoryId }
-        OrbitDropdownField(
-            label = "Category",
-            selectedText = selectedCategory?.labelWithEmoji ?: "❓ Uncategorized",
-            options = categories,
-            optionLabel = { it.labelWithEmoji },
-            onOptionSelected = { selectedCategoryId = it.id },
-            nullOptionLabel = "❓ Uncategorized",
-            onNullSelected = { selectedCategoryId = null },
-            leadingIcon = if (selectedCategory != null) {
-                {
-                    val color = selectedCategory.color.toComposeColor(MaterialTheme.colorScheme.primary)
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(color)
-                    )
-                }
-            } else null
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Notes Input
-        OutlinedTextField(
+        OrbitTextField(
             value = notes,
             onValueChange = { notes = it },
             label = { Text("Notes (Optional)") },
             modifier = Modifier.fillMaxWidth(),
-            maxLines = 3
+            maxLines = 2
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Options: Transfer, MHA & Quick Actions
+        // Grouped Tonal Options Card: Transfer, MHA & Quick Actions
         TransactionOptionsBlock(
             isTransfer = isTransfer,
             onTransferChange = { isTransfer = it },
@@ -279,18 +315,21 @@ fun TransactionEditorContent(
             onMarkRecurring = if (transaction != null && onMarkRecurring != null) ({ onMarkRecurring(transaction) }) else null
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Actions Row (Title Case)
+        // Primary Actions Row (Title Case)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             OutlinedButton(
                 onClick = onDismiss,
-                modifier = Modifier.weight(1f)
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
             ) {
-                Text("Cancel")
+                Text("Cancel", fontWeight = FontWeight.SemiBold)
             }
 
             Button(
@@ -312,54 +351,15 @@ fun TransactionEditorContent(
                     )
                 },
                 enabled = merchant.isNotBlank() && rawAmountCents > 0L,
-                modifier = Modifier.weight(1f)
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
             ) {
-                Text("Save")
+                Text("Save", fontWeight = FontWeight.Bold)
             }
         }
 
-        // Secondary actions: Split & Delete
-        if (transaction != null && transaction.id > 0L) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        haptics.tick()
-                        onSplit(transaction.id)
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = "Split",
-                        modifier = Modifier.size(16.dp).padding(end = 4.dp)
-                    )
-                    Text("Split")
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        haptics.reject()
-                        onDelete(transaction.id)
-                    },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    ),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        modifier = Modifier.size(16.dp).padding(end = 4.dp)
-                    )
-                    Text("Delete")
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }

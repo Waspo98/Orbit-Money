@@ -38,6 +38,7 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSwitchRow
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 
@@ -183,24 +184,27 @@ fun MhaConfigContent(
 
         if (mode == "simple") {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+                OrbitTextField(
                     value = simpleFedRate,
                     onValueChange = { simpleFedRate = it },
                     label = { Text("Federal Rate (%)") },
+                    singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
-                OutlinedTextField(
+                OrbitTextField(
                     value = simpleStateRate,
                     onValueChange = { simpleStateRate = it },
                     label = { Text("State Rate (%)") },
+                    singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
             }
         } else {
-            OutlinedTextField(
+            OrbitTextField(
                 value = stateCode,
                 onValueChange = { stateCode = it.uppercase() },
                 label = { Text("State (e.g. IL, NC, CA)") },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
 

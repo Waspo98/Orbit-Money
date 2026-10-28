@@ -24,12 +24,11 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,7 +44,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryEmojiMapper
+import app.overbay.orbit.ui.components.OrbitSwitchGroupCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 private val PRESET_COLORS = listOf(
@@ -209,14 +210,14 @@ private fun CategoryEditorFormFields(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
+            app.overbay.orbit.ui.components.OrbitTextField(
                 value = selectedIcon,
                 onValueChange = { onIconChange(it.take(16)) },
                 label = { Text("Emoji") },
                 singleLine = true,
                 modifier = Modifier.width(84.dp)
             )
-            OutlinedTextField(
+            app.overbay.orbit.ui.components.OrbitTextField(
                 value = name,
                 onValueChange = onNameChange,
                 label = { Text("Category Name") },
@@ -300,26 +301,37 @@ private fun CategoryEditorFormFields(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Type Switches
-        OrbitSwitchRow(
-            title = "Income Category",
-            checked = isIncome,
-            onCheckedChange = onIncomeChange
-        )
+        app.overbay.orbit.ui.components.OrbitSwitchGroupCard {
+            OrbitSwitchRow(
+                title = "Income Category",
+                checked = isIncome,
+                onCheckedChange = onIncomeChange,
+                showContainer = false
+            )
 
-        Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
+            )
 
-        OrbitSwitchRow(
-            title = "Transfer Category",
-            checked = isTransfer,
-            onCheckedChange = onTransferChange
-        )
+            OrbitSwitchRow(
+                title = "Transfer Category",
+                checked = isTransfer,
+                onCheckedChange = onTransferChange,
+                showContainer = false
+            )
 
-        Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
+            )
 
-        OrbitSwitchRow(
-            title = "Default MHA Eligible",
-            checked = mhaEligible,
-            onCheckedChange = onMhaChange
-        )
+            OrbitSwitchRow(
+                title = "Default MHA Eligible",
+                checked = mhaEligible,
+                onCheckedChange = onMhaChange,
+                showContainer = false
+            )
+        }
     }
 }

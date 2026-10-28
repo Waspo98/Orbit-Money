@@ -7,26 +7,22 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -36,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
@@ -46,6 +43,7 @@ import app.overbay.orbit.data.model.RuleConditionField
 import app.overbay.orbit.data.model.RuleOperator
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.rules.components.ActionEditorRow
 import app.overbay.orbit.ui.rules.components.ConditionEditorRow
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -126,28 +124,32 @@ fun RuleEditorContent(
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // Rule Name
-        OutlinedTextField(
-            value = name,
-            onValueChange = { name = it },
-            label = { Text("Rule Name") },
-            placeholder = { Text("e.g. Categorize Grocery Trips") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
+        // 2-Column Bento Row: Rule Name + Priority
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OrbitTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Rule Name") },
+                placeholder = { Text("e.g. Grocery Trips") },
+                singleLine = true,
+                modifier = Modifier.weight(0.68f)
+            )
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Priority
-        OutlinedTextField(
-            value = priorityText,
-            onValueChange = { priorityText = it.filter { ch -> ch.isDigit() } },
-            label = { Text("Priority (Higher evaluated first)") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
+            OrbitTextField(
+                value = priorityText,
+                onValueChange = { priorityText = it.filter { ch -> ch.isDigit() } },
+                label = { Text("Priority") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.weight(0.32f)
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -168,7 +170,8 @@ fun RuleEditorContent(
                 onClick = {
                     haptics.tick()
                     conditions.add(RuleCondition(RuleConditionField.MERCHANT, RuleOperator.CONTAINS, ""))
-                }
+                },
+                shape = RoundedCornerShape(999.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
@@ -213,7 +216,8 @@ fun RuleEditorContent(
                 onClick = {
                     haptics.tick()
                     actions.add(RuleAction(RuleActionType.CATEGORIZE, targetCategoryId = categories.firstOrNull()?.id))
-                }
+                },
+                shape = RoundedCornerShape(999.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
@@ -244,7 +248,7 @@ fun RuleEditorContent(
 
         // Live Match Count Preview Badge
         Surface(
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(14.dp),
             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)),
             modifier = Modifier.fillMaxWidth()
@@ -269,7 +273,7 @@ fun RuleEditorContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         // Actions (Title Case)
         Row(
@@ -278,9 +282,12 @@ fun RuleEditorContent(
         ) {
             OutlinedButton(
                 onClick = onDismiss,
-                modifier = Modifier.weight(1f)
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
             ) {
-                Text("Cancel")
+                Text("Cancel", fontWeight = FontWeight.SemiBold)
             }
 
             Button(
@@ -298,12 +305,15 @@ fun RuleEditorContent(
                     onSave(newRule)
                 },
                 enabled = name.isNotBlank() && conditions.isNotEmpty() && actions.isNotEmpty(),
-                modifier = Modifier.weight(1f)
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
             ) {
-                Text("Save Rule")
+                Text("Save Rule", fontWeight = FontWeight.Bold)
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }

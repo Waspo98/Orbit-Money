@@ -1,38 +1,28 @@
 package app.overbay.orbit.ui.upcoming.sheets
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
@@ -50,10 +41,11 @@ import app.overbay.orbit.data.model.UpcomingKind
 import app.overbay.orbit.data.model.UpcomingStatus
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.LocalDateUtils
-import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitAmountTypeCard
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.datetime.LocalDate
 import kotlin.math.abs
@@ -111,9 +103,14 @@ fun RecurringItemEditorContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
             .verticalScroll(rememberScrollState())
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
                 text = if (isEditing) "Edit Recurring Schedule" else "New Recurring Schedule",
                 style = MaterialTheme.typography.titleLarge,
@@ -121,72 +118,78 @@ fun RecurringItemEditorContent(
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Name
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Name / Merchant") },
-                placeholder = { Text("e.g. Netflix, Rent, Employer") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Amount + Expense/Income Pill
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(modifier = Modifier.weight(1f)) {
-                    CurrencyTextField(
-                        cents = rawAmountCents,
-                        onCentsChange = { rawAmountCents = it },
-                        label = "Amount"
-                    )
-                }
-
-                SingleChoiceSegmentedButtonRow {
-                    SegmentedButton(
-                        selected = isExpense,
-                        onClick = {
-                            haptics.tick()
-                            isExpense = true
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                        icon = {},
-                        label = { Text("Expense") }
-                    )
-                    SegmentedButton(
-                        selected = !isExpense,
-                        onClick = {
-                            haptics.tick()
-                            isExpense = false
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                        icon = {},
-                        label = { Text("Income") }
-                    )
+            if (item != null && item.id > 0L) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable {
+                            haptics.reject()
+                            onDelete(item.id)
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete Schedule",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Delete",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-            // Next Due Date
+        // Centerpiece Amount + Expense/Income Hero Card
+        OrbitAmountTypeCard(
+            cents = rawAmountCents,
+            onCentsChange = { rawAmountCents = it },
+            isExpense = isExpense,
+            onIsExpenseChange = { isExpense = it }
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Name / Merchant
+        OrbitTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Name / Merchant") },
+            placeholder = { Text("e.g. Netflix, Rent, Employer") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // 2-Column Bento Row: Next Due Date + Recurrence Frequency
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             DateFieldButton(
                 date = selectedDate,
                 onDateSelected = { selectedDate = it },
-                label = "Next Due Date"
+                label = "Next Due",
+                modifier = Modifier.weight(0.48f)
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Frequency Dropdown
             OrbitDropdownField(
-                label = "Recurrence Frequency",
+                label = "Frequency",
                 selectedText = frequency.name.lowercase().replaceFirstChar { it.uppercase() },
                 options = listOf(
                     RecurrenceFrequency.WEEKLY,
@@ -197,101 +200,94 @@ fun RecurringItemEditorContent(
                     RecurrenceFrequency.YEARLY
                 ),
                 optionLabel = { it.name.lowercase().replaceFirstChar { c -> c.uppercase() } },
-                onOptionSelected = { frequency = it }
+                onOptionSelected = { frequency = it },
+                modifier = Modifier.weight(0.52f)
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Category Dropdown
-            val selectedCategory = categories.find { it.id == selectedCategoryId }
-            OrbitDropdownField(
-                label = "Category",
-                selectedText = selectedCategory?.labelWithEmoji ?: "None / Unassigned",
-                options = categories,
-                optionLabel = { it.labelWithEmoji },
-                onOptionSelected = { selectedCategoryId = it.id },
-                nullOptionLabel = "None",
-                onNullSelected = { selectedCategoryId = null }
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Account Dropdown
-            val selectedAccount = accounts.find { it.id == selectedAccountId }
-            OrbitDropdownField(
-                label = "Payment Account",
-                selectedText = selectedAccount?.name ?: "None / Unassigned",
-                options = accounts,
-                optionLabel = { it.name },
-                onOptionSelected = { selectedAccountId = it.id },
-                nullOptionLabel = "None",
-                onNullSelected = { selectedAccountId = null }
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Action Buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Cancel")
-                }
-
-                Button(
-                    onClick = {
-                        haptics.confirm()
-                        val updated = item?.copy(
-                            name = name.trim(),
-                            merchant = name.trim(),
-                            amountCents = rawAmountCents,
-                            kind = if (isExpense) UpcomingKind.BILL else UpcomingKind.INCOME,
-                            direction = if (isExpense) "expense" else "income",
-                            frequencyType = frequency,
-                            nextDate = selectedDate.toString(),
-                            categoryId = selectedCategoryId,
-                            accountId = selectedAccountId,
-                            status = UpcomingStatus.ACTIVE
-                        ) ?: UpcomingItem(
-                            name = name.trim(),
-                            merchant = name.trim(),
-                            amountCents = rawAmountCents,
-                            kind = if (isExpense) UpcomingKind.BILL else UpcomingKind.INCOME,
-                            direction = if (isExpense) "expense" else "income",
-                            frequencyType = frequency,
-                            nextDate = selectedDate.toString(),
-                            categoryId = selectedCategoryId,
-                            accountId = selectedAccountId,
-                            status = UpcomingStatus.ACTIVE
-                        )
-                        onSave(updated)
-                    },
-                    enabled = name.isNotBlank() && rawAmountCents > 0L,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Save")
-                }
-            }
-
-            if (isEditing) {
-                Spacer(modifier = Modifier.height(10.dp))
-                OutlinedButton(
-                    onClick = {
-                        haptics.reject()
-                        onDelete(item.id)
-                    },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete Schedule", modifier = Modifier.size(16.dp))
-                    Text("Delete Schedule")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
         }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Category Dropdown
+        val selectedCategory = categories.find { it.id == selectedCategoryId }
+        OrbitDropdownField(
+            label = "Category",
+            selectedText = selectedCategory?.labelWithEmoji ?: "None / Unassigned",
+            options = categories,
+            optionLabel = { it.labelWithEmoji },
+            onOptionSelected = { selectedCategoryId = it.id },
+            nullOptionLabel = "None",
+            onNullSelected = { selectedCategoryId = null }
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Account Dropdown
+        val selectedAccount = accounts.find { it.id == selectedAccountId }
+        OrbitDropdownField(
+            label = "Payment Account",
+            selectedText = selectedAccount?.name ?: "None / Unassigned",
+            options = accounts,
+            optionLabel = { it.name },
+            onOptionSelected = { selectedAccountId = it.id },
+            nullOptionLabel = "None",
+            onNullSelected = { selectedAccountId = null }
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // Action Buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+            ) {
+                Text("Cancel", fontWeight = FontWeight.SemiBold)
+            }
+
+            Button(
+                onClick = {
+                    haptics.confirm()
+                    val updated = item?.copy(
+                        name = name.trim(),
+                        merchant = name.trim(),
+                        amountCents = rawAmountCents,
+                        kind = if (isExpense) UpcomingKind.BILL else UpcomingKind.INCOME,
+                        direction = if (isExpense) "expense" else "income",
+                        frequencyType = frequency,
+                        nextDate = selectedDate.toString(),
+                        categoryId = selectedCategoryId,
+                        accountId = selectedAccountId,
+                        status = UpcomingStatus.ACTIVE
+                    ) ?: UpcomingItem(
+                        name = name.trim(),
+                        merchant = name.trim(),
+                        amountCents = rawAmountCents,
+                        kind = if (isExpense) UpcomingKind.BILL else UpcomingKind.INCOME,
+                        direction = if (isExpense) "expense" else "income",
+                        frequencyType = frequency,
+                        nextDate = selectedDate.toString(),
+                        categoryId = selectedCategoryId,
+                        accountId = selectedAccountId,
+                        status = UpcomingStatus.ACTIVE
+                    )
+                    onSave(updated)
+                },
+                enabled = name.isNotBlank() && rawAmountCents > 0L,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+            ) {
+                Text("Save", fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+    }
 }
