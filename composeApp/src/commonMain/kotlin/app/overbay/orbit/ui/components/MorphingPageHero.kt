@@ -198,7 +198,19 @@ fun MorphingPageHero(
             val titleTranslationY = ((minBarHeightPx / 2f) - expandedTitleCenterY) * fraction
             val backShiftXPx = with(density) { (-6).dp.toPx() } * fraction
 
-            val collapsedTitleWidthDp = with(density) { (rawTitleWidthPx * collapsedTitleScale).toDp() }
+            val totalWidthPx = with(density) { totalWidth.toPx() }
+            val expandedTitleLeftPx = with(density) { (20.dp + if (canNavigateBack) 42.dp else 0.dp).toPx() }
+            val collapsedTitleWidthPx = rawTitleWidthPx * collapsedTitleScale
+            val rightObstaclePx = when {
+                hasGlidingToolbar && collapsedActions == null -> expToolbarWidthPx * 0.9f + with(density) { 24.dp.toPx() }
+                hasGlidingToolbar -> colToolbarWidthPx + with(density) { 24.dp.toPx() }
+                else -> with(density) { 20.dp.toPx() }
+            }
+            val centeredTitleLeftPx = ((totalWidthPx - collapsedTitleWidthPx) / 2f)
+                .coerceIn(expandedTitleLeftPx, (totalWidthPx - rightObstaclePx - collapsedTitleWidthPx).coerceAtLeast(expandedTitleLeftPx))
+            val titleTranslationX = if (hasMorphingSlot) backShiftXPx else (centeredTitleLeftPx - expandedTitleLeftPx) * fraction
+
+            val collapsedTitleWidthDp = with(density) { collapsedTitleWidthPx.toDp() }
                 .coerceIn(64.dp, (totalWidth * 0.56f).coerceAtLeast(120.dp))
             val collapsedTitleRightDp = (20.dp + if (canNavigateBack) 36.dp else 0.dp) + collapsedTitleWidthDp
             val expandedTextBottomDp = with(density) { textBlockHeightPx.toDp() }
@@ -261,6 +273,7 @@ fun MorphingPageHero(
                                 scaleX = titleScale
                                 scaleY = titleScale
                                 transformOrigin = TransformOrigin(0f, 0.5f)
+                                translationX = titleTranslationX
                                 translationY = titleTranslationY
                             }
                         ) { heroContent() }
@@ -286,7 +299,7 @@ fun MorphingPageHero(
                                     scaleX = titleScale
                                     scaleY = titleScale
                                     transformOrigin = TransformOrigin(0f, 0.5f)
-                                    translationX = backShiftXPx
+                                    translationX = titleTranslationX
                                     translationY = titleTranslationY
                                 }
                         )
