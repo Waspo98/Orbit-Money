@@ -42,6 +42,7 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
@@ -117,6 +118,11 @@ fun HouseholdScreen(
                             contentDescription = "New Member",
                             onClick = { viewModel.openMemberEditor(null) },
                             buttonSize = barHeight
+                        )
+
+                        CanopySettingsButton(
+                            buttonSize = barHeight,
+                            onClick = { onNavigate(OrbitNavKey.Settings) }
                         )
                     }
                 )

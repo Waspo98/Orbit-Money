@@ -23,6 +23,8 @@ class GoalsViewModel(
     private val _showEditorSheet = MutableStateFlow(false)
     private val _allocatingGoal = MutableStateFlow<Goal?>(null)
     private val _showAllocationDialog = MutableStateFlow(false)
+    private val _isReorderMode = MutableStateFlow(false)
+    private val _goalSortOverrides = MutableStateFlow<Map<Long, Int>>(emptyMap())
 
     private val dataFlow = combine(
         repository.goals,
@@ -43,10 +45,14 @@ class GoalsViewModel(
     val uiState: StateFlow<GoalsUiState> = combine(
         dataFlow,
         dialogFlow,
-        _inspectingGoalId
-    ) { (goals, accounts), dialog, inspectingId ->
+        _inspectingGoalId,
+        _isReorderMode,
+        _goalSortOverrides
+    ) { (goals, accounts), dialog, inspectingId, isReorder, sortOverrides ->
         val sortedGoals = goals.sortedWith(
-            compareBy<Goal> { it.isCompleted }.thenBy { it.sortOrder }.thenBy { it.id }
+            compareBy<Goal> { it.isCompleted }
+                .thenBy { sortOverrides[it.id] ?: it.sortOrder }
+                .thenBy { it.id }
         )
         val totalSaved = goals.sumOf { it.currentAmountCents }
         val totalTarget = goals.sumOf { it.targetAmountCents }
@@ -62,6 +68,7 @@ class GoalsViewModel(
             showEditorSheet = dialog.showSheet,
             allocatingGoal = dialog.allocating,
             showAllocationDialog = dialog.showAlloc,
+            isReorderMode = isReorder,
             isLoading = false
         )
     }.stateIn(
@@ -113,6 +120,27 @@ class GoalsViewModel(
     fun closeEditorSheet() {
         _showEditorSheet.value = false
         _editingGoal.value = null
+    }
+
+    fun toggleReorderMode() {
+        _isReorderMode.value = !_isReorderMode.value
+    }
+
+    fun moveGoal(completedGroup: Boolean, fromIndex: Int, toIndex: Int) {
+        val list = (if (completedGroup) uiState.value.completedGoals else uiState.value.activeGoals).toMutableList()
+        if (fromIndex !in list.indices || toIndex !in list.indices || fromIndex == toIndex) return
+        val moved = list.removeAt(fromIndex)
+        list.add(toIndex, moved)
+        val newOverrides = _goalSortOverrides.value.toMutableMap()
+        list.forEachIndexed { idx, goal -> newOverrides[goal.id] = idx }
+        _goalSortOverrides.value = newOverrides
+        viewModelScope.launch {
+            list.forEachIndexed { idx, goal ->
+                if (goal.sortOrder != idx) {
+                    repository.saveGoal(goal.copy(sortOrder = idx))
+                }
+            }
+        }
     }
 
     fun saveGoal(goal: Goal) {

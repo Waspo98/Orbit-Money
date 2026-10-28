@@ -22,6 +22,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.retirement.cards.HouseholdIncomeAssumptionsCard
 import app.overbay.orbit.ui.calculators.retirement.cards.RetirementAccountsListCard
 import app.overbay.orbit.ui.calculators.retirement.cards.RetirementProjectionHeroCard
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
@@ -56,7 +57,7 @@ fun RetirementCalculatorScreen(
                 canNavigateBack = true,
                 onBack = onBack,
                 scrollState = heroScrollState,
-                canopyBar = { _, isCompact, _ ->
+                canopyBar = { _, isCompact, barHeight ->
                     val proj = MoneyUtils.formatCents(uiState.scenario.projectedBalanceCents, showCents = false)
                     val funded = "${uiState.scenario.readinessPercent.roundToInt()}% Funded"
                     CanopySurfacePill(
@@ -67,6 +68,11 @@ fun RetirementCalculatorScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
+                    )
+
+                    CanopySettingsButton(
+                        buttonSize = barHeight,
+                        onClick = { onNavigate(OrbitNavKey.Settings) }
                     )
                 }
             )

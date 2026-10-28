@@ -180,6 +180,8 @@ fun TransactionsScreen(
             initialFilter = state.filterDraft,
             onApply = { draft -> viewModel.applyFilterDraft(draft) },
             onDismiss = { viewModel.closeFilterSheet() },
+            initialSort = state.sortOption,
+            onApplySort = { sort -> viewModel.setSortOption(sort) },
             accountNames = state.accounts.associate { it.id to it.name },
             categoryNames = state.categories.associate { it.id to it.labelWithEmoji }
         )

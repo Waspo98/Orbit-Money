@@ -79,9 +79,8 @@ fun MoreDestinationsSheet(
         DestinationItem(OrbitNavKey.RetirementCalculator, "Retirement Calculator", "Coast FIRE, nest egg & drawdowns", OrbitIcons.RetirementCalculator)
     )
 
-    val systemGroup = listOf(
-        DestinationItem(OrbitNavKey.Household, "Household", "Member profiles & account sharing", OrbitIcons.Household),
-        DestinationItem(OrbitNavKey.Settings, "Settings", "Data storage, Google Drive & theme presets", OrbitIcons.Settings)
+    val householdGroup = listOf(
+        DestinationItem(OrbitNavKey.Household, "Household", "Member profiles & account sharing", OrbitIcons.Household)
     )
 
     OrbitModalSheet(
@@ -112,7 +111,7 @@ fun MoreDestinationsSheet(
             DestinationSection("Calculators & Projections", calculatorsGroup, currentKey, onNavigate, onDismiss, haptics::tick)
             Spacer(modifier = Modifier.height(16.dp))
 
-            DestinationSection("Household & System", systemGroup, currentKey, onNavigate, onDismiss, haptics::tick)
+            DestinationSection("Household", householdGroup, currentKey, onNavigate, onDismiss, haptics::tick)
             Spacer(modifier = Modifier.height(24.dp))
         }
     }

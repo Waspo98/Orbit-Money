@@ -67,7 +67,8 @@ fun AdaptiveNavigationShell(
             OrbitNavKey.Dashboard,
             is OrbitNavKey.Transactions,
             OrbitNavKey.Budgets,
-            is OrbitNavKey.Accounts -> false
+            is OrbitNavKey.Accounts,
+            OrbitNavKey.Settings -> false
             else -> true
         }
     }

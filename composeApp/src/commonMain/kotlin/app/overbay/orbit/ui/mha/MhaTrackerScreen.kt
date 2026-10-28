@@ -37,6 +37,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.PeriodNavigatorPill
@@ -118,6 +119,11 @@ fun MhaTrackerScreen(
                             },
                             buttonSize = barHeight,
                             isActive = state.showConfigSheet
+                        )
+
+                        CanopySettingsButton(
+                            buttonSize = barHeight,
+                            onClick = { onNavigate(OrbitNavKey.Settings) }
                         )
                     }
                 )

@@ -22,6 +22,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.ui.components.CanopySegmentedBar
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.networth.components.AssetLiabilityBreakdownCard
@@ -67,7 +68,7 @@ fun NetWorthScreen(
                     canNavigateBack = true,
                     onBack = onBack,
                     scrollState = heroScrollState,
-                    canopyBar = { _, isCompact, _ ->
+                    canopyBar = { _, isCompact, barHeight ->
                         CanopySegmentedBar(
                             items = NetWorthPeriod.entries,
                             selectedItem = state.selectedPeriod,
@@ -77,6 +78,11 @@ fun NetWorthScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
+                        )
+
+                        CanopySettingsButton(
+                            buttonSize = barHeight,
+                            onClick = { onNavigate(OrbitNavKey.Settings) }
                         )
                     }
                 )

@@ -132,10 +132,9 @@ fun TransactionsListPane(
                             contentAlignment = Alignment.CenterEnd
                         ) {
                             TransactionsSearchTrailingControls(
-                                state = state,
                                 activeFilterCount = activeChips.size,
                                 onOpenFilter = { viewModel.openFilterSheet() },
-                                onSelectSort = { viewModel.setSortOption(it) },
+                                onOpenSettings = { onNavigate(OrbitNavKey.Settings) },
                                 buttonSize = restingHeight
                             )
                         }

@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitAlertDialog
@@ -42,11 +43,7 @@ import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.rememberHeroScrollState
-import app.overbay.orbit.ui.settings.blocks.GoogleDriveBackupBlock
-import app.overbay.orbit.ui.settings.blocks.SecurityBiometricsBlock
-import app.overbay.orbit.ui.settings.blocks.SimpleFinBankSyncBlock
-import app.overbay.orbit.ui.settings.blocks.StorageSyncModeBlock
-import app.overbay.orbit.ui.settings.blocks.ThemeAppearanceBlock
+import app.overbay.orbit.ui.settings.blocks.*
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.LocalFileImportExportHelper
@@ -100,6 +97,12 @@ fun SettingsScreen(
                         buttonSize = barHeight,
                         isActive = uiState.isSyncing,
                         enabled = !uiState.isSyncing
+                    )
+
+                    CanopySettingsButton(
+                        buttonSize = barHeight,
+                        isActive = true,
+                        onClick = {}
                     )
                 }
             )

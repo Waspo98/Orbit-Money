@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.ui.components.CanopyActionPillButton
 import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
@@ -120,6 +121,11 @@ fun RulesScreen(
                                 contentDescription = "New Rule",
                                 onClick = { viewModel.openAddRule() },
                                 buttonSize = barHeight
+                            )
+
+                            CanopySettingsButton(
+                                buttonSize = barHeight,
+                                onClick = { onNavigate(OrbitNavKey.Settings) }
                             )
                         }
                     )

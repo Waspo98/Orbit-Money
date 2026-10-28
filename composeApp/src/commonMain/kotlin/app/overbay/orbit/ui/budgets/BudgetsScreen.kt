@@ -38,6 +38,7 @@ import app.overbay.orbit.ui.budgets.components.BudgetDetailInspectorPane
 import app.overbay.orbit.ui.budgets.components.BudgetSummaryHeroCard
 import app.overbay.orbit.ui.budgets.dialogs.BudgetAmountEditorSheet
 import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
@@ -113,8 +114,8 @@ fun BudgetsScreen(
 
                         Box {
                             CanopyIconButton(
-                                icon = OrbitIcons.Sort,
-                                contentDescription = "Sort Budgets",
+                                icon = OrbitIcons.Filter,
+                                contentDescription = "Filter & Sort Budgets",
                                 onClick = { sortMenuExpanded = true },
                                 buttonSize = barHeight,
                                 isActive = state.sortOption != CategorySortOption.OVER_BUDGET_FIRST
@@ -158,6 +159,11 @@ fun BudgetsScreen(
                                 }
                             }
                         }
+
+                        CanopySettingsButton(
+                            buttonSize = barHeight,
+                            onClick = { onNavigate(OrbitNavKey.Settings) }
+                        )
                     }
                 )
 

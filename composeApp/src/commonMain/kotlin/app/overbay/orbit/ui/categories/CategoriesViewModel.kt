@@ -21,26 +21,35 @@ class CategoriesViewModel(
     private val _editingCategory = MutableStateFlow<Category?>(null)
     private val _showEditorDialog = MutableStateFlow(false)
     private val _deleteConfirmId = MutableStateFlow<Long?>(null)
+    private val _isReorderMode = MutableStateFlow(false)
+    private val _groupOrder = MutableStateFlow(
+        listOf("Income", "Living Needs (Fixed)", "Discretionary (Variable)", "Transfers & Savings")
+    )
+    private val _categorySortOverrides = MutableStateFlow<Map<Long, Int>>(emptyMap())
 
     private val dialogFlow = combine(
         _inspectingCategoryId,
         _editingCategory,
         _showEditorDialog,
-        _deleteConfirmId
-    ) { inspectingId, editing, showDialog, deleteId ->
+        _deleteConfirmId,
+        _isReorderMode
+    ) { inspectingId, editing, showDialog, deleteId, isReorder ->
         CategoriesUiState(
             inspectingCategoryId = inspectingId,
             editingCategory = editing,
             showEditorDialog = showDialog,
-            deleteConfirmCategoryId = deleteId
+            deleteConfirmCategoryId = deleteId,
+            isReorderMode = isReorder
         )
     }
 
     val uiState: StateFlow<CategoriesUiState> = combine(
         repository.categories,
         repository.transactions,
-        dialogFlow
-    ) { categories, transactions, dialogState ->
+        dialogFlow,
+        _groupOrder,
+        _categorySortOverrides
+    ) { categories, transactions, dialogState, groupOrder, sortOverrides ->
         // Count and sum per category
         val txnCountMap = mutableMapOf<Long, Int>()
         val txnSumMap = mutableMapOf<Long, Cents>()
@@ -51,7 +60,11 @@ class CategoriesViewModel(
             txnSumMap[catId] = (txnSumMap[catId] ?: 0L) + abs(txn.effectiveAmountCents)
         }
 
-        val summaries = categories.map { cat ->
+        val sortedCategories = categories.sortedWith(
+            compareBy<Category> { sortOverrides[it.id] ?: it.sortOrder }.thenBy { it.name }
+        )
+
+        val summaries = sortedCategories.map { cat ->
             CategorySummary(
                 category = cat,
                 transactionCount = txnCountMap[cat.id] ?: 0,
@@ -82,12 +95,15 @@ class CategoriesViewModel(
             CategoryGroupDisplay("Living Needs (Fixed)", fixedNeedsList, fixedNeedsList.sumOf { it.totalAmountCents }),
             CategoryGroupDisplay("Discretionary (Variable)", variableDiscretionaryList, variableDiscretionaryList.sumOf { it.totalAmountCents }),
             CategoryGroupDisplay("Transfers & Savings", transferList, transferList.sumOf { it.totalAmountCents })
-        ).filter { it.items.isNotEmpty() }
+        ).filter { it.items.isNotEmpty() }.sortedBy { grp ->
+            val idx = groupOrder.indexOf(grp.title)
+            if (idx >= 0) idx else Int.MAX_VALUE
+        }
 
         dialogState.copy(
-            categories = categories,
+            categories = sortedCategories,
             groups = groups,
-            totalCategoriesCount = categories.size
+            totalCategoriesCount = sortedCategories.size
         )
     }.stateIn(
         scope = viewModelScope,
@@ -126,6 +142,37 @@ class CategoriesViewModel(
         _editingCategory.value = null
     }
 
+    fun toggleReorderMode() {
+        _isReorderMode.value = !_isReorderMode.value
+    }
+
+    fun moveCategoryGroup(fromIndex: Int, toIndex: Int) {
+        val visibleTitles = uiState.value.groups.map { it.title }.toMutableList()
+        if (fromIndex !in visibleTitles.indices || toIndex !in visibleTitles.indices || fromIndex == toIndex) return
+        val moved = visibleTitles.removeAt(fromIndex)
+        visibleTitles.add(toIndex, moved)
+        val remaining = _groupOrder.value.filter { it !in visibleTitles }
+        _groupOrder.value = visibleTitles + remaining
+    }
+
+    fun moveCategoryInGroup(groupTitle: String, fromIndex: Int, toIndex: Int) {
+        val group = uiState.value.groups.find { it.title == groupTitle } ?: return
+        val list = group.items.map { it.category }.toMutableList()
+        if (fromIndex !in list.indices || toIndex !in list.indices || fromIndex == toIndex) return
+        val moved = list.removeAt(fromIndex)
+        list.add(toIndex, moved)
+        val newOverrides = _categorySortOverrides.value.toMutableMap()
+        list.forEachIndexed { idx, cat -> newOverrides[cat.id] = idx }
+        _categorySortOverrides.value = newOverrides
+        viewModelScope.launch {
+            list.forEachIndexed { idx, cat ->
+                if (cat.sortOrder != idx) {
+                    repository.saveCategory(cat.copy(sortOrder = idx))
+                }
+            }
+        }
+    }
+
     fun saveCategory(
         id: Long,
         name: String,
@@ -136,6 +183,7 @@ class CategoriesViewModel(
         mhaEligible: Boolean
     ) {
         viewModelScope.launch {
+            val existingSortOrder = _editingCategory.value?.sortOrder ?: 0
             val category = Category(
                 id = id,
                 name = name,
@@ -143,7 +191,8 @@ class CategoriesViewModel(
                 icon = icon,
                 isTransfer = isTransfer,
                 isIncome = isIncome,
-                mhaDefaultEligible = mhaEligible
+                mhaDefaultEligible = mhaEligible,
+                sortOrder = existingSortOrder
             )
             repository.saveCategory(category)
             closeEditorDialog()

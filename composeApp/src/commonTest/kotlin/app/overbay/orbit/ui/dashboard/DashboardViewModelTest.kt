@@ -253,20 +253,20 @@ class DashboardViewModelTest {
         }
         testScheduler.advanceUntilIdle()
 
-        // Boundary: moving top card up is a no-op
+        // Boundary: moving out-of-bounds is a no-op
         val firstCard = viewModel.uiState.value.visibleCards.first()
-        viewModel.moveCardUp(firstCard)
+        viewModel.moveCard(0, -1)
         testScheduler.advanceUntilIdle()
         assertEquals(firstCard, viewModel.uiState.value.visibleCards.first())
 
-        // Boundary: moving bottom card down is a no-op
+        val lastIndex = viewModel.uiState.value.customization.cardConfigs.lastIndex
         val lastCard = viewModel.uiState.value.visibleCards.last()
-        viewModel.moveCardDown(lastCard)
+        viewModel.moveCard(lastIndex, lastIndex + 1)
         testScheduler.advanceUntilIdle()
         assertEquals(lastCard, viewModel.uiState.value.visibleCards.last())
 
-        // Move first card down: swaps positions with second card
-        viewModel.moveCardDown(firstCard)
+        // Drag first card to index 1: swaps positions with second card
+        viewModel.moveCard(0, 1)
         testScheduler.advanceUntilIdle()
         assertEquals(firstCard, viewModel.uiState.value.visibleCards[1])
 

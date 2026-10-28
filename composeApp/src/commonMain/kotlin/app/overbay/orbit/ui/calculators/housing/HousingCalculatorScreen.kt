@@ -22,6 +22,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.housing.cards.AmortizationSummaryCard
 import app.overbay.orbit.ui.calculators.housing.cards.MonthlyPaymentBreakdownCard
 import app.overbay.orbit.ui.calculators.housing.cards.MortgageInputCard
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
@@ -55,7 +56,7 @@ fun HousingCalculatorScreen(
                 canNavigateBack = true,
                 onBack = onBack,
                 scrollState = heroScrollState,
-                canopyBar = { _, isCompact, _ ->
+                canopyBar = { _, isCompact, barHeight ->
                     val monthly = MoneyUtils.formatCents(uiState.buyingResult.totalMonthlyPaymentCents, showCents = false)
                     val close = MoneyUtils.formatCents(uiState.buyingResult.cashToCloseCents, showCents = false)
                     CanopySurfacePill(
@@ -66,6 +67,11 @@ fun HousingCalculatorScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
+                    )
+
+                    CanopySettingsButton(
+                        buttonSize = barHeight,
+                        onClick = { onNavigate(OrbitNavKey.Settings) }
                     )
                 }
             )

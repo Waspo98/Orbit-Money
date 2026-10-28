@@ -35,6 +35,7 @@ class AccountsViewModel(
     private val _showArchived = MutableStateFlow(false)
     private val _isReorderMode = MutableStateFlow(false)
     private val _groupOrder = MutableStateFlow(AccountTypeCategory.entries.toList())
+    private val _accountSortOverrides = MutableStateFlow<Map<Long, Int>>(emptyMap())
     private val _isSyncing = MutableStateFlow(false)
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
 
@@ -133,6 +134,21 @@ class AccountsViewModel(
         state.copy(isPhoneViewingDetail = phoneDetail)
     }.combine(_deleteConfirmAccountId) { state, delId ->
         state.copy(deleteConfirmAccountId = delId)
+    }.combine(_accountSortOverrides) { state, overrides ->
+        if (overrides.isEmpty()) {
+            state
+        } else {
+            val updatedGroups = state.accountGroups.map { grp ->
+                grp.copy(
+                    accounts = grp.accounts.sortedWith(
+                        compareBy<Account> { it.isArchived }
+                            .thenBy { overrides[it.id] ?: it.sortOrder }
+                            .thenBy { it.name }
+                    )
+                )
+            }
+            state.copy(accountGroups = updatedGroups)
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -254,16 +270,31 @@ class AccountsViewModel(
         _isReorderMode.value = !_isReorderMode.value
     }
 
-    fun moveGroup(category: AccountTypeCategory, direction: Int) {
+    fun moveGroup(fromIndex: Int, toIndex: Int) {
         val visibleCategories = uiState.value.accountGroups.map { it.category }.toMutableList()
-        val idx = visibleCategories.indexOf(category)
-        val targetIdx = idx + direction
-        if (idx !in visibleCategories.indices || targetIdx !in visibleCategories.indices) return
-        val swapped = visibleCategories[idx]
-        visibleCategories[idx] = visibleCategories[targetIdx]
-        visibleCategories[targetIdx] = swapped
+        if (fromIndex !in visibleCategories.indices || toIndex !in visibleCategories.indices || fromIndex == toIndex) return
+        val moved = visibleCategories.removeAt(fromIndex)
+        visibleCategories.add(toIndex, moved)
         val remaining = _groupOrder.value.filter { it !in visibleCategories }
         _groupOrder.value = visibleCategories + remaining
+    }
+
+    fun moveAccountInGroup(category: AccountTypeCategory, fromIndex: Int, toIndex: Int) {
+        val group = uiState.value.accountGroups.find { it.category == category } ?: return
+        val list = group.accounts.toMutableList()
+        if (fromIndex !in list.indices || toIndex !in list.indices || fromIndex == toIndex) return
+        val moved = list.removeAt(fromIndex)
+        list.add(toIndex, moved)
+        val newOverrides = _accountSortOverrides.value.toMutableMap()
+        list.forEachIndexed { idx, acct -> newOverrides[acct.id] = idx }
+        _accountSortOverrides.value = newOverrides
+        viewModelScope.launch {
+            list.forEachIndexed { idx, acct ->
+                if (acct.sortOrder != idx) {
+                    repository.saveAccount(acct.copy(sortOrder = idx))
+                }
+            }
+        }
     }
 
     fun toggleArchiveAccount(account: Account) {

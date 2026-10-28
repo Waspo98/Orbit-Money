@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
@@ -183,6 +184,11 @@ fun UpcomingScreen(
                                     }
                                 }
                             }
+
+                            CanopySettingsButton(
+                                buttonSize = barHeight,
+                                onClick = { onNavigate(OrbitNavKey.Settings) }
+                            )
                         }
                     )
 

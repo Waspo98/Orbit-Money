@@ -22,6 +22,7 @@ data class CategoriesUiState(
     val editingCategory: Category? = null,
     val showEditorDialog: Boolean = false,
     val deleteConfirmCategoryId: Long? = null,
+    val isReorderMode: Boolean = false,
     val isLoading: Boolean = false,
     val totalCategoriesCount: Int = 0
 ) {

@@ -192,22 +192,6 @@ class DashboardViewModel(
         }
     }
 
-    fun moveCardUp(cardType: DashboardCardType) {
-        val currentWidgets = normalizedWidgets()
-        val index = currentWidgets.indexOfFirst { DashboardCardType.fromWidgetId(it.widgetId) == cardType }
-        if (index > 0) {
-            moveCard(index, index - 1)
-        }
-    }
-
-    fun moveCardDown(cardType: DashboardCardType) {
-        val currentWidgets = normalizedWidgets()
-        val index = currentWidgets.indexOfFirst { DashboardCardType.fromWidgetId(it.widgetId) == cardType }
-        if (index >= 0 && index < currentWidgets.lastIndex) {
-            moveCard(index, index + 1)
-        }
-    }
-
     fun resetCardsToDefault() {
         viewModelScope.launch {
             val updated = repository.preferences.value.copy(
@@ -457,8 +441,6 @@ class DashboardViewModel(
             is DashboardAction.ToggleCardVisibility -> toggleCardVisibility(action.cardType)
             is DashboardAction.SetCardWideSpan -> setCardWideSpan(action.cardType, action.wideSpan)
             is DashboardAction.MoveCard -> moveCard(action.fromIndex, action.toIndex)
-            is DashboardAction.MoveCardUp -> moveCardUp(action.cardType)
-            is DashboardAction.MoveCardDown -> moveCardDown(action.cardType)
             DashboardAction.ResetCardsToDefault -> resetCardsToDefault()
             is DashboardAction.MarkBillPaid -> markUpcomingPaid(action.upcomingItemId, action.dueDateIso)
             is DashboardAction.HideBiggestTransaction -> hideBiggestTransaction(action.transactionId)

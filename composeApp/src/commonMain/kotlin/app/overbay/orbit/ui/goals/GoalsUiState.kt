@@ -15,6 +15,7 @@ data class GoalsUiState(
     val showEditorSheet: Boolean = false,
     val allocatingGoal: Goal? = null,
     val showAllocationDialog: Boolean = false,
+    val isReorderMode: Boolean = false,
     val isLoading: Boolean = false
 ) {
     val activeGoals get() = goals.filter { !it.isCompleted }

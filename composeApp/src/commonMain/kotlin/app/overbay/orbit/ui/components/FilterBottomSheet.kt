@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.ui.transactions.TransactionSortOption
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 data class TransactionFilterDraft(
@@ -39,7 +40,7 @@ data class TransactionFilterDraft(
 )
 
 /**
- * Draft-state bottom sheet for transaction filtering.
+ * Draft-state bottom sheet for transaction filtering and sorting.
  * Edits remain local until 'Apply Filters' is tapped.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,11 +50,14 @@ fun FilterBottomSheet(
     onApply: (TransactionFilterDraft) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    initialSort: TransactionSortOption = TransactionSortOption.DATE_DESC,
+    onApplySort: (TransactionSortOption) -> Unit = {},
     accountNames: Map<Long, String> = emptyMap(),
     categoryNames: Map<Long, String> = emptyMap()
 ) {
     val haptics = LocalOrbitHaptics.current
     var draft by remember(initialFilter) { mutableStateOf(initialFilter) }
+    var sortDraft by remember(initialSort) { mutableStateOf(initialSort) }
 
     OrbitModalSheet(
         onDismissRequest = onDismiss,
@@ -66,12 +70,41 @@ fun FilterBottomSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "Filter Transactions",
+                text = "Filter & Sort Transactions",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
+
+            // 0. Sort By
+            Text(
+                text = "SORT BY",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TransactionSortOption.entries.forEach { option ->
+                    val selected = sortDraft == option
+                    FilterChip(
+                        selected = selected,
+                        onClick = {
+                            haptics.tick()
+                            sortDraft = option
+                        },
+                        label = { Text(option.label) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             // 1. Transaction Type
             Text(
@@ -226,6 +259,7 @@ fun FilterBottomSheet(
                     onClick = {
                         haptics.tick()
                         draft = TransactionFilterDraft()
+                        sortDraft = TransactionSortOption.DATE_DESC
                     },
                     modifier = Modifier.weight(1f)
                 ) {
@@ -236,6 +270,7 @@ fun FilterBottomSheet(
                     onClick = {
                         haptics.confirm()
                         onApply(draft)
+                        onApplySort(sortDraft)
                         onDismiss()
                     },
                     modifier = Modifier.weight(1f)

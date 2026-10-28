@@ -188,6 +188,7 @@ class TransactionsViewModel(
         _searchQuery.value = ""
         _quickFilter.value = QuickFilter.ALL
         _filterDraft.value = TransactionFilterDraft()
+        _sortOption.value = TransactionSortOption.DATE_DESC
     }
 
     fun applyDeepLink(

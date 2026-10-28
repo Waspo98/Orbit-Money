@@ -357,8 +357,6 @@ sealed interface DashboardAction {
     data class ToggleCardVisibility(val cardType: DashboardCardType) : DashboardAction
     data class SetCardWideSpan(val cardType: DashboardCardType, val wideSpan: Int) : DashboardAction
     data class MoveCard(val fromIndex: Int, val toIndex: Int) : DashboardAction
-    data class MoveCardUp(val cardType: DashboardCardType) : DashboardAction
-    data class MoveCardDown(val cardType: DashboardCardType) : DashboardAction
     data object ResetCardsToDefault : DashboardAction
     data class MarkBillPaid(val upcomingItemId: Long, val dueDateIso: String) : DashboardAction
     data class HideBiggestTransaction(val transactionId: Long) : DashboardAction

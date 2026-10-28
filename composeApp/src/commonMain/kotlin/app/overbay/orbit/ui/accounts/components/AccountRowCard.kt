@@ -64,6 +64,7 @@ fun AccountRowCard(
     onToggleArchive: () -> Unit,
     onDelete: () -> Unit,
     isInspected: Boolean = false,
+    dragHandle: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -95,6 +96,11 @@ fun AccountRowCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
+        if (dragHandle != null) {
+            dragHandle()
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+
         // Left Column: Name, Institution, and Badges
         Column(modifier = Modifier.weight(1f)) {
             Text(

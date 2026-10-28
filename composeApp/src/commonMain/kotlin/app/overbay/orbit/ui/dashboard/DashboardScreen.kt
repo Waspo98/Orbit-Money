@@ -31,26 +31,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.rememberHeroScrollState
-import app.overbay.orbit.ui.dashboard.cards.AccountsOverviewCard
-import app.overbay.orbit.ui.dashboard.cards.BiggestTransactionsCard
-import app.overbay.orbit.ui.dashboard.cards.BudgetPulseCard
-import app.overbay.orbit.ui.dashboard.cards.CategorizeRecentCard
-import app.overbay.orbit.ui.dashboard.cards.GoalFocusCard
-import app.overbay.orbit.ui.dashboard.cards.GoalsProgressCard
-import app.overbay.orbit.ui.dashboard.cards.MhaSummaryCard
-import app.overbay.orbit.ui.dashboard.cards.MonthComparisonCard
-import app.overbay.orbit.ui.dashboard.cards.MortgageSnapshotCard
-import app.overbay.orbit.ui.dashboard.cards.NetCashflowHeroCard
-import app.overbay.orbit.ui.dashboard.cards.RecentTransactionsCard
-import app.overbay.orbit.ui.dashboard.cards.RetirementSnapshotCard
-import app.overbay.orbit.ui.dashboard.cards.SubscriptionsCard
-import app.overbay.orbit.ui.dashboard.cards.TopSpendingCard
-import app.overbay.orbit.ui.dashboard.cards.UncategorizedCard
-import app.overbay.orbit.ui.dashboard.cards.UpcomingBillsCard
+import app.overbay.orbit.ui.dashboard.cards.*
 import app.overbay.orbit.ui.dashboard.dialogs.DashboardCustomizeSheet
 import app.overbay.orbit.ui.dashboard.dialogs.TransactionReviewSheet
 import app.overbay.orbit.util.LocalDevicePosture
@@ -135,6 +121,11 @@ fun DashboardScreen(
                         onClick = { onAction(DashboardAction.OpenCustomizeSheet) },
                         buttonSize = barHeight,
                         isActive = uiState.customization.isCustomizing
+                    )
+
+                    CanopySettingsButton(
+                        buttonSize = barHeight,
+                        onClick = { onNavigate(OrbitNavKey.Settings) }
                     )
                 }
             )

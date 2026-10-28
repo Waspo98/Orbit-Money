@@ -24,6 +24,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.ui.components.CanopySegmentedBar
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.rememberHeroScrollState
@@ -89,7 +90,7 @@ fun SpendingTrendsScreen(
                     canNavigateBack = true,
                     onBack = onBack,
                     scrollState = heroScrollState,
-                    canopyBar = { _, isCompact, _ ->
+                    canopyBar = { _, isCompact, barHeight ->
                         CanopySegmentedBar(
                             items = TrendsPeriod.entries,
                             selectedItem = state.selectedPeriod,
@@ -99,6 +100,11 @@ fun SpendingTrendsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
+                        )
+
+                        CanopySettingsButton(
+                            buttonSize = barHeight,
+                            onClick = { onNavigate(OrbitNavKey.Settings) }
                         )
                     }
                 )

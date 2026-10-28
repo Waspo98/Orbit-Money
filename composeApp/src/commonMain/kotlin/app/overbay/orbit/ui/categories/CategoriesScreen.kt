@@ -26,14 +26,19 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.ui.categories.components.CategoryDetailInspectorPane
 import app.overbay.orbit.ui.categories.components.CategoryGroupCard
 import app.overbay.orbit.ui.categories.dialogs.CategoryEditorDialog
-import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopyMenuAction
+import app.overbay.orbit.ui.components.CanopyMoreMenuButton
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
+import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
+import app.overbay.orbit.ui.components.dragReorderItem
+import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalDevicePosture
@@ -101,11 +106,25 @@ fun CategoriesScreen(
                                     .fillMaxHeight()
                             )
 
-                            CanopyIconButton(
-                                icon = Icons.Default.Add,
-                                contentDescription = "Add Category",
-                                onClick = { viewModel.openAddCategory() },
-                                buttonSize = barHeight
+                            CanopyMoreMenuButton(
+                                buttonSize = barHeight,
+                                contentDescription = "Category Options",
+                                actions = listOf(
+                                    CanopyMenuAction(
+                                        label = "Reorder Categories",
+                                        isChecked = state.isReorderMode,
+                                        onClick = { viewModel.toggleReorderMode() }
+                                    ),
+                                    CanopyMenuAction(
+                                        label = "Add Category",
+                                        onClick = { viewModel.openAddCategory() }
+                                    )
+                                )
+                            )
+
+                            CanopySettingsButton(
+                                buttonSize = barHeight,
+                                onClick = { onNavigate(OrbitNavKey.Settings) }
                             )
                         }
                     )
@@ -131,6 +150,12 @@ fun CategoriesScreen(
                                     )
                                 }
                             } else {
+                                val groupReorderState = rememberDragReorderState(
+                                    items = state.groups,
+                                    keySelector = { it.title },
+                                    onMove = { from, to -> viewModel.moveCategoryGroup(from, to) },
+                                    itemSpacingDp = 16.dp
+                                )
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
                                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
@@ -149,7 +174,16 @@ fun CategoriesScreen(
                                                 null
                                             },
                                             onEditCategory = { cat -> viewModel.openEditCategory(cat) },
-                                            onDeleteCategory = { id -> viewModel.requestDeleteCategory(id) }
+                                            onDeleteCategory = { id -> viewModel.requestDeleteCategory(id) },
+                                            isReorderMode = state.isReorderMode,
+                                            groupDragHandle = if (state.isReorderMode) {
+                                                { OrbitDragHandle(state = groupReorderState, key = group.title) }
+                                            } else null,
+                                            onMoveCategory = { from, to -> viewModel.moveCategoryInGroup(group.title, from, to) },
+                                            modifier = Modifier.dragReorderItem(
+                                                state = if (state.isReorderMode) groupReorderState else null,
+                                                key = group.title
+                                            )
                                         )
                                     }
                                 }

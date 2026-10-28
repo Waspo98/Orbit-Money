@@ -30,14 +30,19 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.accounts.components.AccountDetailInspectorPane
 import app.overbay.orbit.ui.accounts.components.AccountGroupSection
 import app.overbay.orbit.ui.accounts.sheets.AccountMergeDialog
-import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopyMenuAction
+import app.overbay.orbit.ui.components.CanopyMoreMenuButton
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
+import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
+import app.overbay.orbit.ui.components.dragReorderItem
+import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.util.LocalDevicePosture
 
@@ -114,20 +119,26 @@ fun AccountsScreen(
                                 .fillMaxHeight()
                         )
 
-                        CanopyIconButton(
-                            icon = OrbitIcons.Filter,
-                            contentDescription = "Show Archived Accounts",
-                            onClick = { viewModel.toggleShowArchived() },
+                        CanopyMoreMenuButton(
                             buttonSize = barHeight,
-                            isActive = state.showArchived
+                            contentDescription = "Account Options",
+                            actions = listOf(
+                                CanopyMenuAction(
+                                    label = "Show Archived",
+                                    isChecked = state.showArchived,
+                                    onClick = { viewModel.toggleShowArchived() }
+                                ),
+                                CanopyMenuAction(
+                                    label = "Reorder Accounts",
+                                    isChecked = state.isReorderMode,
+                                    onClick = { viewModel.toggleReorderMode() }
+                                )
+                            )
                         )
 
-                        CanopyIconButton(
-                            icon = OrbitIcons.Sort,
-                            contentDescription = "Reorder Account Groups",
-                            onClick = { viewModel.toggleReorderMode() },
+                        CanopySettingsButton(
                             buttonSize = barHeight,
-                            isActive = state.isReorderMode
+                            onClick = { onNavigate(OrbitNavKey.Settings) }
                         )
                     }
                 )
@@ -221,6 +232,12 @@ private fun AccountsMasterContent(
 
         val startPad = if (isWideScreen) 20.dp else 16.dp
         val endPad = if (isWideScreen) 0.dp else 16.dp
+        val groupReorderState = rememberDragReorderState(
+            items = state.accountGroups,
+            keySelector = { it.category },
+            onMove = { from, to -> viewModel.moveGroup(from, to) },
+            itemSpacingDp = 14.dp
+        )
 
         // Account Groups List
         LazyColumn(
@@ -228,7 +245,7 @@ private fun AccountsMasterContent(
             contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            itemsIndexed(state.accountGroups, key = { _, it -> it.category.name }) { index, group ->
+            itemsIndexed(state.accountGroups, key = { _, it -> it.category.name }) { _, group ->
                 AccountGroupSection(
                     group = group,
                     selectedAccountId = state.selectedAccountId,
@@ -243,10 +260,14 @@ private fun AccountsMasterContent(
                     onToggleArchive = { viewModel.toggleArchiveAccount(it) },
                     onDeleteAccount = { viewModel.requestDeleteAccount(it.id) },
                     isReorderMode = state.isReorderMode,
-                    canMoveUp = index > 0,
-                    canMoveDown = index < state.accountGroups.lastIndex,
-                    onMoveUp = { viewModel.moveGroup(group.category, -1) },
-                    onMoveDown = { viewModel.moveGroup(group.category, 1) }
+                    groupDragHandle = if (state.isReorderMode) {
+                        { OrbitDragHandle(state = groupReorderState, key = group.category) }
+                    } else null,
+                    onMoveAccount = { from, to -> viewModel.moveAccountInGroup(group.category, from, to) },
+                    modifier = Modifier.dragReorderItem(
+                        state = if (state.isReorderMode) groupReorderState else null,
+                        key = group.category
+                    )
                 )
             }
         }

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.transactions.QuickFilter
 import app.overbay.orbit.ui.transactions.TransactionSortOption
@@ -35,8 +36,11 @@ fun rememberActiveFilterChips(
     state: TransactionsUiState,
     viewModel: TransactionsViewModel
 ): List<Pair<String, () -> Unit>> {
-    return remember(state.quickFilter, state.filterDraft, state.accountMap, state.categoryMap) {
+    return remember(state.quickFilter, state.filterDraft, state.sortOption, state.accountMap, state.categoryMap) {
         buildList {
+            if (state.sortOption != TransactionSortOption.DATE_DESC) {
+                add("Sort: ${state.sortOption.label}" to { viewModel.setSortOption(TransactionSortOption.DATE_DESC) })
+            }
             if (state.quickFilter != QuickFilter.ALL) {
                 add("Quick: ${state.quickFilter.label}" to { viewModel.setQuickFilter(QuickFilter.ALL) })
             }
@@ -71,134 +75,37 @@ fun rememberActiveFilterChips(
 }
 
 /**
- * Flanking circular Filter and Sort icon buttons positioned immediately to the right
+ * Flanking circular Filter & Settings icon buttons positioned immediately to the right
  * of the TransactionsSearchBar. Shrinks in lockstep with the search bar on scroll.
  */
 @Composable
 fun TransactionsSearchTrailingControls(
-    state: TransactionsUiState,
     activeFilterCount: Int,
     onOpenFilter: () -> Unit,
-    onSelectSort: (TransactionSortOption) -> Unit,
+    onOpenSettings: () -> Unit,
     buttonSize: Dp,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
-    var sortMenuExpanded by remember { mutableStateOf(false) }
     val hasActiveFilter = activeFilterCount > 0
-    val hasCustomSort = state.sortOption != TransactionSortOption.DATE_DESC
-    val iconSize = if (buttonSize < 42.dp) 18.dp else 20.dp
 
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Circular Filter Button with active badge
-        Surface(
-            onClick = { haptics.tick(); onOpenFilter() },
-            shape = CircleShape,
-            color = if (hasActiveFilter) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-            border = BorderStroke(
-                width = 1.dp,
-                color = if (hasActiveFilter) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                } else {
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                }
-            ),
-            modifier = Modifier.size(buttonSize)
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                BadgedBox(
-                    badge = {
-                        if (hasActiveFilter) {
-                            Badge(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ) {
-                                Text(activeFilterCount.toString())
-                            }
-                        }
-                    }
-                ) {
-                    Icon(
-                        imageVector = OrbitIcons.Filter,
-                        contentDescription = "Filter transactions",
-                        tint = if (hasActiveFilter) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.size(iconSize)
-                    )
-                }
-            }
-        }
+        CanopyIconButton(
+            icon = OrbitIcons.Filter,
+            contentDescription = "Filter & Sort Transactions",
+            onClick = onOpenFilter,
+            buttonSize = buttonSize,
+            isActive = hasActiveFilter,
+            badgeCount = activeFilterCount
+        )
 
-        // Circular Sort Button with DropdownMenu
-        Box {
-            Surface(
-                onClick = { haptics.tick(); sortMenuExpanded = true },
-                shape = CircleShape,
-                color = if (hasCustomSort) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = if (hasCustomSort) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                    } else {
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                    }
-                ),
-                modifier = Modifier.size(buttonSize)
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        imageVector = OrbitIcons.Sort,
-                        contentDescription = "Sort transactions",
-                        tint = if (hasCustomSort) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.size(iconSize)
-                    )
-                }
-            }
-
-            DropdownMenu(
-                expanded = sortMenuExpanded,
-                onDismissRequest = { sortMenuExpanded = false }
-            ) {
-                TransactionSortOption.entries.forEach { option ->
-                    val selected = state.sortOption == option
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = option.label,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        },
-                        trailingIcon = if (selected) {
-                            {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        } else null,
-                        onClick = {
-                            haptics.tick()
-                            onSelectSort(option)
-                            sortMenuExpanded = false
-                        }
-                    )
-                }
-            }
-        }
+        CanopySettingsButton(
+            buttonSize = buttonSize,
+            onClick = onOpenSettings
+        )
     }
 }
 

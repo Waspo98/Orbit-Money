@@ -42,6 +42,7 @@ fun GoalProgressCard(
     onClick: () -> Unit,
     onDepositClick: () -> Unit,
     isInspected: Boolean = false,
+    dragHandle: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -74,6 +75,11 @@ fun GoalProgressCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                if (dragHandle != null) {
+                    dragHandle()
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
                         text = goal.labelWithEmoji,

@@ -18,18 +18,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -47,12 +46,15 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.accounts.AccountGroupDisplay
 import app.overbay.orbit.ui.accounts.AccountTypeCategory
+import app.overbay.orbit.ui.components.OrbitDragHandle
+import app.overbay.orbit.ui.components.dragReorderItem
+import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
  * Editorial white accordion group section card matching Screenshot 3.
  * Collapsed by default with 20dp corners, 1dp cardBorder, tracked uppercase header,
- * bold colored balance, and circular 30dp bordered chevron button.
+ * bold colored balance, circular 30dp bordered chevron button, and left-side drag handle.
  * Strictly under the 400-line ceiling.
  */
 @Composable
@@ -68,10 +70,8 @@ fun AccountGroupSection(
     onToggleArchive: (Account) -> Unit,
     onDeleteAccount: (Account) -> Unit,
     isReorderMode: Boolean = false,
-    canMoveUp: Boolean = false,
-    canMoveDown: Boolean = false,
-    onMoveUp: () -> Unit = {},
-    onMoveDown: () -> Unit = {},
+    groupDragHandle: (@Composable () -> Unit)? = null,
+    onMoveAccount: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -112,6 +112,11 @@ fun AccountGroupSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                if (groupDragHandle != null) {
+                    groupDragHandle()
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
                 // Left Column: Tracked uppercase title + account count
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -150,48 +155,21 @@ fun AccountGroupSection(
 
                     Spacer(modifier = Modifier.width(10.dp))
 
-                    if (isReorderMode) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { haptics.tick(); onMoveUp() },
-                                enabled = canMoveUp,
-                                modifier = Modifier.size(30.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowUp,
-                                    contentDescription = "Move Group Up",
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            IconButton(
-                                onClick = { haptics.tick(); onMoveDown() },
-                                enabled = canMoveDown,
-                                modifier = Modifier.size(30.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Move Group Down",
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    } else {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                            modifier = Modifier.size(30.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = if (expanded) "Collapse" else "Expand",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .rotate(chevronRotation)
-                                )
-                            }
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (expanded) "Collapse" else "Expand",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .rotate(chevronRotation)
+                            )
                         }
                     }
                 }
@@ -199,26 +177,41 @@ fun AccountGroupSection(
 
             // Expanded Account Rows inside the same card
             AnimatedVisibility(visible = expanded) {
+                val accountReorderState = rememberDragReorderState(
+                    items = group.accounts,
+                    keySelector = { it.id },
+                    onMove = onMoveAccount,
+                    itemSpacingDp = 1.dp
+                )
                 Column(modifier = Modifier.fillMaxWidth()) {
                     group.accounts.forEach { account ->
-                        HorizontalDivider(
-                            thickness = 1.dp,
-                            color = OrbitTheme.colors.cardBorder
-                        )
-                        AccountRowCard(
-                            account = account,
-                            isInspected = selectedAccountId == account.id,
-                            onInspect = { onInspectAccount(account) },
-                            onSeeTransactions = { onSeeTransactions(account) },
-                            onEdit = { onEditAccount(account) },
-                            onPerks = if (account.type == AccountType.CREDIT) {
-                                { onPerksClick(account) }
-                            } else null,
-                            onHistory = { onHistoryClick(account) },
-                            onMerge = { onMergeClick(account) },
-                            onToggleArchive = { onToggleArchive(account) },
-                            onDelete = { onDeleteAccount(account) }
-                        )
+                        key(account.id) {
+                            HorizontalDivider(
+                                thickness = 1.dp,
+                                color = OrbitTheme.colors.cardBorder
+                            )
+                            AccountRowCard(
+                                account = account,
+                                isInspected = selectedAccountId == account.id,
+                                onInspect = { onInspectAccount(account) },
+                                onSeeTransactions = { onSeeTransactions(account) },
+                                onEdit = { onEditAccount(account) },
+                                onPerks = if (account.type == AccountType.CREDIT) {
+                                    { onPerksClick(account) }
+                                } else null,
+                                onHistory = { onHistoryClick(account) },
+                                onMerge = { onMergeClick(account) },
+                                onToggleArchive = { onToggleArchive(account) },
+                                onDelete = { onDeleteAccount(account) },
+                                dragHandle = if (isReorderMode) {
+                                    { OrbitDragHandle(state = accountReorderState, key = account.id) }
+                                } else null,
+                                modifier = Modifier.dragReorderItem(
+                                    state = if (isReorderMode) accountReorderState else null,
+                                    key = account.id
+                                )
+                            )
+                        }
                     }
                 }
             }

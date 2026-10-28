@@ -36,13 +36,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopyMenuAction
+import app.overbay.orbit.ui.components.CanopyMoreMenuButton
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
+import app.overbay.orbit.ui.components.dragReorderItem
+import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import kotlin.math.roundToInt
 import app.overbay.orbit.ui.goals.components.GoalDetailInspectorPane
@@ -128,11 +133,25 @@ fun GoalsScreen(
                                     .fillMaxHeight()
                             )
 
-                            CanopyIconButton(
-                                icon = Icons.Default.Add,
-                                contentDescription = "New Goal",
-                                onClick = { viewModel.openAddGoal() },
-                                buttonSize = barHeight
+                            CanopyMoreMenuButton(
+                                buttonSize = barHeight,
+                                contentDescription = "Goal Options",
+                                actions = listOf(
+                                    CanopyMenuAction(
+                                        label = "Reorder Goals",
+                                        isChecked = state.isReorderMode,
+                                        onClick = { viewModel.toggleReorderMode() }
+                                    ),
+                                    CanopyMenuAction(
+                                        label = "New Goal",
+                                        onClick = { viewModel.openAddGoal() }
+                                    )
+                                )
+                            )
+
+                            CanopySettingsButton(
+                                buttonSize = barHeight,
+                                onClick = { onNavigate(OrbitNavKey.Settings) }
                             )
                         }
                     )
@@ -141,6 +160,18 @@ fun GoalsScreen(
                     val endPad = if (isTwoPane) 0.dp else 16.dp
 
                     val masterList: @Composable () -> Unit = {
+                        val activeReorderState = rememberDragReorderState(
+                            items = state.activeGoals,
+                            keySelector = { it.id },
+                            onMove = { from, to -> viewModel.moveGoal(completedGroup = false, fromIndex = from, toIndex = to) },
+                            itemSpacingDp = 16.dp
+                        )
+                        val completedReorderState = rememberDragReorderState(
+                            items = state.completedGoals,
+                            keySelector = { it.id },
+                            onMove = { from, to -> viewModel.moveGoal(completedGroup = true, fromIndex = from, toIndex = to) },
+                            itemSpacingDp = 16.dp
+                        )
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
@@ -238,7 +269,14 @@ fun GoalsScreen(
                                                 viewModel.openEditGoal(goal)
                                             }
                                         },
-                                        onDepositClick = { viewModel.openAllocationDialog(goal) }
+                                        onDepositClick = { viewModel.openAllocationDialog(goal) },
+                                        dragHandle = if (state.isReorderMode) {
+                                            { OrbitDragHandle(state = activeReorderState, key = goal.id) }
+                                        } else null,
+                                        modifier = Modifier.dragReorderItem(
+                                            state = if (state.isReorderMode) activeReorderState else null,
+                                            key = goal.id
+                                        )
                                     )
                                 }
                             }
@@ -268,7 +306,14 @@ fun GoalsScreen(
                                                 viewModel.openEditGoal(goal)
                                             }
                                         },
-                                        onDepositClick = {}
+                                        onDepositClick = {},
+                                        dragHandle = if (state.isReorderMode) {
+                                            { OrbitDragHandle(state = completedReorderState, key = goal.id) }
+                                        } else null,
+                                        modifier = Modifier.dragReorderItem(
+                                            state = if (state.isReorderMode) completedReorderState else null,
+                                            key = goal.id
+                                        )
                                     )
                                 }
                             }
