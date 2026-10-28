@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
@@ -30,9 +33,13 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.data.model.StorageMode
+import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitAlertDialog
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.settings.blocks.GoogleDriveBackupBlock
@@ -71,7 +78,30 @@ fun SettingsScreen(
                 subtitle = "Preferences, sync connections, backups, and appearance.",
                 canNavigateBack = true,
                 onBack = onBack,
-                scrollState = heroScrollState
+                scrollState = heroScrollState,
+                canopyBar = { _, isCompact, barHeight ->
+                    val isLocal = uiState.preferences.storageMode == StorageMode.LOCAL
+                    val modeLabel = if (isLocal) "Local Offline Mode · Ready" else "Self-Hosted Server · Active"
+                    val shortMode = if (isLocal) "Local Mode" else "Server Sync"
+                    CanopySurfacePill(
+                        expandedText = if (uiState.isSyncing) "Syncing workspace..." else modeLabel,
+                        compactText = if (uiState.isSyncing) "Syncing..." else shortMode,
+                        isCompact = isCompact,
+                        leadingIcon = OrbitIcons.Settings,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    )
+
+                    CanopyIconButton(
+                        icon = Icons.Default.Refresh,
+                        contentDescription = "Sync Now",
+                        onClick = { viewModel.triggerSync() },
+                        buttonSize = barHeight,
+                        isActive = uiState.isSyncing,
+                        enabled = !uiState.isSyncing
+                    )
+                }
             )
 
             LazyColumn(
@@ -282,13 +312,9 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     TextButton(
                         onClick = {
-                            fileHelper.pickAndImportFile("application/json") { content ->
-                                viewModel.setRestoreJsonText(content)
-                            }
+                            fileHelper.pickAndImportFile("application/json") { viewModel.setRestoreJsonText(it) }
                         }
-                    ) {
-                        Text("Choose .orbit.json File")
-                    }
+                    ) { Text("Choose .orbit.json File") }
                     Spacer(modifier = Modifier.height(4.dp))
                     OutlinedTextField(
                         value = uiState.restoreJsonText,
@@ -302,19 +328,14 @@ fun SettingsScreen(
                 Button(
                     onClick = { viewModel.restoreBackup(uiState.restoreJsonText) },
                     enabled = uiState.restoreJsonText.isNotBlank()
-                ) {
-                    Text("Restore")
-                }
+                ) { Text("Restore") }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::closeRestoreDialog) {
-                    Text("Cancel")
-                }
+                TextButton(onClick = viewModel::closeRestoreDialog) { Text("Cancel") }
             }
         )
     }
 
-    // Reset Confirmation Dialog
     if (uiState.showResetConfirmation) {
         OrbitConfirmationDialog(
             title = "Reset Workspace?",
@@ -337,10 +358,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun AboutSupportBlock(
-    onDonateClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+private fun AboutSupportBlock(onDonateClick: () -> Unit, modifier: Modifier = Modifier) {
     OrbitSectionCard(
         title = "About & Support",
         subtitle = "Orbit Money — Open source, private household finance",
@@ -364,10 +382,7 @@ private fun AboutSupportBlock(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            FilledTonalButton(
-                onClick = onDonateClick,
-                shape = RoundedCornerShape(12.dp)
-            ) {
+            FilledTonalButton(onClick = onDonateClick, shape = RoundedCornerShape(12.dp)) {
                 Text("☕ Donate")
             }
         }

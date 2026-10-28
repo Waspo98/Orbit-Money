@@ -29,8 +29,11 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
-import app.overbay.orbit.ui.components.OrbitSecondaryPillButton
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.dashboard.cards.AccountsOverviewCard
 import app.overbay.orbit.ui.dashboard.cards.BiggestTransactionsCard
@@ -96,12 +99,44 @@ fun DashboardScreen(
                 .fillMaxSize()
                 .nestedScroll(heroScrollState.nestedScrollConnection)
         ) {
-            // Edge-to-edge curved green canopy hero — no month selector in Dashboard header
+            // Edge-to-edge curved green canopy hero with 2-axis morphing summary & controls bar
             MorphingPageHero(
                 kicker = "FINANCIAL ORBIT",
                 title = "Dashboard",
                 subtitle = "${uiState.dateLabel} · ${uiState.greeting}",
-                scrollState = heroScrollState
+                scrollState = heroScrollState,
+                canopyBar = { _, isCompact, barHeight ->
+                    val monthName = uiState.cashflow.monthLabel.ifBlank { "This Month" }
+                    val netFormatted = MoneyUtils.formatCents(uiState.cashflow.netCents, showCents = false, signed = true)
+                    CanopySurfacePill(
+                        expandedText = "$monthName · Net $netFormatted",
+                        compactText = "Net $netFormatted",
+                        isCompact = isCompact,
+                        leadingIcon = OrbitIcons.SpendingTrends,
+                        onClick = { onNavigate(OrbitNavKey.SpendingTrends) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    )
+
+                    if (uiState.uncategorized.count > 0) {
+                        CanopyIconButton(
+                            icon = OrbitIcons.Categories,
+                            contentDescription = "Categorize Recent Transactions",
+                            onClick = { onAction(DashboardAction.OpenCategorizeReview) },
+                            buttonSize = barHeight,
+                            badgeCount = uiState.uncategorized.count
+                        )
+                    }
+
+                    CanopyIconButton(
+                        icon = OrbitIcons.ViewSliders,
+                        contentDescription = "Customize Dashboard",
+                        onClick = { onAction(DashboardAction.OpenCustomizeSheet) },
+                        buttonSize = barHeight,
+                        isActive = uiState.customization.isCustomizing
+                    )
+                }
             )
 
             if (uiState.isLoading) {
@@ -203,19 +238,6 @@ fun DashboardScreen(
                                     Spacer(modifier = Modifier.height(14.dp))
                                 }
                             }
-                        }
-
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        // Centered Customize Dashboard Button
-                        Box(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            OrbitSecondaryPillButton(
-                                text = "Customize Dashboard",
-                                onClick = { onAction(DashboardAction.OpenCustomizeSheet) }
-                            )
                         }
 
                         Spacer(modifier = Modifier.height(bottomContentPadding))

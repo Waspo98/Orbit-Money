@@ -58,30 +58,6 @@ fun UpcomingTimelineList(
     val haptics = LocalOrbitHaptics.current
 
     Column(modifier = modifier.fillMaxWidth()) {
-        // Filter Chips Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            FilterChip(
-                selected = filterOption == UpcomingFilterOption.ALL,
-                onClick = { onFilterChanged(UpcomingFilterOption.ALL) },
-                label = { Text("All Recurring") }
-            )
-            FilterChip(
-                selected = filterOption == UpcomingFilterOption.BILLS,
-                onClick = { onFilterChanged(UpcomingFilterOption.BILLS) },
-                label = { Text("Bills & Expenses") }
-            )
-            FilterChip(
-                selected = filterOption == UpcomingFilterOption.INCOME,
-                onClick = { onFilterChanged(UpcomingFilterOption.INCOME) },
-                label = { Text("Income") }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         if (items.isEmpty()) {
             EmptyStateCard(
                 title = "No Upcoming Items",

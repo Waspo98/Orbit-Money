@@ -85,41 +85,6 @@ fun BudgetCategoryGroupList(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Sort Option Filter Chips Bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SortFilterChip(
-                label = "Over Budget First",
-                selected = activeSort == CategorySortOption.OVER_BUDGET_FIRST,
-                onClick = { onSortSelected(CategorySortOption.OVER_BUDGET_FIRST) }
-            )
-
-            SortFilterChip(
-                label = "Least Room Left",
-                selected = activeSort == CategorySortOption.LEAST_ROOM_LEFT,
-                onClick = { onSortSelected(CategorySortOption.LEAST_ROOM_LEFT) }
-            )
-
-            SortFilterChip(
-                label = "Most Spent",
-                selected = activeSort == CategorySortOption.MOST_SPENT,
-                onClick = { onSortSelected(CategorySortOption.MOST_SPENT) }
-            )
-
-            SortFilterChip(
-                label = "Name A-Z",
-                selected = activeSort == CategorySortOption.NAME_A_TO_Z,
-                onClick = { onSortSelected(CategorySortOption.NAME_A_TO_Z) }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         // 1. Budgeted Section
         if (budgeted.isNotEmpty()) {
             val totalBudgeted = budgeted.sumOf { it.amountCents }
@@ -329,18 +294,5 @@ private fun SectionHeader(title: String, subtitle: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
-}
-
-@Composable
-private fun SortFilterChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label, style = MaterialTheme.typography.labelMedium) }
-    )
 }
 

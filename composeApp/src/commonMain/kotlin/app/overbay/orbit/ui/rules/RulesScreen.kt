@@ -1,43 +1,37 @@
 package app.overbay.orbit.ui.rules
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.ui.components.CanopyActionPillButton
+import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.rules.components.RuleDetailInspectorPane
@@ -97,35 +91,36 @@ fun RulesScreen(
                         canNavigateBack = true,
                         onBack = onBack,
                         scrollState = heroScrollState,
-                        actions = {
+                        canopyBar = { _, isCompact, barHeight ->
+                            CanopySurfacePill(
+                                expandedText = "${state.rules.size} Automated Rules",
+                                compactText = "${state.rules.size} Rules",
+                                isCompact = isCompact,
+                                leadingIcon = OrbitIcons.Rules,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                            )
+
                             if (state.rules.isNotEmpty()) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = Color.White.copy(alpha = 0.18f),
-                                    modifier = Modifier.clickable(
-                                        enabled = !state.isApplyingRules
-                                    ) { viewModel.runRulesNow() }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.PlayArrow,
-                                            contentDescription = "Run Rules",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = if (state.isApplyingRules) "Running..." else "Run Rules",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                    }
-                                }
+                                CanopyActionPillButton(
+                                    icon = Icons.Default.PlayArrow,
+                                    label = if (state.isApplyingRules) "Running..." else "Run Rules",
+                                    compactLabel = if (state.isApplyingRules) "Running" else "Run",
+                                    isCompact = isCompact,
+                                    isActive = state.isApplyingRules,
+                                    enabled = !state.isApplyingRules,
+                                    buttonSize = barHeight,
+                                    onClick = { viewModel.runRulesNow() }
+                                )
                             }
+
+                            CanopyIconButton(
+                                icon = Icons.Default.Add,
+                                contentDescription = "New Rule",
+                                onClick = { viewModel.openAddRule() },
+                                buttonSize = barHeight
+                            )
                         }
                     )
 

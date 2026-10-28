@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,14 +30,14 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.accounts.components.AccountDetailInspectorPane
 import app.overbay.orbit.ui.accounts.components.AccountGroupSection
 import app.overbay.orbit.ui.accounts.sheets.AccountMergeDialog
+import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
-import app.overbay.orbit.ui.components.OrbitPageActionRow
-import app.overbay.orbit.ui.components.OrbitSecondaryPillButton
-import app.overbay.orbit.ui.components.OrbitTogglePill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.util.LocalDevicePosture
 
@@ -99,7 +100,36 @@ fun AccountsScreen(
                     kicker = "YOUR MONEY'S HOME BASE",
                     title = "Accounts",
                     subtitle = "${MoneyUtils.formatCents(state.netWorthCents)} Net Worth across ${state.accounts.size} Accounts",
-                    scrollState = heroScrollState
+                    scrollState = heroScrollState,
+                    canopyBar = { _, isCompact, barHeight ->
+                        val nwFormatted = MoneyUtils.formatCents(state.netWorthCents, showCents = false)
+                        CanopySurfacePill(
+                            expandedText = "Net Worth · $nwFormatted",
+                            compactText = nwFormatted,
+                            isCompact = isCompact,
+                            leadingIcon = OrbitIcons.NetWorth,
+                            onClick = { onNavigate(OrbitNavKey.NetWorth) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+
+                        CanopyIconButton(
+                            icon = OrbitIcons.Filter,
+                            contentDescription = "Show Archived Accounts",
+                            onClick = { viewModel.toggleShowArchived() },
+                            buttonSize = barHeight,
+                            isActive = state.showArchived
+                        )
+
+                        CanopyIconButton(
+                            icon = OrbitIcons.Sort,
+                            contentDescription = "Reorder Account Groups",
+                            onClick = { viewModel.toggleReorderMode() },
+                            buttonSize = barHeight,
+                            isActive = state.isReorderMode
+                        )
+                    }
                 )
 
                 val masterList: @Composable () -> Unit = {
@@ -189,26 +219,13 @@ private fun AccountsMasterContent(
             return@Column
         }
 
-        // Secondary Action Row Below Hero
-        OrbitPageActionRow {
-            OrbitTogglePill(
-                label = "Show Archived",
-                checked = state.showArchived,
-                onCheckedChange = { viewModel.toggleShowArchived() }
-            )
-            OrbitSecondaryPillButton(
-                text = if (state.isReorderMode) "Done" else "Reorder Groups",
-                onClick = { viewModel.toggleReorderMode() }
-            )
-        }
-
         val startPad = if (isWideScreen) 20.dp else 16.dp
         val endPad = if (isWideScreen) 0.dp else 16.dp
 
         // Account Groups List
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = startPad, end = endPad, top = 4.dp, bottom = 88.dp),
+            contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             itemsIndexed(state.accountGroups, key = { _, it -> it.category.name }) { index, group ->

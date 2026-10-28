@@ -6,25 +6,41 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.data.model.CategorySortOption
 import app.overbay.orbit.ui.budgets.components.BudgetCategoryGroupList
 import app.overbay.orbit.ui.budgets.components.BudgetDetailInspectorPane
 import app.overbay.orbit.ui.budgets.components.BudgetSummaryHeroCard
 import app.overbay.orbit.ui.budgets.dialogs.BudgetAmountEditorSheet
+import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.PeriodNavigatorPill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
@@ -69,19 +85,79 @@ fun BudgetsScreen(
                     .padding(paddingValues)
                     .nestedScroll(heroScrollState.nestedScrollConnection)
             ) {
+                var sortMenuExpanded by remember { mutableStateOf(false) }
+
                 MorphingPageHero(
                     kicker = "BUDGET PLANNING",
                     title = "Budgets",
                     subtitle = "${state.monthLabel} · ${state.daysRemaining} days left",
                     scrollState = heroScrollState,
-                    expandedToolbar = {
+                    canopyBar = { _, isCompact, barHeight ->
+                        val shortMonth = if (state.monthLabel.length > 8) {
+                            state.monthLabel.take(3) + " " + state.selectedMonth.take(4)
+                        } else {
+                            state.monthLabel
+                        }
                         PeriodNavigatorPill(
                             label = state.monthLabel,
+                            compactLabel = shortMonth,
+                            isCompact = isCompact,
                             onPrevious = { viewModel.onPreviousMonth() },
                             onNext = { viewModel.onNextMonth() },
                             canGoNext = state.canGoNextMonth,
-                            onClickLabel = { viewModel.onResetToCurrentMonth() }
+                            onClickLabel = { viewModel.onResetToCurrentMonth() },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
                         )
+
+                        Box {
+                            CanopyIconButton(
+                                icon = OrbitIcons.Sort,
+                                contentDescription = "Sort Budgets",
+                                onClick = { sortMenuExpanded = true },
+                                buttonSize = barHeight,
+                                isActive = state.sortOption != CategorySortOption.OVER_BUDGET_FIRST
+                            )
+
+                            DropdownMenu(
+                                expanded = sortMenuExpanded,
+                                onDismissRequest = { sortMenuExpanded = false }
+                            ) {
+                                val sortOptions = listOf(
+                                    CategorySortOption.OVER_BUDGET_FIRST to "Over Budget First",
+                                    CategorySortOption.LEAST_ROOM_LEFT to "Least Room Left",
+                                    CategorySortOption.MOST_SPENT to "Most Spent",
+                                    CategorySortOption.NAME_A_TO_Z to "Name A-Z"
+                                )
+                                sortOptions.forEach { (option, label) ->
+                                    val selected = state.sortOption == option
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = label,
+                                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        },
+                                        trailingIcon = if (selected) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        } else null,
+                                        onClick = {
+                                            viewModel.setSortOption(option)
+                                            sortMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 )
 

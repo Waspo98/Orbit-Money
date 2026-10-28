@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
@@ -38,8 +40,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.StorageMode
+import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.rememberHeroScrollState
@@ -93,7 +99,26 @@ fun HouseholdScreen(
                     subtitle = "Manage household members, paychecks, benefits, and tax filing profile.",
                     canNavigateBack = true,
                     onBack = onBack,
-                    scrollState = heroScrollState
+                    scrollState = heroScrollState,
+                    canopyBar = { _, isCompact, barHeight ->
+                        val grossYearly = MoneyUtils.formatCents(uiState.totalHouseholdGrossIncomeCents, showCents = false)
+                        CanopySurfacePill(
+                            expandedText = "${uiState.members.size} Members · $grossYearly/yr Gross",
+                            compactText = "$grossYearly/yr",
+                            isCompact = isCompact,
+                            leadingIcon = OrbitIcons.Household,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+
+                        CanopyIconButton(
+                            icon = Icons.Default.Add,
+                            contentDescription = "New Member",
+                            onClick = { viewModel.openMemberEditor(null) },
+                            buttonSize = barHeight
+                        )
+                    }
                 )
 
                 OrbitMorphingSplitLayout(

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -17,10 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.housing.cards.AmortizationSummaryCard
 import app.overbay.orbit.ui.calculators.housing.cards.MonthlyPaymentBreakdownCard
 import app.overbay.orbit.ui.calculators.housing.cards.MortgageInputCard
+import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalDevicePosture
@@ -50,7 +54,20 @@ fun HousingCalculatorScreen(
                 subtitle = "Estimate selling proceeds, cash to close, and projected monthly payment.",
                 canNavigateBack = true,
                 onBack = onBack,
-                scrollState = heroScrollState
+                scrollState = heroScrollState,
+                canopyBar = { _, isCompact, _ ->
+                    val monthly = MoneyUtils.formatCents(uiState.buyingResult.totalMonthlyPaymentCents, showCents = false)
+                    val close = MoneyUtils.formatCents(uiState.buyingResult.cashToCloseCents, showCents = false)
+                    CanopySurfacePill(
+                        expandedText = "Est. $monthly/mo · $close Cash to Close",
+                        compactText = "$monthly/mo Est.",
+                        isCompact = isCompact,
+                        leadingIcon = OrbitIcons.HousingCalculator,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    )
+                }
             )
 
             if (isTwoPane) {

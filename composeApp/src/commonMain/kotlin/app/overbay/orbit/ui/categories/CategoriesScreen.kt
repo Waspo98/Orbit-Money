@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -23,10 +26,13 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.ui.categories.components.CategoryDetailInspectorPane
 import app.overbay.orbit.ui.categories.components.CategoryGroupCard
 import app.overbay.orbit.ui.categories.dialogs.CategoryEditorDialog
+import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.util.DevicePosture
@@ -83,7 +89,25 @@ fun CategoriesScreen(
                         subtitle = "$catCount categories across ${state.groups.size} groups",
                         canNavigateBack = true,
                         onBack = onBack,
-                        scrollState = heroScrollState
+                        scrollState = heroScrollState,
+                        canopyBar = { _, isCompact, barHeight ->
+                            CanopySurfacePill(
+                                expandedText = "$catCount Categories · ${state.groups.size} Groups",
+                                compactText = "$catCount Categories",
+                                isCompact = isCompact,
+                                leadingIcon = OrbitIcons.Categories,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                            )
+
+                            CanopyIconButton(
+                                icon = Icons.Default.Add,
+                                contentDescription = "Add Category",
+                                onClick = { viewModel.openAddCategory() },
+                                buttonSize = barHeight
+                            )
+                        }
                     )
 
                     OrbitMorphingSplitLayout(

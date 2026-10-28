@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -33,11 +36,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import kotlin.math.roundToInt
 import app.overbay.orbit.ui.goals.components.GoalDetailInspectorPane
 import app.overbay.orbit.ui.goals.components.GoalProgressCard
 import app.overbay.orbit.ui.goals.dialogs.GoalAllocationDialog
@@ -98,7 +105,36 @@ fun GoalsScreen(
                         subtitle = "Connect asset accounts, allocate savings, and project when each target lands.",
                         canNavigateBack = true,
                         onBack = onBack,
-                        scrollState = heroScrollState
+                        scrollState = heroScrollState,
+                        canopyBar = { _, isCompact, barHeight ->
+                            val pct = (state.overallProgressRatio * 100).roundToInt()
+                            val savedFormatted = MoneyUtils.formatCents(state.totalSavedCents, showCents = false)
+                            val targetFormatted = MoneyUtils.formatCents(state.totalTargetCents, showCents = false)
+                            CanopySurfacePill(
+                                expandedText = if (state.totalTargetCents > 0L) {
+                                    "Saved $savedFormatted of $targetFormatted · $pct%"
+                                } else {
+                                    "${state.goals.size} Savings Goals"
+                                },
+                                compactText = if (state.totalTargetCents > 0L) {
+                                    "$savedFormatted · $pct%"
+                                } else {
+                                    "${state.goals.size} Goals"
+                                },
+                                isCompact = isCompact,
+                                leadingIcon = OrbitIcons.Goals,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                            )
+
+                            CanopyIconButton(
+                                icon = Icons.Default.Add,
+                                contentDescription = "New Goal",
+                                onClick = { viewModel.openAddGoal() },
+                                buttonSize = barHeight
+                            )
+                        }
                     )
 
                     val startPad = if (isTwoPane) 20.dp else 16.dp

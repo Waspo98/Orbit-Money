@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -35,7 +36,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.PeriodNavigatorPill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.mha.components.MhaTaxSavingsCard
@@ -93,13 +96,28 @@ fun MhaTrackerScreen(
                     canNavigateBack = true,
                     onBack = onBack,
                     scrollState = heroScrollState,
-                    expandedToolbar = {
+                    canopyBar = { _, isCompact, barHeight ->
                         PeriodNavigatorPill(
-                            label = "${state.selectedYear}",
+                            label = "Tax Year ${state.selectedYear}",
+                            compactLabel = "${state.selectedYear}",
+                            isCompact = isCompact,
                             onPrevious = { viewModel.setYear(state.selectedYear - 1) },
                             onNext = { viewModel.setYear(state.selectedYear + 1) },
                             canGoNext = state.selectedYear < 2030,
-                            onClickLabel = { viewModel.setYear(2026) }
+                            onClickLabel = { viewModel.setYear(2026) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+
+                        CanopyIconButton(
+                            icon = OrbitIcons.ViewSliders,
+                            contentDescription = "Configure MHA Limits",
+                            onClick = {
+                                if (state.showConfigSheet) viewModel.closeConfigSheet() else viewModel.openConfigSheet()
+                            },
+                            buttonSize = barHeight,
+                            isActive = state.showConfigSheet
                         )
                     }
                 )

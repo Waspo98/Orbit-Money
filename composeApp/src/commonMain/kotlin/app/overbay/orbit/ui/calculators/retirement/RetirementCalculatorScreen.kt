@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -17,11 +18,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.retirement.cards.HouseholdIncomeAssumptionsCard
 import app.overbay.orbit.ui.calculators.retirement.cards.RetirementAccountsListCard
 import app.overbay.orbit.ui.calculators.retirement.cards.RetirementProjectionHeroCard
+import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import kotlin.math.roundToInt
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalDevicePosture
 
@@ -50,7 +55,20 @@ fun RetirementCalculatorScreen(
                 subtitle = "All projections are shown in today's dollars",
                 canNavigateBack = true,
                 onBack = onBack,
-                scrollState = heroScrollState
+                scrollState = heroScrollState,
+                canopyBar = { _, isCompact, _ ->
+                    val proj = MoneyUtils.formatCents(uiState.scenario.projectedBalanceCents, showCents = false)
+                    val funded = "${uiState.scenario.readinessPercent.roundToInt()}% Funded"
+                    CanopySurfacePill(
+                        expandedText = "Age ${uiState.retirementAge.toInt()} · $proj ($funded)",
+                        compactText = "$proj · $funded",
+                        isCompact = isCompact,
+                        leadingIcon = OrbitIcons.RetirementCalculator,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    )
+                }
             )
 
             if (isTwoPane) {

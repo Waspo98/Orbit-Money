@@ -111,8 +111,8 @@ fun rememberHeroScrollState(maxHeight: Dp = 112.dp, minHeight: Dp = 56.dp): Hero
 
 /**
  * Edge-to-edge flat emerald canopy header that draws seamlessly behind the system status bar.
- * Features a single continuous morphing title (32sp expanded -> 19sp collapsed) that scales
- * and glides into the 56dp compact bar on GPU graphicsLayer, plus physical-glide toolbars.
+ * Features a single continuous morphing title (30sp expanded -> 17.5–21sp left-anchored collapsed)
+ * that scales and glides into the 56dp compact bar on GPU graphicsLayer, plus 2-axis morphing toolbars.
  */
 @Composable
 fun MorphingPageHero(
@@ -125,9 +125,8 @@ fun MorphingPageHero(
     scrollState: HeroScrollState? = null,
     contentAlpha: Float = 1f,
     activeHeightOverrideDp: Dp? = null,
-    expandedToolbar: (@Composable ColumnScope.() -> Unit)? = null,
-    collapsedActions: (@Composable RowScope.() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
+    canopyBar: (@Composable RowScope.(collapseFraction: Float, isCompact: Boolean, barHeight: Dp) -> Unit)? = null,
     morphingContent: (@Composable BoxWithConstraintsScope.(collapseFraction: Float, collapsedTitleRightDp: Dp, expandedTextBottomDp: Dp) -> Unit)? = null,
     persistentBottomBar: (@Composable ColumnScope.() -> Unit)? = null,
     heroContent: (@Composable () -> Unit)? = null
@@ -139,25 +138,25 @@ fun MorphingPageHero(
 
     val minBarHeightPx = scrollState?.minHeightPx ?: with(density) { 56.dp.toPx() }
     val minBarHeightDp = with(density) { minBarHeightPx.toDp() }
-    val hasGlidingToolbar = expandedToolbar != null && morphingContent == null
+    val hasCanopyBar = canopyBar != null && morphingContent == null
     val hasMorphingSlot = morphingContent != null
 
     var textBlockHeightPx by remember { mutableFloatStateOf(with(density) { 104.dp.toPx() }) }
     var titleTopInColumnPx by remember { mutableFloatStateOf(with(density) { if (kicker != null) 16.dp.toPx() else 0.dp.toPx() }) }
     var titleHeightPx by remember { mutableFloatStateOf(with(density) { 38.dp.toPx() }) }
     var rawTitleWidthPx by remember { mutableFloatStateOf(with(density) { 180.dp.toPx() }) }
-    var expToolbarWidthPx by remember { mutableFloatStateOf(with(density) { 160.dp.toPx() }) }
-    var expToolbarHeightPx by remember { mutableFloatStateOf(with(density) { 36.dp.toPx() }) }
-    var colToolbarWidthPx by remember { mutableFloatStateOf(with(density) { 100.dp.toPx() }) }
-    var colToolbarHeightPx by remember { mutableFloatStateOf(with(density) { 32.dp.toPx() }) }
 
     val expandedFontSize = if (title.length > 17) 26.sp else 30.sp
-    val collapsedTitleScale = 21f / expandedFontSize.value
+    val collapsedTargetSp = when {
+        title.length > 15 -> 17.5f
+        title.length > 11 -> 19f
+        else -> 21f
+    }
+    val collapsedTitleScale = collapsedTargetSp / expandedFontSize.value
     val titleScale = lerp(1f, collapsedTitleScale, fraction)
 
     val extraMorphSlotPx = when {
-        hasMorphingSlot -> with(density) { 58.dp.toPx() }
-        hasGlidingToolbar -> expToolbarHeightPx + with(density) { 16.dp.toPx() }
+        hasMorphingSlot || hasCanopyBar -> with(density) { 58.dp.toPx() }
         else -> 0f
     }
     val expandedMorphHeightPx = (textBlockHeightPx + extraMorphSlotPx).coerceAtLeast(minBarHeightPx)
@@ -192,26 +191,18 @@ fun MorphingPageHero(
             val secondaryAlpha = ((1f - fraction * 2.2f).coerceIn(0f, 1f) * contentAlpha).coerceIn(0f, 1f)
             val topPadDp = 18.dp
             val topPadPx = with(density) { topPadDp.toPx() }
-            val bottomPadDp = if (hasMorphingSlot || hasGlidingToolbar || persistentBottomBar != null) 10.dp else 18.dp
+            val bottomPadDp = if (hasMorphingSlot || hasCanopyBar || persistentBottomBar != null) 10.dp else 18.dp
 
             val expandedTitleCenterY = topPadPx + titleTopInColumnPx + (titleHeightPx / 2f)
             val titleTranslationY = ((minBarHeightPx / 2f) - expandedTitleCenterY) * fraction
             val backShiftXPx = with(density) { (-6).dp.toPx() } * fraction
 
-            val totalWidthPx = with(density) { totalWidth.toPx() }
-            val expandedTitleLeftPx = with(density) { (20.dp + if (canNavigateBack) 42.dp else 0.dp).toPx() }
             val collapsedTitleWidthPx = rawTitleWidthPx * collapsedTitleScale
-            val rightObstaclePx = when {
-                hasGlidingToolbar && collapsedActions == null -> expToolbarWidthPx * 0.9f + with(density) { 24.dp.toPx() }
-                hasGlidingToolbar -> colToolbarWidthPx + with(density) { 24.dp.toPx() }
-                else -> with(density) { 20.dp.toPx() }
-            }
-            val centeredTitleLeftPx = ((totalWidthPx - collapsedTitleWidthPx) / 2f)
-                .coerceIn(expandedTitleLeftPx, (totalWidthPx - rightObstaclePx - collapsedTitleWidthPx).coerceAtLeast(expandedTitleLeftPx))
-            val titleTranslationX = if (hasMorphingSlot) backShiftXPx else (centeredTitleLeftPx - expandedTitleLeftPx) * fraction
+            val titleTranslationX = backShiftXPx
 
+            val maxCollapsedTitleWidthDp = (totalWidth * 0.46f).coerceAtLeast(100.dp)
             val collapsedTitleWidthDp = with(density) { collapsedTitleWidthPx.toDp() }
-                .coerceIn(64.dp, (totalWidth * 0.56f).coerceAtLeast(120.dp))
+                .coerceIn(52.dp, maxCollapsedTitleWidthDp)
             val collapsedTitleRightDp = (20.dp + if (canNavigateBack) 36.dp else 0.dp) + collapsedTitleWidthDp
             val expandedTextBottomDp = with(density) { textBlockHeightPx.toDp() }
 
@@ -330,59 +321,26 @@ fun MorphingPageHero(
                 ) { actions() }
             }
 
-            // 2. Physical-Glide Toolbar Slot (Budgets, MHA Tracker, Net Worth, Spending Trends)
-            if (expandedToolbar != null && morphingContent == null) {
-                val expWidthDp = with(density) { expToolbarWidthPx.toDp() }
-                val expHeightDp = with(density) { expToolbarHeightPx.toDp() }
+            // 2. Standardized 2-Axis Morphing Canopy Bar (46dp expanded -> 38dp collapsed)
+            if (canopyBar != null && morphingContent == null) {
+                val barHeight = lerp(46.dp, 38.dp, fraction)
+                val collapsedRowLeft = collapsedTitleRightDp + 10.dp
+                val barLeft = lerp(20.dp, collapsedRowLeft, fraction)
+                val barTop = lerp(expandedTextBottomDp, (minBarHeightDp - barHeight) / 2, fraction)
+                val barRightMargin = lerp(20.dp, 16.dp, fraction)
+                val barWidth = (totalWidth - barRightMargin - barLeft).coerceAtLeast(120.dp)
+                val isCompact = fraction > 0.45f
 
-                if (collapsedActions == null) {
-                    val pillScale = lerp(1f, 0.9f, fraction)
-                    val targetRightLeftDp = (totalWidth - 16.dp - expWidthDp * pillScale).coerceAtLeast(collapsedTitleRightDp + 8.dp)
-                    Column(
-                        modifier = Modifier
-                            .offset(
-                                x = lerp(20.dp, targetRightLeftDp, fraction),
-                                y = lerp(expandedTextBottomDp, (minBarHeightDp - expHeightDp) / 2, fraction)
-                            )
-                            .onSizeChanged { expToolbarWidthPx = it.width.toFloat(); expToolbarHeightPx = it.height.toFloat() }
-                            .graphicsLayer {
-                                alpha = contentAlpha
-                                scaleX = pillScale
-                                scaleY = pillScale
-                                transformOrigin = TransformOrigin(0f, 0.5f)
-                            }
-                    ) { expandedToolbar() }
-                } else {
-                    val colWidthDp = with(density) { colToolbarWidthPx.toDp() }
-                    val colHeightDp = with(density) { colToolbarHeightPx.toDp() }
-                    val targetRightLeftDp = (totalWidth - 16.dp - colWidthDp).coerceAtLeast(collapsedTitleRightDp + 8.dp)
-                    val currentLeftDp = lerp(20.dp, targetRightLeftDp, fraction)
-                    val expAlpha = ((1f - fraction * 1.8f).coerceIn(0f, 1f) * contentAlpha).coerceIn(0f, 1f)
-                    val colAlpha = (((fraction - 0.3f) / 0.7f).coerceIn(0f, 1f) * contentAlpha).coerceIn(0f, 1f)
-
-                    if (expAlpha > 0.01f) {
-                        Column(
-                            modifier = Modifier
-                                .offset(x = currentLeftDp, y = lerp(expandedTextBottomDp, (minBarHeightDp - expHeightDp) / 2, fraction))
-                                .onSizeChanged { expToolbarWidthPx = it.width.toFloat(); expToolbarHeightPx = it.height.toFloat() }
-                                .graphicsLayer {
-                                    alpha = expAlpha
-                                    val s = lerp(1f, 0.85f, fraction)
-                                    scaleX = s
-                                    scaleY = s
-                                    transformOrigin = TransformOrigin(0f, 0.5f)
-                                }
-                        ) { expandedToolbar() }
-                    }
-                    if (colAlpha > 0.01f) {
-                        Row(
-                            modifier = Modifier
-                                .offset(x = currentLeftDp, y = lerp(expandedTextBottomDp, (minBarHeightDp - colHeightDp) / 2, fraction))
-                                .onSizeChanged { colToolbarWidthPx = it.width.toFloat(); colToolbarHeightPx = it.height.toFloat() }
-                                .graphicsLayer { alpha = colAlpha },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) { collapsedActions() }
-                    }
+                Row(
+                    modifier = Modifier
+                        .offset(x = barLeft, y = barTop)
+                        .width(barWidth)
+                        .height(barHeight)
+                        .graphicsLayer { alpha = contentAlpha },
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    canopyBar(fraction, isCompact, barHeight)
                 }
             }
 
