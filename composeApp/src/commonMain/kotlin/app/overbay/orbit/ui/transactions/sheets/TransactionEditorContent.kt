@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -81,6 +82,7 @@ fun TransactionEditorContent(
     onDismiss: () -> Unit,
     onCreateRule: ((Transaction) -> Unit)? = null,
     onMarkRecurring: ((Transaction) -> Unit)? = null,
+    onImportCsv: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -111,13 +113,36 @@ fun TransactionEditorContent(
             .padding(horizontal = 20.dp, vertical = 12.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        // Title Header
-        Text(
-            text = if (isEditing) "Edit Transaction" else "New Transaction",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        // Title Header + Optional Import CSV Action
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isEditing) "Edit Transaction" else "New Transaction",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (!isEditing && onImportCsv != null) {
+                OutlinedButton(
+                    onClick = {
+                        haptics.tick()
+                        onImportCsv()
+                    },
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Text(
+                        text = "Import CSV",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
 
         // Provenance Card (if imported original values exist)
         if (transaction != null && transaction.id > 0L) {

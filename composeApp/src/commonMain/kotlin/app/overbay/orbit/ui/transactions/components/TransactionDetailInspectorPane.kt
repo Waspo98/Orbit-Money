@@ -117,6 +117,10 @@ fun TransactionDetailInspectorPane(
                         viewModel.markTransactionRecurring(txn)
                         viewModel.closeTransactionEditor()
                         onNavigate(OrbitNavKey.Upcoming)
+                    },
+                    onImportCsv = {
+                        viewModel.closeTransactionEditor()
+                        viewModel.openCsvImportSheet()
                     }
                 )
             }

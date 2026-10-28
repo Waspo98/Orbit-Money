@@ -84,7 +84,6 @@ fun TransactionsScreen(
                 state = state,
                 viewModel = viewModel,
                 onOpenDrawer = onOpenDrawer,
-                onOpenCsv = { viewModel.openCsvImportSheet() },
                 onSelectForInspect = { id ->
                     if (isTwoPane) {
                         viewModel.selectTransactionForInspect(id)
@@ -147,7 +146,11 @@ fun TransactionsScreen(
                 onResetToOriginal = {},
                 onDelete = {},
                 onSplit = {},
-                onDismiss = { viewModel.closeTransactionEditor() }
+                onDismiss = { viewModel.closeTransactionEditor() },
+                onImportCsv = {
+                    viewModel.closeTransactionEditor()
+                    viewModel.openCsvImportSheet()
+                }
             )
         }
 

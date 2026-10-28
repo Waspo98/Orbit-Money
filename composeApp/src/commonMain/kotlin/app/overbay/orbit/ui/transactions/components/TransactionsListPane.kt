@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -47,8 +48,8 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
  * Editorial Transactions list pane featuring flat MorphingPageHero with a physical-glide
- * search bar that shrinks beside the title on collapse and expands to full-width on tap,
- * a persistent Filter/Sort/View + active-filter chip strip, pull-to-refresh SimpleFIN sync,
+ * search bar and flanking circular Filter/Sort buttons that shrink beside the title on collapse,
+ * an auto-appearing active-filter chip strip, pull-to-refresh SimpleFIN sync,
  * and scroll-reactive '+' FAB.
  * Strictly under the 400-line ceiling.
  */
@@ -58,7 +59,6 @@ fun TransactionsListPane(
     state: TransactionsUiState,
     viewModel: TransactionsViewModel,
     onOpenDrawer: () -> Unit,
-    onOpenCsv: () -> Unit,
     onSelectForInspect: (Long) -> Unit,
     modifier: Modifier = Modifier,
     isWideScreen: Boolean = false,
@@ -71,6 +71,7 @@ fun TransactionsListPane(
     val keyboardController = LocalSoftwareKeyboardController.current
     val heroScrollState = rememberHeroScrollState()
     heroScrollState.scrollEnabled = !state.isSearchActive
+    val activeChips = rememberActiveFilterChips(state = state, viewModel = viewModel)
 
     val searchActiveProgress by animateFloatAsState(
         targetValue = if (state.isSearchActive) 1f else 0f,
@@ -96,18 +97,25 @@ fun TransactionsListPane(
                 contentAlpha = contentAlpha,
                 activeHeightOverrideDp = activeHeightOverrideDp,
                 morphingContent = { collapseFraction, collapsedTitleRightDp, expandedTextBottomDp ->
-                    val collapsedSearchLeft = collapsedTitleRightDp + 12.dp
-                    val collapsedSearchWidth = (maxWidth - 16.dp - collapsedSearchLeft).coerceAtLeast(96.dp)
-
-                    val restingLeft = lerp(20.dp, collapsedSearchLeft, collapseFraction)
-                    val restingTop = lerp(expandedTextBottomDp, 9.dp, collapseFraction)
-                    val restingWidth = lerp((maxWidth - 40.dp).coerceAtLeast(100.dp), collapsedSearchWidth, collapseFraction)
                     val restingHeight = lerp(46.dp, 38.dp, collapseFraction)
+                    val controlsWidth = restingHeight * 2 + 8.dp
+                    val gapToControls = 8.dp
+                    val totalTrailingReserve = controlsWidth + gapToControls
+
+                    val collapsedRowLeft = collapsedTitleRightDp + 10.dp
+                    val restingLeft = lerp(20.dp, collapsedRowLeft, collapseFraction)
+                    val restingTop = lerp(expandedTextBottomDp, 9.dp, collapseFraction)
+                    val restingRowRightMargin = lerp(20.dp, 16.dp, collapseFraction)
+                    val restingTotalRowWidth = (maxWidth - restingRowRightMargin - restingLeft).coerceAtLeast(160.dp)
+                    val restingSearchWidth = (restingTotalRowWidth - totalTrailingReserve).coerceAtLeast(72.dp)
 
                     val currentLeft = lerp(restingLeft, 12.dp, searchActiveProgress)
                     val currentTop = lerp(restingTop, 6.dp, searchActiveProgress)
-                    val currentWidth = lerp(restingWidth, (maxWidth - 24.dp).coerceAtLeast(100.dp), searchActiveProgress)
+                    val currentSearchWidth = lerp(restingSearchWidth, (maxWidth - 24.dp).coerceAtLeast(100.dp), searchActiveProgress)
                     val currentHeight = lerp(restingHeight, 48.dp, searchActiveProgress)
+
+                    val controlsLeft = restingLeft + restingSearchWidth + gapToControls
+                    val controlsAlpha = (1f - searchActiveProgress * 2.2f).coerceIn(0f, 1f)
 
                     val isCompact = !state.isSearchActive && (collapseFraction > 0.45f)
                     val placeholder = if (state.isSearchActive || collapseFraction <= 0.45f) {
@@ -116,10 +124,28 @@ fun TransactionsListPane(
                         "Search..."
                     }
 
+                    if (controlsAlpha > 0.01f) {
+                        Box(
+                            modifier = Modifier
+                                .offset(x = controlsLeft, y = restingTop)
+                                .height(restingHeight)
+                                .graphicsLayer { alpha = controlsAlpha },
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            TransactionsSearchTrailingControls(
+                                state = state,
+                                activeFilterCount = activeChips.size,
+                                onOpenFilter = { viewModel.openFilterSheet() },
+                                onSelectSort = { viewModel.setSortOption(it) },
+                                buttonSize = restingHeight
+                            )
+                        }
+                    }
+
                     Box(
                         modifier = Modifier
                             .offset(x = currentLeft, y = currentTop)
-                            .width(currentWidth)
+                            .width(currentSearchWidth)
                             .height(currentHeight)
                     ) {
                         TransactionsSearchBar(
@@ -134,10 +160,10 @@ fun TransactionsListPane(
                     }
                 },
                 persistentBottomBar = {
-                    TransactionsPersistentFilterStrip(
-                        state = state,
-                        viewModel = viewModel,
-                        onOpenCsv = onOpenCsv
+                    TransactionsActiveFilterChipsBar(
+                        isSearchActive = state.isSearchActive,
+                        activeChips = activeChips,
+                        onClearAll = { viewModel.clearFilters() }
                     )
                 }
             )
@@ -191,30 +217,21 @@ fun TransactionsListPane(
                                     }
                                 }
                                 state.groupedTransactions.isEmpty() -> {
+                                    val filtered = state.searchQuery.isNotBlank() || state.hasActiveFilters
                                     Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .nestedScroll(heroScrollState.nestedScrollConnection)
-                                            .padding(24.dp),
+                                        modifier = Modifier.fillMaxSize().nestedScroll(heroScrollState.nestedScrollConnection).padding(24.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         EmptyStateCard(
-                                            title = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) {
-                                                "No matching transactions"
-                                            } else {
-                                                "No transactions recorded"
-                                            },
-                                            description = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) {
+                                            title = if (filtered) "No matching transactions" else "No transactions recorded",
+                                            description = if (filtered) {
                                                 "Try clearing your search query or adjusting your filters."
                                             } else {
                                                 "Pull down to sync with SimpleFIN or tap '+' to record a transaction."
                                             },
                                             icon = OrbitIcons.Transactions,
-                                            actionButtonText = if (state.searchQuery.isNotBlank() || state.hasActiveFilters) "Reset Filters" else null,
-                                            onActionClick = {
-                                                viewModel.setSearchQuery("")
-                                                viewModel.clearFilters()
-                                            }
+                                            actionButtonText = if (filtered) "Reset Filters" else null,
+                                            onActionClick = { viewModel.setSearchQuery(""); viewModel.clearFilters() }
                                         )
                                     }
                                 }
@@ -224,9 +241,7 @@ fun TransactionsListPane(
                                         viewModel = viewModel,
                                         isWideScreen = isWideScreen,
                                         onSelectForInspect = onSelectForInspect,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .nestedScroll(heroScrollState.nestedScrollConnection)
+                                        modifier = Modifier.fillMaxSize().nestedScroll(heroScrollState.nestedScrollConnection)
                                     )
                                 }
                             }
@@ -235,26 +250,15 @@ fun TransactionsListPane(
                                 visible = state.syncToastMessage != null,
                                 enter = slideInVertically { -it } + fadeIn(),
                                 exit = slideOutVertically { -it } + fadeOut(),
-                                modifier = Modifier
-                                    .align(Alignment.TopCenter)
-                                    .padding(top = 12.dp, start = 16.dp, end = 16.dp)
+                                modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp, start = 16.dp, end = 16.dp)
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.inverseSurface,
-                                    tonalElevation = 6.dp,
-                                    shadowElevation = 6.dp
-                                ) {
+                                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.inverseSurface, tonalElevation = 6.dp, shadowElevation = 6.dp) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         if (state.isSyncing) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                strokeWidth = 2.dp,
-                                                color = MaterialTheme.colorScheme.inverseOnSurface
-                                            )
+                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.inverseOnSurface)
                                             Spacer(modifier = Modifier.width(10.dp))
                                         }
                                         Text(

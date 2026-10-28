@@ -38,6 +38,7 @@ fun TransactionEditorSheet(
     onDismiss: () -> Unit,
     onCreateRule: ((Transaction) -> Unit)? = null,
     onMarkRecurring: ((Transaction) -> Unit)? = null,
+    onImportCsv: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     isInlinePane: Boolean = false
 ) {
@@ -53,6 +54,7 @@ fun TransactionEditorSheet(
             onDismiss = onDismiss,
             onCreateRule = onCreateRule,
             onMarkRecurring = onMarkRecurring,
+            onImportCsv = onImportCsv,
             modifier = modifier
         )
     } else {
@@ -75,6 +77,7 @@ fun TransactionEditorSheet(
                 onDismiss = onDismiss,
                 onCreateRule = onCreateRule,
                 onMarkRecurring = onMarkRecurring,
+                onImportCsv = onImportCsv,
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
