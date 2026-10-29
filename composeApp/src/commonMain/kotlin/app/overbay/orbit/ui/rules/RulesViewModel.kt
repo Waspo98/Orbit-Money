@@ -106,9 +106,9 @@ class RulesViewModel(
     }
 
     fun saveRule(rule: TransactionRule) {
+        closeEditorSheet()
         viewModelScope.launch {
             repository.saveRule(rule)
-            closeEditorSheet()
         }
     }
 

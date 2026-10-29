@@ -58,6 +58,7 @@ actual class PlatformStorage actual constructor() {
     }
 
     actual fun clear() {
+        PlatformStorageEpoch.bump()
         try {
             localStorage.clear()
         } catch (_: Throwable) {}

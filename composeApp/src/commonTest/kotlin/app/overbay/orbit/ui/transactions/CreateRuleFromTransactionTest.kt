@@ -14,6 +14,7 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.network.RuleDto
 import app.overbay.orbit.data.network.RuleWireMapper
+import app.overbay.orbit.domain.RuleMatcherEngine
 import app.overbay.orbit.ui.rules.RuleDraftDefaults
 import app.overbay.orbit.util.PlatformStorage
 import kotlinx.coroutines.Dispatchers
@@ -374,5 +375,134 @@ class CreateRuleFromTransactionTest {
         assertEquals(3L, decoded.conditions[2].targetId)
         assertEquals("Costco Wholesale", decoded.actions[0].textValue)
         assertEquals(12L, decoded.actions[1].targetCategoryId)
+    }
+
+    @Test
+    fun testApplyNewRuleIncrementally_matchesFullApplyAndPreservesUntouchedIdentity() {
+        val existingRule = TransactionRule(
+            id = 1L,
+            name = "Generic Coffee",
+            priority = 10,
+            conditions = listOf(RuleCondition(RuleConditionField.MERCHANT, RuleOperator.CONTAINS, "COFFEE")),
+            actions = listOf(RuleAction(RuleActionType.CATEGORIZE, value = "10", targetCategoryId = 10L)),
+            enabled = true
+        )
+        val initialTxns = listOf(
+            Transaction(id = 1L, accountId = 1L, originalDate = "2026-06-01", originalMerchant = "GROCERY MART", originalAmountCents = -4500L),
+            Transaction(id = 2L, accountId = 1L, originalDate = "2026-06-02", originalMerchant = "SQ *COFFEE ROASTER", originalAmountCents = -550L),
+            Transaction(
+                id = 3L,
+                accountId = 1L,
+                originalDate = "2026-06-03",
+                originalMerchant = "SQ *COFFEE ROASTER #2",
+                editedMerchant = "User Locked Name",
+                editedMerchantSource = "user",
+                editSource = EditSource.USER,
+                originalAmountCents = -600L
+            )
+        )
+        val afterFirst = RuleMatcherEngine.applyRules(initialTxns, listOf(existingRule))
+        assertTrue(afterFirst[0] === initialTxns[0], "Unmatched transaction must preserve object identity")
+        assertTrue(afterFirst[2] === initialTxns[2], "User-locked transaction must preserve object identity")
+
+        val newHighPriorityRule = TransactionRule(
+            id = 2L,
+            name = "Coffee Roaster",
+            priority = 20,
+            conditions = listOf(RuleCondition(RuleConditionField.MERCHANT, RuleOperator.CONTAINS, "ROASTER")),
+            actions = listOf(
+                RuleAction(RuleActionType.RENAME, value = "Coffee Roaster", textValue = "Coffee Roaster"),
+                RuleAction(RuleActionType.CATEGORIZE, value = "99", targetCategoryId = 99L)
+            ),
+            enabled = true
+        )
+        val allRules = listOf(existingRule, newHighPriorityRule)
+
+        val incremental = RuleMatcherEngine.applyNewRuleIncrementally(afterFirst, allRules, newHighPriorityRule)
+        val fullPass = RuleMatcherEngine.applyRules(afterFirst, allRules)
+
+        assertEquals(fullPass, incremental)
+        assertTrue(incremental[0] === afterFirst[0], "Non-matching row must not be re-allocated")
+        assertTrue(incremental[2] === afterFirst[2], "User-edited row must not be re-allocated")
+        assertEquals("Coffee Roaster", incremental[1].effectiveMerchant)
+        assertEquals("rule:2", incremental[1].editedMerchantSource)
+        assertEquals(99L, incremental[1].effectiveCategoryId)
+
+        val remapped = RuleMatcherEngine.remapRuleSourceTag(incremental, oldRuleId = 2L, newRuleId = 88L)
+        assertTrue(remapped[0] === incremental[0])
+        assertEquals("rule:88", remapped[1].editedMerchantSource)
+        assertEquals("rule:88", remapped[1].editedCategoryIdSource)
+    }
+
+    @Test
+    fun testDeleteRule_revertsRuleAppliedEditsImmediatelyInMemory() = runTest(testDispatcher) {
+        repository.saveAccount(Account(id = 1L, name = "Checking", type = AccountType.CHECKING))
+        repository.saveTransaction(
+            Transaction(
+                id = 501L,
+                accountId = 1L,
+                originalDate = "2026-06-10",
+                originalMerchant = "TST* TACO STAND",
+                originalAmountCents = -1425L
+            )
+        )
+        val rule = TransactionRule(
+            id = 0L,
+            name = "Taco Stand",
+            priority = 10,
+            conditions = listOf(RuleCondition(RuleConditionField.MERCHANT, RuleOperator.CONTAINS, "TACO STAND")),
+            actions = listOf(RuleAction(RuleActionType.RENAME, value = "Taco Stand", textValue = "Taco Stand")),
+            enabled = true
+        )
+        repository.saveRule(rule)
+        val savedRuleId = repository.rules.value.first { it.name == "Taco Stand" }.id
+        assertEquals("Taco Stand", repository.transactions.value.first { it.id == 501L }.effectiveMerchant)
+
+        repository.deleteRule(savedRuleId)
+        val reverted = repository.transactions.value.first { it.id == 501L }
+        assertEquals("TST* TACO STAND", reverted.effectiveMerchant)
+        assertNull(reverted.editedMerchant)
+        assertEquals(EditSource.NONE, reverted.editSource)
+    }
+
+    @Test
+    fun testLargeLedgerRulePerformance_5000TransactionsBy100Rules() {
+        val txns = (1L..5000L).map { i ->
+            Transaction(
+                id = i,
+                accountId = (i % 4L) + 1L,
+                originalDate = "2026-05-${((i % 28) + 1).toString().padStart(2, '0')}",
+                originalMerchant = if (i % 1000L == 0L) "SQ *SPECIAL BAKERY #$i" else "VENDOR_${i % 250} STORE #$i",
+                originalDescription = "POS PURCHASE VENDOR_${i % 250}",
+                originalAmountCents = -(i % 15000L) - 100L
+            )
+        }
+        val existingRules = (1L..100L).map { r ->
+            TransactionRule(
+                id = r,
+                name = "Vendor $r",
+                priority = r.toInt(),
+                conditions = listOf(RuleCondition(RuleConditionField.MERCHANT, RuleOperator.CONTAINS, "VENDOR_$r ")),
+                actions = listOf(RuleAction(RuleActionType.RENAME, value = "Clean Vendor $r", textValue = "Clean Vendor $r")),
+                enabled = true
+            )
+        }
+
+        val baseline = RuleMatcherEngine.applyRules(txns, existingRules)
+        val newBakeryRule = TransactionRule(
+            id = 101L,
+            name = "Special Bakery",
+            priority = 200,
+            conditions = listOf(RuleCondition(RuleConditionField.MERCHANT, RuleOperator.CONTAINS, "SPECIAL BAKERY")),
+            actions = listOf(RuleAction(RuleActionType.RENAME, value = "Special Bakery", textValue = "Special Bakery")),
+            enabled = true
+        )
+
+        val afterIncremental = RuleMatcherEngine.applyNewRuleIncrementally(
+            transactions = baseline,
+            allRules = existingRules + newBakeryRule,
+            newRule = newBakeryRule
+        )
+        assertEquals(5, afterIncremental.count { it.effectiveMerchant == "Special Bakery" })
     }
 }

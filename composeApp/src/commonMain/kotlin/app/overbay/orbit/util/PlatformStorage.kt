@@ -2,6 +2,18 @@
 
 package app.overbay.orbit.util
 
+import kotlin.concurrent.Volatile
+
+object PlatformStorageEpoch {
+    @Volatile
+    var epoch: Long = 0L
+        private set
+
+    fun bump() {
+        epoch += 1L
+    }
+}
+
 expect class PlatformStorage() {
     fun saveString(key: String, value: String)
     fun loadString(key: String): String?

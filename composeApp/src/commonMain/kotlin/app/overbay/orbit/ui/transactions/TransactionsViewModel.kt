@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -59,7 +60,7 @@ class TransactionsViewModel(
     ) { txns, categories, accounts, rules ->
         val nextPriority = (rules.maxOfOrNull { it.priority } ?: 0) + 10
         RepoSnapshot(txns, categories, accounts, nextPriority)
-    }
+    }.distinctUntilChanged()
 
     private val filterFlow = combine(
         _searchQuery,
@@ -69,7 +70,7 @@ class TransactionsViewModel(
         _isCompactView
     ) { query, quick, draft, sort, compact ->
         FilterParams(query, quick, draft, sort, compact)
-    }
+    }.distinctUntilChanged()
 
     val uiState: StateFlow<TransactionsUiState> = combine(
         dataFlow,
@@ -505,10 +506,7 @@ class TransactionsViewModel(
 
     fun saveRuleFromTransaction(rule: TransactionRule) {
         _ruleDraftTransactionId.value = null
-        viewModelScope.launch {
-            repository.saveRule(rule)
-            repository.runRulesOnAllTransactions()
-        }
+        viewModelScope.launch { repository.saveRule(rule) }
     }
 
     fun previewRuleMatchCount(conditions: List<RuleCondition>): Int {
@@ -544,6 +542,9 @@ class TransactionsViewModel(
         draft: TransactionFilterDraft,
         categoryMap: Map<Long, app.overbay.orbit.data.model.Category>
     ): List<Transaction> {
+        if (query.isBlank() && quick == QuickFilter.ALL && draft.type == "all" && draft.accountId == null && draft.categoryId == null) {
+            return transactions
+        }
         return transactions.filter { txn ->
             if (query.isNotBlank()) {
                 val q = query.trim().lowercase()

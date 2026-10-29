@@ -56,6 +56,7 @@ class OrbitRepository(
     private val simpleFinClient = customSimpleFinClient ?: SimpleFinDirectClient()
     private val localEngine = LocalSnapshotEngine(storage, simpleFinClient)
     private var activeEngine: OrbitStorageEngine = localEngine
+    private val flushCoordinator = SnapshotFlushCoordinator(scope, localEngine, cloudSyncManager)
 
     private val _snapshot = MutableStateFlow(OrbitWorkspaceSnapshot.empty())
     val snapshot: StateFlow<OrbitWorkspaceSnapshot> = _snapshot.asStateFlow()
@@ -169,11 +170,10 @@ class OrbitRepository(
         _storageMode.value = newSnapshot.preferences.storageMode
     }
 
-    private suspend fun commitSnapshot(updated: OrbitWorkspaceSnapshot) = snapshotMutex.withLock {
+    private suspend fun commitSnapshot(updated: OrbitWorkspaceSnapshot, immediate: Boolean = false) = snapshotMutex.withLock {
         updateMemoryState(updated)
-        localEngine.saveSnapshot(updated)
-        if (activeEngine !== localEngine) activeEngine.saveSnapshot(updated)
-        if (updated.preferences.googleDriveSyncEnabled) cloudSyncManager.backupSnapshot(updated)
+        if (immediate) flushCoordinator.flushImmediate(updated, activeEngine)
+        else flushCoordinator.scheduleFlush({ _snapshot.value }, { activeEngine })
     }
 
     suspend fun setStorageMode(mode: StorageMode, serverUrl: String? = null) {
@@ -186,7 +186,7 @@ class OrbitRepository(
         activeEngine = if (mode == StorageMode.SELF_HOSTED) {
             SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
         } else localEngine
-        commitSnapshot(activeEngine.loadSnapshot().copy(preferences = updatedPref))
+        commitSnapshot(activeEngine.loadSnapshot().copy(preferences = updatedPref), immediate = true)
     }
 
     suspend fun prepareForOidcLogin(serverUrl: String) {
@@ -213,7 +213,7 @@ class OrbitRepository(
         localEngine.saveSnapshot(_snapshot.value.copy(preferences = updatedPref))
         activeEngine = SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
         val fresh = activeEngine.loadSnapshot().copy(preferences = updatedPref)
-        commitSnapshot(fresh)
+        commitSnapshot(fresh, immediate = true)
         _syncStatus.value = SyncResult.Success("Signed in as $userLabel (${fresh.transactions.size} transactions)")
     }
 
@@ -516,16 +516,23 @@ class OrbitRepository(
         val current = _rules.value
         val exists = current.any { it.id == rule.id && rule.id != 0L }
         val localId = if (exists) rule.id else if (rule.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else rule.id
-        val updatedList = if (exists) current.map { if (it.id == rule.id) rule else it } else current + rule.copy(id = localId)
-        commitSnapshot(_snapshot.value.copy(rules = updatedList))
+        val saved = if (exists) rule else rule.copy(id = localId)
+        val updatedRules = if (exists) current.map { if (it.id == rule.id) saved else it } else current + saved
+        val updatedTxns = if (!exists && saved.enabled) RuleMatcherEngine.applyNewRuleIncrementally(_transactions.value, updatedRules, saved)
+        else RuleMatcherEngine.applyRules(_transactions.value, updatedRules)
+        commitSnapshot(_snapshot.value.copy(rules = updatedRules, transactions = updatedTxns))
         val pushed = activeEngine.pushRule(if (exists) rule else rule.copy(id = 0L)).getOrNull()
         if (pushed != null && pushed.id > 0L && pushed.id != localId) {
-            commitSnapshot(_snapshot.value.copy(rules = _rules.value.map { if (it.id == localId) it.copy(id = pushed.id) else it }))
+            commitSnapshot(_snapshot.value.copy(
+                rules = _rules.value.map { if (it.id == localId) it.copy(id = pushed.id) else it },
+                transactions = RuleMatcherEngine.remapRuleSourceTag(_transactions.value, localId, pushed.id)
+            ))
         }
     }
 
     suspend fun deleteRule(id: Long) {
-        commitSnapshot(_snapshot.value.copy(rules = _rules.value.filterNot { it.id == id }))
+        val remaining = _rules.value.filterNot { it.id == id }
+        commitSnapshot(_snapshot.value.copy(rules = remaining, transactions = RuleMatcherEngine.applyRules(_transactions.value, remaining)))
         activeEngine.deleteRule(id)
     }
 
@@ -535,9 +542,7 @@ class OrbitRepository(
         activeEngine.runRules()
     }
 
-    suspend fun pairTransfers() {
-        commitSnapshot(_snapshot.value.copy(transactions = TransferMatcherEngine.matchTransfers(_transactions.value)))
-    }
+    suspend fun pairTransfers() = commitSnapshot(_snapshot.value.copy(transactions = TransferMatcherEngine.matchTransfers(_transactions.value)))
 
     // Upcoming Items
     suspend fun saveUpcoming(item: UpcomingItem) {
@@ -561,7 +566,7 @@ class OrbitRepository(
     suspend fun updatePreferences(preferences: OrbitPreferences) {
         _preferences.value = preferences
         _storageMode.value = preferences.storageMode
-        commitSnapshot(_snapshot.value.copy(preferences = preferences))
+        commitSnapshot(_snapshot.value.copy(preferences = preferences), immediate = true)
         activeEngine.pushPreferences(preferences)
     }
 
@@ -570,12 +575,12 @@ class OrbitRepository(
     suspend fun sync(force: Boolean = false): SyncResult {
         val result = activeEngine.sync(force)
         _syncStatus.value = result
-        if (result is SyncResult.Success) commitSnapshot(activeEngine.loadSnapshot())
+        if (result is SyncResult.Success) commitSnapshot(activeEngine.loadSnapshot(), immediate = true)
         return result
     }
 
     fun exportBackupJson(): String = json.encodeToString(OrbitWorkspaceSnapshot.serializer(), _snapshot.value)
-    suspend fun restoreBackupJson(jsonString: String): Result<Unit> = runCatching { commitSnapshot(json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString)) }
+    suspend fun restoreBackupJson(jsonString: String): Result<Unit> = runCatching { commitSnapshot(json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString), immediate = true) }
     suspend fun loadDemoData(snapshot: OrbitWorkspaceSnapshot) = commitSnapshot(snapshot)
     suspend fun updateHouseholdInfo(household: HouseholdInfo) = commitSnapshot(_snapshot.value.copy(household = household))
 

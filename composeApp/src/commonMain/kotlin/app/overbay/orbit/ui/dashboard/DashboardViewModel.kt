@@ -419,7 +419,6 @@ class DashboardViewModel(
         )
         viewModelScope.launch {
             repository.saveRule(rule)
-            repository.runRulesOnAllTransactions()
             if (current != null) {
                 recordHandledReviewId(current.id)
             }

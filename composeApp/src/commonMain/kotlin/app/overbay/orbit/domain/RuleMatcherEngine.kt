@@ -15,54 +15,124 @@ object RuleMatcherEngine {
     /**
      * Re-evaluates all enabled rules against transactions in priority DESC, id ASC order.
      * Evaluates conditions strictly against immutable original_* fields.
-     * Respects user and system edit locks.
+     * Respects user and system edit locks and preserves object identity when unchanged.
      */
     fun applyRules(
         transactions: List<Transaction>,
         rules: List<TransactionRule>
     ): List<Transaction> {
-        val sortedRules = rules
-            .filter { it.enabled && it.conditions.isNotEmpty() && it.actions.isNotEmpty() }
-            .sortedWith(compareByDescending<TransactionRule> { it.priority }.thenBy { it.id })
-
-        return transactions.map { txn ->
+        if (transactions.isEmpty()) return transactions
+        val compiledRules = compileSortedRules(rules)
+        var anyChanged = false
+        val updated = transactions.map { txn ->
             if (txn.editSource == EditSource.USER) {
                 txn
             } else {
-                computeTransactionEdits(txn, sortedRules)
+                val next = computeCompiledEdits(txn, compiledRules)
+                if (next !== txn) anyChanged = true
+                next
             }
         }
+        return if (anyChanged) updated else transactions
     }
 
     fun evaluateAll(rules: List<TransactionRule>, transactions: List<Transaction>): List<Transaction> =
         applyRules(transactions, rules)
 
+    /**
+     * Fast-path O(N) evaluation when adding a brand-new enabled rule.
+     * Since conditions inspect immutable original_* fields, non-matching transactions cannot change.
+     */
+    fun applyNewRuleIncrementally(
+        transactions: List<Transaction>,
+        allRules: List<TransactionRule>,
+        newRule: TransactionRule
+    ): List<Transaction> {
+        if (transactions.isEmpty() || !newRule.enabled || newRule.conditions.isEmpty() || newRule.actions.isEmpty()) {
+            return transactions
+        }
+        val compiledTarget = compileRule(newRule)
+        val compiledAll = compileSortedRules(allRules)
+        var anyChanged = false
+        val updated = transactions.map { txn ->
+            if (txn.editSource == EditSource.USER) {
+                txn
+            } else {
+                val merchantLower = txn.originalMerchant.lowercase()
+                val descLower = txn.originalDescription?.lowercase()
+                if (!matchesCompiledConditions(txn, merchantLower, descLower, compiledTarget.conditions)) {
+                    txn
+                } else {
+                    val next = computeCompiledEdits(txn, compiledAll, merchantLower, descLower)
+                    if (next !== txn) anyChanged = true
+                    next
+                }
+            }
+        }
+        return if (anyChanged) updated else transactions
+    }
+
+    /**
+     * Remaps optimistic "rule:oldRuleId" provenance tags to "rule:newRuleId" when server sync completes.
+     */
+    fun remapRuleSourceTag(
+        transactions: List<Transaction>,
+        oldRuleId: Long,
+        newRuleId: Long
+    ): List<Transaction> {
+        if (oldRuleId == newRuleId || transactions.isEmpty()) return transactions
+        val oldTag = "rule:$oldRuleId"
+        val newTag = "rule:$newRuleId"
+        var changed = false
+        val mapped = transactions.map { txn ->
+            val m = txn.editedMerchantSource == oldTag
+            val c = txn.editedCategoryIdSource == oldTag
+            val t = txn.editedIsTransferSource == oldTag
+            val i = txn.editedIsIgnoredSource == oldTag
+            val h = txn.editedMhaEligibleSource == oldTag
+            if (!m && !c && !t && !i && !h) {
+                txn
+            } else {
+                changed = true
+                txn.copy(
+                    editedMerchantSource = if (m) newTag else txn.editedMerchantSource,
+                    editedCategoryIdSource = if (c) newTag else txn.editedCategoryIdSource,
+                    editedIsTransferSource = if (t) newTag else txn.editedIsTransferSource,
+                    editedIsIgnoredSource = if (i) newTag else txn.editedIsIgnoredSource,
+                    editedMhaEligibleSource = if (h) newTag else txn.editedMhaEligibleSource
+                )
+            }
+        }
+        return if (changed) mapped else transactions
+    }
+
     fun computeTransactionEdits(
         transaction: Transaction,
         rules: List<TransactionRule>
     ): Transaction {
-        // Strict User Provenance Lock: user-edited transactions are never mutated by automated rules
-        if (transaction.editSource == EditSource.USER) {
-            return transaction
-        }
+        if (transaction.editSource == EditSource.USER) return transaction
+        return computeCompiledEdits(transaction, rules.map(::compileRule))
+    }
 
-        // Start from empty edits, preserving user and system locks
+    private fun computeCompiledEdits(
+        transaction: Transaction,
+        rules: List<CompiledRule>,
+        precomputedMerchantLower: String? = null,
+        precomputedDescLower: String? = null
+    ): Transaction {
+        if (transaction.editSource == EditSource.USER) return transaction
+
         var editedMerchant: String? = null
         var editedMerchantSource: String? = null
-
         var editedCategoryId: Long? = null
         var editedCategoryIdSource: String? = null
-
         var editedIsTransfer: Boolean? = null
         var editedIsTransferSource: String? = null
-
         var editedIsIgnored: Boolean? = null
         var editedIsIgnoredSource: String? = null
-
         var editedMhaEligible: Boolean? = null
         var editedMhaEligibleSource: String? = null
 
-        // Preserve locks
         if (isLocked(transaction.editedMerchantSource)) {
             editedMerchant = transaction.editedMerchant
             editedMerchantSource = transaction.editedMerchantSource
@@ -84,70 +154,77 @@ object RuleMatcherEngine {
             editedMhaEligibleSource = transaction.editedMhaEligibleSource
         }
 
-        // Apply rules in order. First rule to claim an unclaimed field wins.
-        for (rule in rules) {
-            if (!evalConditions(transaction, rule.conditions)) continue
-            val ruleSourceTag = "rule:${rule.id}"
+        if (rules.isNotEmpty()) {
+            val merchantLower = precomputedMerchantLower ?: transaction.originalMerchant.lowercase()
+            val descLower = precomputedDescLower ?: transaction.originalDescription?.lowercase()
 
-            for (action in rule.actions) {
-                when (action.type) {
-                    RuleActionType.RENAME, RuleActionType.RENAME_MERCHANT -> {
-                        val newName = action.textValue ?: action.value.takeIf { it.isNotBlank() }
-                        if (editedMerchantSource == null && newName != null) {
-                            if (newName != transaction.originalMerchant) {
-                                editedMerchant = newName
+            for (rule in rules) {
+                if (!matchesCompiledConditions(transaction, merchantLower, descLower, rule.conditions)) continue
+                val ruleSourceTag = rule.sourceTag
+
+                for (action in rule.actions) {
+                    when (action.type) {
+                        RuleActionType.RENAME, RuleActionType.RENAME_MERCHANT -> {
+                            if (editedMerchantSource == null && action.newName != null && action.newName != transaction.originalMerchant) {
+                                editedMerchant = action.newName
                                 editedMerchantSource = ruleSourceTag
                             }
                         }
-                    }
-                    RuleActionType.CATEGORIZE, RuleActionType.SET_CATEGORY -> {
-                        val targetCatId = action.targetCategoryId ?: action.value.toLongOrNull()
-                        if (editedCategoryIdSource == null && targetCatId != null) {
-                            if (targetCatId != transaction.originalCategoryId) {
-                                editedCategoryId = targetCatId
+                        RuleActionType.CATEGORIZE, RuleActionType.SET_CATEGORY -> {
+                            if (editedCategoryIdSource == null && action.targetCatId != null && action.targetCatId != transaction.originalCategoryId) {
+                                editedCategoryId = action.targetCatId
                                 editedCategoryIdSource = ruleSourceTag
                             }
                         }
-                    }
-                    RuleActionType.MARK_TRANSFER -> {
-                        if (editedIsTransferSource == null) {
-                            if (!transaction.originalIsTransfer) {
+                        RuleActionType.MARK_TRANSFER -> {
+                            if (editedIsTransferSource == null && !transaction.originalIsTransfer) {
                                 editedIsTransfer = true
                                 editedIsTransferSource = ruleSourceTag
                             }
                         }
-                    }
-                    RuleActionType.MARK_IGNORED -> {
-                        if (editedIsIgnoredSource == null) {
-                            if (!transaction.originalIsIgnored) {
+                        RuleActionType.MARK_IGNORED -> {
+                            if (editedIsIgnoredSource == null && !transaction.originalIsIgnored) {
                                 editedIsIgnored = true
                                 editedIsIgnoredSource = ruleSourceTag
                             }
                         }
-                    }
-                    RuleActionType.SET_MHA_ELIGIBLE -> {
-                        val boolVal = action.booleanValue ?: (action.value.lowercase() in setOf("1", "true"))
-                        if (editedMhaEligibleSource == null) {
-                            editedMhaEligible = boolVal
-                            editedMhaEligibleSource = ruleSourceTag
+                        RuleActionType.SET_MHA_ELIGIBLE -> {
+                            if (editedMhaEligibleSource == null) {
+                                editedMhaEligible = action.boolVal
+                                editedMhaEligibleSource = ruleSourceTag
+                            }
                         }
                     }
                 }
             }
         }
 
-        val hasAnyRuleEdits = listOf(
-            editedMerchantSource,
-            editedCategoryIdSource,
-            editedIsTransferSource,
-            editedIsIgnoredSource,
-            editedMhaEligibleSource
-        ).any { it?.startsWith("rule:") == true }
+        val hasAnyRuleEdits = (editedMerchantSource?.startsWith("rule:") == true) ||
+            (editedCategoryIdSource?.startsWith("rule:") == true) ||
+            (editedIsTransferSource?.startsWith("rule:") == true) ||
+            (editedIsIgnoredSource?.startsWith("rule:") == true) ||
+            (editedMhaEligibleSource?.startsWith("rule:") == true)
 
         val newEditSource = when {
             transaction.editSource == EditSource.USER -> EditSource.USER
             hasAnyRuleEdits -> EditSource.RULE
             else -> EditSource.NONE
+        }
+
+        if (
+            transaction.editedMerchant == editedMerchant &&
+            transaction.editedMerchantSource == editedMerchantSource &&
+            transaction.editedCategoryId == editedCategoryId &&
+            transaction.editedCategoryIdSource == editedCategoryIdSource &&
+            transaction.editedIsTransfer == editedIsTransfer &&
+            transaction.editedIsTransferSource == editedIsTransferSource &&
+            transaction.editedIsIgnored == editedIsIgnored &&
+            transaction.editedIsIgnoredSource == editedIsIgnoredSource &&
+            transaction.editedMhaEligible == editedMhaEligible &&
+            transaction.editedMhaEligibleSource == editedMhaEligibleSource &&
+            transaction.editSource == newEditSource
+        ) {
+            return transaction
         }
 
         return transaction.copy(
@@ -167,89 +244,161 @@ object RuleMatcherEngine {
 
     fun evalConditions(transaction: Transaction, conditions: List<RuleCondition>): Boolean {
         if (conditions.isEmpty()) return false
-        return conditions.all { matchesCondition(transaction, it) }
-    }
-
-    private fun matchesCondition(transaction: Transaction, condition: RuleCondition): Boolean {
-        return when (condition.field) {
-            RuleConditionField.MERCHANT -> {
-                val candidates = listOfNotNull(transaction.originalMerchant, transaction.originalDescription)
-                matchesAnyText(candidates, condition.operator, condition.value)
-            }
-            RuleConditionField.ORIGINAL_DESCRIPTION -> {
-                matchesAnyText(listOfNotNull(transaction.originalDescription), condition.operator, condition.value)
-            }
-            RuleConditionField.AMOUNT -> {
-                val amountCents = abs(transaction.originalAmountCents)
-                val targetAmountCents = condition.amountCentsValue ?: MoneyUtils.dollarsToCents(condition.value)
-                when (condition.operator) {
-                    RuleOperator.EQUALS, RuleOperator.EXACT -> amountCents == targetAmountCents
-                    RuleOperator.GREATER_THAN -> amountCents > targetAmountCents
-                    RuleOperator.LESS_THAN -> amountCents < targetAmountCents
-                    RuleOperator.BETWEEN -> {
-                        val parsedRange = if (condition.minAmountCentsValue == null && condition.maxAmountCentsValue == null) {
-                            parseAmountRange(condition.value)
-                        } else null
-                        val min = condition.minAmountCentsValue ?: parsedRange?.first ?: 0L
-                        val max = condition.maxAmountCentsValue ?: parsedRange?.second ?: Long.MAX_VALUE
-                        amountCents in min..max
-                    }
-                    else -> false
-                }
-            }
-            RuleConditionField.ACCOUNT, RuleConditionField.ACCOUNT_ID -> {
-                val targetId = condition.targetId ?: condition.value.toLongOrNull()
-                when (condition.operator) {
-                    RuleOperator.IS, RuleOperator.EQUALS, RuleOperator.EXACT -> transaction.accountId == targetId
-                    RuleOperator.IS_NOT -> transaction.accountId != targetId
-                    else -> false
-                }
-            }
-            RuleConditionField.CATEGORY, RuleConditionField.CATEGORY_ID -> {
-                val targetId = condition.targetId ?: condition.value.toLongOrNull()
-                when (condition.operator) {
-                    RuleOperator.IS, RuleOperator.EQUALS, RuleOperator.EXACT -> transaction.originalCategoryId == targetId
-                    RuleOperator.IS_NOT -> transaction.originalCategoryId != targetId
-                    else -> false
-                }
-            }
-            RuleConditionField.NOTES -> {
-                matchesAnyText(listOfNotNull(transaction.notes), condition.operator, condition.value)
-            }
-        }
-    }
-
-    private fun matchesAnyText(candidates: List<String>, operator: RuleOperator, expected: String): Boolean {
-        val targetLower = expected.trim().lowercase()
-        return candidates.any { candidate ->
-            val actualLower = candidate.lowercase()
-            when (operator) {
-                RuleOperator.EQUALS, RuleOperator.EXACT -> actualLower == targetLower
-                RuleOperator.CONTAINS -> actualLower.contains(targetLower)
-                RuleOperator.STARTS_WITH -> actualLower.startsWith(targetLower)
-                RuleOperator.ENDS_WITH -> actualLower.endsWith(targetLower)
-                RuleOperator.REGEX -> {
-                    try {
-                        Regex(expected, RegexOption.IGNORE_CASE).containsMatchIn(candidate)
-                    } catch (_: Exception) {
-                        false
-                    }
-                }
-                else -> false
-            }
-        }
+        val compiled = conditions.map(::compileCondition)
+        return matchesCompiledConditions(
+            transaction = transaction,
+            merchantLower = transaction.originalMerchant.lowercase(),
+            descLower = transaction.originalDescription?.lowercase(),
+            conditions = compiled
+        )
     }
 
     fun countMatches(transactions: List<Transaction>, conditions: List<RuleCondition>): Int {
-        return transactions.count { evalConditions(it, conditions) }
+        if (conditions.isEmpty() || transactions.isEmpty()) return 0
+        val compiled = conditions.map(::compileCondition)
+        return transactions.count { txn ->
+            matchesCompiledConditions(txn, txn.originalMerchant.lowercase(), txn.originalDescription?.lowercase(), compiled)
+        }
     }
 
     fun matchingTransactions(transactions: List<Transaction>, conditions: List<RuleCondition>): List<Transaction> {
-        if (conditions.isEmpty()) return emptyList()
+        if (conditions.isEmpty() || transactions.isEmpty()) return emptyList()
+        val compiled = conditions.map(::compileCondition)
         return transactions
-            .filter { evalConditions(it, conditions) }
+            .filter { txn ->
+                matchesCompiledConditions(txn, txn.originalMerchant.lowercase(), txn.originalDescription?.lowercase(), compiled)
+            }
             .sortedWith(compareByDescending<Transaction> { it.effectiveDate }.thenByDescending { it.id })
     }
+
+    private fun compileSortedRules(rules: List<TransactionRule>): List<CompiledRule> =
+        rules
+            .filter { it.enabled && it.conditions.isNotEmpty() && it.actions.isNotEmpty() }
+            .sortedWith(compareByDescending<TransactionRule> { it.priority }.thenBy { it.id })
+            .map(::compileRule)
+
+    private fun compileRule(rule: TransactionRule): CompiledRule = CompiledRule(
+        sourceTag = "rule:${rule.id}",
+        conditions = rule.conditions.map(::compileCondition),
+        actions = rule.actions.map(::compileAction)
+    )
+
+    private fun compileCondition(condition: RuleCondition): CompiledCondition {
+        val parsedRange = if (
+            condition.operator == RuleOperator.BETWEEN &&
+            condition.minAmountCentsValue == null &&
+            condition.maxAmountCentsValue == null
+        ) parseAmountRange(condition.value) else null
+        return CompiledCondition(
+            field = condition.field,
+            operator = condition.operator,
+            targetLower = condition.value.trim().lowercase(),
+            compiledRegex = if (condition.operator == RuleOperator.REGEX) {
+                runCatching { Regex(condition.value, RegexOption.IGNORE_CASE) }.getOrNull()
+            } else null,
+            targetId = condition.targetId ?: condition.value.toLongOrNull(),
+            targetAmountCents = condition.amountCentsValue ?: MoneyUtils.dollarsToCents(condition.value),
+            minAmountCents = condition.minAmountCentsValue ?: parsedRange?.first ?: 0L,
+            maxAmountCents = condition.maxAmountCentsValue ?: parsedRange?.second ?: Long.MAX_VALUE
+        )
+    }
+
+    private fun compileAction(action: RuleAction): CompiledAction = CompiledAction(
+        type = action.type,
+        newName = action.textValue ?: action.value.takeIf { it.isNotBlank() },
+        targetCatId = action.targetCategoryId ?: action.value.toLongOrNull(),
+        boolVal = action.booleanValue ?: (action.value.equals("1", ignoreCase = true) || action.value.equals("true", ignoreCase = true))
+    )
+
+    private fun matchesCompiledConditions(
+        transaction: Transaction,
+        merchantLower: String,
+        descLower: String?,
+        conditions: List<CompiledCondition>
+    ): Boolean {
+        if (conditions.isEmpty()) return false
+        for (cond in conditions) {
+            if (!matchesCompiledCondition(transaction, merchantLower, descLower, cond)) return false
+        }
+        return true
+    }
+
+    private fun matchesCompiledCondition(
+        transaction: Transaction,
+        merchantLower: String,
+        descLower: String?,
+        cond: CompiledCondition
+    ): Boolean = when (cond.field) {
+        RuleConditionField.MERCHANT -> {
+            matchesSingleText(transaction.originalMerchant, merchantLower, cond) ||
+                (descLower != null && matchesSingleText(transaction.originalDescription ?: "", descLower, cond))
+        }
+        RuleConditionField.ORIGINAL_DESCRIPTION -> {
+            descLower != null && matchesSingleText(transaction.originalDescription ?: "", descLower, cond)
+        }
+        RuleConditionField.AMOUNT -> {
+            val amountCents = abs(transaction.originalAmountCents)
+            when (cond.operator) {
+                RuleOperator.EQUALS, RuleOperator.EXACT -> amountCents == cond.targetAmountCents
+                RuleOperator.GREATER_THAN -> amountCents > cond.targetAmountCents
+                RuleOperator.LESS_THAN -> amountCents < cond.targetAmountCents
+                RuleOperator.BETWEEN -> amountCents in cond.minAmountCents..cond.maxAmountCents
+                else -> false
+            }
+        }
+        RuleConditionField.ACCOUNT, RuleConditionField.ACCOUNT_ID -> {
+            when (cond.operator) {
+                RuleOperator.IS, RuleOperator.EQUALS, RuleOperator.EXACT -> transaction.accountId == cond.targetId
+                RuleOperator.IS_NOT -> transaction.accountId != cond.targetId
+                else -> false
+            }
+        }
+        RuleConditionField.CATEGORY, RuleConditionField.CATEGORY_ID -> {
+            when (cond.operator) {
+                RuleOperator.IS, RuleOperator.EQUALS, RuleOperator.EXACT -> transaction.originalCategoryId == cond.targetId
+                RuleOperator.IS_NOT -> transaction.originalCategoryId != cond.targetId
+                else -> false
+            }
+        }
+        RuleConditionField.NOTES -> {
+            val notes = transaction.notes
+            notes != null && matchesSingleText(notes, notes.lowercase(), cond)
+        }
+    }
+
+    private fun matchesSingleText(rawCandidate: String, candidateLower: String, cond: CompiledCondition): Boolean =
+        when (cond.operator) {
+            RuleOperator.EQUALS, RuleOperator.EXACT -> candidateLower == cond.targetLower
+            RuleOperator.CONTAINS -> candidateLower.contains(cond.targetLower)
+            RuleOperator.STARTS_WITH -> candidateLower.startsWith(cond.targetLower)
+            RuleOperator.ENDS_WITH -> candidateLower.endsWith(cond.targetLower)
+            RuleOperator.REGEX -> cond.compiledRegex?.containsMatchIn(rawCandidate) == true
+            else -> false
+        }
+
+    private class CompiledRule(
+        val sourceTag: String,
+        val conditions: List<CompiledCondition>,
+        val actions: List<CompiledAction>
+    )
+
+    private class CompiledCondition(
+        val field: RuleConditionField,
+        val operator: RuleOperator,
+        val targetLower: String,
+        val compiledRegex: Regex?,
+        val targetId: Long?,
+        val targetAmountCents: Long,
+        val minAmountCents: Long,
+        val maxAmountCents: Long
+    )
+
+    private class CompiledAction(
+        val type: RuleActionType,
+        val newName: String?,
+        val targetCatId: Long?,
+        val boolVal: Boolean
+    )
 
     private fun parseAmountRange(raw: String): Pair<Cents, Cents>? {
         if (raw.isBlank()) return null

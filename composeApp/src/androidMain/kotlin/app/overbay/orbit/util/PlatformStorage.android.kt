@@ -58,6 +58,7 @@ actual class PlatformStorage actual constructor() {
     }
 
     actual fun clear() {
+        PlatformStorageEpoch.bump()
         directory.listFiles()?.forEach { it.delete() }
     }
 }

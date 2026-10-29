@@ -45,7 +45,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Category
-import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.data.model.labelWithEmoji
@@ -155,9 +154,6 @@ fun SwipeableTransactionRow(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
-                        if (transaction.editSource == EditSource.USER) {
-                            Text("Edited", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 6.dp))
-                        }
                         if (transaction.isPending) {
                             Text("Pending", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, color = colors.warning, modifier = Modifier.padding(start = 6.dp))
                         }
