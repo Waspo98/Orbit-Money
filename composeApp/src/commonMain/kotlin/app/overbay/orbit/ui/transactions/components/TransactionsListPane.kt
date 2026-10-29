@@ -341,7 +341,7 @@ private fun TransactionsGroupedLazyList(
                     onLongClick = { onInteraction(); viewModel.toggleTransactionSelection(txn.id) },
                     onEdit = { viewModel.openTransactionEditor(txn.id) },
                     onSplit = { viewModel.openSplitSheet(txn.id) },
-                    onCreateRule = { viewModel.createRuleFromTransaction(txn); onNavigate(OrbitNavKey.Rules) },
+                    onCreateRule = { viewModel.openCreateRuleModal(txn.id) },
                     onMarkRecurring = { viewModel.markTransactionRecurring(txn); onNavigate(OrbitNavKey.Upcoming) },
                     onToggleTransfer = { viewModel.toggleTransfer(txn.id) },
                     onToggleMha = { viewModel.toggleMha(txn.id) },

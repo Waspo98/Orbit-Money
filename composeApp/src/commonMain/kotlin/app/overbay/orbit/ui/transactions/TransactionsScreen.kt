@@ -8,12 +8,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.ui.components.FilterBottomSheet
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
+import app.overbay.orbit.ui.rules.RuleDraftDefaults
+import app.overbay.orbit.ui.rules.sheets.RuleEditorSheet
 import app.overbay.orbit.ui.transactions.components.TransactionBatchActionBar
 import app.overbay.orbit.ui.transactions.components.TransactionDetailInspectorPane
 import app.overbay.orbit.ui.transactions.components.TransactionsListPane
@@ -120,9 +123,7 @@ fun TransactionsScreen(
                 onSplit = { id -> viewModel.openSplitSheet(id) },
                 onDismiss = { viewModel.closeTransactionEditor() },
                 onCreateRule = { txn ->
-                    viewModel.createRuleFromTransaction(txn)
-                    viewModel.closeTransactionEditor()
-                    onNavigate(OrbitNavKey.Rules)
+                    viewModel.openCreateRuleModal(txn.id)
                 },
                 onMarkRecurring = { txn ->
                     viewModel.markTransactionRecurring(txn)
@@ -195,6 +196,25 @@ fun TransactionsScreen(
             onSaveLogoUrl = { url -> viewModel.saveMerchantLogoOverride(logoFinderTxn.id, url) },
             onUseCategoryIcon = { viewModel.useCategoryIconSuspend(logoFinderTxn.id) },
             onDismiss = { viewModel.closeLogoFinder() }
+        )
+    }
+
+    val ruleDraftTxn = state.ruleDraftTransaction
+    if (ruleDraftTxn != null) {
+        val draftRule = remember(ruleDraftTxn.id, state.nextRulePriority) {
+            RuleDraftDefaults.makeRuleDraftFromTransaction(
+                transaction = ruleDraftTxn,
+                nextPriority = state.nextRulePriority
+            )
+        }
+        RuleEditorSheet(
+            rule = draftRule,
+            categories = state.categories,
+            accounts = state.accounts,
+            sourceTransaction = ruleDraftTxn,
+            onSave = { savedRule -> viewModel.saveRuleFromTransaction(savedRule) },
+            onPreviewCount = { conditions -> viewModel.previewRuleMatchCount(conditions) },
+            onDismiss = { viewModel.closeCreateRuleModal() }
         )
     }
 

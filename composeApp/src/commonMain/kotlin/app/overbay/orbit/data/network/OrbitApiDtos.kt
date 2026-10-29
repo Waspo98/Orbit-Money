@@ -21,6 +21,8 @@ import app.overbay.orbit.data.model.UpcomingStatus
 import app.overbay.orbit.domain.MoneyUtils
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class AccountDto(
@@ -305,49 +307,19 @@ data class GoalDto(
 data class RuleConditionDto(
     val field: String = "merchant",
     val operator: String = "contains",
-    @Serializable(with = FlexibleStringSerializer::class) val value: String = ""
+    val value: JsonElement = JsonPrimitive("")
 ) {
-    fun toDomain(): RuleCondition = RuleCondition(
-        field = when (field.lowercase()) {
-            "merchant" -> RuleConditionField.MERCHANT
-            "amount" -> RuleConditionField.AMOUNT
-            "account", "account_id" -> RuleConditionField.ACCOUNT_ID
-            "notes" -> RuleConditionField.NOTES
-            "original_description" -> RuleConditionField.ORIGINAL_DESCRIPTION
-            else -> RuleConditionField.CATEGORY_ID
-        },
-        operator = when (operator.lowercase()) {
-            "exact", "equals" -> RuleOperator.EXACT
-            "starts_with" -> RuleOperator.STARTS_WITH
-            "ends_with" -> RuleOperator.ENDS_WITH
-            "greater_than" -> RuleOperator.GREATER_THAN
-            "less_than" -> RuleOperator.LESS_THAN
-            "regex" -> RuleOperator.REGEX
-            "between" -> RuleOperator.BETWEEN
-            "is" -> RuleOperator.IS
-            "is_not" -> RuleOperator.IS_NOT
-            else -> RuleOperator.CONTAINS
-        },
-        value = value
-    )
+    constructor(field: String = "merchant", operator: String = "contains", value: String) : this(field, operator, JsonPrimitive(value))
+    fun toDomain(): RuleCondition = RuleWireMapper.conditionToDomain(this)
 }
 
 @Serializable
 data class RuleActionDto(
     val type: String = "categorize",
-    @Serializable(with = FlexibleStringSerializer::class) val value: String = ""
+    val value: JsonElement = JsonPrimitive("")
 ) {
-    fun toDomain(): RuleAction = RuleAction(
-        type = when (type.lowercase()) {
-            "categorize", "set_category" -> RuleActionType.SET_CATEGORY
-            "rename_merchant", "rename" -> RuleActionType.RENAME_MERCHANT
-            "mark_transfer" -> RuleActionType.MARK_TRANSFER
-            "mark_ignored" -> RuleActionType.MARK_IGNORED
-            "set_mha_eligible" -> RuleActionType.SET_MHA_ELIGIBLE
-            else -> RuleActionType.SET_CATEGORY
-        },
-        value = value
-    )
+    constructor(type: String = "categorize", value: String) : this(type, JsonPrimitive(value))
+    fun toDomain(): RuleAction = RuleWireMapper.actionToDomain(this)
 }
 
 @Serializable

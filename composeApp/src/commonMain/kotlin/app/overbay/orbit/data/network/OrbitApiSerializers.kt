@@ -3,7 +3,14 @@ package app.overbay.orbit.data.network
 import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.MhaTaxProfile
+import app.overbay.orbit.data.model.RuleAction
+import app.overbay.orbit.data.model.RuleActionType
+import app.overbay.orbit.data.model.RuleCondition
+import app.overbay.orbit.data.model.RuleConditionField
+import app.overbay.orbit.data.model.RuleOperator
+import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.domain.MoneyUtils
+import kotlin.math.abs
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -14,6 +21,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -234,3 +242,150 @@ data class MhaOverviewResponseDto(
     @Serializable(with = FlexibleBooleanSerializer::class) val enabled: Boolean = false,
     val taxProfile: MhaTaxProfileDto? = null
 )
+
+object RuleWireMapper {
+    fun conditionToDomain(dto: RuleConditionDto): RuleCondition {
+        val resolvedField = when (dto.field.lowercase()) {
+            "merchant" -> RuleConditionField.MERCHANT
+            "amount" -> RuleConditionField.AMOUNT
+            "account", "account_id" -> RuleConditionField.ACCOUNT_ID
+            "notes" -> RuleConditionField.NOTES
+            "original_description" -> RuleConditionField.ORIGINAL_DESCRIPTION
+            else -> RuleConditionField.CATEGORY_ID
+        }
+        val resolvedOp = when (dto.operator.lowercase()) {
+            "exact", "equals" -> RuleOperator.EQUALS
+            "starts_with" -> RuleOperator.STARTS_WITH
+            "ends_with" -> RuleOperator.ENDS_WITH
+            "greater_than" -> RuleOperator.GREATER_THAN
+            "less_than" -> RuleOperator.LESS_THAN
+            "regex" -> RuleOperator.REGEX
+            "between" -> RuleOperator.BETWEEN
+            "is" -> RuleOperator.IS
+            "is_not" -> RuleOperator.IS_NOT
+            else -> RuleOperator.CONTAINS
+        }
+        val strValue = jsonElementToRuleString(dto.value)
+        val isIdField = resolvedField == RuleConditionField.ACCOUNT_ID || resolvedField == RuleConditionField.CATEGORY_ID
+        val rangeParts = if (resolvedField == RuleConditionField.AMOUNT && resolvedOp == RuleOperator.BETWEEN && dto.value is JsonArray && dto.value.size == 2) {
+            val a = abs(MoneyUtils.dollarsToCents((dto.value[0] as? JsonPrimitive)?.content))
+            val b = abs(MoneyUtils.dollarsToCents((dto.value[1] as? JsonPrimitive)?.content))
+            minOf(a, b) to maxOf(a, b)
+        } else null
+        return RuleCondition(
+            field = resolvedField,
+            operator = resolvedOp,
+            value = strValue,
+            amountCentsValue = if (resolvedField == RuleConditionField.AMOUNT && resolvedOp != RuleOperator.BETWEEN && strValue.isNotBlank()) abs(MoneyUtils.dollarsToCents(strValue)) else null,
+            minAmountCentsValue = rangeParts?.first,
+            maxAmountCentsValue = rangeParts?.second,
+            targetId = if (isIdField) strValue.toLongOrNull() else null
+        )
+    }
+
+    fun actionToDomain(dto: RuleActionDto): RuleAction {
+        val resolvedType = when (dto.type.lowercase()) {
+            "categorize", "set_category" -> RuleActionType.CATEGORIZE
+            "rename_merchant", "rename" -> RuleActionType.RENAME
+            "mark_transfer" -> RuleActionType.MARK_TRANSFER
+            "mark_ignored" -> RuleActionType.MARK_IGNORED
+            "set_mha_eligible" -> RuleActionType.SET_MHA_ELIGIBLE
+            else -> RuleActionType.CATEGORIZE
+        }
+        val strValue = jsonElementToRuleString(dto.value)
+        val isBoolFlag = resolvedType in setOf(RuleActionType.MARK_TRANSFER, RuleActionType.MARK_IGNORED, RuleActionType.SET_MHA_ELIGIBLE)
+        return RuleAction(
+            type = resolvedType,
+            value = strValue,
+            textValue = if (resolvedType == RuleActionType.RENAME) strValue else null,
+            targetCategoryId = if (resolvedType == RuleActionType.CATEGORIZE) strValue.toLongOrNull() else null,
+            booleanValue = if (isBoolFlag) (strValue.isEmpty() || strValue.lowercase() in setOf("1", "true")) else null
+        )
+    }
+
+    fun toDto(rule: TransactionRule): RuleDto = RuleDto(
+        id = rule.id,
+        name = rule.name,
+        conditions = rule.conditions.map(::conditionToDto),
+        actions = rule.actions.map(::actionToDto),
+        priority = rule.priority,
+        enabled = rule.enabled
+    )
+
+    private fun conditionToDto(cond: RuleCondition): RuleConditionDto {
+        val wireField = when (cond.field) {
+            RuleConditionField.MERCHANT -> "merchant"
+            RuleConditionField.ORIGINAL_DESCRIPTION -> "original_description"
+            RuleConditionField.AMOUNT -> "amount"
+            RuleConditionField.ACCOUNT, RuleConditionField.ACCOUNT_ID -> "account_id"
+            RuleConditionField.CATEGORY, RuleConditionField.CATEGORY_ID -> "category_id"
+            RuleConditionField.NOTES -> "notes"
+        }
+        val wireOperator = when (cond.operator) {
+            RuleOperator.EXACT, RuleOperator.EQUALS -> "equals"
+            RuleOperator.CONTAINS -> "contains"
+            RuleOperator.STARTS_WITH -> "starts_with"
+            RuleOperator.ENDS_WITH -> "ends_with"
+            RuleOperator.GREATER_THAN -> "greater_than"
+            RuleOperator.LESS_THAN -> "less_than"
+            RuleOperator.BETWEEN -> "between"
+            RuleOperator.IS -> "is"
+            RuleOperator.IS_NOT -> "is_not"
+            RuleOperator.REGEX -> "regex"
+        }
+        val wireValue: JsonElement = when {
+            cond.field == RuleConditionField.AMOUNT && cond.operator == RuleOperator.BETWEEN -> {
+                val parts = cond.value.split(",").map { it.trim() }
+                val minCents = cond.minAmountCentsValue ?: parts.getOrNull(0)?.let { abs(MoneyUtils.dollarsToCents(it)) } ?: 0L
+                val maxCents = cond.maxAmountCentsValue ?: parts.getOrNull(1)?.let { abs(MoneyUtils.dollarsToCents(it)) } ?: minCents
+                val lo = minOf(minCents, maxCents)
+                val hi = maxOf(minCents, maxCents)
+                JsonArray(listOf(JsonPrimitive(MoneyUtils.centsToDollars(lo)), JsonPrimitive(MoneyUtils.centsToDollars(hi))))
+            }
+            cond.field == RuleConditionField.AMOUNT -> {
+                val cents = cond.amountCentsValue ?: abs(MoneyUtils.dollarsToCents(cond.value))
+                JsonPrimitive(MoneyUtils.centsToDollars(cents))
+            }
+            cond.field in setOf(RuleConditionField.ACCOUNT, RuleConditionField.ACCOUNT_ID, RuleConditionField.CATEGORY, RuleConditionField.CATEGORY_ID) -> {
+                val id = cond.targetId ?: cond.value.toLongOrNull()
+                if (id != null) JsonPrimitive(id) else JsonPrimitive(cond.value)
+            }
+            else -> JsonPrimitive(cond.value)
+        }
+        return RuleConditionDto(field = wireField, operator = wireOperator, value = wireValue)
+    }
+
+    private fun actionToDto(act: RuleAction): RuleActionDto {
+        val wireType = when (act.type) {
+            RuleActionType.CATEGORIZE, RuleActionType.SET_CATEGORY -> "categorize"
+            RuleActionType.RENAME, RuleActionType.RENAME_MERCHANT -> "rename"
+            RuleActionType.MARK_TRANSFER -> "mark_transfer"
+            RuleActionType.MARK_IGNORED -> "mark_ignored"
+            RuleActionType.SET_MHA_ELIGIBLE -> "set_mha_eligible"
+        }
+        val wireValue: JsonElement = when (act.type) {
+            RuleActionType.CATEGORIZE, RuleActionType.SET_CATEGORY -> {
+                val catId = act.targetCategoryId ?: act.value.toLongOrNull()
+                if (catId != null) JsonPrimitive(catId) else JsonPrimitive(act.value)
+            }
+            RuleActionType.RENAME, RuleActionType.RENAME_MERCHANT -> {
+                JsonPrimitive(act.textValue ?: act.value)
+            }
+            RuleActionType.MARK_TRANSFER, RuleActionType.MARK_IGNORED -> {
+                JsonPrimitive(act.booleanValue ?: true)
+            }
+            RuleActionType.SET_MHA_ELIGIBLE -> {
+                val boolVal = act.booleanValue ?: (act.value.isEmpty() || act.value.lowercase() in setOf("1", "true"))
+                JsonPrimitive(boolVal)
+            }
+        }
+        return RuleActionDto(type = wireType, value = wireValue)
+    }
+
+    private fun jsonElementToRuleString(element: JsonElement): String = when (element) {
+        is JsonNull -> ""
+        is JsonPrimitive -> element.content
+        is JsonArray -> element.joinToString(",") { (it as? JsonPrimitive)?.content ?: it.toString() }
+        else -> element.toString()
+    }
+}

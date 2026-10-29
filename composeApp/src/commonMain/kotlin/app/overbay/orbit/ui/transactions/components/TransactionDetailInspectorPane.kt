@@ -113,9 +113,8 @@ fun TransactionDetailInspectorPane(
                     },
                     onDismiss = { if (state.inspectingTransaction != null) viewModel.closeTransactionEditor() else onClosePane() },
                     onCreateRule = { txn ->
-                        viewModel.createRuleFromTransaction(txn)
                         viewModel.closeTransactionEditor()
-                        onNavigate(OrbitNavKey.Rules)
+                        viewModel.openCreateRuleModal(txn.id)
                     },
                     onMarkRecurring = { txn ->
                         viewModel.markTransactionRecurring(txn)
@@ -143,8 +142,7 @@ fun TransactionDetailInspectorPane(
                         onEdit = { viewModel.openTransactionEditor(inspecting.id) },
                         onSplit = { viewModel.openSplitSheet(inspecting.id) },
                         onCreateRule = {
-                            viewModel.createRuleFromTransaction(inspecting)
-                            onNavigate(OrbitNavKey.Rules)
+                            viewModel.openCreateRuleModal(inspecting.id)
                         },
                         onMarkRecurring = {
                             viewModel.markTransactionRecurring(inspecting)

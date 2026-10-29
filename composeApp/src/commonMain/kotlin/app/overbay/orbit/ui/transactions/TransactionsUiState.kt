@@ -57,6 +57,8 @@ data class TransactionsUiState(
     val singleDeleteConfirmId: Long? = null,
     val showCategoryBatchPicker: Boolean = false,
     val logoFinderTransactionId: Long? = null,
+    val ruleDraftTransactionId: Long? = null,
+    val nextRulePriority: Int = 10,
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
     val syncToastMessage: String? = null,
@@ -72,6 +74,9 @@ data class TransactionsUiState(
 
     val logoFinderTransaction: Transaction?
         get() = transactions.find { it.id == logoFinderTransactionId }
+
+    val ruleDraftTransaction: Transaction?
+        get() = transactions.find { it.id == ruleDraftTransactionId }
 
     val hasActiveFilters: Boolean
         get() = searchQuery.isNotBlank() ||

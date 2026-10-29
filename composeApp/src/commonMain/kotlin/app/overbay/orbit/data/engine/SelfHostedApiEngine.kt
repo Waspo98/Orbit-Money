@@ -15,9 +15,7 @@ import app.overbay.orbit.data.network.AccountDto
 import app.overbay.orbit.data.network.CategoryDto
 import app.overbay.orbit.data.network.GoalDto
 import app.overbay.orbit.data.network.OrbitApiClient
-import app.overbay.orbit.data.network.RuleActionDto
-import app.overbay.orbit.data.network.RuleConditionDto
-import app.overbay.orbit.data.network.RuleDto
+import app.overbay.orbit.data.network.RuleWireMapper
 import app.overbay.orbit.data.network.TransactionDto
 import app.overbay.orbit.data.network.UpcomingItemDto
 import app.overbay.orbit.domain.MoneyUtils
@@ -260,14 +258,7 @@ class SelfHostedApiEngine(
     override suspend fun deleteGoal(id: Long): Result<Boolean> = apiClient.deleteGoal(id)
 
     override suspend fun pushRule(rule: TransactionRule): Result<TransactionRule> {
-        val dto = RuleDto(
-            id = rule.id,
-            name = rule.name,
-            conditions = rule.conditions.map { RuleConditionDto(it.field.name.lowercase(), it.operator.name.lowercase(), it.value) },
-            actions = rule.actions.map { RuleActionDto(it.type.name.lowercase(), it.value) },
-            priority = rule.priority,
-            enabled = rule.enabled
-        )
+        val dto = RuleWireMapper.toDto(rule)
         return if (rule.id == 0L) {
             apiClient.createRule(dto).map { it.toDomain() }
         } else {

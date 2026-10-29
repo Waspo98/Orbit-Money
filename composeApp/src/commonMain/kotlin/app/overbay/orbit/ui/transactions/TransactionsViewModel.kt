@@ -7,11 +7,7 @@ import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.RecurrenceFrequency
-import app.overbay.orbit.data.model.RuleAction
-import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
-import app.overbay.orbit.data.model.RuleConditionField
-import app.overbay.orbit.data.model.RuleOperator
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.UpcomingItem
@@ -19,6 +15,7 @@ import app.overbay.orbit.data.model.UpcomingKind
 import app.overbay.orbit.data.model.UpcomingStatus
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.domain.RuleMatcherEngine
 import app.overbay.orbit.ui.components.TransactionFilterDraft
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,15 +47,18 @@ class TransactionsViewModel(
     private val _singleDeleteConfirmId = MutableStateFlow<Long?>(null)
     private val _showCategoryBatchPicker = MutableStateFlow(false)
     private val _logoFinderTransactionId = MutableStateFlow<Long?>(null)
+    private val _ruleDraftTransactionId = MutableStateFlow<Long?>(null)
     private val _isSyncing = MutableStateFlow(false)
     private val _syncToastMessage = MutableStateFlow<String?>(null)
 
     private val dataFlow = combine(
         repository.transactions,
         repository.categories,
-        repository.accounts
-    ) { txns, categories, accounts ->
-        Triple(txns, categories, accounts)
+        repository.accounts,
+        repository.rules
+    ) { txns, categories, accounts, rules ->
+        val nextPriority = (rules.maxOfOrNull { it.priority } ?: 0) + 10
+        RepoSnapshot(txns, categories, accounts, nextPriority)
     }
 
     private val filterFlow = combine(
@@ -74,7 +74,7 @@ class TransactionsViewModel(
     val uiState: StateFlow<TransactionsUiState> = combine(
         dataFlow,
         filterFlow
-    ) { (txns, categories, accounts), filterParams ->
+    ) { (txns, categories, accounts, nextPriority), filterParams ->
         val categoryMap = categories.associateBy { it.id }
         val accountMap = accounts.associateBy { it.id }
 
@@ -133,43 +133,31 @@ class TransactionsViewModel(
             sortOption = filterParams.sort,
             isCompactView = filterParams.isCompactView,
             monthlyTransactionCount = monthlyCount,
+            nextRulePriority = nextPriority,
             totalExpenseCents = totalExpense,
             totalIncomeCents = totalIncome,
             netCashflowCents = totalIncome + totalExpense
         )
-    }.combine(_isSearchActive) { state, searchActive ->
-        state.copy(isSearchActive = searchActive)
-    }.combine(_selectedIds) { state, selected ->
-        state.copy(selectedTransactionIds = selected)
-    }.combine(_inspectingId) { state, inspecting ->
-        state.copy(inspectingTransactionId = inspecting)
-    }.combine(_expandedId) { state, expanded ->
-        state.copy(expandedTransactionId = expanded)
-    }.combine(_showEditorSheet) { state, showEditor ->
-        state.copy(showEditorSheet = showEditor)
-    }.combine(_showSplitSheet) { state, showSplit ->
-        state.copy(showSplitSheet = showSplit)
-    }.combine(_showCsvImportSheet) { state, showCsv ->
-        state.copy(showCsvImportSheet = showCsv)
-    }.combine(_showFilterSheet) { state, showFilter ->
-        state.copy(showFilterSheet = showFilter)
-    }.combine(_showBatchDeleteConfirm) { state, showBatchDel ->
-        state.copy(showBatchDeleteConfirm = showBatchDel)
-    }.combine(_singleDeleteConfirmId) { state, singleDelId ->
-        state.copy(singleDeleteConfirmId = singleDelId)
-    }.combine(_showCategoryBatchPicker) { state, showCatPicker ->
-        state.copy(showCategoryBatchPicker = showCatPicker)
-    }.combine(_logoFinderTransactionId) { state, logoFinderId ->
-        state.copy(logoFinderTransactionId = logoFinderId)
-    }.combine(_isSyncing) { state, isSyncing ->
-        state.copy(isSyncing = isSyncing)
-    }.combine(_syncToastMessage) { state, toastMsg ->
-        state.copy(syncToastMessage = toastMsg)
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = TransactionsUiState(isLoading = true)
-    )
+    }.combine(_isSearchActive) { state, v -> state.copy(isSearchActive = v) }
+        .combine(_selectedIds) { state, v -> state.copy(selectedTransactionIds = v) }
+        .combine(_inspectingId) { state, v -> state.copy(inspectingTransactionId = v) }
+        .combine(_expandedId) { state, v -> state.copy(expandedTransactionId = v) }
+        .combine(_showEditorSheet) { state, v -> state.copy(showEditorSheet = v) }
+        .combine(_showSplitSheet) { state, v -> state.copy(showSplitSheet = v) }
+        .combine(_showCsvImportSheet) { state, v -> state.copy(showCsvImportSheet = v) }
+        .combine(_showFilterSheet) { state, v -> state.copy(showFilterSheet = v) }
+        .combine(_showBatchDeleteConfirm) { state, v -> state.copy(showBatchDeleteConfirm = v) }
+        .combine(_singleDeleteConfirmId) { state, v -> state.copy(singleDeleteConfirmId = v) }
+        .combine(_showCategoryBatchPicker) { state, v -> state.copy(showCategoryBatchPicker = v) }
+        .combine(_logoFinderTransactionId) { state, v -> state.copy(logoFinderTransactionId = v) }
+        .combine(_ruleDraftTransactionId) { state, v -> state.copy(ruleDraftTransactionId = v) }
+        .combine(_isSyncing) { state, v -> state.copy(isSyncing = v) }
+        .combine(_syncToastMessage) { state, v -> state.copy(syncToastMessage = v) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = TransactionsUiState(isLoading = true)
+        )
 
     fun setSearchQuery(query: String) { _searchQuery.value = query }
     fun setSearchActive(active: Boolean) {
@@ -506,19 +494,26 @@ class TransactionsViewModel(
         }
     }
 
-    fun createRuleFromTransaction(transaction: Transaction) {
+    fun openCreateRuleModal(transactionId: Long) {
+        _showEditorSheet.value = false
+        _ruleDraftTransactionId.value = transactionId
+    }
+
+    fun closeCreateRuleModal() {
+        _ruleDraftTransactionId.value = null
+    }
+
+    fun saveRuleFromTransaction(rule: TransactionRule) {
+        _ruleDraftTransactionId.value = null
         viewModelScope.launch {
-            val actions = buildList {
-                transaction.effectiveCategoryId?.let { add(RuleAction(RuleActionType.SET_CATEGORY, it.toString())) }
-                if (transaction.effectiveIsTransfer) add(RuleAction(RuleActionType.MARK_TRANSFER, "true"))
-            }
-            val rule = TransactionRule(
-                name = "${transaction.effectiveMerchant} Rule",
-                conditions = listOf(RuleCondition(RuleConditionField.MERCHANT, RuleOperator.CONTAINS, transaction.originalMerchant.ifBlank { transaction.effectiveMerchant })),
-                actions = actions
-            )
             repository.saveRule(rule)
+            repository.runRulesOnAllTransactions()
         }
+    }
+
+    fun previewRuleMatchCount(conditions: List<RuleCondition>): Int {
+        if (conditions.isEmpty()) return 0
+        return RuleMatcherEngine.countMatches(repository.transactions.value, conditions)
     }
 
     fun markTransactionRecurring(transaction: Transaction) {
@@ -575,6 +570,13 @@ class TransactionsViewModel(
             true
         }
     }
+
+    private data class RepoSnapshot(
+        val transactions: List<Transaction>,
+        val categories: List<app.overbay.orbit.data.model.Category>,
+        val accounts: List<app.overbay.orbit.data.model.Account>,
+        val nextRulePriority: Int
+    )
 
     private data class FilterParams(
         val query: String,
