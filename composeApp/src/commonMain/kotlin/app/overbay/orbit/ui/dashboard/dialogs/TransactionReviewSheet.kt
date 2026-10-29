@@ -211,6 +211,9 @@ fun TransactionReviewSheet(
             accounts = state.accounts,
             onSave = { savedRule -> onAction(DashboardAction.SaveReviewRule(savedRule)) },
             onPreviewCount = onPreviewRuleMatches,
+            onPreviewMatches = { conditions ->
+                RuleMatcherEngine.matchingTransactions(state.allTransactions, conditions)
+            },
             onDismiss = { onAction(DashboardAction.CloseReviewRuleCreator) },
             sourceTransaction = state.allTransactions.find { it.id == ruleTxn.id }
         )

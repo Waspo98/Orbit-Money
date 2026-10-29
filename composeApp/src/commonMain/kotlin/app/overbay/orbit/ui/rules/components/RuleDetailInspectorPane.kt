@@ -40,10 +40,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
+import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.ui.rules.RulesUiState
@@ -61,6 +61,7 @@ fun RuleDetailInspectorPane(
     onRunRulesNow: () -> Unit,
     onPreviewCount: (List<RuleCondition>) -> Int,
     onDismissPane: () -> Unit,
+    onPreviewMatches: (List<RuleCondition>) -> List<Transaction> = { emptyList() },
     modifier: Modifier = Modifier
 ) {
     val activeMode = when {
@@ -91,6 +92,7 @@ fun RuleDetailInspectorPane(
                         accounts = state.accounts,
                         onSave = onSaveRule,
                         onPreviewCount = onPreviewCount,
+                        onPreviewMatches = onPreviewMatches,
                         onDismiss = {
                             if (state.inspectingRule != null) {
                                 onCloseEdit()

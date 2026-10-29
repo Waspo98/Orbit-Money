@@ -187,6 +187,7 @@ fun RulesScreen(
                                 onDeleteRule = { id -> viewModel.requestDeleteRule(id) },
                                 onRunRulesNow = { viewModel.runRulesNow() },
                                 onPreviewCount = { conditions -> viewModel.previewMatchCount(conditions) },
+                                onPreviewMatches = { conditions -> viewModel.previewMatchingTransactions(conditions) },
                                 onDismissPane = { viewModel.dismissInspectorPane() }
                             )
                         }
@@ -202,6 +203,7 @@ fun RulesScreen(
                 accounts = state.accounts,
                 onSave = { rule -> viewModel.saveRule(rule) },
                 onPreviewCount = { conditions -> viewModel.previewMatchCount(conditions) },
+                onPreviewMatches = { conditions -> viewModel.previewMatchingTransactions(conditions) },
                 onDismiss = { viewModel.closeEditorSheet() }
             )
         }

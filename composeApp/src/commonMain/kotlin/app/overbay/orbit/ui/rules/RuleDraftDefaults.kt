@@ -97,10 +97,10 @@ object RuleDraftDefaults {
     }
 
     /**
-     * Seeds a new rule draft from a transaction, matching `main`'s "Create rule" flow:
+     * Seeds a new rule draft from a transaction:
      * - Condition: merchant contains [originalMerchant (fallback effectiveMerchant)]
      * - Action: rename merchant to [effectiveMerchant]
-     * - Name: blank (optional; auto-generated on save if left empty)
+     * - Name: populated by default with the final output merchant name (or original merchant)
      */
     fun makeRuleDraftFromTransaction(
         transaction: Transaction,
@@ -108,24 +108,26 @@ object RuleDraftDefaults {
     ): TransactionRule {
         val matchMerchant = transaction.originalMerchant.ifBlank { transaction.effectiveMerchant }.trim()
         val targetMerchant = transaction.effectiveMerchant
+        val conditions = listOf(
+            RuleCondition(
+                field = RuleConditionField.MERCHANT,
+                operator = RuleOperator.CONTAINS,
+                value = matchMerchant
+            )
+        )
+        val actions = listOf(
+            RuleAction(
+                type = RuleActionType.RENAME,
+                value = targetMerchant,
+                textValue = targetMerchant
+            )
+        )
         return TransactionRule(
             id = 0L,
-            name = "",
+            name = defaultRuleName(conditions, actions, transaction),
             priority = nextPriority,
-            conditions = listOf(
-                RuleCondition(
-                    field = RuleConditionField.MERCHANT,
-                    operator = RuleOperator.CONTAINS,
-                    value = matchMerchant
-                )
-            ),
-            actions = listOf(
-                RuleAction(
-                    type = RuleActionType.RENAME,
-                    value = targetMerchant,
-                    textValue = targetMerchant
-                )
-            ),
+            conditions = conditions,
+            actions = actions,
             enabled = true
         )
     }
@@ -222,21 +224,9 @@ object RuleDraftDefaults {
                 ?: condition.value.takeIf { it.isNotBlank() }?.let { abs(MoneyUtils.dollarsToCents(it)) }
             if (baseCents != null && baseCents > 0L) {
                 val s = MoneyUtils.centsToDollarString(baseCents)
-                condition.copy(
-                    operator = resolvedOp,
-                    value = "$s,$s",
-                    amountCentsValue = null,
-                    minAmountCentsValue = baseCents,
-                    maxAmountCentsValue = baseCents
-                )
+                condition.copy(operator = resolvedOp, value = "$s,$s", amountCentsValue = null, minAmountCentsValue = baseCents, maxAmountCentsValue = baseCents)
             } else {
-                condition.copy(
-                    operator = resolvedOp,
-                    value = "",
-                    amountCentsValue = null,
-                    minAmountCentsValue = null,
-                    maxAmountCentsValue = null
-                )
+                condition.copy(operator = resolvedOp, value = "", amountCentsValue = null, minAmountCentsValue = null, maxAmountCentsValue = null)
             }
         } else {
             val baseCents = condition.amountCentsValue
@@ -244,21 +234,9 @@ object RuleDraftDefaults {
                 ?: condition.value.split(",").firstOrNull()?.takeIf { it.isNotBlank() }?.let { abs(MoneyUtils.dollarsToCents(it)) }
             if (baseCents != null && baseCents > 0L) {
                 val s = MoneyUtils.centsToDollarString(baseCents)
-                condition.copy(
-                    operator = resolvedOp,
-                    value = s,
-                    amountCentsValue = baseCents,
-                    minAmountCentsValue = null,
-                    maxAmountCentsValue = null
-                )
+                condition.copy(operator = resolvedOp, value = s, amountCentsValue = baseCents, minAmountCentsValue = null, maxAmountCentsValue = null)
             } else {
-                condition.copy(
-                    operator = resolvedOp,
-                    value = "",
-                    amountCentsValue = null,
-                    minAmountCentsValue = null,
-                    maxAmountCentsValue = null
-                )
+                condition.copy(operator = resolvedOp, value = "", amountCentsValue = null, minAmountCentsValue = null, maxAmountCentsValue = null)
             }
         }
     }
@@ -352,21 +330,51 @@ object RuleDraftDefaults {
         return "$fLabel $opLabel \"$valLabel\""
     }
 
-    fun resolveRuleName(
-        rawName: String,
+    /**
+     * Computes the default rule name from the rule's final output merchant name:
+     * 1. If a RENAME action with non-blank text is present, use that new merchant name.
+     * 2. Else if [sourceTransaction] is provided, use its original merchant name (falling back to effective merchant).
+     * 3. Else if a MERCHANT condition with non-blank text is present, use that condition value.
+     */
+    fun defaultRuleName(
         conditions: List<RuleCondition>,
         actions: List<RuleAction>,
-        accounts: List<Account> = emptyList(),
-        categories: List<Category> = emptyList()
+        sourceTransaction: Transaction? = null
     ): String {
-        val trimmed = rawName.trim()
-        if (trimmed.isNotEmpty()) return trimmed
-
         val renameValue = actions
             .firstOrNull { canonicalActionType(it.type) == RuleActionType.RENAME }
             ?.let { (it.textValue ?: it.value).trim() }
             .orEmpty()
         if (renameValue.isNotEmpty()) return renameValue.take(80)
+
+        val originalMerchant = sourceTransaction
+            ?.let { it.originalMerchant.trim().ifEmpty { it.effectiveMerchant.trim() } }
+            .orEmpty()
+        if (originalMerchant.isNotEmpty()) return originalMerchant.take(80)
+
+        val conditionMerchant = conditions
+            .firstOrNull { canonicalField(it.field) == RuleConditionField.MERCHANT }
+            ?.value
+            ?.trim()
+            .orEmpty()
+        if (conditionMerchant.isNotEmpty()) return conditionMerchant.take(80)
+
+        return ""
+    }
+
+    fun resolveRuleName(
+        rawName: String,
+        conditions: List<RuleCondition>,
+        actions: List<RuleAction>,
+        accounts: List<Account> = emptyList(),
+        categories: List<Category> = emptyList(),
+        sourceTransaction: Transaction? = null
+    ): String {
+        val trimmed = rawName.trim()
+        if (trimmed.isNotEmpty()) return trimmed
+
+        val merchantDefault = defaultRuleName(conditions, actions, sourceTransaction)
+        if (merchantDefault.isNotEmpty()) return merchantDefault
 
         val firstCond = conditions.firstOrNull()
         if (firstCond != null) {

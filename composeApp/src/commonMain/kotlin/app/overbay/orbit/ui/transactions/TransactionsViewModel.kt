@@ -516,6 +516,9 @@ class TransactionsViewModel(
         return RuleMatcherEngine.countMatches(repository.transactions.value, conditions)
     }
 
+    fun previewRuleMatches(conditions: List<RuleCondition>): List<Transaction> =
+        RuleMatcherEngine.matchingTransactions(repository.transactions.value, conditions)
+
     fun markTransactionRecurring(transaction: Transaction) {
         viewModelScope.launch {
             val item = UpcomingItem(

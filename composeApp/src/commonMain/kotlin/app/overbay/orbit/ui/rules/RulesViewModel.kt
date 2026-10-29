@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.RuleCondition
+import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.domain.RuleMatcherEngine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -151,4 +152,7 @@ class RulesViewModel(
         if (conditions.isEmpty()) return 0
         return RuleMatcherEngine.countMatches(repository.transactions.value, conditions)
     }
+
+    fun previewMatchingTransactions(conditions: List<RuleCondition>): List<Transaction> =
+        RuleMatcherEngine.matchingTransactions(repository.transactions.value, conditions)
 }

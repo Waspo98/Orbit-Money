@@ -115,7 +115,7 @@ class CreateRuleFromTransactionTest {
         val draft = RuleDraftDefaults.makeRuleDraftFromTransaction(txn, nextPriority = 30)
 
         assertEquals(0L, draft.id)
-        assertEquals("", draft.name, "Draft rule name starts blank (optional)")
+        assertEquals("Blue Bottle Coffee", draft.name, "Draft rule name defaults to final output merchant name")
         assertEquals(30, draft.priority)
         assertEquals(1, draft.conditions.size)
         assertEquals(RuleConditionField.MERCHANT, draft.conditions[0].field)
@@ -206,28 +206,53 @@ class CreateRuleFromTransactionTest {
     }
 
     @Test
-    fun testResolveRuleName_autoGeneratesFromRenameOrConditionSummary() {
+    fun testDefaultAndResolveRuleName_usesOutputMerchantOrOriginalMerchantAndAllowsCustomOverwrite() {
         val accounts = listOf(Account(id = 2L, name = "Sapphire", type = AccountType.CREDIT))
         val categories = listOf(Category(id = 10L, name = "Coffee"))
         val conditions = listOf(RuleCondition(RuleConditionField.MERCHANT, RuleOperator.CONTAINS, "SQ *COFFEE"))
-
-        val fromRename = RuleDraftDefaults.resolveRuleName(
-            rawName = "   ",
-            conditions = conditions,
-            actions = listOf(RuleAction(RuleActionType.RENAME, value = "Morning Coffee", textValue = "Morning Coffee")),
-            accounts = accounts,
-            categories = categories
+        val sourceTxn = Transaction(
+            id = 77L,
+            accountId = 2L,
+            originalDate = "2026-06-04",
+            originalMerchant = "SQ *COFFEE #88",
+            editedMerchant = "Morning Coffee",
+            editedMerchantSource = "user",
+            editSource = EditSource.USER,
+            originalAmountCents = -525L
         )
-        assertEquals("Morning Coffee", fromRename)
 
-        val fromCondition = RuleDraftDefaults.resolveRuleName(
-            rawName = "",
-            conditions = conditions,
-            actions = listOf(RuleAction(RuleActionType.CATEGORIZE, value = "10", targetCategoryId = 10L)),
-            accounts = accounts,
-            categories = categories
+        // 1. When a RENAME action is present with non-blank text, default name is the new merchant name
+        val renameActions = listOf(RuleAction(RuleActionType.RENAME, value = "Morning Coffee", textValue = "Morning Coffee"))
+        assertEquals("Morning Coffee", RuleDraftDefaults.defaultRuleName(conditions, renameActions, sourceTxn))
+        assertEquals(
+            "Morning Coffee",
+            RuleDraftDefaults.resolveRuleName("   ", conditions, renameActions, accounts, categories, sourceTxn)
         )
-        assertEquals("Merchant Name contains \"SQ *COFFEE\"", fromCondition)
+
+        // 2. When NO RENAME action is applied (e.g. categorize-only), default name is original merchant name
+        val categorizeActions = listOf(RuleAction(RuleActionType.CATEGORIZE, value = "10", targetCategoryId = 10L))
+        assertEquals("SQ *COFFEE #88", RuleDraftDefaults.defaultRuleName(conditions, categorizeActions, sourceTxn))
+        assertEquals(
+            "SQ *COFFEE #88",
+            RuleDraftDefaults.resolveRuleName("", conditions, categorizeActions, accounts, categories, sourceTxn)
+        )
+
+        // 3. Without a source transaction or RENAME action, falls back to MERCHANT condition value
+        assertEquals("SQ *COFFEE", RuleDraftDefaults.defaultRuleName(conditions, categorizeActions, null))
+
+        // 4. Non-merchant condition without source transaction falls back to condition summary on save
+        val amountConditions = listOf(RuleCondition(RuleConditionField.AMOUNT, RuleOperator.GREATER_THAN, "100.00", amountCentsValue = 10000L))
+        assertEquals("", RuleDraftDefaults.defaultRuleName(amountConditions, categorizeActions, null))
+        assertEquals(
+            "Amount is greater than \"100.00\"",
+            RuleDraftDefaults.resolveRuleName("", amountConditions, categorizeActions, accounts, categories, null)
+        )
+
+        // 5. User-entered custom name always overwrites default
+        assertEquals(
+            "Custom Household Coffee Rule",
+            RuleDraftDefaults.resolveRuleName("  Custom Household Coffee Rule  ", conditions, renameActions, accounts, categories, sourceTxn)
+        )
     }
 
     @Test
@@ -261,10 +286,17 @@ class CreateRuleFromTransactionTest {
 
         val sourceTxn = viewModel.uiState.value.ruleDraftTransaction!!
         val draft = RuleDraftDefaults.makeRuleDraftFromTransaction(sourceTxn, viewModel.uiState.value.nextRulePriority)
+        assertEquals("SQ *ROASTERY #1", draft.name)
         assertEquals(1, viewModel.previewRuleMatchCount(draft.conditions))
+        assertEquals(listOf(201L), viewModel.previewRuleMatches(draft.conditions).map { it.id })
 
         val broadenedConditions = listOf(draft.conditions.first().copy(value = "SQ *ROASTERY"))
         assertEquals(2, viewModel.previewRuleMatchCount(broadenedConditions))
+        assertEquals(
+            listOf(202L, 201L),
+            viewModel.previewRuleMatches(broadenedConditions).map { it.id },
+            "Matching transactions preview window lists matches newest-first"
+        )
 
         val finalizedRule = draft.copy(
             name = "Local Roastery",

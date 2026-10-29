@@ -1,6 +1,5 @@
 package app.overbay.orbit.ui.rules.sheets
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,21 +8,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -32,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
@@ -48,6 +46,7 @@ import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.rules.RuleDraftDefaults
 import app.overbay.orbit.ui.rules.components.ActionEditorRow
 import app.overbay.orbit.ui.rules.components.ConditionEditorRow
+import app.overbay.orbit.ui.rules.components.RuleMatchPreviewWindow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -59,6 +58,7 @@ fun RuleEditorSheet(
     onPreviewCount: (List<RuleCondition>) -> Int,
     onDismiss: () -> Unit,
     sourceTransaction: Transaction? = null,
+    onPreviewMatches: (List<RuleCondition>) -> List<Transaction> = { emptyList() },
     modifier: Modifier = Modifier
 ) {
     OrbitModalSheet(onDismissRequest = onDismiss, modifier = modifier) {
@@ -69,7 +69,8 @@ fun RuleEditorSheet(
             onSave = onSave,
             onPreviewCount = onPreviewCount,
             onDismiss = onDismiss,
-            sourceTransaction = sourceTransaction
+            sourceTransaction = sourceTransaction,
+            onPreviewMatches = onPreviewMatches
         )
     }
 }
@@ -83,16 +84,12 @@ fun RuleEditorContent(
     onPreviewCount: (List<RuleCondition>) -> Int,
     onDismiss: () -> Unit,
     sourceTransaction: Transaction? = null,
+    onPreviewMatches: (List<RuleCondition>) -> List<Transaction> = { emptyList() },
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
     val isEditingExisting = rule != null && rule.id > 0L
     val sortedCategories = remember(categories) { categories.sortedBy { it.name.lowercase() } }
-
-    var name by remember(rule, sourceTransaction?.id) { mutableStateOf(rule?.name ?: "") }
-    var priorityText by remember(rule, sourceTransaction?.id) {
-        mutableStateOf((rule?.priority ?: 10).toString())
-    }
 
     val conditions = remember(rule, sourceTransaction?.id) {
         mutableStateListOf<RuleCondition>().apply {
@@ -117,9 +114,36 @@ fun RuleEditorContent(
 
     val currentConditions = conditions.toList()
     val currentActions = actions.toList()
+    val computedDefaultName = remember(currentConditions, currentActions, sourceTransaction) {
+        RuleDraftDefaults.defaultRuleName(currentConditions, currentActions, sourceTransaction)
+    }
+
+    var hasCustomName by remember(rule, sourceTransaction?.id) {
+        mutableStateOf(isEditingExisting && !rule?.name.isNullOrBlank())
+    }
+    var name by remember(rule, sourceTransaction?.id) {
+        mutableStateOf(
+            if (isEditingExisting) rule?.name.orEmpty()
+            else computedDefaultName.ifBlank { rule?.name.orEmpty() }
+        )
+    }
+
+    LaunchedEffect(computedDefaultName, hasCustomName) {
+        if (!hasCustomName) {
+            name = computedDefaultName
+        }
+    }
+
     val allConditionsValid = currentConditions.isNotEmpty() && currentConditions.all(RuleDraftDefaults::isConditionValid)
     val canSave = allConditionsValid && currentActions.isNotEmpty() && currentActions.all(RuleDraftDefaults::isActionValid)
-    val matchCount = remember(currentConditions) { if (allConditionsValid) onPreviewCount(currentConditions) else 0 }
+    val matchingTransactions = remember(currentConditions) {
+        if (allConditionsValid) onPreviewMatches(currentConditions) else emptyList()
+    }
+    val matchCount = remember(currentConditions, matchingTransactions) {
+        if (!allConditionsValid) 0
+        else if (matchingTransactions.isNotEmpty()) matchingTransactions.size
+        else onPreviewCount(currentConditions)
+    }
 
     Column(
         modifier = modifier
@@ -135,31 +159,52 @@ fun RuleEditorContent(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OrbitTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Name (Optional)") },
-                placeholder = { Text("Auto-generated if empty") },
-                singleLine = true,
-                modifier = Modifier.weight(0.68f)
-            )
+        OrbitTextField(
+            value = name,
+            onValueChange = {
+                name = it
+                hasCustomName = true
+            },
+            label = { Text("Rule Name") },
+            placeholder = { Text("Enter custom rule name") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            trailingIcon = if (name.isNotEmpty()) {
+                {
+                    IconButton(
+                        onClick = {
+                            haptics.tick()
+                            name = ""
+                            hasCustomName = true
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "Clear Rule Name",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            } else null,
+            supportingText = {
+                Text(
+                    text = if (hasCustomName) {
+                        "Custom rule name"
+                    } else {
+                        "Defaults to merchant name — tap to overwrite"
+                    }
+                )
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
 
-            OrbitTextField(
-                value = priorityText,
-                onValueChange = { priorityText = it.filter { ch -> ch.isDigit() } },
-                label = { Text("Priority") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                modifier = Modifier.weight(0.32f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -262,32 +307,14 @@ fun RuleEditorContent(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = "Match Preview",
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (allConditionsValid) {
-                        "Matches $matchCount existing transaction${if (matchCount == 1) "" else "s"}"
-                    } else {
-                        "Fill in conditions to see a match preview"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
-        }
+        RuleMatchPreviewWindow(
+            allConditionsValid = allConditionsValid,
+            matchCount = matchCount,
+            matchingTransactions = matchingTransactions,
+            accounts = accounts,
+            categories = sortedCategories,
+            sourceTransactionId = sourceTransaction?.id
+        )
 
         Spacer(modifier = Modifier.height(18.dp))
 
@@ -303,13 +330,19 @@ fun RuleEditorContent(
             Button(
                 onClick = {
                     haptics.confirm()
-                    val priority = priorityText.toIntOrNull() ?: 10
-                    val finalName = RuleDraftDefaults.resolveRuleName(name, currentConditions, currentActions, accounts, sortedCategories)
+                    val finalName = RuleDraftDefaults.resolveRuleName(
+                        rawName = name,
+                        conditions = currentConditions,
+                        actions = currentActions,
+                        accounts = accounts,
+                        categories = sortedCategories,
+                        sourceTransaction = sourceTransaction
+                    )
                     onSave(
                         TransactionRule(
                             id = rule?.id ?: 0L,
                             name = finalName,
-                            priority = priority,
+                            priority = rule?.priority ?: 10,
                             conditions = currentConditions,
                             actions = currentActions,
                             enabled = rule?.enabled ?: true

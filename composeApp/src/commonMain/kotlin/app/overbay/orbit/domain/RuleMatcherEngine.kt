@@ -244,6 +244,13 @@ object RuleMatcherEngine {
         return transactions.count { evalConditions(it, conditions) }
     }
 
+    fun matchingTransactions(transactions: List<Transaction>, conditions: List<RuleCondition>): List<Transaction> {
+        if (conditions.isEmpty()) return emptyList()
+        return transactions
+            .filter { evalConditions(it, conditions) }
+            .sortedWith(compareByDescending<Transaction> { it.effectiveDate }.thenByDescending { it.id })
+    }
+
     private fun parseAmountRange(raw: String): Pair<Cents, Cents>? {
         if (raw.isBlank()) return null
         val cleaned = raw.trim().removeSurrounding("[", "]").trim()

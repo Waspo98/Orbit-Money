@@ -264,9 +264,10 @@ internal fun makeReviewRuleDraft(
 ): TransactionRule {
     val categoryId = txn.categoryId ?: txn.suggestedCategoryId ?: categories.firstOrNull()?.id
     val merchantValue = txn.merchant.ifBlank { txn.originalMerchant }
+    val defaultName = txn.originalMerchant.ifBlank { merchantValue }.trim()
     return TransactionRule(
         id = 0L,
-        name = "Categorize ${txn.merchant.ifBlank { "merchant" }}",
+        name = defaultName,
         priority = 10,
         conditions = listOf(
             RuleCondition(

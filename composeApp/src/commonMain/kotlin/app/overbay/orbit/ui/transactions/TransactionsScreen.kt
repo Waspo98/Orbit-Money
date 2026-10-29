@@ -214,6 +214,7 @@ fun TransactionsScreen(
             sourceTransaction = ruleDraftTxn,
             onSave = { savedRule -> viewModel.saveRuleFromTransaction(savedRule) },
             onPreviewCount = { conditions -> viewModel.previewRuleMatchCount(conditions) },
+            onPreviewMatches = { conditions -> viewModel.previewRuleMatches(conditions) },
             onDismiss = { viewModel.closeCreateRuleModal() }
         )
     }
