@@ -178,7 +178,8 @@ data class HouseholdMemberDto(
     @SerialName("hsa_contribution_annual") val hsaContributionAnnual: Double = 0.0,
     @SerialName("dependent_care_fsa_annual") val dependentCareFsaAnnual: Double = 0.0,
     @SerialName("other_benefits_annual") val otherBenefitsAnnual: Double = 0.0,
-    val notes: String? = null
+    val notes: String? = null,
+    @SerialName("retirement_accounts") val retirementAccounts: List<HouseholdRetirementAccountWireDto> = emptyList()
 ) {
     fun toDomain(): HouseholdMember = HouseholdMember(
         id = id,
@@ -203,13 +204,16 @@ data class HouseholdMemberDto(
         hsaContributionAnnualCents = MoneyUtils.dollarsToCents(hsaContributionAnnual),
         dependentCareFsaAnnualCents = MoneyUtils.dollarsToCents(dependentCareFsaAnnual),
         otherBenefitsAnnualCents = MoneyUtils.dollarsToCents(otherBenefitsAnnual),
-        notes = notes
+        notes = notes,
+        retirementAccounts = retirementAccounts.map { it.toDomain(id) }
     )
 }
 
 @Serializable
 data class HouseholdResponseDto(
-    val members: List<HouseholdMemberDto> = emptyList()
+    val members: List<HouseholdMemberDto> = emptyList(),
+    val records: List<HouseholdIncomeRecordWireDto> = emptyList(),
+    @SerialName("retirement_accounts") val retirementAccounts: List<HouseholdRetirementAccountWireDto> = emptyList()
 )
 
 @Serializable
@@ -240,7 +244,8 @@ data class MhaTaxProfileDto(
 @Serializable
 data class MhaOverviewResponseDto(
     @Serializable(with = FlexibleBooleanSerializer::class) val enabled: Boolean = false,
-    val taxProfile: MhaTaxProfileDto? = null
+    val taxProfile: MhaTaxProfileDto? = null,
+    val taxReference: MhaTaxReferenceWireDto? = null
 )
 
 object RuleWireMapper {

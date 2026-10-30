@@ -73,7 +73,7 @@ class LocalSnapshotEngine(
     // In Local Mode, state mutations are committed through OrbitRepository saving the snapshot.
     override suspend fun pushTransaction(transaction: Transaction): Result<Transaction> = Result.success(transaction)
     override suspend fun deleteTransaction(id: Long): Result<Boolean> = Result.success(true)
-    override suspend fun resetTransaction(id: Long): Result<Transaction> {
+    override suspend fun resetTransaction(id: Long, fields: List<String>): Result<Transaction> {
         val found = loadSnapshot().transactions.find { it.id == id }
         return if (found != null) Result.success(found) else Result.failure(NoSuchElementException("Transaction $id not found"))
     }

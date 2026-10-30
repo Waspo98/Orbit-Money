@@ -138,7 +138,11 @@ data class TransactionFilter(
     val transfersOnly: Boolean = false,
     val uncategorizedOnly: Boolean = false,
     val mhaOnly: Boolean = false,
-    val ignoredOnly: Boolean = false
+    val ignoredOnly: Boolean = false,
+    val hasEditsFilter: String = "any",
+    val includeIgnored: Boolean = true,
+    val includeTransfers: Boolean = true,
+    val transactionType: String = "all"
 ) {
     val isActive: Boolean
         get() = query.isNotBlank() ||
@@ -152,13 +156,18 @@ data class TransactionFilter(
                 transfersOnly ||
                 uncategorizedOnly ||
                 mhaOnly ||
-                ignoredOnly
+                ignoredOnly ||
+                hasEditsFilter != "any" ||
+                !includeIgnored ||
+                !includeTransfers ||
+                transactionType != "all"
 }
 
 @Serializable
 enum class UpcomingKind {
     BILL,
     SUBSCRIPTION,
+    GIVING,
     INCOME
 }
 
@@ -304,7 +313,14 @@ data class RecurringCandidate(
     val lastDate: String = "",
     val nextProjectedDate: String = "",
     val categoryName: String? = null,
-    val intervalDays: Int = 0
+    val intervalDays: Int = 0,
+    val key: String = "",
+    val name: String = "",
+    val kind: UpcomingKind = UpcomingKind.BILL,
+    val direction: String = "expense",
+    val sourceTransactionId: Long? = null,
+    val frequencyInterval: Int = 1,
+    val frequencyUnit: String = "months"
 ) {
     val confidenceLevel: CandidateConfidence
         get() = when {

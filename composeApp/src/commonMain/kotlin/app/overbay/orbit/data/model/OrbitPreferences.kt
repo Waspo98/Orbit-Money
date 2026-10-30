@@ -47,7 +47,24 @@ data class OrbitPreferences(
     val simpleFinToken: String? = null,
     val dashboardWidgets: List<DashboardWidgetConfig> = defaultDashboardWidgets(),
     val handledReviewTransactionIds: List<Long> = emptyList(),
-    val onboardingCompleted: Boolean = false
+    val onboardingCompleted: Boolean = false,
+    val amoledDarkMode: Boolean = false,
+    val hiddenRouteNames: List<String> = emptyList(),
+    val moreRouteOrder: List<String> = emptyList(),
+    val budgetSortOption: CategorySortOption = CategorySortOption.OVER_BUDGET_FIRST,
+    val dashboardHiddenBiggestIds: List<Long> = emptyList(),
+    val dashboardFocusedGoalId: Long? = null,
+    val dashboardRetirementAge: Int = 67,
+    val dashboardRetirementPreset: String = "BALANCED",
+    val googleDriveClientId: String = "",
+    val simpleFinCutoverDate: String? = null,
+    val accountGroupWideSpans: Map<String, Int> = emptyMap(),
+    val dismissedRecurringKeys: List<String> = emptyList(),
+    val includeHsaInRetirementRate: Boolean = true,
+    val notificationPreferences: NotificationPreferencesConfig = NotificationPreferencesConfig(),
+    val sharedSessionCachedAtEpochMs: Long? = null,
+    val isSharedNonOwnerSession: Boolean = false,
+    val isReadOnlySession: Boolean = false
 ) {
     companion object {
         fun defaultDashboardWidgets(): List<DashboardWidgetConfig> = listOf(

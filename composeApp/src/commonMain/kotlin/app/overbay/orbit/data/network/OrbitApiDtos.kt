@@ -2,6 +2,7 @@ package app.overbay.orbit.data.network
 
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.data.model.AmountStrategy
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryBudget
 import app.overbay.orbit.data.model.CreditCardProfile
@@ -9,6 +10,7 @@ import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.data.model.MerchantLogo
 import app.overbay.orbit.data.model.RecurrenceFrequency
+import app.overbay.orbit.data.model.RecurrenceRule
 import app.overbay.orbit.data.model.RuleAction
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
@@ -17,12 +19,19 @@ import app.overbay.orbit.data.model.RuleOperator
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.UpcomingItem
+import app.overbay.orbit.data.model.UpcomingKind
+import app.overbay.orbit.data.model.UpcomingSource
 import app.overbay.orbit.data.model.UpcomingStatus
 import app.overbay.orbit.domain.MoneyUtils
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
 
 @Serializable
 data class AccountDto(
@@ -39,7 +48,8 @@ data class AccountDto(
     @SerialName("sort_order") val sortOrder: Int = 0,
     @SerialName("mha_default_eligible") @Serializable(with = FlexibleBooleanSerializer::class) val mhaDefaultEligible: Boolean = false,
     @SerialName("simplefin_account_id") val simplefinAccountId: String? = null,
-    @SerialName("credit_card_profile") val creditCardProfile: CreditCardProfileDto? = null
+    @SerialName("credit_card_profile") val creditCardProfile: CreditCardProfileDto? = null,
+    @SerialName("transaction_count") val transactionCount: Int = 0
 ) {
     fun toDomain(): Account = Account(
         id = id,
@@ -54,7 +64,8 @@ data class AccountDto(
         sortOrder = sortOrder,
         mhaDefaultEligible = mhaDefaultEligible,
         simplefinAccountId = simplefinAccountId,
-        creditCardProfile = creditCardProfile?.toDomain()
+        creditCardProfile = creditCardProfile?.toDomain(),
+        transactionCount = transactionCount
     )
 }
 
@@ -62,22 +73,36 @@ data class AccountDto(
 data class CreditCardProfileDto(
     val id: Long? = null,
     @SerialName("account_id") val accountId: Long = 0L,
+    @SerialName("card_name") val cardName: String? = null,
+    @SerialName("issuer_name") val issuerName: String? = null,
+    val network: String? = null,
+    @SerialName("image_url") val imageUrl: String? = null,
     @SerialName("annual_fee") val annualFee: Double? = null,
     @SerialName("annual_fee_post_date") val annualFeePostDate: String? = null,
     @SerialName("credit_limit") val creditLimit: Double? = null,
     @SerialName("statement_closing_day") val statementClosingDay: Int? = null,
     @SerialName("payment_due_day") val paymentDueDay: Int? = null,
-    @SerialName("authorized_users") val authorizedUsers: List<String> = emptyList()
+    @SerialName("authorized_users") val authorizedUsers: List<String> = emptyList(),
+    @SerialName("reward_categories") val rewardCategories: List<RewardCategoryWireDto> = emptyList(),
+    val benefits: List<CardBenefitWireDto> = emptyList(),
+    val notes: String? = null
 ) {
     fun toDomain(): CreditCardProfile = CreditCardProfile(
         id = id ?: 0L,
         accountId = accountId,
+        cardName = cardName,
+        issuerName = issuerName,
+        network = network,
+        imageUrl = imageUrl,
         annualFeeCents = annualFee?.let { MoneyUtils.dollarsToCents(it) },
         annualFeePostDate = annualFeePostDate,
         creditLimitCents = creditLimit?.let { MoneyUtils.dollarsToCents(it) },
         statementClosingDay = statementClosingDay,
         paymentDueDay = paymentDueDay,
-        authorizedUsers = authorizedUsers
+        authorizedUsers = authorizedUsers,
+        rewardCategories = rewardCategories.map { it.toDomain() },
+        benefits = benefits.map { it.toDomain() },
+        notes = notes
     )
 }
 
@@ -199,7 +224,10 @@ data class CategoryDto(
     @SerialName("is_income") @Serializable(with = FlexibleBooleanSerializer::class) val isIncome: Boolean = false,
     @SerialName("sort_order") val sortOrder: Int = 0,
     @SerialName("mha_default_eligible") @Serializable(with = FlexibleBooleanSerializer::class) val mhaDefaultEligible: Boolean = false,
-    @SerialName("mha_default_ignored") @Serializable(with = FlexibleBooleanSerializer::class) val mhaDefaultIgnored: Boolean = false
+    @SerialName("mha_default_ignored") @Serializable(with = FlexibleBooleanSerializer::class) val mhaDefaultIgnored: Boolean = false,
+    @SerialName("transaction_count") val transactionCount: Int = 0,
+    @SerialName("budget_count") val budgetCount: Int = 0,
+    @SerialName("rule_count") val ruleCount: Int = 0
 ) {
     fun toDomain(): Category = Category(
         id = id,
@@ -210,7 +238,10 @@ data class CategoryDto(
         isIncome = isIncome,
         sortOrder = sortOrder,
         mhaDefaultEligible = mhaDefaultEligible,
-        mhaDefaultIgnored = mhaDefaultIgnored
+        mhaDefaultIgnored = mhaDefaultIgnored,
+        transactionCount = transactionCount,
+        budgetCount = budgetCount,
+        ruleCount = ruleCount
     )
 }
 
@@ -271,7 +302,7 @@ data class MonthlyBudgetOverviewDto(
     @SerialName("total_budgeted") val totalBudgeted: Double = 0.0,
     @SerialName("total_spent") val totalSpent: Double = 0.0,
     @SerialName("daily_safe_spend") val dailySafeSpend: Double = 0.0,
-    @SerialName("days_remaining") val daysRemaining: Int = 0
+    @SerialName("days_remaining") val dailyRemaining: Int = 0
 ) {
     fun toDomainList(): List<CategoryBudget> =
         if (budgets.isNotEmpty()) budgets.map { it.toDomain() }
@@ -288,7 +319,12 @@ data class GoalDto(
     @SerialName("linked_account_id") val linkedAccountId: Long? = null,
     @SerialName("kind") val kind: String = "custom",
     @SerialName("icon") val icon: String? = null,
-    @SerialName("sort_order") val sortOrder: Int = 0
+    @SerialName("sort_order") val sortOrder: Int = 0,
+    val notes: String? = null,
+    @SerialName("monthly_pace") val monthlyPace: Double = 0.0,
+    val eta: GoalEtaWireDto? = null,
+    val history: List<GoalHistoryPointWireDto> = emptyList(),
+    val allocations: List<GoalAllocationWireDto> = emptyList()
 ) {
     fun toDomain(): Goal = Goal(
         id = id,
@@ -299,7 +335,12 @@ data class GoalDto(
         linkedAccountId = linkedAccountId,
         kind = kind,
         icon = icon,
-        sortOrder = sortOrder
+        sortOrder = sortOrder,
+        allocations = allocations.map { it.toDomain() },
+        notes = notes,
+        monthlyPaceCents = MoneyUtils.dollarsToCents(monthlyPace),
+        eta = eta?.toDomain(),
+        history = history.map { it.toDomain() }
     )
 }
 
@@ -344,32 +385,76 @@ data class RuleDto(
 @Serializable
 data class UpcomingItemDto(
     val id: Long = 0L,
-    val name: String,
+    val name: String = "",
+    val merchant: String? = null,
+    val kind: String = "bill",
     val amount: Double = 0.0,
     val direction: String = "expense",
     @SerialName("frequency_type") val frequencyType: String = "monthly",
-    @SerialName("next_date") val nextDate: String,
+    @SerialName("frequency_interval") val frequencyInterval: Int = 1,
+    @SerialName("frequency_unit") val frequencyUnit: String = "months",
+    @SerialName("recurrence_rule") val recurrenceRule: JsonElement? = null,
+    @SerialName("amount_strategy") val amountStrategy: String = "fixed",
+    @SerialName("amount_lookback_months") val amountLookbackMonths: Int = 6,
+    @SerialName("next_date") val nextDate: String = "",
     @SerialName("category_id") val categoryId: Long? = null,
     @SerialName("account_id") val accountId: Long? = null,
-    val status: String = "active"
+    val source: String = "manual",
+    @SerialName("source_transaction_id") val sourceTransactionId: Long? = null,
+    val status: String = "active",
+    val notes: String? = null
 ) {
-    fun toDomain(): UpcomingItem = UpcomingItem(
-        id = id,
-        name = name,
-        amountCents = MoneyUtils.dollarsToCents(amount),
-        direction = direction,
-        frequencyType = when (frequencyType.lowercase()) {
+    fun toDomain(): UpcomingItem {
+        val freq = when (frequencyType.lowercase()) {
             "weekly" -> RecurrenceFrequency.WEEKLY
             "biweekly" -> RecurrenceFrequency.BIWEEKLY
             "semimonthly" -> RecurrenceFrequency.SEMIMONTHLY
+            "bimonthly" -> RecurrenceFrequency.BIMONTHLY
+            "quarterly" -> RecurrenceFrequency.QUARTERLY
             "yearly" -> RecurrenceFrequency.YEARLY
+            "custom" -> RecurrenceFrequency.CUSTOM
             else -> RecurrenceFrequency.MONTHLY
-        },
-        nextDate = nextDate,
-        categoryId = categoryId,
-        accountId = accountId,
-        status = if (status.lowercase() == "paused") UpcomingStatus.PAUSED else UpcomingStatus.ACTIVE
-    )
+        }
+        val k = when (kind.lowercase()) {
+            "subscription" -> UpcomingKind.SUBSCRIPTION
+            "giving" -> UpcomingKind.GIVING
+            "income" -> UpcomingKind.INCOME
+            else -> UpcomingKind.BILL
+        }
+        val src = when (source.lowercase()) {
+            "transaction" -> UpcomingSource.TRANSACTION
+            "suggestion" -> UpcomingSource.SUGGESTION
+            else -> UpcomingSource.MANUAL
+        }
+        val strat = when (amountStrategy.lowercase()) {
+            "history_average" -> AmountStrategy.HISTORY_AVERAGE
+            else -> AmountStrategy.FIXED
+        }
+        val st = if (status.equals("paused", ignoreCase = true)) UpcomingStatus.PAUSED else UpcomingStatus.ACTIVE
+        val rule = parseRecurrenceRuleJson(recurrenceRule)
+
+        return UpcomingItem(
+            id = id,
+            name = name.ifBlank { merchant ?: "" },
+            kind = k,
+            source = src,
+            merchant = merchant,
+            amountCents = MoneyUtils.dollarsToCents(amount),
+            direction = direction,
+            frequencyType = freq,
+            frequencyInterval = frequencyInterval,
+            frequencyUnit = frequencyUnit,
+            nextDate = nextDate,
+            categoryId = categoryId,
+            accountId = accountId,
+            sourceTransactionId = sourceTransactionId,
+            status = st,
+            notes = notes,
+            recurrenceRule = rule,
+            amountStrategy = strat,
+            amountLookbackMonths = amountLookbackMonths
+        )
+    }
 }
 
 @Serializable
@@ -466,74 +551,3 @@ data class ResetTransactionRequestDto(
     val fields: List<String> = listOf("merchant", "category_id", "is_transfer", "is_ignored", "mha_eligible")
 )
 
-@Serializable
-data class MerchantLogoDto(
-    @SerialName("merchant_key") val merchantKey: String = "",
-    @SerialName("merchant_name") val merchantName: String = "",
-    val provider: String = "logo_dev",
-    @SerialName("provider_query") val providerQuery: String = "",
-    val url: String? = null,
-    val status: String = "candidate"
-) {
-    fun toDomain(): MerchantLogo? =
-        if (merchantKey.isBlank()) null
-        else MerchantLogo(merchantKey, merchantName, provider, providerQuery, url, status)
-}
-
-@Serializable
-data class MerchantLogoCandidateDto(
-    val name: String = "",
-    val domain: String = "",
-    @SerialName("logo_url") val logoUrl: String? = null
-)
-
-@Serializable
-data class MerchantLogoReportRequestDto(
-    @SerialName("merchant_key") val merchantKey: String,
-    val status: String
-)
-
-@Serializable
-data class MerchantLogoEnsureRequestDto(
-    @SerialName("transaction_id") val transactionId: Long
-)
-
-@Serializable
-data class MerchantLogoOverrideRequestDto(
-    @SerialName("merchant_key") val merchantKey: String,
-    @SerialName("logo_url") val logoUrl: String? = null,
-    @SerialName("use_category_icon") val useCategoryIcon: Boolean = false
-)
-
-@Serializable
-data class MerchantLogoSearchRequestDto(
-    @SerialName("transaction_id") val transactionId: Long,
-    val query: String
-)
-
-@Serializable
-data class MerchantLogoMutationResponseDto(
-    val success: Boolean = true,
-    @SerialName("merchant_logo") val merchantLogo: MerchantLogoDto? = null
-)
-
-@Serializable
-data class MerchantLogoSearchResponseDto(
-    val success: Boolean = true,
-    val configured: Boolean = true,
-    @SerialName("merchant_logo") val merchantLogo: MerchantLogoDto? = null,
-    val candidates: List<MerchantLogoCandidateDto> = emptyList()
-)
-
-@Serializable
-data class ReapplyRulesResponseDto(
-    @Serializable(with = FlexibleBooleanSerializer::class) val success: Boolean = true,
-    val updated: Int = 0,
-    val appliedCount: Int = 0,
-    val processed: Int = 0
-)
-
-@Serializable
-data class MergeAccountRequestDto(
-    val targetId: Long
-)

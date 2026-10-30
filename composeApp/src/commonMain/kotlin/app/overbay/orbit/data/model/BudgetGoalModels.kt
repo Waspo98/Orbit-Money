@@ -110,6 +110,7 @@ data class GoalAllocation(
     val allocationPercent: Double = 0.0,
     val allocationAmountCents: Cents = 0L,
     val reserveAmountCents: Cents = 0L,
+    val currentAmountCents: Cents = 0L,
     val createdAt: String = "",
     val updatedAt: String = ""
 )
@@ -127,6 +128,10 @@ data class Goal(
     val icon: String? = "🎯",
     val sortOrder: Int = 0,
     val allocations: List<GoalAllocation> = emptyList(),
+    val notes: String? = null,
+    val monthlyPaceCents: Cents = 0L,
+    val eta: GoalEtaInfo? = null,
+    val history: List<GoalMonthlyPoint> = emptyList(),
     val createdAt: String = "",
     val updatedAt: String = ""
 ) {

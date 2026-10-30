@@ -3,14 +3,19 @@ package app.overbay.orbit.data.engine
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryBudget
+import app.overbay.orbit.data.model.CategorySortOption
+import app.overbay.orbit.data.model.DashboardWidgetConfig
 import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.data.model.HouseholdInfo
+import app.overbay.orbit.data.model.MhaTaxProfile
+import app.overbay.orbit.data.model.NotificationPreferencesConfig
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.UpcomingItem
+import app.overbay.orbit.data.model.UpcomingKind
 import app.overbay.orbit.data.network.AccountDto
 import app.overbay.orbit.data.network.CategoryDto
 import app.overbay.orbit.data.network.GoalDto
@@ -18,11 +23,18 @@ import app.overbay.orbit.data.network.OrbitApiClient
 import app.overbay.orbit.data.network.RuleWireMapper
 import app.overbay.orbit.data.network.TransactionDto
 import app.overbay.orbit.data.network.UpcomingItemDto
+import app.overbay.orbit.data.network.*
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.util.PlatformStorage
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
 
 /**
  * Storage engine communicating with the self-hosted Express API endpoints.
@@ -30,7 +42,7 @@ import kotlinx.serialization.json.Json
  * take 0ms and data remains readable offline.
  */
 class SelfHostedApiEngine(
-    private val apiClient: OrbitApiClient,
+    val apiClient: OrbitApiClient,
     private val storage: PlatformStorage,
     private val preferencesProvider: () -> OrbitPreferences = { OrbitPreferences(storageMode = StorageMode.SELF_HOSTED) }
 ) : OrbitStorageEngine {
@@ -42,6 +54,11 @@ class SelfHostedApiEngine(
         ignoreUnknownKeys = true
         isLenient = true
         encodeDefaults = true
+    }
+
+    private inline fun <reified T> JsonObject.prefOr(key: String, fallback: T): T {
+        val elem = this[key] ?: return fallback
+        return runCatching { json.decodeFromJsonElement<T>(elem) }.getOrDefault(fallback)
     }
 
     override suspend fun loadSnapshot(): OrbitWorkspaceSnapshot {
@@ -64,10 +81,12 @@ class SelfHostedApiEngine(
         val budgetsDeferred = async { apiClient.getBudgets("").getOrNull() }
         val goalsDeferred = async { apiClient.getGoals().getOrNull() ?: emptyList() }
         val rulesDeferred = async { apiClient.getRules().getOrNull() ?: emptyList() }
-        val upcomingDeferred = async { apiClient.getUpcoming().getOrNull() ?: emptyList() }
+        val upcomingDeferred = async { apiClient.getUpcomingFull().getOrNull() }
         val householdDeferred = async { apiClient.getHousehold().getOrNull() }
         val mhaDeferred = async { apiClient.getMhaOverview().getOrNull() }
         val authMeDeferred = async { apiClient.getMe().getOrNull() }
+        val sharingDeferred = async { apiClient.getHouseholdSharingRemote().getOrNull() }
+        val remotePrefsDeferred = async { apiClient.getRemotePreferences().getOrNull() }
 
         val accountsDto = accountsDeferred.await()
         val txDtos = transactionsDeferred.await()
@@ -75,10 +94,12 @@ class SelfHostedApiEngine(
         val budgetsDto = budgetsDeferred.await()
         val goalsDto = goalsDeferred.await()
         val rulesDto = rulesDeferred.await()
-        val upcomingDto = upcomingDeferred.await()
+        val upcomingFull = upcomingDeferred.await()
         val householdDto = householdDeferred.await()
         val mhaDto = mhaDeferred.await()
         val authMe = authMeDeferred.await()
+        val sharing = sharingDeferred.await()
+        val remotePrefs = remotePrefsDeferred.await()
 
         val accounts = accountsDto.map { it.toDomain() }
         val categories = categoriesDto.map { it.toDomain() }
@@ -96,11 +117,41 @@ class SelfHostedApiEngine(
             )
         }
 
-        val resolvedPrefs = if (mhaDto != null) {
-            currentPrefs.copy(mhaTrackerEnabled = mhaDto.enabled)
-        } else {
-            currentPrefs
-        }
+        val members = householdDto?.members?.map { it.toDomain() } ?: emptyList()
+        val memberRetirementLinks = members.flatMap { it.retirementAccounts }
+
+        val upcomingItems = upcomingFull?.items?.map { it.toDomain() }
+            ?: apiClient.getUpcoming().getOrNull()?.map { it.toDomain() }
+            ?: emptyList()
+        val upcomingOccurrences = upcomingFull?.occurrences?.map { it.toDomain() } ?: emptyList()
+        val upcomingSuggestions = upcomingFull?.suggestions?.map { it.toDomain() } ?: emptyList()
+
+        val creditCardProfiles = accounts.mapNotNull { it.creditCardProfile }
+        val incomeRecords = runCatching { householdDto?.records?.map { it.toDomain() } }.getOrNull() ?: emptyList()
+        val retirementAccountLinks = runCatching { householdDto?.retirementAccounts?.map { it.toDomain(it.memberId) } }
+            .getOrNull()?.ifEmpty { null } ?: memberRetirementLinks
+
+        val resolvedPrefs = currentPrefs.copy(
+            mhaTrackerEnabled = mhaDto?.enabled ?: currentPrefs.mhaTrackerEnabled,
+            amoledDarkMode = remotePrefs?.prefOr("amoledDarkMode", currentPrefs.amoledDarkMode) ?: currentPrefs.amoledDarkMode,
+            hiddenRouteNames = remotePrefs?.prefOr("hiddenRouteNames", currentPrefs.hiddenRouteNames) ?: currentPrefs.hiddenRouteNames,
+            moreRouteOrder = remotePrefs?.prefOr("moreRouteOrder", currentPrefs.moreRouteOrder) ?: currentPrefs.moreRouteOrder,
+            budgetSortOption = remotePrefs?.prefOr<String?>("budgetSortOption", null)?.let { name ->
+                CategorySortOption.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
+            } ?: currentPrefs.budgetSortOption,
+            dashboardWidgets = remotePrefs?.prefOr("dashboardWidgets", currentPrefs.dashboardWidgets) ?: currentPrefs.dashboardWidgets,
+            dashboardHiddenBiggestIds = remotePrefs?.prefOr("dashboardHiddenBiggestIds", currentPrefs.dashboardHiddenBiggestIds) ?: currentPrefs.dashboardHiddenBiggestIds,
+            dashboardFocusedGoalId = remotePrefs?.prefOr("dashboardFocusedGoalId", currentPrefs.dashboardFocusedGoalId),
+            dashboardRetirementAge = remotePrefs?.prefOr("dashboardRetirementAge", currentPrefs.dashboardRetirementAge) ?: currentPrefs.dashboardRetirementAge,
+            dashboardRetirementPreset = remotePrefs?.prefOr("dashboardRetirementPreset", currentPrefs.dashboardRetirementPreset) ?: currentPrefs.dashboardRetirementPreset,
+            accountGroupWideSpans = remotePrefs?.prefOr("accountGroupWideSpans", currentPrefs.accountGroupWideSpans) ?: currentPrefs.accountGroupWideSpans,
+            dismissedRecurringKeys = remotePrefs?.prefOr("dismissedRecurringKeys", currentPrefs.dismissedRecurringKeys) ?: currentPrefs.dismissedRecurringKeys,
+            includeHsaInRetirementRate = remotePrefs?.prefOr("includeHsaInRetirementRate", currentPrefs.includeHsaInRetirementRate) ?: currentPrefs.includeHsaInRetirementRate,
+            notificationPreferences = remotePrefs?.prefOr("notificationPreferences", currentPrefs.notificationPreferences) ?: currentPrefs.notificationPreferences,
+            isSharedNonOwnerSession = sharing != null && sharing.currentUserRole != "owner",
+            isReadOnlySession = sharing != null && sharing.currentUserAccessLevel == "read",
+            sharedSessionCachedAtEpochMs = Clock.System.now().toEpochMilliseconds()
+        )
 
         OrbitWorkspaceSnapshot(
             schemaVersion = OrbitWorkspaceSnapshot.CURRENT_SCHEMA_VERSION,
@@ -109,16 +160,24 @@ class SelfHostedApiEngine(
                 id = authMe?.household?.id ?: 1L,
                 name = authMe?.household?.name ?: "My Household"
             ),
-            members = householdDto?.members?.map { it.toDomain() } ?: emptyList(),
+            members = members,
+            shares = sharing?.shares ?: emptyList(),
             accounts = accounts,
+            creditCardProfiles = creditCardProfiles,
+            balanceRecords = emptyList(),
             categories = categories,
             transactions = transactions,
             budgets = budgetsDto?.toDomainList() ?: emptyList(),
             goals = goalsDto.map { it.toDomain() },
             rules = rulesDto.map { it.toDomain() },
-            upcomingItems = upcomingDto.map { it.toDomain() },
+            upcomingItems = upcomingItems,
+            upcomingOccurrences = upcomingOccurrences,
+            upcomingSuggestions = upcomingSuggestions,
+            incomeRecords = incomeRecords,
+            retirementAccountLinks = retirementAccountLinks,
+            importBatches = emptyList(),
             preferences = resolvedPrefs,
-            mhaTaxProfile = mhaDto?.taxProfile?.toDomain() ?: app.overbay.orbit.data.model.MhaTaxProfile()
+            mhaTaxProfile = mhaDto?.taxProfile?.toDomain() ?: MhaTaxProfile()
         )
     }
 
@@ -180,7 +239,11 @@ class SelfHostedApiEngine(
     }
 
     override suspend fun deleteTransaction(id: Long): Result<Boolean> = apiClient.deleteTransaction(id)
-    override suspend fun resetTransaction(id: Long): Result<Transaction> = apiClient.resetTransaction(id).map { it.toDomain() }
+
+    override suspend fun resetTransaction(
+        id: Long,
+        fields: List<String>
+    ): Result<Transaction> = apiClient.resetTransaction(id, fields).map { it.toDomain() }
 
     override suspend fun pushAccount(account: Account): Result<Account> {
         val dto = AccountDto(
@@ -237,6 +300,10 @@ class SelfHostedApiEngine(
     override suspend fun deleteBudget(id: Long): Result<Boolean> = apiClient.deleteBudget(id)
 
     override suspend fun pushGoal(goal: Goal): Result<Goal> {
+        if (goal.allocations.isNotEmpty()) {
+            val allocatedResult = apiClient.saveGoalWithAllocations(goal)
+            if (allocatedResult.isSuccess) return allocatedResult
+        }
         val dto = GoalDto(
             id = goal.id,
             name = goal.name,
@@ -270,6 +337,12 @@ class SelfHostedApiEngine(
     override suspend fun runRules(): Result<Int> = apiClient.runRules()
 
     override suspend fun pushUpcoming(item: UpcomingItem): Result<UpcomingItem> {
+        val kindStr = when (item.kind) {
+            UpcomingKind.BILL -> "bill"
+            UpcomingKind.SUBSCRIPTION -> "subscription"
+            UpcomingKind.INCOME -> "income"
+            else -> "bill"
+        }
         val dto = UpcomingItemDto(
             id = item.id,
             name = item.name,
@@ -279,7 +352,16 @@ class SelfHostedApiEngine(
             nextDate = item.nextDate,
             categoryId = item.categoryId,
             accountId = item.accountId,
-            status = item.status.name.lowercase()
+            status = item.status.name.lowercase(),
+            merchant = item.merchant,
+            kind = kindStr,
+            frequencyInterval = item.frequencyInterval,
+            frequencyUnit = item.frequencyUnit,
+            amountStrategy = item.amountStrategy.name.lowercase(),
+            amountLookbackMonths = item.amountLookbackMonths,
+            source = item.source.name.lowercase(),
+            sourceTransactionId = item.sourceTransactionId,
+            notes = item.notes
         )
         return if (item.id == 0L) {
             apiClient.createUpcoming(dto).map { it.toDomain() }
@@ -289,7 +371,28 @@ class SelfHostedApiEngine(
     }
 
     override suspend fun deleteUpcoming(id: Long): Result<Boolean> = apiClient.deleteUpcoming(id)
-    override suspend fun pushPreferences(preferences: OrbitPreferences): Result<OrbitPreferences> = Result.success(preferences)
+
+    override suspend fun pushPreferences(preferences: OrbitPreferences): Result<OrbitPreferences> {
+        runCatching {
+            val map = mutableMapOf<String, JsonElement>()
+            map["amoledDarkMode"] = JsonPrimitive(preferences.amoledDarkMode)
+            map["budgetSortOption"] = JsonPrimitive(preferences.budgetSortOption.name)
+            map["dashboardRetirementAge"] = JsonPrimitive(preferences.dashboardRetirementAge)
+            map["dashboardRetirementPreset"] = JsonPrimitive(preferences.dashboardRetirementPreset)
+            map["includeHsaInRetirementRate"] = JsonPrimitive(preferences.includeHsaInRetirementRate)
+            preferences.dashboardFocusedGoalId?.let { map["dashboardFocusedGoalId"] = JsonPrimitive(it) }
+            preferences.simpleFinCutoverDate?.let { map["simpleFinCutoverDate"] = JsonPrimitive(it) }
+            map["hiddenRouteNames"] = json.encodeToJsonElement(preferences.hiddenRouteNames)
+            map["moreRouteOrder"] = json.encodeToJsonElement(preferences.moreRouteOrder)
+            map["dashboardHiddenBiggestIds"] = json.encodeToJsonElement(preferences.dashboardHiddenBiggestIds)
+            map["dismissedRecurringKeys"] = json.encodeToJsonElement(preferences.dismissedRecurringKeys)
+            map["dashboardWidgets"] = json.encodeToJsonElement(preferences.dashboardWidgets)
+            map["notificationPreferences"] = json.encodeToJsonElement(preferences.notificationPreferences)
+            map["accountGroupWideSpans"] = json.encodeToJsonElement(preferences.accountGroupWideSpans)
+            apiClient.putRemotePreferences(map)
+        }
+        return Result.success(preferences)
+    }
 
     companion object {
         const val CACHE_SNAPSHOT_KEY = "orbit_remote_cache_snapshot.json"

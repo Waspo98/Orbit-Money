@@ -16,12 +16,11 @@ import app.overbay.orbit.data.model.MerchantLogo
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
+import app.overbay.orbit.data.model.SimpleFinStatusInfo
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.UpcomingItem
-import app.overbay.orbit.data.model.cleanMerchantNameForLogo
-import app.overbay.orbit.data.model.merchantLogoKey
 import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.data.network.OrbitApiClient
 import app.overbay.orbit.data.network.ServerUrlNormalizer
@@ -40,6 +39,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 
 /**
@@ -47,48 +47,62 @@ import kotlinx.serialization.json.Json
  * Manages reactive in-memory state and delegates persistence to the active OrbitStorageEngine.
  */
 class OrbitRepository(
-    private val storage: PlatformStorage,
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
+    internal val storage: PlatformStorage,
+    internal val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
     private val customApiClient: OrbitApiClient? = null,
     private val customSimpleFinClient: SimpleFinDirectClient? = null,
     val cloudSyncManager: CloudSyncManager = CloudSyncManager()
 ) {
-    private val simpleFinClient = customSimpleFinClient ?: SimpleFinDirectClient()
-    private val localEngine = LocalSnapshotEngine(storage, simpleFinClient)
-    private var activeEngine: OrbitStorageEngine = localEngine
-    private val flushCoordinator = SnapshotFlushCoordinator(scope, localEngine, cloudSyncManager)
+    internal val simpleFinClient = customSimpleFinClient ?: SimpleFinDirectClient()
+    internal val localEngine = LocalSnapshotEngine(storage, simpleFinClient)
+    internal var activeEngine: OrbitStorageEngine = localEngine
+    internal val flushCoordinator = SnapshotFlushCoordinator(scope, localEngine, cloudSyncManager)
 
-    private val _snapshot = MutableStateFlow(OrbitWorkspaceSnapshot.empty())
+    internal val _snapshot = MutableStateFlow(OrbitWorkspaceSnapshot.empty())
     val snapshot: StateFlow<OrbitWorkspaceSnapshot> = _snapshot.asStateFlow()
-    private val _storageMode = MutableStateFlow(StorageMode.LOCAL)
+    internal val _storageMode = MutableStateFlow(StorageMode.LOCAL)
     val storageMode: StateFlow<StorageMode> = _storageMode.asStateFlow()
-    private val _accounts = MutableStateFlow<List<Account>>(emptyList())
+    internal val _accounts = MutableStateFlow<List<Account>>(emptyList())
     val accounts: StateFlow<List<Account>> = _accounts.asStateFlow()
-    private val _transactions = MutableStateFlow<List<Transaction>>(emptyList())
+    internal val _transactions = MutableStateFlow<List<Transaction>>(emptyList())
     val transactions: StateFlow<List<Transaction>> = _transactions.asStateFlow()
-    private val _categories = MutableStateFlow<List<Category>>(emptyList())
+    internal val _categories = MutableStateFlow<List<Category>>(emptyList())
     val categories: StateFlow<List<Category>> = _categories.asStateFlow()
-    private val _budgets = MutableStateFlow<List<CategoryBudget>>(emptyList())
+    internal val _budgets = MutableStateFlow<List<CategoryBudget>>(emptyList())
     val budgets: StateFlow<List<CategoryBudget>> = _budgets.asStateFlow()
-    private val _goals = MutableStateFlow<List<Goal>>(emptyList())
+    internal val _goals = MutableStateFlow<List<Goal>>(emptyList())
     val goals: StateFlow<List<Goal>> = _goals.asStateFlow()
-    private val _rules = MutableStateFlow<List<TransactionRule>>(emptyList())
+    internal val _rules = MutableStateFlow<List<TransactionRule>>(emptyList())
     val rules: StateFlow<List<TransactionRule>> = _rules.asStateFlow()
-    private val _upcomingItems = MutableStateFlow<List<UpcomingItem>>(emptyList())
+    internal val _upcomingItems = MutableStateFlow<List<UpcomingItem>>(emptyList())
     val upcomingItems: StateFlow<List<UpcomingItem>> = _upcomingItems.asStateFlow()
-    private val _preferences = MutableStateFlow(OrbitPreferences())
+    internal val _preferences = MutableStateFlow(OrbitPreferences())
     val preferences: StateFlow<OrbitPreferences> = _preferences.asStateFlow()
-    private val _syncStatus = MutableStateFlow<SyncResult>(SyncResult.NoOp)
+    internal val _syncStatus = MutableStateFlow<SyncResult>(SyncResult.NoOp)
     val syncStatus: StateFlow<SyncResult> = _syncStatus.asStateFlow()
-    private val _isAuthenticated = MutableStateFlow(true)
+    internal val _isAuthenticated = MutableStateFlow(true)
     val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
-    private val _currentUser = MutableStateFlow<String?>(null)
+    internal val _currentUser = MutableStateFlow<String?>(null)
     val currentUser: StateFlow<String?> = _currentUser.asStateFlow()
 
-    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true; isLenient = true }
-    private val snapshotMutex = Mutex()
-    private var defaultApiClient: OrbitApiClient? = null
-    private var defaultClientUrl: String? = null
+    internal val _isOffline = MutableStateFlow(false)
+    val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
+    internal val _simpleFinStatus = MutableStateFlow(SimpleFinStatusInfo())
+    val simpleFinStatus: StateFlow<SimpleFinStatusInfo> = _simpleFinStatus.asStateFlow()
+    internal val _pendingRuleIdToEdit = MutableStateFlow<Long?>(null)
+    val pendingRuleIdToEdit: StateFlow<Long?> = _pendingRuleIdToEdit.asStateFlow()
+    fun requestOpenRuleEditor(ruleId: Long?) { _pendingRuleIdToEdit.value = ruleId }
+    internal val _pendingBudgetMonth = MutableStateFlow<String?>(null)
+    val pendingBudgetMonth: StateFlow<String?> = _pendingBudgetMonth.asStateFlow()
+    fun requestOpenBudgetMonth(month: String?) { _pendingBudgetMonth.value = month }
+    internal val _pendingSettingsSubpage = MutableStateFlow<String?>(null)
+    val pendingSettingsSubpage: StateFlow<String?> = _pendingSettingsSubpage.asStateFlow()
+    fun requestOpenSettingsSubpage(subpage: String?) { _pendingSettingsSubpage.value = subpage }
+
+    internal val json = Json { prettyPrint = true; ignoreUnknownKeys = true; isLenient = true }
+    internal val snapshotMutex = Mutex()
+    internal var defaultApiClient: OrbitApiClient? = null
+    internal var defaultClientUrl: String? = null
 
     fun createApiClient(serverUrl: String = _preferences.value.selfHostedServerUrl): OrbitApiClient {
         customApiClient?.let { return it }
@@ -145,19 +159,36 @@ class OrbitRepository(
         val meResult = client.getMe()
         val me = meResult.getOrNull()
         if (me != null && me.authenticated) {
+            _isOffline.value = false
             storage.delete(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
             _isAuthenticated.value = true
             _currentUser.value = me.displayName ?: me.username ?: me.email
             val loaded = remoteEngine.loadSnapshot().copy(preferences = pref)
             updateMemoryState(loaded)
             localEngine.saveSnapshot(loaded)
-        } else if ((me != null && !me.authenticated) || !hadCachedSession || meResult.exceptionOrNull()?.message.orEmpty().contains("401")) {
-            _isAuthenticated.value = false
-            _currentUser.value = null
+        } else {
+            val errMsg = meResult.exceptionOrNull()?.message.orEmpty()
+            val is401 = (me != null && !me.authenticated) || errMsg.contains("401") || !hadCachedSession
+            if (is401) {
+                _isOffline.value = false
+                _isAuthenticated.value = false
+                _currentUser.value = null
+            } else if (hadCachedSession) {
+                _isOffline.value = true
+                val cachedEpoch = pref.sharedSessionCachedAtEpochMs
+                if (pref.isSharedNonOwnerSession && cachedEpoch != null) {
+                    val ageMs = Clock.System.now().toEpochMilliseconds() - cachedEpoch
+                    if (ageMs > 7L * 24 * 3600 * 1000L) {
+                        _isAuthenticated.value = false
+                        _currentUser.value = null
+                        activeEngine.clear()
+                    }
+                }
+            }
         }
     }
 
-    private fun updateMemoryState(newSnapshot: OrbitWorkspaceSnapshot) {
+    internal fun updateMemoryState(newSnapshot: OrbitWorkspaceSnapshot) {
         _snapshot.value = newSnapshot
         _accounts.value = newSnapshot.accounts
         _transactions.value = newSnapshot.transactions
@@ -170,7 +201,7 @@ class OrbitRepository(
         _storageMode.value = newSnapshot.preferences.storageMode
     }
 
-    private suspend fun commitSnapshot(updated: OrbitWorkspaceSnapshot, immediate: Boolean = false) = snapshotMutex.withLock {
+    internal suspend fun commitSnapshot(updated: OrbitWorkspaceSnapshot, immediate: Boolean = false) = snapshotMutex.withLock {
         updateMemoryState(updated)
         if (immediate) flushCoordinator.flushImmediate(updated, activeEngine)
         else flushCoordinator.scheduleFlush({ _snapshot.value }, { activeEngine })
@@ -324,58 +355,6 @@ class OrbitRepository(
         ids.forEach { activeEngine.deleteTransaction(it) }
     }
 
-    suspend fun reportMerchantLogoStatus(merchantKey: String, status: String) {
-        if (merchantKey.isBlank()) return
-        if (_storageMode.value == StorageMode.SELF_HOSTED) {
-            runCatching { createApiClient().reportMerchantLogoStatus(merchantKey, status) }
-        }
-        val updatedList = _transactions.value.map { txn ->
-            val currentLogo = txn.merchantLogo
-            if (currentLogo?.merchantKey == merchantKey && currentLogo.status == "candidate") {
-                txn.copy(merchantLogo = currentLogo.copy(status = status, url = if (status == "failed") null else currentLogo.url))
-            } else txn
-        }
-        if (updatedList != _transactions.value) commitSnapshot(_snapshot.value.copy(transactions = updatedList))
-    }
-
-    suspend fun searchMerchantLogos(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> = runCatching {
-        if (_storageMode.value != StorageMode.SELF_HOSTED) {
-            MerchantLogoSearchResponseDto(configured = false, candidates = emptyList())
-        } else {
-            createApiClient().searchMerchantLogos(transactionId, query).getOrThrow()
-        }
-    }
-
-    suspend fun overrideMerchantLogo(transactionId: Long, logoUrl: String? = null, useCategoryIcon: Boolean = false): Result<MerchantLogo> = runCatching {
-        val target = _transactions.value.find { it.id == transactionId }
-            ?: throw IllegalStateException("Transaction not found.")
-        val cleanedName = cleanMerchantNameForLogo(target.effectiveMerchant.ifBlank { target.originalMerchant })
-        val fallbackKey = target.resolvedMerchantKey
-        if (fallbackKey.isBlank()) throw IllegalStateException("This merchant does not have a logo entry to update yet.")
-        val updatedLogo = if (_storageMode.value == StorageMode.SELF_HOSTED) {
-            val client = createApiClient()
-            val ensuredKey = target.merchantLogo?.merchantKey?.takeIf { it.isNotBlank() }
-                ?: client.ensureMerchantLogo(transactionId).getOrNull()?.merchantKey
-                ?: fallbackKey
-            client.overrideMerchantLogo(ensuredKey, logoUrl, useCategoryIcon).getOrThrow().toDomain()
-                ?: MerchantLogo(ensuredKey, cleanedName, url = if (useCategoryIcon) null else logoUrl, status = if (useCategoryIcon) "hidden" else "manual")
-        } else {
-            MerchantLogo(
-                merchantKey = fallbackKey,
-                merchantName = cleanedName,
-                providerQuery = cleanedName,
-                url = if (useCategoryIcon) null else logoUrl?.trim(),
-                status = if (useCategoryIcon) "hidden" else "manual"
-            )
-        }
-        val updatedList = _transactions.value.map { txn ->
-            if (txn.id == transactionId || txn.resolvedMerchantKey == updatedLogo.merchantKey || merchantLogoKey(txn.effectiveMerchant) == updatedLogo.merchantKey) {
-                txn.copy(merchantLogo = updatedLogo)
-            } else txn
-        }
-        commitSnapshot(_snapshot.value.copy(transactions = updatedList))
-        updatedLogo
-    }
 
     suspend fun importTransactions(
         newTransactions: List<Transaction>,
@@ -570,8 +549,6 @@ class OrbitRepository(
         activeEngine.pushPreferences(preferences)
     }
 
-    suspend fun updateMhaTaxProfile(profile: MhaTaxProfile) = commitSnapshot(_snapshot.value.copy(mhaTaxProfile = profile))
-
     suspend fun sync(force: Boolean = false): SyncResult {
         val result = activeEngine.sync(force)
         _syncStatus.value = result
@@ -579,20 +556,16 @@ class OrbitRepository(
         return result
     }
 
-    fun exportBackupJson(): String = json.encodeToString(OrbitWorkspaceSnapshot.serializer(), _snapshot.value)
-    suspend fun restoreBackupJson(jsonString: String): Result<Unit> = runCatching { commitSnapshot(json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString), immediate = true) }
-    suspend fun loadDemoData(snapshot: OrbitWorkspaceSnapshot) = commitSnapshot(snapshot)
-    suspend fun updateHouseholdInfo(household: HouseholdInfo) = commitSnapshot(_snapshot.value.copy(household = household))
-
-    suspend fun saveHouseholdMember(member: HouseholdMember) {
-        val current = _snapshot.value.members
-        val exists = current.any { it.id == member.id && member.id != 0L }
-        val updated = if (exists) current.map { if (it.id == member.id) member else it }
-        else current + member.copy(id = if (member.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else member.id)
-        commitSnapshot(_snapshot.value.copy(members = updated))
-    }
-
-    suspend fun deleteHouseholdMember(id: Long) = commitSnapshot(_snapshot.value.copy(members = _snapshot.value.members.filterNot { it.id == id }))
-    suspend fun saveHouseholdShare(share: HouseholdShare) = commitSnapshot(_snapshot.value.copy(shares = _snapshot.value.shares + share))
-    suspend fun deleteHouseholdShare(id: Long) = commitSnapshot(_snapshot.value.copy(shares = _snapshot.value.shares.filterNot { it.id == id }))
+    suspend fun reportMerchantLogoStatus(merchantKey: String, status: String) = reportMerchantLogoStatusImpl(merchantKey, status)
+    suspend fun searchMerchantLogos(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> = searchMerchantLogosImpl(transactionId, query)
+    suspend fun overrideMerchantLogo(transactionId: Long, logoUrl: String? = null, useCategoryIcon: Boolean = false): Result<MerchantLogo> = overrideMerchantLogoImpl(transactionId, logoUrl, useCategoryIcon)
+    fun exportBackupJson(): String = exportBackupJsonImpl()
+    suspend fun restoreBackupJson(jsonString: String): Result<Unit> = restoreBackupJsonImpl(jsonString)
+    suspend fun loadDemoData(snapshot: OrbitWorkspaceSnapshot) = loadDemoDataImpl(snapshot)
+    suspend fun updateMhaTaxProfile(profile: MhaTaxProfile) = updateMhaTaxProfileImpl(profile)
+    suspend fun updateHouseholdInfo(household: HouseholdInfo) = updateHouseholdInfoImpl(household)
+    suspend fun saveHouseholdMember(member: HouseholdMember, effectiveDate: String? = null) = saveHouseholdMemberImpl(member, effectiveDate)
+    suspend fun deleteHouseholdMember(id: Long) = deleteHouseholdMemberImpl(id)
+    suspend fun saveHouseholdShare(share: HouseholdShare) = saveHouseholdShareImpl(share)
+    suspend fun deleteHouseholdShare(id: Long) = deleteHouseholdShareImpl(id)
 }

@@ -50,6 +50,7 @@ data class HouseholdShare(
     val householdId: Long = 1L,
     val invitedEmail: String,
     val role: HouseholdRole = HouseholdRole.MEMBER,
+    val accessLevel: String = "write",
     val acceptedAt: String? = null,
     val revokedAt: String? = null,
     val createdAt: String = ""
@@ -80,6 +81,7 @@ data class HouseholdMember(
     val dependentCareFsaAnnualCents: Cents = 0L,
     val otherBenefitsAnnualCents: Cents = 0L,
     val notes: String? = null,
+    val retirementAccounts: List<HouseholdRetirementAccount> = emptyList(),
     val createdAt: String = "",
     val updatedAt: String = ""
 )

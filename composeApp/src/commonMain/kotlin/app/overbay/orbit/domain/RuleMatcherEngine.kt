@@ -114,6 +114,21 @@ object RuleMatcherEngine {
         return computeCompiledEdits(transaction, rules.map(::compileRule))
     }
 
+    fun matchesRule(
+        transaction: Transaction,
+        rule: TransactionRule
+    ): Boolean {
+        if (rule.conditions.isEmpty()) return false
+        val compiled = compileRule(rule)
+        if (compiled.conditions.isEmpty()) return false
+        return matchesCompiledConditions(
+            transaction = transaction,
+            merchantLower = transaction.originalMerchant.lowercase(),
+            descLower = transaction.originalDescription?.lowercase(),
+            conditions = compiled.conditions
+        )
+    }
+
     private fun computeCompiledEdits(
         transaction: Transaction,
         rules: List<CompiledRule>,

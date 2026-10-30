@@ -15,6 +15,9 @@ data class Category(
     val sortOrder: Int = 0,
     val mhaDefaultEligible: Boolean = false,
     val mhaDefaultIgnored: Boolean = false,
+    val transactionCount: Int = 0,
+    val budgetCount: Int = 0,
+    val ruleCount: Int = 0,
     val createdAt: String = ""
 )
 

@@ -35,7 +35,10 @@ interface OrbitStorageEngine {
     // Granular mutation push hooks (for SelfHostedApiEngine remote sync; LocalSnapshotEngine persists via snapshot)
     suspend fun pushTransaction(transaction: Transaction): Result<Transaction>
     suspend fun deleteTransaction(id: Long): Result<Boolean>
-    suspend fun resetTransaction(id: Long): Result<Transaction>
+    suspend fun resetTransaction(
+        id: Long,
+        fields: List<String> = listOf("merchant", "category_id", "is_transfer", "is_ignored", "mha_eligible")
+    ): Result<Transaction>
 
     suspend fun pushAccount(account: Account): Result<Account>
     suspend fun deleteAccount(id: Long): Result<Boolean>

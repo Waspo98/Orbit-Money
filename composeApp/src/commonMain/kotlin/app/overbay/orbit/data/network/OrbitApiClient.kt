@@ -1,6 +1,7 @@
 package app.overbay.orbit.data.network
 
 import app.overbay.orbit.data.model.TransactionFilter
+import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.util.PlatformStorage
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -30,7 +31,7 @@ class OrbitApiClient(
     private val storage: PlatformStorage,
     private val customHttpClient: HttpClient? = null
 ) {
-    private val client: HttpClient = customHttpClient ?: HttpClient {
+    internal val client: HttpClient = customHttpClient ?: HttpClient {
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
@@ -46,14 +47,14 @@ class OrbitApiClient(
         }
     }
 
-    private var sessionCookie: String?
+    internal var sessionCookie: String?
         get() = storage.loadString(COOKIE_STORAGE_KEY)
         set(value) {
             if (value != null) storage.saveString(COOKIE_STORAGE_KEY, value)
             else storage.delete(COOKIE_STORAGE_KEY)
         }
 
-    private fun extractSessionCookie(response: HttpResponse) {
+    internal fun extractSessionCookie(response: HttpResponse) {
         val allCookies = response.headers.getAll("Set-Cookie")
             ?: response.headers.getAll("set-cookie")
             ?: listOfNotNull(response.headers["Set-Cookie"] ?: response.headers["set-cookie"])
@@ -66,7 +67,7 @@ class OrbitApiClient(
         }
     }
 
-    private fun ensureSuccess(response: HttpResponse) {
+    internal fun ensureSuccess(response: HttpResponse) {
         if (!response.status.isSuccess()) {
             if (response.status.value == 401) {
                 throw IllegalStateException("Unauthorized (HTTP 401) — please sign in to the server")
@@ -75,7 +76,7 @@ class OrbitApiClient(
         }
     }
 
-    private fun url(path: String): String {
+    internal fun url(path: String): String {
         val base = ServerUrlNormalizer.normalize(baseUrlProvider())
         val normalizedPath = if (path.startsWith("/")) path else "/$path"
         return if (base.isNotEmpty()) "$base$normalizedPath" else normalizedPath
@@ -204,17 +205,31 @@ class OrbitApiClient(
     suspend fun getTransactions(
         page: Int = 1,
         limit: Int = 50,
-        filter: TransactionFilter = TransactionFilter()
+        filter: TransactionFilter = TransactionFilter(),
+        sort: String = "date_desc"
     ): Result<TransactionListResponseDto> = runCatching {
         val response = client.get(url("/api/transactions")) {
             sessionCookie?.let { header("Cookie", it) }
             parameter("page", page)
             parameter("limit", limit)
+            parameter("sort", sort)
             if (filter.query.isNotBlank()) parameter("q", filter.query)
             if (filter.startDate != null) parameter("date_from", filter.startDate)
             if (filter.endDate != null) parameter("date_to", filter.endDate)
             if (filter.accountIds.isNotEmpty()) parameter("accounts", filter.accountIds.joinToString(","))
-            if (filter.categoryIds.isNotEmpty()) parameter("categories", filter.categoryIds.joinToString(","))
+            if (filter.categoryIds.isNotEmpty() || filter.uncategorizedOnly) {
+                val cats = buildList {
+                    addAll(filter.categoryIds.map { it.toString() })
+                    if (filter.uncategorizedOnly) add("uncategorized")
+                }.joinToString(",")
+                parameter("categories", cats)
+            }
+            if (filter.minAmountCents != null) parameter("amount_min", MoneyUtils.centsToDollars(filter.minAmountCents))
+            if (filter.maxAmountCents != null) parameter("amount_max", MoneyUtils.centsToDollars(filter.maxAmountCents))
+            if (filter.transactionType != "all") parameter("type", filter.transactionType)
+            parameter("include_ignored", if (filter.includeIgnored) "1" else "0")
+            parameter("include_transfers", if (filter.includeTransfers) "1" else "0")
+            if (filter.hasEditsFilter != "any") parameter("has_edits", filter.hasEditsFilter)
         }
         extractSessionCookie(response)
         ensureSuccess(response)
@@ -265,11 +280,14 @@ class OrbitApiClient(
         response.status.isSuccess()
     }
 
-    suspend fun resetTransaction(id: Long): Result<TransactionDto> = runCatching {
+    suspend fun resetTransaction(
+        id: Long,
+        fields: List<String> = listOf("merchant", "category_id", "is_transfer", "is_ignored", "mha_eligible")
+    ): Result<TransactionDto> = runCatching {
         val response = client.post(url("/api/transactions/$id/reset")) {
             contentType(ContentType.Application.Json)
             sessionCookie?.let { header("Cookie", it) }
-            setBody(ResetTransactionRequestDto())
+            setBody(ResetTransactionRequestDto(fields = fields))
         }
         extractSessionCookie(response)
         runCatching { response.body<TransactionMutationResponseDto>().transaction ?: throw IllegalStateException("Missing transaction") }
@@ -513,64 +531,6 @@ class OrbitApiClient(
         }
         extractSessionCookie(response)
         response.status.isSuccess()
-    }
-
-    // -------------------------------------------------------------------------
-    // Merchant Logos Endpoints
-    // -------------------------------------------------------------------------
-    suspend fun reportMerchantLogoStatus(merchantKey: String, status: String): Result<Boolean> = runCatching {
-        val response = client.post(url("/api/merchant-logos/report")) {
-            contentType(ContentType.Application.Json)
-            sessionCookie?.let { header("Cookie", it) }
-            setBody(MerchantLogoReportRequestDto(merchantKey = merchantKey, status = status))
-        }
-        extractSessionCookie(response)
-        response.status.isSuccess()
-    }
-
-    suspend fun ensureMerchantLogo(transactionId: Long): Result<MerchantLogoDto> = runCatching {
-        val response = client.post(url("/api/merchant-logos/ensure")) {
-            contentType(ContentType.Application.Json)
-            sessionCookie?.let { header("Cookie", it) }
-            setBody(MerchantLogoEnsureRequestDto(transactionId = transactionId))
-        }
-        extractSessionCookie(response)
-        ensureSuccess(response)
-        response.body<MerchantLogoMutationResponseDto>().merchantLogo
-            ?: throw IllegalStateException("This transaction does not have a merchant name to override.")
-    }
-
-    suspend fun searchMerchantLogos(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> = runCatching {
-        val response = client.post(url("/api/merchant-logos/search")) {
-            contentType(ContentType.Application.Json)
-            sessionCookie?.let { header("Cookie", it) }
-            setBody(MerchantLogoSearchRequestDto(transactionId = transactionId, query = query))
-        }
-        extractSessionCookie(response)
-        ensureSuccess(response)
-        response.body()
-    }
-
-    suspend fun overrideMerchantLogo(
-        merchantKey: String,
-        logoUrl: String? = null,
-        useCategoryIcon: Boolean = false
-    ): Result<MerchantLogoDto> = runCatching {
-        val response = client.post(url("/api/merchant-logos/override")) {
-            contentType(ContentType.Application.Json)
-            sessionCookie?.let { header("Cookie", it) }
-            setBody(
-                MerchantLogoOverrideRequestDto(
-                    merchantKey = merchantKey,
-                    logoUrl = logoUrl?.takeIf { it.isNotBlank() },
-                    useCategoryIcon = useCategoryIcon
-                )
-            )
-        }
-        extractSessionCookie(response)
-        ensureSuccess(response)
-        response.body<MerchantLogoMutationResponseDto>().merchantLogo
-            ?: throw IllegalStateException("Merchant logo override failed.")
     }
 
     // -------------------------------------------------------------------------

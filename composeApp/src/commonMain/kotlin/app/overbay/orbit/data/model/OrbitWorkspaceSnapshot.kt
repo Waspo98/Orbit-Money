@@ -26,6 +26,10 @@ data class OrbitWorkspaceSnapshot(
     val rules: List<TransactionRule> = emptyList(),
     val upcomingItems: List<UpcomingItem> = emptyList(),
     val upcomingOccurrences: List<ProjectedOccurrence> = emptyList(),
+    val upcomingSuggestions: List<RecurringCandidate> = emptyList(),
+    val incomeRecords: List<HouseholdIncomeRecord> = emptyList(),
+    val retirementAccountLinks: List<HouseholdRetirementAccount> = emptyList(),
+    val importBatches: List<ImportBatchRecord> = emptyList(),
     val preferences: OrbitPreferences = OrbitPreferences(),
     val mhaTaxProfile: MhaTaxProfile = MhaTaxProfile()
 ) {

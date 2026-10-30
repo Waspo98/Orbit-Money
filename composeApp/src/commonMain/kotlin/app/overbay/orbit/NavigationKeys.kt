@@ -114,7 +114,13 @@ sealed interface OrbitNavKey {
         val transactionId: Long? = null,
         val accountId: Long? = null,
         val uncategorizedOnly: Boolean = false,
-        val categoryId: Long? = null
+        val categoryId: Long? = null,
+        val startDate: String? = null,
+        val endDate: String? = null,
+        val sortOption: String? = null,
+        val openAddSheet: Boolean = false,
+        val includeTransfers: Boolean = true,
+        val includeIgnored: Boolean = true
     ) : OrbitNavKey
 
     @Serializable
@@ -188,5 +194,26 @@ sealed interface OrbitNavKey {
             RetirementCalculator -> "Retirement Calculator"
             Household -> "Household"
             Settings -> "Settings"
+        }
+
+    val routeName: String
+        get() = when (this) {
+            Login -> "login"
+            Onboarding -> "onboarding"
+            Dashboard -> "dashboard"
+            is Transactions -> "transactions"
+            Budgets -> "budgets"
+            is Accounts -> "accounts"
+            Upcoming -> "upcoming"
+            Goals -> "goals"
+            Categories -> "categories"
+            Rules -> "rules"
+            SpendingTrends -> "spending_trends"
+            NetWorth -> "net_worth"
+            MhaTracker -> "mha"
+            HousingCalculator -> "housing_calculator"
+            RetirementCalculator -> "retirement_calculator"
+            Household -> "household"
+            Settings -> "settings"
         }
 }

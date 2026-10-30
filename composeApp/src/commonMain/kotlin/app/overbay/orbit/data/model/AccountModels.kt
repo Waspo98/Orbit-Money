@@ -49,6 +49,7 @@ data class Account(
     val sortOrder: Int = 0,
     val mhaDefaultEligible: Boolean = false,
     val creditCardProfile: CreditCardProfile? = null,
+    val transactionCount: Int = 0,
     val createdAt: String = "",
     val updatedAt: String = ""
 ) {
@@ -76,19 +77,24 @@ data class Account(
 
 @Serializable
 data class RewardCategory(
-    val category: String,
-    val multiplier: Double,
+    val category: String = "",
+    val multiplier: Double = 1.0,
     val isRotating: Boolean = false,
     val capCents: Cents? = null,
-    val description: String? = null
+    val description: String? = null,
+    val label: String = "",
+    val rateType: String = "multiplier",
+    val notes: String? = null
 )
 
 @Serializable
 data class CardBenefit(
-    val title: String,
+    val title: String = "",
     val description: String? = null,
     val annualCreditValueCents: Cents? = null,
-    val usedThisYear: Boolean = false
+    val usedThisYear: Boolean = false,
+    val category: String? = null,
+    val valueText: String? = null
 )
 
 @Serializable
