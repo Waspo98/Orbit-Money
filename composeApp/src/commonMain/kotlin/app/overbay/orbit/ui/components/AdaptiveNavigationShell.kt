@@ -24,8 +24,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,11 +44,14 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
+import app.overbay.orbit.util.PlatformRuntime
 
 private data class NavTabItem(val key: OrbitNavKey, val title: String, val icon: ImageVector)
 
 /**
- * Adaptive navigation shell supporting phone bottom bar, tablet rail, and desktop sidebar.
+ * Adaptive navigation shell:
+ * - Phones, folding phones, and tablets always keep the 5-tab bottom NavigationBar.
+ * - Desktop web browsers (>= 1200.dp on Web) render the full desktop sidebar.
  */
 @Composable
 fun AdaptiveNavigationShell(
@@ -85,55 +86,37 @@ fun AdaptiveNavigationShell(
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        when {
-            maxWidth >= 900.dp -> {
-                // Desktop Sidebar (>= 900.dp)
-                Row(modifier = Modifier.fillMaxSize()) {
-                    DesktopSidebar(
-                        primaryTabs = primaryTabs,
-                        currentKey = currentKey,
-                        onNavigate = { haptics.tick(); onNavigate(it) },
-                        mhaEnabled = mhaEnabled,
-                        hiddenRouteNames = hiddenRouteNames,
-                        moreRouteOrder = moreRouteOrder
-                    )
-                    VerticalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) { content() }
-                }
+        val showDesktopWebSidebar = PlatformRuntime.isWeb && maxWidth >= 1200.dp
+        if (showDesktopWebSidebar) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                DesktopSidebar(
+                    primaryTabs = primaryTabs,
+                    currentKey = currentKey,
+                    onNavigate = { haptics.tick(); onNavigate(it) },
+                    mhaEnabled = mhaEnabled,
+                    hiddenRouteNames = hiddenRouteNames,
+                    moreRouteOrder = moreRouteOrder
+                )
+                VerticalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) { content() }
             }
-            maxWidth >= 600.dp -> {
-                // Tablet NavigationRail (600.dp..899.dp)
-                Row(modifier = Modifier.fillMaxSize()) {
-                    TabletNavRail(
+        } else {
+            // Persistent bottom NavigationBar across phones, folding phones, and tablets
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                bottomBar = {
+                    PhoneBottomBar(
                         primaryTabs = primaryTabs,
                         currentKey = currentKey,
                         isSecondaryRoute = isSecondaryRoute,
                         onTabSelected = { haptics.tick(); onNavigate(it) },
-                        onOpenMore = { haptics.tick(); showMoreSheet = true },
-                        onOpenSettings = { haptics.tick(); onNavigate(OrbitNavKey.Settings) }
+                        onOpenMore = { haptics.tick(); showMoreSheet = true }
                     )
-                    VerticalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) { content() }
                 }
-            }
-            else -> {
-                // Compact Phone Bottom NavigationBar (< 600.dp)
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                    bottomBar = {
-                        PhoneBottomBar(
-                            primaryTabs = primaryTabs,
-                            currentKey = currentKey,
-                            isSecondaryRoute = isSecondaryRoute,
-                            onTabSelected = { haptics.tick(); onNavigate(it) },
-                            onOpenMore = { haptics.tick(); showMoreSheet = true }
-                        )
-                    }
-                ) { padding ->
-                    Box(modifier = Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
-                        content()
-                    }
+            ) { padding ->
+                Box(modifier = Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
+                    content()
                 }
             }
         }
@@ -248,46 +231,6 @@ private fun SidebarRow(title: String, icon: ImageVector, selected: Boolean, onCl
         }
         Spacer(modifier = Modifier.width(12.dp))
         Text(text = title, style = MaterialTheme.typography.labelLarge, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun TabletNavRail(
-    primaryTabs: List<NavTabItem>,
-    currentKey: OrbitNavKey,
-    isSecondaryRoute: Boolean,
-    onTabSelected: (OrbitNavKey) -> Unit,
-    onOpenMore: () -> Unit,
-    onOpenSettings: () -> Unit
-) {
-    NavigationRail(
-        containerColor = MaterialTheme.colorScheme.surface,
-        header = {
-            Icon(imageVector = OrbitIcons.Dashboard, contentDescription = "Orbit", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp).padding(vertical = 4.dp))
-        }
-    ) {
-        primaryTabs.forEach { tab ->
-            NavigationRailItem(
-                selected = isTabSelected(tab.key, currentKey),
-                onClick = { onTabSelected(tab.key) },
-                icon = { Icon(imageVector = tab.icon, contentDescription = tab.title, modifier = Modifier.size(24.dp)) },
-                label = { Text(tab.title.uppercase(), style = MaterialTheme.typography.labelSmall, fontSize = 10.sp) }
-            )
-        }
-        NavigationRailItem(
-            selected = isSecondaryRoute,
-            onClick = onOpenMore,
-            icon = { Icon(imageVector = OrbitIcons.MoreHoriz, contentDescription = "More", modifier = Modifier.size(24.dp)) },
-            label = { Text("MORE", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp) }
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        NavigationRailItem(
-            selected = currentKey == OrbitNavKey.Settings,
-            onClick = onOpenSettings,
-            icon = { Icon(imageVector = OrbitIcons.Settings, contentDescription = "Settings", modifier = Modifier.size(24.dp)) },
-            label = { Text("SETTINGS", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp) },
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
     }
 }
 

@@ -269,6 +269,12 @@ class SettingsViewModel(
         _uiState.update { it.copy(isSimpleFinLogsExpanded = !it.isSimpleFinLogsExpanded) }
     }
 
+    fun unmuteSimpleFinAccount(label: String) {
+        scope.launch {
+            repository.unmuteSimpleFinAccountWarning(label)
+        }
+    }
+
     // Household Partner Sharing
     fun loadHouseholdSharing() {
         _uiState.update { it.copy(isLoadingSharing = true) }

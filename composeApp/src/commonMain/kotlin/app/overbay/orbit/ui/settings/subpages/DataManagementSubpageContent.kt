@@ -58,6 +58,8 @@ fun DataManagementSubpageContent(
             cutoverDate = uiState.preferences.simpleFinCutoverDate,
             syncLogs = uiState.simpleFinLogs,
             isLogsExpanded = uiState.isSimpleFinLogsExpanded,
+            mutedAccounts = uiState.preferences.mutedSimpleFinAccounts,
+            onUnmuteAccount = viewModel::unmuteSimpleFinAccount,
             onTokenChange = viewModel::setSimpleFinToken,
             onSetupBridge = viewModel::setupSimpleFinBridge,
             onTriggerSync = viewModel::triggerSync,

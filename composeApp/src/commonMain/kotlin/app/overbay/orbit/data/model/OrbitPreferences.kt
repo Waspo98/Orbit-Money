@@ -60,6 +60,7 @@ data class OrbitPreferences(
     val simpleFinCutoverDate: String? = null,
     val accountGroupWideSpans: Map<String, Int> = emptyMap(),
     val dismissedRecurringKeys: List<String> = emptyList(),
+    val mutedSimpleFinAccounts: List<String> = emptyList(),
     val includeHsaInRetirementRate: Boolean = true,
     val notificationPreferences: NotificationPreferencesConfig = NotificationPreferencesConfig(),
     val sharedSessionCachedAtEpochMs: Long? = null,

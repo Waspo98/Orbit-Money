@@ -8,6 +8,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,8 +19,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -50,12 +54,15 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SimpleFinBankSyncBlock(
     token: String?,
     cutoverDate: String? = null,
     syncLogs: List<SimpleFinSyncLogEntry> = emptyList(),
     isLogsExpanded: Boolean = false,
+    mutedAccounts: List<String> = emptyList(),
+    onUnmuteAccount: (String) -> Unit = {},
     onTokenChange: (String?) -> Unit = {},
     onSetupBridge: (token: String, cutoverDate: String?) -> Unit = { _, _ -> },
     onTriggerSync: () -> Unit = {},
@@ -250,6 +257,39 @@ fun SimpleFinBankSyncBlock(
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // Muted SimpleFIN Account Warnings (tap chip to unmute)
+        if (mutedAccounts.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "MUTED SYNC WARNINGS (${mutedAccounts.size})",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                mutedAccounts.forEach { accountLabel ->
+                    AssistChip(
+                        onClick = { onUnmuteAccount(accountLabel) },
+                        label = { Text(accountLabel, style = MaterialTheme.typography.labelMedium) },
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Unmute $accountLabel",
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    )
                 }
             }
         }

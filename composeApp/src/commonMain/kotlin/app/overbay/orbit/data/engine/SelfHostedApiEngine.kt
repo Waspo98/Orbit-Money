@@ -146,6 +146,7 @@ class SelfHostedApiEngine(
             dashboardRetirementPreset = remotePrefs?.prefOr("dashboardRetirementPreset", currentPrefs.dashboardRetirementPreset) ?: currentPrefs.dashboardRetirementPreset,
             accountGroupWideSpans = remotePrefs?.prefOr("accountGroupWideSpans", currentPrefs.accountGroupWideSpans) ?: currentPrefs.accountGroupWideSpans,
             dismissedRecurringKeys = remotePrefs?.prefOr("dismissedRecurringKeys", currentPrefs.dismissedRecurringKeys) ?: currentPrefs.dismissedRecurringKeys,
+            mutedSimpleFinAccounts = remotePrefs?.prefOr("mutedSimpleFinAccounts", currentPrefs.mutedSimpleFinAccounts) ?: currentPrefs.mutedSimpleFinAccounts,
             includeHsaInRetirementRate = remotePrefs?.prefOr("includeHsaInRetirementRate", currentPrefs.includeHsaInRetirementRate) ?: currentPrefs.includeHsaInRetirementRate,
             notificationPreferences = remotePrefs?.prefOr("notificationPreferences", currentPrefs.notificationPreferences) ?: currentPrefs.notificationPreferences,
             isSharedNonOwnerSession = sharing != null && sharing.currentUserRole != "owner",
@@ -386,6 +387,7 @@ class SelfHostedApiEngine(
             map["moreRouteOrder"] = json.encodeToJsonElement(preferences.moreRouteOrder)
             map["dashboardHiddenBiggestIds"] = json.encodeToJsonElement(preferences.dashboardHiddenBiggestIds)
             map["dismissedRecurringKeys"] = json.encodeToJsonElement(preferences.dismissedRecurringKeys)
+            map["mutedSimpleFinAccounts"] = json.encodeToJsonElement(preferences.mutedSimpleFinAccounts)
             map["dashboardWidgets"] = json.encodeToJsonElement(preferences.dashboardWidgets)
             map["notificationPreferences"] = json.encodeToJsonElement(preferences.notificationPreferences)
             map["accountGroupWideSpans"] = json.encodeToJsonElement(preferences.accountGroupWideSpans)

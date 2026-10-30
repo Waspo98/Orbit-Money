@@ -3,6 +3,8 @@ package app.overbay.orbit.domain
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.addBalanceRecord
 import app.overbay.orbit.data.importTransactionsWithBatch
+import app.overbay.orbit.data.muteSimpleFinAccountWarnings
+import app.overbay.orbit.data.unmuteSimpleFinAccountWarning
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.AmountStrategy
@@ -355,5 +357,37 @@ class Wave2ParityEngineAndRepoTest {
             realReturn = 0.04
         )
         assertNull(post65)
+    }
+
+    @Test
+    fun testSimpleFinWarningParser_extractsAccountAndSuppressesMutedAccountWarnings() = runTest(testDispatcher) {
+        val singlePartialError = "Partial sync — SimpleFIN reported: Connection to Bright Start 529 - College Savings Plan may need attention"
+        val initialIssues = SimpleFinWarningParser.parseUnmutedIssues(singlePartialError)
+        assertEquals(1, initialIssues.size)
+        assertEquals("Bright Start 529 - College Savings Plan", initialIssues[0].accountLabel)
+
+        // User toggles "Do not warn me about this account again"
+        repository.muteSimpleFinAccountWarnings(listOf(initialIssues[0].accountLabel))
+        assertEquals(listOf("Bright Start 529 - College Savings Plan"), repository.preferences.value.mutedSimpleFinAccounts)
+
+        // Subsequent partial sync with only Bright Start 529 produces zero unmuted issues (popup suppressed)
+        val afterMute = SimpleFinWarningParser.parseUnmutedIssues(
+            rawError = singlePartialError,
+            mutedAccounts = repository.preferences.value.mutedSimpleFinAccounts
+        )
+        assertTrue(afterMute.isEmpty())
+
+        // Multi-account partial sync suppresses Bright Start 529 while still surfacing Chase Checking
+        val multiError = "Partial sync - SimpleFIN reported: Connection to Bright Start 529 - College Savings Plan may need attention; Connection to Chase Checking failed"
+        val partialUnmuted = SimpleFinWarningParser.parseUnmutedIssues(
+            rawError = multiError,
+            mutedAccounts = repository.preferences.value.mutedSimpleFinAccounts
+        )
+        assertEquals(1, partialUnmuted.size)
+        assertEquals("Chase Checking", partialUnmuted[0].accountLabel)
+
+        // Unmuting restores warnings for that account
+        repository.unmuteSimpleFinAccountWarning("Bright Start 529 - College Savings Plan")
+        assertTrue(repository.preferences.value.mutedSimpleFinAccounts.isEmpty())
     }
 }

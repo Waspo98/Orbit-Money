@@ -294,6 +294,25 @@ suspend fun OrbitRepository.fetchSimpleFinSyncLogs(limit: Int = 20): Result<List
     } else emptyList()
 }
 
+suspend fun OrbitRepository.muteSimpleFinAccountWarnings(accountLabels: List<String>) {
+    val cleaned = accountLabels.map { it.trim() }.filter { it.isNotEmpty() }
+    if (cleaned.isEmpty()) return
+    val existing = preferences.value.mutedSimpleFinAccounts
+    val merged = (existing + cleaned).distinctBy { it.lowercase() }
+    if (merged != existing) {
+        updatePreferences(preferences.value.copy(mutedSimpleFinAccounts = merged))
+    }
+}
+
+suspend fun OrbitRepository.unmuteSimpleFinAccountWarning(accountLabel: String) {
+    val target = accountLabel.trim().lowercase()
+    val existing = preferences.value.mutedSimpleFinAccounts
+    val updated = existing.filterNot { it.trim().lowercase() == target }
+    if (updated != existing) {
+        updatePreferences(preferences.value.copy(mutedSimpleFinAccounts = updated))
+    }
+}
+
 suspend fun OrbitRepository.disconnectSimpleFinBridge(): Result<Boolean> = runCatching {
     if (storageMode.value == StorageMode.SELF_HOSTED) {
         createApiClient().disconnectSimpleFin().getOrThrow()
