@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.accounts.sheets
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,17 +9,23 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,8 +36,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -39,6 +50,8 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 fun AccountMergeDialog(
     sourceAccount: Account,
     availableAccounts: List<Account>,
+    sourceTransactionCount: Int = 0,
+    getTransactionCount: (Long) -> Int = { 0 },
     onMerge: (sourceId: Long, targetId: Long, combineBalances: Boolean) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -68,10 +81,38 @@ fun AccountMergeDialog(
             )
 
             Text(
-                text = "Merge \"${sourceAccount.name}\" into another account. All transactions will be reassigned safely to the target account.",
+                text = "Merge \"${sourceAccount.name}\" into another account. All $sourceTransactionCount transactions will be reassigned safely to the target account.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            // SimpleFIN recreation warning banner
+            if (!sourceAccount.simplefinAccountId.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Warning: \"${sourceAccount.name}\" is linked to SimpleFIN. Future SimpleFIN syncs may recreate it unless you unlink it first or configure your cutover date.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
 
             if (eligibleTargets.isEmpty()) {
                 Text(
@@ -89,9 +130,11 @@ fun AccountMergeDialog(
                         value = selectedTarget?.name ?: "Select Target Account",
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Merge Into") },
+                        label = { Text("Merge Into (Target Account)") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                     )
                     ExposedDropdownMenu(
                         expanded = dropdownExpanded,
@@ -105,6 +148,41 @@ fun AccountMergeDialog(
                                     dropdownExpanded = false
                                 }
                             )
+                        }
+                    }
+                }
+
+                // Projected Target Impact Card
+                selectedTarget?.let { target ->
+                    val targetTxns = getTransactionCount(target.id)
+                    val projectedTxns = targetTxns + sourceTransactionCount
+                    val projectedBalance = if (combineBalances) target.currentBalanceCents + sourceAccount.currentBalanceCents else target.currentBalanceCents
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = "PROJECTED OUTCOME FOR ${target.name.uppercase()}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Transactions:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("$targetTxns → $projectedTxns", style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold))
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Projected Balance:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    "${MoneyUtils.formatCents(target.currentBalanceCents)} → ${MoneyUtils.formatCents(projectedBalance)}",
+                                    style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                )
+                            }
                         }
                     }
                 }
@@ -127,7 +205,7 @@ fun AccountMergeDialog(
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = "Add source balance to destination balance",
+                            text = "Add source balance (${MoneyUtils.formatCents(sourceAccount.currentBalanceCents)}) to target account balance",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )

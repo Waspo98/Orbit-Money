@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
@@ -38,6 +39,7 @@ import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.rules.components.RuleDetailInspectorPane
 import app.overbay.orbit.ui.rules.components.RuleItemCard
 import app.overbay.orbit.ui.rules.sheets.RuleEditorSheet
+import app.overbay.orbit.ui.rules.sheets.WipeRulesDialog
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalDevicePosture
 
@@ -114,6 +116,13 @@ fun RulesScreen(
                                     buttonSize = barHeight,
                                     onClick = { viewModel.runRulesNow() }
                                 )
+
+                                CanopyIconButton(
+                                    icon = Icons.Default.Delete,
+                                    contentDescription = "Wipe All Rules",
+                                    onClick = { viewModel.openWipeAllRulesDialog() },
+                                    buttonSize = barHeight
+                                )
                             }
 
                             CanopyIconButton(
@@ -188,6 +197,8 @@ fun RulesScreen(
                                 onRunRulesNow = { viewModel.runRulesNow() },
                                 onPreviewCount = { conditions -> viewModel.previewMatchCount(conditions) },
                                 onPreviewMatches = { conditions -> viewModel.previewMatchingTransactions(conditions) },
+                                onPreviewRule = { rule -> viewModel.previewRule(rule) },
+                                onOpenRule = { id -> viewModel.selectRuleForInspect(id) },
                                 onDismissPane = { viewModel.dismissInspectorPane() }
                             )
                         }
@@ -204,6 +215,8 @@ fun RulesScreen(
                 onSave = { rule -> viewModel.saveRule(rule) },
                 onPreviewCount = { conditions -> viewModel.previewMatchCount(conditions) },
                 onPreviewMatches = { conditions -> viewModel.previewMatchingTransactions(conditions) },
+                onPreviewRule = { rule -> viewModel.previewRule(rule) },
+                onOpenRule = { id -> viewModel.selectRuleForInspect(id) },
                 onDismiss = { viewModel.closeEditorSheet() }
             )
         }
@@ -217,6 +230,14 @@ fun RulesScreen(
                 isDestructive = true,
                 onConfirm = { viewModel.deleteRule(ruleId) },
                 onDismiss = { viewModel.dismissDeleteRule() }
+            )
+        }
+
+        if (state.showWipeAllRulesDialog) {
+            WipeRulesDialog(
+                ruleCount = state.rules.size,
+                onConfirmWipe = { viewModel.wipeAllRules() },
+                onDismiss = { viewModel.dismissWipeAllRulesDialog() }
             )
         }
     }

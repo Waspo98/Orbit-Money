@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -49,6 +50,8 @@ import app.overbay.orbit.data.model.UpcomingItem
 import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.domain.ProjectedAmountResult
+import app.overbay.orbit.domain.UpcomingScheduleHelper
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
@@ -61,11 +64,6 @@ import kotlin.math.abs
 
 private enum class UpcomingInspectorSubMode { DETAIL, EDIT }
 
-/**
- * Right-hand morphing inspector pane for Upcoming recurring schedules on unfolded phones, tablets, and desktops.
- * Shows the read-only schedule summary by default when tapped, and morphs smoothly into the editor form.
- * Strictly under the 400-line ceiling.
- */
 @Composable
 fun UpcomingDetailInspectorPane(
     state: UpcomingUiState,
@@ -111,13 +109,16 @@ fun UpcomingDetailInspectorPane(
                 if (inspecting != null) {
                     val cat = inspecting.categoryId?.let { state.categoryMap[it] }
                     val acct = inspecting.accountId?.let { state.accountMap[it] }
+                    val proj = state.projectedAmounts[inspecting.id]
                     UpcomingReadOnlyDetailContent(
                         item = inspecting,
                         category = cat,
                         account = acct,
+                        projected = proj,
                         onClose = onClosePane,
                         onEdit = { viewModel.openEditUpcoming(inspecting) },
                         onMarkPaid = { viewModel.openReconcileDialog(inspecting) },
+                        onViewHistory = { viewModel.openHistoryModal(inspecting) },
                         onDelete = { viewModel.deleteUpcoming(inspecting.id) }
                     )
                 }
@@ -132,15 +133,19 @@ private fun UpcomingReadOnlyDetailContent(
     item: UpcomingItem,
     category: Category?,
     account: Account?,
+    projected: ProjectedAmountResult?,
     onClose: () -> Unit,
     onEdit: () -> Unit,
     onMarkPaid: () -> Unit,
+    onViewHistory: () -> Unit,
     onDelete: () -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
     val isExpense = item.direction.lowercase() != "income"
     val amountColor = if (isExpense) colors.expense else colors.income
+    val effectiveAmountCents = projected?.amountCents ?: item.amountCents
+
     val catColor = try {
         val hex = category?.color?.trim()?.removePrefix("#") ?: "9E9E9E"
         Color(hex.toLong(16) or 0xFF000000)
@@ -178,10 +183,20 @@ private fun UpcomingReadOnlyDetailContent(
                 Spacer(modifier = Modifier.height(2.dp))
                 val prefix = if (isExpense) "-" else "+"
                 Text(
-                    text = "$prefix${MoneyUtils.formatCents(abs(item.amountCents))}",
+                    text = "$prefix${MoneyUtils.formatCents(abs(effectiveAmountCents))}",
                     style = TabularNumStyle.copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
                     color = amountColor
                 )
+
+                if (projected?.isProjectedAverage == true) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Projected from ${projected.sampleCount} transactions",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
             IconButton(onClick = { haptics.tick(); onClose() }, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Close Details", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -196,12 +211,12 @@ private fun UpcomingReadOnlyDetailContent(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 UpcomingMetaField(label = "NEXT DUE DATE", value = item.nextDate)
                 UpcomingMetaField(
-                    label = "FREQUENCY",
-                    value = item.frequencyType.name.lowercase().replaceFirstChar { it.uppercase() }
+                    label = "SCHEDULE",
+                    value = UpcomingScheduleHelper.formatRecurrenceSchedule(item)
                 )
                 UpcomingMetaField(
-                    label = "DIRECTION",
-                    value = if (isExpense) "Bill / Expense" else "Income"
+                    label = "KIND",
+                    value = item.kind.name.lowercase().replaceFirstChar { it.uppercase() }
                 )
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -220,6 +235,11 @@ private fun UpcomingReadOnlyDetailContent(
             }
         }
 
+        if (!item.notes.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            UpcomingMetaField(label = "NOTES", value = item.notes)
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
         HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
         Spacer(modifier = Modifier.height(16.dp))
@@ -234,6 +254,7 @@ private fun UpcomingReadOnlyDetailContent(
                 label = if (isExpense) "Mark Paid" else "Mark Received",
                 onClick = onMarkPaid
             )
+            UpcomingPillAction(label = "View History", onClick = onViewHistory)
             UpcomingPillAction(label = "Delete", isDestructive = true, onClick = onDelete)
         }
     }

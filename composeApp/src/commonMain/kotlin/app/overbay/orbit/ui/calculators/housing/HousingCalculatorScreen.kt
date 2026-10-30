@@ -17,11 +17,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.housing.cards.AmortizationSummaryCard
 import app.overbay.orbit.ui.calculators.housing.cards.MonthlyPaymentBreakdownCard
 import app.overbay.orbit.ui.calculators.housing.cards.MortgageInputCard
+import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
@@ -69,6 +72,13 @@ fun HousingCalculatorScreen(
                             .fillMaxHeight()
                     )
 
+                    CanopyIconButton(
+                        icon = Icons.Default.Refresh,
+                        contentDescription = "Reset Defaults",
+                        onClick = { viewModel.reset() },
+                        buttonSize = barHeight
+                    )
+
                     CanopySettingsButton(
                         buttonSize = barHeight,
                         onClick = { onNavigate(OrbitNavKey.Settings) }
@@ -105,7 +115,9 @@ fun HousingCalculatorScreen(
                                 onUseNetProceeds = viewModel::useNetProceedsAsDownPayment,
                                 onAgentCommissionChange = viewModel::setAgentCommissionPercent,
                                 onSellerClosingChange = viewModel::setSellerClosingPercent,
-                                onBuyerClosingChange = viewModel::setBuyerClosingPercent
+                                onBuyerClosingChange = viewModel::setBuyerClosingPercent,
+                                onProratedPropertyTaxChange = viewModel::setProratedPropertyTax,
+                                onMiscRepairsChange = viewModel::setMiscRepairs
                             )
                         }
                     }
@@ -158,7 +170,9 @@ fun HousingCalculatorScreen(
                             onUseNetProceeds = viewModel::useNetProceedsAsDownPayment,
                             onAgentCommissionChange = viewModel::setAgentCommissionPercent,
                             onSellerClosingChange = viewModel::setSellerClosingPercent,
-                            onBuyerClosingChange = viewModel::setBuyerClosingPercent
+                            onBuyerClosingChange = viewModel::setBuyerClosingPercent,
+                            onProratedPropertyTaxChange = viewModel::setProratedPropertyTax,
+                            onMiscRepairsChange = viewModel::setMiscRepairs
                         )
                     }
 

@@ -33,9 +33,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.CategorySortOption
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.budgets.components.BudgetCategoryGroupList
 import app.overbay.orbit.ui.budgets.components.BudgetDetailInspectorPane
 import app.overbay.orbit.ui.budgets.components.BudgetSummaryHeroCard
+import app.overbay.orbit.ui.budgets.components.NotablePanel
+import app.overbay.orbit.ui.budgets.dialogs.AddBudgetCategorySheet
 import app.overbay.orbit.ui.budgets.dialogs.BudgetAmountEditorSheet
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
@@ -48,10 +51,10 @@ import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.util.LocalDevicePosture
 
 /**
- * Editorial Budgets screen featuring flat emerald canopy hero with period navigation,
- * 2x2 snapshot metrics panel, spending mix strip, inline expandable category rows on phones,
+ * Editorial Budgets screen featuring flat emerald canopy hero with period navigation & active month selector,
+ * 2x2 snapshot metrics panel, notable actionable insights panel, spending mix strip, inline expandable category rows,
  * morphing dual-screen inspector pane, and scroll-reactive FAB.
- * Conforms strictly to <= 6 parameters and < 400-line ceiling.
+ * Conforms strictly to <= 6 parameters and < 390-line ceiling.
  */
 @Composable
 fun BudgetsScreen(
@@ -87,6 +90,7 @@ fun BudgetsScreen(
                     .nestedScroll(heroScrollState.nestedScrollConnection)
             ) {
                 var sortMenuExpanded by remember { mutableStateOf(false) }
+                var monthMenuExpanded by remember { mutableStateOf(false) }
 
                 MorphingPageHero(
                     kicker = "BUDGET PLANNING",
@@ -99,18 +103,55 @@ fun BudgetsScreen(
                         } else {
                             state.monthLabel
                         }
-                        PeriodNavigatorPill(
-                            label = state.monthLabel,
-                            compactLabel = shortMonth,
-                            isCompact = isCompact,
-                            onPrevious = { viewModel.onPreviousMonth() },
-                            onNext = { viewModel.onNextMonth() },
-                            canGoNext = state.canGoNextMonth,
-                            onClickLabel = { viewModel.onResetToCurrentMonth() },
+
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                        )
+                        ) {
+                            PeriodNavigatorPill(
+                                label = state.monthLabel,
+                                compactLabel = shortMonth,
+                                isCompact = isCompact,
+                                onPrevious = { viewModel.onPreviousMonth() },
+                                onNext = { viewModel.onNextMonth() },
+                                canGoNext = state.canGoNextMonth,
+                                onClickLabel = { monthMenuExpanded = true },
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                            DropdownMenu(
+                                expanded = monthMenuExpanded,
+                                onDismissRequest = { monthMenuExpanded = false }
+                            ) {
+                                state.activeMonths.forEach { m ->
+                                    val isSelected = m == state.selectedMonth
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = LocalDateUtils.formatMonthLabel(m),
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        },
+                                        trailingIcon = if (isSelected) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        } else null,
+                                        onClick = {
+                                            viewModel.jumpToMonth(m)
+                                            monthMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
 
                         Box {
                             CanopyIconButton(
@@ -192,6 +233,26 @@ fun BudgetsScreen(
                                 )
                             }
 
+                            if (state.notables.hasNotables) {
+                                item {
+                                    NotablePanel(
+                                        notables = state.notables,
+                                        onInspectCategory = { categoryId ->
+                                            if (isTwoPane) {
+                                                viewModel.toggleExpandCategory(categoryId)
+                                            } else {
+                                                val found = (state.budgetedItems + state.unbudgetedItems + state.inactiveItems)
+                                                    .find { it.category.id == categoryId }
+                                                if (found != null) viewModel.openBudgetEditor(found)
+                                            }
+                                        },
+                                        onAddBudget = { item ->
+                                            viewModel.openAddBudgetPicker(item.category.id)
+                                        }
+                                    )
+                                }
+                            }
+
                             item {
                                 BudgetCategoryGroupList(
                                     budgeted = state.budgetedItems,
@@ -205,7 +266,11 @@ fun BudgetsScreen(
                                     onEditBudget = { viewModel.openBudgetEditor(it) },
                                     onDeleteBudget = { viewModel.deleteBudget(it) },
                                     onViewTransactions = { categoryId ->
-                                        onNavigate(OrbitNavKey.Transactions(categoryId = categoryId))
+                                        val (y, m) = LocalDateUtils.parseYearMonth(state.selectedMonth) ?: Pair(2026, 1)
+                                        val days = LocalDateUtils.daysInMonth(y, m)
+                                        val start = "${state.selectedMonth}-01"
+                                        val end = "${state.selectedMonth}-${days.toString().padStart(2, '0')}"
+                                        onNavigate(OrbitNavKey.Transactions(categoryId = categoryId, startDate = start, endDate = end))
                                     },
                                     isWideScreen = isTwoPane
                                 )
@@ -249,6 +314,20 @@ fun BudgetsScreen(
                     viewModel.deleteBudget(budgetId)
                 },
                 onDismiss = { viewModel.closeBudgetEditor() }
+            )
+        }
+
+        // Add Category Budget Modal Sheet
+        if (state.showAddCategorySheet) {
+            val availableCategories = state.unbudgetedItems.map { it.category } + state.inactiveItems.map { it.category }
+            AddBudgetCategorySheet(
+                availableCategories = availableCategories,
+                initialCategoryId = state.initialAddCategoryId,
+                threeMonthAvgProvider = { viewModel.calculate3MonthAverageSpend(it) },
+                onSave = { categoryId, amountCents, rollover ->
+                    viewModel.saveBudget(categoryId, amountCents, rollover)
+                },
+                onDismiss = { viewModel.closeAddBudgetPicker() }
             )
         }
     }

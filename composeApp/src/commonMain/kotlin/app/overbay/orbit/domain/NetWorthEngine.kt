@@ -134,12 +134,29 @@ object NetWorthEngine {
             monthMap[txn.accountId] = (monthMap[txn.accountId] ?: 0L) + txn.effectiveAmountCents
         }
 
-        // Snapshot records by account and month
-        val recordsByAcctMonth = balanceRecords.associateBy { "${it.accountId}|${it.recordDate.take(7)}" }
+        // Snapshot records by account and month (latest record per month per account)
+        val recordsByAcctMonth = balanceRecords
+            .sortedBy { it.recordDate }
+            .associateBy { "${it.accountId}|${it.recordDate.take(7)}" }
+
+        val actualCount = if (monthsCount == Int.MAX_VALUE) {
+            val earliestTxMonth = transactions
+                .filter { !it.effectiveIsIgnored && !it.effectiveIsTransfer }
+                .mapNotNull { it.effectiveDate.take(7).takeIf { d -> d.length == 7 && d.contains("-") } }
+                .minOrNull()
+            val earliestRecMonth = balanceRecords
+                .mapNotNull { it.recordDate.take(7).takeIf { d -> d.length == 7 && d.contains("-") } }
+                .minOrNull()
+            val earliestMonth = listOfNotNull(earliestTxMonth, earliestRecMonth).minOrNull() ?: latestMonth
+            val diff = parseYearMonthToTotalMonths(latestMonth) - parseYearMonthToTotalMonths(earliestMonth) + 1
+            maxOf(diff, 12)
+        } else {
+            monthsCount
+        }
 
         val monthsList = mutableListOf<String>()
         var cur = latestMonth
-        for (i in 0 until monthsCount) {
+        for (i in 0 until actualCount) {
             monthsList.add(cur)
             cur = addMonths(cur, -1)
         }
@@ -150,6 +167,9 @@ object NetWorthEngine {
             val acctsWithBalances = activeAccounts.map { acct ->
                 val snapshotRec = recordsByAcctMonth["${acct.id}|$m"]
                 val bal = snapshotRec?.balanceCents ?: (currentBalances[acct.id] ?: 0L)
+                if (snapshotRec != null) {
+                    currentBalances[acct.id] = snapshotRec.balanceCents
+                }
                 acct.copy(currentBalanceCents = bal)
             }
             val snap = computeCurrentSnapshot(acctsWithBalances)
@@ -173,6 +193,13 @@ object NetWorthEngine {
                 point.copy(deltaFromPreviousCents = delta, percentChange = pct)
             }
         }
+    }
+
+    private fun parseYearMonthToTotalMonths(yearMonth: String): Int {
+        val parts = yearMonth.split("-")
+        val y = parts.getOrNull(0)?.toIntOrNull() ?: 2026
+        val m = parts.getOrNull(1)?.toIntOrNull() ?: 1
+        return y * 12 + (m - 1)
     }
 
     private fun addMonths(month: String, delta: Int): String {

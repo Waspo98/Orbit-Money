@@ -2,6 +2,7 @@ package app.overbay.orbit.ui.categories.dialogs
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -296,6 +297,44 @@ private fun CategoryEditorFormFields(
                     }
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Custom Hex Color Input with live preview swatch
+        val parsedCustomColor = remember(selectedColor) {
+            runCatching {
+                val cleanHex = selectedColor.trim().removePrefix("#")
+                if (cleanHex.length == 6) Color(cleanHex.toLong(16) or 0xFF000000) else null
+            }.getOrNull()
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(parsedCustomColor ?: MaterialTheme.colorScheme.primaryContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (parsedCustomColor == null) {
+                    Text("?", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            app.overbay.orbit.ui.components.OrbitTextField(
+                value = selectedColor,
+                onValueChange = { input ->
+                    val formatted = if (input.startsWith("#")) input.take(7) else "#${input.take(6)}"
+                    onColorChange(formatted)
+                },
+                label = { Text("Custom Hex Color (#RRGGBB)") },
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))

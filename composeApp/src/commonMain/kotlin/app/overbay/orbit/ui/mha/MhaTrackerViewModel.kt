@@ -2,7 +2,7 @@ package app.overbay.orbit.ui.mha
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.*
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.MhaTaxProfile
@@ -24,6 +24,7 @@ class MhaTrackerViewModel(
 
     private val _selectedYear = MutableStateFlow(LocalDateUtils.todayLocalDate().year)
     private val _selectedTabFilter = MutableStateFlow(MhaTransactionTabFilter.ELIGIBLE)
+    private val _activeScreenTab = MutableStateFlow(MhaScreenTab.TRACKER)
     private val _searchQuery = MutableStateFlow("")
     private val _showConfigSheet = MutableStateFlow(false)
     private val _errorMessage = MutableStateFlow<String?>(null)
@@ -43,11 +44,12 @@ class MhaTrackerViewModel(
         },
         combine(
             _selectedTabFilter,
+            _activeScreenTab,
             _searchQuery,
             _showConfigSheet,
             _errorMessage
-        ) { tab, search, showConfig, err ->
-            ViewFilterData(tab, search, showConfig, err)
+        ) { tab, screenTab, search, showConfig, err ->
+            ViewFilterData(tab, screenTab, search, showConfig, err)
         },
         combine(
             _designatedCapCents,
@@ -64,6 +66,7 @@ class MhaTrackerViewModel(
         val year = snapData.year
 
         val tabFilter = filterData.tabFilter
+        val screenTab = filterData.screenTab
         val search = filterData.searchQuery
         val showConfig = filterData.showConfig
         val error = filterData.error
@@ -191,7 +194,9 @@ class MhaTrackerViewModel(
             searchQuery = search,
             showConfigSheet = showConfig,
             isLoading = false,
-            errorMessage = error
+            errorMessage = error,
+            mhaEnabled = snapshot.preferences.mhaTrackerEnabled,
+            activeScreenTab = screenTab
         )
     }.stateIn(
         scope = viewModelScope,
@@ -205,6 +210,10 @@ class MhaTrackerViewModel(
 
     fun setTabFilter(filter: MhaTransactionTabFilter) {
         _selectedTabFilter.value = filter
+    }
+
+    fun setActiveScreenTab(tab: MhaScreenTab) {
+        _activeScreenTab.value = tab
     }
 
     fun setSearchQuery(query: String) {
@@ -221,6 +230,30 @@ class MhaTrackerViewModel(
 
     fun dismissConfigSheet() = closeConfigSheet()
 
+    fun setMhaEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setMhaEnabled(enabled)
+        }
+    }
+
+    fun setMhaAccountDefault(accountId: Long, eligible: Boolean) {
+        viewModelScope.launch {
+            repository.setMhaAccountDefault(accountId, eligible)
+        }
+    }
+
+    fun setMhaCategoryDefault(categoryId: Long, eligible: Boolean) {
+        viewModelScope.launch {
+            repository.setMhaCategoryDefault(categoryId, eligible)
+        }
+    }
+
+    fun setMhaCategoryIgnoreDefault(categoryId: Long, ignored: Boolean) {
+        viewModelScope.launch {
+            repository.setMhaCategoryIgnoreDefault(categoryId, ignored)
+        }
+    }
+
     fun toggleTransactionEligibility(transactionId: Long, currentEligible: Boolean? = null) {
         viewModelScope.launch {
             val target = uiState.value.allYearOutflows.find { it.id == transactionId }
@@ -232,6 +265,18 @@ class MhaTrackerViewModel(
     fun resetTransactionEligibility(transactionId: Long) {
         viewModelScope.launch {
             repository.resetTransaction(transactionId)
+        }
+    }
+
+    fun resetTransactionMhaOverride(transactionId: Long) {
+        viewModelScope.launch {
+            repository.resetTransactionFields(transactionId, listOf("mha_eligible"))
+        }
+    }
+
+    fun setTransactionIgnored(transactionId: Long, ignored: Boolean) {
+        viewModelScope.launch {
+            repository.setTransactionIgnored(transactionId, ignored)
         }
     }
 
@@ -281,6 +326,7 @@ class MhaTrackerViewModel(
 
     private data class ViewFilterData(
         val tabFilter: MhaTransactionTabFilter,
+        val screenTab: MhaScreenTab,
         val searchQuery: String,
         val showConfig: Boolean,
         val error: String?

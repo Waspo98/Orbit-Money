@@ -311,6 +311,8 @@ fun TransactionEditorContent(
             onTransferChange = { isTransfer = it },
             mhaEligible = mhaEligible,
             onMhaEligibleChange = { mhaEligible = it },
+            isIgnored = isIgnored,
+            onIgnoredChange = { isIgnored = it },
             onCreateRule = if (transaction != null && onCreateRule != null) ({ onCreateRule(transaction) }) else null,
             onMarkRecurring = if (transaction != null && onMarkRecurring != null) ({ onMarkRecurring(transaction) }) else null
         )

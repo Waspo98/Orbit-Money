@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.RulePreviewResult
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleAction
@@ -59,6 +60,8 @@ fun RuleEditorSheet(
     onDismiss: () -> Unit,
     sourceTransaction: Transaction? = null,
     onPreviewMatches: (List<RuleCondition>) -> List<Transaction> = { emptyList() },
+    onPreviewRule: ((TransactionRule) -> RulePreviewResult)? = null,
+    onOpenRule: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     OrbitModalSheet(onDismissRequest = onDismiss, modifier = modifier) {
@@ -70,7 +73,9 @@ fun RuleEditorSheet(
             onPreviewCount = onPreviewCount,
             onDismiss = onDismiss,
             sourceTransaction = sourceTransaction,
-            onPreviewMatches = onPreviewMatches
+            onPreviewMatches = onPreviewMatches,
+            onPreviewRule = onPreviewRule,
+            onOpenRule = onOpenRule
         )
     }
 }
@@ -85,6 +90,8 @@ fun RuleEditorContent(
     onDismiss: () -> Unit,
     sourceTransaction: Transaction? = null,
     onPreviewMatches: (List<RuleCondition>) -> List<Transaction> = { emptyList() },
+    onPreviewRule: ((TransactionRule) -> RulePreviewResult)? = null,
+    onOpenRule: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -307,13 +314,29 @@ fun RuleEditorContent(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        val previewResult = remember(currentConditions, currentActions, canSave) {
+            if (allConditionsValid && canSave && onPreviewRule != null) {
+                val draftRule = TransactionRule(
+                    id = rule?.id ?: 0L,
+                    name = name.ifBlank { "Preview Rule" },
+                    priority = rule?.priority ?: 10,
+                    conditions = currentConditions,
+                    actions = currentActions,
+                    enabled = rule?.enabled ?: true
+                )
+                onPreviewRule.invoke(draftRule)
+            } else null
+        }
+
         RuleMatchPreviewWindow(
             allConditionsValid = allConditionsValid,
             matchCount = matchCount,
             matchingTransactions = matchingTransactions,
             accounts = accounts,
             categories = sortedCategories,
-            sourceTransactionId = sourceTransaction?.id
+            sourceTransactionId = sourceTransaction?.id,
+            previewResult = previewResult,
+            onOpenRule = onOpenRule
         )
 
         Spacer(modifier = Modifier.height(18.dp))

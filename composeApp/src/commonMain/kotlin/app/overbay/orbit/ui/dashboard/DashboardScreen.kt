@@ -36,7 +36,7 @@ import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.rememberHeroScrollState
-import app.overbay.orbit.ui.dashboard.cards.*
+import app.overbay.orbit.ui.dashboard.cards.EmptyWorkspaceSetupCard
 import app.overbay.orbit.ui.dashboard.dialogs.DashboardCustomizeSheet
 import app.overbay.orbit.ui.dashboard.dialogs.TransactionReviewSheet
 import app.overbay.orbit.util.LocalDevicePosture
@@ -172,6 +172,24 @@ fun DashboardScreen(
                             .fillMaxWidth()
                             .padding(horizontal = if (posture.supportsTwoPane) 20.dp else 16.dp, vertical = 14.dp)
                     ) {
+                        // First-time empty workspace guided setup card
+                        if (uiState.isEmptyWorkspace) {
+                            EmptyWorkspaceSetupCard(
+                                onImportCsv = {
+                                    onAction(DashboardAction.RequestOpenDataSettings)
+                                    onNavigate(OrbitNavKey.Settings)
+                                },
+                                onConnectSimpleFin = {
+                                    onAction(DashboardAction.RequestOpenDataSettings)
+                                    onNavigate(OrbitNavKey.Settings)
+                                },
+                                onAddManualAccount = {
+                                    onNavigate(OrbitNavKey.Accounts())
+                                }
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+
                         if (posture.supportsTwoPane) {
                             val gridRows = buildDashboardGridRows(visibleConfigs)
                             Column(
@@ -249,138 +267,5 @@ fun DashboardScreen(
         if (uiState.isReviewModalOpen) {
             TransactionReviewSheet(state = uiState.categorizeReview, onAction = onAction)
         }
-    }
-}
-
-private data class DashboardGridRow(
-    val leftCard: DashboardCardType,
-    val rightCard: DashboardCardType? = null,
-    val isFullSpan: Boolean = false
-)
-
-private fun buildDashboardGridRows(visibleConfigs: List<DashboardCardConfigItem>): List<DashboardGridRow> {
-    val rows = mutableListOf<DashboardGridRow>()
-    var pendingLeft: DashboardCardType? = null
-
-    for (config in visibleConfigs) {
-        if (config.wideSpan == 2) {
-            if (pendingLeft != null) {
-                rows.add(DashboardGridRow(leftCard = pendingLeft, rightCard = null, isFullSpan = false))
-                pendingLeft = null
-            }
-            rows.add(DashboardGridRow(leftCard = config.type, rightCard = null, isFullSpan = true))
-        } else {
-            if (pendingLeft == null) {
-                pendingLeft = config.type
-            } else {
-                rows.add(DashboardGridRow(leftCard = pendingLeft, rightCard = config.type, isFullSpan = false))
-                pendingLeft = null
-            }
-        }
-    }
-
-    if (pendingLeft != null) {
-        rows.add(DashboardGridRow(leftCard = pendingLeft, rightCard = null, isFullSpan = false))
-    }
-
-    return rows
-}
-
-@Composable
-private fun DashboardCardItem(
-    cardType: DashboardCardType,
-    uiState: DashboardUiState,
-    onAction: (DashboardAction) -> Unit,
-    onNavigate: (OrbitNavKey) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    when (cardType) {
-        DashboardCardType.ACCOUNTS_OVERVIEW -> AccountsOverviewCard(
-            accounts = uiState.accounts,
-            onClick = { onNavigate(OrbitNavKey.Accounts()) },
-            modifier = modifier
-        )
-        DashboardCardType.BUDGET_PULSE -> BudgetPulseCard(
-            summary = uiState.budgetPulse,
-            onClick = { onNavigate(OrbitNavKey.Budgets) },
-            modifier = modifier
-        )
-        DashboardCardType.TOP_SPENDING -> TopSpendingCard(
-            state = uiState.topSpending,
-            onClick = { onNavigate(OrbitNavKey.SpendingTrends) },
-            onCategoryClick = { catId -> onNavigate(OrbitNavKey.Transactions(categoryId = catId)) },
-            modifier = modifier
-        )
-        DashboardCardType.CASHFLOW_HERO -> NetCashflowHeroCard(
-            cashflow = uiState.cashflow,
-            onClick = { onNavigate(OrbitNavKey.SpendingTrends) },
-            modifier = modifier
-        )
-        DashboardCardType.BIGGEST_TRANSACTIONS -> BiggestTransactionsCard(
-            state = uiState.biggestTransactions,
-            onClick = { onNavigate(OrbitNavKey.Transactions()) },
-            onHideTransaction = { onAction(DashboardAction.HideBiggestTransaction(it)) },
-            onResetHidden = { onAction(DashboardAction.ResetHiddenBiggestTransactions) },
-            modifier = modifier
-        )
-        DashboardCardType.SUBSCRIPTIONS -> SubscriptionsCard(
-            state = uiState.subscriptions,
-            onClick = { onNavigate(OrbitNavKey.Upcoming) },
-            modifier = modifier
-        )
-        DashboardCardType.UNCATEGORIZED -> UncategorizedCard(
-            state = uiState.uncategorized,
-            onClick = { onNavigate(OrbitNavKey.Transactions(uncategorizedOnly = true)) },
-            modifier = modifier
-        )
-        DashboardCardType.CATEGORIZE_RECENT -> CategorizeRecentCard(
-            onOpenReview = { onAction(DashboardAction.OpenCategorizeReview) },
-            modifier = modifier
-        )
-        DashboardCardType.MONTH_COMPARISON -> MonthComparisonCard(
-            state = uiState.monthComparison,
-            onClick = { onNavigate(OrbitNavKey.SpendingTrends) },
-            modifier = modifier
-        )
-        DashboardCardType.GOALS_PROGRESS -> GoalsProgressCard(
-            state = uiState.goals,
-            onClick = { onNavigate(OrbitNavKey.Goals) },
-            modifier = modifier
-        )
-        DashboardCardType.GOAL_FOCUS -> GoalFocusCard(
-            state = uiState.goalFocus,
-            onSelectGoal = { onAction(DashboardAction.SetGoalFocus(it)) },
-            onClick = { onNavigate(OrbitNavKey.Goals) },
-            modifier = modifier
-        )
-        DashboardCardType.RETIREMENT_SNAPSHOT -> RetirementSnapshotCard(
-            state = uiState.retirement,
-            onChangeAge = { onAction(DashboardAction.SetRetirementAge(it)) },
-            onChangePreset = { onAction(DashboardAction.SetRetirementPreset(it)) },
-            onClick = { onNavigate(OrbitNavKey.RetirementCalculator) },
-            modifier = modifier
-        )
-        DashboardCardType.MHA_SUMMARY -> MhaSummaryCard(
-            state = uiState.mha,
-            onClick = { onNavigate(OrbitNavKey.MhaTracker) },
-            modifier = modifier
-        )
-        DashboardCardType.UPCOMING_BILLS -> UpcomingBillsCard(
-            bills = uiState.upcoming.items,
-            onReconcile = { id, date -> onAction(DashboardAction.MarkBillPaid(id, date)) },
-            onViewAll = { onNavigate(OrbitNavKey.Upcoming) },
-            modifier = modifier
-        )
-        DashboardCardType.MORTGAGE_SNAPSHOT -> MortgageSnapshotCard(
-            state = uiState.mortgage,
-            onClick = { onNavigate(OrbitNavKey.Accounts(accountId = uiState.mortgage.mortgageAccountId)) },
-            modifier = modifier
-        )
-        DashboardCardType.RECENT_TRANSACTIONS -> RecentTransactionsCard(
-            transactions = uiState.recentTransactions.transactions,
-            onSelectTransaction = { onNavigate(OrbitNavKey.Transactions(it)) },
-            onViewAll = { onNavigate(OrbitNavKey.Transactions()) },
-            modifier = modifier
-        )
     }
 }

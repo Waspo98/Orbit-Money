@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -30,12 +29,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.UpcomingItem
+import app.overbay.orbit.data.model.UpcomingKind
 import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.domain.ProjectedAmountResult
+import app.overbay.orbit.domain.UpcomingScheduleHelper
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.upcoming.UpcomingFilterOption
@@ -52,11 +55,10 @@ fun UpcomingTimelineList(
     onItemClick: (UpcomingItem) -> Unit,
     onMarkPaid: (UpcomingItem) -> Unit,
     onAddClick: () -> Unit,
+    projectedAmounts: Map<Long, ProjectedAmountResult> = emptyMap(),
     inspectingItemId: Long? = null,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
-
     Column(modifier = modifier.fillMaxWidth()) {
         if (items.isEmpty()) {
             EmptyStateCard(
@@ -67,16 +69,15 @@ fun UpcomingTimelineList(
             )
         } else {
             items.forEach { item ->
+                val proj = projectedAmounts[item.id]
                 UpcomingItemRow(
                     item = item,
                     category = item.categoryId?.let { categoryMap[it] },
                     accountName = item.accountId?.let { accountMap[it]?.name },
+                    projected = proj,
                     isInspected = item.id == inspectingItemId,
                     onClick = { onItemClick(item) },
-                    onMarkPaid = {
-                        haptics.confirm()
-                        onMarkPaid(item)
-                    }
+                    onMarkPaid = { onMarkPaid(item) }
                 )
                 Spacer(modifier = Modifier.height(10.dp))
             }
@@ -89,12 +90,15 @@ private fun UpcomingItemRow(
     item: UpcomingItem,
     category: Category?,
     accountName: String?,
+    projected: ProjectedAmountResult?,
     onClick: () -> Unit,
     onMarkPaid: () -> Unit,
     isInspected: Boolean = false
 ) {
+    val haptics = LocalOrbitHaptics.current
     val isExpense = item.direction.lowercase() != "income"
     val amountColor = if (isExpense) OrbitTheme.colors.expense else OrbitTheme.colors.income
+    val effectiveAmountCents = projected?.amountCents ?: item.amountCents
 
     val catColor = try {
         val hex = category?.color?.trim()?.removePrefix("#") ?: "9E9E9E"
@@ -143,21 +147,58 @@ private fun UpcomingItemRow(
 
                 val iconPrefix = category?.displayEmoji?.let { "$it " } ?: ""
                 Column {
-                    Text(
-                        text = "$iconPrefix${item.name.ifBlank { item.merchant ?: "Recurring Item" }}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "$iconPrefix${item.name.ifBlank { item.merchant ?: "Recurring Item" }}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        if (item.kind == UpcomingKind.GIVING || item.kind == UpcomingKind.SUBSCRIPTION) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            val kindLabel = if (item.kind == UpcomingKind.GIVING) "Giving" else "Sub"
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
+                            ) {
+                                Text(
+                                    text = kindLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(2.dp))
 
+                    val scheduleText = UpcomingScheduleHelper.formatRecurrenceSchedule(item)
                     val catSuffix = category?.labelWithEmoji?.let { " • $it" } ?: ""
                     Text(
-                        text = "Due ${item.nextDate} • ${item.frequencyType.name.lowercase().replaceFirstChar { it.uppercase() }}$catSuffix${if (accountName != null) " • $accountName" else ""}",
+                        text = "Due ${item.nextDate} • $scheduleText$catSuffix${if (accountName != null) " • $accountName" else ""}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
+                    if (projected?.isProjectedAverage == true) {
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                        ) {
+                            Text(
+                                text = "Projected from ${projected.sampleCount} transactions",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -166,7 +207,7 @@ private fun UpcomingItemRow(
             Column(horizontalAlignment = Alignment.End) {
                 val prefix = if (isExpense) "-" else "+"
                 Text(
-                    text = "$prefix${MoneyUtils.formatCents(abs(item.amountCents))}",
+                    text = "$prefix${MoneyUtils.formatCents(abs(effectiveAmountCents))}",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         fontFeatureSettings = "tnum"
@@ -177,7 +218,10 @@ private fun UpcomingItemRow(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 OutlinedButton(
-                    onClick = onMarkPaid,
+                    onClick = {
+                        haptics.confirm()
+                        onMarkPaid()
+                    },
                     contentPadding = ButtonDefaults.TextButtonContentPadding,
                     modifier = Modifier.height(32.dp)
                 ) {

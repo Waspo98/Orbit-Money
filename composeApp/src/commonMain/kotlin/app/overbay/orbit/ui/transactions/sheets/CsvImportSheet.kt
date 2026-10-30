@@ -45,8 +45,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.*
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.ImportBatchRecord
 import app.overbay.orbit.data.model.RuleAction
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
@@ -69,7 +71,10 @@ fun CsvImportSheet(
     existingTransactions: List<Transaction>,
     onImportConfirmed: (transactions: List<Transaction>, rules: List<TransactionRule>) -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onImportBatch: ((fileName: String, rawCsv: String, transactions: List<Transaction>, rules: List<TransactionRule>) -> Unit)? = null,
+    importBatches: List<ImportBatchRecord> = emptyList(),
+    onUndoBatch: ((Long) -> Unit)? = null
 ) {
     val haptics = LocalOrbitHaptics.current
     val fileHelper = LocalFileImportExportHelper.current
@@ -81,10 +86,10 @@ fun CsvImportSheet(
     var includeRules by remember { mutableStateOf(true) }
 
     val sampleCsv = remember {
-        """Date,Account Type,Account Name,Institution Name,Name,Amount,Description,Category
-2026-10-15,Checking,Everyday Checking,Chase,Whole Foods,-45.50,GROCERY STORE,Groceries
-2026-10-16,Credit Card,Sapphire Reserve,Chase,Chevron,-35.00,GAS STATION,Auto & Gas
-2026-10-18,Checking,Everyday Checking,Chase,Direct Deposit,2500.00,PAYROLL DEPOSIT,Income"""
+        "Date,Account Type,Account Name,Institution Name,Name,Amount,Description,Category\n" +
+        "2026-10-15,Checking,Everyday Checking,Chase,Whole Foods,-45.50,GROCERY STORE,Groceries\n" +
+        "2026-10-16,Credit Card,Sapphire Reserve,Chase,Chevron,-35.00,GAS STATION,Auto & Gas\n" +
+        "2026-10-18,Checking,Everyday Checking,Chase,Direct Deposit,2500.00,PAYROLL DEPOSIT,Income"
     }
 
     fun parseCsv() {
@@ -353,7 +358,11 @@ fun CsvImportSheet(
                                 }
                             } else emptyList()
 
-                            onImportConfirmed(assignedTxns, generatedRules)
+                            if (onImportBatch != null) {
+                                onImportBatch("import.csv", csvText, assignedTxns, generatedRules)
+                            } else {
+                                onImportConfirmed(assignedTxns, generatedRules)
+                            }
                         },
                         enabled = preview.transactions.isNotEmpty(),
                         modifier = Modifier.weight(1f)
@@ -361,6 +370,14 @@ fun CsvImportSheet(
                         Text("Import (${preview.transactions.size})")
                     }
                 }
+            }
+
+            if (importBatches.isNotEmpty() && onUndoBatch != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                ImportBatchesSection(
+                    batches = importBatches,
+                    onUndoBatch = onUndoBatch
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))

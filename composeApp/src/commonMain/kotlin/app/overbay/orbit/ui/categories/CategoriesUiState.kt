@@ -6,6 +6,8 @@ import app.overbay.orbit.domain.Cents
 data class CategorySummary(
     val category: Category,
     val transactionCount: Int = 0,
+    val budgetCount: Int = 0,
+    val ruleCount: Int = 0,
     val totalAmountCents: Cents = 0L
 )
 
@@ -22,7 +24,9 @@ data class CategoriesUiState(
     val editingCategory: Category? = null,
     val showEditorDialog: Boolean = false,
     val deleteConfirmCategoryId: Long? = null,
+    val ruleBlockedDeleteCategory: CategorySummary? = null,
     val isReorderMode: Boolean = false,
+    val searchQuery: String = "",
     val isLoading: Boolean = false,
     val totalCategoriesCount: Int = 0
 ) {

@@ -7,12 +7,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -29,7 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -67,7 +63,7 @@ private enum class AccountInspectorSubMode { DETAIL, EDIT, PERKS, HISTORY }
  * Right-hand morphing inspector pane for Accounts on unfolded phones, tablets, and desktops.
  * Shows the read-only Account Detail view by default when an account row is tapped, and morphs
  * smoothly into the Edit, Credit Card Perks, or Balance History views when triggered.
- * Strictly under the 400-line ceiling.
+ * Strictly under the 390-line ceiling.
  */
 @Composable
 fun AccountDetailInspectorPane(
@@ -117,6 +113,9 @@ fun AccountDetailInspectorPane(
                         account = editTarget,
                         onSave = { viewModel.saveAccount(it) },
                         onDelete = { viewModel.requestDeleteAccount(it) },
+                        onUnlinkSimpleFin = if (!editTarget.simplefinAccountId.isNullOrBlank()) {
+                            { viewModel.unlinkSimpleFin(editTarget.id) }
+                        } else null,
                         onDismiss = {
                             if (state.selectedAccount != null) viewModel.closeEditorSheet() else onClosePane()
                         }
@@ -125,10 +124,19 @@ fun AccountDetailInspectorPane(
             }
             AccountInspectorSubMode.PERKS -> {
                 val profile = state.editingCardProfile
+                val targetAccount = inspecting
                 if (profile != null) {
                     CreditCardProfileEditorContent(
                         profile = profile,
-                        onSave = { viewModel.saveCreditCardProfile(it) },
+                        initialAccountName = targetAccount?.name ?: "",
+                        initialInstitution = targetAccount?.institution ?: "",
+                        onSave = { updatedProfile, acctName, acctInst ->
+                            viewModel.saveCreditCardProfile(
+                                profile = updatedProfile,
+                                accountName = acctName.takeIf { it.isNotBlank() },
+                                accountInstitution = acctInst.takeIf { it.isNotBlank() }
+                            )
+                        },
                         onDismiss = {
                             if (state.selectedAccount != null) viewModel.closeCreditCardProfile() else onClosePane()
                         }
@@ -141,6 +149,8 @@ fun AccountDetailInspectorPane(
                     AccountBalanceHistoryContent(
                         account = histAcct,
                         transactions = state.selectedAccountTransactions,
+                        balanceRecords = state.historyBalanceRecords,
+                        onAddRecord = { viewModel.openAddBalanceRecord(histAcct) },
                         onDismiss = {
                             if (state.selectedAccount != null) viewModel.closeBalanceHistory() else onClosePane()
                         }
@@ -156,9 +166,14 @@ fun AccountDetailInspectorPane(
                         onEdit = { viewModel.openEditAccount(inspecting) },
                         onPerks = { viewModel.openCreditCardProfile(inspecting) },
                         onHistory = { viewModel.openBalanceHistory(inspecting) },
+                        onSnapshotReminder = { viewModel.requestSnapshotReminder(onNavigate) },
                         onMerge = { viewModel.openMergeDialog(inspecting) },
                         onToggleArchive = { viewModel.toggleArchiveAccount(inspecting) },
                         onDelete = { viewModel.requestDeleteAccount(inspecting.id) },
+                        onUnlinkSimpleFin = if (!inspecting.simplefinAccountId.isNullOrBlank()) {
+                            { viewModel.unlinkSimpleFin(inspecting.id) }
+                        } else null,
+                        onToggleBenefit = { index -> viewModel.toggleCardBenefit(inspecting.id, index) },
                         onSeeTransactions = { onNavigate(OrbitNavKey.Transactions(accountId = inspecting.id)) }
                     )
                 }
@@ -167,7 +182,6 @@ fun AccountDetailInspectorPane(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AccountReadOnlyDetailContent(
     account: Account,
@@ -176,9 +190,12 @@ private fun AccountReadOnlyDetailContent(
     onEdit: () -> Unit,
     onPerks: () -> Unit,
     onHistory: () -> Unit,
+    onSnapshotReminder: () -> Unit,
     onMerge: () -> Unit,
     onToggleArchive: () -> Unit,
     onDelete: () -> Unit,
+    onUnlinkSimpleFin: (() -> Unit)? = null,
+    onToggleBenefit: (Int) -> Unit = {},
     onSeeTransactions: () -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -209,17 +226,13 @@ private fun AccountReadOnlyDetailContent(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
+                        Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primaryContainer) {
                             Text(
                                 text = account.type.displayName,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
-                                softWrap = false,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
@@ -291,27 +304,28 @@ private fun AccountReadOnlyDetailContent(
 
         item {
             HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-            Spacer(modifier = Modifier.height(12.dp))
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AccountPillAction(label = "Edit", onClick = onEdit)
-                if (isCredit) {
-                    AccountPillAction(label = "Card Perks", onClick = onPerks)
-                }
-                AccountPillAction(label = "Balance History", onClick = onHistory)
-                AccountPillAction(label = "Merge", onClick = onMerge)
-                AccountPillAction(label = "See Transactions", onClick = onSeeTransactions)
-                AccountPillAction(label = if (account.isArchived) "Unarchive" else "Archive", onClick = onToggleArchive)
-                AccountPillAction(label = "Delete", isDestructive = true, onClick = onDelete)
-            }
+            Spacer(modifier = Modifier.height(10.dp))
+            AccountInspectorActionsSection(
+                account = account,
+                onEdit = onEdit,
+                onPerks = onPerks,
+                onHistory = onHistory,
+                onSnapshotReminder = onSnapshotReminder,
+                onMerge = onMerge,
+                onSeeTransactions = onSeeTransactions,
+                onToggleArchive = onToggleArchive,
+                onDelete = onDelete,
+                onUnlinkSimpleFin = onUnlinkSimpleFin
+            )
         }
 
         if (isCredit && account.creditCardProfile != null) {
             item {
-                CreditCardPerksPanel(profile = account.creditCardProfile, onEditPerks = onPerks)
+                CreditCardPerksPanel(
+                    profile = account.creditCardProfile,
+                    onEditPerks = onPerks,
+                    onToggleBenefit = onToggleBenefit
+                )
             }
         }
 
@@ -345,23 +359,11 @@ private fun AccountReadOnlyDetailContent(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = txn.effectiveMerchant,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = txn.effectiveDate,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
+                            Text(txn.effectiveMerchant, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(txn.effectiveDate, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -373,25 +375,5 @@ private fun AccountReadOnlyDetailContent(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun AccountPillAction(label: String, onClick: () -> Unit, isDestructive: Boolean = false) {
-    val haptics = LocalOrbitHaptics.current
-    OutlinedButton(
-        onClick = { haptics.tick(); onClick() },
-        shape = CircleShape,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-        border = BorderStroke(1.dp, if (isDestructive) OrbitTheme.colors.danger else OrbitTheme.colors.cardBorder),
-        modifier = Modifier.height(34.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isDestructive) OrbitTheme.colors.danger else MaterialTheme.colorScheme.onSurface
-        )
     }
 }

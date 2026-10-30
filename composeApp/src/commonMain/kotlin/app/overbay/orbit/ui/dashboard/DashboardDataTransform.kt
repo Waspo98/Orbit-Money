@@ -476,6 +476,9 @@ object DashboardDataTransform {
                     LocalDateUtils.formatRelativeOrDisplayDate(it)
                 } ?: txn.effectiveDate
 
+                val hasEdits = txn.editedDate != null || txn.editedMerchant != null || txn.editedAmountCents != null ||
+                    txn.editedCategoryIdSource != null || txn.editedIsTransfer != null || txn.editedIsIgnored != null || txn.editedMhaEligible != null
+
                 DashboardRecentTransactionItem(
                     id = txn.id,
                     merchant = txn.effectiveMerchant,
@@ -484,12 +487,17 @@ object DashboardDataTransform {
                     formattedAmount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
                     dateIso = txn.effectiveDate,
                     dateDisplay = dateDisplay,
+                    categoryId = txn.effectiveCategoryId,
                     categoryName = cat?.name ?: txn.categoryName ?: "Uncategorized",
                     categoryColor = cat?.color ?: txn.categoryColor,
                     categoryIcon = cat?.displayEmoji ?: CategoryEmojiMapper.resolveEmoji(txn.categoryIcon),
                     accountName = acct?.name ?: txn.accountName,
                     isPending = txn.isPending,
-                    merchantLogoUrl = txn.merchantLogo?.url?.takeIf { it.isNotBlank() && txn.merchantLogo.status != "hidden" && txn.merchantLogo.status != "failed" }
+                    merchantLogoUrl = txn.merchantLogo?.url?.takeIf { it.isNotBlank() && txn.merchantLogo.status != "hidden" && txn.merchantLogo.status != "failed" },
+                    isTransfer = txn.effectiveIsTransfer,
+                    isIgnored = txn.effectiveIsIgnored,
+                    isMhaEligible = txn.effectiveMhaEligible ?: false,
+                    hasEdits = hasEdits
                 )
             }
         val recentState = RecentTransactionsState(transactions = recentList)
@@ -531,6 +539,8 @@ object DashboardDataTransform {
             daysRemaining = daysRemaining,
             selectedMonth = selectedMonth,
             mhaEnabled = snapshot.preferences.mhaTrackerEnabled,
+            isEmptyWorkspace = snapshot.accounts.isEmpty() && snapshot.transactions.isEmpty(),
+            availableCategories = snapshot.categories,
             isReviewModalOpen = categorizeReview.isOpen,
             categorizeReview = categorizeReview.copy(
                 categories = snapshot.categories,

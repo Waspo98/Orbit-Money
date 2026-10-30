@@ -43,6 +43,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         setIntent(intent)
         handleIncomingIntent(intent)
     }
@@ -66,7 +67,7 @@ class MainActivity : FragmentActivity() {
 
     private fun extractNavKeyFromHostAndPath(hostAndPath: String): OrbitNavKey? {
         return when {
-            hostAndPath.contains("add-transaction") -> OrbitNavKey.Transactions()
+            hostAndPath.contains("add-transaction") -> OrbitNavKey.Transactions(openAddSheet = true)
             hostAndPath.contains("budgets") -> OrbitNavKey.Budgets
             hostAndPath.contains("accounts") -> OrbitNavKey.Accounts()
             else -> null

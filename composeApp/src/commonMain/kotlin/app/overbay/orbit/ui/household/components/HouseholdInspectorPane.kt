@@ -48,7 +48,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 fun HouseholdInspectorPane(
     state: HouseholdUiState,
     onOpenEditMember: (HouseholdMember) -> Unit,
-    onSaveMember: (HouseholdMember) -> Unit,
+    onSaveMember: (HouseholdMember, String?) -> Unit,
     onCloseEditMember: () -> Unit,
     onDeleteMember: (Long) -> Unit,
     onInviteMember: (email: String, role: HouseholdRole) -> Unit,
@@ -93,6 +93,7 @@ fun HouseholdInspectorPane(
                 "MEMBER_EDIT" -> {
                     HouseholdMemberEditorContent(
                         member = state.editingMember,
+                        availableAccounts = state.availableAccounts,
                         onDismiss = {
                             if (state.inspectingMember != null) {
                                 onCloseEditMember()

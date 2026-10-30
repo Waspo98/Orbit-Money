@@ -75,8 +75,7 @@ fun DashboardCustomizeSheet(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
-    val posture = LocalDevicePosture.current
-    val showWidthPicker = posture.supportsTwoPane
+    val showWidthPicker = true
     val standardPlacements = remember(cards) { computeStandardPlacements(cards) }
 
     var draggingIndex by remember { mutableIntStateOf(-1) }

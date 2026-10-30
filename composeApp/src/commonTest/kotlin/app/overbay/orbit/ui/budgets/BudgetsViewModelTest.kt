@@ -71,7 +71,7 @@ class BudgetsViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(currentMonth, state.selectedMonth)
         assertTrue(state.isCurrentMonth)
-        assertFalse(state.canGoNextMonth)
+        assertTrue(state.canGoNextMonth)
 
         assertEquals(80000L, state.totalBudgetedCents)
         assertEquals(70000L, state.totalSpentCents)
@@ -114,12 +114,14 @@ class BudgetsViewModelTest {
 
         assertEquals(currentMonth, viewModel.uiState.value.selectedMonth)
         assertTrue(viewModel.uiState.value.isCurrentMonth)
-        assertFalse(viewModel.uiState.value.canGoNextMonth)
+        assertTrue(viewModel.uiState.value.canGoNextMonth)
 
-        // Cannot navigate past current month
+        // Can navigate into future month (main branch parity)
+        val nextMonth = LocalDateUtils.addMonthsToYearMonth(currentMonth, 1)
         viewModel.onNextMonth()
         testScheduler.advanceUntilIdle()
-        assertEquals(currentMonth, viewModel.uiState.value.selectedMonth)
+        assertEquals(nextMonth, viewModel.uiState.value.selectedMonth)
+        assertFalse(viewModel.uiState.value.isCurrentMonth)
 
         // Reset to current month
         viewModel.onPreviousMonth()

@@ -220,6 +220,7 @@ fun OrbitTheme(
     themePreset: OrbitThemePreset = OrbitThemePreset.ORBIT_EMERALD,
     themeMode: OrbitThemeMode = OrbitThemeMode.SYSTEM,
     dynamicColor: Boolean = false,
+    amoledDark: Boolean = false,
     customPreset: CustomThemePreset? = null,
     content: @Composable () -> Unit
 ) {
@@ -236,7 +237,20 @@ fun OrbitTheme(
         getPresetColorScheme(themePreset, darkTheme)
     }
 
-    val finalColorScheme = dynamicScheme ?: baseScheme
+    val selectedScheme = dynamicScheme ?: baseScheme
+    val finalColorScheme = if (darkTheme && amoledDark) {
+        selectedScheme.copy(
+            background = androidx.compose.ui.graphics.Color.Black,
+            surface = androidx.compose.ui.graphics.Color.Black,
+            surfaceDim = androidx.compose.ui.graphics.Color.Black,
+            surfaceContainerLowest = androidx.compose.ui.graphics.Color.Black,
+            surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFF0A0A0A),
+            surfaceContainer = androidx.compose.ui.graphics.Color(0xFF111111)
+        )
+    } else {
+        selectedScheme
+    }
+
     val customColors = if (customPreset != null) {
         createCustomThemeColors(customPreset)
     } else if (dynamicScheme != null) {
@@ -258,6 +272,26 @@ fun OrbitTheme(
         )
     }
 }
+
+/**
+ * Standard alias for [OrbitTheme].
+ */
+@Composable
+fun OrbitMoneyTheme(
+    themePreset: OrbitThemePreset = OrbitThemePreset.ORBIT_EMERALD,
+    themeMode: OrbitThemeMode = OrbitThemeMode.SYSTEM,
+    dynamicColor: Boolean = false,
+    amoledDark: Boolean = false,
+    customPreset: CustomThemePreset? = null,
+    content: @Composable () -> Unit
+) = OrbitTheme(
+    themePreset = themePreset,
+    themeMode = themeMode,
+    dynamicColor = dynamicColor,
+    amoledDark = amoledDark,
+    customPreset = customPreset,
+    content = content
+)
 
 /**
  * Global accessor object for easy ergonomic access to custom financial tokens, typography, and springs.

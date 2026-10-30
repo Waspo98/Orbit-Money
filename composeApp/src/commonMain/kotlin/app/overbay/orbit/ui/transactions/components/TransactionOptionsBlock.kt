@@ -24,6 +24,8 @@ fun TransactionOptionsBlock(
     onTransferChange: (Boolean) -> Unit,
     mhaEligible: Boolean,
     onMhaEligibleChange: (Boolean) -> Unit,
+    isIgnored: Boolean = false,
+    onIgnoredChange: (Boolean) -> Unit = {},
     onCreateRule: (() -> Unit)? = null,
     onMarkRecurring: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -35,6 +37,19 @@ fun TransactionOptionsBlock(
                 subtitle = "Exclude from spending calculations",
                 checked = isTransfer,
                 onCheckedChange = onTransferChange,
+                showContainer = false
+            )
+
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
+            )
+
+            OrbitSwitchRow(
+                title = "Ignore from Budget",
+                subtitle = "Exclude from spending and budget calculations",
+                checked = isIgnored,
+                onCheckedChange = onIgnoredChange,
                 showContainer = false
             )
 

@@ -89,3 +89,55 @@ async function cacheFirst(request) {
     return Response.error();
   }
 }
+
+// =============================================================================
+// Web Push Notifications
+// =============================================================================
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  try {
+    const data = event.data.json();
+    const title = data.title || 'Orbit Money';
+    const options = {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      badge: '/notification-badge-96.png',
+      tag: data.tag || 'orbit-alert',
+      data: {
+        url: data.url || '/'
+      }
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+  } catch (err) {
+    const text = event.data.text();
+    event.waitUntil(
+      self.registration.showNotification('Orbit Money', {
+        body: text,
+        icon: '/icon-192.png',
+        badge: '/notification-badge-96.png'
+      })
+    );
+  }
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          if ('navigate' in client && targetUrl !== '/') {
+            client.navigate(targetUrl);
+          }
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

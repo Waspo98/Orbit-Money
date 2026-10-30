@@ -146,6 +146,18 @@ fun ThemeStyleCard(
                 onCheckedChange = { onIntent(OnboardingIntent.SetDynamicColor(it)) }
             )
 
+            // Optional Biometric App Lock
+            val biometricHelper = app.overbay.orbit.util.LocalBiometricAuthHelper.current
+            val canBiometric = androidx.compose.runtime.remember { biometricHelper.canAuthenticate() }
+            if (canBiometric) {
+                OrbitSwitchRow(
+                    title = "Enable Biometric App Lock",
+                    subtitle = "Protect sensitive household data with biometric unlock",
+                    checked = state.biometricOptIn,
+                    onCheckedChange = { onIntent(OnboardingIntent.SetBiometricOptIn(it)) }
+                )
+            }
+
             // Live Miniature Preview
             Surface(
                 modifier = Modifier.fillMaxWidth(),

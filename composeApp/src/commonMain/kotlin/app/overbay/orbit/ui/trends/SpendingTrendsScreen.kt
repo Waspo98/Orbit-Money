@@ -23,12 +23,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.CanopySegmentedBar
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.trends.components.CategoryBreakdownList
+import app.overbay.orbit.ui.trends.components.CategoryBudgetEditorModal
+import app.overbay.orbit.ui.trends.components.CategoryTrendStatsCard
 import app.overbay.orbit.ui.trends.components.TopMerchantsCard
 import app.overbay.orbit.ui.trends.components.TrendsChartSection
 import app.overbay.orbit.util.DevicePosture
@@ -122,8 +126,20 @@ fun SpendingTrendsScreen(
                             onSelectPeriod = { viewModel.setPeriod(it) },
                             onSelectChartMode = { viewModel.setChartMode(it) },
                             onSelectCategory = { viewModel.selectCategory(it) },
-                            onScrubBar = { idx, item -> viewModel.onScrubBar(idx, item) }
+                            onScrubBar = { idx, item -> viewModel.onScrubBar(idx, item) },
+                            onInspectMonth = { month -> viewModel.openInspectMonthDialog(month) }
                         )
+                    }
+
+                    // Category Trend 4-Tile Stats Card when a category is selected
+                    val trend = state.selectedCategoryTrend
+                    if (state.chartMode == TrendsChartMode.CATEGORY_TREND && trend != null) {
+                        item {
+                            CategoryTrendStatsCard(
+                                trend = trend,
+                                onOpenBudgetModal = { viewModel.openBudgetModal() }
+                            )
+                        }
                     }
 
                     if (isTwoPane) {
@@ -171,6 +187,50 @@ fun SpendingTrendsScreen(
                     }
                 }
             }
+        }
+
+        // Bar Tap Month Confirmation Dialog
+        if (state.isInspectMonthDialogOpen && state.pendingInspectMonth != null) {
+            val month = state.pendingInspectMonth!!
+            val categoryLabel = state.selectedCategoryTrend?.category?.name ?: "All"
+            OrbitConfirmationDialog(
+                title = "View Transactions",
+                message = "View all $categoryLabel transactions in $month?",
+                confirmText = "View",
+                dismissText = "Cancel",
+                onConfirm = {
+                    viewModel.closeInspectMonthDialog()
+                    val (year, monthNum) = LocalDateUtils.parseYearMonth(month) ?: Pair(2026, 1)
+                    val days = LocalDateUtils.daysInMonth(year, monthNum)
+                    val monthEndDate = "$month-${days.toString().padStart(2, '0')}"
+                    onNavigate(
+                        OrbitNavKey.Transactions(
+                            categoryId = state.selectedCategoryId,
+                            startDate = "$month-01",
+                            endDate = monthEndDate,
+                            includeTransfers = false,
+                            includeIgnored = false
+                        )
+                    )
+                },
+                onDismiss = { viewModel.closeInspectMonthDialog() }
+            )
+        }
+
+        // In-Place Budget Create / Edit Modal
+        if (state.isBudgetModalOpen && state.selectedCategoryTrend != null) {
+            val cat = state.selectedCategoryTrend!!.category
+            CategoryBudgetEditorModal(
+                category = cat,
+                existingBudget = state.selectedCategoryBudget,
+                onSave = { amountCents, rollover ->
+                    viewModel.saveBudget(cat.id, amountCents, rollover)
+                },
+                onDelete = { budgetId ->
+                    viewModel.deleteBudget(budgetId)
+                },
+                onDismiss = { viewModel.closeBudgetModal() }
+            )
         }
     }
 }

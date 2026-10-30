@@ -52,10 +52,11 @@ import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * Editorial white accordion group section card matching Screenshot 3.
+ * Editorial accordion group section card.
  * Collapsed by default with 20dp corners, 1dp cardBorder, tracked uppercase header,
- * bold colored balance, circular 30dp bordered chevron button, and left-side drag handle.
- * Strictly under the 400-line ceiling.
+ * bold colored balance, circular 30dp bordered chevron button, left-side drag handle,
+ * and support for 1-column vs 2-column wideSpan layout.
+ * Strictly under the 390-line ceiling.
  */
 @Composable
 fun AccountGroupSection(
@@ -70,6 +71,8 @@ fun AccountGroupSection(
     onToggleArchive: (Account) -> Unit,
     onDeleteAccount: (Account) -> Unit,
     isReorderMode: Boolean = false,
+    wideSpan: Int = 1,
+    onToggleWideSpan: (() -> Unit)? = null,
     groupDragHandle: (@Composable () -> Unit)? = null,
     onMoveAccount: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
@@ -142,8 +145,33 @@ fun AccountGroupSection(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Right Column: Bold colored balance + 30dp circular bordered chevron
+                // Right Column: WideSpan toggle, Bold balance, Chevron
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (onToggleWideSpan != null && group.accounts.size > 1) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (wideSpan == 2) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clickable {
+                                    haptics.tick()
+                                    onToggleWideSpan()
+                                }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = if (wideSpan == 2) "2C" else "1C",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (wideSpan == 2) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+
                     Text(
                         text = MoneyUtils.formatCents(group.totalCents),
                         style = TabularNumStyle.copy(
@@ -183,34 +211,66 @@ fun AccountGroupSection(
                     onMove = onMoveAccount,
                     itemSpacingDp = 1.dp
                 )
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    group.accounts.forEach { account ->
-                        key(account.id) {
-                            HorizontalDivider(
-                                thickness = 1.dp,
-                                color = OrbitTheme.colors.cardBorder
-                            )
-                            AccountRowCard(
-                                account = account,
-                                isInspected = selectedAccountId == account.id,
-                                onInspect = { onInspectAccount(account) },
-                                onSeeTransactions = { onSeeTransactions(account) },
-                                onEdit = { onEditAccount(account) },
-                                onPerks = if (account.type == AccountType.CREDIT) {
-                                    { onPerksClick(account) }
-                                } else null,
-                                onHistory = { onHistoryClick(account) },
-                                onMerge = { onMergeClick(account) },
-                                onToggleArchive = { onToggleArchive(account) },
-                                onDelete = { onDeleteAccount(account) },
-                                dragHandle = if (isReorderMode) {
-                                    { OrbitDragHandle(state = accountReorderState, key = account.id) }
-                                } else null,
-                                modifier = Modifier.dragReorderItem(
-                                    state = if (isReorderMode) accountReorderState else null,
-                                    key = account.id
+
+                if (wideSpan == 2 && group.accounts.size >= 2 && !isReorderMode) {
+                    val pairs = group.accounts.chunked(2)
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        pairs.forEachIndexed { rowIndex, pairAccounts ->
+                            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                pairAccounts.forEachIndexed { colIndex, account ->
+                                    AccountRowCard(
+                                        account = account,
+                                        isInspected = selectedAccountId == account.id,
+                                        onInspect = { onInspectAccount(account) },
+                                        onSeeTransactions = { onSeeTransactions(account) },
+                                        onEdit = { onEditAccount(account) },
+                                        onPerks = if (account.type == AccountType.CREDIT) {
+                                            { onPerksClick(account) }
+                                        } else null,
+                                        onHistory = { onHistoryClick(account) },
+                                        onMerge = { onMergeClick(account) },
+                                        onToggleArchive = { onToggleArchive(account) },
+                                        onDelete = { onDeleteAccount(account) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                if (pairAccounts.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        group.accounts.forEach { account ->
+                            key(account.id) {
+                                HorizontalDivider(
+                                    thickness = 1.dp,
+                                    color = OrbitTheme.colors.cardBorder
                                 )
-                            )
+                                AccountRowCard(
+                                    account = account,
+                                    isInspected = selectedAccountId == account.id,
+                                    onInspect = { onInspectAccount(account) },
+                                    onSeeTransactions = { onSeeTransactions(account) },
+                                    onEdit = { onEditAccount(account) },
+                                    onPerks = if (account.type == AccountType.CREDIT) {
+                                        { onPerksClick(account) }
+                                    } else null,
+                                    onHistory = { onHistoryClick(account) },
+                                    onMerge = { onMergeClick(account) },
+                                    onToggleArchive = { onToggleArchive(account) },
+                                    onDelete = { onDeleteAccount(account) },
+                                    dragHandle = if (isReorderMode) {
+                                        { OrbitDragHandle(state = accountReorderState, key = account.id) }
+                                    } else null,
+                                    modifier = Modifier.dragReorderItem(
+                                        state = if (isReorderMode) accountReorderState else null,
+                                        key = account.id
+                                    )
+                                )
+                            }
                         }
                     }
                 }

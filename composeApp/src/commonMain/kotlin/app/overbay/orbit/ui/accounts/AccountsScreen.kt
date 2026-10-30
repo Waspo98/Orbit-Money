@@ -30,11 +30,13 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.accounts.components.AccountDetailInspectorPane
 import app.overbay.orbit.ui.accounts.components.AccountGroupSection
 import app.overbay.orbit.ui.accounts.sheets.AccountMergeDialog
+import app.overbay.orbit.ui.accounts.sheets.AddBalanceRecordDialog
 import app.overbay.orbit.ui.components.CanopyMenuAction
 import app.overbay.orbit.ui.components.CanopyMoreMenuButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitAlertDialog
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
@@ -50,7 +52,7 @@ import app.overbay.orbit.util.LocalDevicePosture
  * Editorial Accounts screen with curved green canopy hero, 2x2 bento stats grid,
  * 3-pill action row, collapsed-by-default white accordion account group cards,
  * and morphing dual-screen inspector pane / phone OrbitModalSheet.
- * Conforms strictly to <= 6 parameters and < 400-line ceiling.
+ * Conforms strictly to <= 6 parameters and < 390-line ceiling.
  */
 @Composable
 fun AccountsScreen(
@@ -195,8 +197,32 @@ fun AccountsScreen(
         AccountMergeDialog(
             sourceAccount = state.mergingAccount!!,
             availableAccounts = state.accounts,
+            sourceTransactionCount = viewModel.getAccountTransactionCount(state.mergingAccount!!.id),
+            getTransactionCount = { viewModel.getAccountTransactionCount(it) },
             onMerge = { src, tgt, combine -> viewModel.mergeAccountInto(src, tgt, combine) },
             onDismiss = { viewModel.closeMergeDialog() }
+        )
+    }
+
+    if (state.showAddRecordDialog && state.addRecordAccount != null) {
+        AddBalanceRecordDialog(
+            account = state.addRecordAccount!!,
+            onAddRecord = { date, balance ->
+                viewModel.addBalanceRecord(state.addRecordAccount!!.id, date, balance)
+            },
+            onDismiss = { viewModel.closeAddBalanceRecord() }
+        )
+    }
+
+    if (state.deleteBlockedAccount != null) {
+        val count = state.deleteBlockedTransactionCount
+        OrbitConfirmationDialog(
+            title = "Cannot Delete Account",
+            message = "This account has $count transactions. Merge it into another account first before deleting.",
+            confirmText = "Merge Account",
+            dismissText = "Close",
+            onConfirm = { viewModel.openMergeFromDeleteBlocked() },
+            onDismiss = { viewModel.dismissDeleteBlocked() }
         )
     }
 
@@ -246,6 +272,7 @@ private fun AccountsMasterContent(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             itemsIndexed(state.accountGroups, key = { _, it -> it.category.name }) { _, group ->
+                val span = state.accountGroupWideSpans[group.category.name] ?: 1
                 AccountGroupSection(
                     group = group,
                     selectedAccountId = state.selectedAccountId,
@@ -260,6 +287,8 @@ private fun AccountsMasterContent(
                     onToggleArchive = { viewModel.toggleArchiveAccount(it) },
                     onDeleteAccount = { viewModel.requestDeleteAccount(it.id) },
                     isReorderMode = state.isReorderMode,
+                    wideSpan = span,
+                    onToggleWideSpan = { viewModel.toggleGroupWideSpan(group.category) },
                     groupDragHandle = if (state.isReorderMode) {
                         { OrbitDragHandle(state = groupReorderState, key = group.category) }
                     } else null,

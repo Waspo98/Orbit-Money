@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.trends
 
+import app.overbay.orbit.data.model.CategoryBudget
 import app.overbay.orbit.domain.CategorySpendingTrend
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.SpendingTrendsOverview
@@ -30,13 +31,17 @@ data class SpendingTrendsUiState(
     val selectedPeriod: TrendsPeriod = TrendsPeriod.SIX_MONTHS,
     val chartMode: TrendsChartMode = TrendsChartMode.CASH_FLOW,
     val selectedCategoryId: Long? = null,
+    val selectedCategoryBudget: CategoryBudget? = null,
     val scrubbedIndex: Int? = null,
     val scrubbedBarItem: SpendingBarItem? = null,
+    val pendingInspectMonth: String? = null,
+    val isInspectMonthDialogOpen: Boolean = false,
+    val isBudgetModalOpen: Boolean = false,
     val isLoading: Boolean = false
 ) {
     val selectedCategoryTrend: CategorySpendingTrend?
         get() = overview.categoryTrends.firstOrNull { it.category.id == selectedCategoryId }
-            ?: overview.categoryTrends.firstOrNull()
+            ?: if (chartMode == TrendsChartMode.CATEGORY_TREND) overview.categoryTrends.firstOrNull() else null
 
     val totalPeriodNetCents: Cents
         get() = overview.totalPeriodIncomeCents - overview.totalPeriodSpendingCents

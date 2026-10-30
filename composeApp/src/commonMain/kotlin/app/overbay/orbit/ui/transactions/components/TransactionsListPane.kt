@@ -355,41 +355,20 @@ private fun TransactionsGroupedLazyList(
                 )
             }
         }
+
+        if (state.filteredTransactions.size > state.pageSize && state.pageSize > 0) {
+            item(key = "pagination_bar") {
+                TransactionsPaginationBar(
+                    currentPage = state.currentPage,
+                    totalPages = state.totalPages,
+                    pageSize = state.pageSize,
+                    totalItemsCount = state.filteredTransactions.size,
+                    onPageChange = { page -> viewModel.setCurrentPage(page) },
+                    onPageSizeChange = { size -> viewModel.setPageSize(size) },
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+        }
     }
 }
 
-@Composable
-private fun MonthGroupHeader(monthLabel: String, count: Int) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(top = 10.dp, bottom = 4.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = monthLabel.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "$count ${if (count == 1) "transaction" else "transactions"}",
-                style = MaterialTheme.typography.bodySmall,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.outline
-            )
-        }
-        HorizontalDivider(
-            thickness = 1.dp,
-            color = OrbitTheme.colors.cardBorder,
-            modifier = Modifier.padding(top = 6.dp)
-        )
-    }
-}

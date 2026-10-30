@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.accounts.sheets
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,9 +37,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSwitchRow
@@ -49,6 +54,7 @@ fun AccountEditorSheet(
     account: Account,
     onSave: (Account) -> Unit,
     onDelete: ((Long) -> Unit)? = null,
+    onUnlinkSimpleFin: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -60,6 +66,7 @@ fun AccountEditorSheet(
             account = account,
             onSave = onSave,
             onDelete = onDelete,
+            onUnlinkSimpleFin = onUnlinkSimpleFin,
             onDismiss = onDismiss
         )
     }
@@ -71,10 +78,12 @@ fun AccountEditorContent(
     account: Account,
     onSave: (Account) -> Unit,
     onDelete: ((Long) -> Unit)? = null,
+    onUnlinkSimpleFin: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
+    var showUnlinkConfirm by remember { mutableStateOf(false) }
 
     var name by remember(account) { mutableStateOf(account.name) }
     var institution by remember(account) { mutableStateOf(account.institution ?: "") }
@@ -131,6 +140,64 @@ fun AccountEditorContent(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.error
                         )
+                    }
+                }
+            }
+        }
+
+        // SimpleFIN link status banner with Unlink button
+        if (!account.simplefinAccountId.isNullOrBlank()) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = OrbitColorTokens.Green,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Linked to SimpleFIN",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = "Synced via SimpleFIN Bridge",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+
+                    if (onUnlinkSimpleFin != null) {
+                        OutlinedButton(
+                            onClick = {
+                                haptics.tick()
+                                showUnlinkConfirm = true
+                            },
+                            shape = CircleShape,
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Text("Unlink", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }
@@ -250,5 +317,18 @@ fun AccountEditorContent(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    if (showUnlinkConfirm && onUnlinkSimpleFin != null) {
+        OrbitConfirmationDialog(
+            title = "Unlink SimpleFIN?",
+            message = "Unlinking will turn this account into a manual account. Existing transactions and balances will not be lost.",
+            confirmText = "Unlink",
+            onConfirm = {
+                showUnlinkConfirm = false
+                onUnlinkSimpleFin()
+            },
+            onDismiss = { showUnlinkConfirm = false }
+        )
     }
 }

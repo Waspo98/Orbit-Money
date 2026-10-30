@@ -5,19 +5,26 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,10 +49,13 @@ import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.upcoming.components.UpcomingCalendarStrip
+import app.overbay.orbit.ui.upcoming.components.UpcomingCashFlowCard
 import app.overbay.orbit.ui.upcoming.components.UpcomingDetailInspectorPane
 import app.overbay.orbit.ui.upcoming.components.UpcomingSuggestionBanner
 import app.overbay.orbit.ui.upcoming.components.UpcomingTimelineList
+import app.overbay.orbit.ui.upcoming.sheets.AddFromTransactionSheet
 import app.overbay.orbit.ui.upcoming.sheets.ReconcileOccurrenceDialog
+import app.overbay.orbit.ui.upcoming.sheets.RecurringHistoryModal
 import app.overbay.orbit.ui.upcoming.sheets.RecurringItemEditorSheet
 import app.overbay.orbit.util.LocalDevicePosture
 
@@ -98,7 +108,7 @@ fun UpcomingScreen(
                     MorphingPageHero(
                         kicker = "MONEY CALENDAR",
                         title = "Upcoming",
-                        subtitle = "Projected bills, subscriptions, income, and cash flow.",
+                        subtitle = "Projected bills, subscriptions, giving, income, and cash flow.",
                         canNavigateBack = true,
                         onBack = onBack,
                         scrollState = heroScrollState,
@@ -137,7 +147,7 @@ fun UpcomingScreen(
                                 ) {
                                     val filterOptions = listOf(
                                         UpcomingFilterOption.ALL to "All Recurring",
-                                        UpcomingFilterOption.BILLS to "Bills & Expenses",
+                                        UpcomingFilterOption.BILLS to "Bills, Giving & Subs",
                                         UpcomingFilterOption.INCOME to "Income"
                                     )
                                     filterOptions.forEach { (option, label) ->
@@ -201,6 +211,16 @@ fun UpcomingScreen(
                             contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
+                            // Projected Cash Flow Hero Card
+                            item {
+                                UpcomingCashFlowCard(
+                                    summary = state.cashFlowSummary,
+                                    selectedPeriod = state.cashFlowPeriod,
+                                    onPeriodChanged = { viewModel.setCashFlowPeriod(it) }
+                                )
+                            }
+
+                            // Calendar Date Strip
                             item {
                                 UpcomingCalendarStrip(
                                     selectedDate = state.selectedDateFilter,
@@ -209,6 +229,7 @@ fun UpcomingScreen(
                                 )
                             }
 
+                            // Recurring Bills/Suggestions Banner
                             if (state.candidates.isNotEmpty()) {
                                 item {
                                     UpcomingSuggestionBanner(
@@ -219,6 +240,33 @@ fun UpcomingScreen(
                                 }
                             }
 
+                            // Action Bar: Add from Transaction
+                            item {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { viewModel.openAddFromTxModal() },
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Add From Transaction",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Recurring Timeline List
                             item {
                                 UpcomingTimelineList(
                                     items = state.items,
@@ -235,6 +283,7 @@ fun UpcomingScreen(
                                     },
                                     onMarkPaid = { viewModel.openReconcileDialog(it) },
                                     onAddClick = { viewModel.openAddUpcoming() },
+                                    projectedAmounts = state.projectedAmounts,
                                     inspectingItemId = if (isTwoPane) state.inspectingItemId else null
                                 )
                             }
@@ -275,15 +324,45 @@ fun UpcomingScreen(
         }
     }
 
-    // Reconcile Occurrence Confirmation Dialog
+    // Reconcile Occurrence Dialog
     val reconcilingItem = state.reconcilingItem
     if (state.showReconcileDialog && reconcilingItem != null) {
         ReconcileOccurrenceDialog(
             item = reconcilingItem,
-            onConfirm = { id, date ->
-                viewModel.reconcileItemPaid(id, date)
+            recentTransactions = state.recentTransactions,
+            onMarkPaid = { id, date, matchedTxnId ->
+                viewModel.reconcileOccurrencePaid(id, date, matchedTxnId)
+            },
+            onSkipMissed = { id, date ->
+                viewModel.reconcileOccurrenceMissed(id, date)
+            },
+            onResetPending = { id ->
+                viewModel.reconcileOccurrenceReset(id)
             },
             onDismiss = { viewModel.closeReconcileDialog() }
+        )
+    }
+
+    // Add From Transaction Modal Sheet
+    if (state.showAddFromTxModal) {
+        AddFromTransactionSheet(
+            transactions = state.recentTransactions,
+            categoryMap = state.categoryMap,
+            accountMap = state.accountMap,
+            onSelectTransaction = { viewModel.createFromTransaction(it) },
+            onDismiss = { viewModel.closeAddFromTxModal() }
+        )
+    }
+
+    // Past History Modal Sheet
+    val histItem = state.historyItem
+    if (state.showHistoryModal && histItem != null) {
+        RecurringHistoryModal(
+            item = histItem,
+            matches = state.matchingHistory,
+            categoryMap = state.categoryMap,
+            accountMap = state.accountMap,
+            onDismiss = { viewModel.closeHistoryModal() }
         )
     }
 }

@@ -166,15 +166,42 @@ fun BudgetCategoryRow(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (item.amountCents > 0L) {
-                            "${MoneyUtils.formatCents(item.spentCents)} of ${MoneyUtils.formatCents(item.amountCents)}"
-                        } else {
-                            "No budget set"
-                        },
-                        style = TabularNumStyle.copy(fontSize = 12.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (item.amountCents > 0L) {
+                        Text(
+                            text = "${MoneyUtils.formatCents(item.spentCents)} of ${MoneyUtils.formatCents(item.amountCents)}",
+                            style = TabularNumStyle.copy(fontSize = 12.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "No budget set",
+                                style = TabularNumStyle.copy(fontSize = 12.sp),
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                            Surface(
+                                onClick = {
+                                    haptics.tick()
+                                    onEditBudget()
+                                },
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = "+ Set Budget",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
 
                     Text(
                         text = "${item.transactionCount} transaction${if (item.transactionCount == 1) "" else "s"}",

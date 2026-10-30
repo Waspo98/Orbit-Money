@@ -34,6 +34,11 @@ enum class MhaTransactionTabFilter(val label: String) {
     ALL("All Expenses")
 }
 
+enum class MhaScreenTab(val label: String) {
+    TRACKER("Tracker"),
+    DEFAULTS("Defaults")
+}
+
 data class MhaTransactionItem(
     val transaction: Transaction,
     val category: Category?,
@@ -71,7 +76,9 @@ data class MhaTrackerUiState(
     val searchQuery: String = "",
     val showConfigSheet: Boolean = false,
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val mhaEnabled: Boolean = true,
+    val activeScreenTab: MhaScreenTab = MhaScreenTab.TRACKER
 ) {
     val mhaDesignationCapCents: Cents? get() = designatedCapCents
     val bindingLimit: MhaBindingLimit get() = limitingFactor

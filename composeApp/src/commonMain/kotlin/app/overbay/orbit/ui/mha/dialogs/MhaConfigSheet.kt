@@ -20,6 +20,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -36,6 +37,7 @@ import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.OrbitTextField
@@ -47,6 +49,8 @@ fun MhaConfigSheet(
     taxProfile: MhaTaxProfile,
     designatedCapCents: Cents? = null,
     fairMarketRentalValueCents: Cents? = null,
+    mhaEnabled: Boolean = true,
+    onToggleMhaEnabled: ((Boolean) -> Unit)? = null,
     onDismiss: () -> Unit,
     onSave: (MhaTaxProfile, Cents?, Cents?) -> Unit,
     modifier: Modifier = Modifier
@@ -59,6 +63,8 @@ fun MhaConfigSheet(
             taxProfile = taxProfile,
             designatedCapCents = designatedCapCents,
             fairMarketRentalValueCents = fairMarketRentalValueCents,
+            mhaEnabled = mhaEnabled,
+            onToggleMhaEnabled = onToggleMhaEnabled,
             onDismiss = onDismiss,
             onSave = onSave,
             modifier = Modifier.padding(bottom = 24.dp)
@@ -72,12 +78,15 @@ fun MhaConfigContent(
     taxProfile: MhaTaxProfile,
     designatedCapCents: Cents? = null,
     fairMarketRentalValueCents: Cents? = null,
+    mhaEnabled: Boolean = true,
+    onToggleMhaEnabled: ((Boolean) -> Unit)? = null,
     onDismiss: () -> Unit,
     onSave: (MhaTaxProfile, Cents?, Cents?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
 
+    var currentMhaEnabled by remember(mhaEnabled) { mutableStateOf(mhaEnabled) }
     var mode by remember(taxProfile) { mutableStateOf(taxProfile.mode) }
     var enableDesignatedCap by remember(designatedCapCents) { mutableStateOf(designatedCapCents != null) }
     var inputDesignatedCapCents by remember(designatedCapCents) { mutableStateOf(designatedCapCents ?: 0L) }
@@ -107,6 +116,16 @@ fun MhaConfigContent(
             text = "Configure your official advance Church Designation and Fair Market Rental Value to enforce the 3-Limit IRS test under IRC Section 107.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.outline
+        )
+
+        OrbitSwitchRow(
+            title = "MHA Tracker Active",
+            subtitle = if (currentMhaEnabled) "Housing allowance tracking and tax calculations enabled" else "MHA calculations paused",
+            checked = currentMhaEnabled,
+            onCheckedChange = {
+                currentMhaEnabled = it
+                onToggleMhaEnabled?.invoke(it)
+            }
         )
 
         // Section 1: Designation & FMRV
@@ -208,10 +227,12 @@ fun MhaConfigContent(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Text(
-                text = "Filing Status: ${selectedFilingStatus.displayName}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+            OrbitDropdownField(
+                label = "Filing Status",
+                selectedText = selectedFilingStatus.displayName,
+                options = FilingStatus.entries,
+                optionLabel = { it.displayName },
+                onOptionSelected = { selectedFilingStatus = it }
             )
 
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -237,7 +258,35 @@ fun MhaConfigContent(
                 }
             }
 
-            if (deductionMode == "itemized") {
+            if (deductionMode == "standard") {
+                val standardDeductionRef = when (selectedFilingStatus) {
+                    FilingStatus.SINGLE -> "$15,000"
+                    FilingStatus.MARRIED_JOINT -> "$30,000"
+                    FilingStatus.MARRIED_SEPARATE -> "$15,000"
+                    FilingStatus.HEAD_OF_HOUSEHOLD -> "$22,500"
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "2026 IRS Standard Deduction Reference",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${selectedFilingStatus.displayName}: $standardDeductionRef",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            } else {
                 CurrencyTextField(
                     cents = itemizedDeductionCents,
                     onCentsChange = { itemizedDeductionCents = it },

@@ -17,6 +17,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -61,6 +62,8 @@ fun MortgageInputCard(
     onAgentCommissionChange: (Double) -> Unit = {},
     onSellerClosingChange: (Double) -> Unit = {},
     onBuyerClosingChange: (Double) -> Unit = {},
+    onProratedPropertyTaxChange: (Cents) -> Unit = {},
+    onMiscRepairsChange: (Cents) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val selectedAccount = uiState.availableMortgageAccounts.find { it.id == uiState.selectedMortgageAccountId }
@@ -152,46 +155,33 @@ fun MortgageInputCard(
                     )
                 }
 
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    CurrencyTextField(
+                        cents = uiState.proratedPropertyTaxCents,
+                        onCentsChange = onProratedPropertyTaxChange,
+                        label = "Prorated Property Tax",
+                        modifier = Modifier.weight(1f)
+                    )
+                    CurrencyTextField(
+                        cents = uiState.miscRepairsCents,
+                        onCentsChange = onMiscRepairsChange,
+                        label = "Misc Repairs / Credits",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
                 val proceeds = uiState.sellingProceeds
                 if (proceeds != null) {
                     Spacer(modifier = Modifier.height(10.dp))
-                    Surface(
-                        shape = MaterialTheme.shapes.small,
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = "Est. Net Proceeds: ${MoneyUtils.formatCents(proceeds.netProceedsCents)}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                                Text(
-                                    text = "After ${MoneyUtils.formatCents(proceeds.totalSellingFeesCents)} fees & closing",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                )
-                            }
-                            if (proceeds.netProceedsCents > 0L) {
-                                Button(
-                                    onClick = onUseNetProceeds,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary
-                                    )
-                                ) {
-                                    Text("Apply Down", style = MaterialTheme.typography.labelSmall)
-                                }
-                            }
-                        }
-                    }
+                    SellingProceedsBreakdownCard(
+                        proceeds = proceeds,
+                        onUseNetProceeds = onUseNetProceeds
+                    )
                 }
             }
         }
@@ -253,17 +243,53 @@ fun MortgageInputCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+                val isStandardTerm = uiState.loanTermYears in listOf(15, 20, 30)
+                var isCustomTerm by remember(uiState.loanTermYears) { mutableStateOf(!isStandardTerm) }
+                var customYearsInput by remember(uiState.loanTermYears) {
+                    mutableStateOf(if (!isStandardTerm) uiState.loanTermYears.toString() else "25")
+                }
+
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     val terms = listOf(15, 20, 30)
                     terms.forEachIndexed { index, years ->
                         SegmentedButton(
-                            selected = uiState.loanTermYears == years,
-                            onClick = { onLoanTermChange(years) },
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = terms.size),
+                            selected = !isCustomTerm && uiState.loanTermYears == years,
+                            onClick = {
+                                isCustomTerm = false
+                                onLoanTermChange(years)
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = 4),
                             icon = {},
                             label = { Text("${years}y", style = MaterialTheme.typography.labelSmall) }
                         )
                     }
+                    SegmentedButton(
+                        selected = isCustomTerm,
+                        onClick = {
+                            isCustomTerm = true
+                            val y = customYearsInput.toIntOrNull()?.coerceIn(1, 50) ?: 25
+                            onLoanTermChange(y)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 3, count = 4),
+                        icon = {},
+                        label = { Text("Custom", style = MaterialTheme.typography.labelSmall) }
+                    )
+                }
+
+                if (isCustomTerm) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = customYearsInput,
+                        onValueChange = { str ->
+                            customYearsInput = str
+                            str.toIntOrNull()?.let { y ->
+                                if (y in 1..50) onLoanTermChange(y)
+                            }
+                        },
+                        label = { Text("Custom Term (1-50y)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
                 }
             }
         }

@@ -58,6 +58,7 @@ fun TrendsChartSection(
     onSelectChartMode: (TrendsChartMode) -> Unit,
     onSelectCategory: (Long?) -> Unit,
     onScrubBar: (Int?, SpendingBarItem?) -> Unit,
+    onInspectMonth: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -152,6 +153,36 @@ fun TrendsChartSection(
                 isScrubbing = isScrubbing,
                 scrubDateText = scrubItem?.label
             )
+
+            val scrubbedMonth = state.scrubbedIndex?.let { idx ->
+                if (isCategoryMode) {
+                    selectedTrend?.monthlySeries?.getOrNull(idx)?.month
+                } else {
+                    state.overview.flowSeries.getOrNull(idx)?.month
+                }
+            }
+
+            if (scrubbedMonth != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.clickable {
+                            haptics.tick()
+                            onInspectMonth(scrubbedMonth)
+                        }
+                    ) {
+                        Text(
+                            text = "Inspect Month ($scrubbedMonth)",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 

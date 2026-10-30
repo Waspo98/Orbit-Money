@@ -320,12 +320,13 @@ suspend fun OrbitRepository.resetTransactionFields(id: Long, fields: List<String
         cleared.editedMerchantSource, cleared.editedCategoryIdSource,
         cleared.editedIsTransferSource, cleared.editedIsIgnoredSource, cleared.editedMhaEligibleSource
     )
-    val newEditSource = if (sources.any { it == "user" }) EditSource.USER
-    else if (sources.any { it.startsWith("rule") }) EditSource.RULE
-    else EditSource.NONE
-    cleared = cleared.copy(editSource = newEditSource)
+    val hasRemainingUserLock = sources.any { it == "user" } ||
+        (target.editSource == EditSource.USER && (cleared.editedAmountCents != null || cleared.editedDate != null))
 
-    val ruleEvaluated = RuleMatcherEngine.applyRules(listOf(cleared), rules.value).firstOrNull() ?: cleared
+    // Temporarily pass EditSource.NONE so RuleMatcherEngine re-evaluates unlocked fields while respecting per-field "user" source locks
+    val unlockedForRuleEval = cleared.copy(editSource = EditSource.NONE)
+    val evaluated = RuleMatcherEngine.applyRules(listOf(unlockedForRuleEval), rules.value).firstOrNull() ?: unlockedForRuleEval
+    val ruleEvaluated = if (hasRemainingUserLock) evaluated.copy(editSource = EditSource.USER) else evaluated
     commitSnapshot(snapshot.value.copy(transactions = current.map { if (it.id == id) ruleEvaluated else it }))
     activeEngine.resetTransaction(id, fields)
 }
@@ -368,7 +369,10 @@ suspend fun OrbitRepository.previewRule(rule: TransactionRule): RulePreviewResul
         val remote = createApiClient().previewRuleRemote(rule).getOrNull()
         if (remote != null) return remote
     }
+    return previewRuleLocal(rule)
+}
 
+fun OrbitRepository.previewRuleLocal(rule: TransactionRule): RulePreviewResult {
     val txns = transactions.value
     val existingRules = rules.value.filter { it.enabled && it.id != rule.id }
     val diffs = mutableListOf<RuleMutationDiff>()

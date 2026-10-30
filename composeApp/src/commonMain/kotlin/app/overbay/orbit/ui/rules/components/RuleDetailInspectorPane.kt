@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.RulePreviewResult
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
@@ -62,7 +63,9 @@ fun RuleDetailInspectorPane(
     onPreviewCount: (List<RuleCondition>) -> Int,
     onDismissPane: () -> Unit,
     onPreviewMatches: (List<RuleCondition>) -> List<Transaction> = { emptyList() },
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onPreviewRule: ((TransactionRule) -> RulePreviewResult)? = null,
+    onOpenRule: ((Long) -> Unit)? = null
 ) {
     val activeMode = when {
         state.showEditorSheet -> "EDIT"
@@ -93,6 +96,8 @@ fun RuleDetailInspectorPane(
                         onSave = onSaveRule,
                         onPreviewCount = onPreviewCount,
                         onPreviewMatches = onPreviewMatches,
+                        onPreviewRule = onPreviewRule,
+                        onOpenRule = onOpenRule,
                         onDismiss = {
                             if (state.inspectingRule != null) {
                                 onCloseEdit()
@@ -350,20 +355,13 @@ private fun RuleInspectorDetailView(
 
         // Action Buttons Row
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = { haptics.tick(); onOpenEdit() },
-                modifier = Modifier.weight(1f)
-            ) {
+            Button(onClick = { haptics.tick(); onOpenEdit() }, modifier = Modifier.weight(1f)) {
                 Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Edit Rule")
             }
 
-            OutlinedButton(
-                onClick = { haptics.tick(); onRunRulesNow() },
-                enabled = !isApplyingRules,
-                modifier = Modifier.weight(1f)
-            ) {
+            OutlinedButton(onClick = { haptics.tick(); onRunRulesNow() }, enabled = !isApplyingRules, modifier = Modifier.weight(1f)) {
                 Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(if (isApplyingRules) "Running..." else "Run Rules")

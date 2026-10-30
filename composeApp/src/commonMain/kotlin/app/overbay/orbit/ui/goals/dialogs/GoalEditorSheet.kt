@@ -19,6 +19,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -35,16 +37,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.GOAL_PRESETS
 import app.overbay.orbit.data.model.Goal
+import app.overbay.orbit.data.model.GoalAllocation
 import app.overbay.orbit.data.model.resolvedEmoji
+import app.overbay.orbit.domain.GoalAllocationEngine
+import app.overbay.orbit.domain.GoalAllocationEngine.AllocationConflict
 import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
-import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.goals.components.GoalAllocationRowEditor
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.datetime.LocalDate
 
@@ -52,7 +59,8 @@ import kotlinx.datetime.LocalDate
 fun GoalEditorSheet(
     goal: Goal?,
     accounts: List<Account>,
-    onSave: (Goal) -> Unit,
+    existingGoals: List<Goal> = emptyList(),
+    onSave: (Goal, Boolean) -> Unit,
     onDelete: (Long) -> Unit,
     onDismiss: () -> Unit,
     onOpenLinkedAccount: ((Long) -> Unit)? = null,
@@ -65,6 +73,7 @@ fun GoalEditorSheet(
         GoalEditorContent(
             goal = goal,
             accounts = accounts,
+            existingGoals = existingGoals,
             onSave = onSave,
             onDelete = onDelete,
             onDismiss = onDismiss,
@@ -77,7 +86,8 @@ fun GoalEditorSheet(
 fun GoalEditorContent(
     goal: Goal?,
     accounts: List<Account>,
-    onSave: (Goal) -> Unit,
+    existingGoals: List<Goal> = emptyList(),
+    onSave: (Goal, Boolean) -> Unit,
     onDelete: (Long) -> Unit,
     onDismiss: () -> Unit,
     onOpenLinkedAccount: ((Long) -> Unit)? = null,
@@ -91,18 +101,40 @@ fun GoalEditorContent(
     var selectedIcon by remember(goal) { mutableStateOf(goal?.resolvedEmoji ?: "🎯") }
     var targetAmountCents by remember(goal) { mutableStateOf(goal?.targetAmountCents ?: 0L) }
     var currentAmountCents by remember(goal) { mutableStateOf(goal?.currentAmountCents ?: 0L) }
+    var isOngoing by remember(goal) { mutableStateOf(goal != null && goal.targetDate == null) }
     var targetDate by remember(goal) {
         val parsed = goal?.targetDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
         mutableStateOf(parsed)
     }
-    var linkedAccountId by remember(goal) { mutableStateOf(goal?.linkedAccountId) }
+    var allocations by remember(goal) { mutableStateOf(goal?.allocations ?: emptyList()) }
+    var notes by remember(goal) { mutableStateOf(goal?.notes ?: "") }
+    var conflicts by remember { mutableStateOf<List<AllocationConflict>>(emptyList()) }
+    var pendingGoalToSave by remember { mutableStateOf<Goal?>(null) }
+
+    if (conflicts.isNotEmpty() && pendingGoalToSave != null) {
+        GoalConflictDialog(
+            conflicts = conflicts,
+            onConfirmSteal = {
+                val g = pendingGoalToSave!!
+                conflicts = emptyList()
+                pendingGoalToSave = null
+                onSave(g, true)
+            },
+            onDismiss = {
+                conflicts = emptyList()
+                pendingGoalToSave = null
+            }
+        )
+    }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 12.dp)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // Top Header Row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -148,9 +180,7 @@ fun GoalEditorContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Goal Preset Chips
+        // Preset Chips
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -162,11 +192,10 @@ fun GoalEditorContent(
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    border = if (isSelected) {
-                        BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
-                    } else {
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                    },
+                    border = BorderStroke(
+                        if (isSelected) 1.5.dp else 1.dp,
+                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    ),
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
                         .clickable {
@@ -195,9 +224,7 @@ fun GoalEditorContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Goal Emoji + Name
+        // Emoji & Name
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -207,22 +234,18 @@ fun GoalEditorContent(
                 value = selectedIcon,
                 onValueChange = { selectedIcon = it.take(16) },
                 label = { Text("Emoji") },
-                singleLine = true,
                 modifier = Modifier.width(84.dp)
             )
             OrbitTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Goal Name") },
-                placeholder = { Text("e.g. Emergency Fund, Vacation") },
-                singleLine = true,
+                placeholder = { Text("e.g. Emergency Fund, New Car") },
                 modifier = Modifier.weight(1f)
             )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // 2-Column Bento Row: Target Amount + Current Saved
+        // Target Amount & Current Amount
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -243,53 +266,70 @@ fun GoalEditorContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Target Completion Date
-        val displayDate = targetDate ?: LocalDateUtils.todayLocalDate()
-        DateFieldButton(
-            date = displayDate,
-            onDateSelected = { targetDate = it },
-            label = "Target Date (Optional)"
-        )
-
-        if (targetDate != null) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { targetDate = null }) {
-                    Text("Clear Target Date")
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Linked Account Picker
-        val linkedAccount = accounts.find { it.id == linkedAccountId }
-        OrbitDropdownField(
-            label = "Linked Bank Account",
-            selectedText = linkedAccount?.name ?: "None / Unlinked",
-            options = accounts,
-            optionLabel = { "${it.name} (${it.type.name.lowercase().replaceFirstChar { c -> c.uppercase() }})" },
-            onOptionSelected = { linkedAccountId = it.id },
-            nullOptionLabel = "None / Unlinked",
-            onNullSelected = { linkedAccountId = null }
-        )
-
-        if (isEditing && linkedAccountId != null && onOpenLinkedAccount != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = {
-                    haptics.tick()
-                    onOpenLinkedAccount(linkedAccountId!!)
-                },
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
+        // Target Date Mode Toggle: Target Date vs Ongoing
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("View Linked Account")
+                Text(
+                    text = "Timeline Mode:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                FilterChip(
+                    selected = !isOngoing,
+                    onClick = {
+                        haptics.tick()
+                        isOngoing = false
+                        if (targetDate == null) targetDate = LocalDateUtils.todayLocalDate()
+                    },
+                    label = { Text("Target Date") },
+                    shape = RoundedCornerShape(8.dp)
+                )
+                FilterChip(
+                    selected = isOngoing,
+                    onClick = {
+                        haptics.tick()
+                        isOngoing = true
+                        targetDate = null
+                    },
+                    label = { Text("Ongoing / Open-Ended") },
+                    shape = RoundedCornerShape(8.dp)
+                )
+            }
+
+            if (!isOngoing) {
+                val displayDate = targetDate ?: LocalDateUtils.todayLocalDate()
+                DateFieldButton(
+                    date = displayDate,
+                    onDateSelected = { targetDate = it },
+                    label = "Target Date"
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        // Notes Field
+        OrbitTextField(
+            value = notes,
+            onValueChange = { notes = it },
+            label = { Text("Notes & Intentions") },
+            placeholder = { Text("Add notes, milestones, or rules for this goal...") },
+            singleLine = false,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+
+        // Multi-Account Allocations Row Editor
+        GoalAllocationRowEditor(
+            allocations = allocations,
+            accounts = accounts,
+            onAllocationsChange = { allocations = it }
+        )
+
+        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
 
         // Action Buttons
         Row(
@@ -299,9 +339,7 @@ fun GoalEditorContent(
             OutlinedButton(
                 onClick = onDismiss,
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
+                modifier = Modifier.weight(1f).height(48.dp)
             ) {
                 Text("Cancel", fontWeight = FontWeight.SemiBold)
             }
@@ -309,6 +347,7 @@ fun GoalEditorContent(
             Button(
                 onClick = {
                     haptics.confirm()
+                    val targetDateIso = if (!isOngoing) targetDate?.toString() else null
                     val updated = (goal ?: Goal(
                         name = name,
                         targetAmountCents = targetAmountCents,
@@ -319,18 +358,24 @@ fun GoalEditorContent(
                         icon = selectedIcon.trim().ifBlank { "🎯" },
                         targetAmountCents = targetAmountCents,
                         currentAmountCents = currentAmountCents,
-                        targetDate = targetDate?.toString(),
-                        linkedAccountId = linkedAccountId
+                        targetDate = targetDateIso,
+                        allocations = allocations,
+                        notes = notes.trim().ifBlank { null }
                     )
-                    onSave(updated)
+
+                    val detected = GoalAllocationEngine.detectConflicts(updated, existingGoals, accounts)
+                    if (detected.isNotEmpty()) {
+                        pendingGoalToSave = updated
+                        conflicts = detected
+                    } else {
+                        onSave(updated, false)
+                    }
                 },
                 enabled = name.isNotBlank() && targetAmountCents > 0L,
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
+                modifier = Modifier.weight(1f).height(48.dp)
             ) {
-                Text("Save", fontWeight = FontWeight.Bold)
+                Text("Save Goal", fontWeight = FontWeight.Bold)
             }
         }
 

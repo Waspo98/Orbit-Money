@@ -4,12 +4,9 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -21,14 +18,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
-import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.displayEmoji
@@ -141,9 +135,7 @@ fun TransactionDetailInspectorPane(
                         onClose = onClosePane,
                         onEdit = { viewModel.openTransactionEditor(inspecting.id) },
                         onSplit = { viewModel.openSplitSheet(inspecting.id) },
-                        onCreateRule = {
-                            viewModel.openCreateRuleModal(inspecting.id)
-                        },
+                        onCreateRule = { viewModel.openCreateRuleModal(inspecting.id) },
                         onMarkRecurring = {
                             viewModel.markTransactionRecurring(inspecting)
                             onNavigate(OrbitNavKey.Upcoming)
@@ -152,8 +144,18 @@ fun TransactionDetailInspectorPane(
                         onToggleMha = { viewModel.toggleMha(inspecting.id) },
                         onToggleIgnore = { viewModel.toggleIgnore(inspecting.id) },
                         onDelete = { onRequestDelete(inspecting.id) },
-                        onResetMerchant = { viewModel.resetMerchant(inspecting.id) },
-                        onResetCategory = { viewModel.resetCategory(inspecting.id) },
+                        onResetMerchant = { viewModel.resetField(inspecting.id, "merchant") },
+                        onResetCategory = { viewModel.resetField(inspecting.id, "category") },
+                        onResetField = { field -> viewModel.resetField(inspecting.id, field) },
+                        onResetAll = { viewModel.resetTransaction(inspecting.id) },
+                        onViewRule = { ruleId ->
+                            viewModel.requestOpenRuleEditor(ruleId)
+                            onNavigate(OrbitNavKey.Rules)
+                        },
+                        onViewBudgetMonth = { month ->
+                            viewModel.requestOpenBudgetMonth(month)
+                            onNavigate(OrbitNavKey.Budgets)
+                        },
                         onFindLogo = { viewModel.openLogoFinder(inspecting.id) },
                         onUseCategoryIcon = { viewModel.useCategoryIconForTransaction(inspecting.id) },
                         onReportLogoStatus = { key, status -> viewModel.reportMerchantLogoStatus(key, status) }
@@ -184,6 +186,10 @@ private fun TransactionReadOnlyDetailContent(
     onDelete: () -> Unit,
     onResetMerchant: () -> Unit,
     onResetCategory: () -> Unit,
+    onResetField: (String) -> Unit,
+    onResetAll: () -> Unit,
+    onViewRule: (Long) -> Unit,
+    onViewBudgetMonth: (String) -> Unit,
     onFindLogo: () -> Unit = {},
     onUseCategoryIcon: () -> Unit = {},
     onReportLogoStatus: (String, String) -> Unit = { _, _ -> }
@@ -240,9 +246,26 @@ private fun TransactionReadOnlyDetailContent(
         HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
         Spacer(modifier = Modifier.height(14.dp))
 
+        // Provenance & Quick Links Card
+        TransactionProvenanceCard(
+            transaction = transaction,
+            onResetToOriginal = { onResetAll() },
+            onResetField = onResetField,
+            onViewRule = onViewRule,
+            onViewBudgetMonth = onViewBudgetMonth,
+            onMarkRecurring = onMarkRecurring
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                InspectorMetaItem(label = "DATE", value = transaction.effectiveDate)
+                InspectorMetaItem(
+                    label = "DATE",
+                    value = transaction.effectiveDate,
+                    subtitle = if (transaction.editedDate != null) "Orig: ${transaction.originalDate}" else null,
+                    onReset = if (transaction.editedDate != null) ({ onResetField("date") }) else null
+                )
                 InspectorMetaItem(label = "ACCOUNT", value = accountName.ifBlank { "Account" })
                 InspectorMetaItem(
                     label = "MERCHANT",
@@ -292,72 +315,3 @@ private fun TransactionReadOnlyDetailContent(
         }
     }
 }
-
-@Composable
-private fun InspectorMetaItem(
-    label: String,
-    value: String,
-    isMono: Boolean = false,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface,
-    subtitle: String? = null,
-    onReset: (() -> Unit)? = null
-) {
-    val haptics = LocalOrbitHaptics.current
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (onReset != null) {
-                Text(
-                    text = "Reset",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 8.dp).clickable { haptics.tick(); onReset() }
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = value,
-            style = if (isMono) MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace) else MaterialTheme.typography.bodyMedium,
-            color = valueColor,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (subtitle != null) {
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun InspectorPillAction(label: String, onClick: () -> Unit, isDestructive: Boolean = false) {
-    val haptics = LocalOrbitHaptics.current
-    OutlinedButton(
-        onClick = { haptics.tick(); onClick() },
-        shape = CircleShape,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-        border = BorderStroke(1.dp, if (isDestructive) OrbitTheme.colors.danger else OrbitTheme.colors.cardBorder),
-        modifier = Modifier.height(34.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isDestructive) OrbitTheme.colors.danger else MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-

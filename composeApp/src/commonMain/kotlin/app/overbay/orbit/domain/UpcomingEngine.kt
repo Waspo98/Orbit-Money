@@ -24,6 +24,7 @@ object UpcomingEngine {
     const val GRACE_DAYS = 4
     const val MIN_MATCH_SCORE = 70
     const val MIN_MERCHANT_SCORE = 30
+    val GIVING_HINTS = UpcomingScheduleHelper.GIVING_HINTS
 
     /**
      * Generates all projected dates for an UpcomingItem between startDate and endDate.
@@ -143,29 +144,7 @@ object UpcomingEngine {
      * the anchor day extracted from its schedule or recurrence rule.
      */
     fun advanceInterval(item: UpcomingItem, date: String = item.nextDate): String {
-        val rule = item.recurrenceRule
-        val anchorDay = when (rule) {
-            is RecurrenceRule.MonthDays -> rule.days.firstOrNull() ?: 0
-            else -> LocalDateUtils.parseIsoDate(item.nextDate)?.dayOfMonth ?: 0
-        }
-        if (item.frequencyType == RecurrenceFrequency.CUSTOM) {
-            val safeInterval = max(1, item.frequencyInterval)
-            val d = LocalDateUtils.parseIsoDate(date)
-            if (d != null) {
-                if (item.frequencyUnit.equals("days", ignoreCase = true)) {
-                    return LocalDateUtils.formatIsoDate(LocalDateUtils.addDays(d, safeInterval))
-                }
-                if (item.frequencyUnit.equals("weeks", ignoreCase = true)) {
-                    return LocalDateUtils.formatIsoDate(LocalDateUtils.addDays(d, 7 * safeInterval))
-                }
-            }
-        }
-        return advanceInterval(
-            date = date,
-            frequency = item.frequencyType,
-            interval = item.frequencyInterval,
-            anchorDay = anchorDay
-        )
+        return UpcomingScheduleHelper.advanceRecurrence(item, date)
     }
 
     private fun advanceMonths(date: LocalDate, monthsToAdd: Int, anchorDay: Int): String {
@@ -246,16 +225,7 @@ object UpcomingEngine {
         item: UpcomingItem,
         postedTransactions: List<Transaction>
     ): Cents {
-        if (item.amountStrategy == AmountStrategy.FIXED) {
-            return item.amountCents
-        }
-        val targetMerchant = item.merchant ?: item.name
-        val matching = postedTransactions.filter { txn ->
-            textMatchScore(targetMerchant, txn.effectiveMerchant) >= MIN_MERCHANT_SCORE
-        }
-        if (matching.isEmpty()) return item.amountCents
-        val sum = matching.sumOf { abs(it.effectiveAmountCents) }
-        return sum / matching.size
+        return UpcomingScheduleHelper.computeProjectedAmount(item, postedTransactions).amountCents
     }
 
     /**

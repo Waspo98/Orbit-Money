@@ -30,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Goal
+import app.overbay.orbit.data.model.GoalAllocationType
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
@@ -62,8 +64,9 @@ private enum class GoalInspectorSubMode { DETAIL, EDIT, DEPOSIT }
 
 /**
  * Right-hand morphing inspector pane for Savings Goals on unfolded phones, tablets, and desktops.
- * Shows the read-only goal overview by default when tapped, and morphs smoothly into the Edit or Deposit form.
- * Strictly under the 400-line ceiling.
+ * Shows the read-only goal overview, historical growth canvas chart, and "Imagine" simulator by default,
+ * and morphs smoothly into the Edit or Deposit form.
+ * Strictly under the 390-line ceiling.
  */
 @Composable
 fun GoalDetailInspectorPane(
@@ -108,7 +111,8 @@ fun GoalDetailInspectorPane(
                 GoalEditorContent(
                     goal = state.editingGoal,
                     accounts = state.accounts,
-                    onSave = { viewModel.saveGoal(it) },
+                    existingGoals = state.goals,
+                    onSave = { goal, steal -> viewModel.saveGoalWithAllocations(goal, steal) },
                     onDelete = { viewModel.deleteGoal(it) },
                     onDismiss = {
                         if (state.inspectingGoalId != null) viewModel.closeEditorSheet() else onClosePane()
@@ -171,8 +175,10 @@ private fun GoalReadOnlyDetailContent(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // Title Header
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -181,7 +187,7 @@ private fun GoalReadOnlyDetailContent(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "${MoneyUtils.formatCents(goal.currentAmountCents, showCents = false)} of ${MoneyUtils.formatCents(goal.targetAmountCents, showCents = false)}",
                     style = TabularNumStyle.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold),
@@ -193,7 +199,6 @@ private fun GoalReadOnlyDetailContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
         LinearProgressIndicator(
             progress = { progress },
             modifier = Modifier
@@ -204,48 +209,50 @@ private fun GoalReadOnlyDetailContent(
             trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-        Spacer(modifier = Modifier.height(14.dp))
+        // Historical Chart & What-If Simulator Card
+        GoalHistoryAndImagineCard(goal = goal)
 
+        // Metadata 2-Column Grid
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 GoalMetaField(label = "PROGRESS", value = "${(goal.progressRatio * 100).toInt()}%")
+                GoalMetaField(label = "REMAINING", value = MoneyUtils.formatCents(goal.remainingAmountCents, showCents = false))
                 GoalMetaField(
-                    label = "REMAINING",
-                    value = MoneyUtils.formatCents(goal.remainingAmountCents, showCents = false)
-                )
-                GoalMetaField(
-                    label = "MONTHLY PACE NEEDED",
+                    label = "PACE NEEDED",
                     value = if (monthlyNeededCents != null && monthlyNeededCents > 0L) {
                         "${MoneyUtils.formatCents(monthlyNeededCents, showCents = false)}/mo"
-                    } else if (isDone) {
-                        "Goal reached"
-                    } else {
-                        "No target date set"
-                    }
+                    } else if (isDone) "Goal reached" else "Ongoing"
                 )
             }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                GoalMetaField(label = "TARGET DATE", value = goal.targetDate ?: "Ongoing")
+                GoalMetaField(label = "CATEGORY KIND", value = goal.kind.replaceFirstChar { it.uppercase() })
+                val allocCount = goal.allocations.size
                 GoalMetaField(
-                    label = "TARGET DATE",
-                    value = goal.targetDate ?: "Not set"
-                )
-                GoalMetaField(
-                    label = "LINKED ACCOUNT",
-                    value = linkedAccount?.name ?: "None / Unlinked"
-                )
-                GoalMetaField(
-                    label = "CATEGORY KIND",
-                    value = goal.kind.replaceFirstChar { it.uppercase() }
+                    label = "SOURCES",
+                    value = if (allocCount > 0) "$allocCount Accounts Linked" else linkedAccount?.name ?: "Unlinked"
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-        Spacer(modifier = Modifier.height(16.dp))
+        // Notes block if present
+        if (!goal.notes.isNullOrBlank()) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(text = "NOTES", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = goal.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+        }
 
+        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+
+        // Action Buttons FlowRow
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

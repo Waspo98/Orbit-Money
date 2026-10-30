@@ -84,29 +84,34 @@ class NetWorthViewModelTest {
         }
         testScheduler.advanceUntilIdle()
 
-        // Default: ONE_YEAR (12 points)
-        assertEquals(NetWorthPeriod.ONE_YEAR, viewModel.uiState.value.selectedPeriod)
+        // Default: TWO_YEARS (24 points, main branch parity)
+        assertEquals(NetWorthHorizon.TWO_YEARS, viewModel.uiState.value.selectedHorizon)
+        assertEquals(24, viewModel.uiState.value.filteredPoints.size)
+
+        // 1 Year
+        viewModel.setHorizon(NetWorthHorizon.ONE_YEAR)
+        testScheduler.advanceUntilIdle()
         assertEquals(12, viewModel.uiState.value.filteredPoints.size)
 
-        // 3 Months
-        viewModel.setPeriod(NetWorthPeriod.THREE_MONTHS)
+        // 3 Years
+        viewModel.setHorizon(NetWorthHorizon.THREE_YEARS)
         testScheduler.advanceUntilIdle()
-        assertEquals(3, viewModel.uiState.value.filteredPoints.size)
+        assertEquals(36, viewModel.uiState.value.filteredPoints.size)
 
-        // 6 Months
-        viewModel.setPeriod(NetWorthPeriod.SIX_MONTHS)
+        // 5 Years
+        viewModel.setHorizon(NetWorthHorizon.FIVE_YEARS)
         testScheduler.advanceUntilIdle()
-        assertEquals(6, viewModel.uiState.value.filteredPoints.size)
+        assertEquals(60, viewModel.uiState.value.filteredPoints.size)
 
-        // 1 Month (clamped to at least 2 for delta calculation)
-        viewModel.setPeriod(NetWorthPeriod.ONE_MONTH)
+        // 10 Years
+        viewModel.setHorizon(NetWorthHorizon.TEN_YEARS)
         testScheduler.advanceUntilIdle()
-        assertEquals(2, viewModel.uiState.value.filteredPoints.size)
+        assertEquals(120, viewModel.uiState.value.filteredPoints.size)
 
-        // All (24 months)
-        viewModel.setPeriod(NetWorthPeriod.ALL)
+        // All Time (minimum 12 months when no older transactions exist)
+        viewModel.setHorizon(NetWorthHorizon.ALL_TIME)
         testScheduler.advanceUntilIdle()
-        assertEquals(24, viewModel.uiState.value.filteredPoints.size)
+        assertEquals(12, viewModel.uiState.value.filteredPoints.size)
 
         collectJob.cancel()
     }

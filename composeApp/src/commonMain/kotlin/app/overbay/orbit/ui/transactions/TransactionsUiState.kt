@@ -21,6 +21,8 @@ enum class TransactionSortOption(val label: String) {
     DATE_ASC("Date: Oldest"),
     AMOUNT_DESC("Amount: High to Low"),
     AMOUNT_ASC("Amount: Low to High"),
+    ABS_AMOUNT_DESC("Biggest First"),
+    ABS_AMOUNT_ASC("Smallest First"),
     MERCHANT_ASC("Merchant: A to Z")
 }
 
@@ -34,6 +36,7 @@ data class MonthTransactionGroup(
 data class TransactionsUiState(
     val transactions: List<Transaction> = emptyList(),
     val filteredTransactions: List<Transaction> = emptyList(),
+    val paginatedTransactions: List<Transaction> = emptyList(),
     val groupedTransactions: List<MonthTransactionGroup> = emptyList(),
     val categories: List<Category> = emptyList(),
     val accounts: List<Account> = emptyList(),
@@ -45,6 +48,8 @@ data class TransactionsUiState(
     val filterDraft: TransactionFilterDraft = TransactionFilterDraft(),
     val sortOption: TransactionSortOption = TransactionSortOption.DATE_DESC,
     val isCompactView: Boolean = false,
+    val pageSize: Int = 50,
+    val currentPage: Int = 1,
     val selectedTransactionIds: Set<Long> = emptySet(),
     val inspectingTransactionId: Long? = null,
     val expandedTransactionId: Long? = null,
@@ -78,11 +83,24 @@ data class TransactionsUiState(
     val ruleDraftTransaction: Transaction?
         get() = transactions.find { it.id == ruleDraftTransactionId }
 
+    val totalPages: Int
+        get() = if (pageSize <= 0) 1 else ((filteredTransactions.size + pageSize - 1) / pageSize).coerceAtLeast(1)
+
     val hasActiveFilters: Boolean
         get() = searchQuery.isNotBlank() ||
                 quickFilter != QuickFilter.ALL ||
                 filterDraft.type != "all" ||
                 filterDraft.datePreset != "all" ||
                 filterDraft.accountId != null ||
-                filterDraft.categoryId != null
+                filterDraft.categoryId != null ||
+                filterDraft.accountIds.isNotEmpty() ||
+                filterDraft.categoryIds.isNotEmpty() ||
+                filterDraft.uncategorizedOnly ||
+                filterDraft.startDate != null ||
+                filterDraft.endDate != null ||
+                filterDraft.minAmountCents != null ||
+                filterDraft.maxAmountCents != null ||
+                filterDraft.hasEditsFilter != "any" ||
+                !filterDraft.includeTransfers ||
+                !filterDraft.includeIgnored
 }

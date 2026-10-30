@@ -51,6 +51,7 @@ data class OnboardingUiState(
     val selectedThemePreset: OrbitThemePreset = OrbitThemePreset.ORBIT_EMERALD,
     val selectedThemeMode: OrbitThemeMode = OrbitThemeMode.SYSTEM,
     val dynamicColorEnabled: Boolean = true,
+    val biometricOptIn: Boolean = false,
     val isSubmitting: Boolean = false,
     val isCompleted: Boolean = false,
     val errorMessage: String? = null
@@ -72,6 +73,7 @@ sealed interface OnboardingIntent {
     data class SelectThemePreset(val preset: OrbitThemePreset) : OnboardingIntent
     data class SelectThemeMode(val mode: OrbitThemeMode) : OnboardingIntent
     data class SetDynamicColor(val enabled: Boolean) : OnboardingIntent
+    data class SetBiometricOptIn(val enabled: Boolean) : OnboardingIntent
     data object CompleteOnboarding : OnboardingIntent
     data object SkipOnboarding : OnboardingIntent
 }

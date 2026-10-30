@@ -2,8 +2,9 @@ package app.overbay.orbit.ui.rules
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.*
 import app.overbay.orbit.data.model.RuleCondition
+import app.overbay.orbit.data.model.RulePreviewResult
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.domain.RuleMatcherEngine
@@ -23,6 +24,21 @@ class RulesViewModel(
     private val _showEditorSheet = MutableStateFlow(false)
     private val _deleteConfirmId = MutableStateFlow<Long?>(null)
     private val _isApplying = MutableStateFlow(false)
+    private val _showWipeAllRulesDialog = MutableStateFlow(false)
+
+    init {
+        viewModelScope.launch {
+            repository.pendingRuleIdToEdit.collect { pendingId ->
+                if (pendingId != null) {
+                    val rule = repository.rules.value.find { it.id == pendingId }
+                    if (rule != null) {
+                        openEditRule(rule)
+                    }
+                    repository.requestOpenRuleEditor(null)
+                }
+            }
+        }
+    }
 
     private val dataFlow = combine(
         repository.rules,
@@ -50,6 +66,8 @@ class RulesViewModel(
             deleteConfirmRuleId = deleteId,
             isApplyingRules = isApplying
         )
+    }.combine(_showWipeAllRulesDialog) { state, showWipe ->
+        state.copy(showWipeAllRulesDialog = showWipe)
     }
 
     val uiState: StateFlow<RulesUiState> = combine(
@@ -114,8 +132,7 @@ class RulesViewModel(
 
     fun toggleRuleEnabled(id: Long, enabled: Boolean) {
         viewModelScope.launch {
-            val rule = uiState.value.rules.find { it.id == id } ?: return@launch
-            repository.saveRule(rule.copy(enabled = enabled))
+            repository.setRuleEnabled(id, enabled)
         }
     }
 
@@ -137,6 +154,21 @@ class RulesViewModel(
         }
     }
 
+    fun openWipeAllRulesDialog() {
+        _showWipeAllRulesDialog.value = true
+    }
+
+    fun dismissWipeAllRulesDialog() {
+        _showWipeAllRulesDialog.value = false
+    }
+
+    fun wipeAllRules() {
+        viewModelScope.launch {
+            repository.wipeAllRules()
+            _showWipeAllRulesDialog.value = false
+        }
+    }
+
     fun runRulesNow() {
         viewModelScope.launch {
             _isApplying.value = true
@@ -147,6 +179,9 @@ class RulesViewModel(
             }
         }
     }
+
+    fun previewRule(rule: TransactionRule): RulePreviewResult =
+        repository.previewRuleLocal(rule)
 
     fun previewMatchCount(conditions: List<RuleCondition>): Int {
         if (conditions.isEmpty()) return 0

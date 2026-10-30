@@ -236,12 +236,17 @@ data class DashboardRecentTransactionItem(
     val formattedAmount: String,
     val dateIso: String,
     val dateDisplay: String,
+    val categoryId: Long? = null,
     val categoryName: String? = null,
     val categoryColor: String? = null,
     val categoryIcon: String? = null,
     val accountName: String = "",
     val isPending: Boolean = false,
-    val merchantLogoUrl: String? = null
+    val merchantLogoUrl: String? = null,
+    val isTransfer: Boolean = false,
+    val isIgnored: Boolean = false,
+    val isMhaEligible: Boolean = false,
+    val hasEdits: Boolean = false
 )
 
 data class RecentTransactionsState(
@@ -319,6 +324,8 @@ data class DashboardUiState(
     val daysRemaining: Int = 0,
     val selectedMonth: String = "",
     val mhaEnabled: Boolean = false,
+    val isEmptyWorkspace: Boolean = false,
+    val availableCategories: List<Category> = emptyList(),
     val isReviewModalOpen: Boolean = false,
     val categorizeReview: CategorizeReviewState = CategorizeReviewState(),
     val cashflow: CashflowHeroState = CashflowHeroState(),
@@ -346,38 +353,4 @@ data class DashboardUiState(
             visibleCards = DashboardCardType.entries.sortedBy { it.defaultSortOrder }
         )
     }
-}
-
-sealed interface DashboardAction {
-    data object Refresh : DashboardAction
-    data object PreviousMonth : DashboardAction
-    data object NextMonth : DashboardAction
-    data object OpenCustomizeSheet : DashboardAction
-    data object CloseCustomizeSheet : DashboardAction
-    data class ToggleCardVisibility(val cardType: DashboardCardType) : DashboardAction
-    data class SetCardWideSpan(val cardType: DashboardCardType, val wideSpan: Int) : DashboardAction
-    data class MoveCard(val fromIndex: Int, val toIndex: Int) : DashboardAction
-    data object ResetCardsToDefault : DashboardAction
-    data class MarkBillPaid(val upcomingItemId: Long, val dueDateIso: String) : DashboardAction
-    data class HideBiggestTransaction(val transactionId: Long) : DashboardAction
-    data object ResetHiddenBiggestTransactions : DashboardAction
-    data class SetGoalFocus(val goalId: Long) : DashboardAction
-    data class SetRetirementAge(val age: Int) : DashboardAction
-    data class SetRetirementPreset(val presetKey: String) : DashboardAction
-    data object OpenCategorizeReview : DashboardAction
-    data object CloseCategorizeReview : DashboardAction
-    data class ApplyCategory(val transactionId: Long, val categoryId: Long) : DashboardAction
-    data object ApproveReviewTransaction : DashboardAction
-    data object RejectReviewTransaction : DashboardAction
-    data object CloseReviewCategoryPicker : DashboardAction
-    data class RequestConfirmReviewCategory(val categoryId: Long) : DashboardAction
-    data object CancelConfirmReviewCategory : DashboardAction
-    data object ConfirmReviewCategory : DashboardAction
-    data object SkipReviewTransaction : DashboardAction
-    data object GoBackReviewTransaction : DashboardAction
-    data object LoadMoreReviewTransactions : DashboardAction
-    data object StartFunReviewMode : DashboardAction
-    data object OpenReviewRuleCreator : DashboardAction
-    data object CloseReviewRuleCreator : DashboardAction
-    data class SaveReviewRule(val rule: TransactionRule) : DashboardAction
 }

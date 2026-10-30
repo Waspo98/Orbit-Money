@@ -3,6 +3,7 @@ package app.overbay.orbit.ui.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.*
 import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.DashboardWidgetConfig
 import app.overbay.orbit.data.model.EditSource
@@ -35,11 +36,22 @@ class DashboardViewModel(
     private val _isRefreshing = MutableStateFlow(false)
     private val _isCustomizing = MutableStateFlow(false)
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
-    private val _hiddenBiggestIds = MutableStateFlow<Set<Long>>(emptySet())
-    private val _focusedGoalId = MutableStateFlow<Long?>(null)
-    private val _retirementAge = MutableStateFlow(67)
-    private val _retirementPreset = MutableStateFlow("balanced")
+    private val _hiddenBiggestIds = MutableStateFlow<Set<Long>>(repository.preferences.value.dashboardHiddenBiggestIds.toSet())
+    private val _focusedGoalId = MutableStateFlow<Long?>(repository.preferences.value.dashboardFocusedGoalId)
+    private val _retirementAge = MutableStateFlow(repository.preferences.value.dashboardRetirementAge)
+    private val _retirementPreset = MutableStateFlow(repository.preferences.value.dashboardRetirementPreset.ifBlank { "balanced" })
     private val _reviewState = MutableStateFlow(CategorizeReviewState())
+
+    init {
+        viewModelScope.launch {
+            repository.preferences.collect { prefs ->
+                _hiddenBiggestIds.value = prefs.dashboardHiddenBiggestIds.toSet()
+                _focusedGoalId.value = prefs.dashboardFocusedGoalId
+                _retirementAge.value = prefs.dashboardRetirementAge
+                _retirementPreset.value = prefs.dashboardRetirementPreset.ifBlank { "balanced" }
+            }
+        }
+    }
 
     val uiState: StateFlow<DashboardUiState> = combine(
         combine(
@@ -228,23 +240,50 @@ class DashboardViewModel(
     }
 
     fun hideBiggestTransaction(transactionId: Long) {
-        _hiddenBiggestIds.value = _hiddenBiggestIds.value + transactionId
+        val updated = _hiddenBiggestIds.value + transactionId
+        _hiddenBiggestIds.value = updated
+        viewModelScope.launch {
+            repository.updatePreferences(
+                repository.preferences.value.copy(dashboardHiddenBiggestIds = updated.toList())
+            )
+        }
     }
 
     fun resetHiddenBiggestTransactions() {
         _hiddenBiggestIds.value = emptySet()
+        viewModelScope.launch {
+            repository.updatePreferences(
+                repository.preferences.value.copy(dashboardHiddenBiggestIds = emptyList())
+            )
+        }
     }
 
     fun setGoalFocus(goalId: Long) {
         _focusedGoalId.value = goalId
+        viewModelScope.launch {
+            repository.updatePreferences(
+                repository.preferences.value.copy(dashboardFocusedGoalId = goalId)
+            )
+        }
     }
 
     fun setRetirementAge(age: Int) {
-        _retirementAge.value = age.coerceIn(50, 80)
+        val coerced = age.coerceIn(50, 80)
+        _retirementAge.value = coerced
+        viewModelScope.launch {
+            repository.updatePreferences(
+                repository.preferences.value.copy(dashboardRetirementAge = coerced)
+            )
+        }
     }
 
     fun setRetirementPreset(preset: String) {
         _retirementPreset.value = preset
+        viewModelScope.launch {
+            repository.updatePreferences(
+                repository.preferences.value.copy(dashboardRetirementPreset = preset)
+            )
+        }
     }
 
     fun openCategorizeReview() {
@@ -463,6 +502,13 @@ class DashboardViewModel(
             DashboardAction.OpenReviewRuleCreator -> openReviewRuleCreator()
             DashboardAction.CloseReviewRuleCreator -> closeReviewRuleCreator()
             is DashboardAction.SaveReviewRule -> saveReviewRule(action.rule)
+            is DashboardAction.ToggleTransactionTransfer -> viewModelScope.launch { repository.batchMarkTransfer(setOf(action.transactionId), action.isTransfer) }
+            is DashboardAction.ToggleTransactionIgnored -> viewModelScope.launch { repository.setTransactionIgnored(action.transactionId, action.isIgnored) }
+            is DashboardAction.ToggleTransactionMha -> viewModelScope.launch { repository.batchSetMhaEligible(setOf(action.transactionId), action.isEligible) }
+            is DashboardAction.MarkTransactionRecurring -> viewModelScope.launch { repository.createUpcomingFromTransaction(action.transactionId) }
+            is DashboardAction.ResetTransactionEdits -> viewModelScope.launch { repository.resetTransaction(action.transactionId) }
+            is DashboardAction.DeleteTransaction -> viewModelScope.launch { repository.deleteTransaction(action.transactionId) }
+            DashboardAction.RequestOpenDataSettings -> repository.requestOpenSettingsSubpage("data")
         }
     }
 

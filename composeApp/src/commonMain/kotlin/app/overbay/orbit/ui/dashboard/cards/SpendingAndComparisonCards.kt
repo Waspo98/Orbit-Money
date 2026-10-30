@@ -150,7 +150,7 @@ fun BiggestTransactionsCard(
 
     OrbitSectionCard(
         title = "BIGGEST MONTHLY TRANSACTIONS",
-        actionText = "Browse",
+        actionText = "View All",
         onActionClick = onClick,
         modifier = modifier
             .clip(MaterialTheme.shapes.large)

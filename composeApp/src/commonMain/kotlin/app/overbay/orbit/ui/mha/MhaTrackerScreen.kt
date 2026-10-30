@@ -23,9 +23,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -42,6 +46,7 @@ import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.PeriodNavigatorPill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.mha.components.MhaAutoDefaultsSection
 import app.overbay.orbit.ui.mha.components.MhaTaxSavingsCard
 import app.overbay.orbit.ui.mha.components.MhaThreeLimitHeroCard
 import app.overbay.orbit.ui.mha.components.MhaTransactionsTab
@@ -128,7 +133,42 @@ fun MhaTrackerScreen(
                     }
                 )
 
-                if (isTwoPane) {
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+                ) {
+                    SegmentedButton(
+                        selected = state.activeScreenTab == MhaScreenTab.TRACKER,
+                        onClick = { viewModel.setActiveScreenTab(MhaScreenTab.TRACKER) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) {
+                        Text("Tracker & Expenses")
+                    }
+                    SegmentedButton(
+                        selected = state.activeScreenTab == MhaScreenTab.DEFAULTS,
+                        onClick = { viewModel.setActiveScreenTab(MhaScreenTab.DEFAULTS) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) {
+                        Text("Auto-Defaults")
+                    }
+                }
+
+                if (state.activeScreenTab == MhaScreenTab.DEFAULTS) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item {
+                            MhaAutoDefaultsSection(
+                                accounts = state.accounts,
+                                categories = state.categories,
+                                onToggleAccountDefault = viewModel::setMhaAccountDefault,
+                                onToggleCategoryDefault = viewModel::setMhaCategoryDefault,
+                                onToggleCategoryIgnoreDefault = viewModel::setMhaCategoryIgnoreDefault
+                            )
+                        }
+                    }
+                } else if (isTwoPane) {
                     // Foldable / Tablet / Wide Two-Pane Split
                     Row(
                         modifier = Modifier
@@ -184,6 +224,8 @@ fun MhaTrackerScreen(
                                         taxProfile = state.taxProfile,
                                         designatedCapCents = state.designatedCapCents,
                                         fairMarketRentalValueCents = state.fairMarketRentalValueCents,
+                                        mhaEnabled = state.mhaEnabled,
+                                        onToggleMhaEnabled = { viewModel.setMhaEnabled(it) },
                                         onDismiss = { viewModel.closeConfigSheet() },
                                         onSave = { updatedProfile, cap, fmrv ->
                                             viewModel.updateMhaConfig(cap, fmrv, updatedProfile)
@@ -205,7 +247,9 @@ fun MhaTrackerScreen(
                                         onTabChange = { viewModel.setTabFilter(it) },
                                         onSearchChange = { viewModel.setSearchQuery(it) },
                                         onToggleEligible = { id, current -> viewModel.toggleTransactionEligibility(id, current) },
-                                        onResetEligible = { id -> viewModel.resetTransactionEligibility(id) }
+                                        onResetEligible = { id -> viewModel.resetTransactionMhaOverride(id) },
+                                        onIgnoreFromBudget = { id, ignored -> viewModel.setTransactionIgnored(id, ignored) },
+                                        onInspectTransaction = { id -> onNavigate(OrbitNavKey.Transactions(transactionId = id)) }
                                     )
                                 }
                             }
@@ -248,7 +292,9 @@ fun MhaTrackerScreen(
                                 onTabChange = { viewModel.setTabFilter(it) },
                                 onSearchChange = { viewModel.setSearchQuery(it) },
                                 onToggleEligible = { id, current -> viewModel.toggleTransactionEligibility(id, current) },
-                                onResetEligible = { id -> viewModel.resetTransactionEligibility(id) }
+                                onResetEligible = { id -> viewModel.resetTransactionMhaOverride(id) },
+                                onIgnoreFromBudget = { id, ignored -> viewModel.setTransactionIgnored(id, ignored) },
+                                onInspectTransaction = { id -> onNavigate(OrbitNavKey.Transactions(transactionId = id)) }
                             )
                         }
                     }
@@ -261,6 +307,8 @@ fun MhaTrackerScreen(
                 taxProfile = state.taxProfile,
                 designatedCapCents = state.designatedCapCents,
                 fairMarketRentalValueCents = state.fairMarketRentalValueCents,
+                mhaEnabled = state.mhaEnabled,
+                onToggleMhaEnabled = { viewModel.setMhaEnabled(it) },
                 onDismiss = { viewModel.closeConfigSheet() },
                 onSave = { updatedProfile, cap, fmrv ->
                     viewModel.updateMhaConfig(cap, fmrv, updatedProfile)

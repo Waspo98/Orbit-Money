@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +24,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.*
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.ui.accounts.AccountsScreen
 import app.overbay.orbit.ui.accounts.AccountsViewModel
@@ -33,6 +35,7 @@ import app.overbay.orbit.ui.budgets.BudgetsViewModel
 import app.overbay.orbit.ui.categories.CategoriesScreen
 import app.overbay.orbit.ui.categories.CategoriesViewModel
 import app.overbay.orbit.ui.components.AdaptiveNavigationShell
+import app.overbay.orbit.ui.components.GlobalStatusBanners
 import app.overbay.orbit.ui.components.LocalCanopyScreenKeyId
 import app.overbay.orbit.ui.components.LocalCanopyTransitionCoordinator
 import app.overbay.orbit.ui.components.rememberCanopyTransitionCoordinator
@@ -117,6 +120,12 @@ fun OrbitNavigation(
         }
     }
 
+    LaunchedEffect(preferences.storageMode, isAuthenticated) {
+        if (preferences.storageMode == StorageMode.SELF_HOSTED && isAuthenticated) {
+            repo.refreshSimpleFinStatus()
+        }
+    }
+
     if (currentKey == OrbitNavKey.Login) {
         LoginScreen(
             viewModel = loginViewModel,
@@ -157,17 +166,28 @@ fun OrbitNavigation(
 
     val navigateTo: (OrbitNavKey) -> Unit = { destination ->
         if (destination is OrbitNavKey.Transactions) {
-            if (
-                destination.transactionId != null ||
+            val hasTransactionsDeepLink = destination.transactionId != null ||
                 destination.accountId != null ||
                 destination.categoryId != null ||
-                destination.uncategorizedOnly
-            ) {
+                destination.uncategorizedOnly ||
+                destination.startDate != null ||
+                destination.endDate != null ||
+                destination.sortOption != null ||
+                destination.openAddSheet ||
+                !destination.includeTransfers ||
+                !destination.includeIgnored
+            if (hasTransactionsDeepLink) {
                 transactionsViewModel.applyDeepLink(
                     transactionId = destination.transactionId,
                     accountId = destination.accountId,
                     categoryId = destination.categoryId,
-                    uncategorizedOnly = destination.uncategorizedOnly
+                    uncategorizedOnly = destination.uncategorizedOnly,
+                    startDate = destination.startDate,
+                    endDate = destination.endDate,
+                    sortOption = destination.sortOption,
+                    openAddSheet = destination.openAddSheet,
+                    includeTransfers = destination.includeTransfers,
+                    includeIgnored = destination.includeIgnored
                 )
             } else {
                 transactionsViewModel.clearFilters()
@@ -209,173 +229,73 @@ fun OrbitNavigation(
             canNavigateBack = backStack.size > 1,
             onBack = popBackOrDashboard,
             mhaEnabled = preferences.mhaTrackerEnabled,
+            hiddenRouteNames = preferences.hiddenRouteNames,
+            moreRouteOrder = preferences.moreRouteOrder,
             modifier = modifier
         ) {
-            AnimatedContent(
-                targetState = currentKey,
-                transitionSpec = { orbitNavigationTransitionSpec() },
-                contentKey = { key -> key.primaryTabIndex ?: key },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .onGloballyPositioned { coords ->
-                        canopyCoordinator.containerRootX = coords.positionInRoot().x
-                        canopyCoordinator.containerWidthPx = coords.size.width.toFloat()
-                    },
-                label = "OrbitNavigationTransition"
-            ) { key ->
-                CompositionLocalProvider(LocalCanopyScreenKeyId provides (key.primaryTabIndex ?: key)) {
-                    when (key) {
-                        OrbitNavKey.Dashboard -> {
-                            DashboardScreen(
-                                viewModel = dashboardViewModel,
-                                onNavigate = navigateTo,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        is OrbitNavKey.Transactions -> {
-                            LaunchedEffect(key) {
-                                transactionsViewModel.applyDeepLink(
-                                    transactionId = key.transactionId,
-                                    accountId = key.accountId,
-                                    categoryId = key.categoryId,
-                                    uncategorizedOnly = key.uncategorizedOnly
-                                )
+            Column(modifier = Modifier.fillMaxSize()) {
+                GlobalStatusBanners(
+                    repository = repo,
+                    onNavigate = navigateTo
+                )
+                AnimatedContent(
+                    targetState = currentKey,
+                    transitionSpec = { orbitNavigationTransitionSpec() },
+                    contentKey = { key -> key.primaryTabIndex ?: key },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coords ->
+                            canopyCoordinator.containerRootX = coords.positionInRoot().x
+                            canopyCoordinator.containerWidthPx = coords.size.width.toFloat()
+                        },
+                    label = "OrbitNavigationTransition"
+                ) { key ->
+                    CompositionLocalProvider(LocalCanopyScreenKeyId provides (key.primaryTabIndex ?: key)) {
+                        when (key) {
+                            OrbitNavKey.Dashboard -> DashboardScreen(dashboardViewModel, navigateTo, Modifier.fillMaxSize())
+                            is OrbitNavKey.Transactions -> {
+                                LaunchedEffect(key) {
+                                    transactionsViewModel.applyDeepLink(
+                                        transactionId = key.transactionId,
+                                        accountId = key.accountId,
+                                        categoryId = key.categoryId,
+                                        uncategorizedOnly = key.uncategorizedOnly,
+                                        startDate = key.startDate,
+                                        endDate = key.endDate,
+                                        sortOption = key.sortOption,
+                                        openAddSheet = key.openAddSheet,
+                                        includeTransfers = key.includeTransfers,
+                                        includeIgnored = key.includeIgnored
+                                    )
+                                }
+                                TransactionsScreen(transactionsViewModel, navigateTo, Modifier.fillMaxSize())
                             }
-                            TransactionsScreen(
-                                viewModel = transactionsViewModel,
-                                onNavigate = navigateTo,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        OrbitNavKey.Budgets -> {
-                            BudgetsScreen(
-                                viewModel = budgetsViewModel,
-                                onNavigate = navigateTo,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        OrbitNavKey.Upcoming -> {
-                            UpcomingScreen(
-                                viewModel = upcomingViewModel,
-                                onNavigate = navigateTo,
-                                onBack = popBackOrDashboard,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        OrbitNavKey.Goals -> {
-                            GoalsScreen(
-                                viewModel = goalsViewModel,
-                                onNavigate = navigateTo,
-                                onBack = popBackOrDashboard,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        OrbitNavKey.Categories -> {
-                            CategoriesScreen(
-                                viewModel = categoriesViewModel,
-                                onNavigate = navigateTo,
-                                onBack = popBackOrDashboard,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        OrbitNavKey.Rules -> {
-                            RulesScreen(
-                                viewModel = rulesViewModel,
-                                onNavigate = navigateTo,
-                                onBack = popBackOrDashboard,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        is OrbitNavKey.Accounts -> {
-                            AccountsScreen(
-                                viewModel = accountsViewModel,
-                                initialAccountId = key.accountId,
-                                onNavigate = navigateTo,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        OrbitNavKey.NetWorth -> {
-                            NetWorthScreen(
-                                viewModel = netWorthViewModel,
-                                onNavigate = navigateTo,
-                                onBack = popBackOrDashboard,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        OrbitNavKey.SpendingTrends -> {
-                            SpendingTrendsScreen(
-                                viewModel = spendingTrendsViewModel,
-                                onNavigate = navigateTo,
-                                onBack = popBackOrDashboard,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        OrbitNavKey.MhaTracker -> {
-                            MhaTrackerScreen(
-                                viewModel = mhaTrackerViewModel,
-                                onNavigate = navigateTo,
-                                onBack = popBackOrDashboard,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        OrbitNavKey.HousingCalculator -> {
-                            HousingCalculatorScreen(
-                                viewModel = housingViewModel,
-                                onNavigate = navigateTo,
-                                onBack = popBackOrDashboard,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        OrbitNavKey.RetirementCalculator -> {
-                            RetirementCalculatorScreen(
-                                viewModel = retirementViewModel,
-                                onNavigate = navigateTo,
-                                onBack = popBackOrDashboard,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        OrbitNavKey.Household -> {
-                            HouseholdScreen(
-                                viewModel = householdViewModel,
-                                onNavigate = navigateTo,
-                                onBack = popBackOrDashboard,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        OrbitNavKey.Settings -> {
-                            SettingsScreen(
-                                viewModel = settingsViewModel,
-                                onNavigate = navigateTo,
-                                onBack = popBackOrDashboard,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        else -> {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.background)
-                                    .padding(24.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = "Orbit Money",
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = key.title,
-                                        style = MaterialTheme.typography.titleLarge,
-                                        color = MaterialTheme.colorScheme.onBackground
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "Mode: ${posture.mode.name}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.outline
-                                    )
+                            OrbitNavKey.Budgets -> BudgetsScreen(budgetsViewModel, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.Upcoming -> UpcomingScreen(upcomingViewModel, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.Goals -> GoalsScreen(goalsViewModel, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.Categories -> CategoriesScreen(categoriesViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.Rules -> RulesScreen(rulesViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            is OrbitNavKey.Accounts -> AccountsScreen(accountsViewModel, key.accountId, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.NetWorth -> NetWorthScreen(netWorthViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.SpendingTrends -> SpendingTrendsScreen(spendingTrendsViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.MhaTracker -> MhaTrackerScreen(mhaTrackerViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.HousingCalculator -> HousingCalculatorScreen(housingViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.RetirementCalculator -> RetirementCalculatorScreen(retirementViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.Household -> HouseholdScreen(householdViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.Settings -> SettingsScreen(settingsViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            else -> {
+                                Box(
+                                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(text = "Orbit Money", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(text = key.title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(text = "Mode: ${posture.mode.name}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                                    }
                                 }
                             }
                         }

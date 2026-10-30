@@ -54,33 +54,54 @@ fun MoreDestinationsSheet(
     onNavigate: (OrbitNavKey) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    mhaEnabled: Boolean = false
+    mhaEnabled: Boolean = false,
+    hiddenRouteNames: List<String> = emptyList(),
+    moreRouteOrder: List<String> = emptyList()
 ) {
     val haptics = LocalOrbitHaptics.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val planningGroup = listOf(
-        DestinationItem(OrbitNavKey.Upcoming, "Upcoming", "Bills, subscriptions & recurring paychecks", OrbitIcons.Upcoming),
-        DestinationItem(OrbitNavKey.Goals, "Goals", "Target savings & sinking funds", OrbitIcons.Goals),
-        DestinationItem(OrbitNavKey.Categories, "Categories", "Budget structures & monthly caps", OrbitIcons.Categories),
-        DestinationItem(OrbitNavKey.Rules, "Rules", "Automated merchant categorizations", OrbitIcons.Rules)
-    )
-
-    val insightsGroup = buildList {
+    val allSecondary = buildList {
+        add(DestinationItem(OrbitNavKey.Upcoming, "Upcoming", "Bills, subscriptions & recurring paychecks", OrbitIcons.Upcoming))
+        add(DestinationItem(OrbitNavKey.Goals, "Goals", "Target savings & sinking funds", OrbitIcons.Goals))
+        add(DestinationItem(OrbitNavKey.Categories, "Categories", "Budget structures & monthly caps", OrbitIcons.Categories))
+        add(DestinationItem(OrbitNavKey.Rules, "Rules", "Automated merchant categorizations", OrbitIcons.Rules))
         add(DestinationItem(OrbitNavKey.SpendingTrends, "Spending Trends", "Income vs expense breakdown & velocity", OrbitIcons.SpendingTrends))
         add(DestinationItem(OrbitNavKey.NetWorth, "Net Worth", "Historical assets, liabilities & trajectory", OrbitIcons.NetWorth))
         if (mhaEnabled) {
             add(DestinationItem(OrbitNavKey.MhaTracker, "MHA Tracker", "Ministerial housing allowance & tax tracking", OrbitIcons.MhaTracker))
         }
+        add(DestinationItem(OrbitNavKey.HousingCalculator, "Housing Calculator", "Mortgage, rent vs buy & affordability", OrbitIcons.HousingCalculator))
+        add(DestinationItem(OrbitNavKey.RetirementCalculator, "Retirement Calculator", "Coast FIRE, nest egg & drawdowns", OrbitIcons.RetirementCalculator))
+        add(DestinationItem(OrbitNavKey.Household, "Household", "Member profiles & account sharing", OrbitIcons.Household))
     }
 
-    val calculatorsGroup = listOf(
-        DestinationItem(OrbitNavKey.HousingCalculator, "Housing Calculator", "Mortgage, rent vs buy & affordability", OrbitIcons.HousingCalculator),
-        DestinationItem(OrbitNavKey.RetirementCalculator, "Retirement Calculator", "Coast FIRE, nest egg & drawdowns", OrbitIcons.RetirementCalculator)
-    )
+    val visibleSecondary = allSecondary.filter { !hiddenRouteNames.contains(it.key.routeName) }
+    val orderedSecondary = if (moreRouteOrder.isNotEmpty()) {
+        val orderMap = moreRouteOrder.withIndex().associate { it.value to it.index }
+        visibleSecondary.sortedBy { orderMap[it.key.routeName] ?: 999 }
+    } else {
+        visibleSecondary
+    }
 
-    val householdGroup = listOf(
-        DestinationItem(OrbitNavKey.Household, "Household", "Member profiles & account sharing", OrbitIcons.Household)
+    val planningGroup = orderedSecondary.filter {
+        it.key in listOf(OrbitNavKey.Upcoming, OrbitNavKey.Goals, OrbitNavKey.Categories, OrbitNavKey.Rules)
+    }
+
+    val insightsGroup = orderedSecondary.filter {
+        it.key in listOf(OrbitNavKey.SpendingTrends, OrbitNavKey.NetWorth, OrbitNavKey.MhaTracker)
+    }
+
+    val calculatorsGroup = orderedSecondary.filter {
+        it.key in listOf(OrbitNavKey.HousingCalculator, OrbitNavKey.RetirementCalculator)
+    }
+
+    val householdGroup = orderedSecondary.filter {
+        it.key == OrbitNavKey.Household
+    }
+
+    val systemGroup = listOf(
+        DestinationItem(OrbitNavKey.Settings, "Settings", "Preferences, sync connections & data management", OrbitIcons.Settings)
     )
 
     OrbitModalSheet(
@@ -102,16 +123,27 @@ fun MoreDestinationsSheet(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            DestinationSection("Planning & Tracking", planningGroup, currentKey, onNavigate, onDismiss, haptics::tick)
-            Spacer(modifier = Modifier.height(16.dp))
+            if (planningGroup.isNotEmpty()) {
+                DestinationSection("Planning & Tracking", planningGroup, currentKey, onNavigate, onDismiss, haptics::tick)
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
-            DestinationSection("Insights & Analytics", insightsGroup, currentKey, onNavigate, onDismiss, haptics::tick)
-            Spacer(modifier = Modifier.height(16.dp))
+            if (insightsGroup.isNotEmpty()) {
+                DestinationSection("Insights & Analytics", insightsGroup, currentKey, onNavigate, onDismiss, haptics::tick)
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
-            DestinationSection("Calculators & Projections", calculatorsGroup, currentKey, onNavigate, onDismiss, haptics::tick)
-            Spacer(modifier = Modifier.height(16.dp))
+            if (calculatorsGroup.isNotEmpty()) {
+                DestinationSection("Calculators & Projections", calculatorsGroup, currentKey, onNavigate, onDismiss, haptics::tick)
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
-            DestinationSection("Household", householdGroup, currentKey, onNavigate, onDismiss, haptics::tick)
+            if (householdGroup.isNotEmpty()) {
+                DestinationSection("Household", householdGroup, currentKey, onNavigate, onDismiss, haptics::tick)
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            DestinationSection("System", systemGroup, currentKey, onNavigate, onDismiss, haptics::tick)
             Spacer(modifier = Modifier.height(24.dp))
         }
     }

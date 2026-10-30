@@ -1,7 +1,9 @@
 package app.overbay.orbit.ui.household
 
 import androidx.lifecycle.ViewModel
+import app.overbay.orbit.data.*
 import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.model.HouseholdIncomeRecord
 import app.overbay.orbit.data.model.HouseholdInfo
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.HouseholdRole
@@ -33,10 +35,17 @@ class HouseholdViewModel(
                         householdInfo = snapshot.household,
                         members = snapshot.members,
                         shares = snapshot.shares,
+                        incomeRecords = snapshot.incomeRecords,
+                        includeHsaInRetirementRate = snapshot.preferences.includeHsaInRetirementRate,
                         totalHouseholdGrossIncomeCents = totalIncome,
                         isLoading = false
                     )
                 }
+            }
+        }
+        scope.launch {
+            repository.accounts.collect { accounts ->
+                _uiState.update { it.copy(availableAccounts = accounts) }
             }
         }
         scope.launch {
@@ -54,11 +63,25 @@ class HouseholdViewModel(
         }
     }
 
-    fun saveMember(member: HouseholdMember) {
+    fun saveMember(member: HouseholdMember, effectiveDate: String? = null) {
         scope.launch {
-            repository.saveHouseholdMember(member)
+            repository.saveHouseholdMember(member, effectiveDate)
         }
         closeMemberEditor()
+    }
+
+    fun addIncomeRecord(record: HouseholdIncomeRecord) {
+        scope.launch {
+            repository.addHouseholdIncomeRecord(record)
+        }
+    }
+
+    fun setIncludeHsaInRetirementRate(include: Boolean) {
+        val updated = repository.preferences.value.copy(includeHsaInRetirementRate = include)
+        _uiState.update { it.copy(includeHsaInRetirementRate = include) }
+        scope.launch {
+            repository.updatePreferences(updated)
+        }
     }
 
     fun deleteMember(id: Long) {

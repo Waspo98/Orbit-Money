@@ -8,19 +8,35 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.ui.categories.components.CategoryDetailInspectorPane
@@ -126,6 +142,45 @@ fun CategoriesScreen(
                                 buttonSize = barHeight,
                                 onClick = { onNavigate(OrbitNavKey.Settings) }
                             )
+                        },
+                        persistentBottomBar = {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainer
+                            ) {
+                                OutlinedTextField(
+                                    value = state.searchQuery,
+                                    onValueChange = { viewModel.setSearchQuery(it) },
+                                    placeholder = { Text("Search categories by name or emoji...") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Search,
+                                            contentDescription = "Search",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    trailingIcon = if (state.searchQuery.isNotBlank()) {
+                                        {
+                                            IconButton(
+                                                onClick = { viewModel.setSearchQuery("") },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Clear",
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    } else null,
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                            }
                         }
                     )
 
@@ -222,11 +277,42 @@ fun CategoriesScreen(
             )
         }
 
+        val blockedSummary = state.ruleBlockedDeleteCategory
+        if (blockedSummary != null) {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissRuleBlockedDialog() },
+                title = { Text("Category in Use by Rules", fontWeight = FontWeight.Bold) },
+                text = {
+                    Text(
+                        "Cannot delete '${blockedSummary.category.name}' because ${blockedSummary.ruleCount} automation rule(s) use it. Update or delete those rules first."
+                    )
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        viewModel.dismissRuleBlockedDialog()
+                        onNavigate(OrbitNavKey.Rules)
+                    }) {
+                        Text("View Rules")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.dismissRuleBlockedDialog() }) {
+                        Text("Dismiss")
+                    }
+                }
+            )
+        }
+
         if (state.deleteConfirmCategoryId != null) {
             val catId = state.deleteConfirmCategoryId!!
+            val targetCat = state.categories.find { it.id == catId }
+            val summary = state.groups.asSequence().flatMap { it.items.asSequence() }.find { it.category.id == catId }
+            val txCount = summary?.transactionCount ?: targetCat?.transactionCount ?: 0
+            val budgetCount = summary?.budgetCount ?: targetCat?.budgetCount ?: 0
+            val catName = targetCat?.name ?: "this category"
             OrbitConfirmationDialog(
                 title = "Delete Category?",
-                message = "Are you sure you want to delete this category? Existing transactions with this category will become uncategorized.",
+                message = "Deleting '$catName' will leave $txCount transaction(s) uncategorized and remove $budgetCount budget(s).",
                 confirmText = "Delete",
                 isDestructive = true,
                 onConfirm = { viewModel.deleteCategory(catId) },

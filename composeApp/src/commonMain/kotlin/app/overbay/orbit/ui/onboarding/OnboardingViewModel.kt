@@ -50,6 +50,7 @@ class OnboardingViewModel(
             is OnboardingIntent.SelectThemePreset -> _uiState.update { it.copy(selectedThemePreset = intent.preset) }
             is OnboardingIntent.SelectThemeMode -> _uiState.update { it.copy(selectedThemeMode = intent.mode) }
             is OnboardingIntent.SetDynamicColor -> _uiState.update { it.copy(dynamicColorEnabled = intent.enabled) }
+            is OnboardingIntent.SetBiometricOptIn -> _uiState.update { it.copy(biometricOptIn = intent.enabled) }
             OnboardingIntent.CompleteOnboarding -> finalizeOnboarding()
             OnboardingIntent.SkipOnboarding -> skipAllAndFinish()
         }
@@ -246,6 +247,7 @@ class OnboardingViewModel(
                     themePreset = state.selectedThemePreset,
                     themeMode = state.selectedThemeMode,
                     dynamicColor = state.dynamicColorEnabled,
+                    biometricLockEnabled = state.biometricOptIn,
                     googleDriveSyncEnabled = (state.selectedStorageMode == StorageMode.LOCAL && state.selectedSeedChoice == SeedChoice.GOOGLE_DRIVE),
                     onboardingCompleted = true
                 )

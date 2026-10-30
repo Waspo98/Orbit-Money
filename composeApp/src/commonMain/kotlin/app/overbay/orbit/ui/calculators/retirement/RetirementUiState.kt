@@ -1,6 +1,8 @@
 package app.overbay.orbit.ui.calculators.retirement
 
 import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.HouseholdMember
+import app.overbay.orbit.data.model.RetirementHistoryPoint
 import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.data.model.RetirementTargetMode
 import app.overbay.orbit.domain.Cents
@@ -20,6 +22,17 @@ data class RetirementUiState(
     val legacyAmountCents: Cents = 1_000_000_00L,
     val useConnectedAccounts: Boolean = true,
     val investmentAccounts: List<Account> = emptyList(),
+    val householdMembers: List<HouseholdMember> = emptyList(),
+    val allAccounts: List<Account> = emptyList(),
+    val historyPoints: List<RetirementHistoryPoint> = emptyList(),
+    val selectedHorizon: String = "All",
+    val showTargetSettingsSheet: Boolean = false,
+    val annualSpendingOverridden: Boolean = false,
+    val currentAgeOverridden: Boolean = false,
+    val nonHsaCurrentBalanceCents: Cents = 100_000_00L,
+    val nonHsaMonthlySavingsCents: Cents = 1000_00L,
+    val hsaCurrentBalanceCents: Cents = 0L,
+    val hsaMonthlySavingsCents: Cents = 0L,
     val scenario: RetirementScenarioModel = RetirementCalculatorEngine.calculateScenario(
         currentAge = 35.0,
         retirementAge = 67.0,

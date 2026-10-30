@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.AmountStrategy
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RecurrenceFrequency
 import app.overbay.orbit.data.model.UpcomingItem
@@ -89,14 +90,21 @@ fun RecurringItemEditorContent(
     val haptics = LocalOrbitHaptics.current
     val isEditing = item != null && item.id > 0L
 
-    var name by remember(item) { mutableStateOf(item?.name ?: "") }
+    var name by remember(item) { mutableStateOf(item?.merchant ?: item?.name ?: "") }
     var rawAmountCents by remember(item) { mutableStateOf(abs(item?.amountCents ?: 0L)) }
+    var kind by remember(item) { mutableStateOf(item?.kind ?: UpcomingKind.BILL) }
     var isExpense by remember(item) { mutableStateOf(item?.direction?.lowercase() != "income") }
     var selectedDate by remember(item) {
         val parsed = item?.nextDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
         mutableStateOf(parsed ?: LocalDateUtils.todayLocalDate())
     }
     var frequency by remember(item) { mutableStateOf(item?.frequencyType ?: RecurrenceFrequency.MONTHLY) }
+    var customInterval by remember(item) { mutableStateOf(item?.frequencyInterval ?: 1) }
+    var customUnit by remember(item) { mutableStateOf(item?.frequencyUnit ?: "days") }
+    var amountStrategy by remember(item) { mutableStateOf(item?.amountStrategy ?: AmountStrategy.FIXED) }
+    var lookbackMonths by remember(item) { mutableStateOf(item?.amountLookbackMonths ?: 3) }
+    var status by remember(item) { mutableStateOf(item?.status ?: UpcomingStatus.ACTIVE) }
+    var notes by remember(item) { mutableStateOf(item?.notes ?: "") }
     var selectedCategoryId by remember(item) { mutableStateOf(item?.categoryId) }
     var selectedAccountId by remember(item) { mutableStateOf(item?.accountId) }
 
@@ -153,29 +161,61 @@ fun RecurringItemEditorContent(
 
         Spacer(modifier = Modifier.height(14.dp))
 
+        // 4-Pill Kind Selector
+        RecurringKindSelector(
+            selectedKind = kind,
+            onKindSelected = { newKind ->
+                kind = newKind
+                if (newKind == UpcomingKind.INCOME) {
+                    isExpense = false
+                } else {
+                    isExpense = true
+                }
+            }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         // Centerpiece Amount + Expense/Income Hero Card
         OrbitAmountTypeCard(
             cents = rawAmountCents,
             onCentsChange = { rawAmountCents = it },
             isExpense = isExpense,
-            onIsExpenseChange = { isExpense = it }
+            onIsExpenseChange = { newIsExpense ->
+                isExpense = newIsExpense
+                if (newIsExpense && kind == UpcomingKind.INCOME) {
+                    kind = UpcomingKind.BILL
+                } else if (!newIsExpense && kind != UpcomingKind.INCOME) {
+                    kind = UpcomingKind.INCOME
+                }
+            }
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Amount Strategy (Fixed vs History Average)
+        RecurringAmountStrategySection(
+            amountStrategy = amountStrategy,
+            lookbackMonths = lookbackMonths,
+            onStrategyChanged = { amountStrategy = it },
+            onLookbackChanged = { lookbackMonths = it }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         // Name / Merchant
         OrbitTextField(
             value = name,
             onValueChange = { name = it },
             label = { Text("Name / Merchant") },
-            placeholder = { Text("e.g. Netflix, Rent, Employer") },
+            placeholder = { Text("e.g. Netflix, Church Tithe, Employer") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 2-Column Bento Row: Next Due Date + Recurrence Frequency
+        // 2-Column Bento Row: Next Due Date + Frequency
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -196,14 +236,25 @@ fun RecurringItemEditorContent(
                     RecurrenceFrequency.BIWEEKLY,
                     RecurrenceFrequency.SEMIMONTHLY,
                     RecurrenceFrequency.MONTHLY,
+                    RecurrenceFrequency.BIMONTHLY,
                     RecurrenceFrequency.QUARTERLY,
-                    RecurrenceFrequency.YEARLY
+                    RecurrenceFrequency.YEARLY,
+                    RecurrenceFrequency.CUSTOM
                 ),
                 optionLabel = { it.name.lowercase().replaceFirstChar { c -> c.uppercase() } },
                 onOptionSelected = { frequency = it },
                 modifier = Modifier.weight(0.52f)
             )
         }
+
+        // Custom frequency fields
+        RecurringCustomScheduleFields(
+            frequency = frequency,
+            customInterval = customInterval,
+            customUnit = customUnit,
+            onIntervalChanged = { customInterval = it },
+            onUnitChanged = { customUnit = it }
+        )
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -233,7 +284,17 @@ fun RecurringItemEditorContent(
             onNullSelected = { selectedAccountId = null }
         )
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Status & Notes
+        RecurringStatusAndNotesSection(
+            status = status,
+            notes = notes,
+            onStatusChanged = { status = it },
+            onNotesChanged = { notes = it }
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
 
         // Action Buttons
         Row(
@@ -253,28 +314,39 @@ fun RecurringItemEditorContent(
             Button(
                 onClick = {
                     haptics.confirm()
+                    val trimmedName = name.trim()
                     val updated = item?.copy(
-                        name = name.trim(),
-                        merchant = name.trim(),
+                        name = trimmedName,
+                        merchant = trimmedName,
                         amountCents = rawAmountCents,
-                        kind = if (isExpense) UpcomingKind.BILL else UpcomingKind.INCOME,
+                        kind = kind,
                         direction = if (isExpense) "expense" else "income",
                         frequencyType = frequency,
+                        frequencyInterval = if (frequency == RecurrenceFrequency.CUSTOM) customInterval else 1,
+                        frequencyUnit = if (frequency == RecurrenceFrequency.CUSTOM) customUnit else "months",
                         nextDate = selectedDate.toString(),
                         categoryId = selectedCategoryId,
                         accountId = selectedAccountId,
-                        status = UpcomingStatus.ACTIVE
+                        status = status,
+                        amountStrategy = amountStrategy,
+                        amountLookbackMonths = lookbackMonths,
+                        notes = notes.trim().ifBlank { null }
                     ) ?: UpcomingItem(
-                        name = name.trim(),
-                        merchant = name.trim(),
+                        name = trimmedName,
+                        merchant = trimmedName,
                         amountCents = rawAmountCents,
-                        kind = if (isExpense) UpcomingKind.BILL else UpcomingKind.INCOME,
+                        kind = kind,
                         direction = if (isExpense) "expense" else "income",
                         frequencyType = frequency,
+                        frequencyInterval = if (frequency == RecurrenceFrequency.CUSTOM) customInterval else 1,
+                        frequencyUnit = if (frequency == RecurrenceFrequency.CUSTOM) customUnit else "months",
                         nextDate = selectedDate.toString(),
                         categoryId = selectedCategoryId,
                         accountId = selectedAccountId,
-                        status = UpcomingStatus.ACTIVE
+                        status = status,
+                        amountStrategy = amountStrategy,
+                        amountLookbackMonths = lookbackMonths,
+                        notes = notes.trim().ifBlank { null }
                     )
                     onSave(updated)
                 },
@@ -288,6 +360,6 @@ fun RecurringItemEditorContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
     }
 }

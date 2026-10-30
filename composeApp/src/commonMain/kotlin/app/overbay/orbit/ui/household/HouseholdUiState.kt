@@ -1,5 +1,7 @@
 package app.overbay.orbit.ui.household
 
+import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.HouseholdIncomeRecord
 import app.overbay.orbit.data.model.HouseholdInfo
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.HouseholdShare
@@ -11,6 +13,9 @@ data class HouseholdUiState(
     val members: List<HouseholdMember> = emptyList(),
     val storageMode: StorageMode = StorageMode.LOCAL,
     val shares: List<HouseholdShare> = emptyList(),
+    val incomeRecords: List<HouseholdIncomeRecord> = emptyList(),
+    val availableAccounts: List<Account> = emptyList(),
+    val includeHsaInRetirementRate: Boolean = true,
     val inspectingMemberId: Long? = null,
     val showInviteDialog: Boolean = false,
     val showMemberEditor: Boolean = false,

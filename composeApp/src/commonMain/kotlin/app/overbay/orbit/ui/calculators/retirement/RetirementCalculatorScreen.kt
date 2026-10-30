@@ -20,8 +20,13 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.retirement.cards.HouseholdIncomeAssumptionsCard
+import app.overbay.orbit.ui.calculators.retirement.cards.HsaBridgeAnalysisCard
+import app.overbay.orbit.ui.calculators.retirement.cards.MemberRetirementBreakdownCard
 import app.overbay.orbit.ui.calculators.retirement.cards.RetirementAccountsListCard
+import app.overbay.orbit.ui.calculators.retirement.cards.RetirementHistoryTrajectoryCard
 import app.overbay.orbit.ui.calculators.retirement.cards.RetirementProjectionHeroCard
+import app.overbay.orbit.ui.calculators.retirement.dialogs.TargetSettingsSheet
+import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
@@ -70,6 +75,14 @@ fun RetirementCalculatorScreen(
                             .fillMaxHeight()
                     )
 
+                    CanopyIconButton(
+                        icon = OrbitIcons.ViewSliders,
+                        contentDescription = "Target & Runway Settings",
+                        onClick = { viewModel.openTargetSettings() },
+                        buttonSize = barHeight,
+                        isActive = uiState.showTargetSettingsSheet
+                    )
+
                     CanopySettingsButton(
                         buttonSize = barHeight,
                         onClick = { onNavigate(OrbitNavKey.Settings) }
@@ -104,6 +117,13 @@ fun RetirementCalculatorScreen(
                         }
 
                         item {
+                            MemberRetirementBreakdownCard(
+                                members = uiState.householdMembers,
+                                accounts = uiState.allAccounts
+                            )
+                        }
+
+                        item {
                             RetirementAccountsListCard(
                                 uiState = uiState,
                                 onCurrentBalanceChange = viewModel::setCurrentBalance,
@@ -125,6 +145,22 @@ fun RetirementCalculatorScreen(
                                 onAgeScrubbed = viewModel::onAgeScrubbed
                             )
                         }
+
+                        item {
+                            HsaBridgeAnalysisCard(
+                                hsaBridge = uiState.scenario.hsaBridge,
+                                retirementAge = uiState.retirementAge,
+                                annualSpendingCents = uiState.annualSpendingCents
+                            )
+                        }
+
+                        item {
+                            RetirementHistoryTrajectoryCard(
+                                historyPoints = uiState.historyPoints,
+                                selectedHorizon = uiState.selectedHorizon,
+                                onSelectHorizon = viewModel::setSelectedHorizon
+                            )
+                        }
                     }
                 }
             } else {
@@ -137,6 +173,14 @@ fun RetirementCalculatorScreen(
                         RetirementProjectionHeroCard(
                             uiState = uiState,
                             onAgeScrubbed = viewModel::onAgeScrubbed
+                        )
+                    }
+
+                    item {
+                        HsaBridgeAnalysisCard(
+                            hsaBridge = uiState.scenario.hsaBridge,
+                            retirementAge = uiState.retirementAge,
+                            annualSpendingCents = uiState.annualSpendingCents
                         )
                     }
 
@@ -154,6 +198,13 @@ fun RetirementCalculatorScreen(
                     }
 
                     item {
+                        MemberRetirementBreakdownCard(
+                            members = uiState.householdMembers,
+                            accounts = uiState.allAccounts
+                        )
+                    }
+
+                    item {
                         RetirementAccountsListCard(
                             uiState = uiState,
                             onCurrentBalanceChange = viewModel::setCurrentBalance,
@@ -163,10 +214,29 @@ fun RetirementCalculatorScreen(
                     }
 
                     item {
+                        RetirementHistoryTrajectoryCard(
+                            historyPoints = uiState.historyPoints,
+                            selectedHorizon = uiState.selectedHorizon,
+                            onSelectHorizon = viewModel::setSelectedHorizon
+                        )
+                    }
+
+                    item {
                         Spacer(modifier = Modifier.height(32.dp))
                     }
                 }
             }
+        }
+
+        if (uiState.showTargetSettingsSheet) {
+            TargetSettingsSheet(
+                targetMode = uiState.targetMode,
+                customTargetAmountCents = uiState.customTargetCents,
+                legacyAmountCents = uiState.legacyAmountCents,
+                runwayEndAge = uiState.runwayEndAge,
+                onDismiss = viewModel::closeTargetSettings,
+                onSave = viewModel::saveTargetSettings
+            )
         }
     }
 }

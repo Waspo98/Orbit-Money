@@ -17,10 +17,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +38,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.toComposeColor
@@ -223,17 +233,27 @@ private fun ReviewLaunchGraphic(
 
 /**
  * Editorial Recent Transactions card showing up to 10 latest transactions
- * with 3-line layout (Merchant, Date · Category, Account + Amount).
+ * with inline expandable quick actions (categorize, transfer, ignore, mha, recurring, reset, delete).
  */
 @Composable
 fun RecentTransactionsCard(
     transactions: List<DashboardRecentTransactionItem>,
+    mhaEnabled: Boolean = false,
+    categories: List<Category> = emptyList(),
     onSelectTransaction: (Long) -> Unit,
     onViewAll: () -> Unit,
+    onQuickCategorize: (Long, Long) -> Unit = { _, _ -> },
+    onToggleTransfer: (Long, Boolean) -> Unit = { _, _ -> },
+    onToggleIgnore: (Long, Boolean) -> Unit = { _, _ -> },
+    onToggleMha: (Long, Boolean) -> Unit = { _, _ -> },
+    onMarkRecurring: (Long) -> Unit = {},
+    onResetEdits: (Long) -> Unit = {},
+    onDelete: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
+    var expandedTransactionId by remember { mutableStateOf<Long?>(null) }
 
     OrbitSectionCard(
         title = "RECENT TRANSACTIONS",
@@ -255,9 +275,11 @@ fun RecentTransactionsCard(
         } else {
             Column(modifier = Modifier.fillMaxWidth()) {
                 transactions.take(10).forEachIndexed { index, txn ->
+                    val isExpanded = expandedTransactionId == txn.id
                     val catColor = txn.categoryColor.toComposeColor(MaterialTheme.colorScheme.primary)
                     val catPrefix = CategoryEmojiMapper.resolveEmoji(txn.categoryIcon)?.let { "$it " } ?: ""
                     val catLabel = txn.categoryName?.let { "$catPrefix$it" } ?: "❓ Uncategorized"
+
                     OrbitCompactListRow(
                         title = txn.merchant,
                         subtitle = "${txn.dateDisplay} · $catLabel",
@@ -274,11 +296,43 @@ fun RecentTransactionsCard(
                                     .background(catColor)
                             )
                         },
+                        trailingAction = {
+                            IconButton(
+                                onClick = {
+                                    haptics.tick()
+                                    expandedTransactionId = if (isExpanded) null else txn.id
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Quick actions",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        },
                         onClick = {
                             haptics.tick()
                             onSelectTransaction(txn.id)
                         }
                     )
+
+                    if (isExpanded) {
+                        RecentTransactionQuickActionsRow(
+                            transaction = txn,
+                            mhaEnabled = mhaEnabled,
+                            categories = categories,
+                            onQuickCategorize = { catId -> onQuickCategorize(txn.id, catId) },
+                            onToggleTransfer = { isTr -> onToggleTransfer(txn.id, isTr) },
+                            onToggleIgnore = { isIgn -> onToggleIgnore(txn.id, isIgn) },
+                            onToggleMha = { isMha -> onToggleMha(txn.id, isMha) },
+                            onMarkRecurring = { onMarkRecurring(txn.id) },
+                            onResetEdits = { onResetEdits(txn.id) },
+                            onInspectDetails = { onSelectTransaction(txn.id) },
+                            onDelete = { onDelete(txn.id) }
+                        )
+                    }
                 }
             }
         }

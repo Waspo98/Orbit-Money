@@ -1,5 +1,6 @@
 package app.overbay.orbit.domain
 
+import app.overbay.orbit.data.model.HsaBridgeAnalysis
 import app.overbay.orbit.data.model.RetirementPreset
 import app.overbay.orbit.data.model.RetirementTargetMode
 import app.overbay.orbit.data.model.TargetNestEggMode
@@ -35,7 +36,8 @@ data class RetirementScenarioModel(
     val earliestRetirementAge: Double?,
     val accumulationPoints: List<ProjectionPoint>,
     val drawdownPoints: List<ProjectionPoint>,
-    val depletionAge: Double?
+    val depletionAge: Double?,
+    val hsaBridge: HsaBridgeAnalysis? = null
 )
 
 object RetirementCalculatorEngine {
@@ -168,6 +170,35 @@ object RetirementCalculatorEngine {
         )
     }
 
+    fun computeHsaBridgeAnalysis(
+        currentAge: Double,
+        retirementAge: Double,
+        nonHsaCurrentBalanceCents: Cents,
+        nonHsaMonthlySavingsCents: Cents,
+        hsaCurrentBalanceCents: Cents,
+        hsaMonthlySavingsCents: Cents,
+        annualSpendingCents: Cents,
+        realReturn: Double
+    ): HsaBridgeAnalysis? {
+        if (retirementAge >= 65.0) return null
+        val bridgeYears = (65.0 - retirementAge).toInt().coerceAtLeast(0)
+        if (bridgeYears <= 0) return null
+        val months = max(0, ((retirementAge - currentAge) * 12.0).roundToLong().toInt())
+        val projNonHsa = futureValue(nonHsaCurrentBalanceCents, nonHsaMonthlySavingsCents, realReturn, months)
+        val projHsa = futureValue(hsaCurrentBalanceCents, hsaMonthlySavingsCents, realReturn, months)
+        val bridgeNeed = bridgeYears * annualSpendingCents
+        val isCovered = projNonHsa >= bridgeNeed
+        val shortfall = if (isCovered) 0L else max(0L, bridgeNeed - projNonHsa)
+        return HsaBridgeAnalysis(
+            bridgeYears = bridgeYears,
+            bridgeNeedCents = bridgeNeed,
+            projectedNonHsaAtRetirementCents = projNonHsa,
+            projectedHsaAtRetirementCents = projHsa,
+            isBridgeCovered = isCovered,
+            shortfallCents = shortfall
+        )
+    }
+
     fun calculateScenario(
         currentAge: Double,
         retirementAge: Double,
@@ -178,7 +209,11 @@ object RetirementCalculatorEngine {
         preset: RetirementPreset = RetirementPreset.BALANCED,
         targetMode: TargetNestEggMode = TargetNestEggMode.WITHDRAWAL_4_PERCENT,
         customTargetCents: Cents? = null,
-        legacyAmountCents: Cents = 1_000_000_00L
+        legacyAmountCents: Cents = 1_000_000_00L,
+        nonHsaCurrentBalanceCents: Cents = currentBalanceCents,
+        nonHsaMonthlySavingsCents: Cents = monthlySavingsCents,
+        hsaCurrentBalanceCents: Cents = 0L,
+        hsaMonthlySavingsCents: Cents = 0L
     ): RetirementScenarioModel {
         val realReturn = computeRealReturn(preset.nominalAnnualReturn, preset.inflationRate)
         val rm = computeEffectiveMonthlyRate(realReturn)
@@ -230,6 +265,19 @@ object RetirementCalculatorEngine {
             realReturn = realReturn
         )
 
+        val hsaBridge = if (hsaCurrentBalanceCents > 0L || hsaMonthlySavingsCents > 0L || retirementAge < 65.0) {
+            computeHsaBridgeAnalysis(
+                currentAge = currentAge,
+                retirementAge = retirementAge,
+                nonHsaCurrentBalanceCents = nonHsaCurrentBalanceCents,
+                nonHsaMonthlySavingsCents = nonHsaMonthlySavingsCents,
+                hsaCurrentBalanceCents = hsaCurrentBalanceCents,
+                hsaMonthlySavingsCents = hsaMonthlySavingsCents,
+                annualSpendingCents = annualSpendingCents,
+                realReturn = realReturn
+            )
+        } else null
+
         return RetirementScenarioModel(
             realAnnualReturn = realReturn,
             effectiveMonthlyRate = rm,
@@ -245,7 +293,8 @@ object RetirementCalculatorEngine {
             earliestRetirementAge = earliestAge,
             accumulationPoints = accumPoints,
             drawdownPoints = drawdown.points,
-            depletionAge = drawdown.depletionAge
+            depletionAge = drawdown.depletionAge,
+            hsaBridge = hsaBridge
         )
     }
 }

@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.goals
 
 import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.AccountAllocationSummary
 import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.domain.Cents
 
@@ -8,6 +9,7 @@ data class GoalsUiState(
     val goals: List<Goal> = emptyList(),
     val accounts: List<Account> = emptyList(),
     val accountMap: Map<Long, Account> = emptyMap(),
+    val accountSummaries: List<AccountAllocationSummary> = emptyList(),
     val totalSavedCents: Cents = 0L,
     val totalTargetCents: Cents = 0L,
     val inspectingGoalId: Long? = null,
@@ -16,6 +18,7 @@ data class GoalsUiState(
     val allocatingGoal: Goal? = null,
     val showAllocationDialog: Boolean = false,
     val isReorderMode: Boolean = false,
+    val showAccountsOverview: Boolean = true,
     val isLoading: Boolean = false
 ) {
     val activeGoals get() = goals.filter { !it.isCompleted }

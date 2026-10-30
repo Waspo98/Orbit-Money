@@ -50,8 +50,10 @@ import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.household.components.HouseholdIncomeHistoryCard
 import app.overbay.orbit.ui.household.components.HouseholdInspectorPane
 import app.overbay.orbit.ui.household.components.HouseholdMembersCard
+import app.overbay.orbit.ui.household.components.HouseholdPlanningSignalsCard
 import app.overbay.orbit.ui.household.dialogs.HouseholdMemberEditorSheet
 import app.overbay.orbit.ui.household.dialogs.InviteMemberDialog
 import app.overbay.orbit.util.DevicePosture
@@ -138,7 +140,16 @@ fun HouseholdScreen(
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            // 1. Household Profile Card
+                            // 1. Planning Signals & KPI Tiles
+                            item {
+                                HouseholdPlanningSignalsCard(
+                                    members = uiState.members,
+                                    includeHsaInSavingsRate = uiState.includeHsaInRetirementRate,
+                                    onToggleIncludeHsa = viewModel::setIncludeHsaInRetirementRate
+                                )
+                            }
+
+                            // 2. Household Profile Card
                             item {
                                 OrbitSectionCard(
                                     title = "Household Profile",
@@ -211,7 +222,16 @@ fun HouseholdScreen(
                                 )
                             }
 
-                            // 3. Multi-User Collaboration / Shared Invites
+                            // 3. Compensation & Raise Milestones History
+                            item {
+                                HouseholdIncomeHistoryCard(
+                                    incomeRecords = uiState.incomeRecords,
+                                    members = uiState.members,
+                                    onAddSnapshot = viewModel::addIncomeRecord
+                                )
+                            }
+
+                            // 4. Multi-User Collaboration / Shared Invites
                             item {
                                 OrbitSectionCard(
                                     title = "Shared Access & Invites",
@@ -299,6 +319,7 @@ fun HouseholdScreen(
         if (!isTwoPane && uiState.showMemberEditor) {
             HouseholdMemberEditorSheet(
                 member = uiState.editingMember,
+                availableAccounts = uiState.availableAccounts,
                 onDismiss = viewModel::closeMemberEditor,
                 onSave = viewModel::saveMember
             )

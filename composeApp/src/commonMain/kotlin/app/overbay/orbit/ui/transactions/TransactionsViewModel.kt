@@ -2,17 +2,13 @@ package app.overbay.orbit.ui.transactions
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.*
 import app.overbay.orbit.data.engine.SyncResult
-import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.data.model.EditSource
-import app.overbay.orbit.data.model.RecurrenceFrequency
 import app.overbay.orbit.data.model.RuleCondition
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
-import app.overbay.orbit.data.model.UpcomingItem
-import app.overbay.orbit.data.model.UpcomingKind
-import app.overbay.orbit.data.model.UpcomingStatus
+import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.RuleMatcherEngine
@@ -25,7 +21,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 class TransactionsViewModel(
     private val repository: OrbitRepository
@@ -37,6 +32,8 @@ class TransactionsViewModel(
     private val _filterDraft = MutableStateFlow(TransactionFilterDraft())
     private val _sortOption = MutableStateFlow(TransactionSortOption.DATE_DESC)
     private val _isCompactView = MutableStateFlow(false)
+    private val _pageSize = MutableStateFlow(50)
+    private val _currentPage = MutableStateFlow(1)
     private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
     private val _inspectingId = MutableStateFlow<Long?>(null)
     private val _expandedId = MutableStateFlow<Long?>(null)
@@ -59,7 +56,7 @@ class TransactionsViewModel(
         repository.rules
     ) { txns, categories, accounts, rules ->
         val nextPriority = (rules.maxOfOrNull { it.priority } ?: 0) + 10
-        RepoSnapshot(txns, categories, accounts, nextPriority)
+        TransactionsFilterHelper.RepoSnapshot(txns, categories, accounts, nextPriority)
     }.distinctUntilChanged()
 
     private val filterFlow = combine(
@@ -69,17 +66,25 @@ class TransactionsViewModel(
         _sortOption,
         _isCompactView
     ) { query, quick, draft, sort, compact ->
-        FilterParams(query, quick, draft, sort, compact)
+        TransactionsFilterHelper.FilterParams(query, quick, draft, sort, compact)
+    }.distinctUntilChanged()
+
+    private val paginationFlow = combine(
+        _pageSize,
+        _currentPage
+    ) { size, page ->
+        Pair(size, page)
     }.distinctUntilChanged()
 
     val uiState: StateFlow<TransactionsUiState> = combine(
         dataFlow,
-        filterFlow
-    ) { (txns, categories, accounts, nextPriority), filterParams ->
+        filterFlow,
+        paginationFlow
+    ) { (txns, categories, accounts, nextPriority), filterParams, (pageSize, page) ->
         val categoryMap = categories.associateBy { it.id }
         val accountMap = accounts.associateBy { it.id }
 
-        val filteredRaw = filterTransactions(
+        val filteredRaw = TransactionsFilterHelper.filterTransactions(
             transactions = txns,
             query = filterParams.query,
             quick = filterParams.quick,
@@ -87,13 +92,9 @@ class TransactionsViewModel(
             categoryMap = categoryMap
         )
 
-        val sorted = when (filterParams.sort) {
-            TransactionSortOption.DATE_DESC -> filteredRaw.sortedWith(compareByDescending<Transaction> { it.effectiveDate }.thenByDescending { it.id })
-            TransactionSortOption.DATE_ASC -> filteredRaw.sortedWith(compareBy<Transaction> { it.effectiveDate }.thenBy { it.id })
-            TransactionSortOption.AMOUNT_DESC -> filteredRaw.sortedByDescending { abs(it.effectiveAmountCents) }
-            TransactionSortOption.AMOUNT_ASC -> filteredRaw.sortedBy { abs(it.effectiveAmountCents) }
-            TransactionSortOption.MERCHANT_ASC -> filteredRaw.sortedBy { it.effectiveMerchant.lowercase() }
-        }
+        val sorted = TransactionsFilterHelper.sortTransactions(filteredRaw, filterParams.sort)
+
+        val paginated = TransactionsFilterHelper.paginateTransactions(sorted, page, pageSize)
 
         val currentMonthKey = LocalDateUtils.currentYearMonth()
         val monthlyCount = txns.count { it.effectiveDate.take(7) == currentMonthKey && !it.effectiveIsIgnored }
@@ -110,8 +111,9 @@ class TransactionsViewModel(
             }
         }
 
-        // Group by month
-        val grouped = sorted.groupBy { it.effectiveDate.take(7) }.map { (monthKey, items) ->
+        // Group active paginated transactions by month (or all sorted if page size is 0 / All)
+        val displayList = if (pageSize <= 0) sorted else paginated
+        val grouped = displayList.groupBy { it.effectiveDate.take(7) }.map { (monthKey, items) ->
             MonthTransactionGroup(
                 monthKey = monthKey,
                 monthLabel = LocalDateUtils.formatMonthLabel(monthKey),
@@ -123,6 +125,7 @@ class TransactionsViewModel(
         TransactionsUiState(
             transactions = txns,
             filteredTransactions = sorted,
+            paginatedTransactions = paginated,
             groupedTransactions = grouped,
             categories = categories,
             accounts = accounts,
@@ -133,6 +136,8 @@ class TransactionsViewModel(
             filterDraft = filterParams.draft,
             sortOption = filterParams.sort,
             isCompactView = filterParams.isCompactView,
+            pageSize = pageSize,
+            currentPage = page,
             monthlyTransactionCount = monthlyCount,
             nextRulePriority = nextPriority,
             totalExpenseCents = totalExpense,
@@ -173,32 +178,76 @@ class TransactionsViewModel(
     fun setSingleDeleteConfirmId(id: Long?) { _singleDeleteConfirmId.value = id }
     fun setShowCategoryBatchPicker(show: Boolean) { _showCategoryBatchPicker.value = show }
 
+    fun setPageSize(size: Int) {
+        _pageSize.value = size
+        _currentPage.value = 1
+    }
+
+    fun setCurrentPage(page: Int) {
+        val maxPages = uiState.value.totalPages
+        _currentPage.value = page.coerceIn(1, maxPages)
+    }
+
+    fun nextPage() {
+        val next = _currentPage.value + 1
+        if (next <= uiState.value.totalPages) _currentPage.value = next
+    }
+
+    fun prevPage() {
+        val prev = _currentPage.value - 1
+        if (prev >= 1) _currentPage.value = prev
+    }
+
     fun clearFilters() {
         _searchQuery.value = ""
         _quickFilter.value = QuickFilter.ALL
         _filterDraft.value = TransactionFilterDraft()
         _sortOption.value = TransactionSortOption.DATE_DESC
+        _currentPage.value = 1
     }
 
     fun applyDeepLink(
         transactionId: Long? = null,
         accountId: Long? = null,
         categoryId: Long? = null,
-        uncategorizedOnly: Boolean = false
+        uncategorizedOnly: Boolean = false,
+        startDate: String? = null,
+        endDate: String? = null,
+        sortOption: String? = null,
+        openAddSheet: Boolean = false,
+        includeTransfers: Boolean = true,
+        includeIgnored: Boolean = true
     ) {
-        val hasDeepLink = transactionId != null || accountId != null || categoryId != null || uncategorizedOnly
+        val hasDeepLink = transactionId != null || accountId != null || categoryId != null ||
+                uncategorizedOnly || startDate != null || endDate != null ||
+                sortOption != null || openAddSheet || !includeTransfers || !includeIgnored
         if (!hasDeepLink) return
+
         _searchQuery.value = ""
         _isSearchActive.value = false
         _quickFilter.value = if (uncategorizedOnly) QuickFilter.UNCATEGORIZED else QuickFilter.ALL
+
+        val resolvedSort = sortOption?.let { TransactionsFilterHelper.parseSortOption(it) }
+            ?: TransactionSortOption.DATE_DESC
+        _sortOption.value = resolvedSort
+
         _filterDraft.value = TransactionFilterDraft(
             accountId = accountId,
-            categoryId = categoryId
+            categoryId = categoryId,
+            accountIds = if (accountId != null) setOf(accountId) else emptySet(),
+            categoryIds = if (categoryId != null) setOf(categoryId) else emptySet(),
+            uncategorizedOnly = uncategorizedOnly,
+            startDate = startDate,
+            endDate = endDate,
+            includeTransfers = includeTransfers,
+            includeIgnored = includeIgnored
         )
+
         _inspectingId.value = transactionId
         _expandedId.value = transactionId
-        _showEditorSheet.value = false
+        _showEditorSheet.value = openAddSheet
         _showSplitSheet.value = false
+        _currentPage.value = 1
     }
 
     fun toggleTransactionSelection(id: Long) {
@@ -211,9 +260,7 @@ class TransactionsViewModel(
         _selectedIds.value = visibleIds
     }
 
-    fun clearSelection() {
-        _selectedIds.value = emptySet()
-    }
+    fun clearSelection() { _selectedIds.value = emptySet() }
 
     fun toggleExpandTransaction(id: Long) {
         _expandedId.value = if (_expandedId.value == id) null else id
@@ -240,19 +287,12 @@ class TransactionsViewModel(
         _showEditorSheet.value = true
     }
 
-    fun closeTransactionEditor() {
-        _showEditorSheet.value = false
-    }
-
+    fun closeTransactionEditor() { _showEditorSheet.value = false }
     fun openSplitSheet(id: Long) {
         _inspectingId.value = id
         _showSplitSheet.value = true
     }
-
-    fun closeSplitSheet() {
-        _showSplitSheet.value = false
-    }
-
+    fun closeSplitSheet() { _showSplitSheet.value = false }
     fun openCsvImportSheet() { _showCsvImportSheet.value = true }
     fun closeCsvImportSheet() { _showCsvImportSheet.value = false }
     fun openFilterSheet() { _showFilterSheet.value = true }
@@ -363,12 +403,7 @@ class TransactionsViewModel(
     fun toggleIgnore(id: Long) {
         viewModelScope.launch {
             val txn = uiState.value.transactions.find { it.id == id } ?: return@launch
-            val updated = txn.copy(
-                editedIsIgnored = !txn.effectiveIsIgnored,
-                editedIsIgnoredSource = "user",
-                editSource = EditSource.USER
-            )
-            repository.saveTransaction(updated)
+            repository.setTransactionIgnored(id, !txn.effectiveIsIgnored)
         }
     }
 
@@ -385,44 +420,18 @@ class TransactionsViewModel(
         }
     }
 
-    fun resetMerchant(id: Long) {
-        viewModelScope.launch {
-            val txn = uiState.value.transactions.find { it.id == id } ?: return@launch
-            val updated = txn.copy(
-                editedMerchant = null,
-                editedMerchantSource = null
-            )
-            repository.saveTransaction(updated)
-        }
-    }
-
-    fun resetCategory(id: Long) {
-        viewModelScope.launch {
-            val txn = uiState.value.transactions.find { it.id == id } ?: return@launch
-            val updated = txn.copy(
-                editedCategoryId = null,
-                editedCategoryIdSource = null
-            )
-            repository.saveTransaction(updated)
-        }
-    }
-
-    fun resetTransaction(id: Long) {
-        viewModelScope.launch {
-            repository.resetTransaction(id)
-            closeTransactionEditor()
-        }
-    }
+    fun resetMerchant(id: Long) = resetField(id, "merchant")
+    fun resetCategory(id: Long) = resetField(id, "category")
+    fun resetField(id: Long, field: String) { viewModelScope.launch { repository.resetTransactionFields(id, listOf(field)) } }
+    fun resetTransaction(id: Long) { viewModelScope.launch { repository.resetTransaction(id); closeTransactionEditor() } }
+    fun requestOpenRuleEditor(ruleId: Long?) = repository.requestOpenRuleEditor(ruleId)
+    fun requestOpenBudgetMonth(month: String?) = repository.requestOpenBudgetMonth(month)
 
     fun deleteTransaction(id: Long) {
         viewModelScope.launch {
             repository.deleteTransaction(id)
-            if (_inspectingId.value == id) {
-                _inspectingId.value = null
-            }
-            if (_expandedId.value == id) {
-                _expandedId.value = null
-            }
+            if (_inspectingId.value == id) _inspectingId.value = null
+            if (_expandedId.value == id) _expandedId.value = null
             closeTransactionEditor()
             closeSplitSheet()
         }
@@ -435,6 +444,9 @@ class TransactionsViewModel(
         }
     }
 
+    fun getImportBatches(): List<app.overbay.orbit.data.model.ImportBatchRecord> =
+        repository.snapshot.value.importBatches
+
     fun importCsvTransactions(
         transactions: List<Transaction>,
         rules: List<TransactionRule> = emptyList()
@@ -445,9 +457,31 @@ class TransactionsViewModel(
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Batch Operations
-    // -------------------------------------------------------------------------
+    fun importCsvBatch(
+        fileName: String,
+        rawCsvContent: String,
+        transactions: List<Transaction>,
+        rules: List<TransactionRule> = emptyList()
+    ) {
+        viewModelScope.launch {
+            repository.importTransactionsWithBatch(
+                fileName = fileName,
+                rawCsvContent = rawCsvContent,
+                newTransactions = transactions,
+                newAccounts = emptyList(),
+                newCategories = emptyList(),
+                newRules = rules
+            )
+            closeCsvImportSheet()
+        }
+    }
+
+    fun undoImportBatch(batchId: Long) {
+        viewModelScope.launch {
+            repository.undoImportBatch(batchId)
+        }
+    }
+
     fun batchCategorize(categoryId: Long) {
         val selected = _selectedIds.value
         if (selected.isEmpty()) return
@@ -500,9 +534,7 @@ class TransactionsViewModel(
         _ruleDraftTransactionId.value = transactionId
     }
 
-    fun closeCreateRuleModal() {
-        _ruleDraftTransactionId.value = null
-    }
+    fun closeCreateRuleModal() { _ruleDraftTransactionId.value = null }
 
     fun saveRuleFromTransaction(rule: TransactionRule) {
         _ruleDraftTransactionId.value = null
@@ -519,74 +551,7 @@ class TransactionsViewModel(
 
     fun markTransactionRecurring(transaction: Transaction) {
         viewModelScope.launch {
-            val item = UpcomingItem(
-                name = transaction.effectiveMerchant,
-                merchant = transaction.effectiveMerchant,
-                amountCents = abs(transaction.effectiveAmountCents),
-                kind = if (transaction.isExpense) UpcomingKind.BILL else UpcomingKind.INCOME,
-                direction = if (transaction.isExpense) "expense" else "income",
-                frequencyType = RecurrenceFrequency.MONTHLY,
-                nextDate = transaction.effectiveDate,
-                categoryId = transaction.effectiveCategoryId,
-                accountId = transaction.accountId,
-                status = UpcomingStatus.ACTIVE
-            )
-            repository.saveUpcoming(item)
+            repository.createUpcomingFromTransaction(transaction.id)
         }
     }
-
-    private fun filterTransactions(
-        transactions: List<Transaction>,
-        query: String,
-        quick: QuickFilter,
-        draft: TransactionFilterDraft,
-        categoryMap: Map<Long, app.overbay.orbit.data.model.Category>
-    ): List<Transaction> {
-        if (query.isBlank() && quick == QuickFilter.ALL && draft.type == "all" && draft.accountId == null && draft.categoryId == null) {
-            return transactions
-        }
-        return transactions.filter { txn ->
-            if (query.isNotBlank()) {
-                val q = query.trim().lowercase()
-                val matchMerchant = txn.effectiveMerchant.lowercase().contains(q)
-                val matchDesc = txn.originalDescription?.lowercase()?.contains(q) ?: false
-                val matchNotes = txn.notes?.lowercase()?.contains(q) ?: false
-                val matchCategory = txn.effectiveCategoryId?.let { categoryMap[it]?.name?.lowercase()?.contains(q) } ?: false
-                if (!matchMerchant && !matchDesc && !matchNotes && !matchCategory) return@filter false
-            }
-
-            when (quick) {
-                QuickFilter.ALL -> {}
-                QuickFilter.EXPENSES -> if (!txn.isExpense || txn.effectiveIsTransfer) return@filter false
-                QuickFilter.INCOME -> if (!txn.isIncome || txn.effectiveIsTransfer) return@filter false
-                QuickFilter.TRANSFERS -> if (!txn.effectiveIsTransfer) return@filter false
-                QuickFilter.UNCATEGORIZED -> if (txn.effectiveCategoryId != null || txn.effectiveIsTransfer) return@filter false
-                QuickFilter.PENDING -> if (!txn.isPending) return@filter false
-                QuickFilter.MHA -> if (txn.effectiveMhaEligible != true) return@filter false
-            }
-
-            if (draft.type == "expenses" && (!txn.isExpense || txn.effectiveIsTransfer)) return@filter false
-            if (draft.type == "income" && (!txn.isIncome || txn.effectiveIsTransfer)) return@filter false
-            if (draft.type == "transfers" && !txn.effectiveIsTransfer) return@filter false
-            if (draft.accountId != null && txn.accountId != draft.accountId) return@filter false
-            if (draft.categoryId != null && txn.effectiveCategoryId != draft.categoryId) return@filter false
-
-            true
-        }
-    }
-
-    private data class RepoSnapshot(
-        val transactions: List<Transaction>,
-        val categories: List<app.overbay.orbit.data.model.Category>,
-        val accounts: List<app.overbay.orbit.data.model.Account>,
-        val nextRulePriority: Int
-    )
-
-    private data class FilterParams(
-        val query: String,
-        val quick: QuickFilter,
-        val draft: TransactionFilterDraft,
-        val sort: TransactionSortOption,
-        val isCompactView: Boolean
-    )
 }

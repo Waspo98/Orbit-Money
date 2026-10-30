@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -27,6 +29,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +58,8 @@ fun MhaTransactionsTab(
     onSearchChange: (String) -> Unit,
     onToggleEligible: (Long, Boolean) -> Unit,
     onResetEligible: (Long) -> Unit,
+    onIgnoreFromBudget: (Long, Boolean) -> Unit = { _, _ -> },
+    onInspectTransaction: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -122,6 +127,18 @@ fun MhaTransactionsTab(
                             onToggle = {
                                 haptics.tick()
                                 onToggleEligible(item.id, item.isEligible)
+                            },
+                            onResetOverride = {
+                                haptics.tick()
+                                onResetEligible(item.id)
+                            },
+                            onIgnore = {
+                                haptics.tick()
+                                onIgnoreFromBudget(item.id, !item.transaction.effectiveIsIgnored)
+                            },
+                            onInspect = {
+                                haptics.tick()
+                                onInspectTransaction(item.id)
                             }
                         )
                     }
@@ -134,74 +151,107 @@ fun MhaTransactionsTab(
 @Composable
 private fun MhaTransactionRow(
     item: MhaTransactionItem,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    onResetOverride: () -> Unit,
+    onIgnore: () -> Unit,
+    onInspect: () -> Unit
 ) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = if (item.isEligible) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxWidth().clickable { onToggle() }
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Left: Checkbox + Merchant + Category/Account Tag
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f, fill = false)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Checkbox(
-                    checked = item.isEligible,
-                    onCheckedChange = { onToggle() },
-                    colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = item.merchant,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        if (item.isExplicitOverride) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer
-                            ) {
-                                Text(
-                                    text = "USER",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                )
+                // Left: Checkbox + Merchant + Category/Account Tag
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Checkbox(
+                        checked = item.isEligible,
+                        onCheckedChange = { onToggle() },
+                        colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = item.merchant,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            if (item.isExplicitOverride) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Text(
+                                        text = "USER",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
                             }
                         }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${item.date} • ${item.category?.labelWithEmoji ?: "❓ Uncategorized"} • ${item.account?.name ?: ""}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "${item.date} • ${item.category?.labelWithEmoji ?: "❓ Uncategorized"} • ${item.account?.name ?: ""}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
+
+                // Right: Tabular Amount
+                Text(
+                    text = MoneyUtils.formatCents(abs(item.amountCents)),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (item.isEligible) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
             }
 
-            // Right: Tabular Amount
-            Text(
-                text = MoneyUtils.formatCents(abs(item.amountCents)),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (item.isEligible) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-            )
+            // Quick Actions Bar
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (item.isExplicitOverride) {
+                    TextButton(onClick = onResetOverride) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Reset Override", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                TextButton(onClick = onIgnore) {
+                    Text(
+                        text = if (item.transaction.effectiveIsIgnored) "Un-Ignore" else "Ignore",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+
+                TextButton(onClick = onInspect) {
+                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Inspect", style = MaterialTheme.typography.labelSmall)
+                }
+            }
         }
     }
 }

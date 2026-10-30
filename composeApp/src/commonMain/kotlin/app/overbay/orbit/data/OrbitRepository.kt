@@ -217,7 +217,12 @@ class OrbitRepository(
         activeEngine = if (mode == StorageMode.SELF_HOSTED) {
             SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
         } else localEngine
-        commitSnapshot(activeEngine.loadSnapshot().copy(preferences = updatedPref), immediate = true)
+        val loaded = activeEngine.loadSnapshot()
+        val latestPref = _preferences.value.copy(
+            storageMode = mode,
+            selfHostedServerUrl = if (serverUrl != null) normalizedUrl else _preferences.value.selfHostedServerUrl
+        )
+        commitSnapshot(loaded.copy(preferences = latestPref), immediate = true)
     }
 
     suspend fun prepareForOidcLogin(serverUrl: String) {

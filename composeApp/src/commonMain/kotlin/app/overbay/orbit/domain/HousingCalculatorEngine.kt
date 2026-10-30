@@ -29,7 +29,9 @@ object HousingCalculatorEngine {
             sellerClosingCents = closing,
             totalSellingFeesCents = totalFees,
             remainingMortgageCents = remainingMortgageCents,
-            netProceedsCents = net
+            netProceedsCents = net,
+            proratedPropertyTaxCents = proratedPropertyTaxCents,
+            miscRepairsCents = miscRepairsCents
         )
     }
 

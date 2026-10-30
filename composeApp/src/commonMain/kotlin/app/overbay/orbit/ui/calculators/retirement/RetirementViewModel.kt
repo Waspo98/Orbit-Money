@@ -1,10 +1,12 @@
 package app.overbay.orbit.ui.calculators.retirement
 
+import app.overbay.orbit.data.*
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.data.model.RetirementTargetMode
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.RetirementCalculatorEngine
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.max
+import kotlin.math.roundToLong
 
 class RetirementViewModel(
     private val repository: OrbitRepository,
@@ -29,7 +32,10 @@ class RetirementViewModel(
             repository.accounts.collect { accounts ->
                 val investments = accounts.filter { !it.isArchived && it.type == AccountType.INVESTMENT }
                 _uiState.update { current ->
-                    val next = current.copy(investmentAccounts = investments)
+                    val next = current.copy(
+                        investmentAccounts = investments,
+                        allAccounts = accounts
+                    )
                     if (current.useConnectedAccounts && investments.isNotEmpty()) {
                         val totalBal = investments.sumOf { it.currentBalanceCents }
                         next.copy(currentBalanceCents = max(0L, totalBal))
@@ -40,12 +46,42 @@ class RetirementViewModel(
                 recalculate()
             }
         }
+
+        scope.launch {
+            repository.snapshot.collect { snapshot ->
+                val currentYear = LocalDateUtils.todayLocalDate().year
+                val adultBirthYears = snapshot.members
+                    .filter { it.role.equals("adult", ignoreCase = true) }
+                    .mapNotNull { it.birthDate?.take(4)?.toIntOrNull() }
+                val derivedAge = if (adultBirthYears.isNotEmpty()) {
+                    (currentYear - adultBirthYears.minOrNull()!!).toDouble().coerceIn(18.0, 80.0)
+                } else 35.0
+
+                val totalGross = snapshot.members.sumOf { it.grossIncomeAnnualCents }
+                val baselineSpending = if (totalGross > 0L) ((totalGross.toDouble() * 0.80).roundToLong()) else 60_000_00L
+
+                _uiState.update { current ->
+                    current.copy(
+                        householdMembers = snapshot.members,
+                        currentAge = if (!current.currentAgeOverridden) derivedAge else current.currentAge,
+                        annualSpendingCents = if (!current.annualSpendingOverridden) baselineSpending else current.annualSpendingCents
+                    )
+                }
+                recalculate()
+            }
+        }
+
+        scope.launch {
+            val history = repository.getRetirementHistory()
+            _uiState.update { it.copy(historyPoints = history) }
+        }
+
         recalculate()
     }
 
     fun setCurrentAge(age: Double) {
         val clampedAge = age.coerceIn(18.0, _uiState.value.retirementAge - 1.0)
-        _uiState.update { it.copy(currentAge = clampedAge) }
+        _uiState.update { it.copy(currentAge = clampedAge, currentAgeOverridden = true) }
         recalculate()
     }
 
@@ -82,7 +118,7 @@ class RetirementViewModel(
     }
 
     fun setAnnualSpending(cents: Cents) {
-        _uiState.update { it.copy(annualSpendingCents = max(0L, cents)) }
+        _uiState.update { it.copy(annualSpendingCents = max(0L, cents), annualSpendingOverridden = true) }
         recalculate()
     }
 
@@ -106,6 +142,36 @@ class RetirementViewModel(
         recalculate()
     }
 
+    fun setSelectedHorizon(horizon: String) {
+        _uiState.update { it.copy(selectedHorizon = horizon) }
+    }
+
+    fun openTargetSettings() {
+        _uiState.update { it.copy(showTargetSettingsSheet = true) }
+    }
+
+    fun closeTargetSettings() {
+        _uiState.update { it.copy(showTargetSettingsSheet = false) }
+    }
+
+    fun saveTargetSettings(
+        mode: RetirementTargetMode,
+        customTarget: Cents?,
+        legacyAmount: Cents,
+        runwayEndAge: Double
+    ) {
+        _uiState.update {
+            it.copy(
+                targetMode = mode,
+                customTargetCents = customTarget,
+                legacyAmountCents = legacyAmount,
+                runwayEndAge = runwayEndAge,
+                showTargetSettingsSheet = false
+            )
+        }
+        recalculate()
+    }
+
     fun onAgeScrubbed(age: Double?, balance: Cents?) {
         _uiState.update {
             it.copy(
@@ -117,13 +183,33 @@ class RetirementViewModel(
 
     fun reset() {
         _uiState.value = RetirementUiState(
-            investmentAccounts = _uiState.value.investmentAccounts
+            investmentAccounts = _uiState.value.investmentAccounts,
+            householdMembers = _uiState.value.householdMembers,
+            allAccounts = _uiState.value.allAccounts,
+            historyPoints = _uiState.value.historyPoints
         )
         recalculate()
     }
 
     private fun recalculate() {
         val state = _uiState.value
+
+        // Separate HSA vs Non-HSA for pre-65 bridge analysis
+        val hsaLinks = repository.snapshot.value.retirementAccountLinks
+            .filter { it.accountKind.equals("hsa", ignoreCase = true) }
+            .map { it.accountId }
+            .toSet()
+
+        val hsaBalance = if (state.useConnectedAccounts) {
+            state.allAccounts.filter { it.id in hsaLinks }.sumOf { it.currentBalanceCents }
+        } else 0L
+
+        val nonHsaBalance = max(0L, state.currentBalanceCents - hsaBalance)
+
+        val hsaAnnualContrib = state.householdMembers.sumOf { it.hsaContributionAnnualCents }
+        val hsaMonthlySavings = (hsaAnnualContrib.toDouble() / 12.0).roundToLong()
+        val nonHsaMonthlySavings = max(0L, state.monthlySavingsCents - hsaMonthlySavings)
+
         val scenario = RetirementCalculatorEngine.calculateScenario(
             currentAge = state.currentAge,
             retirementAge = state.retirementAge,
@@ -134,8 +220,21 @@ class RetirementViewModel(
             preset = state.preset,
             targetMode = state.targetMode,
             customTargetCents = state.customTargetCents,
-            legacyAmountCents = state.legacyAmountCents
+            legacyAmountCents = state.legacyAmountCents,
+            nonHsaCurrentBalanceCents = nonHsaBalance,
+            nonHsaMonthlySavingsCents = nonHsaMonthlySavings,
+            hsaCurrentBalanceCents = hsaBalance,
+            hsaMonthlySavingsCents = hsaMonthlySavings
         )
-        _uiState.update { it.copy(scenario = scenario) }
+
+        _uiState.update {
+            it.copy(
+                scenario = scenario,
+                nonHsaCurrentBalanceCents = nonHsaBalance,
+                nonHsaMonthlySavingsCents = nonHsaMonthlySavings,
+                hsaCurrentBalanceCents = hsaBalance,
+                hsaMonthlySavingsCents = hsaMonthlySavings
+            )
+        }
     }
 }

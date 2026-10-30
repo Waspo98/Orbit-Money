@@ -142,6 +142,33 @@ fun AccountRowCard(
                     modifier = Modifier.align(Alignment.CenterVertically)
                 )
 
+                if (isCredit && account.creditCardProfile != null) {
+                    val profile = account.creditCardProfile
+                    if (!profile.network.isNullOrBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f),
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        ) {
+                            Text(
+                                text = profile.network.uppercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                    if (!profile.cardName.isNullOrBlank()) {
+                        AccountBadge(
+                            text = profile.cardName,
+                            isAccent = true,
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        )
+                    }
+                }
+
                 if (account.isManual && account.simplefinAccountId.isNullOrBlank()) {
                     AccountBadge(
                         text = "Manual",

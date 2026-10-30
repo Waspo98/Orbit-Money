@@ -52,6 +52,7 @@ import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
@@ -133,7 +134,11 @@ fun BudgetDetailInspectorPane(
                         onEdit = { viewModel.openBudgetEditor(inspecting) },
                         onDelete = { inspecting.budgetId?.let { viewModel.deleteBudget(it) } },
                         onViewTransactions = {
-                            onNavigate(OrbitNavKey.Transactions(categoryId = inspecting.category.id))
+                            val (y, m) = LocalDateUtils.parseYearMonth(state.selectedMonth) ?: Pair(2026, 1)
+                            val days = LocalDateUtils.daysInMonth(y, m)
+                            val start = "${state.selectedMonth}-01"
+                            val end = "${state.selectedMonth}-${days.toString().padStart(2, '0')}"
+                            onNavigate(OrbitNavKey.Transactions(categoryId = inspecting.category.id, startDate = start, endDate = end))
                         }
                     )
                 }
@@ -279,7 +284,7 @@ private fun BudgetReadOnlyDetailContent(
                     onClick = onEdit
                 )
                 BudgetPillAction(
-                    label = "View in Transactions",
+                    label = "View All in Transactions",
                     onClick = onViewTransactions
                 )
                 if (item.budgetId != null) {

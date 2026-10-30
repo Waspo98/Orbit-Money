@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.accounts
 
 import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.BalanceRecord
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.Cents
@@ -42,8 +43,14 @@ data class AccountsUiState(
     val showMergeDialog: Boolean = false,
     val historyAccount: Account? = null,
     val showHistorySheet: Boolean = false,
+    val historyBalanceRecords: List<BalanceRecord> = emptyList(),
+    val showAddRecordDialog: Boolean = false,
+    val addRecordAccount: Account? = null,
     val isPhoneViewingDetail: Boolean = false,
     val deleteConfirmAccountId: Long? = null,
+    val deleteBlockedAccount: Account? = null,
+    val deleteBlockedTransactionCount: Int = 0,
+    val accountGroupWideSpans: Map<String, Int> = emptyMap(),
     val isSyncing: Boolean = false,
     val syncErrorMessage: String? = null,
     val isLoading: Boolean = false

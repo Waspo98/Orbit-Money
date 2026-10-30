@@ -129,7 +129,9 @@ data class SellingProceedsResult(
     val sellerClosingCents: Cents,
     val totalSellingFeesCents: Cents,
     val remainingMortgageCents: Cents,
-    val netProceedsCents: Cents
+    val netProceedsCents: Cents,
+    val proratedPropertyTaxCents: Cents = 0L,
+    val miscRepairsCents: Cents = 0L
 )
 
 @Serializable
@@ -211,10 +213,21 @@ data class RetirementProjectionPoint(
 )
 
 @Serializable
+data class HsaBridgeAnalysis(
+    val bridgeYears: Int = 0,
+    val bridgeNeedCents: Cents = 0L,
+    val projectedNonHsaAtRetirementCents: Cents = 0L,
+    val projectedHsaAtRetirementCents: Cents = 0L,
+    val isBridgeCovered: Boolean = true,
+    val shortfallCents: Cents = 0L
+)
+
+@Serializable
 data class RetirementProjectionResult(
     val targetNestEggCents: Cents,
     val projectedNestEggAtRetirementCents: Cents,
     val monthlySavingsNeededCents: Cents,
     val isFunded: Boolean,
-    val points: List<RetirementProjectionPoint> = emptyList()
+    val points: List<RetirementProjectionPoint> = emptyList(),
+    val hsaBridge: HsaBridgeAnalysis? = null
 )

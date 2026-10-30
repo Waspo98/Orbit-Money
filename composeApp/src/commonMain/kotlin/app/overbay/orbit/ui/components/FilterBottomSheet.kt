@@ -1,26 +1,19 @@
 package app.overbay.orbit.ui.components
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,13 +27,23 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 
 data class TransactionFilterDraft(
     val type: String = "all", // "all", "expense", "income", "transfer"
-    val datePreset: String = "all", // "all", "this_month", "last_month", "this_year"
+    val datePreset: String = "all", // "all", "this_month", "last_30_days", "last_90_days", "this_year", "custom"
     val accountId: Long? = null,
-    val categoryId: Long? = null
+    val categoryId: Long? = null,
+    val accountIds: Set<Long> = if (accountId != null) setOf(accountId) else emptySet(),
+    val categoryIds: Set<Long> = if (categoryId != null) setOf(categoryId) else emptySet(),
+    val uncategorizedOnly: Boolean = false,
+    val startDate: String? = null,
+    val endDate: String? = null,
+    val minAmountCents: Long? = null,
+    val maxAmountCents: Long? = null,
+    val hasEditsFilter: String = "any", // "any", "edited", "original"
+    val includeTransfers: Boolean = true,
+    val includeIgnored: Boolean = true
 )
 
 /**
- * Draft-state bottom sheet for transaction filtering and sorting.
+ * Rich draft-state bottom sheet for transaction filtering and sorting.
  * Edits remain local until 'Apply Filters' is tapped.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,175 +81,94 @@ fun FilterBottomSheet(
             )
 
             // 0. Sort By
-            Text(
-                text = "SORT BY",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+            FilterSortSection(
+                sortDraft = sortDraft,
+                onSortChange = { sortDraft = it }
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TransactionSortOption.entries.forEach { option ->
-                    val selected = sortDraft == option
-                    FilterChip(
-                        selected = selected,
-                        onClick = {
-                            haptics.tick()
-                            sortDraft = option
-                        },
-                        label = { Text(option.label) }
-                    )
-                }
-            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
             // 1. Transaction Type
-            Text(
-                text = "TRANSACTION TYPE",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+            FilterTypeSection(
+                currentType = draft.type,
+                onTypeChange = { draft = draft.copy(type = it) }
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf(
-                    "all" to "All Types",
-                    "expense" to "Expenses",
-                    "income" to "Income",
-                    "transfer" to "Transfers"
-                ).forEach { (value, label) ->
-                    val selected = draft.type == value
-                    FilterChip(
-                        selected = selected,
-                        onClick = {
-                            haptics.tick()
-                            draft = draft.copy(type = value)
-                        },
-                        label = { Text(label) }
-                    )
-                }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // 2. Has Edits
+            FilterEditsSection(
+                currentHasEdits = draft.hasEditsFilter,
+                onHasEditsChange = { draft = draft.copy(hasEditsFilter = it) }
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // 3. Date Range
+            FilterDateRangeSection(
+                datePreset = draft.datePreset,
+                startDate = draft.startDate,
+                endDate = draft.endDate,
+                onPresetChange = { draft = draft.copy(datePreset = it) },
+                onStartDateChange = { draft = draft.copy(startDate = it) },
+                onEndDateChange = { draft = draft.copy(endDate = it) }
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // 4. Amount Range
+            FilterAmountRangeSection(
+                minAmountCents = draft.minAmountCents,
+                maxAmountCents = draft.maxAmountCents,
+                onMinAmountChange = { draft = draft.copy(minAmountCents = it) },
+                onMaxAmountChange = { draft = draft.copy(maxAmountCents = it) }
+            )
+
+            // 5. Accounts Filter
+            if (accountNames.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                FilterAccountsSection(
+                    selectedAccountIds = draft.accountIds,
+                    accountNames = accountNames,
+                    onToggleAccount = { id ->
+                        val next = if (draft.accountIds.contains(id)) draft.accountIds - id else draft.accountIds + id
+                        draft = draft.copy(accountIds = next, accountId = next.firstOrNull())
+                    },
+                    onClearAccounts = {
+                        draft = draft.copy(accountIds = emptySet(), accountId = null)
+                    }
+                )
+            }
+
+            // 6. Categories Filter
+            if (categoryNames.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                FilterCategoriesSection(
+                    selectedCategoryIds = draft.categoryIds,
+                    uncategorizedOnly = draft.uncategorizedOnly,
+                    categoryNames = categoryNames,
+                    onToggleCategory = { id ->
+                        val next = if (draft.categoryIds.contains(id)) draft.categoryIds - id else draft.categoryIds + id
+                        draft = draft.copy(categoryIds = next, categoryId = next.firstOrNull(), uncategorizedOnly = false)
+                    },
+                    onToggleUncategorized = {
+                        draft = draft.copy(uncategorizedOnly = !draft.uncategorizedOnly, categoryIds = emptySet(), categoryId = null)
+                    },
+                    onClearCategories = {
+                        draft = draft.copy(categoryIds = emptySet(), categoryId = null, uncategorizedOnly = false)
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 2. Date Range Presets
-            Text(
-                text = "DATE RANGE",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+            // 7. Switches: Include Transfers & Include Ignored
+            FilterSwitchesSection(
+                includeTransfers = draft.includeTransfers,
+                onIncludeTransfersChange = { draft = draft.copy(includeTransfers = it) },
+                includeIgnored = draft.includeIgnored,
+                onIncludeIgnoredChange = { draft = draft.copy(includeIgnored = it) }
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf(
-                    "all" to "All Time",
-                    "this_month" to "This Month",
-                    "last_month" to "Last Month",
-                    "this_year" to "This Year"
-                ).forEach { (value, label) ->
-                    val selected = draft.datePreset == value
-                    FilterChip(
-                        selected = selected,
-                        onClick = {
-                            haptics.tick()
-                            draft = draft.copy(datePreset = value)
-                        },
-                        label = { Text(label) }
-                    )
-                }
-            }
-
-            // 3. Accounts Filter
-            if (accountNames.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(20.dp))
-                Text(
-                    text = "ACCOUNT",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = draft.accountId == null,
-                        onClick = {
-                            haptics.tick()
-                            draft = draft.copy(accountId = null)
-                        },
-                        label = { Text("All Accounts") }
-                    )
-                    accountNames.forEach { (id, name) ->
-                        val selected = draft.accountId == id
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                haptics.tick()
-                                draft = draft.copy(accountId = if (selected) null else id)
-                            },
-                            label = { Text(name) }
-                        )
-                    }
-                }
-            }
-
-            // 4. Categories Filter
-            if (categoryNames.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(20.dp))
-                Text(
-                    text = "CATEGORY",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = draft.categoryId == null,
-                        onClick = {
-                            haptics.tick()
-                            draft = draft.copy(categoryId = null)
-                        },
-                        label = { Text("All Categories") }
-                    )
-                    categoryNames.forEach { (id, name) ->
-                        val selected = draft.categoryId == id
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                haptics.tick()
-                                draft = draft.copy(categoryId = if (selected) null else id)
-                            },
-                            label = { Text(name) }
-                        )
-                    }
-                }
-            }
 
             Spacer(modifier = Modifier.height(28.dp))
 

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
@@ -51,6 +52,7 @@ fun StorageSyncModeBlock(
     onAuthenticateServer: ((String, String) -> Unit)? = null,
     onOpenLoginScreen: (() -> Unit)? = null,
     onLogout: (() -> Unit)? = null,
+    onOpenMigrateWizard: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val oidcLauncher = LocalOidcAuthLauncher.current
@@ -82,6 +84,17 @@ fun StorageSyncModeBlock(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
+
+        if (preferences.storageMode == StorageMode.LOCAL && onOpenMigrateWizard != null) {
+            OutlinedButton(
+                onClick = onOpenMigrateWizard,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Migrate Local Workspace to Server")
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
 
         if (preferences.storageMode == StorageMode.SELF_HOSTED) {
             Row(
