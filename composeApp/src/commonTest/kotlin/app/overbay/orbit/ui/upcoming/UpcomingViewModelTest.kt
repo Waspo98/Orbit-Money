@@ -43,7 +43,7 @@ class UpcomingViewModelTest {
         storage.clear()
         repository = OrbitRepository(storage)
         repository.initialize()
-        viewModel = UpcomingViewModel(repository)
+        viewModel = UpcomingViewModel(repository, testDispatcher)
     }
 
     @AfterTest

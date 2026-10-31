@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.settings
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.*
 import app.overbay.orbit.data.engine.SyncResult
@@ -13,17 +14,19 @@ import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.network.ServerUrlNormalizer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 
 class SettingsViewModel(
     private val repository: OrbitRepository,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    customScope: CoroutineScope? = null
 ) : ViewModel() {
+
+    private val scope: CoroutineScope = customScope ?: (viewModelScope + Dispatchers.Default)
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()

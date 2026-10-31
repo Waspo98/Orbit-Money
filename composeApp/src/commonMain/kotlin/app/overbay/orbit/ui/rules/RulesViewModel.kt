@@ -8,15 +8,19 @@ import app.overbay.orbit.data.model.RulePreviewResult
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.domain.RuleMatcherEngine
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class RulesViewModel(
-    private val repository: OrbitRepository
+    private val repository: OrbitRepository,
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val _inspectingRuleId = MutableStateFlow<Long?>(null)
@@ -80,7 +84,7 @@ class RulesViewModel(
             accounts = acctsAndMap.first,
             categoryMap = acctsAndMap.second
         )
-    }.stateIn(
+    }.flowOn(computeDispatcher).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = RulesUiState(isLoading = true)

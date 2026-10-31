@@ -9,27 +9,30 @@ import app.overbay.orbit.data.model.SellingProceedsResult
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.HousingCalculatorEngine
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
 class HousingViewModel(
     private val repository: OrbitRepository,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    scope: CoroutineScope? = null
 ) : ViewModel() {
+    private val vmScope: CoroutineScope = scope ?: (viewModelScope + Dispatchers.Default)
     private val _uiState = MutableStateFlow(HousingUiState())
     val uiState: StateFlow<HousingUiState> = _uiState.asStateFlow()
 
     init {
-        scope.launch {
+        vmScope.launch {
+            recalculate()
             repository.accounts.collect { accounts ->
                 val mortgages = accounts.filter { !it.isArchived && it.type == AccountType.MORTGAGE }
                 _uiState.update { current ->
@@ -37,7 +40,6 @@ class HousingViewModel(
                 }
             }
         }
-        recalculate()
     }
 
     fun selectMortgage(accountId: Long?) {

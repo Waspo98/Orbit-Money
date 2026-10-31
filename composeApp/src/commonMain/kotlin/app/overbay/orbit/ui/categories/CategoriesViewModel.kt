@@ -7,16 +7,20 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleConditionField
 import app.overbay.orbit.domain.Cents
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 class CategoriesViewModel(
-    private val repository: OrbitRepository
+    private val repository: OrbitRepository,
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val _inspectingCategoryId = MutableStateFlow<Long?>(null)
@@ -164,7 +168,7 @@ class CategoriesViewModel(
             groups = groups,
             totalCategoriesCount = sortedCategories.size
         )
-    }.stateIn(
+    }.flowOn(computeDispatcher).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = CategoriesUiState(isLoading = true)

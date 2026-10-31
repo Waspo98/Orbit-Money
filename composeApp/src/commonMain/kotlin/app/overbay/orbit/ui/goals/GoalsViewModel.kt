@@ -9,16 +9,20 @@ import app.overbay.orbit.data.saveGoalWithAllocations
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.GoalAllocationEngine
 import app.overbay.orbit.domain.LocalDateUtils
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
 class GoalsViewModel(
-    private val repository: OrbitRepository
+    private val repository: OrbitRepository,
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val _inspectingGoalId = MutableStateFlow<Long?>(null)
@@ -113,7 +117,7 @@ class GoalsViewModel(
             showAccountsOverview = showOverview,
             isLoading = false
         )
-    }.stateIn(
+    }.flowOn(computeDispatcher).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = GoalsUiState(isLoading = true)

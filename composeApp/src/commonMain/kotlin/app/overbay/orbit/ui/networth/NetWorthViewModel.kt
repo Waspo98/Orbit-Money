@@ -8,15 +8,19 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MonthlyNetWorthPoint
 import app.overbay.orbit.domain.NetWorthEngine
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlin.math.abs
 
 class NetWorthViewModel(
-    private val repository: OrbitRepository
+    private val repository: OrbitRepository,
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val _selectedHorizon = MutableStateFlow(NetWorthHorizon.TWO_YEARS)
@@ -121,7 +125,7 @@ class NetWorthViewModel(
             topContributingAccounts = topContributingAccounts,
             isLoading = false
         )
-    }.stateIn(
+    }.flowOn(computeDispatcher).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = NetWorthUiState(isLoading = true)

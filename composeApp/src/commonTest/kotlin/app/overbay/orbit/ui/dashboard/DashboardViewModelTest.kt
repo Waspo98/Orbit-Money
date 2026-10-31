@@ -46,7 +46,7 @@ class DashboardViewModelTest {
         storage.clear()
         repository = OrbitRepository(storage)
         repository.initialize()
-        viewModel = DashboardViewModel(repository)
+        viewModel = DashboardViewModel(repository, testDispatcher)
     }
 
     @AfterTest

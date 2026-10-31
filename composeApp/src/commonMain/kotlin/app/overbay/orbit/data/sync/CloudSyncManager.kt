@@ -2,11 +2,13 @@ package app.overbay.orbit.data.sync
 
 import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -92,7 +94,9 @@ class CloudSyncManager(
                 appVersion = "0.9.0-beta",
                 snapshot = snapshot
             )
-            val jsonContent = json.encodeToString(backup)
+            val jsonContent = withContext(Dispatchers.Default) {
+                json.encodeToString(backup)
+            }
             val success = client.uploadTextFile(REMOTE_BACKUP_FILENAME, jsonContent)
             if (success) {
                 val result = SyncResult.Success("Backup uploaded to Google Drive")

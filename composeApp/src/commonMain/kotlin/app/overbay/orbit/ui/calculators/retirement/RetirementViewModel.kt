@@ -9,32 +9,58 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.RetirementCalculatorEngine
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import kotlin.math.max
 import kotlin.math.roundToLong
 
 class RetirementViewModel(
     private val repository: OrbitRepository,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    scope: CoroutineScope? = null
 ) : ViewModel() {
+    private val vmScope: CoroutineScope = scope ?: (viewModelScope + Dispatchers.Default)
     private val _uiState = MutableStateFlow(RetirementUiState())
     val uiState: StateFlow<RetirementUiState> = _uiState.asStateFlow()
 
     init {
-        scope.launch {
-            repository.accounts.collect { accounts ->
+        vmScope.launch {
+            combine(
+                repository.accounts,
+                repository.snapshot
+                    .map { it.members to it.retirementAccountLinks }
+                    .distinctUntilChanged()
+            ) { accounts, (members, _) ->
+                accounts to members
+            }.collect { (accounts, members) ->
                 val investments = accounts.filter { !it.isArchived && it.type == AccountType.INVESTMENT }
+                val currentYear = LocalDateUtils.todayLocalDate().year
+                val adultBirthYears = members
+                    .filter { it.role.equals("adult", ignoreCase = true) }
+                    .mapNotNull { it.birthDate?.take(4)?.toIntOrNull() }
+                val derivedAge = if (adultBirthYears.isNotEmpty()) {
+                    (currentYear - adultBirthYears.minOrNull()!!).toDouble().coerceIn(18.0, 80.0)
+                } else 35.0
+
+                val totalGross = members.sumOf { it.grossIncomeAnnualCents }
+                val baselineSpending = if (totalGross > 0L) ((totalGross.toDouble() * 0.80).roundToLong()) else 60_000_00L
+
                 _uiState.update { current ->
                     val next = current.copy(
                         investmentAccounts = investments,
-                        allAccounts = accounts
+                        allAccounts = accounts,
+                        householdMembers = members,
+                        currentAge = if (!current.currentAgeOverridden) derivedAge else current.currentAge,
+                        annualSpendingCents = if (!current.annualSpendingOverridden) baselineSpending else current.annualSpendingCents
                     )
                     if (current.useConnectedAccounts && investments.isNotEmpty()) {
                         val totalBal = investments.sumOf { it.currentBalanceCents }
@@ -47,36 +73,10 @@ class RetirementViewModel(
             }
         }
 
-        scope.launch {
-            repository.snapshot.collect { snapshot ->
-                val currentYear = LocalDateUtils.todayLocalDate().year
-                val adultBirthYears = snapshot.members
-                    .filter { it.role.equals("adult", ignoreCase = true) }
-                    .mapNotNull { it.birthDate?.take(4)?.toIntOrNull() }
-                val derivedAge = if (adultBirthYears.isNotEmpty()) {
-                    (currentYear - adultBirthYears.minOrNull()!!).toDouble().coerceIn(18.0, 80.0)
-                } else 35.0
-
-                val totalGross = snapshot.members.sumOf { it.grossIncomeAnnualCents }
-                val baselineSpending = if (totalGross > 0L) ((totalGross.toDouble() * 0.80).roundToLong()) else 60_000_00L
-
-                _uiState.update { current ->
-                    current.copy(
-                        householdMembers = snapshot.members,
-                        currentAge = if (!current.currentAgeOverridden) derivedAge else current.currentAge,
-                        annualSpendingCents = if (!current.annualSpendingOverridden) baselineSpending else current.annualSpendingCents
-                    )
-                }
-                recalculate()
-            }
-        }
-
-        scope.launch {
+        vmScope.launch {
             val history = repository.getRetirementHistory()
             _uiState.update { it.copy(historyPoints = history) }
         }
-
-        recalculate()
     }
 
     fun setCurrentAge(age: Double) {

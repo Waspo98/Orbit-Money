@@ -37,7 +37,7 @@ class NetWorthViewModelTest {
         storage.clear()
         repository = OrbitRepository(storage)
         repository.initialize()
-        viewModel = NetWorthViewModel(repository)
+        viewModel = NetWorthViewModel(repository, testDispatcher)
     }
 
     @AfterTest

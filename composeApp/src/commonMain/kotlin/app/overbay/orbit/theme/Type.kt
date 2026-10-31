@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -23,23 +24,29 @@ import org.jetbrains.compose.resources.Font
  * for canopy headers, card titles (`h1-h4`), and hero figures.
  */
 @Composable
-fun rememberDisplayFontFamily(): FontFamily = FontFamily(
-    Font(Res.font.dm_sans_medium, FontWeight.Medium),
-    Font(Res.font.dm_sans_semibold, FontWeight.SemiBold),
-    Font(Res.font.dm_sans_bold, FontWeight.Bold)
-)
+fun rememberDisplayFontFamily(): FontFamily {
+    val medium = Font(Res.font.dm_sans_medium, FontWeight.Medium)
+    val semiBold = Font(Res.font.dm_sans_semibold, FontWeight.SemiBold)
+    val bold = Font(Res.font.dm_sans_bold, FontWeight.Bold)
+    return remember(medium, semiBold, bold) {
+        FontFamily(medium, semiBold, bold)
+    }
+}
 
 /**
  * High-legibility UI and tabular numeral font family (Inter Tight) matching main branch `--font-sans`
  * for transaction rows, cards, labels, pills, and rolling tickers.
  */
 @Composable
-fun rememberBodyFontFamily(): FontFamily = FontFamily(
-    Font(Res.font.inter_tight_regular, FontWeight.Normal),
-    Font(Res.font.inter_tight_medium, FontWeight.Medium),
-    Font(Res.font.inter_tight_semibold, FontWeight.SemiBold),
-    Font(Res.font.inter_tight_bold, FontWeight.Bold)
-)
+fun rememberBodyFontFamily(): FontFamily {
+    val regular = Font(Res.font.inter_tight_regular, FontWeight.Normal)
+    val medium = Font(Res.font.inter_tight_medium, FontWeight.Medium)
+    val semiBold = Font(Res.font.inter_tight_semibold, FontWeight.SemiBold)
+    val bold = Font(Res.font.inter_tight_bold, FontWeight.Bold)
+    return remember(regular, medium, semiBold, bold) {
+        FontFamily(regular, medium, semiBold, bold)
+    }
+}
 
 /**
  * Non-composable fallback tabular numeral style for unit tests.
@@ -195,8 +202,10 @@ val OrbitTypography = buildOrbitTypography()
 fun rememberOrbitTypography(): Typography {
     val displayFontFamily = rememberDisplayFontFamily()
     val bodyFontFamily = rememberBodyFontFamily()
-    return buildOrbitTypography(
-        displayFontFamily = displayFontFamily,
-        bodyFontFamily = bodyFontFamily
-    )
+    return remember(displayFontFamily, bodyFontFamily) {
+        buildOrbitTypography(
+            displayFontFamily = displayFontFamily,
+            bodyFontFamily = bodyFontFamily
+        )
+    }
 }

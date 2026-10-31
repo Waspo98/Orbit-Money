@@ -39,7 +39,7 @@ class SpendingTrendsAdversarialTest {
         storage.clear()
         repository = OrbitRepository(storage)
         repository.initialize()
-        viewModel = SpendingTrendsViewModel(repository)
+        viewModel = SpendingTrendsViewModel(repository, testDispatcher)
     }
 
     @AfterTest

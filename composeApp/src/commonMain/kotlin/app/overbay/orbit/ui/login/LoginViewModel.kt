@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.login
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.network.OrbitApiClient
@@ -11,21 +12,23 @@ import app.overbay.orbit.util.PlatformStorage
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 
 class LoginViewModel(
     private val repository: OrbitRepository,
     private val customApiClient: OrbitApiClient? = null,
     private val storage: PlatformStorage = PlatformStorage(),
     private val isWebPlatform: Boolean = PlatformRuntime.isWeb,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    scope: CoroutineScope? = null
 ) : ViewModel() {
+
+    private val scope: CoroutineScope = scope ?: (viewModelScope + Dispatchers.Default)
 
     private val _uiState = MutableStateFlow(LoginUiState(showServerConfig = !isWebPlatform))
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
@@ -40,10 +43,12 @@ class LoginViewModel(
                 showServerConfig = shouldShowServerBox
             )
         }
-        if (isWebPlatform || initialUrl.isNotBlank()) {
+        val alreadySelfHostedAuthed =
+            repository.storageMode.value == StorageMode.SELF_HOSTED && repository.isAuthenticated.value
+        if (!alreadySelfHostedAuthed && (isWebPlatform || initialUrl.isNotBlank())) {
             fetchAuthConfig(initialUrl)
         }
-        scope.launch {
+        this.scope.launch {
             combine(
                 repository.isAuthenticated,
                 repository.storageMode
@@ -58,7 +63,7 @@ class LoginViewModel(
                     }
                 }
         }
-        scope.launch {
+        this.scope.launch {
             combine(
                 OidcCallbackBridge.isExchanging,
                 OidcCallbackBridge.exchangeError

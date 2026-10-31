@@ -449,6 +449,11 @@ internal suspend fun OrbitRepository.reportMerchantLogoStatusImpl(merchantKey: S
     if (storageMode.value == StorageMode.SELF_HOSTED) {
         runCatching { createApiClient().reportMerchantLogoStatus(merchantKey, status) }
     }
+    if (status == "loaded") {
+        // "candidate" and "loaded" render identically in UI; avoid cloning all transactions
+        // and triggering full workspace snapshot emissions/disk flushes as each logo finishes loading.
+        return
+    }
     val updatedList = transactions.value.map { txn ->
         val currentLogo = txn.merchantLogo
         if (currentLogo?.merchantKey == merchantKey && currentLogo.status == "candidate") {

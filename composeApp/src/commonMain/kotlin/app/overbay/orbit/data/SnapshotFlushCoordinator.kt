@@ -68,10 +68,9 @@ internal class SnapshotFlushCoordinator(
         activeEngine.saveSnapshot(snapshot)
         if (activeEngine !== localEngine) {
             // In self-hosted mode, avoid duplicating multi-MB transaction snapshots into localEngine;
-            // only keep startup preferences in sync when preferences change.
+            // persist only the ~1 KB startup preferences sidecar when preferences change.
             if (lastSyncedLocalPreferences != snapshot.preferences) {
-                val baseLocal = localEngine.loadSnapshot()
-                localEngine.saveSnapshot(baseLocal.copy(preferences = snapshot.preferences))
+                localEngine.saveStartupPreferences(snapshot.preferences)
                 lastSyncedLocalPreferences = snapshot.preferences
             }
         } else {

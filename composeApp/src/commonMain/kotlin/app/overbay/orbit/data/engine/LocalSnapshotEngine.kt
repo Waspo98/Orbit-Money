@@ -33,6 +33,18 @@ class LocalSnapshotEngine(
         encodeDefaults = true
     }
 
+    fun loadStartupPreferences(): OrbitPreferences? {
+        val raw = storage.loadString(STARTUP_PREFS_KEY) ?: return null
+        return runCatching {
+            json.decodeFromString(OrbitPreferences.serializer(), raw)
+        }.getOrNull()
+    }
+
+    fun saveStartupPreferences(preferences: OrbitPreferences) {
+        val serialized = json.encodeToString(OrbitPreferences.serializer(), preferences)
+        storage.saveString(STARTUP_PREFS_KEY, serialized)
+    }
+
     override suspend fun loadSnapshot(): OrbitWorkspaceSnapshot {
         val raw = storage.loadString(SNAPSHOT_KEY) ?: return OrbitWorkspaceSnapshot.empty()
         return try {
@@ -47,6 +59,7 @@ class LocalSnapshotEngine(
     override suspend fun saveSnapshot(snapshot: OrbitWorkspaceSnapshot) {
         val serialized = json.encodeToString(OrbitWorkspaceSnapshot.serializer(), snapshot)
         storage.saveString(SNAPSHOT_KEY, serialized)
+        saveStartupPreferences(snapshot.preferences)
     }
 
     override suspend fun sync(force: Boolean): SyncResult {
@@ -68,6 +81,7 @@ class LocalSnapshotEngine(
 
     override suspend fun clear() {
         storage.delete(SNAPSHOT_KEY)
+        storage.delete(STARTUP_PREFS_KEY)
     }
 
     // In Local Mode, state mutations are committed through OrbitRepository saving the snapshot.
@@ -94,5 +108,6 @@ class LocalSnapshotEngine(
 
     companion object {
         const val SNAPSHOT_KEY = "orbit_workspace_snapshot.json"
+        const val STARTUP_PREFS_KEY = "orbit_startup_preferences.json"
     }
 }

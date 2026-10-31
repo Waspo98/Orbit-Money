@@ -39,7 +39,7 @@ class MhaTrackerViewModelTest {
         storage.clear()
         repository = OrbitRepository(storage)
         repository.initialize()
-        viewModel = MhaTrackerViewModel(repository)
+        viewModel = MhaTrackerViewModel(repository, testDispatcher)
     }
 
     @AfterTest

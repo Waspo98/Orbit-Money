@@ -20,16 +20,20 @@ import app.overbay.orbit.domain.ProjectedAmountResult
 import app.overbay.orbit.domain.UpcomingCashFlowSummary
 import app.overbay.orbit.domain.UpcomingEngine
 import app.overbay.orbit.domain.UpcomingScheduleHelper
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 class UpcomingViewModel(
-    private val repository: OrbitRepository
+    private val repository: OrbitRepository,
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val _filterOption = MutableStateFlow(UpcomingFilterOption.ALL)
@@ -186,7 +190,7 @@ class UpcomingViewModel(
             recentTransactions = recentTxns,
             isLoading = false
         )
-    }.stateIn(
+    }.flowOn(computeDispatcher).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = UpcomingUiState(isLoading = true)

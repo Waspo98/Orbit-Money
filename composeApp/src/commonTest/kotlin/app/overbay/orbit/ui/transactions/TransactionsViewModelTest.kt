@@ -41,7 +41,7 @@ class TransactionsViewModelTest {
         storage.clear()
         repository = OrbitRepository(storage)
         repository.initialize()
-        viewModel = TransactionsViewModel(repository)
+        viewModel = TransactionsViewModel(repository, testDispatcher)
     }
 
     @AfterTest

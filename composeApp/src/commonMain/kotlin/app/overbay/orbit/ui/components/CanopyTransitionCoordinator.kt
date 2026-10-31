@@ -16,7 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -149,42 +149,54 @@ fun Modifier.stationaryCanopyBackdrop(
     .fillMaxWidth()
     .onGloballyPositioned { coords -> setHeroCoordinates(coords) }
     .shadow(elevation = elevationDp, shape = RectangleShape, clip = false)
-    .drawBehind {
-        val animTick = coordinator?.transitionFraction ?: 1f
-        val currentRootX = getHeroCoordinates()?.takeIf { it.isAttached }?.positionInRoot()?.x ?: 0f
-        val slideOffsetX = if (coordinator != null && coordinator.containerWidthPx > 0f && animTick >= 0f) {
-            currentRootX - coordinator.containerRootX
-        } else {
-            0f
-        }
-        val totalW = if (coordinator != null && coordinator.containerWidthPx > 0f) {
-            coordinator.containerWidthPx
-        } else {
-            size.width
-        }
-        val h = size.height
+    .drawWithCache {
         val gradientHeightPx = 180.dp.toPx()
-        drawRect(
-            brush = Brush.linearGradient(
-                colors = listOf(canopyStart, canopyMid, canopyEnd),
-                start = Offset(-slideOffsetX, 0f),
-                end = Offset(totalW - slideOffsetX, gradientHeightPx)
-            )
-        )
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(canopyGlow, Color.Transparent),
-                center = Offset(totalW * 0.92f - slideOffsetX, 0f),
-                radius = (totalW * 0.7f).coerceAtLeast(100f)
-            )
-        )
         val strokePx = 1.dp.toPx()
-        drawLine(
-            color = Color.White.copy(alpha = 0.16f),
-            start = Offset(0f, h - strokePx / 2f),
-            end = Offset(size.width, h - strokePx / 2f),
-            strokeWidth = strokePx
-        )
+        val borderColor = Color.White.copy(alpha = 0.16f)
+        val linearColors = listOf(canopyStart, canopyMid, canopyEnd)
+        val radialColors = listOf(canopyGlow, Color.Transparent)
+        var cachedTotalW = Float.NaN
+        var cachedSlideX = Float.NaN
+        var cachedLinearBrush: Brush? = null
+        var cachedRadialBrush: Brush? = null
+
+        onDrawBehind {
+            val animTick = coordinator?.transitionFraction ?: 1f
+            val currentRootX = getHeroCoordinates()?.takeIf { it.isAttached }?.positionInRoot()?.x ?: 0f
+            val slideOffsetX = if (coordinator != null && coordinator.containerWidthPx > 0f && animTick >= 0f) {
+                currentRootX - coordinator.containerRootX
+            } else {
+                0f
+            }
+            val totalW = if (coordinator != null && coordinator.containerWidthPx > 0f) {
+                coordinator.containerWidthPx
+            } else {
+                size.width
+            }
+            if (cachedLinearBrush == null || cachedTotalW != totalW || cachedSlideX != slideOffsetX) {
+                cachedTotalW = totalW
+                cachedSlideX = slideOffsetX
+                cachedLinearBrush = Brush.linearGradient(
+                    colors = linearColors,
+                    start = Offset(-slideOffsetX, 0f),
+                    end = Offset(totalW - slideOffsetX, gradientHeightPx)
+                )
+                cachedRadialBrush = Brush.radialGradient(
+                    colors = radialColors,
+                    center = Offset(totalW * 0.92f - slideOffsetX, 0f),
+                    radius = (totalW * 0.7f).coerceAtLeast(100f)
+                )
+            }
+            drawRect(brush = cachedLinearBrush!!)
+            drawRect(brush = cachedRadialBrush!!)
+            val h = size.height
+            drawLine(
+                color = borderColor,
+                start = Offset(0f, h - strokePx / 2f),
+                end = Offset(size.width, h - strokePx / 2f),
+                strokeWidth = strokePx
+            )
+        }
     }
     .statusBarsPadding()
     .clipToBounds()

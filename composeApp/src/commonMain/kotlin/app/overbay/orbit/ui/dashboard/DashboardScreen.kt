@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -14,15 +15,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -70,7 +72,7 @@ fun DashboardScreen(
 ) {
     val posture = LocalDevicePosture.current
     val heroScrollState = rememberHeroScrollState()
-    val scrollState = rememberScrollState()
+    val listState = rememberLazyListState()
 
     val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottomContentPadding = navBarBottomPadding + 88.dp
@@ -143,113 +145,124 @@ fun DashboardScreen(
                     )
                 }
             } else {
-                val visibleConfigs = uiState.customization.cardConfigs
-                    .ifEmpty {
-                        uiState.visibleCards.mapIndexed { idx, type ->
-                            DashboardCardConfigItem(
-                                type = type,
-                                title = type.defaultTitle,
-                                description = type.defaultDescription,
-                                isVisible = true,
-                                sortOrder = idx,
-                                wideSpan = type.defaultWideSpan
-                            )
+                val visibleConfigs = remember(
+                    uiState.customization.cardConfigs,
+                    uiState.visibleCards,
+                    uiState.mhaEnabled
+                ) {
+                    uiState.customization.cardConfigs
+                        .ifEmpty {
+                            uiState.visibleCards.mapIndexed { idx, type ->
+                                DashboardCardConfigItem(
+                                    type = type,
+                                    title = type.defaultTitle,
+                                    description = type.defaultDescription,
+                                    isVisible = true,
+                                    sortOrder = idx,
+                                    wideSpan = type.defaultWideSpan
+                                )
+                            }
                         }
-                    }
-                    .filter { config ->
-                        config.isVisible && (if (config.type == DashboardCardType.MHA_SUMMARY) uiState.mhaEnabled else true)
-                    }
+                        .filter { config ->
+                            config.isVisible && (if (config.type == DashboardCardType.MHA_SUMMARY) uiState.mhaEnabled else true)
+                        }
+                }
+                val gridRows = remember(visibleConfigs, posture.supportsTwoPane) {
+                    if (posture.supportsTwoPane) buildDashboardGridRows(visibleConfigs) else emptyList()
+                }
+                val horizontalPadding = if (posture.supportsTwoPane) 20.dp else 16.dp
 
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(scrollState),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.TopCenter
                 ) {
-                    Column(
+                    LazyColumn(
+                        state = listState,
                         modifier = Modifier
                             .widthIn(max = 1440.dp)
-                            .fillMaxWidth()
-                            .padding(horizontal = if (posture.supportsTwoPane) 20.dp else 16.dp, vertical = 14.dp)
+                            .fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = horizontalPadding,
+                            end = horizontalPadding,
+                            top = 14.dp,
+                            bottom = 14.dp + bottomContentPadding
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        // First-time empty workspace guided setup card
                         if (uiState.isEmptyWorkspace) {
-                            EmptyWorkspaceSetupCard(
-                                onImportCsv = {
-                                    onAction(DashboardAction.RequestOpenDataSettings)
-                                    onNavigate(OrbitNavKey.Settings)
-                                },
-                                onConnectSimpleFin = {
-                                    onAction(DashboardAction.RequestOpenDataSettings)
-                                    onNavigate(OrbitNavKey.Settings)
-                                },
-                                onAddManualAccount = {
-                                    onNavigate(OrbitNavKey.Accounts())
-                                }
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
+                            item(key = "empty_workspace_setup") {
+                                EmptyWorkspaceSetupCard(
+                                    onImportCsv = {
+                                        onAction(DashboardAction.RequestOpenDataSettings)
+                                        onNavigate(OrbitNavKey.Settings)
+                                    },
+                                    onConnectSimpleFin = {
+                                        onAction(DashboardAction.RequestOpenDataSettings)
+                                        onNavigate(OrbitNavKey.Settings)
+                                    },
+                                    onAddManualAccount = {
+                                        onNavigate(OrbitNavKey.Accounts())
+                                    }
+                                )
+                            }
                         }
 
                         if (posture.supportsTwoPane) {
-                            val gridRows = buildDashboardGridRows(visibleConfigs)
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(14.dp)
-                            ) {
-                                gridRows.forEach { row ->
-                                    if (row.isFullSpan) {
-                                        DashboardCardItem(row.leftCard, uiState, onAction, onNavigate)
-                                    } else {
-                                        Row(
+                            items(
+                                items = gridRows,
+                                key = { row -> "${row.leftCard.name}_${row.rightCard?.name ?: "single"}" }
+                            ) { row ->
+                                if (row.isFullSpan) {
+                                    DashboardCardItem(row.leftCard, uiState, onAction, onNavigate)
+                                } else {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(IntrinsicSize.Max),
+                                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                    ) {
+                                        Box(
                                             modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(IntrinsicSize.Max),
-                                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                                .weight(1f)
+                                                .fillMaxHeight()
                                         ) {
+                                            DashboardCardItem(
+                                                cardType = row.leftCard,
+                                                uiState = uiState,
+                                                onAction = onAction,
+                                                onNavigate = onNavigate,
+                                                modifier = Modifier.fillMaxHeight()
+                                            )
+                                        }
+                                        if (row.rightCard != null) {
                                             Box(
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .fillMaxHeight()
                                             ) {
                                                 DashboardCardItem(
-                                                    cardType = row.leftCard,
+                                                    cardType = row.rightCard,
                                                     uiState = uiState,
                                                     onAction = onAction,
                                                     onNavigate = onNavigate,
                                                     modifier = Modifier.fillMaxHeight()
                                                 )
                                             }
-                                            if (row.rightCard != null) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .fillMaxHeight()
-                                                ) {
-                                                    DashboardCardItem(
-                                                        cardType = row.rightCard,
-                                                        uiState = uiState,
-                                                        onAction = onAction,
-                                                        onNavigate = onNavigate,
-                                                        modifier = Modifier.fillMaxHeight()
-                                                    )
-                                                }
-                                            } else {
-                                                Spacer(modifier = Modifier.weight(1f))
-                                            }
+                                        } else {
+                                            Spacer(modifier = Modifier.weight(1f))
                                         }
                                     }
                                 }
                             }
                         } else {
-                            visibleConfigs.forEachIndexed { index, config ->
+                            items(
+                                items = visibleConfigs,
+                                key = { config -> config.type.name },
+                                contentType = { config -> config.type }
+                            ) { config ->
                                 DashboardCardItem(config.type, uiState, onAction, onNavigate)
-                                if (index < visibleConfigs.lastIndex) {
-                                    Spacer(modifier = Modifier.height(14.dp))
-                                }
                             }
                         }
-
-                        Spacer(modifier = Modifier.height(bottomContentPadding))
                     }
                 }
             }

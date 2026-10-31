@@ -61,27 +61,27 @@ object DashboardDataTransform {
         val categoryById = snapshot.categories.associateBy { it.id }
         val accountById = snapshot.accounts.associateBy { it.id }
 
-        // Active non-ignored non-transfer transactions
-        val activeTxns = snapshot.transactions.filter { !it.effectiveIsIgnored && !it.effectiveIsTransfer }
-        val monthTxns = activeTxns.filter { it.effectiveDate.take(7) == selectedMonth }
+        val priorMonth = LocalDateUtils.addMonthsToYearMonth(selectedMonth, -1)
+        val currentYearStr = selectedMonth.take(4)
+        val scan = DashboardTransactionAggregator.scan(
+            transactions = snapshot.transactions,
+            accountById = accountById,
+            selectedMonth = selectedMonth,
+            priorMonth = priorMonth,
+            currentYearStr = currentYearStr,
+            hiddenBiggestIds = hiddenBiggestIds
+        )
+        val monthTxns = scan.monthTxns
+        val incomeCents = scan.incomeCents
+        val expenseCents = scan.expenseCents
+        val priorIncome = scan.priorIncomeCents
+        val priorExpense = scan.priorExpenseCents
+        val mhaSpending = scan.mhaSpendingCents
+        val mhaTxnCount = scan.mhaTransactionCount
+        val topRecent = scan.topRecent
 
-        var incomeCents: Cents = 0L
-        var expenseCents: Cents = 0L
-        for (t in monthTxns) {
-            val amt = t.effectiveAmountCents
-            if (amt > 0) incomeCents += amt else if (amt < 0) expenseCents += -amt
-        }
         val netCents = incomeCents - expenseCents
         val savingsRate = if (incomeCents > 0L) (netCents.toDouble() / incomeCents.toDouble()) * 100.0 else 0.0
-
-        val priorMonth = LocalDateUtils.addMonthsToYearMonth(selectedMonth, -1)
-        val priorTxns = activeTxns.filter { it.effectiveDate.take(7) == priorMonth }
-        var priorIncome: Cents = 0L
-        var priorExpense: Cents = 0L
-        for (t in priorTxns) {
-            val amt = t.effectiveAmountCents
-            if (amt > 0) priorIncome += amt else if (amt < 0) priorExpense += -amt
-        }
         val priorNet = priorIncome - priorExpense
         val netDeltaPct = if (priorNet != 0L) {
             ((netCents - priorNet).toDouble() / abs(priorNet).toDouble()) * 100.0
@@ -102,12 +102,12 @@ object DashboardDataTransform {
             netDeltaPercent = netDeltaPct
         )
 
-        // 2. Budget Pulse
+        // 2. Budget Pulse (pass pre-filtered monthTxns instead of scanning all transactions again)
         val budgetOverview = BudgetEngine.calculateMonthlyOverview(
             month = selectedMonth,
             categories = snapshot.categories,
             budgets = snapshot.budgets,
-            transactions = snapshot.transactions,
+            transactions = monthTxns,
             todayDate = todayIso
         )
         val percentUsed = if (budgetOverview.totalBudgetedCents > 0L) {
@@ -138,14 +138,7 @@ object DashboardDataTransform {
         )
 
         // 3. Top Spending (Top 7 categories)
-        val categorySpendingMap = mutableMapOf<Long, Long>()
-        for (t in monthTxns) {
-            if (t.isExpense) {
-                val catId = t.effectiveCategoryId ?: 0L
-                categorySpendingMap[catId] = (categorySpendingMap[catId] ?: 0L) + abs(t.effectiveAmountCents)
-            }
-        }
-        val topSpendingCategories = categorySpendingMap.entries
+        val topSpendingCategories = scan.categorySpendingMap.entries
             .sortedByDescending { it.value }
             .take(7)
             .map { entry ->
@@ -167,27 +160,24 @@ object DashboardDataTransform {
         )
 
         // 4. Biggest Monthly Transactions
-        val expenseTxns = monthTxns.filter { it.isExpense && it.id !in hiddenBiggestIds }
-            .sortedByDescending { abs(it.effectiveAmountCents) }
-            .take(5)
-            .map { t ->
-                val cat = t.effectiveCategoryId?.let { categoryById[it] }
-                val acct = accountById[t.accountId]
-                val dateDisplay = LocalDateUtils.parseIsoDate(t.effectiveDate)?.let {
-                    LocalDateUtils.formatRelativeOrDisplayDate(it)
-                } ?: t.effectiveDate
-                BiggestTransactionItem(
-                    id = t.id,
-                    merchant = t.effectiveMerchant,
-                    amountCents = t.effectiveAmountCents,
-                    formattedAmount = MoneyUtils.formatCents(t.effectiveAmountCents, signed = true),
-                    dateDisplay = dateDisplay,
-                    categoryName = cat?.name ?: t.categoryName,
-                    categoryColor = cat?.color ?: t.categoryColor,
-                    categoryIcon = cat?.displayEmoji ?: CategoryEmojiMapper.resolveEmoji(t.categoryIcon),
-                    accountName = acct?.name ?: t.accountName
-                )
-            }
+        val expenseTxns = scan.topBiggestExpenses.map { t ->
+            val cat = t.effectiveCategoryId?.let { categoryById[it] }
+            val acct = accountById[t.accountId]
+            val dateDisplay = LocalDateUtils.parseIsoDate(t.effectiveDate)?.let {
+                LocalDateUtils.formatRelativeOrDisplayDate(it)
+            } ?: t.effectiveDate
+            BiggestTransactionItem(
+                id = t.id,
+                merchant = t.effectiveMerchant,
+                amountCents = t.effectiveAmountCents,
+                formattedAmount = MoneyUtils.formatCents(t.effectiveAmountCents, signed = true),
+                dateDisplay = dateDisplay,
+                categoryName = cat?.name ?: t.categoryName,
+                categoryColor = cat?.color ?: t.categoryColor,
+                categoryIcon = cat?.displayEmoji ?: CategoryEmojiMapper.resolveEmoji(t.categoryIcon),
+                accountName = acct?.name ?: t.accountName
+            )
+        }
         val biggestTransactionsState = BiggestTransactionsState(
             transactions = expenseTxns,
             hiddenCount = hiddenBiggestIds.size
@@ -195,6 +185,7 @@ object DashboardDataTransform {
 
         // 5. Subscriptions / Recurring (from Upcoming)
         val subscriptionsList = snapshot.upcomingItems
+            .asSequence()
             .filter { it.status == UpcomingStatus.ACTIVE }
             .take(5)
             .map { item ->
@@ -211,15 +202,13 @@ object DashboardDataTransform {
                     nextDateDisplay = item.nextDate
                 )
             }
+            .toList()
         val subscriptionsState = SubscriptionsState(items = subscriptionsList)
 
         // 6. Uncategorized Transactions
-        val uncategorizedList = snapshot.transactions
-            .filter { !it.effectiveIsIgnored && it.effectiveCategoryId == null }
-            .sortedByDescending { it.effectiveDate }
         val uncategorizedState = UncategorizedTransactionsState(
-            count = uncategorizedList.size,
-            transactions = uncategorizedList.take(5).map { txn ->
+            count = scan.uncategorizedCount,
+            transactions = scan.topUncategorized.map { txn ->
                 val acct = accountById[txn.accountId]
                 DashboardRecentTransactionItem(
                     id = txn.id,
@@ -391,18 +380,11 @@ object DashboardDataTransform {
         )
 
         // 12. MHA Summary
-        val currentYearStr = selectedMonth.take(4)
-        val ytdMhaTxns = snapshot.transactions.filter { txn ->
-            val isEligible = txn.effectiveMhaEligible == true ||
-                (txn.effectiveMhaEligible == null && accountById[txn.accountId]?.mhaDefaultEligible == true)
-            !txn.effectiveIsIgnored && isEligible && txn.effectiveDate.startsWith(currentYearStr)
-        }
-        val mhaSpending = ytdMhaTxns.sumOf { abs(it.effectiveAmountCents) }
         val mhaSavings = (mhaSpending * 0.22).toLong() // 22% estimated marginal savings
         val mhaState = MhaSummaryState(
             eligibleSpendingCents = mhaSpending,
             estimatedTaxSavingsCents = mhaSavings,
-            ytdTransactionCount = ytdMhaTxns.size
+            ytdTransactionCount = mhaTxnCount
         )
 
         // 13. Mortgage Snapshot
@@ -465,41 +447,37 @@ object DashboardDataTransform {
         )
 
         // 15. Recent Transactions (last 5)
-        val recentList = snapshot.transactions
-            .filter { !it.effectiveIsIgnored }
-            .sortedWith(compareByDescending<Transaction> { it.effectiveDate }.thenByDescending { it.id })
-            .take(5)
-            .map { txn ->
-                val cat = txn.effectiveCategoryId?.let { categoryById[it] }
-                val acct = accountById[txn.accountId]
-                val dateDisplay = LocalDateUtils.parseIsoDate(txn.effectiveDate)?.let {
-                    LocalDateUtils.formatRelativeOrDisplayDate(it)
-                } ?: txn.effectiveDate
+        val recentList = topRecent.map { txn ->
+            val cat = txn.effectiveCategoryId?.let { categoryById[it] }
+            val acct = accountById[txn.accountId]
+            val dateDisplay = LocalDateUtils.parseIsoDate(txn.effectiveDate)?.let {
+                LocalDateUtils.formatRelativeOrDisplayDate(it)
+            } ?: txn.effectiveDate
 
-                val hasEdits = txn.editedDate != null || txn.editedMerchant != null || txn.editedAmountCents != null ||
-                    txn.editedCategoryIdSource != null || txn.editedIsTransfer != null || txn.editedIsIgnored != null || txn.editedMhaEligible != null
+            val hasEdits = txn.editedDate != null || txn.editedMerchant != null || txn.editedAmountCents != null ||
+                txn.editedCategoryIdSource != null || txn.editedIsTransfer != null || txn.editedIsIgnored != null || txn.editedMhaEligible != null
 
-                DashboardRecentTransactionItem(
-                    id = txn.id,
-                    merchant = txn.effectiveMerchant,
-                    amountCents = txn.effectiveAmountCents,
-                    isExpense = txn.isExpense,
-                    formattedAmount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
-                    dateIso = txn.effectiveDate,
-                    dateDisplay = dateDisplay,
-                    categoryId = txn.effectiveCategoryId,
-                    categoryName = cat?.name ?: txn.categoryName ?: "Uncategorized",
-                    categoryColor = cat?.color ?: txn.categoryColor,
-                    categoryIcon = cat?.displayEmoji ?: CategoryEmojiMapper.resolveEmoji(txn.categoryIcon),
-                    accountName = acct?.name ?: txn.accountName,
-                    isPending = txn.isPending,
-                    merchantLogoUrl = txn.merchantLogo?.url?.takeIf { it.isNotBlank() && txn.merchantLogo.status != "hidden" && txn.merchantLogo.status != "failed" },
-                    isTransfer = txn.effectiveIsTransfer,
-                    isIgnored = txn.effectiveIsIgnored,
-                    isMhaEligible = txn.effectiveMhaEligible ?: false,
-                    hasEdits = hasEdits
-                )
-            }
+            DashboardRecentTransactionItem(
+                id = txn.id,
+                merchant = txn.effectiveMerchant,
+                amountCents = txn.effectiveAmountCents,
+                isExpense = txn.isExpense,
+                formattedAmount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
+                dateIso = txn.effectiveDate,
+                dateDisplay = dateDisplay,
+                categoryId = txn.effectiveCategoryId,
+                categoryName = cat?.name ?: txn.categoryName ?: "Uncategorized",
+                categoryColor = cat?.color ?: txn.categoryColor,
+                categoryIcon = cat?.displayEmoji ?: CategoryEmojiMapper.resolveEmoji(txn.categoryIcon),
+                accountName = acct?.name ?: txn.accountName,
+                isPending = txn.isPending,
+                merchantLogoUrl = txn.merchantLogo?.url?.takeIf { it.isNotBlank() && txn.merchantLogo.status != "hidden" && txn.merchantLogo.status != "failed" },
+                isTransfer = txn.effectiveIsTransfer,
+                isIgnored = txn.effectiveIsIgnored,
+                isMhaEligible = txn.effectiveMhaEligible ?: false,
+                hasEdits = hasEdits
+            )
+        }
         val recentState = RecentTransactionsState(transactions = recentList)
 
         // 16. Cards Display & Customization
@@ -542,11 +520,15 @@ object DashboardDataTransform {
             isEmptyWorkspace = snapshot.accounts.isEmpty() && snapshot.transactions.isEmpty(),
             availableCategories = snapshot.categories,
             isReviewModalOpen = categorizeReview.isOpen,
-            categorizeReview = categorizeReview.copy(
-                categories = snapshot.categories,
-                accounts = snapshot.accounts,
-                allTransactions = snapshot.transactions
-            ),
+            categorizeReview = if (categorizeReview.isOpen) {
+                categorizeReview.copy(
+                    categories = snapshot.categories,
+                    accounts = snapshot.accounts,
+                    allTransactions = snapshot.transactions
+                )
+            } else {
+                categorizeReview
+            },
             cashflow = cashflowState,
             budgetPulse = budgetPulseState,
             topSpending = topSpendingState,

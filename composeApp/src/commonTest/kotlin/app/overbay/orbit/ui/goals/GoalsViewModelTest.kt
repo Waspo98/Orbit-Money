@@ -37,7 +37,7 @@ class GoalsViewModelTest {
         storage.clear()
         repository = OrbitRepository(storage)
         repository.initialize()
-        viewModel = GoalsViewModel(repository)
+        viewModel = GoalsViewModel(repository, testDispatcher)
     }
 
     @AfterTest

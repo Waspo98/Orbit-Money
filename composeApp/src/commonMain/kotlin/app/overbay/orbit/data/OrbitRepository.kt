@@ -117,35 +117,42 @@ class OrbitRepository(
     }
 
     suspend fun initialize() {
-        val localSnap = localEngine.loadSnapshot()
         val pendingOidcUrl = storage.loadString(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
+        val startupPrefs = localEngine.loadStartupPreferences()
+        val isFastSelfHostedStartup = startupPrefs != null &&
+            (startupPrefs.storageMode == StorageMode.SELF_HOSTED || !pendingOidcUrl.isNullOrBlank())
+
+        var localSnap: OrbitWorkspaceSnapshot? = null
+        val basePref = if (isFastSelfHostedStartup) {
+            startupPrefs
+        } else {
+            val loadedLocal = localEngine.loadSnapshot()
+            localSnap = loadedLocal
+            if (startupPrefs == null) {
+                localEngine.saveStartupPreferences(loadedLocal.preferences)
+            }
+            loadedLocal.preferences
+        }
+
         val pref = if (!pendingOidcUrl.isNullOrBlank()) {
-            localSnap.preferences.copy(
-                storageMode = StorageMode.SELF_HOSTED,
-                selfHostedServerUrl = if (pendingOidcUrl == "/") "" else pendingOidcUrl,
-                onboardingCompleted = true
-            )
-        } else localSnap.preferences
+            basePref.copy(storageMode = StorageMode.SELF_HOSTED, selfHostedServerUrl = if (pendingOidcUrl == "/") "" else pendingOidcUrl, onboardingCompleted = true)
+        } else basePref
         _preferences.value = pref
         _storageMode.value = pref.storageMode
         if (pref.storageMode == StorageMode.SELF_HOSTED) {
             val client = createApiClient(pref.selfHostedServerUrl)
             val remoteEngine = SelfHostedApiEngine(client, storage) { _preferences.value }
             activeEngine = remoteEngine
-            val cachedSnap = remoteEngine.loadCachedSnapshot()?.copy(preferences = pref) ?: localSnap.copy(preferences = pref)
-            val hasSession = !storage.loadString(OrbitApiClient.COOKIE_STORAGE_KEY).isNullOrBlank() ||
-                cachedSnap.accounts.isNotEmpty() || cachedSnap.transactions.isNotEmpty()
+            val cachedSnap = remoteEngine.loadCachedSnapshot()?.copy(preferences = pref) ?: (localSnap ?: localEngine.loadSnapshot()).copy(preferences = pref)
+            val hasSession = !client.sessionCookie.isNullOrBlank() || cachedSnap.accounts.isNotEmpty() || cachedSnap.transactions.isNotEmpty()
             _isAuthenticated.value = hasSession
             updateMemoryState(cachedSnap)
-            if (customApiClient == null) {
-                scope.launch { refreshSelfHostedSession(client, remoteEngine, pref, pendingOidcUrl, hasSession) }
-            } else {
-                refreshSelfHostedSession(client, remoteEngine, pref, pendingOidcUrl, hasSession)
-            }
+            if (customApiClient == null) scope.launch { refreshSelfHostedSession(client, remoteEngine, pref, pendingOidcUrl, hasSession) }
+            else refreshSelfHostedSession(client, remoteEngine, pref, pendingOidcUrl, hasSession)
         } else {
             _isAuthenticated.value = true
             activeEngine = localEngine
-            updateMemoryState(localSnap.copy(preferences = pref))
+            updateMemoryState((localSnap ?: localEngine.loadSnapshot()).copy(preferences = pref))
         }
     }
 
@@ -163,9 +170,11 @@ class OrbitRepository(
             storage.delete(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
             _isAuthenticated.value = true
             _currentUser.value = me.displayName ?: me.username ?: me.email
-            val loaded = remoteEngine.loadSnapshot().copy(preferences = pref)
-            updateMemoryState(loaded)
-            localEngine.saveSnapshot(loaded)
+            val loaded = remoteEngine.loadSnapshot(preFetchedMe = me).copy(preferences = pref)
+            val existing = _snapshot.value
+            val sameData = loaded.copy(preferences = loaded.preferences.copy(sharedSessionCachedAtEpochMs = existing.preferences.sharedSessionCachedAtEpochMs)) == existing
+            if (!sameData) updateMemoryState(loaded) else _preferences.value = loaded.preferences
+            localEngine.saveStartupPreferences(loaded.preferences)
         } else {
             val errMsg = meResult.exceptionOrNull()?.message.orEmpty()
             val is401 = (me != null && !me.authenticated) || errMsg.contains("401") || !hadCachedSession
@@ -232,21 +241,17 @@ class OrbitRepository(
         _preferences.value = updatedPref
         _storageMode.value = StorageMode.SELF_HOSTED
         _isAuthenticated.value = false
-        localEngine.saveSnapshot(_snapshot.value.copy(preferences = updatedPref))
+        localEngine.saveStartupPreferences(updatedPref)
     }
 
     suspend fun markAuthenticated(serverUrl: String, userLabel: String) {
         val normalizedUrl = ServerUrlNormalizer.normalize(serverUrl)
-        val updatedPref = _preferences.value.copy(
-            storageMode = StorageMode.SELF_HOSTED,
-            selfHostedServerUrl = normalizedUrl,
-            onboardingCompleted = true
-        )
+        val updatedPref = _preferences.value.copy(storageMode = StorageMode.SELF_HOSTED, selfHostedServerUrl = normalizedUrl, onboardingCompleted = true)
         _preferences.value = updatedPref
         _storageMode.value = StorageMode.SELF_HOSTED
         _isAuthenticated.value = true
         _currentUser.value = userLabel
-        localEngine.saveSnapshot(_snapshot.value.copy(preferences = updatedPref))
+        localEngine.saveStartupPreferences(updatedPref)
         activeEngine = SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
         val fresh = activeEngine.loadSnapshot().copy(preferences = updatedPref)
         commitSnapshot(fresh, immediate = true)
@@ -557,7 +562,10 @@ class OrbitRepository(
     suspend fun sync(force: Boolean = false): SyncResult {
         val result = activeEngine.sync(force)
         _syncStatus.value = result
-        if (result is SyncResult.Success) commitSnapshot(activeEngine.loadSnapshot(), immediate = true)
+        if (result is SyncResult.Success) {
+            val fresh = (activeEngine as? SelfHostedApiEngine)?.consumeLastSyncedSnapshot() ?: activeEngine.loadSnapshot()
+            commitSnapshot(fresh, immediate = true)
+        }
         return result
     }
 

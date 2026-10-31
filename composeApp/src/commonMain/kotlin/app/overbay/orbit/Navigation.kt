@@ -69,6 +69,26 @@ import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.PlatformStorage
 
+private class OrbitViewModelHolder(repo: OrbitRepository) {
+    val loginViewModel by lazy { LoginViewModel(repo) }
+    val onboardingViewModel by lazy { OnboardingViewModel(repo) }
+    val dashboardViewModel by lazy { DashboardViewModel(repo) }
+    val transactionsViewModel by lazy { TransactionsViewModel(repo) }
+    val categoriesViewModel by lazy { CategoriesViewModel(repo) }
+    val rulesViewModel by lazy { RulesViewModel(repo) }
+    val budgetsViewModel by lazy { BudgetsViewModel(repo) }
+    val upcomingViewModel by lazy { UpcomingViewModel(repo) }
+    val goalsViewModel by lazy { GoalsViewModel(repo) }
+    val accountsViewModel by lazy { AccountsViewModel(repo) }
+    val netWorthViewModel by lazy { NetWorthViewModel(repo) }
+    val spendingTrendsViewModel by lazy { SpendingTrendsViewModel(repo) }
+    val mhaTrackerViewModel by lazy { MhaTrackerViewModel(repo) }
+    val housingViewModel by lazy { HousingViewModel(repo) }
+    val retirementViewModel by lazy { RetirementViewModel(repo) }
+    val householdViewModel by lazy { HouseholdViewModel(repo) }
+    val settingsViewModel by lazy { SettingsViewModel(repo) }
+}
+
 @Composable
 fun OrbitNavigation(
     repository: OrbitRepository? = null,
@@ -82,23 +102,9 @@ fun OrbitNavigation(
     val repo = repository ?: remember { OrbitRepository(PlatformStorage()) }
     val preferences by repo.preferences.collectAsState()
     val isAuthenticated by repo.isAuthenticated.collectAsState()
-    val loginViewModel = remember(repo) { LoginViewModel(repo) }
-    val onboardingViewModel = remember(repo) { OnboardingViewModel(repo) }
-    val dashboardViewModel = remember(repo) { DashboardViewModel(repo) }
-    val transactionsViewModel = remember(repo) { TransactionsViewModel(repo) }
-    val categoriesViewModel = remember(repo) { CategoriesViewModel(repo) }
-    val rulesViewModel = remember(repo) { RulesViewModel(repo) }
-    val budgetsViewModel = remember(repo) { BudgetsViewModel(repo) }
-    val upcomingViewModel = remember(repo) { UpcomingViewModel(repo) }
-    val goalsViewModel = remember(repo) { GoalsViewModel(repo) }
-    val accountsViewModel = remember(repo) { AccountsViewModel(repo) }
-    val netWorthViewModel = remember(repo) { NetWorthViewModel(repo) }
-    val spendingTrendsViewModel = remember(repo) { SpendingTrendsViewModel(repo) }
-    val mhaTrackerViewModel = remember(repo) { MhaTrackerViewModel(repo) }
-    val housingViewModel = remember(repo) { HousingViewModel(repo) }
-    val retirementViewModel = remember(repo) { RetirementViewModel(repo) }
-    val householdViewModel = remember(repo) { HouseholdViewModel(repo) }
-    val settingsViewModel = remember(repo) { SettingsViewModel(repo) }
+    // Instantiate ViewModels lazily per visited route so cold-starting onto Dashboard
+    // only constructs DashboardViewModel instead of all 17 feature ViewModels at once.
+    val viewModels = remember(repo) { OrbitViewModelHolder(repo) }
 
     LaunchedEffect(preferences.storageMode, isAuthenticated, preferences.onboardingCompleted) {
         if (
@@ -128,7 +134,7 @@ fun OrbitNavigation(
 
     if (currentKey == OrbitNavKey.Login) {
         LoginScreen(
-            viewModel = loginViewModel,
+            viewModel = viewModels.loginViewModel,
             onLoginSuccess = {
                 backStack.clear()
                 backStack.add(OrbitNavKey.Dashboard)
@@ -148,7 +154,7 @@ fun OrbitNavigation(
 
     if (currentKey == OrbitNavKey.Onboarding) {
         OnboardingScreen(
-            viewModel = onboardingViewModel,
+            viewModel = viewModels.onboardingViewModel,
             onComplete = {
                 backStack.clear()
                 backStack.add(OrbitNavKey.Dashboard)
@@ -177,7 +183,7 @@ fun OrbitNavigation(
                 !destination.includeTransfers ||
                 !destination.includeIgnored
             if (hasTransactionsDeepLink) {
-                transactionsViewModel.applyDeepLink(
+                viewModels.transactionsViewModel.applyDeepLink(
                     transactionId = destination.transactionId,
                     accountId = destination.accountId,
                     categoryId = destination.categoryId,
@@ -190,14 +196,14 @@ fun OrbitNavigation(
                     includeIgnored = destination.includeIgnored
                 )
             } else {
-                transactionsViewModel.clearFilters()
-                transactionsViewModel.dismissInspectorPane()
+                viewModels.transactionsViewModel.clearFilters()
+                viewModels.transactionsViewModel.dismissInspectorPane()
             }
         } else if (destination is OrbitNavKey.Accounts) {
             if (destination.accountId != null) {
-                accountsViewModel.openAccountDeepLink(destination.accountId)
+                viewModels.accountsViewModel.openAccountDeepLink(destination.accountId)
             } else if (currentKey is OrbitNavKey.Accounts) {
-                accountsViewModel.dismissInspectorPane()
+                viewModels.accountsViewModel.dismissInspectorPane()
             }
         }
 
@@ -253,10 +259,11 @@ fun OrbitNavigation(
                 ) { key ->
                     CompositionLocalProvider(LocalCanopyScreenKeyId provides (key.primaryTabIndex ?: key)) {
                         when (key) {
-                            OrbitNavKey.Dashboard -> DashboardScreen(dashboardViewModel, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.Dashboard -> DashboardScreen(viewModels.dashboardViewModel, navigateTo, Modifier.fillMaxSize())
                             is OrbitNavKey.Transactions -> {
+                                val txVm = viewModels.transactionsViewModel
                                 LaunchedEffect(key) {
-                                    transactionsViewModel.applyDeepLink(
+                                    txVm.applyDeepLink(
                                         transactionId = key.transactionId,
                                         accountId = key.accountId,
                                         categoryId = key.categoryId,
@@ -269,21 +276,21 @@ fun OrbitNavigation(
                                         includeIgnored = key.includeIgnored
                                     )
                                 }
-                                TransactionsScreen(transactionsViewModel, navigateTo, Modifier.fillMaxSize())
+                                TransactionsScreen(txVm, navigateTo, Modifier.fillMaxSize())
                             }
-                            OrbitNavKey.Budgets -> BudgetsScreen(budgetsViewModel, navigateTo, Modifier.fillMaxSize())
-                            OrbitNavKey.Upcoming -> UpcomingScreen(upcomingViewModel, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.Goals -> GoalsScreen(goalsViewModel, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.Categories -> CategoriesScreen(categoriesViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.Rules -> RulesScreen(rulesViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            is OrbitNavKey.Accounts -> AccountsScreen(accountsViewModel, key.accountId, navigateTo, Modifier.fillMaxSize())
-                            OrbitNavKey.NetWorth -> NetWorthScreen(netWorthViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.SpendingTrends -> SpendingTrendsScreen(spendingTrendsViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.MhaTracker -> MhaTrackerScreen(mhaTrackerViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.HousingCalculator -> HousingCalculatorScreen(housingViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.RetirementCalculator -> RetirementCalculatorScreen(retirementViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.Household -> HouseholdScreen(householdViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.Settings -> SettingsScreen(settingsViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.Budgets -> BudgetsScreen(viewModels.budgetsViewModel, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.Upcoming -> UpcomingScreen(viewModels.upcomingViewModel, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.Goals -> GoalsScreen(viewModels.goalsViewModel, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.Categories -> CategoriesScreen(viewModels.categoriesViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.Rules -> RulesScreen(viewModels.rulesViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            is OrbitNavKey.Accounts -> AccountsScreen(viewModels.accountsViewModel, key.accountId, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.NetWorth -> NetWorthScreen(viewModels.netWorthViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.SpendingTrends -> SpendingTrendsScreen(viewModels.spendingTrendsViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.MhaTracker -> MhaTrackerScreen(viewModels.mhaTrackerViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.HousingCalculator -> HousingCalculatorScreen(viewModels.housingViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.RetirementCalculator -> RetirementCalculatorScreen(viewModels.retirementViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.Household -> HouseholdScreen(viewModels.householdViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.Settings -> SettingsScreen(viewModels.settingsViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
                             else -> {
                                 Box(
                                     modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp),

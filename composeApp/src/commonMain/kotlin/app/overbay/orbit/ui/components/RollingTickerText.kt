@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -18,6 +22,8 @@ import app.overbay.orbit.theme.OrbitSprings
 /**
  * Animated character-by-character odometer ticker for numbers and balances.
  * Uses tabular numerals ('tnum') and vertical spring physics reels.
+ * Renders a lightweight single [Text] node on initial mount and activates per-digit
+ * spring reels only once [text] changes after first composition.
  */
 @Composable
 fun RollingTickerText(
@@ -26,7 +32,22 @@ fun RollingTickerText(
     style: TextStyle = MaterialTheme.typography.headlineLarge,
     color: Color = MaterialTheme.colorScheme.onSurface
 ) {
-    val tnumStyle = style.copy(fontFeatureSettings = "tnum")
+    val tnumStyle = remember(style) { style.copy(fontFeatureSettings = "tnum") }
+    val initialText = remember { text }
+    var hasChangedSinceMount by remember { mutableStateOf(false) }
+    if (!hasChangedSinceMount && text != initialText) {
+        hasChangedSinceMount = true
+    }
+
+    if (!hasChangedSinceMount) {
+        Text(
+            text = text,
+            modifier = modifier,
+            style = tnumStyle,
+            color = color
+        )
+        return
+    }
 
     Row(
         modifier = modifier,

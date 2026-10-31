@@ -9,16 +9,20 @@ import app.overbay.orbit.data.model.CategorySortOption
 import app.overbay.orbit.domain.BudgetEngine
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 class BudgetsViewModel(
-    private val repository: OrbitRepository
+    private val repository: OrbitRepository,
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val currentMonth = LocalDateUtils.currentYearMonth()
@@ -127,7 +131,7 @@ class BudgetsViewModel(
             initialAddCategoryId = control.sheets.initialAddCategoryId,
             isLoading = false
         )
-    }.stateIn(
+    }.flowOn(computeDispatcher).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = BudgetsUiState(isLoading = true)

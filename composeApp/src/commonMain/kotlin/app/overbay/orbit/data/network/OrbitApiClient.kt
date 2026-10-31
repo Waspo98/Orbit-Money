@@ -3,6 +3,7 @@ package app.overbay.orbit.data.network
 import app.overbay.orbit.data.model.TransactionFilter
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.util.PlatformStorage
+import app.overbay.orbit.util.PlatformStorageEpoch
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
@@ -20,6 +21,10 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
+import kotlin.concurrent.Volatile
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
 
 /**
@@ -47,9 +52,26 @@ class OrbitApiClient(
         }
     }
 
+    @Volatile
+    private var cachedSessionCookie: String? = null
+
+    @Volatile
+    private var cookieLoadedEpoch: Long = -1L
+
     internal var sessionCookie: String?
-        get() = storage.loadString(COOKIE_STORAGE_KEY)
+        get() {
+            val currentEpoch = PlatformStorageEpoch.epoch
+            if (cookieLoadedEpoch != currentEpoch) {
+                cachedSessionCookie = storage.loadString(COOKIE_STORAGE_KEY)
+                cookieLoadedEpoch = currentEpoch
+            }
+            return cachedSessionCookie
+        }
         set(value) {
+            val currentEpoch = PlatformStorageEpoch.epoch
+            if (cookieLoadedEpoch == currentEpoch && cachedSessionCookie == value) return
+            cachedSessionCookie = value
+            cookieLoadedEpoch = currentEpoch
             if (value != null) storage.saveString(COOKIE_STORAGE_KEY, value)
             else storage.delete(COOKIE_STORAGE_KEY)
         }
@@ -242,10 +264,23 @@ class OrbitApiClient(
         if (totalPages <= 1) return@runCatching firstPage.items
         val allItems = ArrayList<TransactionDto>(firstPage.total.coerceAtLeast(firstPage.items.size))
         allItems.addAll(firstPage.items)
-        for (page in 2..totalPages) {
-            val nextPage = getTransactions(page = page, limit = 200).getOrNull() ?: break
-            if (nextPage.items.isEmpty()) break
-            allItems.addAll(nextPage.items)
+        // Fetch remaining pages in bounded parallel batches of 4 to cut multi-page sync latency by ~4x
+        // while preserving deterministic page order and avoiding connection-pool saturation.
+        coroutineScope {
+            for (batch in (2..totalPages).chunked(4)) {
+                val pages = batch.map { page ->
+                    async { getTransactions(page = page, limit = 200).getOrNull() }
+                }.awaitAll()
+                var reachedEnd = false
+                for (pageResult in pages) {
+                    if (pageResult == null || pageResult.items.isEmpty()) {
+                        reachedEnd = true
+                        break
+                    }
+                    allItems.addAll(pageResult.items)
+                }
+                if (reachedEnd) break
+            }
         }
         allItems
     }

@@ -61,11 +61,13 @@ class SelfHostedApiEngine(
         return runCatching { json.decodeFromJsonElement<T>(elem) }.getOrDefault(fallback)
     }
 
-    override suspend fun loadSnapshot(): OrbitWorkspaceSnapshot {
+    override suspend fun loadSnapshot(): OrbitWorkspaceSnapshot = loadSnapshot(preFetchedMe = null)
+
+    internal suspend fun loadSnapshot(preFetchedMe: AuthMeResponseDto?): OrbitWorkspaceSnapshot {
         // Attempt network fetch first; fall back to local offline cache preserving current preferences
         val currentPrefs = preferencesProvider().copy(storageMode = StorageMode.SELF_HOSTED)
         return try {
-            fetchRemoteSnapshot(currentPrefs).also { freshSnapshot ->
+            fetchRemoteSnapshot(currentPrefs, preFetchedMe).also { freshSnapshot ->
                 saveSnapshot(freshSnapshot)
             }
         } catch (_: Throwable) {
@@ -74,7 +76,10 @@ class SelfHostedApiEngine(
         }
     }
 
-    private suspend fun fetchRemoteSnapshot(currentPrefs: OrbitPreferences): OrbitWorkspaceSnapshot = coroutineScope {
+    private suspend fun fetchRemoteSnapshot(
+        currentPrefs: OrbitPreferences,
+        preFetchedMe: AuthMeResponseDto? = null
+    ): OrbitWorkspaceSnapshot = coroutineScope {
         val accountsDeferred = async { apiClient.getAccounts().getOrThrow() }
         val transactionsDeferred = async { apiClient.getAllTransactions().getOrThrow() }
         val categoriesDeferred = async { apiClient.getCategories().getOrThrow() }
@@ -84,7 +89,7 @@ class SelfHostedApiEngine(
         val upcomingDeferred = async { apiClient.getUpcomingFull().getOrNull() }
         val householdDeferred = async { apiClient.getHousehold().getOrNull() }
         val mhaDeferred = async { apiClient.getMhaOverview().getOrNull() }
-        val authMeDeferred = async { apiClient.getMe().getOrNull() }
+        val authMeDeferred = if (preFetchedMe != null) null else async { apiClient.getMe().getOrNull() }
         val sharingDeferred = async { apiClient.getHouseholdSharingRemote().getOrNull() }
         val remotePrefsDeferred = async { apiClient.getRemotePreferences().getOrNull() }
 
@@ -97,7 +102,7 @@ class SelfHostedApiEngine(
         val upcomingFull = upcomingDeferred.await()
         val householdDto = householdDeferred.await()
         val mhaDto = mhaDeferred.await()
-        val authMe = authMeDeferred.await()
+        val authMe = preFetchedMe ?: authMeDeferred?.await()
         val sharing = sharingDeferred.await()
         val remotePrefs = remotePrefsDeferred.await()
 
@@ -195,11 +200,17 @@ class SelfHostedApiEngine(
         storage.saveString(CACHE_SNAPSHOT_KEY, encoded)
     }
 
+    private var lastSyncedSnapshot: OrbitWorkspaceSnapshot? = null
+
+    internal fun consumeLastSyncedSnapshot(): OrbitWorkspaceSnapshot? =
+        lastSyncedSnapshot.also { lastSyncedSnapshot = null }
+
     override suspend fun sync(force: Boolean): SyncResult {
         return try {
             val simpleFinRes = apiClient.triggerSimpleFinSync().getOrNull()
             val fresh = fetchRemoteSnapshot(preferencesProvider().copy(storageMode = StorageMode.SELF_HOSTED))
             saveSnapshot(fresh)
+            lastSyncedSnapshot = fresh
             val suffix = if (simpleFinRes != null && simpleFinRes.transactionsInserted > 0) {
                 " (${simpleFinRes.transactionsInserted} new SimpleFIN transactions)"
             } else {

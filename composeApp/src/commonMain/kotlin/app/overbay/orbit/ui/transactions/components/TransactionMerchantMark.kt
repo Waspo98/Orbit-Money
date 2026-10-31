@@ -32,33 +32,56 @@ import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
+import app.overbay.orbit.util.PlatformRuntime
+import app.overbay.orbit.util.PlatformStorage
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.http.isSuccess
+import kotlin.concurrent.Volatile
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.decodeToImageBitmap
 
 /**
- * Shared in-memory bitmap and status-report cache for vendor/merchant logos.
- * Ensures 60fps LazyColumn scrolling with 0ms synchronous cache hits.
+ * Shared thread-safe bitmap, in-flight request deduplicator, persistent native disk cache,
+ * and status-report tracker for vendor/merchant logos.
+ * Ensures 60/120fps LazyColumn scrolling with lock-free synchronous memory hits and zero
+ * cold-start HTTPS download bursts on previously cached merchants.
  */
 object MerchantLogoImageCache {
     private val httpClient = HttpClient()
-    private val bitmapCache = mutableMapOf<String, ImageBitmap>()
-    private val failedUrls = mutableSetOf<String>()
-    private val reportedLogoStatuses = mutableSetOf<String>()
+    private val fetchScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val stateMutex = Mutex()
+    private val diskStorage by lazy { PlatformStorage() }
+
+    @Volatile
+    private var bitmapSnapshot: Map<String, ImageBitmap> = emptyMap()
+
+    @Volatile
+    private var failedUrlsSnapshot: Set<String> = emptySet()
+
+    private val inFlightRequests = HashMap<String, Deferred<ImageBitmap?>>()
+    private val reportedLogoStatuses = HashSet<String>()
 
     fun getCached(url: String?): ImageBitmap? =
-        if (url.isNullOrBlank()) null else bitmapCache[url]
+        if (url.isNullOrBlank()) null else bitmapSnapshot[url]
 
     fun isKnownFailed(url: String?): Boolean =
-        !url.isNullOrBlank() && url in failedUrls
+        !url.isNullOrBlank() && url in failedUrlsSnapshot
 
     fun clearFailed(url: String?) {
-        if (!url.isNullOrBlank()) failedUrls.remove(url)
+        if (!url.isNullOrBlank() && url in failedUrlsSnapshot) {
+            failedUrlsSnapshot = failedUrlsSnapshot - url
+        }
     }
 
     fun markReported(merchantKey: String, status: String): Boolean {
@@ -69,25 +92,73 @@ object MerchantLogoImageCache {
         return true
     }
 
-    @OptIn(ExperimentalResourceApi::class)
+    @OptIn(ExperimentalResourceApi::class, ExperimentalEncodingApi::class)
     suspend fun fetchBitmap(url: String): ImageBitmap? {
-        bitmapCache[url]?.let { return it }
-        if (url in failedUrls) return null
-        return withContext(Dispatchers.Default) {
-            runCatching {
-                val response = httpClient.get(url)
-                if (!response.status.isSuccess()) {
-                    throw IllegalStateException("HTTP ${response.status.value}")
+        bitmapSnapshot[url]?.let { return it }
+        if (url in failedUrlsSnapshot) return null
+
+        val deferred = stateMutex.withLock {
+            bitmapSnapshot[url]?.let { return it }
+            if (url in failedUrlsSnapshot) return null
+            inFlightRequests.getOrPut(url) {
+                fetchScope.async {
+                    try {
+                        val diskKey = if (!PlatformRuntime.isWeb) buildDiskCacheKey(url) else null
+                        if (diskKey != null) {
+                            val cachedBase64 = runCatching { diskStorage.loadString(diskKey) }.getOrNull()
+                            if (!cachedBase64.isNullOrBlank()) {
+                                val decodedDisk = runCatching {
+                                    Base64.decode(cachedBase64).decodeToImageBitmap()
+                                }.getOrNull()
+                                if (decodedDisk != null) {
+                                    stateMutex.withLock {
+                                        bitmapSnapshot = bitmapSnapshot + (url to decodedDisk)
+                                    }
+                                    return@async decodedDisk
+                                }
+                            }
+                        }
+
+                        val response = httpClient.get(url)
+                        if (!response.status.isSuccess()) {
+                            throw IllegalStateException("HTTP ${response.status.value}")
+                        }
+                        val bytes: ByteArray = response.body()
+                        val bitmap = bytes.decodeToImageBitmap()
+                        if (diskKey != null && bytes.size <= MAX_DISK_LOGO_BYTES) {
+                            runCatching { diskStorage.saveString(diskKey, Base64.encode(bytes)) }
+                        }
+                        stateMutex.withLock {
+                            bitmapSnapshot = bitmapSnapshot + (url to bitmap)
+                        }
+                        bitmap
+                    } catch (_: Throwable) {
+                        stateMutex.withLock {
+                            failedUrlsSnapshot = failedUrlsSnapshot + url
+                        }
+                        null
+                    } finally {
+                        stateMutex.withLock {
+                            inFlightRequests.remove(url)
+                        }
+                    }
                 }
-                val bytes: ByteArray = response.body()
-                bytes.decodeToImageBitmap()
-            }.onSuccess { bitmap ->
-                bitmapCache[url] = bitmap
-            }.onFailure {
-                failedUrls.add(url)
-            }.getOrNull()
+            }
         }
+        return deferred.await()
     }
+
+    private fun buildDiskCacheKey(url: String): String {
+        // 64-bit FNV-1a hash for compact, collision-resistant filename keys
+        var hash = -3750763034362895579L // 0xcbf29ce484222325uL
+        for (i in url.indices) {
+            hash = hash xor url[i].code.toLong()
+            hash *= 1099511628211L // 0x100000001b3L
+        }
+        return "orbit_logo_cache_${hash.toULong().toString(16)}.b64"
+    }
+
+    private const val MAX_DISK_LOGO_BYTES = 256 * 1024
 }
 
 /**

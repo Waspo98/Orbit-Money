@@ -37,7 +37,7 @@ class CategoriesViewModelTest {
         storage.clear()
         repository = OrbitRepository(storage)
         repository.initialize()
-        viewModel = CategoriesViewModel(repository)
+        viewModel = CategoriesViewModel(repository, testDispatcher)
     }
 
     @AfterTest

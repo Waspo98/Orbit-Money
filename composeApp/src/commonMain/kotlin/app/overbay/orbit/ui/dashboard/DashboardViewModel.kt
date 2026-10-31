@@ -15,10 +15,13 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.ReviewQueueEngine
 import app.overbay.orbit.domain.RuleMatcherEngine
 import app.overbay.orbit.domain.UpcomingEngine
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -28,7 +31,8 @@ import kotlin.math.abs
  * Keeps under the 600-line ceiling by delegating snapshot transformation to [DashboardDataTransform].
  */
 class DashboardViewModel(
-    private val repository: OrbitRepository
+    private val repository: OrbitRepository,
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val currentMonth = LocalDateUtils.currentYearMonth()
@@ -86,7 +90,7 @@ class DashboardViewModel(
             retirementPreset = input2.retirementPreset,
             categorizeReview = input2.reviewState
         )
-    }.stateIn(
+    }.flowOn(computeDispatcher).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = DashboardUiState.initial()

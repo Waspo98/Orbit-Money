@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 actual fun BindPlatformGoogleDriveClient(
@@ -12,7 +14,9 @@ actual fun BindPlatformGoogleDriveClient(
 ) {
     val context = LocalContext.current
     LaunchedEffect(cloudSyncManager, googleClientId) {
-        val googleAccount = GoogleSignIn.getLastSignedInAccount(context)?.account
+        val googleAccount = withContext(Dispatchers.Default) {
+            GoogleSignIn.getLastSignedInAccount(context)?.account
+        }
         if (googleAccount != null) {
             val client = AndroidGoogleDriveClient(context, googleAccount)
             cloudSyncManager.setRemoteClient(client)

@@ -20,15 +20,19 @@ import app.overbay.orbit.data.setAccountArchived
 import app.overbay.orbit.data.unlinkSimpleFinAccount
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.NetWorthEngine
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class AccountsViewModel(
-    private val repository: OrbitRepository
+    private val repository: OrbitRepository,
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
@@ -128,7 +132,7 @@ class AccountsViewModel(
             }
             state.copy(accountGroups = updated)
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AccountsUiState(isLoading = true))
+    }.flowOn(computeDispatcher).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AccountsUiState(isLoading = true))
 
     fun selectAccount(accountId: Long?) { _selectedAccountId.value = accountId }
     fun setPhoneViewingDetail(viewing: Boolean) { _isPhoneViewingDetail.value = viewing }
