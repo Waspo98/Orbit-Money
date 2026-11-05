@@ -1,0 +1,374 @@
+package app.overbay.orbit.ui.transactions.components
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
+import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitFloatingActionButton
+import app.overbay.orbit.ui.components.OrbitIcons
+import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
+import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.transactions.TransactionsUiState
+import app.overbay.orbit.ui.transactions.TransactionsViewModel
+import app.overbay.orbit.util.LocalOrbitHaptics
+
+/**
+ * Editorial Transactions list pane with MorphingPageHero, filter chips, and pull-to-refresh.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TransactionsListPane(
+    state: TransactionsUiState,
+    viewModel: TransactionsViewModel,
+    onSelectForInspect: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    onNavigate: (OrbitNavKey) -> Unit = {},
+    isWideScreen: Boolean = false,
+    isDetailOpen: Boolean = false,
+    onDismissDetail: () -> Unit = {},
+    detailPane: (@Composable () -> Unit)? = null
+) {
+    val haptics = LocalOrbitHaptics.current
+    val density = LocalDensity.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val heroScrollState = rememberHeroScrollState()
+    heroScrollState.scrollEnabled = !state.isSearchActive
+    val activeChips = rememberActiveFilterChips(state = state, viewModel = viewModel)
+
+    val searchActiveProgress by animateFloatAsState(
+        targetValue = if (state.isSearchActive) 1f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "searchActiveProgress"
+    )
+
+    val contentAlpha = (1f - searchActiveProgress * 1.5f).coerceIn(0f, 1f)
+    val restingMorphHeightDp = with(density) {
+        lerp(heroScrollState.maxHeightPx, heroScrollState.minHeightPx, heroScrollState.collapseFraction).toDp()
+    }
+    val activeHeightOverrideDp = if (searchActiveProgress > 0.001f) {
+        lerp(restingMorphHeightDp, 60.dp, searchActiveProgress)
+    } else null
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            MorphingPageHero(
+                kicker = "MONEY MOVEMENT",
+                title = "Transactions",
+                subtitle = "${state.monthlyTransactionCount} transactions this month",
+                scrollState = heroScrollState,
+                contentAlpha = contentAlpha,
+                activeHeightOverrideDp = activeHeightOverrideDp,
+                morphingContent = { collapseFraction, collapsedTitleRightDp, expandedTextBottomDp ->
+                    val restingHeight = lerp(46.dp, 38.dp, collapseFraction)
+                    val controlsWidth = restingHeight * 2 + 8.dp
+                    val gapToControls = 8.dp
+                    val totalTrailingReserve = controlsWidth + gapToControls
+
+                    val collapsedRowLeft = collapsedTitleRightDp + 10.dp
+                    val restingLeft = lerp(20.dp, collapsedRowLeft, collapseFraction)
+                    val restingTop = lerp(expandedTextBottomDp, 9.dp, collapseFraction)
+                    val restingRowRightMargin = lerp(20.dp, 16.dp, collapseFraction)
+                    val restingTotalRowWidth = (maxWidth - restingRowRightMargin - restingLeft).coerceAtLeast(160.dp)
+                    val restingSearchWidth = (restingTotalRowWidth - totalTrailingReserve).coerceAtLeast(72.dp)
+
+                    val currentLeft = lerp(restingLeft, 12.dp, searchActiveProgress)
+                    val currentTop = lerp(restingTop, 6.dp, searchActiveProgress)
+                    val currentSearchWidth = lerp(restingSearchWidth, (maxWidth - 24.dp).coerceAtLeast(100.dp), searchActiveProgress)
+                    val currentHeight = lerp(restingHeight, 48.dp, searchActiveProgress)
+
+                    val controlsLeft = restingLeft + restingSearchWidth + gapToControls
+                    val controlsAlpha = (1f - searchActiveProgress * 2.2f).coerceIn(0f, 1f)
+
+                    val isCompact = !state.isSearchActive && (collapseFraction > 0.45f)
+                    val placeholder = if (state.isSearchActive || collapseFraction <= 0.45f) {
+                        "Search merchant, description, notes..."
+                    } else {
+                        "Search..."
+                    }
+
+                    if (controlsAlpha > 0.01f) {
+                        Box(
+                            modifier = Modifier
+                                .offset(x = controlsLeft, y = restingTop)
+                                .height(restingHeight)
+                                .graphicsLayer { alpha = controlsAlpha },
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            TransactionsSearchTrailingControls(
+                                activeFilterCount = activeChips.size,
+                                onOpenFilter = { viewModel.openFilterSheet() },
+                                onOpenSettings = { onNavigate(OrbitNavKey.Settings) },
+                                buttonSize = restingHeight
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .offset(x = currentLeft, y = currentTop)
+                            .width(currentSearchWidth)
+                            .height(currentHeight)
+                    ) {
+                        TransactionsSearchBar(
+                            searchQuery = state.searchQuery,
+                            onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                            isSearchActive = state.isSearchActive,
+                            onSearchActiveChange = { viewModel.setSearchActive(it) },
+                            isCompact = isCompact,
+                            placeholderText = placeholder,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                },
+                persistentBottomBar = {
+                    TransactionsActiveFilterChipsBar(
+                        isSearchActive = state.isSearchActive,
+                        activeChips = activeChips,
+                        onClearAll = { viewModel.clearFilters() }
+                    )
+                }
+            )
+
+            val listBody: @Composable () -> Unit = {
+                AnimatedContent(
+                    targetState = state.isSearchActive,
+                    transitionSpec = {
+                        fadeIn(OrbitSprings.effectsDefault()) togetherWith fadeOut(OrbitSprings.effectsDefault())
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    label = "transactionsMainToSearchTransition"
+                ) { searching ->
+                    if (searching) {
+                        val searchStage = when {
+                            state.searchQuery.isBlank() -> "PROMPT"
+                            state.groupedTransactions.isEmpty() -> "EMPTY"
+                            else -> "RESULTS"
+                        }
+                        AnimatedContent(
+                            targetState = searchStage,
+                            transitionSpec = {
+                                fadeIn(OrbitSprings.effectsDefault()) togetherWith fadeOut(OrbitSprings.effectsDefault())
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                            label = "transactionsSearchStageTransition"
+                        ) { stage ->
+                            if (stage == "PROMPT" || stage == "EMPTY") {
+                                TransactionsSearchPromptOrEmpty(searchQuery = state.searchQuery)
+                            } else {
+                                TransactionsGroupedLazyList(
+                                    state = state, viewModel = viewModel, isWideScreen = isWideScreen,
+                                    onSelectForInspect = onSelectForInspect, onNavigate = onNavigate,
+                                    onInteraction = { keyboardController?.hide() }, modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+                    } else {
+                        PullToRefreshBox(
+                            isRefreshing = state.isSyncing,
+                            onRefresh = { haptics.tick(); viewModel.syncSimpleFin() },
+                            indicator = {},
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            when {
+                                state.isLoading -> {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator()
+                                    }
+                                }
+                                state.groupedTransactions.isEmpty() -> {
+                                    val filtered = state.searchQuery.isNotBlank() || state.hasActiveFilters
+                                    Box(
+                                        modifier = Modifier.fillMaxSize().nestedScroll(heroScrollState.nestedScrollConnection).padding(24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        EmptyStateCard(
+                                            title = if (filtered) "No matching transactions" else "No transactions recorded",
+                                            description = if (filtered) {
+                                                "Try clearing your search query or adjusting your filters."
+                                            } else {
+                                                "Pull down to sync with SimpleFIN or tap '+' to record a transaction."
+                                            },
+                                            icon = OrbitIcons.Transactions,
+                                            actionButtonText = if (filtered) "Reset Filters" else null,
+                                            onActionClick = { viewModel.setSearchQuery(""); viewModel.clearFilters() }
+                                        )
+                                    }
+                                }
+                                else -> {
+                                    TransactionsGroupedLazyList(
+                                        state = state,
+                                        viewModel = viewModel,
+                                        isWideScreen = isWideScreen,
+                                        onSelectForInspect = onSelectForInspect,
+                                        onNavigate = onNavigate,
+                                        modifier = Modifier.fillMaxSize().nestedScroll(heroScrollState.nestedScrollConnection)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isWideScreen && detailPane != null) {
+                OrbitMorphingSplitLayout(
+                    isDetailOpen = isDetailOpen,
+                    onDismissDetail = onDismissDetail,
+                    masterContent = listBody,
+                    detailContent = detailPane,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                listBody()
+            }
+        }
+
+        androidx.compose.animation.AnimatedVisibility(
+            visible = state.syncToastMessage != null,
+            enter = slideInVertically { -it } + fadeIn(),
+            exit = slideOutVertically { -it } + fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 12.dp, start = 16.dp, end = 16.dp)
+        ) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.inverseSurface, tonalElevation = 6.dp, shadowElevation = 6.dp) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (state.isSyncing) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.inverseOnSurface)
+                        Spacer(modifier = Modifier.width(10.dp))
+                    }
+                    Text(
+                        text = state.syncToastMessage ?: "",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
+        OrbitFloatingActionButton(
+            visible = heroScrollState.isFabVisible && !state.isSelectionMode && !state.isSearchActive,
+            onClick = { viewModel.openTransactionEditor(null) },
+            contentDescription = "Add Transaction",
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(20.dp)
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TransactionsGroupedLazyList(
+    state: TransactionsUiState,
+    viewModel: TransactionsViewModel,
+    isWideScreen: Boolean,
+    onSelectForInspect: (Long) -> Unit,
+    onNavigate: (OrbitNavKey) -> Unit,
+    modifier: Modifier = Modifier,
+    onInteraction: () -> Unit = {}
+) {
+    val startPadding = if (isWideScreen) 20.dp else 16.dp
+    val endPadding = if (isWideScreen) 0.dp else 16.dp
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(start = startPadding, end = endPadding, top = 0.dp, bottom = 88.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        state.groupedTransactions.forEach { group ->
+            stickyHeader(key = "header_${group.monthKey}") {
+                MonthGroupHeader(monthLabel = group.monthLabel, count = group.count)
+            }
+
+            items(items = group.transactions, key = { it.id }) { txn ->
+                SwipeableTransactionRow(
+                    transaction = txn,
+                    category = state.categoryMap[txn.effectiveCategoryId],
+                    accountName = state.accountMap[txn.accountId]?.name ?: txn.accountName,
+                    isSelected = state.selectedTransactionIds.contains(txn.id),
+                    isSelectionMode = state.isSelectionMode,
+                    isExpanded = !isWideScreen && state.expandedTransactionId == txn.id,
+                    isInspected = isWideScreen && state.inspectingTransactionId == txn.id,
+                    onClick = {
+                        onInteraction()
+                        if (state.isSelectionMode) {
+                            viewModel.toggleTransactionSelection(txn.id)
+                        } else if (isWideScreen) {
+                            onSelectForInspect(txn.id)
+                        } else {
+                            viewModel.toggleExpandTransaction(txn.id)
+                        }
+                    },
+                    onLongClick = { onInteraction(); viewModel.toggleTransactionSelection(txn.id) },
+                    onEdit = { viewModel.openTransactionEditor(txn.id) },
+                    onSplit = { viewModel.openSplitSheet(txn.id) },
+                    onCreateRule = { viewModel.openCreateRuleModal(txn.id) },
+                    onMarkRecurring = { viewModel.markTransactionRecurring(txn); onNavigate(OrbitNavKey.Upcoming) },
+                    onToggleTransfer = { viewModel.toggleTransfer(txn.id) },
+                    onToggleMha = { viewModel.toggleMha(txn.id) },
+                    onToggleIgnore = { viewModel.toggleIgnore(txn.id) },
+                    onDelete = { viewModel.setSingleDeleteConfirmId(txn.id) },
+                    onResetMerchant = { viewModel.resetMerchant(txn.id) },
+                    onResetCategory = { viewModel.resetCategory(txn.id) },
+                    onFindLogo = { viewModel.openLogoFinder(txn.id) },
+                    onUseCategoryIcon = { viewModel.useCategoryIconForTransaction(txn.id) },
+                    onReportLogoStatus = { key, status -> viewModel.reportMerchantLogoStatus(key, status) }
+                )
+            }
+        }
+
+        if (state.filteredTransactions.size > state.pageSize && state.pageSize > 0) {
+            item(key = "pagination_bar") {
+                TransactionsPaginationBar(
+                    currentPage = state.currentPage,
+                    totalPages = state.totalPages,
+                    pageSize = state.pageSize,
+                    totalItemsCount = state.filteredTransactions.size,
+                    onPageChange = { page -> viewModel.setCurrentPage(page) },
+                    onPageSizeChange = { size -> viewModel.setPageSize(size) },
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+        }
+    }
+}
+

@@ -15,7 +15,7 @@ build/
 *.aab
 
 # Runtime data (if running locally without Docker)
-data/
+/data/
 backups/
 *.db
 *.db-journal
@@ -34,3 +34,9 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+.gradle/
+local.properties
+.kotlin/
+kotlin-js-store/
+.agents/
