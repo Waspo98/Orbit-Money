@@ -6,6 +6,7 @@ import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.SpendingTrendsEngine
+import app.overbay.orbit.domain.SpendingTrendsOverview
 import app.overbay.orbit.ui.components.charts.SpendingBarItem
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +20,7 @@ import kotlinx.coroutines.launch
 
 class SpendingTrendsViewModel(
     private val repository: OrbitRepository,
-    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val _selectedPeriod = MutableStateFlow(TrendsPeriod.SIX_MONTHS)
@@ -31,21 +32,33 @@ class SpendingTrendsViewModel(
     private val _isInspectMonthDialogOpen = MutableStateFlow(false)
     private val _isBudgetModalOpen = MutableStateFlow(false)
 
+    private val computedTrendsFlow = combine(
+        repository.transactions,
+        repository.categories,
+        repository.budgets,
+        _selectedPeriod
+    ) { txns, cats, budgets, period ->
+        val latestMonth = LocalDateUtils.currentYearMonth()
+        val overview = SpendingTrendsEngine.computeTrends(
+            transactions = txns,
+            categories = cats,
+            budgets = budgets,
+            monthsCount = period.monthsCount,
+            endMonth = latestMonth
+        )
+        ComputedTrendsBundle(
+            overview = overview,
+            budgets = budgets,
+            period = period
+        )
+    }.flowOn(computeDispatcher)
+
     val uiState: StateFlow<SpendingTrendsUiState> = combine(
+        computedTrendsFlow,
         combine(
-            repository.transactions,
-            repository.categories,
-            repository.budgets
-        ) { txns, cats, budgets ->
-            RepoData(txns, cats, budgets)
-        },
-        combine(
-            _selectedPeriod,
             _chartMode,
             _selectedCategoryId
-        ) { period, mode, categoryId ->
-            SelectionData(period, mode, categoryId)
-        },
+        ) { mode, categoryId -> mode to categoryId },
         combine(
             _scrubbedIndex,
             _scrubbedBarItem,
@@ -55,23 +68,9 @@ class SpendingTrendsViewModel(
         ) { scrubIdx, scrubItem, inspectMonth, isInspectOpen, isBudgetOpen ->
             ModalAndScrubData(scrubIdx, scrubItem, inspectMonth, isInspectOpen, isBudgetOpen)
         }
-    ) { repoData, selectionData, modalData ->
-        val txns = repoData.transactions
-        val cats = repoData.categories
-        val budgets = repoData.budgets
-
-        val period = selectionData.period
-        val mode = selectionData.mode
-        val categoryId = selectionData.categoryId
-
-        val latestMonth = LocalDateUtils.currentYearMonth()
-        val overview = SpendingTrendsEngine.computeTrends(
-            transactions = txns,
-            categories = cats,
-            budgets = budgets,
-            monthsCount = period.monthsCount,
-            endMonth = latestMonth
-        )
+    ) { computed, (mode, categoryId), modalData ->
+        val overview = computed.overview
+        val budgets = computed.budgets
 
         val validCategoryId = if (categoryId != null && overview.categoryTrends.any { it.category.id == categoryId }) {
             categoryId
@@ -85,7 +84,7 @@ class SpendingTrendsViewModel(
 
         SpendingTrendsUiState(
             overview = overview,
-            selectedPeriod = period,
+            selectedPeriod = computed.period,
             chartMode = mode,
             selectedCategoryId = validCategoryId,
             selectedCategoryBudget = categoryBudget,
@@ -162,29 +161,23 @@ class SpendingTrendsViewModel(
     }
 
     fun saveBudget(categoryId: Long, amountCents: Cents, rollover: Boolean) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.saveBudget(categoryId, amountCents, rollover)
             _isBudgetModalOpen.value = false
         }
     }
 
     fun deleteBudget(budgetId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.deleteBudget(budgetId)
             _isBudgetModalOpen.value = false
         }
     }
 
-    private data class RepoData(
-        val transactions: List<app.overbay.orbit.data.model.Transaction>,
-        val categories: List<app.overbay.orbit.data.model.Category>,
-        val budgets: List<app.overbay.orbit.data.model.CategoryBudget>
-    )
-
-    private data class SelectionData(
-        val period: TrendsPeriod,
-        val mode: TrendsChartMode,
-        val categoryId: Long?
+    private data class ComputedTrendsBundle(
+        val overview: SpendingTrendsOverview,
+        val budgets: List<app.overbay.orbit.data.model.CategoryBudget>,
+        val period: TrendsPeriod
     )
 
     private data class ModalAndScrubData(

@@ -177,34 +177,31 @@ fun RemoteLogoImage(
     var bitmap by remember(cleanUrl) { mutableStateOf(MerchantLogoImageCache.getCached(cleanUrl)) }
     var loadFailed by remember(cleanUrl) { mutableStateOf(MerchantLogoImageCache.isKnownFailed(cleanUrl)) }
 
-    LaunchedEffect(cleanUrl) {
-        if (cleanUrl == null) {
-            bitmap = null
-            loadFailed = false
-            return@LaunchedEffect
-        }
-        val cached = MerchantLogoImageCache.getCached(cleanUrl)
-        if (cached != null) {
-            bitmap = cached
-            loadFailed = false
-            onLoaded()
-            return@LaunchedEffect
-        }
-        if (MerchantLogoImageCache.isKnownFailed(cleanUrl)) {
-            bitmap = null
-            loadFailed = true
-            onError()
-            return@LaunchedEffect
-        }
-        val fetched = MerchantLogoImageCache.fetchBitmap(cleanUrl)
-        if (fetched != null) {
-            bitmap = fetched
-            loadFailed = false
-            onLoaded()
-        } else {
-            bitmap = null
-            loadFailed = true
-            onError()
+    if (cleanUrl != null && bitmap == null && !loadFailed) {
+        LaunchedEffect(cleanUrl) {
+            val cached = MerchantLogoImageCache.getCached(cleanUrl)
+            if (cached != null) {
+                bitmap = cached
+                loadFailed = false
+                onLoaded()
+                return@LaunchedEffect
+            }
+            if (MerchantLogoImageCache.isKnownFailed(cleanUrl)) {
+                bitmap = null
+                loadFailed = true
+                onError()
+                return@LaunchedEffect
+            }
+            val fetched = MerchantLogoImageCache.fetchBitmap(cleanUrl)
+            if (fetched != null) {
+                bitmap = fetched
+                loadFailed = false
+                onLoaded()
+            } else {
+                bitmap = null
+                loadFailed = true
+                onError()
+            }
         }
     }
 
@@ -306,9 +303,9 @@ fun TransactionMerchantMark(
             }
         }
 
-        if (hasMenuActions) {
+        if (hasMenuActions && menuExpanded) {
             DropdownMenu(
-                expanded = menuExpanded,
+                expanded = true,
                 onDismissRequest = { menuExpanded = false }
             ) {
                 if (onFindLogo != null) {

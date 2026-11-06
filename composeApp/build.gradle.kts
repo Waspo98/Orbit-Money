@@ -108,6 +108,10 @@ dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 }
 
+composeCompiler {
+    includeSourceInformation.set(false)
+}
+
 tasks.matching { it.name == "unpackSkikoWasmRuntime" }.configureEach {
     doNotTrackState("Skiko wasm unpack task does not track state in Gradle 9")
 }

@@ -2,7 +2,6 @@ package app.overbay.orbit.ui.upcoming
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -52,7 +51,7 @@ import app.overbay.orbit.ui.upcoming.components.UpcomingCalendarStrip
 import app.overbay.orbit.ui.upcoming.components.UpcomingCashFlowCard
 import app.overbay.orbit.ui.upcoming.components.UpcomingDetailInspectorPane
 import app.overbay.orbit.ui.upcoming.components.UpcomingSuggestionBanner
-import app.overbay.orbit.ui.upcoming.components.UpcomingTimelineList
+import app.overbay.orbit.ui.upcoming.components.upcomingTimelineItems
 import app.overbay.orbit.ui.upcoming.sheets.AddFromTransactionSheet
 import app.overbay.orbit.ui.upcoming.sheets.ReconcileOccurrenceDialog
 import app.overbay.orbit.ui.upcoming.sheets.RecurringHistoryModal
@@ -69,11 +68,10 @@ fun UpcomingScreen(
     val state by viewModel.uiState.collectAsState()
     val posture = LocalDevicePosture.current
     val heroScrollState = rememberHeroScrollState()
+    val isTwoPane = posture.supportsTwoPane
+    val isDetailOpen = isTwoPane && (state.inspectingItem != null || state.showEditorSheet)
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
-        val isDetailOpen = isTwoPane && (state.inspectingItem != null || state.showEditorSheet)
-
+    Box(modifier = modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -141,56 +139,58 @@ fun UpcomingScreen(
                                     badgeCount = activeFilterCount
                                 )
 
-                                DropdownMenu(
-                                    expanded = filterMenuExpanded,
-                                    onDismissRequest = { filterMenuExpanded = false }
-                                ) {
-                                    val filterOptions = listOf(
-                                        UpcomingFilterOption.ALL to "All Recurring",
-                                        UpcomingFilterOption.BILLS to "Bills, Giving & Subs",
-                                        UpcomingFilterOption.INCOME to "Income"
-                                    )
-                                    filterOptions.forEach { (option, label) ->
-                                        val selected = state.filterOption == option
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = label,
-                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                                )
-                                            },
-                                            trailingIcon = if (selected) {
-                                                {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Check,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(18.dp)
+                                if (filterMenuExpanded) {
+                                    DropdownMenu(
+                                        expanded = true,
+                                        onDismissRequest = { filterMenuExpanded = false }
+                                    ) {
+                                        val filterOptions = listOf(
+                                            UpcomingFilterOption.ALL to "All Recurring",
+                                            UpcomingFilterOption.BILLS to "Bills, Giving & Subs",
+                                            UpcomingFilterOption.INCOME to "Income"
+                                        )
+                                        filterOptions.forEach { (option, label) ->
+                                            val selected = state.filterOption == option
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = label,
+                                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                                     )
+                                                },
+                                                trailingIcon = if (selected) {
+                                                    {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Check,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(18.dp)
+                                                        )
+                                                    }
+                                                } else null,
+                                                onClick = {
+                                                    viewModel.setFilterOption(option)
+                                                    filterMenuExpanded = false
                                                 }
-                                            } else null,
-                                            onClick = {
-                                                viewModel.setFilterOption(option)
-                                                filterMenuExpanded = false
-                                            }
-                                        )
-                                    }
+                                            )
+                                        }
 
-                                    if (state.selectedDateFilter != null) {
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = "Clear Date Filter (${state.selectedDateFilter})",
-                                                    color = MaterialTheme.colorScheme.error,
-                                                    fontWeight = FontWeight.SemiBold
-                                                )
-                                            },
-                                            onClick = {
-                                                viewModel.setSelectedDateFilter(null)
-                                                filterMenuExpanded = false
-                                            }
-                                        )
+                                        if (state.selectedDateFilter != null) {
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = "Clear Date Filter (${state.selectedDateFilter})",
+                                                        color = MaterialTheme.colorScheme.error,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                },
+                                                onClick = {
+                                                    viewModel.setSelectedDateFilter(null)
+                                                    filterMenuExpanded = false
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -209,41 +209,44 @@ fun UpcomingScreen(
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             // Projected Cash Flow Hero Card
-                            item {
+                            item(key = "upcoming_cashflow_card", contentType = "cashflow_card") {
                                 UpcomingCashFlowCard(
                                     summary = state.cashFlowSummary,
                                     selectedPeriod = state.cashFlowPeriod,
-                                    onPeriodChanged = { viewModel.setCashFlowPeriod(it) }
+                                    onPeriodChanged = { viewModel.setCashFlowPeriod(it) },
+                                    modifier = Modifier.padding(bottom = 6.dp)
                                 )
                             }
 
                             // Calendar Date Strip
-                            item {
+                            item(key = "upcoming_calendar_strip", contentType = "calendar_strip") {
                                 UpcomingCalendarStrip(
                                     selectedDate = state.selectedDateFilter,
                                     items = state.activeItems,
-                                    onSelectDate = { viewModel.setSelectedDateFilter(it) }
+                                    onSelectDate = { viewModel.setSelectedDateFilter(it) },
+                                    modifier = Modifier.padding(bottom = 6.dp)
                                 )
                             }
 
                             // Recurring Bills/Suggestions Banner
                             if (state.candidates.isNotEmpty()) {
-                                item {
+                                item(key = "upcoming_suggestions_banner", contentType = "suggestions_banner") {
                                     UpcomingSuggestionBanner(
                                         candidates = state.candidates,
                                         onAccept = { viewModel.acceptCandidate(it) },
-                                        onDismiss = { viewModel.dismissCandidate(it) }
+                                        onDismiss = { viewModel.dismissCandidate(it) },
+                                        modifier = Modifier.padding(bottom = 6.dp)
                                     )
                                 }
                             }
 
                             // Action Bar: Add from Transaction
-                            item {
+                            item(key = "upcoming_add_from_tx_bar", contentType = "action_bar") {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                                     horizontalArrangement = Arrangement.End,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -266,27 +269,23 @@ fun UpcomingScreen(
                                 }
                             }
 
-                            // Recurring Timeline List
-                            item {
-                                UpcomingTimelineList(
-                                    items = state.items,
-                                    categoryMap = state.categoryMap,
-                                    accountMap = state.accountMap,
-                                    filterOption = state.filterOption,
-                                    onFilterChanged = { viewModel.setFilterOption(it) },
-                                    onItemClick = { item ->
-                                        if (isTwoPane) {
-                                            viewModel.selectUpcomingForInspect(item.id)
-                                        } else {
-                                            viewModel.openEditUpcoming(item)
-                                        }
-                                    },
-                                    onMarkPaid = { viewModel.openReconcileDialog(it) },
-                                    onAddClick = { viewModel.openAddUpcoming() },
-                                    projectedAmounts = state.projectedAmounts,
-                                    inspectingItemId = if (isTwoPane) state.inspectingItemId else null
-                                )
-                            }
+                            // Virtualized Recurring Timeline Rows
+                            upcomingTimelineItems(
+                                items = state.items,
+                                categoryMap = state.categoryMap,
+                                accountMap = state.accountMap,
+                                onItemClick = { item ->
+                                    if (isTwoPane) {
+                                        viewModel.selectUpcomingForInspect(item.id)
+                                    } else {
+                                        viewModel.openEditUpcoming(item)
+                                    }
+                                },
+                                onMarkPaid = { viewModel.openReconcileDialog(it) },
+                                onAddClick = { viewModel.openAddUpcoming() },
+                                projectedAmounts = state.projectedAmounts,
+                                inspectingItemId = if (isTwoPane) state.inspectingItemId else null
+                            )
                         }
                     }
 

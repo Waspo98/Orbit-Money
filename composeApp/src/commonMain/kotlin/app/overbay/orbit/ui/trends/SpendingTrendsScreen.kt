@@ -2,7 +2,6 @@ package app.overbay.orbit.ui.trends
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -56,9 +55,9 @@ fun SpendingTrendsScreen(
         return
     }
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
+    val isTwoPane = posture.supportsTwoPane
 
+    Box(modifier = modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             contentWindowInsets = WindowInsets(0, 0, 0, 0)
@@ -120,7 +119,7 @@ fun SpendingTrendsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Interactive Bar Chart Section (Full Width)
-                    item {
+                    item(key = "trends_chart_section", contentType = "chart_section") {
                         TrendsChartSection(
                             state = state,
                             onSelectPeriod = { viewModel.setPeriod(it) },
@@ -134,7 +133,7 @@ fun SpendingTrendsScreen(
                     // Category Trend 4-Tile Stats Card when a category is selected
                     val trend = state.selectedCategoryTrend
                     if (state.chartMode == TrendsChartMode.CATEGORY_TREND && trend != null) {
-                        item {
+                        item(key = "category_trend_stats", contentType = "trend_stats") {
                             CategoryTrendStatsCard(
                                 trend = trend,
                                 onOpenBudgetModal = { viewModel.openBudgetModal() }
@@ -143,7 +142,7 @@ fun SpendingTrendsScreen(
                     }
 
                     if (isTwoPane) {
-                        item {
+                        item(key = "two_pane_breakdown_merchants", contentType = "two_pane_row") {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -167,7 +166,7 @@ fun SpendingTrendsScreen(
                         }
                     } else {
                         // Category Breakdown List
-                        item {
+                        item(key = "category_breakdown_list", contentType = "category_breakdown") {
                             CategoryBreakdownList(
                                 categoryTrends = state.overview.categoryTrends,
                                 selectedCategoryId = state.selectedCategoryId,
@@ -178,7 +177,7 @@ fun SpendingTrendsScreen(
                         }
 
                         // Top Merchants Card
-                        item {
+                        item(key = "top_merchants_card", contentType = "top_merchants") {
                             TopMerchantsCard(
                                 topMerchants = state.overview.topMerchants,
                                 totalPeriodSpendingCents = state.overview.totalPeriodSpendingCents

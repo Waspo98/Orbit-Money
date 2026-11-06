@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 
 class RulesViewModel(
     private val repository: OrbitRepository,
-    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val _inspectingRuleId = MutableStateFlow<Long?>(null)
@@ -129,13 +129,13 @@ class RulesViewModel(
 
     fun saveRule(rule: TransactionRule) {
         closeEditorSheet()
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.saveRule(rule)
         }
     }
 
     fun toggleRuleEnabled(id: Long, enabled: Boolean) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.setRuleEnabled(id, enabled)
         }
     }
@@ -149,7 +149,7 @@ class RulesViewModel(
     }
 
     fun deleteRule(id: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.deleteRule(id)
             if (_inspectingRuleId.value == id) {
                 _inspectingRuleId.value = null
@@ -167,14 +167,14 @@ class RulesViewModel(
     }
 
     fun wipeAllRules() {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.wipeAllRules()
             _showWipeAllRulesDialog.value = false
         }
     }
 
     fun runRulesNow() {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             _isApplying.value = true
             try {
                 repository.runRulesOnAllTransactions()

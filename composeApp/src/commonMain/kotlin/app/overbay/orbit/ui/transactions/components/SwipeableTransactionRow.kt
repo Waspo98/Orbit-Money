@@ -37,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -90,6 +89,10 @@ fun SwipeableTransactionRow(
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
     var menuExpanded by remember { mutableStateOf(false) }
+    var everExpanded by remember { mutableStateOf(isExpanded) }
+    if (isExpanded && !everExpanded) {
+        everExpanded = true
+    }
 
     val catColor = category?.color.toComposeColor(MaterialTheme.colorScheme.primary)
     val rowBgColor = when {
@@ -224,80 +227,84 @@ fun SwipeableTransactionRow(
                             }
                         }
 
-                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                            DropdownMenuItem(text = { Text("Edit") }, onClick = { menuExpanded = false; onEdit() })
-                            DropdownMenuItem(text = { Text("Split") }, onClick = { menuExpanded = false; onSplit() })
-                            DropdownMenuItem(text = { Text("Create Rule") }, onClick = { menuExpanded = false; onCreateRule() })
-                            DropdownMenuItem(text = { Text("Mark as Recurring") }, onClick = { menuExpanded = false; onMarkRecurring() })
-                            DropdownMenuItem(
-                                text = { Text(if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Mark as Transfer") },
-                                onClick = { menuExpanded = false; onToggleTransfer() }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(if (transaction.effectiveMhaEligible == true) "Remove MHA" else "MHA Eligible") },
-                                onClick = { menuExpanded = false; onToggleMha() }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(if (transaction.effectiveIsIgnored) "Unignore" else "Ignore") },
-                                onClick = { menuExpanded = false; onToggleIgnore() }
-                            )
-                            HorizontalDivider()
-                            DropdownMenuItem(text = { Text("Delete", color = colors.danger) }, onClick = { menuExpanded = false; onDelete() })
+                        if (menuExpanded) {
+                            DropdownMenu(expanded = true, onDismissRequest = { menuExpanded = false }) {
+                                DropdownMenuItem(text = { Text("Edit") }, onClick = { menuExpanded = false; onEdit() })
+                                DropdownMenuItem(text = { Text("Split") }, onClick = { menuExpanded = false; onSplit() })
+                                DropdownMenuItem(text = { Text("Create Rule") }, onClick = { menuExpanded = false; onCreateRule() })
+                                DropdownMenuItem(text = { Text("Mark as Recurring") }, onClick = { menuExpanded = false; onMarkRecurring() })
+                                DropdownMenuItem(
+                                    text = { Text(if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Mark as Transfer") },
+                                    onClick = { menuExpanded = false; onToggleTransfer() }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (transaction.effectiveMhaEligible == true) "Remove MHA" else "MHA Eligible") },
+                                    onClick = { menuExpanded = false; onToggleMha() }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (transaction.effectiveIsIgnored) "Unignore" else "Ignore") },
+                                    onClick = { menuExpanded = false; onToggleIgnore() }
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(text = { Text("Delete", color = colors.danger) }, onClick = { menuExpanded = false; onDelete() })
+                            }
                         }
                     }
                 }
             }
 
             // Inline Accordion Detail Panel
-            AnimatedVisibility(visible = isExpanded) {
-                Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-                        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                        Spacer(modifier = Modifier.height(10.dp))
+            if (everExpanded) {
+                AnimatedVisibility(visible = isExpanded) {
+                    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+                            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+                            Spacer(modifier = Modifier.height(10.dp))
 
-                        // 2-Column Metadata Grid
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                MetaItem(label = "DATE", value = transaction.effectiveDate)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                MetaItem(label = "ACCOUNT", value = accountName ?: transaction.accountName)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    MetaItem(label = "MERCHANT", value = transaction.effectiveMerchant)
-                                    if (transaction.editedMerchant != null) {
-                                        Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetMerchant() }.padding(start = 6.dp))
+                            // 2-Column Metadata Grid
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    MetaItem(label = "DATE", value = transaction.effectiveDate)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    MetaItem(label = "ACCOUNT", value = accountName ?: transaction.accountName)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        MetaItem(label = "MERCHANT", value = transaction.effectiveMerchant)
+                                        if (transaction.editedMerchant != null) {
+                                            Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetMerchant() }.padding(start = 6.dp))
+                                        }
                                     }
                                 }
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    MetaItem(label = "CATEGORY", value = category?.labelWithEmoji ?: "❓ Uncategorized")
-                                    if (transaction.editedCategoryId != null) {
-                                        Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetCategory() }.padding(start = 6.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        MetaItem(label = "CATEGORY", value = category?.labelWithEmoji ?: "❓ Uncategorized")
+                                        if (transaction.editedCategoryId != null) {
+                                            Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetCategory() }.padding(start = 6.dp))
+                                        }
                                     }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    MetaItem(label = "ORIGINAL DESCRIPTION", value = transaction.originalDescription ?: transaction.originalMerchant, isMono = true)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    MetaItem(label = "NOTES", value = transaction.notes ?: "None")
                                 }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                MetaItem(label = "ORIGINAL DESCRIPTION", value = transaction.originalDescription ?: transaction.originalMerchant, isMono = true)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                MetaItem(label = "NOTES", value = transaction.notes ?: "None")
                             }
-                        }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
 
-                        // Compact Pill Action Buttons Row
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            CompactPillAction(label = "Edit", onClick = onEdit)
-                            CompactPillAction(label = "Split", onClick = onSplit)
-                            CompactPillAction(label = "Create Rule", onClick = onCreateRule)
-                            CompactPillAction(label = "Recurring", onClick = onMarkRecurring)
-                            CompactPillAction(label = if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Transfer", onClick = onToggleTransfer)
-                            CompactPillAction(label = if (transaction.effectiveIsIgnored) "Unignore" else "Ignore", onClick = onToggleIgnore)
-                            CompactPillAction(label = "Delete", isDestructive = true, onClick = onDelete)
+                            // Compact Pill Action Buttons Row
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                CompactPillAction(label = "Edit", onClick = onEdit)
+                                CompactPillAction(label = "Split", onClick = onSplit)
+                                CompactPillAction(label = "Create Rule", onClick = onCreateRule)
+                                CompactPillAction(label = "Recurring", onClick = onMarkRecurring)
+                                CompactPillAction(label = if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Transfer", onClick = onToggleTransfer)
+                                CompactPillAction(label = if (transaction.effectiveIsIgnored) "Unignore" else "Ignore", onClick = onToggleIgnore)
+                                CompactPillAction(label = "Delete", isDestructive = true, onClick = onDelete)
+                            }
                         }
                     }
                 }
@@ -349,4 +356,3 @@ private fun CompactPillAction(
         )
     }
 }
-

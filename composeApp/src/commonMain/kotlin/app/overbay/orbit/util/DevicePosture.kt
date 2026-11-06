@@ -1,7 +1,8 @@
 package app.overbay.orbit.util
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.compositionLocalOf
 
 enum class PostureMode {
     COMPACT_PHONE,
@@ -9,6 +10,7 @@ enum class PostureMode {
     TABLET_DESKTOP
 }
 
+@Immutable
 data class DevicePosture(
     val isFoldable: Boolean = false,
     val isFolded: Boolean = false,
@@ -29,7 +31,7 @@ data class DevicePosture(
     val supportsTwoPane: Boolean get() = isUnfoldedOrWide
 }
 
-val LocalDevicePosture = staticCompositionLocalOf { DevicePosture() }
+val LocalDevicePosture = compositionLocalOf { DevicePosture() }
 
 @Composable
 expect fun rememberDevicePosture(): DevicePosture

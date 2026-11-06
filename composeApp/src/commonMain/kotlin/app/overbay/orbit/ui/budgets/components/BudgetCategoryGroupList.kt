@@ -3,7 +3,6 @@ package app.overbay.orbit.ui.budgets.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,17 +16,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,127 +51,153 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.roundToInt
 
 /**
- * Categorized budget groups list with Spending Mix strip, sort chips,
- * and inline expandable category rows.
- * Conforms strictly to the < 400-line ceiling.
+ * Lazy-list extension that emits Spending Mix, Budgeted rows, Unbudgeted rows,
+ * and Inactive categories as individual virtualized LazyColumn items.
  */
-@Composable
-fun BudgetCategoryGroupList(
+fun LazyListScope.budgetCategoryGroupItems(
     budgeted: List<CategoryBudgetOverviewItem>,
     unbudgeted: List<CategoryBudgetOverviewItem>,
     inactive: List<CategoryBudgetOverviewItem>,
-    activeSort: CategorySortOption,
     expandedCategoryId: Long?,
     categoryTransactions: Map<Long, List<Transaction>>,
-    onSortSelected: (CategorySortOption) -> Unit,
     onToggleExpand: (Long) -> Unit,
     onEditBudget: (CategoryBudgetOverviewItem) -> Unit,
     onDeleteBudget: (Long) -> Unit,
     onViewTransactions: (Long) -> Unit,
-    isWideScreen: Boolean = false,
-    modifier: Modifier = Modifier
+    isWideScreen: Boolean = false
 ) {
-    val haptics = LocalOrbitHaptics.current
-    var showInactive by rememberSaveable { mutableStateOf(false) }
-
-    Column(modifier = modifier.fillMaxWidth()) {
-        // Spending Mix Panel
-        val allActive = (budgeted + unbudgeted).filter { it.spentCents > 0L }
-        if (allActive.isNotEmpty()) {
-            SpendingMixPanel(items = allActive)
-            Spacer(modifier = Modifier.height(16.dp))
+    val allActive = (budgeted + unbudgeted).filter { it.spentCents > 0L }
+    if (allActive.isNotEmpty()) {
+        item(key = "budget_spending_mix", contentType = "spending_mix") {
+            SpendingMixPanel(
+                items = allActive,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
         }
+    }
 
-        // 1. Budgeted Section
-        if (budgeted.isNotEmpty()) {
-            val totalBudgeted = budgeted.sumOf { it.amountCents }
+    if (budgeted.isNotEmpty()) {
+        val totalBudgeted = budgeted.sumOf { it.amountCents }
+        item(key = "budgeted_section_header", contentType = "section_header") {
             SectionHeader(
                 title = "Budgeted Categories",
                 subtitle = "${budgeted.size} categories • ${MoneyUtils.formatCents(totalBudgeted, showCents = false)}"
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            budgeted.forEach { item ->
-                BudgetCategoryRow(
-                    item = item,
-                    isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
-                    isInspected = isWideScreen && item.category.id == expandedCategoryId,
-                    transactions = categoryTransactions[item.category.id] ?: emptyList(),
-                    onClick = { onToggleExpand(item.category.id) },
-                    onEditBudget = { onEditBudget(item) },
-                    onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
-                    onViewTransactions = { onViewTransactions(item.category.id) }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // 2. Unbudgeted Spending Section
-        if (unbudgeted.isNotEmpty()) {
-            val totalUnbudgeted = unbudgeted.sumOf { it.spentCents }
+        itemsIndexed(
+            items = budgeted,
+            key = { _, item -> "budgeted_${item.category.id}" },
+            contentType = { _, _ -> "budget_category_row" }
+        ) { index, item ->
+            BudgetCategoryRow(
+                item = item,
+                isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
+                isInspected = isWideScreen && item.category.id == expandedCategoryId,
+                transactions = categoryTransactions[item.category.id] ?: emptyList(),
+                onClick = { onToggleExpand(item.category.id) },
+                onEditBudget = { onEditBudget(item) },
+                onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
+                onViewTransactions = { onViewTransactions(item.category.id) },
+                modifier = if (index == budgeted.lastIndex) Modifier.padding(bottom = 8.dp) else Modifier
+            )
+        }
+    }
+
+    if (unbudgeted.isNotEmpty()) {
+        val totalUnbudgeted = unbudgeted.sumOf { it.spentCents }
+        item(key = "unbudgeted_section_header", contentType = "section_header") {
             SectionHeader(
                 title = "Unbudgeted Spending",
                 subtitle = "${unbudgeted.size} categories • ${MoneyUtils.formatCents(totalUnbudgeted, showCents = false)}"
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            unbudgeted.forEach { item ->
-                BudgetCategoryRow(
-                    item = item,
-                    isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
-                    isInspected = isWideScreen && item.category.id == expandedCategoryId,
-                    transactions = categoryTransactions[item.category.id] ?: emptyList(),
-                    onClick = { onToggleExpand(item.category.id) },
-                    onEditBudget = { onEditBudget(item) },
-                    onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
-                    onViewTransactions = { onViewTransactions(item.category.id) }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // 3. Inactive Categories Section (collapsible)
-        if (inactive.isNotEmpty()) {
-            OutlinedButton(
-                onClick = {
-                    haptics.tick()
-                    showInactive = !showInactive
-                },
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                modifier = Modifier.fillMaxWidth().height(44.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = if (showInactive) {
-                            "Hide ${inactive.size} inactive categories"
-                        } else {
-                            "Show ${inactive.size} categories with no activity"
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Icon(
-                        imageVector = if (showInactive) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
+        itemsIndexed(
+            items = unbudgeted,
+            key = { _, item -> "unbudgeted_${item.category.id}" },
+            contentType = { _, _ -> "budget_category_row" }
+        ) { index, item ->
+            BudgetCategoryRow(
+                item = item,
+                isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
+                isInspected = isWideScreen && item.category.id == expandedCategoryId,
+                transactions = categoryTransactions[item.category.id] ?: emptyList(),
+                onClick = { onToggleExpand(item.category.id) },
+                onEditBudget = { onEditBudget(item) },
+                onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
+                onViewTransactions = { onViewTransactions(item.category.id) },
+                modifier = if (index == unbudgeted.lastIndex) Modifier.padding(bottom = 8.dp) else Modifier
+            )
+        }
+    }
 
-            AnimatedVisibility(visible = showInactive) {
+    if (inactive.isNotEmpty()) {
+        item(key = "inactive_categories_section", contentType = "inactive_section") {
+            InactiveBudgetCategoriesSection(
+                inactive = inactive,
+                expandedCategoryId = expandedCategoryId,
+                categoryTransactions = categoryTransactions,
+                onToggleExpand = onToggleExpand,
+                onEditBudget = onEditBudget,
+                onDeleteBudget = onDeleteBudget,
+                onViewTransactions = onViewTransactions,
+                isWideScreen = isWideScreen
+            )
+        }
+    }
+}
+
+@Composable
+private fun InactiveBudgetCategoriesSection(
+    inactive: List<CategoryBudgetOverviewItem>,
+    expandedCategoryId: Long?,
+    categoryTransactions: Map<Long, List<Transaction>>,
+    onToggleExpand: (Long) -> Unit,
+    onEditBudget: (CategoryBudgetOverviewItem) -> Unit,
+    onDeleteBudget: (Long) -> Unit,
+    onViewTransactions: (Long) -> Unit,
+    isWideScreen: Boolean
+) {
+    val haptics = LocalOrbitHaptics.current
+    var showInactive by rememberSaveable { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = {
+                haptics.tick()
+                showInactive = !showInactive
+            },
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+            modifier = Modifier.fillMaxWidth().height(44.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = if (showInactive) {
+                        "Hide ${inactive.size} inactive categories"
+                    } else {
+                        "Show ${inactive.size} categories with no activity"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    imageVector = if (showInactive) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        if (showInactive) {
+            AnimatedVisibility(visible = true) {
                 Column(
                     modifier = Modifier.padding(top = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -198,6 +221,95 @@ fun BudgetCategoryGroupList(
 }
 
 /**
+ * Categorized budget groups list with Spending Mix strip, sort chips,
+ * and inline expandable category rows.
+ * Conforms strictly to the < 400-line ceiling.
+ */
+@Composable
+fun BudgetCategoryGroupList(
+    budgeted: List<CategoryBudgetOverviewItem>,
+    unbudgeted: List<CategoryBudgetOverviewItem>,
+    inactive: List<CategoryBudgetOverviewItem>,
+    activeSort: CategorySortOption,
+    expandedCategoryId: Long?,
+    categoryTransactions: Map<Long, List<Transaction>>,
+    onSortSelected: (CategorySortOption) -> Unit,
+    onToggleExpand: (Long) -> Unit,
+    onEditBudget: (CategoryBudgetOverviewItem) -> Unit,
+    onDeleteBudget: (Long) -> Unit,
+    onViewTransactions: (Long) -> Unit,
+    isWideScreen: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        val allActive = (budgeted + unbudgeted).filter { it.spentCents > 0L }
+        if (allActive.isNotEmpty()) {
+            SpendingMixPanel(items = allActive)
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        if (budgeted.isNotEmpty()) {
+            val totalBudgeted = budgeted.sumOf { it.amountCents }
+            SectionHeader(
+                title = "Budgeted Categories",
+                subtitle = "${budgeted.size} categories • ${MoneyUtils.formatCents(totalBudgeted, showCents = false)}"
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            budgeted.forEach { item ->
+                BudgetCategoryRow(
+                    item = item,
+                    isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
+                    isInspected = isWideScreen && item.category.id == expandedCategoryId,
+                    transactions = categoryTransactions[item.category.id] ?: emptyList(),
+                    onClick = { onToggleExpand(item.category.id) },
+                    onEditBudget = { onEditBudget(item) },
+                    onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
+                    onViewTransactions = { onViewTransactions(item.category.id) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        if (unbudgeted.isNotEmpty()) {
+            val totalUnbudgeted = unbudgeted.sumOf { it.spentCents }
+            SectionHeader(
+                title = "Unbudgeted Spending",
+                subtitle = "${unbudgeted.size} categories • ${MoneyUtils.formatCents(totalUnbudgeted, showCents = false)}"
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            unbudgeted.forEach { item ->
+                BudgetCategoryRow(
+                    item = item,
+                    isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
+                    isInspected = isWideScreen && item.category.id == expandedCategoryId,
+                    transactions = categoryTransactions[item.category.id] ?: emptyList(),
+                    onClick = { onToggleExpand(item.category.id) },
+                    onEditBudget = { onEditBudget(item) },
+                    onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
+                    onViewTransactions = { onViewTransactions(item.category.id) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        if (inactive.isNotEmpty()) {
+            InactiveBudgetCategoriesSection(
+                inactive = inactive,
+                expandedCategoryId = expandedCategoryId,
+                categoryTransactions = categoryTransactions,
+                onToggleExpand = onToggleExpand,
+                onEditBudget = onEditBudget,
+                onDeleteBudget = onDeleteBudget,
+                onViewTransactions = onViewTransactions,
+                isWideScreen = isWideScreen
+            )
+        }
+    }
+}
+
+/**
  * Multi-segment colored horizontal strip showing each category's proportion
  * of total spent + top spending categories legend.
  */
@@ -216,7 +328,6 @@ private fun SpendingMixPanel(
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            // Multi-segment horizontal strip
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -238,7 +349,6 @@ private fun SpendingMixPanel(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Legend of top spending categories
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -295,4 +405,3 @@ private fun SectionHeader(title: String, subtitle: String) {
         )
     }
 }
-

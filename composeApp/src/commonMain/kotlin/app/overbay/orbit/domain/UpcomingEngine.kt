@@ -486,9 +486,11 @@ object UpcomingEngine {
         return candidates.sortedByDescending { it.confidenceScore }
     }
 
+    private val NON_ALPHANUMERIC_REGEX = Regex("[^a-z0-9]+")
+
     private fun normalizeText(text: String): String {
         return text.lowercase()
-            .replace(Regex("[^a-z0-9]+"), " ")
+            .replace(NON_ALPHANUMERIC_REGEX, " ")
             .trim()
     }
 

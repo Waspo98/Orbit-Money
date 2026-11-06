@@ -11,8 +11,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.lerp
@@ -29,6 +27,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Scroll state for [MorphingPageHero] implementing ExitUntilCollapsed physics,
@@ -109,6 +108,10 @@ fun rememberHeroScrollState(maxHeight: Dp = 112.dp, minHeight: Dp = 56.dp): Hero
     return remember(minPx) { HeroScrollState(maxPx, minPx, scope) }
 }
 
+private class CoordinatesHolder {
+    var value: LayoutCoordinates? = null
+}
+
 /**
  * Edge-to-edge flat emerald canopy header that draws seamlessly behind the system status bar.
  * Features a single continuous morphing title (30sp expanded -> 17.5–21sp left-anchored collapsed)
@@ -133,7 +136,6 @@ fun MorphingPageHero(
 ) {
     val haptics = LocalOrbitHaptics.current
     val density = LocalDensity.current
-    val fraction = scrollState?.collapseFraction ?: 0f
     val canopyColors = OrbitTheme.colors
 
     val minBarHeightPx = scrollState?.minHeightPx ?: with(density) { 56.dp.toPx() }
@@ -145,6 +147,7 @@ fun MorphingPageHero(
     var titleTopInColumnPx by remember { mutableFloatStateOf(with(density) { if (kicker != null) 16.dp.toPx() else 0.dp.toPx() }) }
     var titleHeightPx by remember { mutableFloatStateOf(with(density) { 38.dp.toPx() }) }
     var rawTitleWidthPx by remember { mutableFloatStateOf(with(density) { 180.dp.toPx() }) }
+    var containerWidthPx by remember { mutableIntStateOf(with(density) { 400.dp.roundToPx() }) }
 
     val expandedFontSize = if (title.length > 17) 26.sp else 30.sp
     val collapsedTargetSp = when {
@@ -153,7 +156,6 @@ fun MorphingPageHero(
         else -> 21f
     }
     val collapsedTitleScale = collapsedTargetSp / expandedFontSize.value
-    val titleScale = lerp(1f, collapsedTitleScale, fraction)
 
     val extraMorphSlotPx = when {
         hasMorphingSlot || hasCanopyBar -> with(density) { 58.dp.toPx() }
@@ -162,11 +164,178 @@ fun MorphingPageHero(
     val expandedMorphHeightPx = (textBlockHeightPx + extraMorphSlotPx).coerceAtLeast(minBarHeightPx)
     scrollState?.updateMaxHeight(expandedMorphHeightPx)
 
-    val restingZoneHeightDp = lerp(with(density) { expandedMorphHeightPx.toDp() }, minBarHeightDp, fraction)
-    val currentZoneHeightDp = activeHeightOverrideDp ?: restingZoneHeightDp
     val canopyCoordinator = LocalCanopyTransitionCoordinator.current
     val canopyScreenKeyId = LocalCanopyScreenKeyId.current
-    var heroCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val heroCoordinates = remember { CoordinatesHolder() }
+    val maxElevationPx = with(density) { 6.dp.toPx() }
+
+    val topPadDp = 18.dp
+    val topPadPx = with(density) { topPadDp.toPx() }
+    val bottomPadDp = if (hasMorphingSlot || hasCanopyBar || persistentBottomBar != null) 10.dp else 18.dp
+    val backShiftBasePx = with(density) { (-6).dp.toPx() }
+
+    val collapsedTitleWidthPx = rawTitleWidthPx * collapsedTitleScale
+    val expandedTextBottomDp = with(density) { textBlockHeightPx.toDp() }
+
+    val headerTextRow: @Composable () -> Unit = {
+        val expandedTitleCenterY = topPadPx + titleTopInColumnPx + (titleHeightPx / 2f)
+        val maxTitleShiftY = (minBarHeightPx / 2f) - expandedTitleCenterY
+        val iconTopOffsetDp = with(density) {
+            (titleTopInColumnPx + (titleHeightPx - 36.dp.toPx()).coerceAtLeast(0f) / 2f).toDp()
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                    val h = placeable.height.toFloat()
+                    if (abs(h - textBlockHeightPx) > 0.5f) {
+                        textBlockHeightPx = h
+                    }
+                    layout(placeable.width, placeable.height.coerceAtMost(constraints.maxHeight)) {
+                        placeable.placeRelative(0, 0)
+                    }
+                }
+                .padding(start = 20.dp, end = 20.dp, top = topPadDp, bottom = bottomPadDp),
+            verticalAlignment = Alignment.Top
+        ) {
+            if (canNavigateBack) {
+                IconButton(
+                    onClick = { if (contentAlpha > 0.5f) { haptics.tick(); onBack() } },
+                    modifier = Modifier
+                        .padding(top = iconTopOffsetDp, end = 6.dp)
+                        .size(36.dp)
+                        .graphicsLayer {
+                            val f = scrollState?.collapseFraction ?: 0f
+                            alpha = contentAlpha
+                            translationX = backShiftBasePx * f
+                            translationY = maxTitleShiftY * f
+                        }
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = canopyColors.onCanopy)
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                if (kicker != null) {
+                    val kickerTint = lerp(canopyColors.onCanopy, canopyColors.heroStatGood, 0.32f).copy(alpha = 0.84f)
+                    Text(
+                        text = kicker.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.4.sp,
+                        color = kickerTint,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.graphicsLayer {
+                            val f = scrollState?.collapseFraction ?: 0f
+                            alpha = ((1f - f * 2.2f).coerceIn(0f, 1f) * contentAlpha).coerceIn(0f, 1f)
+                            translationY = -f * 12f
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                }
+
+                if (heroContent != null) {
+                    Box(
+                        modifier = Modifier.graphicsLayer {
+                            val f = scrollState?.collapseFraction ?: 0f
+                            val scale = lerp(1f, collapsedTitleScale, f)
+                            alpha = contentAlpha
+                            scaleX = scale
+                            scaleY = scale
+                            transformOrigin = TransformOrigin(0f, 0.5f)
+                            translationX = backShiftBasePx * f
+                            translationY = maxTitleShiftY * f
+                        }
+                    ) { heroContent() }
+                } else {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.displayMedium,
+                        fontSize = expandedFontSize,
+                        lineHeight = (expandedFontSize.value + 6f).sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.sp,
+                        color = canopyColors.onCanopy,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .onPlaced { coordinates ->
+                                val newTop = coordinates.positionInParent().y
+                                val newH = coordinates.size.height.toFloat()
+                                val newW = coordinates.size.width.toFloat()
+                                if (abs(newTop - titleTopInColumnPx) > 0.5f) titleTopInColumnPx = newTop
+                                if (abs(newH - titleHeightPx) > 0.5f) titleHeightPx = newH
+                                if (abs(newW - rawTitleWidthPx) > 0.5f) rawTitleWidthPx = newW
+                            }
+                            .graphicsLayer {
+                                val f = scrollState?.collapseFraction ?: 0f
+                                val scale = lerp(1f, collapsedTitleScale, f)
+                                alpha = contentAlpha
+                                scaleX = scale
+                                scaleY = scale
+                                transformOrigin = TransformOrigin(0f, 0.5f)
+                                translationX = backShiftBasePx * f
+                                translationY = maxTitleShiftY * f
+                            }
+                    )
+                }
+
+                if (subtitle != null) {
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Normal,
+                        letterSpacing = 0.sp,
+                        color = canopyColors.onCanopy.copy(alpha = 0.82f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.graphicsLayer {
+                            val f = scrollState?.collapseFraction ?: 0f
+                            alpha = ((1f - f * 2.2f).coerceIn(0f, 1f) * contentAlpha).coerceIn(0f, 1f)
+                            translationY = -f * 12f
+                        }
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .padding(top = iconTopOffsetDp)
+                    .graphicsLayer {
+                        val f = scrollState?.collapseFraction ?: 0f
+                        alpha = contentAlpha
+                        translationY = maxTitleShiftY * f
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) { actions() }
+        }
+    }
+
+    val zoneLayoutModifier = Modifier
+        .fillMaxWidth()
+        .onSizeChanged { size ->
+            if (size.width > 0 && size.width != containerWidthPx) {
+                containerWidthPx = size.width
+            }
+        }
+        .layout { measurable, constraints ->
+            val f = scrollState?.collapseFraction ?: 0f
+            val restingPx = lerp(expandedMorphHeightPx, minBarHeightPx, f)
+            val targetHeightPx = activeHeightOverrideDp?.roundToPx() ?: restingPx.roundToInt()
+            val coercedHeight = targetHeightPx.coerceAtLeast(0)
+            val placeable = measurable.measure(constraints.copy(minHeight = coercedHeight, maxHeight = coercedHeight))
+            layout(placeable.width, coercedHeight) {
+                placeable.placeRelative(0, 0)
+            }
+        }
+        .clipToBounds()
 
     Column(
         modifier = modifier.stationaryCanopyBackdrop(
@@ -174,179 +343,56 @@ fun MorphingPageHero(
             canopyMid = canopyColors.canopyMid,
             canopyEnd = canopyColors.canopyEnd,
             canopyGlow = canopyColors.canopyGlow,
-            elevationDp = (fraction * 6f).dp,
+            elevationPxProvider = { (scrollState?.collapseFraction ?: 0f) * maxElevationPx },
             coordinator = canopyCoordinator,
             screenKeyId = canopyScreenKeyId,
-            getHeroCoordinates = { heroCoordinates },
-            setHeroCoordinates = { heroCoordinates = it }
+            getHeroCoordinates = { heroCoordinates.value },
+            setHeroCoordinates = { heroCoordinates.value = it }
         )
     ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(currentZoneHeightDp)
-                .clipToBounds()
-        ) {
-            val totalWidth = maxWidth
-            val secondaryAlpha = ((1f - fraction * 2.2f).coerceIn(0f, 1f) * contentAlpha).coerceIn(0f, 1f)
-            val topPadDp = 18.dp
-            val topPadPx = with(density) { topPadDp.toPx() }
-            val bottomPadDp = if (hasMorphingSlot || hasCanopyBar || persistentBottomBar != null) 10.dp else 18.dp
+        if (morphingContent != null) {
+            BoxWithConstraints(modifier = zoneLayoutModifier) {
+                val fraction = scrollState?.collapseFraction ?: 0f
+                val maxCollapsedTitleWidthDp = (maxWidth * 0.46f).coerceAtLeast(100.dp)
+                val collapsedTitleWidthDp = with(density) { collapsedTitleWidthPx.toDp() }
+                    .coerceIn(52.dp, maxCollapsedTitleWidthDp)
+                val collapsedTitleRightDp = (20.dp + if (canNavigateBack) 36.dp else 0.dp) + collapsedTitleWidthDp
 
-            val expandedTitleCenterY = topPadPx + titleTopInColumnPx + (titleHeightPx / 2f)
-            val titleTranslationY = ((minBarHeightPx / 2f) - expandedTitleCenterY) * fraction
-            val backShiftXPx = with(density) { (-6).dp.toPx() } * fraction
-
-            val collapsedTitleWidthPx = rawTitleWidthPx * collapsedTitleScale
-            val titleTranslationX = backShiftXPx
-
-            val maxCollapsedTitleWidthDp = (totalWidth * 0.46f).coerceAtLeast(100.dp)
-            val collapsedTitleWidthDp = with(density) { collapsedTitleWidthPx.toDp() }
-                .coerceIn(52.dp, maxCollapsedTitleWidthDp)
-            val collapsedTitleRightDp = (20.dp + if (canNavigateBack) 36.dp else 0.dp) + collapsedTitleWidthDp
-            val expandedTextBottomDp = with(density) { textBlockHeightPx.toDp() }
-
-            // 1. Single Unconfined Header Text & Actions Block
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .layout { measurable, constraints ->
-                        val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
-                        textBlockHeightPx = placeable.height.toFloat()
-                        layout(placeable.width, placeable.height.coerceAtMost(constraints.maxHeight)) {
-                            placeable.placeRelative(0, 0)
-                        }
-                    }
-                    .padding(start = 20.dp, end = 20.dp, top = topPadDp, bottom = bottomPadDp),
-                verticalAlignment = Alignment.Top
-            ) {
-                val iconTopOffsetDp = with(density) {
-                    (titleTopInColumnPx + (titleHeightPx - 36.dp.toPx()).coerceAtLeast(0f) / 2f).toDp()
-                }
-
-                if (canNavigateBack) {
-                    IconButton(
-                        onClick = { if (contentAlpha > 0.5f) { haptics.tick(); onBack() } },
-                        modifier = Modifier
-                            .padding(top = iconTopOffsetDp, end = 6.dp)
-                            .size(36.dp)
-                            .graphicsLayer {
-                                alpha = contentAlpha
-                                translationX = backShiftXPx
-                                translationY = titleTranslationY
-                            }
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = canopyColors.onCanopy)
-                    }
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    if (kicker != null) {
-                        val kickerTint = lerp(canopyColors.onCanopy, canopyColors.heroStatGood, 0.32f).copy(alpha = 0.84f)
-                        Text(
-                            text = kicker.uppercase(),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.4.sp,
-                            color = kickerTint,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.graphicsLayer { alpha = secondaryAlpha; translationY = -fraction * 12f }
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                    }
-
-                    if (heroContent != null) {
-                        Box(
-                            modifier = Modifier.graphicsLayer {
-                                alpha = contentAlpha
-                                scaleX = titleScale
-                                scaleY = titleScale
-                                transformOrigin = TransformOrigin(0f, 0.5f)
-                                translationX = titleTranslationX
-                                translationY = titleTranslationY
-                            }
-                        ) { heroContent() }
-                    } else {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.displayMedium,
-                            fontSize = expandedFontSize,
-                            lineHeight = (expandedFontSize.value + 6f).sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.sp,
-                            color = canopyColors.onCanopy,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .onPlaced { coordinates ->
-                                    titleTopInColumnPx = coordinates.positionInParent().y
-                                    titleHeightPx = coordinates.size.height.toFloat()
-                                    rawTitleWidthPx = coordinates.size.width.toFloat()
-                                }
-                                .graphicsLayer {
-                                    alpha = contentAlpha
-                                    scaleX = titleScale
-                                    scaleY = titleScale
-                                    transformOrigin = TransformOrigin(0f, 0.5f)
-                                    translationX = titleTranslationX
-                                    translationY = titleTranslationY
-                                }
-                        )
-                    }
-
-                    if (subtitle != null) {
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.Normal,
-                            letterSpacing = 0.sp,
-                            color = canopyColors.onCanopy.copy(alpha = 0.82f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.graphicsLayer { alpha = secondaryAlpha; translationY = -fraction * 12f }
-                        )
-                    }
-                }
-
-                Row(
-                    modifier = Modifier
-                        .padding(top = iconTopOffsetDp)
-                        .graphicsLayer { alpha = contentAlpha; translationY = titleTranslationY },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.End
-                ) { actions() }
-            }
-
-            // 2. Standardized 2-Axis Morphing Canopy Bar (46dp expanded -> 38dp collapsed)
-            if (canopyBar != null && morphingContent == null) {
-                val barHeight = lerp(46.dp, 38.dp, fraction)
-                val collapsedRowLeft = collapsedTitleRightDp + 10.dp
-                val barLeft = lerp(20.dp, collapsedRowLeft, fraction)
-                val barTop = lerp(expandedTextBottomDp, (minBarHeightDp - barHeight) / 2, fraction)
-                val barRightMargin = lerp(20.dp, 16.dp, fraction)
-                val barWidth = (totalWidth - barRightMargin - barLeft).coerceAtLeast(120.dp)
-                val isCompact = fraction > 0.45f
-
-                Row(
-                    modifier = Modifier
-                        .offset(x = barLeft, y = barTop)
-                        .width(barWidth)
-                        .height(barHeight)
-                        .graphicsLayer { alpha = contentAlpha },
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    canopyBar(fraction, isCompact, barHeight)
-                }
-            }
-
-            // 3. Custom 2-Axis Morphing Slot (Transactions Search Bar)
-            if (morphingContent != null) {
+                headerTextRow()
                 morphingContent(fraction, collapsedTitleRightDp, expandedTextBottomDp)
+            }
+        } else {
+            Box(modifier = zoneLayoutModifier) {
+                headerTextRow()
+
+                if (canopyBar != null) {
+                    val fraction = scrollState?.collapseFraction ?: 0f
+                    val totalWidth = with(density) { containerWidthPx.toDp() }
+                    val maxCollapsedTitleWidthDp = (totalWidth * 0.46f).coerceAtLeast(100.dp)
+                    val collapsedTitleWidthDp = with(density) { collapsedTitleWidthPx.toDp() }
+                        .coerceIn(52.dp, maxCollapsedTitleWidthDp)
+                    val collapsedTitleRightDp = (20.dp + if (canNavigateBack) 36.dp else 0.dp) + collapsedTitleWidthDp
+
+                    val barHeight = lerp(46.dp, 38.dp, fraction)
+                    val collapsedRowLeft = collapsedTitleRightDp + 10.dp
+                    val barLeft = lerp(20.dp, collapsedRowLeft, fraction)
+                    val barTop = lerp(expandedTextBottomDp, (minBarHeightDp - barHeight) / 2, fraction)
+                    val barRightMargin = lerp(20.dp, 16.dp, fraction)
+                    val barWidth = (totalWidth - barRightMargin - barLeft).coerceAtLeast(120.dp)
+                    val isCompact = fraction > 0.45f
+
+                    Row(
+                        modifier = Modifier
+                            .offset { IntOffset(barLeft.roundToPx(), barTop.roundToPx()) }
+                            .width(barWidth)
+                            .height(barHeight)
+                            .graphicsLayer { alpha = contentAlpha },
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        canopyBar(fraction, isCompact, barHeight)
+                    }
+                }
             }
         }
 

@@ -8,14 +8,12 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.OccurrenceStatus
 import app.overbay.orbit.data.model.ProjectedOccurrence
-import app.overbay.orbit.data.model.RecurrenceFrequency
 import app.overbay.orbit.data.model.RecurringCandidate
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.UpcomingItem
 import app.overbay.orbit.data.model.UpcomingKind
 import app.overbay.orbit.data.model.UpcomingStatus
 import app.overbay.orbit.domain.LocalDateUtils
-import app.overbay.orbit.domain.MatchedTransactionHistory
 import app.overbay.orbit.domain.ProjectedAmountResult
 import app.overbay.orbit.domain.UpcomingCashFlowSummary
 import app.overbay.orbit.domain.UpcomingEngine
@@ -33,7 +31,7 @@ import kotlin.math.abs
 
 class UpcomingViewModel(
     private val repository: OrbitRepository,
-    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val _filterOption = MutableStateFlow(UpcomingFilterOption.ALL)
@@ -58,47 +56,18 @@ class UpcomingViewModel(
         UpcomingDataBundle(items, transactions, categories, accounts)
     }
 
-    private val controlFlow = combine(
-        _filterOption,
-        _selectedDateFilter,
-        _editingItem,
-        _showEditorSheet,
-        _reconcilingItem
-    ) { filter, date, editing, showSheet, reconciling ->
-        UpcomingControlBundle(filter, date, editing, showSheet, reconciling)
-    }
-
-    val uiState: StateFlow<UpcomingUiState> = combine(
+    private val computedCoreFlow = combine(
         dataFlow,
-        controlFlow,
-        _inspectingItemId,
-        _showReconcileDialog,
-        _dismissedKeys,
-        _cashFlowPeriod,
-        _showHistoryModal,
-        _historyItem,
-        _showAddFromTxModal
-    ) { args ->
-        val data = args[0] as UpcomingDataBundle
-        val control = args[1] as UpcomingControlBundle
-        val inspectingId = args[2] as Long?
-        val showReconcile = args[3] as Boolean
-        val localDismissed = args[4] as Set<String>
-        val cfPeriod = args[5] as UpcomingCashFlowPeriod
-        val showHistory = args[6] as Boolean
-        val histItem = args[7] as UpcomingItem?
-        val showAddFromTx = args[8] as Boolean
-
+        _dismissedKeys
+    ) { data, localDismissed ->
         val todayIso = LocalDateUtils.todayIsoDate()
         val categoryMap = data.categories.associateBy { it.id }
         val accountMap = data.accounts.associateBy { it.id }
 
-        // Reconcile occurrences against posted transactions
         val reconciliation = UpcomingEngine.reconcileOccurrences(data.items, data.transactions, todayIso)
         val repoOccurrences = repository.snapshot.value.upcomingOccurrences
         val effectiveOccurrences = if (repoOccurrences.isNotEmpty()) repoOccurrences else reconciliation.occurrences
 
-        // Suggestions: merge snapshot suggestions with detected history candidates
         val prefDismissed = repository.preferences.value.dismissedRecurringKeys
         val allDismissed = prefDismissed + localDismissed
         val existingMerchants = data.items.mapNotNull { it.merchant?.lowercase() }.toSet() + allDismissed
@@ -116,7 +85,72 @@ class UpcomingViewModel(
             .distinctBy { it.merchant.lowercase().trim() }
             .sortedByDescending { it.confidenceScore }
 
-        // Filter upcoming items
+        val projectedAmounts = data.items.associate { item ->
+            item.id to UpcomingScheduleHelper.computeProjectedAmount(item, data.transactions, todayIso)
+        }
+
+        var totalExpense = 0L
+        var totalIncome = 0L
+        for (item in data.items.filter { it.status == UpcomingStatus.ACTIVE }) {
+            val amount = projectedAmounts[item.id]?.amountCents ?: item.amountCents
+            if (item.direction.lowercase() == "income") {
+                totalIncome += abs(amount)
+            } else {
+                totalExpense += abs(amount)
+            }
+        }
+
+        val cashFlow = UpcomingScheduleHelper.calculateCashFlow(data.items, data.transactions, todayIso)
+        val recentTxns = data.transactions
+            .filter { !it.effectiveIsIgnored && !it.effectiveIsTransfer }
+            .sortedByDescending { it.effectiveDate }
+            .take(60)
+
+        UpcomingComputedCore(
+            data = data,
+            categoryMap = categoryMap,
+            accountMap = accountMap,
+            effectiveOccurrences = effectiveOccurrences,
+            mergedSuggestions = mergedSuggestions,
+            projectedAmounts = projectedAmounts,
+            totalExpense = totalExpense,
+            totalIncome = totalIncome,
+            cashFlow = cashFlow,
+            recentTxns = recentTxns
+        )
+    }.flowOn(computeDispatcher)
+
+    private val controlFlow = combine(
+        _filterOption,
+        _selectedDateFilter,
+        _editingItem,
+        _showEditorSheet,
+        _reconcilingItem
+    ) { filter, date, editing, showSheet, reconciling ->
+        UpcomingControlBundle(filter, date, editing, showSheet, reconciling)
+    }
+
+    val uiState: StateFlow<UpcomingUiState> = combine(
+        computedCoreFlow,
+        controlFlow,
+        _inspectingItemId,
+        _showReconcileDialog,
+        _cashFlowPeriod,
+        _showHistoryModal,
+        _historyItem,
+        _showAddFromTxModal
+    ) { args ->
+        val core = args[0] as UpcomingComputedCore
+        val control = args[1] as UpcomingControlBundle
+        val inspectingId = args[2] as Long?
+        val showReconcile = args[3] as Boolean
+        val cfPeriod = args[4] as UpcomingCashFlowPeriod
+        val showHistory = args[5] as Boolean
+        val histItem = args[6] as UpcomingItem?
+        val showAddFromTx = args[7] as Boolean
+
+        val data = core.data
+
         val filtered = data.items.filter { item ->
             val matchesFilter = when (control.filter) {
                 UpcomingFilterOption.ALL -> true
@@ -130,54 +164,28 @@ class UpcomingViewModel(
             true
         }.sortedBy { it.nextDate }
 
-        // Projected variable amounts per item
-        val projectedAmounts = data.items.associate { item ->
-            item.id to UpcomingScheduleHelper.computeProjectedAmount(item, data.transactions, todayIso)
-        }
-
-        // Totals for next 30 days
-        var totalExpense = 0L
-        var totalIncome = 0L
-        for (item in data.items.filter { it.status == UpcomingStatus.ACTIVE }) {
-            val amount = projectedAmounts[item.id]?.amountCents ?: item.amountCents
-            if (item.direction.lowercase() == "income") {
-                totalIncome += abs(amount)
-            } else {
-                totalExpense += abs(amount)
-            }
-        }
-
-        // Cash flow summary calculation
-        val cashFlow = UpcomingScheduleHelper.calculateCashFlow(data.items, data.transactions, todayIso)
-
-        // Matching transaction history for active history item
         val matchingHistory = if (histItem != null) {
             UpcomingScheduleHelper.findMatchingTransactions(histItem, data.transactions)
         } else {
             emptyList()
         }
 
-        val recentTxns = data.transactions
-            .filter { !it.effectiveIsIgnored && !it.effectiveIsTransfer }
-            .sortedByDescending { it.effectiveDate }
-            .take(60)
-
         UpcomingUiState(
             items = filtered,
-            occurrences = effectiveOccurrences,
-            candidates = mergedSuggestions,
+            occurrences = core.effectiveOccurrences,
+            candidates = core.mergedSuggestions,
             categories = data.categories,
             accounts = data.accounts,
-            categoryMap = categoryMap,
-            accountMap = accountMap,
+            categoryMap = core.categoryMap,
+            accountMap = core.accountMap,
             filterOption = control.filter,
             selectedDateFilter = control.date,
-            totalUpcomingExpenseCents = totalExpense,
-            totalUpcomingIncomeCents = totalIncome,
-            netCashflowProjectionCents = totalIncome - totalExpense,
-            cashFlowSummary = cashFlow,
+            totalUpcomingExpenseCents = core.totalExpense,
+            totalUpcomingIncomeCents = core.totalIncome,
+            netCashflowProjectionCents = core.totalIncome - core.totalExpense,
+            cashFlowSummary = core.cashFlow,
             cashFlowPeriod = cfPeriod,
-            projectedAmounts = projectedAmounts,
+            projectedAmounts = core.projectedAmounts,
             inspectingItemId = inspectingId,
             editingItem = control.editing,
             showEditorSheet = control.showSheet,
@@ -187,7 +195,7 @@ class UpcomingViewModel(
             showHistoryModal = showHistory,
             matchingHistory = matchingHistory,
             showAddFromTxModal = showAddFromTx,
-            recentTransactions = recentTxns,
+            recentTransactions = core.recentTxns,
             isLoading = false
         )
     }.flowOn(computeDispatcher).stateIn(
@@ -251,14 +259,14 @@ class UpcomingViewModel(
     }
 
     fun saveUpcoming(item: UpcomingItem) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.saveUpcoming(item)
             closeEditorSheet()
         }
     }
 
     fun deleteUpcoming(id: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.deleteUpcoming(id)
             if (_inspectingItemId.value == id) {
                 _inspectingItemId.value = null
@@ -286,7 +294,7 @@ class UpcomingViewModel(
         occurrenceDate: String,
         matchedTxnId: Long? = null
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val item = repository.upcomingItems.value.find { it.id == upcomingItemId } ?: return@launch
             val nextDate = UpcomingScheduleHelper.advanceRecurrence(item, occurrenceDate)
 
@@ -321,7 +329,7 @@ class UpcomingViewModel(
     }
 
     fun reconcileOccurrenceMissed(upcomingItemId: Long, occurrenceDate: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val item = repository.upcomingItems.value.find { it.id == upcomingItemId } ?: return@launch
             val nextDate = UpcomingScheduleHelper.advanceRecurrence(item, occurrenceDate)
             val occ = uiState.value.occurrences.find { it.upcomingItemId == upcomingItemId }
@@ -339,7 +347,7 @@ class UpcomingViewModel(
     }
 
     fun reconcileOccurrenceReset(upcomingItemId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val occ = uiState.value.occurrences.find { it.upcomingItemId == upcomingItemId } ?: return@launch
             repository.reconcileOccurrence(
                 occurrenceId = occ.id,
@@ -351,7 +359,7 @@ class UpcomingViewModel(
     }
 
     fun acceptCandidate(candidate: RecurringCandidate) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val res = repository.acceptRecurringSuggestion(candidate)
             if (res.isFailure) {
                 val detectedKind = UpcomingScheduleHelper.detectKind(candidate.merchant)
@@ -374,7 +382,7 @@ class UpcomingViewModel(
     }
 
     fun dismissCandidate(key: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.dismissRecurringSuggestion(key)
             _dismissedKeys.value = _dismissedKeys.value + key.lowercase().trim()
         }
@@ -399,7 +407,7 @@ class UpcomingViewModel(
     }
 
     fun createFromTransaction(transactionId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val res = repository.createUpcomingFromTransaction(transactionId)
             res.onSuccess { item ->
                 _showAddFromTxModal.value = false
@@ -415,6 +423,19 @@ private data class UpcomingDataBundle(
     val transactions: List<Transaction>,
     val categories: List<Category>,
     val accounts: List<Account>
+)
+
+private data class UpcomingComputedCore(
+    val data: UpcomingDataBundle,
+    val categoryMap: Map<Long, Category>,
+    val accountMap: Map<Long, Account>,
+    val effectiveOccurrences: List<ProjectedOccurrence>,
+    val mergedSuggestions: List<RecurringCandidate>,
+    val projectedAmounts: Map<Long, ProjectedAmountResult>,
+    val totalExpense: Long,
+    val totalIncome: Long,
+    val cashFlow: UpcomingCashFlowSummary,
+    val recentTxns: List<Transaction>
 )
 
 private data class UpcomingControlBundle(

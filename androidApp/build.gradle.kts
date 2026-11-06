@@ -87,8 +87,14 @@ android {
 
     buildTypes {
         debug {
+            val invokedFromIde = providers.gradleProperty("android.injected.invoked.from.ide")
+                .map { it.toBoolean() }
+                .orElse(false)
+                .get()
+            isDebuggable = invokedFromIde
             ndk {
-                abiFilters += listOf("arm64-v8a", "x86_64")
+                abiFilters.clear()
+                abiFilters += "arm64-v8a"
             }
         }
         release {
@@ -108,6 +114,10 @@ android {
     buildFeatures {
         compose = true
     }
+}
+
+composeCompiler {
+    includeSourceInformation.set(false)
 }
 
 dependencies {

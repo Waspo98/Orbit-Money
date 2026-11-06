@@ -3,7 +3,6 @@ package app.overbay.orbit.domain
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryBudget
 import app.overbay.orbit.data.model.Transaction
-import kotlin.math.abs
 
 data class MonthlyFlow(
     val month: String,
@@ -49,6 +48,10 @@ data class SpendingTrendsOverview(
 
 object SpendingTrendsEngine {
 
+    private class MonthFlowAccumulator(var incomeCents: Long = 0L, var expensesCents: Long = 0L)
+    private class CatMonthAccumulator(var spentCents: Long = 0L, var count: Int = 0)
+    private class MerchantAccumulator(var spentCents: Long = 0L, var count: Int = 0)
+
     fun computeTrends(
         transactions: List<Transaction>,
         categories: List<Category>,
@@ -59,24 +62,48 @@ object SpendingTrendsEngine {
         val months = (0 until monthsCount).map { i ->
             addMonths(endMonth, -(monthsCount - 1 - i))
         }
-
+        val monthSet = months.toHashSet()
         val budgetMap = budgets.associateBy { it.categoryId }
 
-        val activeTxns = transactions.filter { txn ->
-            !txn.effectiveIsIgnored && !txn.effectiveIsTransfer
+        val flowByMonth = HashMap<String, MonthFlowAccumulator>(monthsCount * 2)
+        val catMonthMap = HashMap<Long, HashMap<String, CatMonthAccumulator>>(categories.size * 2)
+        val merchantMap = HashMap<String, MerchantAccumulator>()
+
+        // Single O(N) pass over transactions
+        for (txn in transactions) {
+            if (txn.effectiveIsIgnored || txn.effectiveIsTransfer) continue
+            val m = txn.effectiveDate.take(7)
+            if (m !in monthSet) continue
+
+            val amt = txn.effectiveAmountCents
+            val flowAcc = flowByMonth.getOrPut(m) { MonthFlowAccumulator() }
+            if (amt > 0L) {
+                flowAcc.incomeCents += amt
+            } else if (amt < 0L) {
+                val expense = -amt
+                flowAcc.expensesCents += expense
+
+                val catId = txn.effectiveCategoryId
+                if (catId != null) {
+                    val byMonth = catMonthMap.getOrPut(catId) { HashMap(monthsCount * 2) }
+                    val catAcc = byMonth.getOrPut(m) { CatMonthAccumulator() }
+                    catAcc.spentCents += expense
+                    catAcc.count += 1
+                }
+
+                val merchAcc = merchantMap.getOrPut(txn.effectiveMerchant) { MerchantAccumulator() }
+                merchAcc.spentCents += expense
+                merchAcc.count += 1
+            }
         }
 
         // Flow per month
         val flowSeries = months.map { m ->
-            val monthTxns = activeTxns.filter { it.effectiveDate.take(7) == m }
-            var income = 0L
-            var expenses = 0L
-            for (t in monthTxns) {
-                if (t.effectiveAmountCents > 0) income += t.effectiveAmountCents
-                else if (t.effectiveAmountCents < 0) expenses += -t.effectiveAmountCents
-            }
+            val acc = flowByMonth[m]
+            val income = acc?.incomeCents ?: 0L
+            val expenses = acc?.expensesCents ?: 0L
             val net = income - expenses
-            val savingsRate = if (income > 0) (net.toDouble() / income.toDouble()) * 100.0 else 0.0
+            val savingsRate = if (income > 0L) (net.toDouble() / income.toDouble()) * 100.0 else 0.0
             MonthlyFlow(
                 month = m,
                 incomeCents = income,
@@ -91,27 +118,27 @@ object SpendingTrendsEngine {
 
         // Category trends
         val spendingCategories = categories.filter { !it.isIncome && !it.isTransfer }
-        val categoryTrends = spendingCategories.map { cat ->
+        val categoryTrends = spendingCategories.mapNotNull { cat ->
+            val byMonth = catMonthMap[cat.id] ?: return@mapNotNull null
             val budget = budgetMap[cat.id]
             val budgetAmt = budget?.amountCents
 
             val series = months.map { m ->
-                val catMonthTxns = activeTxns.filter {
-                    it.effectiveDate.take(7) == m &&
-                        it.effectiveCategoryId == cat.id &&
-                        it.effectiveAmountCents < 0
-                }
-                val spent = catMonthTxns.sumOf { -it.effectiveAmountCents }
-                val isOver = budgetAmt != null && budgetAmt > 0 && spent > budgetAmt
+                val catAcc = byMonth[m]
+                val spent = catAcc?.spentCents ?: 0L
+                val count = catAcc?.count ?: 0
+                val isOver = budgetAmt != null && budgetAmt > 0L && spent > budgetAmt
                 CategoryTrendPoint(
                     month = m,
                     spentCents = spent,
-                    transactionCount = catMonthTxns.size,
+                    transactionCount = count,
                     isOverBudget = isOver
                 )
             }
 
             val totalSpent = series.sumOf { it.spentCents }
+            if (totalSpent <= 0L) return@mapNotNull null
+
             val avgSpent = totalSpent / maxOf(1, months.size)
             val sortedSpents = series.map { it.spentCents }.sorted()
             val medianSpent = if (sortedSpents.isNotEmpty()) {
@@ -120,7 +147,7 @@ object SpendingTrendsEngine {
             } else 0L
 
             val overCount = series.count { it.isOverBudget }
-            val pctOfTotal = if (totalPeriodSpending > 0) {
+            val pctOfTotal = if (totalPeriodSpending > 0L) {
                 (totalSpent.toDouble() / totalPeriodSpending.toDouble()) * 100.0
             } else 0.0
 
@@ -134,23 +161,20 @@ object SpendingTrendsEngine {
                 overBudgetMonthCount = overCount,
                 percentOfTotalSpending = pctOfTotal
             )
-        }.filter { it.totalSpentCents > 0L }.sortedByDescending { it.totalSpentCents }
+        }.sortedByDescending { it.totalSpentCents }
 
         // Top merchants across period
-        val periodTxns = activeTxns.filter {
-            val m = it.effectiveDate.take(7)
-            m in months && it.effectiveAmountCents < 0
-        }
-        val topMerchants = periodTxns.groupBy { it.effectiveMerchant }
-            .map { (merchant, txns) ->
-                val spent = txns.sumOf { -it.effectiveAmountCents }
+        val topMerchants = merchantMap.entries
+            .map { (merchant, acc) ->
                 MerchantSpendingSummary(
                     merchant = merchant,
-                    totalSpentCents = spent,
-                    transactionCount = txns.size,
-                    averageTransactionCents = if (txns.isNotEmpty()) spent / txns.size else 0L
+                    totalSpentCents = acc.spentCents,
+                    transactionCount = acc.count,
+                    averageTransactionCents = if (acc.count > 0) acc.spentCents / acc.count else 0L
                 )
-            }.sortedByDescending { it.totalSpentCents }.take(10)
+            }
+            .sortedByDescending { it.totalSpentCents }
+            .take(10)
 
         return SpendingTrendsOverview(
             months = months,

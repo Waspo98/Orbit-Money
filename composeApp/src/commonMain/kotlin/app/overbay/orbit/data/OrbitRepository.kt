@@ -198,16 +198,17 @@ class OrbitRepository(
     }
 
     internal fun updateMemoryState(newSnapshot: OrbitWorkspaceSnapshot) {
+        if (_snapshot.value === newSnapshot) return
         _snapshot.value = newSnapshot
-        _accounts.value = newSnapshot.accounts
-        _transactions.value = newSnapshot.transactions
-        _categories.value = newSnapshot.categories
-        _budgets.value = newSnapshot.budgets
-        _goals.value = newSnapshot.goals
-        _rules.value = newSnapshot.rules
-        _upcomingItems.value = newSnapshot.upcomingItems
-        _preferences.value = newSnapshot.preferences
-        _storageMode.value = newSnapshot.preferences.storageMode
+        if (_accounts.value !== newSnapshot.accounts) _accounts.value = newSnapshot.accounts
+        if (_transactions.value !== newSnapshot.transactions) _transactions.value = newSnapshot.transactions
+        if (_categories.value !== newSnapshot.categories) _categories.value = newSnapshot.categories
+        if (_budgets.value !== newSnapshot.budgets) _budgets.value = newSnapshot.budgets
+        if (_goals.value !== newSnapshot.goals) _goals.value = newSnapshot.goals
+        if (_rules.value !== newSnapshot.rules) _rules.value = newSnapshot.rules
+        if (_upcomingItems.value !== newSnapshot.upcomingItems) _upcomingItems.value = newSnapshot.upcomingItems
+        if (_preferences.value !== newSnapshot.preferences) _preferences.value = newSnapshot.preferences
+        if (_storageMode.value != newSnapshot.preferences.storageMode) _storageMode.value = newSnapshot.preferences.storageMode
     }
 
     internal suspend fun commitSnapshot(updated: OrbitWorkspaceSnapshot, immediate: Boolean = false) = snapshotMutex.withLock {
@@ -507,9 +508,10 @@ class OrbitRepository(
         val localId = if (exists) rule.id else if (rule.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else rule.id
         val saved = if (exists) rule else rule.copy(id = localId)
         val updatedRules = if (exists) current.map { if (it.id == rule.id) saved else it } else current + saved
-        val updatedTxns = if (!exists && saved.enabled) RuleMatcherEngine.applyNewRuleIncrementally(_transactions.value, updatedRules, saved)
-        else RuleMatcherEngine.applyRules(_transactions.value, updatedRules)
+        val updatedTxns = if (!exists && saved.enabled) RuleMatcherEngine.applyNewRuleIncrementally(_transactions.value, updatedRules, saved) else RuleMatcherEngine.applyRules(_transactions.value, updatedRules)
         commitSnapshot(_snapshot.value.copy(rules = updatedRules, transactions = updatedTxns))
+
+
         val pushed = activeEngine.pushRule(if (exists) rule else rule.copy(id = 0L)).getOrNull()
         if (pushed != null && pushed.id > 0L && pushed.id != localId) {
             commitSnapshot(_snapshot.value.copy(

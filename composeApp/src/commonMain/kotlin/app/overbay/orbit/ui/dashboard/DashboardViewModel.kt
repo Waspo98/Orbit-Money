@@ -32,7 +32,7 @@ import kotlin.math.abs
  */
 class DashboardViewModel(
     private val repository: OrbitRepository,
-    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val currentMonth = LocalDateUtils.currentYearMonth()
@@ -47,7 +47,7 @@ class DashboardViewModel(
     private val _reviewState = MutableStateFlow(CategorizeReviewState())
 
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.preferences.collect { prefs ->
                 _hiddenBiggestIds.value = prefs.dashboardHiddenBiggestIds.toSet()
                 _focusedGoalId.value = prefs.dashboardFocusedGoalId
@@ -120,7 +120,7 @@ class DashboardViewModel(
     // -------------------------------------------------------------------------
 
     fun refresh() {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             _isRefreshing.value = true
             _syncErrorMessage.value = null
             when (val result = repository.sync(force = true)) {
@@ -169,7 +169,7 @@ class DashboardViewModel(
     }
 
     fun toggleCardVisibility(type: DashboardCardType, isVisible: Boolean? = null) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val widgets = normalizedWidgets()
             val index = widgets.indexOfFirst { DashboardCardType.fromWidgetId(it.widgetId) == type }
             if (index >= 0) {
@@ -183,7 +183,7 @@ class DashboardViewModel(
     }
 
     fun setCardWideSpan(type: DashboardCardType, wideSpan: Int) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val normalizedSpan = if (wideSpan == 2) 2 else 1
             val widgets = normalizedWidgets()
             val index = widgets.indexOfFirst { DashboardCardType.fromWidgetId(it.widgetId) == type }
@@ -196,7 +196,7 @@ class DashboardViewModel(
     }
 
     fun moveCard(fromIndex: Int, toIndex: Int) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val current = normalizedWidgets()
             if (fromIndex in current.indices && toIndex in current.indices && fromIndex != toIndex) {
                 val item = current.removeAt(fromIndex)
@@ -209,7 +209,7 @@ class DashboardViewModel(
     }
 
     fun resetCardsToDefault() {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val updated = repository.preferences.value.copy(
                 dashboardWidgets = OrbitPreferences.defaultDashboardWidgets()
             )
@@ -222,7 +222,7 @@ class DashboardViewModel(
     // -------------------------------------------------------------------------
 
     fun markUpcomingPaid(upcomingItemId: Long, occurrenceDate: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val item = repository.upcomingItems.value.find { it.id == upcomingItemId } ?: return@launch
             val isExpense = item.direction.lowercase() != "income"
             val signedAmount = if (isExpense) -abs(item.amountCents) else abs(item.amountCents)
@@ -246,7 +246,7 @@ class DashboardViewModel(
     fun hideBiggestTransaction(transactionId: Long) {
         val updated = _hiddenBiggestIds.value + transactionId
         _hiddenBiggestIds.value = updated
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.updatePreferences(
                 repository.preferences.value.copy(dashboardHiddenBiggestIds = updated.toList())
             )
@@ -255,7 +255,7 @@ class DashboardViewModel(
 
     fun resetHiddenBiggestTransactions() {
         _hiddenBiggestIds.value = emptySet()
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.updatePreferences(
                 repository.preferences.value.copy(dashboardHiddenBiggestIds = emptyList())
             )
@@ -264,7 +264,7 @@ class DashboardViewModel(
 
     fun setGoalFocus(goalId: Long) {
         _focusedGoalId.value = goalId
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.updatePreferences(
                 repository.preferences.value.copy(dashboardFocusedGoalId = goalId)
             )
@@ -274,7 +274,7 @@ class DashboardViewModel(
     fun setRetirementAge(age: Int) {
         val coerced = age.coerceIn(50, 80)
         _retirementAge.value = coerced
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.updatePreferences(
                 repository.preferences.value.copy(dashboardRetirementAge = coerced)
             )
@@ -283,7 +283,7 @@ class DashboardViewModel(
 
     fun setRetirementPreset(preset: String) {
         _retirementPreset.value = preset
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.updatePreferences(
                 repository.preferences.value.copy(dashboardRetirementPreset = preset)
             )
@@ -338,7 +338,7 @@ class DashboardViewModel(
     fun approveReviewTransaction() {
         val state = _reviewState.value
         val current = state.currentTxn ?: return
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             recordHandledReviewId(current.id)
         }
         _reviewState.value = state.copy(
@@ -411,7 +411,7 @@ class DashboardViewModel(
             isCategoryPickerOpen = false,
             pendingConfirmCategoryId = null
         )
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.editTransaction(id = transactionId, categoryId = categoryId)
             recordHandledReviewId(transactionId)
         }
@@ -460,7 +460,7 @@ class DashboardViewModel(
             isCategoryPickerOpen = false,
             pendingConfirmCategoryId = null
         )
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.saveRule(rule)
             if (current != null) {
                 recordHandledReviewId(current.id)

@@ -17,17 +17,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 
@@ -140,7 +139,7 @@ fun Modifier.stationaryCanopyBackdrop(
     canopyMid: Color,
     canopyEnd: Color,
     canopyGlow: Color,
-    elevationDp: Dp,
+    elevationPxProvider: () -> Float,
     coordinator: CanopyTransitionCoordinator?,
     screenKeyId: Any?,
     getHeroCoordinates: () -> LayoutCoordinates?,
@@ -148,7 +147,11 @@ fun Modifier.stationaryCanopyBackdrop(
 ): Modifier = this
     .fillMaxWidth()
     .onGloballyPositioned { coords -> setHeroCoordinates(coords) }
-    .shadow(elevation = elevationDp, shape = RectangleShape, clip = false)
+    .graphicsLayer {
+        shadowElevation = elevationPxProvider()
+        shape = RectangleShape
+        clip = false
+    }
     .drawWithCache {
         val gradientHeightPx = 180.dp.toPx()
         val strokePx = 1.dp.toPx()

@@ -238,8 +238,11 @@ fun OrbitNavigation(
                         .weight(1f)
                         .fillMaxWidth()
                         .onGloballyPositioned { coords ->
-                            canopyCoordinator.containerRootX = coords.positionInRoot().x
-                            canopyCoordinator.containerWidthPx = coords.size.width.toFloat()
+                            val rx = coords.positionInRoot().x
+                            val rw = coords.size.width.toFloat()
+                            if (kotlin.math.abs(rx - canopyCoordinator.containerRootX) > 0.5f) canopyCoordinator.containerRootX = rx
+                            if (kotlin.math.abs(rw - canopyCoordinator.containerWidthPx) > 0.5f) canopyCoordinator.containerWidthPx = rw
+
                         },
                     label = "OrbitNavigationTransition"
                 ) { key ->

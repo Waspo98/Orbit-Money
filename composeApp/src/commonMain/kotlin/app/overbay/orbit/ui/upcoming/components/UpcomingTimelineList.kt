@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -44,6 +46,47 @@ import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.upcoming.UpcomingFilterOption
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
+
+/**
+ * Lazy-list extension that emits Upcoming recurring rows as individual virtualized LazyColumn items.
+ */
+fun LazyListScope.upcomingTimelineItems(
+    items: List<UpcomingItem>,
+    categoryMap: Map<Long, Category>,
+    accountMap: Map<Long, Account>,
+    onItemClick: (UpcomingItem) -> Unit,
+    onMarkPaid: (UpcomingItem) -> Unit,
+    onAddClick: () -> Unit,
+    projectedAmounts: Map<Long, ProjectedAmountResult> = emptyMap(),
+    inspectingItemId: Long? = null
+) {
+    if (items.isEmpty()) {
+        item(key = "upcoming_empty_state", contentType = "empty_state") {
+            EmptyStateCard(
+                title = "No Upcoming Items",
+                description = "Track recurring subscriptions, utility bills, and paychecks to forecast cashflow.",
+                actionButtonText = "+ Add Recurring Item",
+                onActionClick = onAddClick
+            )
+        }
+    } else {
+        items(
+            items = items,
+            key = { "upcoming_${it.id}" },
+            contentType = { "upcoming_item_row" }
+        ) { item ->
+            UpcomingItemRow(
+                item = item,
+                category = item.categoryId?.let { categoryMap[it] },
+                accountName = item.accountId?.let { accountMap[it]?.name },
+                projected = projectedAmounts[item.id],
+                isInspected = item.id == inspectingItemId,
+                onClick = { onItemClick(item) },
+                onMarkPaid = { onMarkPaid(item) }
+            )
+        }
+    }
+}
 
 @Composable
 fun UpcomingTimelineList(

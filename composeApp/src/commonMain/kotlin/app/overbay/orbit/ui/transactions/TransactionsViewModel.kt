@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 
 class TransactionsViewModel(
     private val repository: OrbitRepository,
-    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -80,7 +80,7 @@ class TransactionsViewModel(
         Pair(size, page)
     }.distinctUntilChanged()
 
-    val uiState: StateFlow<TransactionsUiState> = combine(
+    private val baseStateFlow = combine(
         dataFlow,
         filterFlow,
         paginationFlow
@@ -97,7 +97,6 @@ class TransactionsViewModel(
         )
 
         val sorted = TransactionsFilterHelper.sortTransactions(filteredRaw, filterParams.sort)
-
         val paginated = TransactionsFilterHelper.paginateTransactions(sorted, page, pageSize)
 
         val currentMonthKey = LocalDateUtils.currentYearMonth()
@@ -148,22 +147,46 @@ class TransactionsViewModel(
             totalIncomeCents = totalIncome,
             netCashflowCents = totalIncome + totalExpense
         )
-    }.combine(_isSearchActive) { state, v -> state.copy(isSearchActive = v) }
-        .combine(_selectedIds) { state, v -> state.copy(selectedTransactionIds = v) }
-        .combine(_inspectingId) { state, v -> state.copy(inspectingTransactionId = v) }
-        .combine(_expandedId) { state, v -> state.copy(expandedTransactionId = v) }
-        .combine(_showEditorSheet) { state, v -> state.copy(showEditorSheet = v) }
-        .combine(_showSplitSheet) { state, v -> state.copy(showSplitSheet = v) }
-        .combine(_showCsvImportSheet) { state, v -> state.copy(showCsvImportSheet = v) }
-        .combine(_showFilterSheet) { state, v -> state.copy(showFilterSheet = v) }
-        .combine(_showBatchDeleteConfirm) { state, v -> state.copy(showBatchDeleteConfirm = v) }
-        .combine(_singleDeleteConfirmId) { state, v -> state.copy(singleDeleteConfirmId = v) }
-        .combine(_showCategoryBatchPicker) { state, v -> state.copy(showCategoryBatchPicker = v) }
-        .combine(_logoFinderTransactionId) { state, v -> state.copy(logoFinderTransactionId = v) }
-        .combine(_ruleDraftTransactionId) { state, v -> state.copy(ruleDraftTransactionId = v) }
-        .combine(_isSyncing) { state, v -> state.copy(isSyncing = v) }
-        .combine(_syncToastMessage) { state, v -> state.copy(syncToastMessage = v) }
-        .flowOn(computeDispatcher)
+    }.flowOn(computeDispatcher)
+
+    @Suppress("UNCHECKED_CAST")
+    val uiState: StateFlow<TransactionsUiState> = combine(
+        baseStateFlow,
+        _isSearchActive,
+        _selectedIds,
+        _inspectingId,
+        _expandedId,
+        _showEditorSheet,
+        _showSplitSheet,
+        _showCsvImportSheet,
+        _showFilterSheet,
+        _showBatchDeleteConfirm,
+        _singleDeleteConfirmId,
+        _showCategoryBatchPicker,
+        _logoFinderTransactionId,
+        _ruleDraftTransactionId,
+        _isSyncing,
+        _syncToastMessage
+    ) { args ->
+        val base = args[0] as TransactionsUiState
+        base.copy(
+            isSearchActive = args[1] as Boolean,
+            selectedTransactionIds = args[2] as Set<Long>,
+            inspectingTransactionId = args[3] as Long?,
+            expandedTransactionId = args[4] as Long?,
+            showEditorSheet = args[5] as Boolean,
+            showSplitSheet = args[6] as Boolean,
+            showCsvImportSheet = args[7] as Boolean,
+            showFilterSheet = args[8] as Boolean,
+            showBatchDeleteConfirm = args[9] as Boolean,
+            singleDeleteConfirmId = args[10] as Long?,
+            showCategoryBatchPicker = args[11] as Boolean,
+            logoFinderTransactionId = args[12] as Long?,
+            ruleDraftTransactionId = args[13] as Long?,
+            isSyncing = args[14] as Boolean,
+            syncToastMessage = args[15] as String?
+        )
+    }.flowOn(computeDispatcher)
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -224,8 +247,8 @@ class TransactionsViewModel(
         includeIgnored: Boolean = true
     ) {
         val hasDeepLink = transactionId != null || accountId != null || categoryId != null ||
-                uncategorizedOnly || startDate != null || endDate != null ||
-                sortOption != null || openAddSheet || !includeTransfers || !includeIgnored
+            uncategorizedOnly || startDate != null || endDate != null ||
+            sortOption != null || openAddSheet || !includeTransfers || !includeIgnored
         if (!hasDeepLink) return
 
         _searchQuery.value = ""
@@ -306,11 +329,11 @@ class TransactionsViewModel(
     fun closeLogoFinder() { _logoFinderTransactionId.value = null }
 
     fun reportMerchantLogoStatus(merchantKey: String, status: String) {
-        viewModelScope.launch { repository.reportMerchantLogoStatus(merchantKey, status) }
+        viewModelScope.launch(computeDispatcher) { repository.reportMerchantLogoStatus(merchantKey, status) }
     }
 
     fun useCategoryIconForTransaction(transactionId: Long) {
-        viewModelScope.launch { repository.overrideMerchantLogo(transactionId, useCategoryIcon = true) }
+        viewModelScope.launch(computeDispatcher) { repository.overrideMerchantLogo(transactionId, useCategoryIcon = true) }
     }
 
     suspend fun searchMerchantLogos(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> =
@@ -324,7 +347,7 @@ class TransactionsViewModel(
 
     fun syncSimpleFin() {
         if (_isSyncing.value) return
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             _isSyncing.value = true
             _syncToastMessage.value = "Syncing transactions with SimpleFIN..."
             val result = repository.sync(force = true)
@@ -351,7 +374,7 @@ class TransactionsViewModel(
         mhaEligible: Boolean?,
         accountId: Long? = null
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val existing = uiState.value.transactions.find { it.id == id }
             if (existing != null) {
                 val updated = existing.copy(
@@ -394,7 +417,7 @@ class TransactionsViewModel(
     }
 
     fun toggleTransfer(id: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val txn = uiState.value.transactions.find { it.id == id } ?: return@launch
             val updated = txn.copy(
                 editedIsTransfer = !txn.effectiveIsTransfer,
@@ -406,14 +429,14 @@ class TransactionsViewModel(
     }
 
     fun toggleIgnore(id: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val txn = uiState.value.transactions.find { it.id == id } ?: return@launch
             repository.setTransactionIgnored(id, !txn.effectiveIsIgnored)
         }
     }
 
     fun toggleMha(id: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val txn = uiState.value.transactions.find { it.id == id } ?: return@launch
             val isEligible = txn.effectiveMhaEligible == true
             val updated = txn.copy(
@@ -433,7 +456,7 @@ class TransactionsViewModel(
     fun requestOpenBudgetMonth(month: String?) = repository.requestOpenBudgetMonth(month)
 
     fun deleteTransaction(id: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.deleteTransaction(id)
             if (_inspectingId.value == id) _inspectingId.value = null
             if (_expandedId.value == id) _expandedId.value = null
@@ -443,7 +466,7 @@ class TransactionsViewModel(
     }
 
     fun splitTransaction(parentId: Long, splits: List<Pair<Cents, Long?>>) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.splitTransaction(parentId, splits)
             closeSplitSheet()
         }
@@ -456,7 +479,7 @@ class TransactionsViewModel(
         transactions: List<Transaction>,
         rules: List<TransactionRule> = emptyList()
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.importTransactions(transactions, rules)
             closeCsvImportSheet()
         }
@@ -468,7 +491,7 @@ class TransactionsViewModel(
         transactions: List<Transaction>,
         rules: List<TransactionRule> = emptyList()
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.importTransactionsWithBatch(
                 fileName = fileName,
                 rawCsvContent = rawCsvContent,
@@ -482,7 +505,7 @@ class TransactionsViewModel(
     }
 
     fun undoImportBatch(batchId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.undoImportBatch(batchId)
         }
     }
@@ -490,7 +513,7 @@ class TransactionsViewModel(
     fun batchCategorize(categoryId: Long) {
         val selected = _selectedIds.value
         if (selected.isEmpty()) return
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.batchEditCategory(selected, categoryId)
             clearSelection()
         }
@@ -499,7 +522,7 @@ class TransactionsViewModel(
     fun batchMarkTransfer(isTransfer: Boolean) {
         val selected = _selectedIds.value
         if (selected.isEmpty()) return
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.batchMarkTransfer(selected, isTransfer)
             clearSelection()
         }
@@ -508,7 +531,7 @@ class TransactionsViewModel(
     fun batchToggleMha() {
         val selected = _selectedIds.value
         if (selected.isEmpty()) return
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             val txns = uiState.value.transactions.filter { it.id in selected }
             val allEligible = txns.all { it.effectiveMhaEligible == true }
             repository.batchSetMhaEligible(selected, !allEligible)
@@ -519,7 +542,7 @@ class TransactionsViewModel(
     fun batchMarkIgnored(isIgnored: Boolean) {
         val selected = _selectedIds.value
         if (selected.isEmpty()) return
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.batchSetIgnored(selected, isIgnored)
             clearSelection()
         }
@@ -528,7 +551,7 @@ class TransactionsViewModel(
     fun batchDelete() {
         val selected = _selectedIds.value
         if (selected.isEmpty()) return
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.batchDeleteTransactions(selected)
             clearSelection()
         }
@@ -543,7 +566,7 @@ class TransactionsViewModel(
 
     fun saveRuleFromTransaction(rule: TransactionRule) {
         _ruleDraftTransactionId.value = null
-        viewModelScope.launch { repository.saveRule(rule) }
+        viewModelScope.launch(computeDispatcher) { repository.saveRule(rule) }
     }
 
     fun previewRuleMatchCount(conditions: List<RuleCondition>): Int {
@@ -555,7 +578,7 @@ class TransactionsViewModel(
         RuleMatcherEngine.matchingTransactions(repository.transactions.value, conditions)
 
     fun markTransactionRecurring(transaction: Transaction) {
-        viewModelScope.launch {
+        viewModelScope.launch(computeDispatcher) {
             repository.createUpcomingFromTransaction(transaction.id)
         }
     }

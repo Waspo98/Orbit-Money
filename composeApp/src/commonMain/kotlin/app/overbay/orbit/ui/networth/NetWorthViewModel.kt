@@ -3,8 +3,6 @@ package app.overbay.orbit.ui.networth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.OrbitRepository
-import app.overbay.orbit.data.model.Account
-import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MonthlyNetWorthPoint
 import app.overbay.orbit.domain.NetWorthEngine
@@ -26,17 +24,12 @@ class NetWorthViewModel(
     private val _selectedHorizon = MutableStateFlow(NetWorthHorizon.TWO_YEARS)
     private val _scrubbedPoint = MutableStateFlow<MonthlyNetWorthPoint?>(null)
 
-    val uiState: StateFlow<NetWorthUiState> = combine(
-        combine(
-            repository.accounts,
-            repository.transactions,
-            repository.snapshot
-        ) { accounts, transactions, snapshot ->
-            Triple(accounts, transactions, snapshot)
-        },
-        _selectedHorizon,
-        _scrubbedPoint
-    ) { (accounts, transactions, snapshot), horizon, scrubbed ->
+    private val baseStateFlow = combine(
+        repository.accounts,
+        repository.transactions,
+        repository.snapshot,
+        _selectedHorizon
+    ) { accounts, transactions, snapshot, horizon ->
         val activeAccounts = accounts.filterNot { it.isArchived }
         val currentSnapshot = NetWorthEngine.computeCurrentSnapshot(activeAccounts)
 
@@ -63,10 +56,8 @@ class NetWorthViewModel(
         val assetAccounts = activeAccounts.filter { it.type.isAsset }
         val liabilityAccounts = activeAccounts.filter { it.type.isLiability }
 
-        // Hero KPI calculations
         val thisMonthDeltaCents = allHistory.lastOrNull()?.deltaFromPreviousCents ?: 0L
 
-        // YTD calculation: delta from end of prior year (Dec) or earliest point of this year
         val currentYear = latestMonth.take(4)
         val priorYearDecMonth = "${(currentYear.toIntOrNull() ?: 2026) - 1}-12"
         val ytdBaselinePoint = allHistory.find { it.month == priorYearDecMonth }
@@ -83,7 +74,6 @@ class NetWorthViewModel(
             (currentSnapshot.totalLiabilitiesCents.toDouble() / totalCombinedBalance.toDouble()) * 100.0
         } else 0.0
 
-        // Signals
         val largestAsset = assetAccounts.maxByOrNull {
             NetWorthEngine.accountContributionCents(it, it.currentBalanceCents)
         }
@@ -92,7 +82,6 @@ class NetWorthViewModel(
         }
         val trackedAccountCount = activeAccounts.size
 
-        // Contributions: top 8 accounts sorted by absolute net-worth impact
         val topContributingAccounts = activeAccounts.map { acct ->
             val signedContribution = NetWorthEngine.accountContributionCents(acct, acct.currentBalanceCents)
             val absContribution = abs(signedContribution)
@@ -112,7 +101,7 @@ class NetWorthViewModel(
             allHistoryPoints = allHistory,
             filteredPoints = filtered,
             selectedHorizon = horizon,
-            scrubbedPoint = scrubbed,
+            scrubbedPoint = null,
             accounts = activeAccounts,
             assetAccounts = assetAccounts,
             liabilityAccounts = liabilityAccounts,
@@ -125,7 +114,14 @@ class NetWorthViewModel(
             topContributingAccounts = topContributingAccounts,
             isLoading = false
         )
-    }.flowOn(computeDispatcher).stateIn(
+    }.flowOn(computeDispatcher)
+
+    val uiState: StateFlow<NetWorthUiState> = combine(
+        baseStateFlow,
+        _scrubbedPoint
+    ) { baseState, scrubbed ->
+        baseState.copy(scrubbedPoint = scrubbed)
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = NetWorthUiState(isLoading = true)

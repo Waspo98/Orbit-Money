@@ -11,14 +11,12 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,11 +32,9 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.theme.OrbitSprings
-import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
@@ -79,10 +75,10 @@ fun TransactionsListPane(
     )
 
     val contentAlpha = (1f - searchActiveProgress * 1.5f).coerceIn(0f, 1f)
-    val restingMorphHeightDp = with(density) {
-        lerp(heroScrollState.maxHeightPx, heroScrollState.minHeightPx, heroScrollState.collapseFraction).toDp()
-    }
     val activeHeightOverrideDp = if (searchActiveProgress > 0.001f) {
+        val restingMorphHeightDp = with(density) {
+            lerp(heroScrollState.maxHeightPx, heroScrollState.minHeightPx, heroScrollState.collapseFraction).toDp()
+        }
         lerp(restingMorphHeightDp, 60.dp, searchActiveProgress)
     } else null
 
@@ -260,7 +256,7 @@ fun TransactionsListPane(
             }
         }
 
-        androidx.compose.animation.AnimatedVisibility(
+        AnimatedVisibility(
             visible = state.syncToastMessage != null,
             enter = slideInVertically { -it } + fadeIn(),
             exit = slideOutVertically { -it } + fadeOut(),
@@ -315,11 +311,11 @@ private fun TransactionsGroupedLazyList(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         state.groupedTransactions.forEach { group ->
-            stickyHeader(key = "header_${group.monthKey}") {
+            stickyHeader(key = "header_${group.monthKey}", contentType = "month_header") {
                 MonthGroupHeader(monthLabel = group.monthLabel, count = group.count)
             }
 
-            items(items = group.transactions, key = { it.id }) { txn ->
+            items(items = group.transactions, key = { it.id }, contentType = { "transaction_row" }) { txn ->
                 SwipeableTransactionRow(
                     transaction = txn,
                     category = state.categoryMap[txn.effectiveCategoryId],
@@ -357,7 +353,7 @@ private fun TransactionsGroupedLazyList(
         }
 
         if (state.filteredTransactions.size > state.pageSize && state.pageSize > 0) {
-            item(key = "pagination_bar") {
+            item(key = "pagination_bar", contentType = "pagination") {
                 TransactionsPaginationBar(
                     currentPage = state.currentPage,
                     totalPages = state.totalPages,
@@ -371,4 +367,3 @@ private fun TransactionsGroupedLazyList(
         }
     }
 }
-

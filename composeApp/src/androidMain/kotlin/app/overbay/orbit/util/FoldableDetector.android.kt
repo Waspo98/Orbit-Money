@@ -37,7 +37,9 @@ object FoldableDetector {
                 model.contains("MAGIC V") ||
                 model.startsWith("SM-F") || // Samsung Galaxy Z Fold & Z Flip series
                 device.contains("FELIX") ||
-                device.contains("COMET")
+                device.contains("COMET") ||
+                device.contains("RANGO") ||
+                model.contains("FOLD")
             ) {
                 return true
             }
