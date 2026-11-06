@@ -93,7 +93,7 @@ fun PeriodNavigatorPill(
                 Text(
                     text = if (compact) compactLabel else label,
                     style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Normal,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

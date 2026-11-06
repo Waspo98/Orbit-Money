@@ -115,7 +115,7 @@ fun AddFromTransactionSheet(
             OrbitTextField(
                 value = query,
                 onValueChange = { query = it },
-                label = { Text("Search merchant or category") },
+                label = { Text("Search transactions") },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,

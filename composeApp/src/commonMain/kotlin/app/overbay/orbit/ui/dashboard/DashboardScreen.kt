@@ -31,17 +31,15 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overbay.orbit.OrbitNavKey
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
-import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.dashboard.cards.EmptyWorkspaceSetupCard
 import app.overbay.orbit.ui.dashboard.dialogs.DashboardCustomizeSheet
 import app.overbay.orbit.ui.dashboard.dialogs.TransactionReviewSheet
+import app.overbay.orbit.ui.transactions.components.TransactionsSearchBar
 import app.overbay.orbit.util.LocalDevicePosture
 
 /**
@@ -95,12 +93,14 @@ fun DashboardScreen(
                 subtitle = "${uiState.dateLabel} · ${uiState.greeting}",
                 scrollState = heroScrollState,
                 canopyBar = { _, isCompact, barHeight ->
-                    CanopySurfacePill(
-                        expandedText = "Search merchant, description, notes...",
-                        compactText = "Search...",
+                    TransactionsSearchBar(
+                        searchQuery = "",
+                        onSearchQueryChange = {},
+                        isSearchActive = false,
+                        onSearchActiveChange = { active ->
+                            if (active) onNavigate(OrbitNavKey.Transactions(openSearch = true))
+                        },
                         isCompact = isCompact,
-                        leadingIcon = Icons.Default.Search,
-                        onClick = { onNavigate(OrbitNavKey.Transactions(openSearch = true)) },
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()

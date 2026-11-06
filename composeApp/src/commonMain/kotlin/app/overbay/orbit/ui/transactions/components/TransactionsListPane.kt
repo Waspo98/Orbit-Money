@@ -114,7 +114,7 @@ fun TransactionsListPane(
 
                     val isCompact = !state.isSearchActive && (collapseFraction > 0.45f)
                     val placeholder = if (state.isSearchActive || collapseFraction <= 0.45f) {
-                        "Search merchant, description, notes..."
+                        "Search transactions"
                     } else {
                         "Search..."
                     }

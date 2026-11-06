@@ -75,7 +75,7 @@ fun MhaTransactionsTab(
             OrbitTextField(
                 value = searchQuery,
                 onValueChange = onSearchChange,
-                placeholder = { Text("Search housing merchant or notes...") },
+                placeholder = { Text("Search transactions") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {

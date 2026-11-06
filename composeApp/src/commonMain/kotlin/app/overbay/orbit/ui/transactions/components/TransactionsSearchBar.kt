@@ -47,7 +47,7 @@ fun TransactionsSearchBar(
     onSearchActiveChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     isCompact: Boolean = false,
-    placeholderText: String = if (isCompact) "Search..." else "Search merchant, description, notes..."
+    placeholderText: String = if (isCompact) "Search..." else "Search transactions"
 ) {
     val haptics = LocalOrbitHaptics.current
     val focusRequester = remember { FocusRequester() }

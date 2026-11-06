@@ -103,7 +103,7 @@ fun CanopySurfacePill(
                     Text(
                         text = if (compact) compactText else expandedText,
                         style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -116,7 +116,7 @@ fun CanopySurfacePill(
                 Text(
                     text = accentText,
                     style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Normal,
                     color = accentColor,
                     maxLines = 1
                 )
@@ -228,7 +228,7 @@ fun CanopyActionPillButton(
             Text(
                 text = if (isCompact) compactLabel else label,
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.Normal,
                 color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1
             )
@@ -287,7 +287,7 @@ fun <T> CanopySegmentedBar(
                         Text(
                             text = labelProvider(item),
                             fontSize = if (isCompact) 11.sp else 12.sp,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                            fontWeight = FontWeight.Normal,
                             color = if (selected) {
                                 MaterialTheme.colorScheme.onPrimaryContainer
                             } else {
