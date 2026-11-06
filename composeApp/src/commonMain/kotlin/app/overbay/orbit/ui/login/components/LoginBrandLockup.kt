@@ -17,8 +17,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -127,12 +125,7 @@ private fun LoginBrandIcon(
 ) {
     val shape = RoundedCornerShape(16.dp)
     Surface(
-        modifier = modifier.shadow(
-            elevation = 14.dp,
-            shape = shape,
-            ambientColor = Color(0xFF047857),
-            spotColor = Color(0xFF047857)
-        ),
+        modifier = modifier,
         shape = shape,
         color = Color(0xFF50C878)
     ) {
@@ -140,9 +133,7 @@ private fun LoginBrandIcon(
             painter = painterResource(Res.drawable.orbit_logo),
             contentDescription = "Orbit Money Logo",
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(shape)
+            modifier = Modifier.fillMaxSize()
         )
     }
 }

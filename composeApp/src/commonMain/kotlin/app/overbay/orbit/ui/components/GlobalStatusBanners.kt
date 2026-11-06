@@ -195,16 +195,14 @@ fun GlobalStatusBanners(
                     }
 
                     Surface(
+                        onClick = {
+                            haptics.tick()
+                            doNotWarnAgain = !doNotWarnAgain
+                        },
                         shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .clickable {
-                                haptics.tick()
-                                doNotWarnAgain = !doNotWarnAgain
-                            }
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
                             modifier = Modifier

@@ -18,9 +18,9 @@ import app.overbay.orbit.data.model.OrbitThemePreset
 val OrbitShapes = Shapes(
     extraSmall = RoundedCornerShape(14.dp),
     small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(22.dp),
-    extraLarge = RoundedCornerShape(28.dp)
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(24.dp)
 )
 
 // Preset Material 3 Color Schemes

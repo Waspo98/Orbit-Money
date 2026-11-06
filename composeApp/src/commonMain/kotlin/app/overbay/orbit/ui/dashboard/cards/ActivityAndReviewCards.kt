@@ -168,7 +168,6 @@ private fun ReviewLaunchGraphic(
             shape = cardShape,
             color = colors.danger.copy(alpha = 0.14f),
             border = BorderStroke(1.dp, cardBorderColor),
-            shadowElevation = 1.dp,
             modifier = Modifier
                 .size(width = 46.dp, height = 62.dp)
                 .offset(x = (-17).dp)
@@ -183,7 +182,6 @@ private fun ReviewLaunchGraphic(
             shape = cardShape,
             color = primary.copy(alpha = 0.14f),
             border = BorderStroke(1.dp, cardBorderColor),
-            shadowElevation = 1.dp,
             modifier = Modifier
                 .size(width = 46.dp, height = 62.dp)
                 .offset(x = 18.dp)
@@ -198,7 +196,6 @@ private fun ReviewLaunchGraphic(
             shape = cardShape,
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, cardBorderColor),
-            shadowElevation = 2.dp,
             modifier = Modifier
                 .size(width = 46.dp, height = 62.dp)
                 .graphicsLayer {

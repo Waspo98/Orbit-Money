@@ -5,8 +5,6 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -169,12 +167,10 @@ fun LoginScreen(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 420.dp)
-                .animateContentSize(animationSpec = OrbitSprings.spatialDefault()),
+                .widthIn(max = 420.dp),
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surfaceContainerLow,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
-            shadowElevation = 18.dp
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
         ) {
             Column(
                 modifier = Modifier
@@ -190,12 +186,8 @@ fun LoginScreen(
                 AnimatedContent(
                     targetState = state.step,
                     transitionSpec = {
-                        (fadeIn(OrbitSprings.effectsDefault()) +
-                            scaleIn(initialScale = 0.96f, animationSpec = OrbitSprings.spatialDefault()))
-                            .togetherWith(
-                                fadeOut(OrbitSprings.effectsFast()) +
-                                    scaleOut(targetScale = 0.96f, animationSpec = OrbitSprings.spatialDefault())
-                            )
+                        fadeIn(OrbitSprings.effectsDefault())
+                            .togetherWith(fadeOut(OrbitSprings.effectsFast()))
                             .using(
                                 SizeTransform(
                                     clip = false,

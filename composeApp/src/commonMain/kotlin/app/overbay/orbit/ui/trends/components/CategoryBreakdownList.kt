@@ -63,19 +63,17 @@ fun CategoryBreakdownList(
                 val catColor = trend.category.color.toComposeColor()
 
                 Surface(
+                    onClick = {
+                        haptics.tick()
+                        onSelectCategory(trend.category.id)
+                    },
                     shape = RoundedCornerShape(16.dp),
                     color = if (isSelected) {
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                     } else {
                         MaterialTheme.colorScheme.surface
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable {
-                            haptics.tick()
-                            onSelectCategory(trend.category.id)
-                        }
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier
