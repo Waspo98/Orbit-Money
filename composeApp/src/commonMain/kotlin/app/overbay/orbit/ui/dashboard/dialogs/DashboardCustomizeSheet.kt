@@ -42,6 +42,7 @@ import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.ui.dashboard.DashboardAction
 import app.overbay.orbit.ui.dashboard.DashboardCardConfigItem
 import app.overbay.orbit.ui.dashboard.DashboardCardType
+import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -195,8 +196,9 @@ private fun CustomizeCardRow(
 
             Spacer(modifier = Modifier.width(10.dp))
 
+            val supportsTwoPane = LocalDevicePosture.current.supportsTwoPane
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (showWidthPicker) {
+                if (supportsTwoPane && showWidthPicker) {
                     DashboardColumnWidthPicker(
                         wideSpan = config.wideSpan,
                         isRightPlacement = isRightPlacement,

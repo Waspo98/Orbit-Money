@@ -102,7 +102,8 @@ fun CategoryDetailInspectorPane(
                             } else {
                                 onDismissPane()
                             }
-                        }
+                        },
+                        showMhaOption = state.mhaEnabled
                     )
                 }
                 "DETAIL" -> {

@@ -280,12 +280,29 @@ class OrbitRepository(
     }
 
     // Transactions (with Strict Provenance Preservation)
+    private suspend fun commitTransactionsWithManualBalanceSync(oldTxns: List<Transaction>, newTxns: List<Transaction>) {
+        val deltas = mutableMapOf<Long, Cents>()
+        for (t in oldTxns) if (!t.effectiveIsIgnored && t.accountId > 0L) deltas[t.accountId] = (deltas[t.accountId] ?: 0L) - t.effectiveAmountCents
+        for (t in newTxns) if (!t.effectiveIsIgnored && t.accountId > 0L) deltas[t.accountId] = (deltas[t.accountId] ?: 0L) + t.effectiveAmountCents
+        val modifiedManualAccounts = mutableListOf<Account>()
+        val updatedAccounts = _accounts.value.map { acct ->
+            val delta = deltas[acct.id] ?: 0L
+            if (acct.isManual && delta != 0L) acct.copy(currentBalanceCents = acct.currentBalanceCents + delta).also { modifiedManualAccounts.add(it) } else acct
+        }
+        commitSnapshot(_snapshot.value.copy(transactions = newTxns, accounts = updatedAccounts))
+        modifiedManualAccounts.forEach { activeEngine.pushAccount(it) }
+    }
+
     suspend fun saveTransaction(transaction: Transaction) {
         val current = _transactions.value
         val exists = current.any { it.id == transaction.id && transaction.id != 0L }
         val localId = if (exists) transaction.id else if (transaction.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else transaction.id
         val updatedList = if (exists) current.map { if (it.id == transaction.id) transaction else it } else current + transaction.copy(id = localId)
-        commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        if (exists || transaction.id == 0L) {
+            commitTransactionsWithManualBalanceSync(current, updatedList)
+        } else {
+            commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        }
         val pushed = activeEngine.pushTransaction(if (exists) transaction else transaction.copy(id = 0L)).getOrNull()
         if (pushed != null && (pushed.id != localId || pushed.merchantLogo != transaction.merchantLogo)) {
             val syncedId = if (pushed.id > 0L) pushed.id else localId
@@ -310,7 +327,7 @@ class OrbitRepository(
             notes = notes ?: target.notes,
             editSource = EditSource.USER
         )
-        commitSnapshot(_snapshot.value.copy(transactions = current.map { if (it.id == id) updated else it }))
+        commitTransactionsWithManualBalanceSync(current, current.map { if (it.id == id) updated else it })
         activeEngine.pushTransaction(updated)
     }
 
@@ -324,7 +341,7 @@ class OrbitRepository(
             editedIsIgnored = null, editedIsIgnoredSource = null, editedMhaEligible = null, editedMhaEligibleSource = null,
             editSource = EditSource.NONE
         )
-        commitSnapshot(_snapshot.value.copy(transactions = current.map { if (it.id == id) reset else it }))
+        commitTransactionsWithManualBalanceSync(current, current.map { if (it.id == id) reset else it })
         val pushed = activeEngine.resetTransaction(id).getOrNull()
         if (pushed != null && pushed.merchantLogo != reset.merchantLogo) {
             commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.map { if (it.id == id) it.copy(merchantLogo = pushed.merchantLogo) else it }))
@@ -332,8 +349,9 @@ class OrbitRepository(
     }
 
     suspend fun deleteTransaction(id: Long) {
-        val updatedList = _transactions.value.filterNot { it.id == id }
-        commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        val current = _transactions.value
+        val updatedList = current.filterNot { it.id == id }
+        commitTransactionsWithManualBalanceSync(current, updatedList)
         activeEngine.deleteTransaction(id)
     }
 
@@ -356,13 +374,15 @@ class OrbitRepository(
     }
 
     suspend fun batchSetIgnored(ids: Set<Long>, ignored: Boolean) {
-        val updatedList = _transactions.value.map { if (it.id in ids) it.copy(editedIsIgnored = ignored, editedIsIgnoredSource = "user", editSource = EditSource.USER) else it }
-        commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        val current = _transactions.value
+        val updatedList = current.map { if (it.id in ids) it.copy(editedIsIgnored = ignored, editedIsIgnoredSource = "user", editSource = EditSource.USER) else it }
+        commitTransactionsWithManualBalanceSync(current, updatedList)
         updatedList.filter { it.id in ids }.forEach { activeEngine.pushTransaction(it) }
     }
 
     suspend fun batchDeleteTransactions(ids: Set<Long>) {
-        commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.filterNot { it.id in ids }))
+        val current = _transactions.value
+        commitTransactionsWithManualBalanceSync(current, current.filterNot { it.id in ids })
         ids.forEach { activeEngine.deleteTransaction(it) }
     }
 
@@ -398,23 +418,15 @@ class OrbitRepository(
                 parent.copy(editedAmountCents = amount, editedCategoryId = categoryId, editedCategoryIdSource = "user", editSource = EditSource.USER)
             } else {
                 Transaction(
-                    id = nextId++,
-                    householdId = parent.householdId,
-                    accountId = parent.accountId,
-                    accountName = parent.accountName,
-                    originalDate = parent.effectiveDate,
-                    originalMerchant = parent.effectiveMerchant,
-                    originalAmountCents = amount,
-                    originalCategoryId = categoryId,
-                    originalDescription = "Split from #${parent.id}: ${parent.notes ?: ""}".trim(),
-                    externalId = "${parent.externalId ?: parent.id}_split_$index",
-                    editSource = EditSource.USER,
-                    source = "split"
+                    id = nextId++, householdId = parent.householdId, accountId = parent.accountId, accountName = parent.accountName,
+                    originalDate = parent.effectiveDate, originalMerchant = parent.effectiveMerchant, originalAmountCents = amount,
+                    originalCategoryId = categoryId, originalDescription = "Split from #${parent.id}: ${parent.notes ?: ""}".trim(),
+                    externalId = "${parent.externalId ?: parent.id}_split_$index", editSource = EditSource.USER, source = "split"
                 )
             }
         }
         val updatedList = current.map { if (it.id == parentTransactionId) newTransactions[0] else it } + newTransactions.drop(1)
-        commitSnapshot(_snapshot.value.copy(transactions = updatedList))
+        commitTransactionsWithManualBalanceSync(current, updatedList)
         activeEngine.pushTransaction(newTransactions[0])
         newTransactions.drop(1).forEach { activeEngine.pushTransaction(it.copy(id = 0L)) }
     }

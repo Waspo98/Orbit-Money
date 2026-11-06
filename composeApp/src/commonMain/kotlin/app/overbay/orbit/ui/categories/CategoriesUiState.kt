@@ -28,7 +28,8 @@ data class CategoriesUiState(
     val isReorderMode: Boolean = false,
     val searchQuery: String = "",
     val isLoading: Boolean = false,
-    val totalCategoriesCount: Int = 0
+    val totalCategoriesCount: Int = 0,
+    val mhaEnabled: Boolean = false
 ) {
     val inspectingSummary: CategorySummary?
         get() = groups.asSequence()

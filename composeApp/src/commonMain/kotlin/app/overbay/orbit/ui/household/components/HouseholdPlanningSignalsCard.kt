@@ -38,7 +38,17 @@ fun HouseholdPlanningSignalsCard(
     // 1. Annual Take-Home Pay
     val annualTakeHomeCents = members.sumOf { m ->
         val periods = if (m.payPeriodsPerYear > 0.0) m.payPeriodsPerYear else 26.0
-        ((m.netPayPerPeriodCents.toDouble() * periods).roundToLong())
+        if (m.netPayPerPeriodCents > 0L) {
+            (m.netPayPerPeriodCents.toDouble() * periods).roundToLong()
+        } else if (m.grossIncomeAnnualCents > 0L) {
+            val empPct = (m.employeeContributionPercent ?: 0.0) / 100.0
+            val preTaxDeductions = (m.grossIncomeAnnualCents * empPct).roundToLong() +
+                (m.healthPremiumPerMonthCents * 12) + m.hsaContributionAnnualCents
+            val taxable = (m.grossIncomeAnnualCents - preTaxDeductions).coerceAtLeast(0L)
+            (taxable.toDouble() * 0.78).roundToLong()
+        } else {
+            0L
+        }
     }
 
     // 2. Total Retirement Savings + Match

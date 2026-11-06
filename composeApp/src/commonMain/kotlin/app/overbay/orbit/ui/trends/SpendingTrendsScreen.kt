@@ -62,24 +62,6 @@ fun SpendingTrendsScreen(
             modifier = Modifier.fillMaxSize(),
             contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) { innerPadding ->
-            if (!state.hasData) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    EmptyStateCard(
-                        title = "No Spending Trends Yet",
-                        description = "Import or add transactions to see income, expenses, and category history over time.",
-                        actionButtonText = "Go to Transactions",
-                        onActionClick = { onNavigate(OrbitNavKey.Transactions()) }
-                    )
-                }
-                return@Scaffold
-            }
-
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -111,6 +93,23 @@ fun SpendingTrendsScreen(
                         )
                     }
                 )
+
+                if (!state.hasData) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        EmptyStateCard(
+                            title = "No Spending Trends Yet",
+                            description = "Import or add transactions to see income, expenses, and category history over time.",
+                            actionButtonText = "Go to Transactions",
+                            onActionClick = { onNavigate(OrbitNavKey.Transactions()) }
+                        )
+                    }
+                    return@Column
+                }
 
                 // Scrollable Charts and Details
                 LazyColumn(

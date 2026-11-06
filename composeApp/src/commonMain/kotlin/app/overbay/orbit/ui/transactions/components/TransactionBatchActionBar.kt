@@ -55,6 +55,7 @@ fun TransactionBatchActionBar(
     showCategoryPicker: Boolean = false,
     onDismissCategoryPicker: () -> Unit = {},
     onSelectCategory: (Long) -> Unit = {},
+    showMha: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -177,19 +178,21 @@ fun TransactionBatchActionBar(
                         Text("Transfer")
                     }
 
-                    FilledTonalButton(
-                        onClick = {
-                            haptics.tick()
-                            onToggleMha()
-                        },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Home,
-                            contentDescription = "MHA",
-                            modifier = Modifier.padding(end = 6.dp)
-                        )
-                        Text("MHA")
+                    if (showMha) {
+                        FilledTonalButton(
+                            onClick = {
+                                haptics.tick()
+                                onToggleMha()
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Home,
+                                contentDescription = "MHA",
+                                modifier = Modifier.padding(end = 6.dp)
+                            )
+                            Text("MHA")
+                        }
                     }
 
                     FilledTonalButton(

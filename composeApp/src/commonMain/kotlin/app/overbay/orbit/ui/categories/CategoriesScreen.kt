@@ -225,6 +225,7 @@ fun CategoriesScreen(
                                                 { OrbitDragHandle(state = groupReorderState, key = group.title) }
                                             } else null,
                                             onMoveCategory = { from, to -> viewModel.moveCategoryInGroup(group.title, from, to) },
+                                            showMhaBadge = state.mhaEnabled,
                                             modifier = Modifier.dragReorderItem(
                                                 state = if (state.isReorderMode) groupReorderState else null,
                                                 key = group.title
@@ -263,7 +264,8 @@ fun CategoriesScreen(
                     viewModel.closeEditorDialog()
                     onNavigate(OrbitNavKey.Transactions(categoryId = id))
                 },
-                onDismiss = { viewModel.closeEditorDialog() }
+                onDismiss = { viewModel.closeEditorDialog() },
+                showMhaOption = state.mhaEnabled
             )
         }
 

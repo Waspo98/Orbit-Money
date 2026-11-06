@@ -75,7 +75,8 @@ fun TransactionsScreen(
                         onSelectCategory = { catId ->
                             viewModel.batchCategorize(catId)
                             viewModel.setShowCategoryBatchPicker(false)
-                        }
+                        },
+                        showMha = state.mhaEnabled
                     )
                 }
             }
@@ -129,7 +130,8 @@ fun TransactionsScreen(
                     viewModel.markTransactionRecurring(txn)
                     viewModel.closeTransactionEditor()
                     onNavigate(OrbitNavKey.Upcoming)
-                }
+                },
+                showMhaOption = state.mhaEnabled
             )
         }
 
@@ -148,7 +150,8 @@ fun TransactionsScreen(
                 onImportCsv = {
                     viewModel.closeTransactionEditor()
                     viewModel.openCsvImportSheet()
-                }
+                },
+                showMhaOption = state.mhaEnabled
             )
         }
 

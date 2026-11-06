@@ -120,7 +120,8 @@ fun AccountDetailInspectorPane(
                         } else null,
                         onDismiss = {
                             if (state.selectedAccount != null) viewModel.closeEditorSheet() else onClosePane()
-                        }
+                        },
+                        showMhaOption = state.mhaEnabled
                     )
                 }
             }

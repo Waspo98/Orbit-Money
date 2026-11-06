@@ -112,9 +112,10 @@ fun UpcomingScreen(
                         scrollState = heroScrollState,
                         canopyBar = { _, isCompact, barHeight ->
                             val netProjection = MoneyUtils.formatCents(state.netCashflowProjectionCents, showCents = false, signed = true)
+                            val periodLabel = if (state.cashFlowPeriod == UpcomingCashFlowPeriod.REST_OF_MONTH) "Rest of Month Net" else "30-Day Net"
                             val dateFilter = state.selectedDateFilter
                             CanopySurfacePill(
-                                expandedText = if (dateFilter != null) "Date Filter: $dateFilter (Tap to clear)" else "30-Day Net · $netProjection",
+                                expandedText = if (dateFilter != null) "Date Filter: $dateFilter (Tap to clear)" else "$periodLabel · $netProjection",
                                 compactText = if (dateFilter != null) dateFilter else "Net $netProjection",
                                 isCompact = isCompact,
                                 leadingIcon = OrbitIcons.Upcoming,

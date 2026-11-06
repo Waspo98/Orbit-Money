@@ -72,6 +72,7 @@ fun CategoryEditorDialog(
     onDelete: ((Long) -> Unit)? = null,
     onViewTransactions: ((Long) -> Unit)? = null,
     onDismiss: () -> Unit,
+    showMhaOption: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     app.overbay.orbit.ui.components.OrbitModalSheet(
@@ -83,7 +84,8 @@ fun CategoryEditorDialog(
             onSave = onSave,
             onDelete = onDelete,
             onViewTransactions = onViewTransactions,
-            onDismiss = onDismiss
+            onDismiss = onDismiss,
+            showMhaOption = showMhaOption
         )
     }
 }
@@ -95,6 +97,7 @@ fun CategoryEditorContent(
     onDelete: ((Long) -> Unit)? = null,
     onViewTransactions: ((Long) -> Unit)? = null,
     onDismiss: () -> Unit,
+    showMhaOption: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -133,7 +136,8 @@ fun CategoryEditorContent(
             isTransfer = isTransfer,
             onTransferChange = { isTransfer = it; if (it) isIncome = false },
             mhaEligible = mhaEligible,
-            onMhaChange = { mhaEligible = it }
+            onMhaChange = { mhaEligible = it },
+            showMhaOption = showMhaOption
         )
         Spacer(modifier = Modifier.height(20.dp))
         Row(
@@ -200,7 +204,8 @@ private fun CategoryEditorFormFields(
     isTransfer: Boolean,
     onTransferChange: (Boolean) -> Unit,
     mhaEligible: Boolean,
-    onMhaChange: (Boolean) -> Unit
+    onMhaChange: (Boolean) -> Unit,
+    showMhaOption: Boolean = false
 ) {
     val haptics = LocalOrbitHaptics.current
 
@@ -360,17 +365,19 @@ private fun CategoryEditorFormFields(
                 showContainer = false
             )
 
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
-            )
+            if (showMhaOption) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
+                )
 
-            OrbitSwitchRow(
-                title = "Default MHA Eligible",
-                checked = mhaEligible,
-                onCheckedChange = onMhaChange,
-                showContainer = false
-            )
+                OrbitSwitchRow(
+                    title = "Default MHA Eligible",
+                    checked = mhaEligible,
+                    onCheckedChange = onMhaChange,
+                    showContainer = false
+                )
+            }
         }
     }
 }

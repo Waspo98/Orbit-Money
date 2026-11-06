@@ -118,7 +118,8 @@ fun TransactionDetailInspectorPane(
                     onImportCsv = {
                         viewModel.closeTransactionEditor()
                         viewModel.openCsvImportSheet()
-                    }
+                    },
+                    showMhaOption = state.mhaEnabled
                 )
             }
             InspectorSubMode.DETAIL -> {

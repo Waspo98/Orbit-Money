@@ -325,10 +325,13 @@ object DashboardDataTransform {
                     totalLiabilities += abs(bal)
                 }
                 AccountType.MORTGAGE -> {
-                    loansOwedCents += abs(bal)
-                    totalLiabilities += abs(bal)
                     if (acct.estimatedValueCents != null) {
-                        realEstateEquityCents += acct.homeEquityCents ?: 0L
+                        val eq = acct.homeEquityCents ?: 0L
+                        realEstateEquityCents += eq
+                        if (eq >= 0L) totalAssets += eq else totalLiabilities += abs(eq)
+                    } else {
+                        loansOwedCents += abs(bal)
+                        totalLiabilities += abs(bal)
                     }
                 }
                 AccountType.OTHER -> {

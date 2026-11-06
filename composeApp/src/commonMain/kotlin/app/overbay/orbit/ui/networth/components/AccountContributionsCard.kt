@@ -79,8 +79,13 @@ fun AccountContributionsCard(
                                 modifier = Modifier.weight(1f)
                             ) {
                                 // Account Type Badge
+                                val badgeLabel = if (acct.estimatedValueCents != null) {
+                                    "REAL"
+                                } else {
+                                    acct.type.name.take(4)
+                                }
                                 OrbitBadge(
-                                    text = acct.type.name.take(4),
+                                    text = badgeLabel,
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(end = 8.dp)

@@ -33,6 +33,7 @@ fun TransactionEditorSheet(
     onCreateRule: ((Transaction) -> Unit)? = null,
     onMarkRecurring: ((Transaction) -> Unit)? = null,
     onImportCsv: (() -> Unit)? = null,
+    showMhaOption: Boolean = false,
     modifier: Modifier = Modifier,
     isInlinePane: Boolean = false
 ) {
@@ -49,6 +50,7 @@ fun TransactionEditorSheet(
             onCreateRule = onCreateRule,
             onMarkRecurring = onMarkRecurring,
             onImportCsv = onImportCsv,
+            showMhaOption = showMhaOption,
             modifier = modifier
         )
     } else {
@@ -68,6 +70,7 @@ fun TransactionEditorSheet(
                 onCreateRule = onCreateRule,
                 onMarkRecurring = onMarkRecurring,
                 onImportCsv = onImportCsv,
+                showMhaOption = showMhaOption,
                 modifier = Modifier.fillMaxWidth()
             )
         }

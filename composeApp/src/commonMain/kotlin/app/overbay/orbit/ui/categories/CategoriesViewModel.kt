@@ -166,7 +166,8 @@ class CategoriesViewModel(
         dialogState.copy(
             categories = sortedCategories,
             groups = groups,
-            totalCategoriesCount = sortedCategories.size
+            totalCategoriesCount = sortedCategories.size,
+            mhaEnabled = repository.preferences.value.mhaTrackerEnabled
         )
     }.flowOn(computeDispatcher).stateIn(
         scope = viewModelScope,

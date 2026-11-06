@@ -79,46 +79,49 @@ fun CurrencyTextField(
         }
     }
 
-    OutlinedTextField(
-        value = rawText,
-        onValueChange = { input ->
-            val sanitized = sanitizeCurrencyInput(input, allowNegative)
-            rawText = sanitized
-            onCentsChange(MoneyUtils.dollarsToCents(sanitized))
-        },
-        modifier = modifier.fillMaxWidth(),
-        textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-        label = if (label != null) {
-            { Text(label) }
-        } else null,
-        placeholder = { Text("0.00") },
-        leadingIcon = {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "$",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        },
-        supportingText = if (errorMessage != null) {
-            { Text(errorMessage) }
-        } else null,
-        isError = isError || errorMessage != null,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = if (allowNegative) KeyboardType.Text else KeyboardType.Decimal
-        ),
-        singleLine = true,
-        shape = OrbitFormDefaults.FieldShape,
-        colors = OrbitFormDefaults.textFieldColors()
-    )
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (!label.isNullOrBlank()) {
+            OrbitFieldLabel(text = label)
+        }
+        OutlinedTextField(
+            value = rawText,
+            onValueChange = { input ->
+                val sanitized = sanitizeCurrencyInput(input, allowNegative)
+                rawText = sanitized
+                onCentsChange(MoneyUtils.dollarsToCents(sanitized))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+            label = null,
+            placeholder = { Text("0.00") },
+            leadingIcon = {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "$",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            },
+            supportingText = if (errorMessage != null) {
+                { Text(errorMessage) }
+            } else null,
+            isError = isError || errorMessage != null,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = if (allowNegative) KeyboardType.Text else KeyboardType.Decimal
+            ),
+            singleLine = true,
+            shape = OrbitFormDefaults.FieldShape,
+            colors = OrbitFormDefaults.textFieldColors()
+        )
+    }
 }
 
 /**

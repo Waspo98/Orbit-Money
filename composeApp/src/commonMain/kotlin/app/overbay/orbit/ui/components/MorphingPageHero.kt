@@ -368,7 +368,7 @@ fun MorphingPageHero(
                 if (canopyBar != null) {
                     val fraction = scrollState?.collapseFraction ?: 0f
                     val totalWidth = with(density) { containerWidthPx.toDp() }
-                    val maxCollapsedTitleWidthDp = (totalWidth * 0.46f).coerceAtLeast(100.dp)
+                    val maxCollapsedTitleWidthDp = (totalWidth * 0.36f).coerceAtLeast(84.dp)
                     val collapsedTitleWidthDp = with(density) { collapsedTitleWidthPx.toDp() }
                         .coerceIn(52.dp, maxCollapsedTitleWidthDp)
                     val collapsedTitleRightDp = (20.dp + if (canNavigateBack) 36.dp else 0.dp) + collapsedTitleWidthDp

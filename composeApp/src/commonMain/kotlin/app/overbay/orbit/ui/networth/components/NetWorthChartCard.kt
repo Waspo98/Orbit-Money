@@ -102,27 +102,6 @@ fun NetWorthChartCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Horizon Tabs (1M, 3M, 6M, 1Y, ALL)
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                NetWorthPeriod.entries.forEachIndexed { index, period ->
-                    SegmentedButton(
-                        selected = period == selectedPeriod,
-                        onClick = {
-                            haptics.tick()
-                            onSelectPeriod(period)
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(
-                            index = index,
-                            count = NetWorthPeriod.entries.size
-                        ),
-                        icon = {},
-                        label = { Text(period.label, style = MaterialTheme.typography.labelMedium) }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
             // Area Chart Canvas
             if (points.isNotEmpty()) {
                 NetWorthAreaChart(

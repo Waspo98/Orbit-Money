@@ -28,6 +28,7 @@ fun TransactionOptionsBlock(
     onIgnoredChange: (Boolean) -> Unit = {},
     onCreateRule: (() -> Unit)? = null,
     onMarkRecurring: (() -> Unit)? = null,
+    showMhaOption: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -53,18 +54,20 @@ fun TransactionOptionsBlock(
                 showContainer = false
             )
 
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
-            )
+            if (showMhaOption) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
+                )
 
-            OrbitSwitchRow(
-                title = "MHA Eligible",
-                subtitle = "Include in Military Housing Allowance calculations",
-                checked = mhaEligible,
-                onCheckedChange = onMhaEligibleChange,
-                showContainer = false
-            )
+                OrbitSwitchRow(
+                    title = "MHA Eligible",
+                    subtitle = "Include in Military Housing Allowance calculations",
+                    checked = mhaEligible,
+                    onCheckedChange = onMhaEligibleChange,
+                    showContainer = false
+                )
+            }
         }
 
         if (onCreateRule != null || onMarkRecurring != null) {

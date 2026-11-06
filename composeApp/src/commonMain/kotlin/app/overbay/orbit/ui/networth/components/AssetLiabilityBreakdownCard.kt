@@ -4,8 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -144,29 +147,30 @@ fun AllocationBar(
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
         ) {
             if (cashFraction > 0.005f) {
-                Box(modifier = Modifier.weight(cashFraction).fillMaxWidth().background(cashColor))
+                Box(modifier = Modifier.weight(cashFraction).fillMaxHeight().background(cashColor))
             }
             if (invFraction > 0.005f) {
-                Box(modifier = Modifier.weight(invFraction).fillMaxWidth().background(invColor))
+                Box(modifier = Modifier.weight(invFraction).fillMaxHeight().background(invColor))
             }
             if (reFraction > 0.005f) {
-                Box(modifier = Modifier.weight(reFraction).fillMaxWidth().background(reColor))
+                Box(modifier = Modifier.weight(reFraction).fillMaxHeight().background(reColor))
             }
             if (creditFraction > 0.005f) {
-                Box(modifier = Modifier.weight(creditFraction).fillMaxWidth().background(creditColor))
+                Box(modifier = Modifier.weight(creditFraction).fillMaxHeight().background(creditColor))
             }
             if (loansFraction > 0.005f) {
-                Box(modifier = Modifier.weight(loansFraction).fillMaxWidth().background(loanColor))
+                Box(modifier = Modifier.weight(loansFraction).fillMaxHeight().background(loanColor))
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
         // Compact Legend
-        Row(
+        @OptIn(ExperimentalLayoutApi::class)
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             if (cash > 0L) {
                 AllocationLegendItem(label = "Cash (${(cashFraction * 100).toInt()}%)", color = cashColor)
@@ -175,7 +179,7 @@ fun AllocationBar(
                 AllocationLegendItem(label = "Invest (${(invFraction * 100).toInt()}%)", color = invColor)
             }
             if (realEstateOther > 0L) {
-                AllocationLegendItem(label = "Equity (${(reFraction * 100).toInt()}%)", color = reColor)
+                AllocationLegendItem(label = "Real Estate (${(reFraction * 100).toInt()}%)", color = reColor)
             }
             if (credit > 0L) {
                 AllocationLegendItem(label = "Cards (${(creditFraction * 100).toInt()}%)", color = creditColor)
@@ -230,7 +234,7 @@ private fun AssetsSectionContent(snapshot: NetWorthSnapshot) {
 
     BreakdownRow("Cash & Checking", snapshot.cashCents)
     BreakdownRow("Investments & Retirement", snapshot.investmentsCents)
-    BreakdownRow("Real Estate Equity", snapshot.realEstateEquityCents)
+    BreakdownRow("Real Estate", snapshot.realEstateEquityCents)
     if (snapshot.otherCents != 0L) {
         BreakdownRow("Other Assets", snapshot.otherCents)
     }

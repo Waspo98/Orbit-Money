@@ -163,9 +163,9 @@ class NetWorthViewModelTest {
         testScheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        // Property value $400k counts as asset, loan $250k counts as liability
-        assertEquals(40000000L, state.snapshot.totalAssetsCents)
-        assertEquals(25000000L, state.snapshot.totalLiabilitiesCents)
+        // Real Estate displays net equity ($400k property - $250k loan = $150k) under Assets
+        assertEquals(15000000L, state.snapshot.totalAssetsCents)
+        assertEquals(0L, state.snapshot.totalLiabilitiesCents)
         // Equity = $150k
         assertEquals(15000000L, state.snapshot.netWorthCents)
         assertEquals(15000000L, state.snapshot.realEstateEquityCents)

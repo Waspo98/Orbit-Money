@@ -2,6 +2,7 @@ package app.overbay.orbit.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -46,35 +47,40 @@ fun DateFieldButton(
     var showDialog by remember { mutableStateOf(false) }
     val haptics = LocalOrbitHaptics.current
 
-    Box(modifier = modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = LocalDateUtils.formatDisplayDate(date),
-            onValueChange = {},
-            readOnly = true,
-            enabled = enabled,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-            label = if (label != null) { { Text(label) } } else null,
-            trailingIcon = {
-                Icon(
-                    imageVector = Icons.Default.DateRange,
-                    contentDescription = "Select Date",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            },
-            singleLine = true,
-            shape = OrbitFormDefaults.FieldShape,
-            colors = OrbitFormDefaults.textFieldColors(),
-            modifier = Modifier.fillMaxWidth()
-        )
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .clip(OrbitFormDefaults.FieldShape)
-                .clickable(enabled = enabled) {
-                    haptics.tick()
-                    showDialog = true
-                }
-        )
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (!label.isNullOrBlank()) {
+            OrbitFieldLabel(text = label)
+        }
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = LocalDateUtils.formatDisplayDate(date),
+                onValueChange = {},
+                readOnly = true,
+                enabled = enabled,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                label = null,
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = "Select Date",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                singleLine = true,
+                shape = OrbitFormDefaults.FieldShape,
+                colors = OrbitFormDefaults.textFieldColors(),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clip(OrbitFormDefaults.FieldShape)
+                    .clickable(enabled = enabled) {
+                        haptics.tick()
+                        showDialog = true
+                    }
+            )
+        }
     }
 
     if (showDialog) {

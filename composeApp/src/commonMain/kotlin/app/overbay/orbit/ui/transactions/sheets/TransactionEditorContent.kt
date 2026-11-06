@@ -82,6 +82,7 @@ fun TransactionEditorContent(
     onCreateRule: ((Transaction) -> Unit)? = null,
     onMarkRecurring: ((Transaction) -> Unit)? = null,
     onImportCsv: (() -> Unit)? = null,
+    showMhaOption: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -253,7 +254,8 @@ fun TransactionEditorContent(
             isIgnored = isIgnored,
             onIgnoredChange = { isIgnored = it },
             onCreateRule = if (transaction != null && onCreateRule != null) ({ onCreateRule(transaction) }) else null,
-            onMarkRecurring = if (transaction != null && onMarkRecurring != null) ({ onMarkRecurring(transaction) }) else null
+            onMarkRecurring = if (transaction != null && onMarkRecurring != null) ({ onMarkRecurring(transaction) }) else null,
+            showMhaOption = showMhaOption
         )
 
         Spacer(modifier = Modifier.height(16.dp))

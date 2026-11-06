@@ -56,6 +56,7 @@ fun CategoryGroupCard(
     isReorderMode: Boolean = false,
     groupDragHandle: (@Composable () -> Unit)? = null,
     onMoveCategory: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
+    showMhaBadge: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -138,6 +139,7 @@ fun CategoryGroupCard(
                         dragHandle = if (isReorderMode) {
                             { OrbitDragHandle(state = categoryReorderState, key = summary.category.id) }
                         } else null,
+                        showMhaBadge = showMhaBadge,
                         modifier = Modifier.dragReorderItem(
                             state = if (isReorderMode) categoryReorderState else null,
                             key = summary.category.id
@@ -160,6 +162,7 @@ private fun CategoryRowItem(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     dragHandle: (@Composable () -> Unit)? = null,
+    showMhaBadge: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val cat = summary.category
@@ -201,7 +204,7 @@ private fun CategoryRowItem(
         },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (cat.mhaDefaultEligible) {
+                if (showMhaBadge && cat.mhaDefaultEligible) {
                     OrbitBadge(
                         text = "MHA",
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),

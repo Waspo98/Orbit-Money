@@ -34,9 +34,9 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
-import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
+import app.overbay.orbit.ui.components.PeriodNavigatorPill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.dashboard.cards.EmptyWorkspaceSetupCard
 import app.overbay.orbit.ui.dashboard.dialogs.DashboardCustomizeSheet
@@ -95,13 +95,20 @@ fun DashboardScreen(
                 scrollState = heroScrollState,
                 canopyBar = { _, isCompact, barHeight ->
                     val monthName = uiState.cashflow.monthLabel.ifBlank { "This Month" }
+                    val shortMonth = if (monthName.length > 8) {
+                        monthName.take(3) + " " + uiState.selectedMonth.take(4)
+                    } else {
+                        monthName
+                    }
                     val netFormatted = MoneyUtils.formatCents(uiState.cashflow.netCents, showCents = false, signed = true)
-                    CanopySurfacePill(
-                        expandedText = "$monthName · Net $netFormatted",
-                        compactText = "Net $netFormatted",
+                    PeriodNavigatorPill(
+                        label = "$monthName · Net $netFormatted",
+                        compactLabel = shortMonth,
                         isCompact = isCompact,
-                        leadingIcon = OrbitIcons.SpendingTrends,
-                        onClick = { onNavigate(OrbitNavKey.SpendingTrends) },
+                        onPrevious = { onAction(DashboardAction.PreviousMonth) },
+                        onNext = { onAction(DashboardAction.NextMonth) },
+                        canGoNext = uiState.daysRemaining <= 0,
+                        onClickLabel = { onNavigate(OrbitNavKey.SpendingTrends) },
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()

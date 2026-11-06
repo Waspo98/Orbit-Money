@@ -53,8 +53,12 @@ class NetWorthViewModel(
             allHistory.takeLast(horizon.monthsCount)
         }
 
-        val assetAccounts = activeAccounts.filter { it.type.isAsset }
-        val liabilityAccounts = activeAccounts.filter { it.type.isLiability }
+        val assetAccounts = activeAccounts.filter {
+            NetWorthEngine.accountContributionCents(it, it.currentBalanceCents) > 0L
+        }
+        val liabilityAccounts = activeAccounts.filter {
+            NetWorthEngine.accountContributionCents(it, it.currentBalanceCents) < 0L
+        }
 
         val thisMonthDeltaCents = allHistory.lastOrNull()?.deltaFromPreviousCents ?: 0L
 

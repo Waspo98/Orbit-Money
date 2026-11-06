@@ -96,13 +96,16 @@ fun NetWorthAreaChart(
     val surfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
-    // Calculate value range with padding
+    // Calculate value range with proportional minimum span so minor ripples don't look like vertical cliffs
     val rawValues = remember(points) { points.map { it.snapshot.netWorthCents } }
     val minVal = rawValues.minOrNull() ?: 0L
     val maxVal = rawValues.maxOrNull() ?: 1L
-    val span = max(1L, maxVal - minVal)
-    val paddedMin = minVal - (span * 0.12).toLong()
-    val paddedMax = maxVal + (span * 0.12).toLong()
+    val rawSpan = max(1L, maxVal - minVal)
+    val minProportionalSpan = max(kotlin.math.abs(maxVal) / 8L, 100_00L)
+    val effectiveSpan = max(rawSpan, minProportionalSpan)
+    val midVal = (minVal + maxVal) / 2L
+    val paddedMin = midVal - (effectiveSpan * 0.62).toLong()
+    val paddedMax = midVal + (effectiveSpan * 0.62).toLong()
     val totalSpan = max(1L, paddedMax - paddedMin).toDouble()
 
     // Trigger haptics when selected point changes

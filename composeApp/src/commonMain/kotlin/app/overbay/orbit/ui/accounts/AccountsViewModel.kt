@@ -117,7 +117,8 @@ class AccountsViewModel(
             historyAccount = action.historyAccount, showHistorySheet = action.showHistorySheet,
             historyBalanceRecords = historyRecords, showAddRecordDialog = addRecord.showAddRecordDialog,
             addRecordAccount = addRecord.addRecordAccount, accountGroupWideSpans = data.preferences.accountGroupWideSpans,
-            isSyncing = syncReorder.syncing, syncErrorMessage = syncReorder.err, isLoading = false
+            isSyncing = syncReorder.syncing, syncErrorMessage = syncReorder.err, isLoading = false,
+            mhaEnabled = data.preferences.mhaTrackerEnabled
         )
     }.combine(_isPhoneViewingDetail) { state, phoneDetail -> state.copy(isPhoneViewingDetail = phoneDetail)
     }.combine(_deleteConfirmAccountId) { state, delId -> state.copy(deleteConfirmAccountId = delId)
@@ -416,7 +417,8 @@ class AccountsViewModel(
                 AccountTypeCategory.CREDIT_CARDS to ("Credit Cards" to accounts.filter { it.type == AccountType.CREDIT }),
                 AccountTypeCategory.INVESTMENTS to ("Investments" to accounts.filter { it.type == AccountType.INVESTMENT }),
                 AccountTypeCategory.REAL_ESTATE to ("Real Estate" to accounts.filter { it.type == AccountType.MORTGAGE && it.estimatedValueCents != null }),
-                AccountTypeCategory.LOANS to ("Loans & Mortgages" to accounts.filter { it.type == AccountType.LOAN || (it.type == AccountType.MORTGAGE && it.estimatedValueCents == null) })
+                AccountTypeCategory.LOANS to ("Loans & Mortgages" to accounts.filter { it.type == AccountType.LOAN || (it.type == AccountType.MORTGAGE && it.estimatedValueCents == null) }),
+                AccountTypeCategory.OTHER to ("Other" to accounts.filter { it.type == AccountType.OTHER })
             )
             return map.mapNotNull { (cat, pair) ->
                 val (title, list) = pair

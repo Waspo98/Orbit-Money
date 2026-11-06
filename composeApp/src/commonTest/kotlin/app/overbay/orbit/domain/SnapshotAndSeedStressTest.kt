@@ -92,7 +92,7 @@ class SnapshotAndSeedStressTest {
         val snapshot = DemoSeedGenerator.generateDemoSnapshot()
         val txns = snapshot.transactions
 
-        assertEquals(6, txns.size)
+        assertEquals(8, txns.size)
 
         // Find transfer pair
         val transfer1 = txns.firstOrNull { it.id == 105L }

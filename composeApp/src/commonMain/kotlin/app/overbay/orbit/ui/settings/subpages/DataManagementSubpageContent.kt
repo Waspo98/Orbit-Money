@@ -84,7 +84,12 @@ fun DataManagementSubpageContent(
             onExportBudgetingJson = viewModel::exportBudgetingJson,
             onExportBackupJson = viewModel::exportBackup,
             onPickRestoreFile = viewModel::previewBackupForRestore,
-            onOpenRestoreTextDialog = viewModel::openRestoreDialog
+            onOpenRestoreTextDialog = viewModel::openRestoreDialog,
+            onLoadSampleData = {
+                viewModel.loadSampleDemoData()
+                onNavigate(OrbitNavKey.Dashboard)
+            },
+            onResetWorkspace = viewModel::openResetConfirmation
         )
 
         // 5. Google Drive Cloud Backup

@@ -30,6 +30,8 @@ fun DataImportExportBlock(
     onExportBackupJson: () -> String,
     onPickRestoreFile: (String) -> Unit,
     onOpenRestoreTextDialog: () -> Unit,
+    onLoadSampleData: (() -> Unit)? = null,
+    onResetWorkspace: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val fileHelper = LocalFileImportExportHelper.current
@@ -153,6 +155,51 @@ fun DataImportExportBlock(
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Text("Restore Backup")
+                    }
+                }
+            }
+
+            if (onLoadSampleData != null || onResetWorkspace != null) {
+                HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "WORKSPACE SANDBOX & RESET",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Populate realistic sample household data or reset this workspace to a clean empty state.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (onLoadSampleData != null) {
+                            OutlinedButton(
+                                onClick = onLoadSampleData,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Load Sample Data")
+                            }
+                        }
+                        if (onResetWorkspace != null) {
+                            OutlinedButton(
+                                onClick = onResetWorkspace,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text(
+                                    text = "Reset Workspace",
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
                     }
                 }
             }

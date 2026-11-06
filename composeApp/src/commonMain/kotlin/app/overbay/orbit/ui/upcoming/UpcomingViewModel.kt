@@ -182,7 +182,11 @@ class UpcomingViewModel(
             selectedDateFilter = control.date,
             totalUpcomingExpenseCents = core.totalExpense,
             totalUpcomingIncomeCents = core.totalIncome,
-            netCashflowProjectionCents = core.totalIncome - core.totalExpense,
+            netCashflowProjectionCents = if (cfPeriod == UpcomingCashFlowPeriod.REST_OF_MONTH) {
+                core.cashFlow.restOfMonthNetCents
+            } else {
+                core.cashFlow.next30DaysNetCents
+            },
             cashFlowSummary = core.cashFlow,
             cashFlowPeriod = cfPeriod,
             projectedAmounts = core.projectedAmounts,

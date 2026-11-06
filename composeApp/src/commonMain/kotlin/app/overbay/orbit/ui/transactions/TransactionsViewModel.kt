@@ -145,7 +145,8 @@ class TransactionsViewModel(
             nextRulePriority = nextPriority,
             totalExpenseCents = totalExpense,
             totalIncomeCents = totalIncome,
-            netCashflowCents = totalIncome + totalExpense
+            netCashflowCents = totalIncome + totalExpense,
+            mhaEnabled = repository.preferences.value.mhaTrackerEnabled
         )
     }.flowOn(computeDispatcher)
 

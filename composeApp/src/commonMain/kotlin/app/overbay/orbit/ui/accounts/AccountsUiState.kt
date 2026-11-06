@@ -10,8 +10,9 @@ enum class AccountTypeCategory(val displayName: String) {
     CASH_AND_CHECKING("Cash & Checking"),
     CREDIT_CARDS("Credit Cards"),
     INVESTMENTS("Investments"),
-    REAL_ESTATE("Real Estate & Property"),
-    LOANS("Loans & Mortgages")
+    REAL_ESTATE("Real Estate"),
+    LOANS("Loans & Mortgages"),
+    OTHER("Other")
 }
 
 data class AccountGroupDisplay(
@@ -53,7 +54,8 @@ data class AccountsUiState(
     val accountGroupWideSpans: Map<String, Int> = emptyMap(),
     val isSyncing: Boolean = false,
     val syncErrorMessage: String? = null,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val mhaEnabled: Boolean = false
 ) {
     val selectedAccount: Account?
         get() = accounts.find { it.id == selectedAccountId }

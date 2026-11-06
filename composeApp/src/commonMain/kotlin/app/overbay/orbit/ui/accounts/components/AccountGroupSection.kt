@@ -49,6 +49,7 @@ import app.overbay.orbit.ui.accounts.AccountTypeCategory
 import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.dragReorderItem
 import app.overbay.orbit.ui.components.rememberDragReorderState
+import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -146,8 +147,9 @@ fun AccountGroupSection(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 // Right Column: WideSpan toggle, Bold balance, Chevron
+                val supportsTwoPane = LocalDevicePosture.current.supportsTwoPane
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (onToggleWideSpan != null && group.accounts.size > 1) {
+                    if (supportsTwoPane && onToggleWideSpan != null && group.accounts.size > 1) {
                         Surface(
                             shape = CircleShape,
                             color = if (wideSpan == 2) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,

@@ -515,6 +515,13 @@ class SettingsViewModel(
         }
     }
 
+    fun loadSampleDemoData() {
+        scope.launch {
+            repository.loadDemoData(app.overbay.orbit.domain.DemoSeedGenerator.generateDemoSnapshot())
+            _uiState.update { it.copy(statusMessage = "Loaded sample household workspace") }
+        }
+    }
+
     fun setShowDonateDialog(show: Boolean) {
         _uiState.update { it.copy(showDonateDialog = show) }
     }

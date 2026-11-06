@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -39,8 +40,25 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.util.LocalOrbitHaptics
+
+@Composable
+fun OrbitFieldLabel(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier.padding(start = 2.dp, bottom = 4.dp)
+    )
+}
 
 object OrbitFormDefaults {
     val FieldShape: Shape = RoundedCornerShape(16.dp)
@@ -80,28 +98,42 @@ fun OrbitTextField(
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
     minLines: Int = 1
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier,
-        enabled = enabled,
-        readOnly = readOnly,
-        textStyle = textStyle,
-        label = label,
-        placeholder = placeholder,
-        leadingIcon = leadingIcon,
-        trailingIcon = trailingIcon,
-        supportingText = supportingText,
-        isError = isError,
-        visualTransformation = visualTransformation,
-        keyboardOptions = keyboardOptions,
-        keyboardActions = keyboardActions,
-        singleLine = singleLine,
-        maxLines = maxLines,
-        minLines = minLines,
-        shape = OrbitFormDefaults.FieldShape,
-        colors = OrbitFormDefaults.textFieldColors()
-    )
+    Column(modifier = modifier) {
+        if (label != null) {
+            ProvideTextStyle(
+                value = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            ) {
+                Row(modifier = Modifier.padding(start = 2.dp, bottom = 4.dp)) {
+                    label()
+                }
+            }
+        }
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled,
+            readOnly = readOnly,
+            textStyle = textStyle,
+            label = null,
+            placeholder = placeholder,
+            leadingIcon = leadingIcon,
+            trailingIcon = trailingIcon,
+            supportingText = supportingText,
+            isError = isError,
+            visualTransformation = visualTransformation,
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
+            singleLine = singleLine,
+            maxLines = maxLines,
+            minLines = minLines,
+            shape = OrbitFormDefaults.FieldShape,
+            colors = OrbitFormDefaults.textFieldColors()
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -120,28 +152,32 @@ fun <T> OrbitDropdownField(
     var expanded by remember { mutableStateOf(false) }
     val haptics = LocalOrbitHaptics.current
 
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = {
-            haptics.tick()
-            expanded = it
-        },
-        modifier = modifier.fillMaxWidth()
-    ) {
-        OutlinedTextField(
-            value = selectedText,
-            onValueChange = {},
-            readOnly = true,
-            singleLine = true,
-            label = if (label != null) { { Text(label) } } else null,
-            leadingIcon = leadingIcon,
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            shape = OrbitFormDefaults.FieldShape,
-            colors = OrbitFormDefaults.textFieldColors(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-        )
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (!label.isNullOrBlank()) {
+            OrbitFieldLabel(text = label)
+        }
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = {
+                haptics.tick()
+                expanded = it
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedTextField(
+                value = selectedText,
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                label = null,
+                leadingIcon = leadingIcon,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                shape = OrbitFormDefaults.FieldShape,
+                colors = OrbitFormDefaults.textFieldColors(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+            )
 
         ExposedDropdownMenu(
             expanded = expanded,
@@ -171,6 +207,7 @@ fun <T> OrbitDropdownField(
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                 )
             }
+        }
         }
     }
 }

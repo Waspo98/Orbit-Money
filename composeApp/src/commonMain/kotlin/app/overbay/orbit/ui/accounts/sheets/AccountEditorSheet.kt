@@ -58,6 +58,7 @@ fun AccountEditorSheet(
     onDelete: ((Long) -> Unit)? = null,
     onUnlinkSimpleFin: (() -> Unit)? = null,
     onDismiss: () -> Unit,
+    showMhaOption: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     OrbitModalSheet(
@@ -69,7 +70,8 @@ fun AccountEditorSheet(
             onSave = onSave,
             onDelete = onDelete,
             onUnlinkSimpleFin = onUnlinkSimpleFin,
-            onDismiss = onDismiss
+            onDismiss = onDismiss,
+            showMhaOption = showMhaOption
         )
     }
 }
@@ -82,6 +84,7 @@ fun AccountEditorContent(
     onDelete: ((Long) -> Unit)? = null,
     onUnlinkSimpleFin: (() -> Unit)? = null,
     onDismiss: () -> Unit,
+    showMhaOption: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -238,14 +241,16 @@ fun AccountEditorContent(
         }
 
         // MHA Default Eligible Switch
-        OrbitSwitchRow(
-            title = "MHA Expense Eligible",
-            subtitle = "Treat transactions from this account as household-eligible by default",
-            checked = mhaEligible,
-            onCheckedChange = { mhaEligible = it }
-        )
+        if (showMhaOption) {
+            OrbitSwitchRow(
+                title = "MHA Expense Eligible",
+                subtitle = "Treat transactions from this account as household-eligible by default",
+                checked = mhaEligible,
+                onCheckedChange = { mhaEligible = it }
+            )
 
-        Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+        }
 
         // Action Buttons
         Row(

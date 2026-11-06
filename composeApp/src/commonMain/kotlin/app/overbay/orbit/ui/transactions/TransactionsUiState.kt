@@ -69,7 +69,8 @@ data class TransactionsUiState(
     val syncToastMessage: String? = null,
     val totalExpenseCents: Cents = 0L,
     val totalIncomeCents: Cents = 0L,
-    val netCashflowCents: Cents = 0L
+    val netCashflowCents: Cents = 0L,
+    val mhaEnabled: Boolean = false
 ) {
     val isSelectionMode: Boolean get() = selectedTransactionIds.isNotEmpty()
     val selectedCount: Int get() = selectedTransactionIds.size

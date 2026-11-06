@@ -76,14 +76,14 @@ fun RetirementSnapshotCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Age & Preset controls
-            Row(
+            // Age & Preset controls (stacked cleanly to prevent label wrapping on compact phones)
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedButton(
@@ -92,10 +92,10 @@ fun RetirementSnapshotCard(
                             onChangeAge(state.targetAge - 1)
                         },
                         shape = CircleShape,
-                        modifier = Modifier.height(30.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        modifier = Modifier.weight(1f).height(32.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp)
                     ) {
-                        Text("-1 Age", fontSize = 11.sp)
+                        Text("-1 Age", fontSize = 11.5.sp, maxLines = 1)
                     }
                     OutlinedButton(
                         onClick = {
@@ -103,14 +103,17 @@ fun RetirementSnapshotCard(
                             onChangeAge(state.targetAge + 1)
                         },
                         shape = CircleShape,
-                        modifier = Modifier.height(30.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        modifier = Modifier.weight(1f).height(32.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp)
                     ) {
-                        Text("+1 Age", fontSize = 11.sp)
+                        Text("+1 Age", fontSize = 11.5.sp, maxLines = 1)
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     listOf("conservative", "balanced", "aggressive").forEach { key ->
                         val isSelected = state.presetKey.equals(key, ignoreCase = true)
                         FilterChip(
@@ -122,11 +125,12 @@ fun RetirementSnapshotCard(
                             label = {
                                 Text(
                                     text = key.replaceFirstChar { it.uppercase() },
-                                    fontSize = 10.sp,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
                             },
-                            modifier = Modifier.height(28.dp),
+                            modifier = Modifier.height(30.dp),
                             shape = CircleShape,
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,

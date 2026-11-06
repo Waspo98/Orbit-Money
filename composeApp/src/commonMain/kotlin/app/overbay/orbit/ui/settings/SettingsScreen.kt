@@ -72,6 +72,10 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val heroScrollState = rememberHeroScrollState()
 
+    androidx.compose.runtime.LaunchedEffect(uiState.activeSubpage) {
+        heroScrollState.expand()
+    }
+
     // Handle back button returning from subpage to Hub
     BackHandler(enabled = uiState.activeSubpage != null) {
         viewModel.setSubpage(null)

@@ -252,28 +252,7 @@ fun TrendsChartSection(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Horizon Range Tabs (1M, 3M, 6M, 1Y, ALL)
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                TrendsPeriod.entries.forEachIndexed { index, period ->
-                    SegmentedButton(
-                        selected = period == state.selectedPeriod,
-                        onClick = {
-                            haptics.tick()
-                            onSelectPeriod(period)
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(
-                            index = index,
-                            count = TrendsPeriod.entries.size
-                        ),
-                        icon = {},
-                        label = { Text(period.label, style = MaterialTheme.typography.labelMedium) }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Bar Chart Canvas
             if (barItems.isNotEmpty()) {
