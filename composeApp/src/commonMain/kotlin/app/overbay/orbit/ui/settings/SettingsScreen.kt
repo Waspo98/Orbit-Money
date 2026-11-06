@@ -66,7 +66,6 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -94,7 +93,6 @@ fun SettingsScreen(
     }
 
     val isHub = uiState.activeSubpage == null
-    val effectiveOnBack = if (isHub) onBack else { { viewModel.setSubpage(null) } }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         Column(
@@ -107,8 +105,6 @@ fun SettingsScreen(
                 kicker = if (isHub) "CONTROL CENTER" else "SETTINGS HUB",
                 title = pageTitle,
                 subtitle = pageSubtitle,
-                canNavigateBack = true,
-                onBack = effectiveOnBack,
                 scrollState = heroScrollState,
                 canopyBar = { _, isCompact, barHeight ->
                     val isLocal = uiState.preferences.storageMode == StorageMode.LOCAL
@@ -119,6 +115,7 @@ fun SettingsScreen(
                         compactText = if (uiState.isSyncing) "Syncing..." else shortMode,
                         isCompact = isCompact,
                         leadingIcon = OrbitIcons.Settings,
+                        onClick = if (!isHub) { { viewModel.setSubpage(null) } } else null,
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()

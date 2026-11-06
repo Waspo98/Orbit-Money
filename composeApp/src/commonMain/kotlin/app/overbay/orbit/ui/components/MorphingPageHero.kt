@@ -4,8 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,7 +21,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.util.lerp
 import app.overbay.orbit.theme.OrbitTheme
-import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -123,8 +120,6 @@ fun MorphingPageHero(
     modifier: Modifier = Modifier,
     kicker: String? = null,
     subtitle: String? = null,
-    canNavigateBack: Boolean = false,
-    onBack: () -> Unit = {},
     scrollState: HeroScrollState? = null,
     contentAlpha: Float = 1f,
     activeHeightOverrideDp: Dp? = null,
@@ -134,7 +129,6 @@ fun MorphingPageHero(
     persistentBottomBar: (@Composable ColumnScope.() -> Unit)? = null,
     heroContent: (@Composable () -> Unit)? = null
 ) {
-    val haptics = LocalOrbitHaptics.current
     val density = LocalDensity.current
     val canopyColors = OrbitTheme.colors
 
@@ -200,23 +194,6 @@ fun MorphingPageHero(
                 .padding(start = 20.dp, end = 20.dp, top = topPadDp, bottom = bottomPadDp),
             verticalAlignment = Alignment.Top
         ) {
-            if (canNavigateBack) {
-                IconButton(
-                    onClick = { if (contentAlpha > 0.5f) { haptics.tick(); onBack() } },
-                    modifier = Modifier
-                        .padding(top = iconTopOffsetDp, end = 6.dp)
-                        .size(36.dp)
-                        .graphicsLayer {
-                            val f = scrollState?.collapseFraction ?: 0f
-                            alpha = contentAlpha
-                            translationX = backShiftBasePx * f
-                            translationY = maxTitleShiftY * f
-                        }
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = canopyColors.onCanopy)
-                }
-            }
-
             Column(modifier = Modifier.weight(1f)) {
                 if (kicker != null) {
                     val kickerTint = lerp(canopyColors.onCanopy, canopyColors.heroStatGood, 0.32f).copy(alpha = 0.84f)
@@ -356,7 +333,7 @@ fun MorphingPageHero(
                 val maxCollapsedTitleWidthDp = (maxWidth * 0.46f).coerceAtLeast(100.dp)
                 val collapsedTitleWidthDp = with(density) { collapsedTitleWidthPx.toDp() }
                     .coerceIn(52.dp, maxCollapsedTitleWidthDp)
-                val collapsedTitleRightDp = (20.dp + if (canNavigateBack) 36.dp else 0.dp) + collapsedTitleWidthDp
+                val collapsedTitleRightDp = 20.dp + collapsedTitleWidthDp
 
                 headerTextRow()
                 morphingContent(fraction, collapsedTitleRightDp, expandedTextBottomDp)
@@ -371,7 +348,7 @@ fun MorphingPageHero(
                     val maxCollapsedTitleWidthDp = (totalWidth * 0.36f).coerceAtLeast(84.dp)
                     val collapsedTitleWidthDp = with(density) { collapsedTitleWidthPx.toDp() }
                         .coerceIn(52.dp, maxCollapsedTitleWidthDp)
-                    val collapsedTitleRightDp = (20.dp + if (canNavigateBack) 36.dp else 0.dp) + collapsedTitleWidthDp
+                    val collapsedTitleRightDp = 20.dp + collapsedTitleWidthDp
 
                     val barHeight = lerp(46.dp, 38.dp, fraction)
                     val collapsedRowLeft = collapsedTitleRightDp + 10.dp

@@ -42,7 +42,6 @@ fun SpendingTrendsScreen(
     viewModel: SpendingTrendsViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -72,8 +71,6 @@ fun SpendingTrendsScreen(
                     kicker = "HISTORY",
                     title = "Spending Trends",
                     subtitle = "Spending patterns and category breakdown over time",
-                    canNavigateBack = true,
-                    onBack = onBack,
                     scrollState = heroScrollState,
                     canopyBar = { _, isCompact, barHeight ->
                         CanopySegmentedBar(

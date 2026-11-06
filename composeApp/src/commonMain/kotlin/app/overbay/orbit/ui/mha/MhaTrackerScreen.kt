@@ -61,7 +61,6 @@ fun MhaTrackerScreen(
     viewModel: MhaTrackerViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -100,8 +99,6 @@ fun MhaTrackerScreen(
                     kicker = "MINISTERIAL HOUSING ALLOWANCE",
                     title = "MHA Tracker",
                     subtitle = "Calculate projected MHA tax savings and track eligible housing expenses",
-                    canNavigateBack = true,
-                    onBack = onBack,
                     scrollState = heroScrollState,
                     canopyBar = { _, isCompact, barHeight ->
                         PeriodNavigatorPill(

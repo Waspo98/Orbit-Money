@@ -48,7 +48,6 @@ fun RulesScreen(
     viewModel: RulesViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -91,8 +90,6 @@ fun RulesScreen(
                         kicker = "AUTOMATION",
                         title = "Rules",
                         subtitle = "${state.rules.size} automated categorization rules",
-                        canNavigateBack = true,
-                        onBack = onBack,
                         scrollState = heroScrollState,
                         canopyBar = { _, isCompact, barHeight ->
                             CanopySurfacePill(

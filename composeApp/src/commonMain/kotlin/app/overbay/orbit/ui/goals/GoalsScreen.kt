@@ -54,7 +54,6 @@ import kotlin.math.roundToInt
 fun GoalsScreen(
     viewModel: GoalsViewModel,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -102,8 +101,6 @@ fun GoalsScreen(
                         kicker = "SAVING TARGETS",
                         title = "Savings Goals",
                         subtitle = "Connect asset accounts, allocate savings, and project when each target lands.",
-                        canNavigateBack = true,
-                        onBack = onBack,
                         scrollState = heroScrollState,
                         canopyBar = { _, isCompact, barHeight ->
                             val pct = (state.overallProgressRatio * 100).roundToInt()

@@ -65,7 +65,6 @@ fun HouseholdScreen(
     viewModel: HouseholdViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -101,8 +100,6 @@ fun HouseholdScreen(
                     kicker = "INCOME AND BENEFITS",
                     title = "Household",
                     subtitle = "Manage household members, paychecks, benefits, and tax filing profile.",
-                    canNavigateBack = true,
-                    onBack = onBack,
                     scrollState = heroScrollState,
                     canopyBar = { _, isCompact, barHeight ->
                         val grossYearly = MoneyUtils.formatCents(uiState.totalHouseholdGrossIncomeCents, showCents = false)

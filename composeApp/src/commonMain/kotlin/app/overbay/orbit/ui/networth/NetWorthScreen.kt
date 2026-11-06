@@ -53,7 +53,6 @@ fun NetWorthScreen(
     viewModel: NetWorthViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -83,8 +82,6 @@ fun NetWorthScreen(
                     kicker = "BALANCE SHEET",
                     title = "Net Worth",
                     subtitle = "Assets minus liabilities",
-                    canNavigateBack = true,
-                    onBack = onBack,
                     scrollState = heroScrollState,
                     canopyBar = { _, isCompact, barHeight ->
                         CanopySegmentedBar(

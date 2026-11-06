@@ -191,6 +191,8 @@ fun OrbitNavigation(
             } else if (currentKey is OrbitNavKey.Accounts) {
                 viewModels.accountsViewModel.dismissInspectorPane()
             }
+        } else if (destination is OrbitNavKey.Settings) {
+            viewModels.settingsViewModel.setSubpage(null)
         }
 
         if (destination != currentKey) {
@@ -205,21 +207,12 @@ fun OrbitNavigation(
             }
         }
     }
-    val popBackOrDashboard: () -> Unit = {
-        if (backStack.size > 1) {
-            backStack.removeAt(backStack.lastIndex)
-        } else if (currentKey != OrbitNavKey.Dashboard) {
-            backStack[0] = OrbitNavKey.Dashboard
-        }
-    }
     val canopyCoordinator = rememberCanopyTransitionCoordinator(currentKey.primaryTabIndex ?: currentKey)
 
     CompositionLocalProvider(LocalCanopyTransitionCoordinator provides canopyCoordinator) {
         AdaptiveNavigationShell(
             currentKey = currentKey,
             onNavigate = navigateTo,
-            canNavigateBack = backStack.size > 1,
-            onBack = popBackOrDashboard,
             mhaEnabled = preferences.mhaTrackerEnabled,
             hiddenRouteNames = preferences.hiddenRouteNames,
             moreRouteOrder = preferences.moreRouteOrder,
@@ -268,18 +261,18 @@ fun OrbitNavigation(
                                 TransactionsScreen(txVm, navigateTo, Modifier.fillMaxSize())
                             }
                             OrbitNavKey.Budgets -> BudgetsScreen(viewModels.budgetsViewModel, navigateTo, Modifier.fillMaxSize())
-                            OrbitNavKey.Upcoming -> UpcomingScreen(viewModels.upcomingViewModel, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.Goals -> GoalsScreen(viewModels.goalsViewModel, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.Categories -> CategoriesScreen(viewModels.categoriesViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.Rules -> RulesScreen(viewModels.rulesViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.Upcoming -> UpcomingScreen(viewModels.upcomingViewModel, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.Goals -> GoalsScreen(viewModels.goalsViewModel, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.Categories -> CategoriesScreen(viewModels.categoriesViewModel, posture, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.Rules -> RulesScreen(viewModels.rulesViewModel, posture, navigateTo, Modifier.fillMaxSize())
                             is OrbitNavKey.Accounts -> AccountsScreen(viewModels.accountsViewModel, key.accountId, navigateTo, Modifier.fillMaxSize())
-                            OrbitNavKey.NetWorth -> NetWorthScreen(viewModels.netWorthViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.SpendingTrends -> SpendingTrendsScreen(viewModels.spendingTrendsViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.MhaTracker -> MhaTrackerScreen(viewModels.mhaTrackerViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.HousingCalculator -> HousingCalculatorScreen(viewModels.housingViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.RetirementCalculator -> RetirementCalculatorScreen(viewModels.retirementViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.Household -> HouseholdScreen(viewModels.householdViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
-                            OrbitNavKey.Settings -> SettingsScreen(viewModels.settingsViewModel, posture, navigateTo, popBackOrDashboard, Modifier.fillMaxSize())
+                            OrbitNavKey.NetWorth -> NetWorthScreen(viewModels.netWorthViewModel, posture, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.SpendingTrends -> SpendingTrendsScreen(viewModels.spendingTrendsViewModel, posture, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.MhaTracker -> MhaTrackerScreen(viewModels.mhaTrackerViewModel, posture, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.HousingCalculator -> HousingCalculatorScreen(viewModels.housingViewModel, posture, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.RetirementCalculator -> RetirementCalculatorScreen(viewModels.retirementViewModel, posture, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.Household -> HouseholdScreen(viewModels.householdViewModel, posture, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.Settings -> SettingsScreen(viewModels.settingsViewModel, posture, navigateTo, Modifier.fillMaxSize())
                             else -> {
                                 Box(
                                     modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp),

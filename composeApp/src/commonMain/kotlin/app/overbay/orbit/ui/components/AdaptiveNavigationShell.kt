@@ -60,8 +60,6 @@ fun AdaptiveNavigationShell(
     currentKey: OrbitNavKey,
     onNavigate: (OrbitNavKey) -> Unit,
     modifier: Modifier = Modifier,
-    canNavigateBack: Boolean = false,
-    onBack: () -> Unit = {},
     mhaEnabled: Boolean = true,
     hiddenRouteNames: List<String> = emptyList(),
     moreRouteOrder: List<String> = emptyList(),

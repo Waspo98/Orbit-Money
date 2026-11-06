@@ -61,7 +61,6 @@ fun CategoriesScreen(
     viewModel: CategoriesViewModel,
     posture: DevicePosture = LocalDevicePosture.current,
     onNavigate: (OrbitNavKey) -> Unit = {},
-    onBack: () -> Unit = { onNavigate(OrbitNavKey.Dashboard) },
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -105,8 +104,6 @@ fun CategoriesScreen(
                         kicker = "SPENDING CLUSTERS",
                         title = "Category Manager",
                         subtitle = "$catCount categories across ${state.groups.size} groups",
-                        canNavigateBack = true,
-                        onBack = onBack,
                         scrollState = heroScrollState,
                         canopyBar = { _, isCompact, barHeight ->
                             CanopySurfacePill(
