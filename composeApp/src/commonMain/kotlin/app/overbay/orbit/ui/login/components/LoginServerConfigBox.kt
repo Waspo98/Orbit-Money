@@ -13,142 +13,208 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.login.LoginIntent
 import app.overbay.orbit.ui.login.LoginUiState
 import app.overbay.orbit.util.LocalOrbitHaptics
-import app.overbay.orbit.util.PlatformRuntime
 
 @Composable
-fun LoginServerConfigBox(
+fun LoginServerUrlStep(
     state: LoginUiState,
     onIntent: (LoginIntent) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
+    val focusRequester = remember { FocusRequester() }
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        AnimatedVisibility(
-            visible = state.showServerConfig,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                OutlinedTextField(
-                    value = state.customServerInput,
-                    onValueChange = { onIntent(LoginIntent.UpdateServerInput(it)) },
-                    label = { Text("Server Address") },
-                    placeholder = { Text("https://orbit.yourdomain.com") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Uri,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = { onIntent(LoginIntent.ConnectAndSaveServer) }
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
+    var textFieldValue by remember {
+        mutableStateOf(
+            TextFieldValue(
+                text = state.customServerInput,
+                selection = TextRange(state.customServerInput.length)
+            )
+        )
+    }
 
-                LoginErrorBanner(errorMessage = state.serverError)
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            haptics.confirm()
-                            onIntent(LoginIntent.ConnectAndSaveServer)
-                        },
-                        enabled = !state.isTestingServer,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(if (state.isTestingServer) "Testing..." else "Connect")
-                    }
-
-                    if (state.serverUrl.isNotBlank() || PlatformRuntime.isWeb) {
-                        OutlinedButton(
-                            onClick = {
-                                haptics.tick()
-                                onIntent(LoginIntent.SetShowServerConfig(false))
-                            },
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Cancel")
-                        }
-                    }
-                }
-            }
-        }
-
-        if (!state.showServerConfig && (!PlatformRuntime.isWeb || state.serverUrl.isNotBlank())) {
-            val displayServer = state.serverUrl.ifBlank { "Same-Origin Host" }
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                        append("Server: ")
-                    }
-                    withStyle(
-                        SpanStyle(
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    ) {
-                        append(displayServer)
-                    }
-                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                        append(" · ")
-                    }
-                    withStyle(
-                        SpanStyle(
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium,
-                            textDecoration = TextDecoration.Underline
-                        )
-                    ) {
-                        append("Change")
-                    }
-                },
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-                    .clickable {
-                        haptics.tick()
-                        onIntent(LoginIntent.SetShowServerConfig(true))
-                    }
+    LaunchedEffect(state.customServerInput) {
+        if (textFieldValue.text != state.customServerInput) {
+            textFieldValue = TextFieldValue(
+                text = state.customServerInput,
+                selection = TextRange(state.customServerInput.length)
             )
         }
     }
+
+    LaunchedEffect(Unit) {
+        runCatching { focusRequester.requestFocus() }
+    }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = "Enter your Orbit Money server address",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        OutlinedTextField(
+            value = textFieldValue,
+            onValueChange = { newValue ->
+                textFieldValue = newValue
+                onIntent(LoginIntent.UpdateServerInput(newValue.text))
+            },
+            label = { Text("Server Address") },
+            placeholder = { Text("https://orbit.yourdomain.com") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Uri,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = {
+                    haptics.confirm()
+                    onIntent(LoginIntent.ConnectAndSaveServer)
+                },
+                onDone = {
+                    haptics.confirm()
+                    onIntent(LoginIntent.ConnectAndSaveServer)
+                }
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester)
+        )
+
+        LoginErrorBanner(errorMessage = state.serverError)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = {
+                    haptics.tick()
+                    if (state.serverUrl.isNotBlank()) {
+                        onIntent(LoginIntent.SetShowServerConfig(false))
+                    } else {
+                        onIntent(LoginIntent.BackToModeSelect)
+                    }
+                },
+                enabled = !state.isTestingServer,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.height(48.dp)
+            ) {
+                Text("Back")
+            }
+
+            Button(
+                onClick = {
+                    haptics.confirm()
+                    onIntent(LoginIntent.ConnectAndSaveServer)
+                },
+                enabled = !state.isTestingServer,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+            ) {
+                if (state.isTestingServer) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(
+                    text = if (state.isTestingServer) "Connecting..." else "Next",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ConfirmedServerPill(
+    serverUrl: String,
+    onChangeClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalOrbitHaptics.current
+    val displayServer = serverUrl.ifBlank { "Same-Origin Host" }
+
+    Text(
+        text = buildAnnotatedString {
+            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                append("Server: ")
+            }
+            withStyle(
+                SpanStyle(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+            ) {
+                append(displayServer)
+            }
+            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                append(" · ")
+            }
+            withStyle(
+                SpanStyle(
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
+                    textDecoration = TextDecoration.Underline
+                )
+            ) {
+                append("Change")
+            }
+        },
+        style = MaterialTheme.typography.bodySmall,
+        textAlign = TextAlign.Center,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp)
+            .clickable {
+                haptics.tick()
+                onChangeClick()
+            }
+    )
 }
 
 @Composable
@@ -158,8 +224,8 @@ fun LoginErrorBanner(
 ) {
     AnimatedVisibility(
         visible = !errorMessage.isNullOrBlank(),
-        enter = expandVertically() + fadeIn(),
-        exit = shrinkVertically() + fadeOut(),
+        enter = expandVertically(OrbitSprings.spatialDefault()) + fadeIn(OrbitSprings.effectsDefault()),
+        exit = shrinkVertically(OrbitSprings.spatialDefault()) + fadeOut(OrbitSprings.effectsFast()),
         modifier = modifier
     ) {
         Surface(

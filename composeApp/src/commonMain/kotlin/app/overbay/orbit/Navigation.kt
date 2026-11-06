@@ -45,8 +45,6 @@ import app.overbay.orbit.ui.goals.GoalsScreen
 import app.overbay.orbit.ui.goals.GoalsViewModel
 import app.overbay.orbit.ui.login.LoginScreen
 import app.overbay.orbit.ui.login.LoginViewModel
-import app.overbay.orbit.ui.onboarding.OnboardingScreen
-import app.overbay.orbit.ui.onboarding.OnboardingViewModel
 import app.overbay.orbit.ui.rules.RulesScreen
 import app.overbay.orbit.ui.rules.RulesViewModel
 import app.overbay.orbit.ui.transactions.TransactionsScreen
@@ -71,7 +69,6 @@ import app.overbay.orbit.util.PlatformStorage
 
 private class OrbitViewModelHolder(repo: OrbitRepository) {
     val loginViewModel by lazy { LoginViewModel(repo) }
-    val onboardingViewModel by lazy { OnboardingViewModel(repo) }
     val dashboardViewModel by lazy { DashboardViewModel(repo) }
     val transactionsViewModel by lazy { TransactionsViewModel(repo) }
     val categoriesViewModel by lazy { CategoriesViewModel(repo) }
@@ -132,7 +129,12 @@ fun OrbitNavigation(
         }
     }
 
-    if (currentKey == OrbitNavKey.Login) {
+    if (currentKey == OrbitNavKey.Login || currentKey == OrbitNavKey.Onboarding) {
+        LaunchedEffect(currentKey) {
+            if (currentKey == OrbitNavKey.Onboarding) {
+                viewModels.loginViewModel.resetToModeSelect()
+            }
+        }
         LoginScreen(
             viewModel = viewModels.loginViewModel,
             onLoginSuccess = {
@@ -140,22 +142,6 @@ fun OrbitNavigation(
                 backStack.add(OrbitNavKey.Dashboard)
             },
             onUseOfflineStorage = {
-                backStack.clear()
-                if (preferences.onboardingCompleted) {
-                    backStack.add(OrbitNavKey.Dashboard)
-                } else {
-                    backStack.add(OrbitNavKey.Onboarding)
-                }
-            },
-            modifier = modifier.fillMaxSize()
-        )
-        return
-    }
-
-    if (currentKey == OrbitNavKey.Onboarding) {
-        OnboardingScreen(
-            viewModel = viewModels.onboardingViewModel,
-            onComplete = {
                 backStack.clear()
                 backStack.add(OrbitNavKey.Dashboard)
             },

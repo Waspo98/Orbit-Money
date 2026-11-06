@@ -104,12 +104,35 @@ object FlexibleStringSerializer : KSerializer<String> {
 }
 
 object ServerUrlNormalizer {
+    fun sanitizeInput(rawInput: String): String {
+        val trimmed = rawInput.trimStart()
+        return when {
+            trimmed.startsWith("https://https://", ignoreCase = true) ->
+                "https://" + trimmed.substring("https://https://".length)
+            trimmed.startsWith("https://http://", ignoreCase = true) ->
+                "http://" + trimmed.substring("https://http://".length)
+            trimmed.startsWith("http://https://", ignoreCase = true) ->
+                "https://" + trimmed.substring("http://https://".length)
+            trimmed.startsWith("http://http://", ignoreCase = true) ->
+                "http://" + trimmed.substring("http://http://".length)
+            else -> rawInput
+        }
+    }
+
     fun normalize(rawUrl: String): String {
-        var url = rawUrl.trim().trimEnd('/')
+        var url = sanitizeInput(rawUrl).trim().trimEnd('/')
         if (url.endsWith("/api", ignoreCase = true)) {
             url = url.dropLast(4).trimEnd('/')
         }
-        if (url.isEmpty()) return ""
+        if (
+            url.isEmpty() ||
+            url.equals("https:", ignoreCase = true) ||
+            url.equals("http:", ignoreCase = true) ||
+            url.equals("https", ignoreCase = true) ||
+            url.equals("http", ignoreCase = true)
+        ) {
+            return ""
+        }
         if (!url.startsWith("http://", ignoreCase = true) && !url.startsWith("https://", ignoreCase = true)) {
             val lower = url.lowercase()
             val isLocal = lower.startsWith("localhost") ||
@@ -119,6 +142,8 @@ object ServerUrlNormalizer {
                 Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\.").containsMatchIn(lower)
             url = if (isLocal) "http://$url" else "https://$url"
         }
+        val hostPart = url.substringAfter("://", "").trim()
+        if (hostPart.isEmpty()) return ""
         return url
     }
 }

@@ -1,5 +1,13 @@
 package app.overbay.orbit.ui.login
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -49,16 +57,23 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.login.components.ConfirmedServerPill
 import app.overbay.orbit.ui.login.components.LoginBrandLockup
 import app.overbay.orbit.ui.login.components.LoginErrorBanner
-import app.overbay.orbit.ui.login.components.LoginServerConfigBox
+import app.overbay.orbit.ui.login.components.LoginLocalSetupStep
+import app.overbay.orbit.ui.login.components.LoginModeSelectionStep
+import app.overbay.orbit.ui.login.components.LoginServerUrlStep
+import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalOidcAuthLauncher
 import app.overbay.orbit.util.LocalOrbitHaptics
 import app.overbay.orbit.util.PlatformRuntime
 
 /**
- * Immich-inspired centered Login Screen with OIDC / OAuth, Local Password,
- * Server Endpoint Switcher, Sample Data, and Offline Local Storage fallback.
+ * Centered morphing Onboarding & Login Screen with M3E physics springs.
+ * Progressively morphs from Mode Selection (Local vs Self-Hosted) ->
+ * Server URL confirmation (`https://` prefilled) -> Credentials / OIDC,
+ * or Local Workspace initialization.
  * Conforms strictly to the <= 6 parameter rule and < 400-line ceiling.
  */
 @Composable
@@ -87,9 +102,6 @@ fun LoginScreen(
     onUseOfflineStorage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
-    val oidcLauncher = LocalOidcAuthLauncher.current
-
     LaunchedEffect(state.isAuthenticated) {
         if (state.isAuthenticated) {
             onIntent(LoginIntent.ClearNavigationFlags)
@@ -101,6 +113,21 @@ fun LoginScreen(
         if (state.switchedToLocalMode) {
             onIntent(LoginIntent.ClearNavigationFlags)
             onUseOfflineStorage()
+        }
+    }
+
+    BackHandler(enabled = state.step != LoginStep.MODE_SELECT) {
+        when (state.step) {
+            LoginStep.LOCAL_SETUP -> onIntent(LoginIntent.BackToModeSelect)
+            LoginStep.SERVER_URL -> {
+                if (state.serverUrl.isNotBlank()) {
+                    onIntent(LoginIntent.SetShowServerConfig(false))
+                } else {
+                    onIntent(LoginIntent.BackToModeSelect)
+                }
+            }
+            LoginStep.SERVER_AUTH -> onIntent(LoginIntent.SetShowServerConfig(true))
+            LoginStep.MODE_SELECT -> {}
         }
     }
 
@@ -144,8 +171,9 @@ fun LoginScreen(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 400.dp)
-                .verticalScroll(rememberScrollState()),
+                .widthIn(max = 420.dp)
+                .verticalScroll(rememberScrollState())
+                .animateContentSize(animationSpec = OrbitSprings.spatialDefault()),
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
@@ -155,193 +183,231 @@ fun LoginScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp, vertical = 36.dp)
+                    .animateContentSize(animationSpec = OrbitSprings.spatialDefault())
             ) {
                 LoginBrandLockup(
                     modifier = Modifier.padding(bottom = 20.dp)
                 )
 
-                LoginServerConfigBox(
-                    state = state,
-                    onIntent = onIntent
-                )
-
-                if (state.localEnabled) {
-                    OutlinedTextField(
-                        value = state.username,
-                        onValueChange = { onIntent(LoginIntent.UpdateUsername(it)) },
-                        label = { Text("Username") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Text,
-                            imeAction = ImeAction.Next
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedTextField(
-                        value = state.password,
-                        onValueChange = { onIntent(LoginIntent.UpdatePassword(it)) },
-                        label = { Text("Password") },
-                        singleLine = true,
-                        visualTransformation = if (state.isPasswordVisible) {
-                            VisualTransformation.None
-                        } else {
-                            PasswordVisualTransformation()
-                        },
-                        trailingIcon = {
-                            TextButton(
-                                onClick = {
-                                    haptics.tick()
-                                    onIntent(LoginIntent.TogglePasswordVisibility)
-                                }
-                            ) {
-                                Text(
-                                    text = if (state.isPasswordVisible) "Hide" else "Show",
-                                    style = MaterialTheme.typography.labelMedium
+                AnimatedContent(
+                    targetState = state.step,
+                    transitionSpec = {
+                        (fadeIn(OrbitSprings.effectsDefault()) +
+                            scaleIn(initialScale = 0.96f, animationSpec = OrbitSprings.spatialDefault()))
+                            .togetherWith(
+                                fadeOut(OrbitSprings.effectsFast()) +
+                                    scaleOut(targetScale = 0.96f, animationSpec = OrbitSprings.spatialDefault())
+                            )
+                            .using(
+                                SizeTransform(
+                                    clip = false,
+                                    sizeAnimationSpec = { _, _ -> OrbitSprings.spatialDefault() }
                                 )
-                            }
-                        },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                haptics.confirm()
-                                onIntent(LoginIntent.SubmitPasswordLogin)
-                            }
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    LoginErrorBanner(errorMessage = state.errorMessage)
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Button(
-                        onClick = {
-                            haptics.confirm()
-                            onIntent(LoginIntent.SubmitPasswordLogin)
-                        },
-                        enabled = !state.isSubmitting,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                    ) {
-                        if (state.isSubmitting) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-                        Text(
-                            text = if (state.isSubmitting) "Signing In..." else "Sign In",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-                        )
+                    },
+                    label = "LoginStepMorph"
+                ) { step ->
+                    when (step) {
+                        LoginStep.MODE_SELECT -> LoginModeSelectionStep(onIntent = onIntent)
+                        LoginStep.LOCAL_SETUP -> LoginLocalSetupStep(state = state, onIntent = onIntent)
+                        LoginStep.SERVER_URL -> LoginServerUrlStep(state = state, onIntent = onIntent)
+                        LoginStep.SERVER_AUTH -> LoginServerAuthStep(state = state, onIntent = onIntent)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoginServerAuthStep(
+    state: LoginUiState,
+    onIntent: (LoginIntent) -> Unit
+) {
+    val haptics = LocalOrbitHaptics.current
+    val oidcLauncher = LocalOidcAuthLauncher.current
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ConfirmedServerPill(
+            serverUrl = state.serverUrl,
+            onChangeClick = { onIntent(LoginIntent.SetShowServerConfig(true)) }
+        )
+
+        if (state.localEnabled) {
+            OutlinedTextField(
+                value = state.username,
+                onValueChange = { onIntent(LoginIntent.UpdateUsername(it)) },
+                label = { Text("Username") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Next
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = state.password,
+                onValueChange = { onIntent(LoginIntent.UpdatePassword(it)) },
+                label = { Text("Password") },
+                singleLine = true,
+                visualTransformation = if (state.isPasswordVisible) {
+                    VisualTransformation.None
                 } else {
-                    LoginErrorBanner(errorMessage = state.errorMessage)
-                }
-
-                if (state.oidcEnabled && state.localEnabled) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 18.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        HorizontalDivider(modifier = Modifier.weight(1f))
-                        Text(
-                            text = "OR",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.1.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        HorizontalDivider(modifier = Modifier.weight(1f))
-                    }
-                }
-
-                if (state.oidcEnabled) {
-                    val onOidcClick = {
-                        haptics.confirm()
-                        onIntent(LoginIntent.PrepareOidcLogin)
-                        if (PlatformRuntime.isWeb || state.serverUrl.isNotBlank()) {
-                            oidcLauncher.launchOidcLogin(state.serverUrl, state.oidcLoginUrl)
-                        }
-                    }
-
-                    if (!state.localEnabled) {
-                        Button(
-                            onClick = onOidcClick,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                        ) {
-                            Text(
-                                text = state.oidcLoginLabel,
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-                            )
-                        }
-                    } else {
-                        FilledTonalButton(
-                            onClick = onOidcClick,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                        ) {
-                            Text(
-                                text = state.oidcLoginLabel,
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-                            )
-                        }
-                    }
-                }
-
-                if (state.sampleDataEnabled) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    PasswordVisualTransformation()
+                },
+                trailingIcon = {
                     TextButton(
                         onClick = {
                             haptics.tick()
-                            onIntent(LoginIntent.SubmitSampleDataLogin)
-                        },
-                        enabled = !state.isSampleLoading,
-                        modifier = Modifier.fillMaxWidth()
+                            onIntent(LoginIntent.TogglePasswordVisibility)
+                        }
                     ) {
                         Text(
-                            text = if (state.isSampleLoading) "Loading sample data..." else "Continue with sample data",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = if (state.isPasswordVisible) "Hide" else "Show",
+                            style = MaterialTheme.typography.labelMedium
                         )
                     }
-                }
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        haptics.confirm()
+                        onIntent(LoginIntent.SubmitPasswordLogin)
+                    }
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                Spacer(modifier = Modifier.height(6.dp))
-                TextButton(
-                    onClick = {
-                        haptics.tick()
-                        onIntent(LoginIntent.UseOfflineLocalStorage)
-                    },
-                    modifier = Modifier.fillMaxWidth()
+            LoginErrorBanner(errorMessage = state.errorMessage)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    haptics.confirm()
+                    onIntent(LoginIntent.SubmitPasswordLogin)
+                },
+                enabled = !state.isSubmitting,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                if (state.isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(
+                    text = if (state.isSubmitting) "Signing In..." else "Sign In",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                )
+            }
+        } else {
+            LoginErrorBanner(errorMessage = state.errorMessage)
+        }
+
+        if (state.oidcEnabled && state.localEnabled) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                HorizontalDivider(modifier = Modifier.weight(1f))
+                Text(
+                    text = "OR",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.1.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                HorizontalDivider(modifier = Modifier.weight(1f))
+            }
+        }
+
+        if (state.oidcEnabled) {
+            val onOidcClick = {
+                haptics.confirm()
+                onIntent(LoginIntent.PrepareOidcLogin)
+                if (PlatformRuntime.isWeb || state.serverUrl.isNotBlank()) {
+                    oidcLauncher.launchOidcLogin(state.serverUrl, state.oidcLoginUrl)
+                }
+            }
+
+            if (!state.localEnabled) {
+                Button(
+                    onClick = onOidcClick,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
                 ) {
                     Text(
-                        text = "Use Offline Local Storage Instead",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = state.oidcLoginLabel,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+            } else {
+                FilledTonalButton(
+                    onClick = onOidcClick,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text(
+                        text = state.oidcLoginLabel,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
                 }
             }
+        }
+
+        if (state.sampleDataEnabled) {
+            Spacer(modifier = Modifier.height(12.dp))
+            TextButton(
+                onClick = {
+                    haptics.tick()
+                    onIntent(LoginIntent.SubmitSampleDataLogin)
+                },
+                enabled = !state.isSampleLoading,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (state.isSampleLoading) "Loading sample data..." else "Continue with sample data",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+        TextButton(
+            onClick = {
+                haptics.tick()
+                onIntent(LoginIntent.SelectLocalMode)
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Use Offline Local Storage Instead",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

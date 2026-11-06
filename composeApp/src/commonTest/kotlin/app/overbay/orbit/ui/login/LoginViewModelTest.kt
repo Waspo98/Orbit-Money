@@ -47,7 +47,7 @@ class LoginViewModelTest {
     }
 
     @Test
-    fun testInitialState_nativeWithoutServerUrlOpensServerConfig() {
+    fun testInitialState_nativeWithoutServerUrlStartsAtModeSelectWithHttpsPrefill() {
         val viewModel = LoginViewModel(
             repository = repository,
             storage = storage,
@@ -55,9 +55,81 @@ class LoginViewModelTest {
             scope = testScope
         )
         val state = viewModel.uiState.value
-        assertTrue(state.showServerConfig, "Native app without saved server URL should show Server Address input")
+        assertEquals(LoginStep.MODE_SELECT, state.step)
+        assertFalse(state.showServerConfig)
+        assertEquals("https://", state.customServerInput)
         assertEquals("", state.serverUrl)
         assertTrue(state.localEnabled)
+    }
+
+    @Test
+    fun testInitialState_returningUserOrWebStartsAtServerAuth() = runTest(testDispatcher) {
+        val webViewModel = LoginViewModel(
+            repository = repository,
+            storage = storage,
+            isWebPlatform = true,
+            scope = testScope
+        )
+        assertEquals(LoginStep.SERVER_AUTH, webViewModel.uiState.value.step)
+
+        repository.updatePreferences(
+            repository.preferences.value.copy(selfHostedServerUrl = "https://orbit.example.com")
+        )
+        val returningViewModel = LoginViewModel(
+            repository = repository,
+            storage = storage,
+            isWebPlatform = false,
+            scope = testScope
+        )
+        assertEquals(LoginStep.SERVER_AUTH, returningViewModel.uiState.value.step)
+        assertEquals("https://orbit.example.com", returningViewModel.uiState.value.serverUrl)
+    }
+
+    @Test
+    fun testSelectSelfHostedMode_morphsToServerUrlWithHttpsPrefillAndDeduplicatesPaste() {
+        val viewModel = LoginViewModel(
+            repository = repository,
+            storage = storage,
+            isWebPlatform = false,
+            scope = testScope
+        )
+        viewModel.processIntent(LoginIntent.SelectSelfHostedMode)
+        assertEquals(LoginStep.SERVER_URL, viewModel.uiState.value.step)
+        assertTrue(viewModel.uiState.value.showServerConfig)
+        assertEquals("https://", viewModel.uiState.value.customServerInput)
+
+        // Clicking Next on bare "https://" should not advance to SERVER_AUTH
+        viewModel.processIntent(LoginIntent.ConnectAndSaveServer)
+        assertEquals(LoginStep.SERVER_URL, viewModel.uiState.value.step)
+        assertEquals("Please enter a server address", viewModel.uiState.value.serverError)
+
+        // Pasting full https:// URL after prefilled "https://" deduplicates scheme
+        viewModel.processIntent(LoginIntent.UpdateServerInput("https://https://orbit.example.com"))
+        assertEquals("https://orbit.example.com", viewModel.uiState.value.customServerInput)
+        assertNull(viewModel.uiState.value.serverError)
+    }
+
+    @Test
+    fun testSelectLocalMode_morphsToLocalSetupAndSeedsDemoData() = runTest(testDispatcher) {
+        val viewModel = LoginViewModel(
+            repository = repository,
+            storage = storage,
+            isWebPlatform = false,
+            scope = testScope
+        )
+        viewModel.processIntent(LoginIntent.SelectLocalMode)
+        assertEquals(LoginStep.LOCAL_SETUP, viewModel.uiState.value.step)
+
+        viewModel.processIntent(LoginIntent.SelectLocalSeed(LocalSeedChoice.DEMO))
+        assertEquals(LocalSeedChoice.DEMO, viewModel.uiState.value.selectedLocalSeed)
+
+        viewModel.processIntent(LoginIntent.ConfirmLocalSetup)
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.switchedToLocalMode)
+        assertEquals(StorageMode.LOCAL, repository.storageMode.value)
+        assertTrue(repository.preferences.value.onboardingCompleted)
+        assertTrue(repository.accounts.value.isNotEmpty(), "Demo accounts must be seeded into repository")
     }
 
     @Test
@@ -109,6 +181,7 @@ class LoginViewModelTest {
             scope = testScope
         )
         viewModel.processIntent(LoginIntent.SubmitPasswordLogin)
+        assertEquals(LoginStep.SERVER_URL, viewModel.uiState.value.step)
         assertEquals(
             "Please connect to your Orbit Money server first.",
             viewModel.uiState.value.errorMessage
@@ -140,6 +213,7 @@ class LoginViewModelTest {
 
         assertTrue(viewModel.uiState.value.switchedToLocalMode)
         assertEquals(StorageMode.LOCAL, repository.storageMode.value)
+        assertTrue(repository.preferences.value.onboardingCompleted)
         assertTrue(repository.isAuthenticated.value)
     }
 }

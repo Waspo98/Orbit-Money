@@ -6,6 +6,7 @@ import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.network.OrbitApiClient
 import app.overbay.orbit.data.network.ServerUrlNormalizer
+import app.overbay.orbit.domain.DemoSeedGenerator
 import app.overbay.orbit.util.OidcCallbackBridge
 import app.overbay.orbit.util.PlatformRuntime
 import app.overbay.orbit.util.PlatformStorage
@@ -30,22 +31,25 @@ class LoginViewModel(
 
     private val scope: CoroutineScope = scope ?: (viewModelScope + Dispatchers.Default)
 
-    private val _uiState = MutableStateFlow(LoginUiState(showServerConfig = !isWebPlatform))
+    private val _uiState = MutableStateFlow(
+        LoginUiState(step = if (isWebPlatform) LoginStep.SERVER_AUTH else LoginStep.MODE_SELECT)
+    )
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
     init {
         val initialUrl = ServerUrlNormalizer.normalize(repository.preferences.value.selfHostedServerUrl)
-        val shouldShowServerBox = !isWebPlatform && initialUrl.isBlank()
+        val hasKnownServer = isWebPlatform || initialUrl.isNotBlank()
+        val initialStep = if (hasKnownServer) LoginStep.SERVER_AUTH else LoginStep.MODE_SELECT
         _uiState.update {
             it.copy(
+                step = initialStep,
                 serverUrl = initialUrl,
-                customServerInput = initialUrl,
-                showServerConfig = shouldShowServerBox
+                customServerInput = initialUrl.ifBlank { LoginUiState.DEFAULT_SERVER_PREFIX }
             )
         }
         val alreadySelfHostedAuthed =
             repository.storageMode.value == StorageMode.SELF_HOSTED && repository.isAuthenticated.value
-        if (!alreadySelfHostedAuthed && (isWebPlatform || initialUrl.isNotBlank())) {
+        if (!alreadySelfHostedAuthed && hasKnownServer) {
             fetchAuthConfig(initialUrl)
         }
         this.scope.launch {
@@ -79,8 +83,55 @@ class LoginViewModel(
         }
     }
 
+    fun resetToModeSelect() {
+        _uiState.update {
+            it.copy(
+                step = LoginStep.MODE_SELECT,
+                customServerInput = it.serverUrl.ifBlank { LoginUiState.DEFAULT_SERVER_PREFIX },
+                serverError = null,
+                errorMessage = null
+            )
+        }
+    }
+
     fun processIntent(intent: LoginIntent) {
         when (intent) {
+            LoginIntent.SelectLocalMode -> _uiState.update {
+                it.copy(
+                    step = LoginStep.LOCAL_SETUP,
+                    errorMessage = null,
+                    serverError = null
+                )
+            }
+            LoginIntent.SelectSelfHostedMode -> _uiState.update {
+                val prefilled = it.serverUrl.ifBlank {
+                    it.customServerInput.ifBlank { LoginUiState.DEFAULT_SERVER_PREFIX }
+                }
+                it.copy(
+                    step = LoginStep.SERVER_URL,
+                    customServerInput = prefilled,
+                    serverError = null,
+                    errorMessage = null
+                )
+            }
+            LoginIntent.BackToModeSelect -> _uiState.update {
+                it.copy(
+                    step = LoginStep.MODE_SELECT,
+                    serverError = null,
+                    errorMessage = null
+                )
+            }
+            is LoginIntent.SelectLocalSeed -> _uiState.update {
+                it.copy(selectedLocalSeed = intent.choice, errorMessage = null)
+            }
+            is LoginIntent.SetBackupFile -> _uiState.update {
+                it.copy(
+                    backupFileName = intent.fileName,
+                    backupJsonContent = intent.jsonContent,
+                    errorMessage = null
+                )
+            }
+            LoginIntent.ConfirmLocalSetup -> confirmLocalSetup()
             is LoginIntent.UpdateUsername -> _uiState.update {
                 it.copy(username = intent.username, errorMessage = null)
             }
@@ -94,14 +145,28 @@ class LoginViewModel(
             LoginIntent.PrepareOidcLogin -> prepareOidcLogin()
             LoginIntent.SubmitSampleDataLogin -> submitSampleDataLogin()
             is LoginIntent.SetShowServerConfig -> _uiState.update {
+                val targetStep = if (intent.show) {
+                    LoginStep.SERVER_URL
+                } else if (it.serverUrl.isNotBlank() || isWebPlatform) {
+                    LoginStep.SERVER_AUTH
+                } else {
+                    LoginStep.MODE_SELECT
+                }
                 it.copy(
-                    showServerConfig = intent.show,
-                    customServerInput = if (intent.show) it.serverUrl else it.customServerInput,
+                    step = targetStep,
+                    customServerInput = if (intent.show) {
+                        it.serverUrl.ifBlank { LoginUiState.DEFAULT_SERVER_PREFIX }
+                    } else {
+                        it.customServerInput
+                    },
                     serverError = null
                 )
             }
             is LoginIntent.UpdateServerInput -> _uiState.update {
-                it.copy(customServerInput = intent.url, serverError = null)
+                it.copy(
+                    customServerInput = ServerUrlNormalizer.sanitizeInput(intent.url),
+                    serverError = null
+                )
             }
             LoginIntent.ConnectAndSaveServer -> connectAndSaveServer()
             LoginIntent.UseOfflineLocalStorage -> switchToOfflineLocalMode()
@@ -153,7 +218,7 @@ class LoginViewModel(
         }
         _uiState.update {
             it.copy(
-                customServerInput = normalized,
+                customServerInput = normalized.ifBlank { LoginUiState.DEFAULT_SERVER_PREFIX },
                 isTestingServer = true,
                 serverError = null
             )
@@ -170,11 +235,12 @@ class LoginViewModel(
                 )
                 _uiState.update {
                     it.copy(
+                        step = LoginStep.SERVER_AUTH,
                         serverUrl = normalized,
-                        customServerInput = normalized,
-                        showServerConfig = false,
+                        customServerInput = normalized.ifBlank { LoginUiState.DEFAULT_SERVER_PREFIX },
                         isTestingServer = false,
                         serverError = null,
+                        errorMessage = null,
                         localEnabled = localEnabled,
                         oidcEnabled = oidcEnabled,
                         oidcLoginUrl = cfg.oidcLoginUrl?.ifBlank { "/api/auth/oidc/login" } ?: "/api/auth/oidc/login",
@@ -190,11 +256,12 @@ class LoginViewModel(
                     )
                     _uiState.update {
                         it.copy(
+                            step = LoginStep.SERVER_AUTH,
                             serverUrl = normalized,
-                            customServerInput = normalized,
-                            showServerConfig = false,
+                            customServerInput = normalized.ifBlank { LoginUiState.DEFAULT_SERVER_PREFIX },
                             isTestingServer = false,
-                            serverError = null
+                            serverError = null,
+                            errorMessage = null
                         )
                     }
                 } else {
@@ -216,7 +283,7 @@ class LoginViewModel(
         if (!isWebPlatform && normalizedUrl.isBlank()) {
             _uiState.update {
                 it.copy(
-                    showServerConfig = true,
+                    step = LoginStep.SERVER_URL,
                     errorMessage = "Please connect to your Orbit Money server first."
                 )
             }
@@ -247,7 +314,7 @@ class LoginViewModel(
         if (!isWebPlatform && normalizedUrl.isBlank()) {
             _uiState.update {
                 it.copy(
-                    showServerConfig = true,
+                    step = LoginStep.SERVER_URL,
                     errorMessage = "Please connect to your Orbit Money server first."
                 )
             }
@@ -283,9 +350,55 @@ class LoginViewModel(
         }
     }
 
+    private fun confirmLocalSetup() {
+        val state = _uiState.value
+        if (state.selectedLocalSeed == LocalSeedChoice.RESTORE_FILE && state.backupJsonContent.isNullOrBlank()) {
+            _uiState.update { it.copy(errorMessage = "Please select or paste a backup JSON file first.") }
+            return
+        }
+        _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
+        scope.launch {
+            repository.setStorageMode(StorageMode.LOCAL)
+            when (state.selectedLocalSeed) {
+                LocalSeedChoice.DEMO -> {
+                    val snapshot = DemoSeedGenerator.generateDemoSnapshot()
+                    repository.loadDemoData(snapshot)
+                }
+                LocalSeedChoice.RESTORE_FILE -> {
+                    val restoreResult = repository.restoreBackupJson(state.backupJsonContent.orEmpty())
+                    if (restoreResult.isFailure) {
+                        _uiState.update {
+                            it.copy(
+                                isSubmitting = false,
+                                errorMessage = restoreResult.exceptionOrNull()?.message ?: "Could not restore backup file."
+                            )
+                        }
+                        return@launch
+                    }
+                }
+                LocalSeedChoice.FRESH -> {
+                    // Retains clean workspace with standard default categories
+                }
+            }
+            repository.updatePreferences(
+                repository.preferences.value.copy(
+                    storageMode = StorageMode.LOCAL,
+                    onboardingCompleted = true
+                )
+            )
+            _uiState.update { it.copy(isSubmitting = false, switchedToLocalMode = true) }
+        }
+    }
+
     private fun switchToOfflineLocalMode() {
         scope.launch {
             repository.setStorageMode(StorageMode.LOCAL)
+            repository.updatePreferences(
+                repository.preferences.value.copy(
+                    storageMode = StorageMode.LOCAL,
+                    onboardingCompleted = true
+                )
+            )
             _uiState.update { it.copy(switchedToLocalMode = true) }
         }
     }
