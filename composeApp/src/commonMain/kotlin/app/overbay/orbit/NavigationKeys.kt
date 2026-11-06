@@ -119,6 +119,7 @@ sealed interface OrbitNavKey {
         val endDate: String? = null,
         val sortOption: String? = null,
         val openAddSheet: Boolean = false,
+        val openSearch: Boolean = false,
         val includeTransfers: Boolean = true,
         val includeIgnored: Boolean = true
     ) : OrbitNavKey

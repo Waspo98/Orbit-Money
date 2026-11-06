@@ -244,16 +244,17 @@ class TransactionsViewModel(
         endDate: String? = null,
         sortOption: String? = null,
         openAddSheet: Boolean = false,
+        openSearch: Boolean = false,
         includeTransfers: Boolean = true,
         includeIgnored: Boolean = true
     ) {
         val hasDeepLink = transactionId != null || accountId != null || categoryId != null ||
             uncategorizedOnly || startDate != null || endDate != null ||
-            sortOption != null || openAddSheet || !includeTransfers || !includeIgnored
+            sortOption != null || openAddSheet || openSearch || !includeTransfers || !includeIgnored
         if (!hasDeepLink) return
 
         _searchQuery.value = ""
-        _isSearchActive.value = false
+        _isSearchActive.value = openSearch
         _quickFilter.value = if (uncategorizedOnly) QuickFilter.UNCATEGORIZED else QuickFilter.ALL
 
         val resolvedSort = sortOption?.let { TransactionsFilterHelper.parseSortOption(it) }

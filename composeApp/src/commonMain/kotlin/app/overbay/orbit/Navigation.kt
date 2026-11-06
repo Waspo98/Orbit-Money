@@ -166,6 +166,7 @@ fun OrbitNavigation(
                 destination.endDate != null ||
                 destination.sortOption != null ||
                 destination.openAddSheet ||
+                destination.openSearch ||
                 !destination.includeTransfers ||
                 !destination.includeIgnored
             if (hasTransactionsDeepLink) {
@@ -178,10 +179,12 @@ fun OrbitNavigation(
                     endDate = destination.endDate,
                     sortOption = destination.sortOption,
                     openAddSheet = destination.openAddSheet,
+                    openSearch = destination.openSearch,
                     includeTransfers = destination.includeTransfers,
                     includeIgnored = destination.includeIgnored
                 )
             } else {
+                viewModels.transactionsViewModel.setSearchActive(false)
                 viewModels.transactionsViewModel.clearFilters()
                 viewModels.transactionsViewModel.dismissInspectorPane()
             }
@@ -254,6 +257,7 @@ fun OrbitNavigation(
                                         endDate = key.endDate,
                                         sortOption = key.sortOption,
                                         openAddSheet = key.openAddSheet,
+                                        openSearch = key.openSearch,
                                         includeTransfers = key.includeTransfers,
                                         includeIgnored = key.includeIgnored
                                     )
