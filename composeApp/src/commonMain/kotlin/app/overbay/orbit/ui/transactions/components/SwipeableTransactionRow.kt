@@ -85,10 +85,6 @@ fun SwipeableTransactionRow(
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
     var menuExpanded by remember { mutableStateOf(false) }
-    var everExpanded by remember { mutableStateOf(isExpanded) }
-    if (isExpanded && !everExpanded) {
-        everExpanded = true
-    }
 
     val catColor = category?.color.toComposeColor(MaterialTheme.colorScheme.primary)
     val rowBgColor = when {
@@ -241,50 +237,48 @@ fun SwipeableTransactionRow(
                 }
             }
 
-            if (everExpanded) {
-                AnimatedVisibility(visible = isExpanded) {
-                    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-                            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                            Spacer(modifier = Modifier.height(10.dp))
+            AnimatedVisibility(visible = isExpanded) {
+                Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+                        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    MetaItem(label = "Date", value = transaction.effectiveDate)
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    MetaItem(label = "Account", value = accountName ?: transaction.accountName)
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        MetaItem(label = "Merchant", value = transaction.effectiveMerchant)
-                                        if (transaction.editedMerchant != null) {
-                                            Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetMerchant() }.padding(start = 6.dp))
-                                        }
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                MetaItem(label = "Date", value = transaction.effectiveDate)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                MetaItem(label = "Account", value = accountName ?: transaction.accountName)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    MetaItem(label = "Merchant", value = transaction.effectiveMerchant)
+                                    if (transaction.editedMerchant != null) {
+                                        Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetMerchant() }.padding(start = 6.dp))
                                     }
                                 }
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        MetaItem(label = "Category", value = category?.labelWithEmoji ?: "❓ Uncategorized")
-                                        if (transaction.editedCategoryId != null) {
-                                            Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetCategory() }.padding(start = 6.dp))
-                                        }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    MetaItem(label = "Category", value = category?.labelWithEmoji ?: "❓ Uncategorized")
+                                    if (transaction.editedCategoryId != null) {
+                                        Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetCategory() }.padding(start = 6.dp))
                                     }
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    MetaItem(label = "Bank Statement", value = transaction.originalDescription ?: transaction.originalMerchant, isMono = true)
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    MetaItem(label = "Notes", value = transaction.notes ?: "None")
                                 }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                MetaItem(label = "Bank Statement", value = transaction.originalDescription ?: transaction.originalMerchant, isMono = true)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                MetaItem(label = "Notes", value = transaction.notes ?: "None")
                             }
+                        }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OrbitActionChip(label = "Edit Transaction", onClick = { haptics.tick(); onEdit() })
-                                OrbitActionChip(label = "Split", onClick = { haptics.tick(); onSplit() })
-                                OrbitActionChip(label = "Create Rule", onClick = { haptics.tick(); onCreateRule() })
-                            }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OrbitActionChip(label = "Edit Transaction", onClick = { haptics.tick(); onEdit() })
+                            OrbitActionChip(label = "Split", onClick = { haptics.tick(); onSplit() })
+                            OrbitActionChip(label = "Create Rule", onClick = { haptics.tick(); onCreateRule() })
                         }
                     }
                 }

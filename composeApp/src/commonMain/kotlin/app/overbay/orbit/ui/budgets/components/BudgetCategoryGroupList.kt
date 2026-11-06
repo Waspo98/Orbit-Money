@@ -196,24 +196,22 @@ private fun InactiveBudgetCategoriesSection(
             }
         }
 
-        if (showInactive) {
-            AnimatedVisibility(visible = true) {
-                Column(
-                    modifier = Modifier.padding(top = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    inactive.forEach { item ->
-                        BudgetCategoryRow(
-                            item = item,
-                            isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
-                            isInspected = isWideScreen && item.category.id == expandedCategoryId,
-                            transactions = categoryTransactions[item.category.id] ?: emptyList(),
-                            onClick = { onToggleExpand(item.category.id) },
-                            onEditBudget = { onEditBudget(item) },
-                            onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
-                            onViewTransactions = { onViewTransactions(item.category.id) }
-                        )
-                    }
+        AnimatedVisibility(visible = showInactive) {
+            Column(
+                modifier = Modifier.padding(top = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                inactive.forEach { item ->
+                    BudgetCategoryRow(
+                        item = item,
+                        isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
+                        isInspected = isWideScreen && item.category.id == expandedCategoryId,
+                        transactions = categoryTransactions[item.category.id] ?: emptyList(),
+                        onClick = { onToggleExpand(item.category.id) },
+                        onEditBudget = { onEditBudget(item) },
+                        onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
+                        onViewTransactions = { onViewTransactions(item.category.id) }
+                    )
                 }
             }
         }

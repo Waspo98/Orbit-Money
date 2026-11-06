@@ -23,10 +23,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,10 +60,6 @@ fun BudgetCategoryRow(
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
-    var everExpanded by remember { mutableStateOf(isExpanded) }
-    if (isExpanded && !everExpanded) {
-        everExpanded = true
-    }
 
     val categoryColor = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
     val isOverBudget = item.spentCents > item.amountCents && item.amountCents > 0L
@@ -220,109 +212,107 @@ fun BudgetCategoryRow(
             }
 
             // Inline Expandable Detail Preview
-            if (everExpanded) {
-                AnimatedVisibility(visible = isExpanded) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        modifier = Modifier.fillMaxWidth()
+            AnimatedVisibility(visible = isExpanded) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp)
-                        ) {
-                            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                            Spacer(modifier = Modifier.height(10.dp))
+                        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+                        Spacer(modifier = Modifier.height(10.dp))
 
+                        Text(
+                            text = "RECENT TRANSACTIONS",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        if (transactions.isEmpty()) {
                             Text(
-                                text = "RECENT TRANSACTIONS",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
+                                text = "No transactions recorded for this category.",
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            if (transactions.isEmpty()) {
-                                Text(
-                                    text = "No transactions recorded for this category.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            transactions.take(3).forEachIndexed { index, txn ->
+                                OrbitCompactListRow(
+                                    title = txn.effectiveMerchant,
+                                    subtitle = txn.effectiveDate,
+                                    amount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
+                                    amountColor = colors.expense,
+                                    showTopDivider = index > 0
                                 )
-                            } else {
-                                transactions.take(3).forEachIndexed { index, txn ->
-                                    OrbitCompactListRow(
-                                        title = txn.effectiveMerchant,
-                                        subtitle = txn.effectiveDate,
-                                        amount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
-                                        amountColor = colors.expense,
-                                        showTopDivider = index > 0
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Action Buttons: Edit Budget, Delete Budget, View in Transactions
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        haptics.tick()
+                                        onEditBudget()
+                                    },
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text(
+                                        text = if (item.amountCents > 0L) "Edit Budget" else "Set Budget",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
                                     )
                                 }
-                            }
 
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Action Buttons: Edit Budget, Delete Budget, View in Transactions
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (item.budgetId != null) {
                                     OutlinedButton(
                                         onClick = {
-                                            haptics.tick()
-                                            onEditBudget()
+                                            haptics.reject()
+                                            onDeleteBudget()
                                         },
                                         shape = CircleShape,
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                                        border = BorderStroke(1.dp, colors.danger),
                                         modifier = Modifier.height(32.dp)
                                     ) {
                                         Text(
-                                            text = if (item.amountCents > 0L) "Edit Budget" else "Set Budget",
+                                            text = "Delete Budget",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = colors.danger
                                         )
                                     }
-
-                                    if (item.budgetId != null) {
-                                        OutlinedButton(
-                                            onClick = {
-                                                haptics.reject()
-                                                onDeleteBudget()
-                                            },
-                                            shape = CircleShape,
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                            border = BorderStroke(1.dp, colors.danger),
-                                            modifier = Modifier.height(32.dp)
-                                        ) {
-                                            Text(
-                                                text = "Delete Budget",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = colors.danger
-                                            )
-                                        }
-                                    }
                                 }
-
-                                Text(
-                                    text = "View all in Transactions →",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.clickable {
-                                        haptics.tick()
-                                        onViewTransactions()
-                                    }
-                                )
                             }
+
+                            Text(
+                                text = "View all in Transactions →",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable {
+                                    haptics.tick()
+                                    onViewTransactions()
+                                }
+                            )
                         }
                     }
                 }
