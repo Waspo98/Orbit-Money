@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,6 +52,9 @@ import app.overbay.orbit.ui.accounts.AccountsViewModel
 import app.overbay.orbit.ui.accounts.sheets.AccountBalanceHistoryContent
 import app.overbay.orbit.ui.accounts.sheets.AccountEditorContent
 import app.overbay.orbit.ui.accounts.sheets.CreditCardProfileEditorContent
+import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.OrbitCompactListRow
+import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.roundToInt
@@ -226,16 +228,11 @@ private fun AccountReadOnlyDetailContent(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
-                        Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                            Text(
-                                text = account.type.displayName,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
+                        OrbitBadge(
+                            text = account.type.displayName,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -282,10 +279,10 @@ private fun AccountReadOnlyDetailContent(
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    LinearProgressIndicator(
-                        progress = { (pct / 100f).coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
-                        color = if (pct > 30) colors.danger else MaterialTheme.colorScheme.primary
+                    OrbitPillProgressBar(
+                        percent = pct / 100f,
+                        overBudget = pct > 30,
+                        height = 6.dp
                     )
                 }
             }
@@ -357,21 +354,14 @@ private fun AccountReadOnlyDetailContent(
                     border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(txn.effectiveMerchant, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(txn.effectiveDate, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
-                            style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
-                            color = if (txn.effectiveAmountCents > 0L) colors.income else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                    OrbitCompactListRow(
+                        title = txn.effectiveMerchant,
+                        subtitle = txn.effectiveDate,
+                        amount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
+                        amountColor = if (txn.effectiveAmountCents > 0L) colors.income else MaterialTheme.colorScheme.onSurface,
+                        showTopDivider = false,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
                 }
             }
         }

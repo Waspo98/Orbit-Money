@@ -25,6 +25,7 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.retirement.RetirementUiState
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -148,37 +149,21 @@ fun RetirementAccountsListCard(
             )
             Spacer(modifier = Modifier.height(6.dp))
 
-            uiState.investmentAccounts.forEach { account ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = account.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        if (account.institution != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                uiState.investmentAccounts.forEach { account ->
+                    OrbitCompactListRow(
+                        title = account.name,
+                        subtitle = account.institution,
+                        trailingContent = {
                             Text(
-                                text = account.institution,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = MoneyUtils.formatCents(account.currentBalanceCents),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                    }
-                    Text(
-                        text = MoneyUtils.formatCents(account.currentBalanceCents),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
             }
         }
     }

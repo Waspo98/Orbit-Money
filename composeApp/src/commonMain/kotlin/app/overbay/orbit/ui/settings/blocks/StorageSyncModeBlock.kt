@@ -18,7 +18,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -38,6 +37,7 @@ import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOidcAuthLauncher
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,7 +102,7 @@ fun StorageSyncModeBlock(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
+                OrbitTextField(
                     value = serverUrl,
                     onValueChange = {
                         serverUrl = it
@@ -147,14 +147,14 @@ fun StorageSyncModeBlock(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
+                    OrbitTextField(
                         value = username,
                         onValueChange = { username = it },
                         label = { Text("Username") },
                         modifier = Modifier.weight(1f),
                         singleLine = true
                     )
-                    OutlinedTextField(
+                    OrbitTextField(
                         value = password,
                         onValueChange = { password = it },
                         label = { Text("Password") },

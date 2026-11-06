@@ -336,6 +336,7 @@ fun CanopyMoreMenuButton(
     buttonSize: Dp,
     actions: List<CanopyMenuAction>,
     modifier: Modifier = Modifier,
+    icon: ImageVector = OrbitIcons.MoreHoriz,
     contentDescription: String = "More Options",
     isActive: Boolean = actions.any { it.isChecked }
 ) {
@@ -344,7 +345,7 @@ fun CanopyMoreMenuButton(
 
     Box(modifier = modifier) {
         CanopyIconButton(
-            icon = OrbitIcons.MoreHoriz,
+            icon = icon,
             contentDescription = contentDescription,
             onClick = { expanded = true },
             buttonSize = buttonSize,

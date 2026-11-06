@@ -16,15 +16,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,10 +36,10 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountMergeDialog(
     sourceAccount: Account,
@@ -60,7 +54,6 @@ fun AccountMergeDialog(
     val eligibleTargets = availableAccounts.filter { it.id != sourceAccount.id && !it.isArchived }
 
     var selectedTarget by remember { mutableStateOf(eligibleTargets.firstOrNull()) }
-    var dropdownExpanded by remember { mutableStateOf(false) }
     var combineBalances by remember { mutableStateOf(true) }
 
     OrbitModalSheet(
@@ -121,36 +114,13 @@ fun AccountMergeDialog(
                     color = OrbitColorTokens.Red
                 )
             } else {
-                ExposedDropdownMenuBox(
-                    expanded = dropdownExpanded,
-                    onExpandedChange = { dropdownExpanded = it },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedTextField(
-                        value = selectedTarget?.name ?: "Select Target Account",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Merge Into (Target Account)") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                    )
-                    ExposedDropdownMenu(
-                        expanded = dropdownExpanded,
-                        onDismissRequest = { dropdownExpanded = false }
-                    ) {
-                        eligibleTargets.forEach { target ->
-                            DropdownMenuItem(
-                                text = { Text("${target.name} (${target.type.displayName})") },
-                                onClick = {
-                                    selectedTarget = target
-                                    dropdownExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
+                OrbitDropdownField(
+                    label = "Merge Into (Target Account)",
+                    selectedText = selectedTarget?.name ?: "Select Target Account",
+                    options = eligibleTargets,
+                    optionLabel = { "${it.name} (${it.type.displayName})" },
+                    onOptionSelected = { selectedTarget = it }
+                )
 
                 // Projected Target Impact Card
                 selectedTarget?.let { target ->

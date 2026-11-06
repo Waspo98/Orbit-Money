@@ -21,6 +21,7 @@ import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitStatTile
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import kotlin.math.min
 import kotlin.math.roundToLong
@@ -94,32 +95,36 @@ fun HouseholdPlanningSignalsCard(
         ) {
             // 2x2 KPI Tiles
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SignalTile(
-                    title = "Annual Take-Home",
+                OrbitStatTile(
+                    label = "Annual Take-Home",
                     value = MoneyUtils.formatCents(annualTakeHomeCents, showCents = false),
                     subtitle = "Net household paycheck cash flow",
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.weight(1f)
                 )
-                SignalTile(
-                    title = "Retirement + Match",
+                OrbitStatTile(
+                    label = "Retirement + Match",
                     value = MoneyUtils.formatCents(totalRetirementAndMatchCents, showCents = false),
                     subtitle = "Annual employee & employer savings",
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.weight(1f)
                 )
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SignalTile(
-                    title = "Pre-Tax Benefits Value",
+                OrbitStatTile(
+                    label = "Pre-Tax Benefits Value",
                     value = MoneyUtils.formatCents(totalBenefitsValueCents, showCents = false),
                     subtitle = "Health, HSA, FSA & employer plans",
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.weight(1f)
                 )
-                SignalTile(
-                    title = "Effective Savings Rate",
+                OrbitStatTile(
+                    label = "Effective Savings Rate",
                     value = "${effectiveSavingsRatePercent.toInt()}%",
                     subtitle = "Top Earner: ${largestContributor?.name?.split(" ")?.firstOrNull() ?: "None"}",
-                    isEmphasized = true,
+                    valueColor = MaterialTheme.colorScheme.primary,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -132,44 +137,6 @@ fun HouseholdPlanningSignalsCard(
                 subtitle = if (includeHsaInSavingsRate) "Counting annual HSA contributions toward household wealth accumulation" else "Excluding HSA contributions from retirement rate",
                 checked = includeHsaInSavingsRate,
                 onCheckedChange = onToggleIncludeHsa
-            )
-        }
-    }
-}
-
-@Composable
-private fun SignalTile(
-    title: String,
-    value: String,
-    subtitle: String,
-    isEmphasized: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = if (isEmphasized) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-        modifier = modifier
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (isEmphasized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

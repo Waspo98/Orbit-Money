@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.SelectableListRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -90,88 +91,39 @@ fun EmptyWorkspaceSetupCard(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // CTA 1: Import Rocket Money CSV
-                SetupCtaTile(
-                    emoji = "📄",
+                SelectableListRow(
                     title = "Import Rocket Money CSV",
-                    description = "Fast migration of accounts, transactions, and categories.",
-                    isPrimary = true,
+                    subtitle = "Fast migration of accounts, transactions, and categories.",
+                    isSelected = true,
                     onClick = {
                         haptics.confirm()
                         onImportCsv()
-                    }
+                    },
+                    leadingContent = { Text(text = "📄", fontSize = 24.sp) }
                 )
 
                 // CTA 2: Connect SimpleFIN Bank Sync
-                SetupCtaTile(
-                    emoji = "🏦",
+                SelectableListRow(
                     title = "Connect SimpleFIN Bank Sync",
-                    description = "Automatic, read-only sync with over 10,000 financial institutions.",
-                    isPrimary = false,
+                    subtitle = "Automatic, read-only sync with over 10,000 financial institutions.",
+                    isSelected = false,
                     onClick = {
                         haptics.confirm()
                         onConnectSimpleFin()
-                    }
+                    },
+                    leadingContent = { Text(text = "🏦", fontSize = 24.sp) }
                 )
 
                 // CTA 3: Add Manual Account
-                SetupCtaTile(
-                    emoji = "✏️",
+                SelectableListRow(
                     title = "Add Manual Account",
-                    description = "Start fresh with custom checking, savings, or investment accounts.",
-                    isPrimary = false,
+                    subtitle = "Start fresh with custom checking, savings, or investment accounts.",
+                    isSelected = false,
                     onClick = {
                         haptics.confirm()
                         onAddManualAccount()
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SetupCtaTile(
-    emoji: String,
-    title: String,
-    description: String,
-    isPrimary: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        color = if (isPrimary) {
-            MaterialTheme.colorScheme.primaryContainer
-        } else {
-            MaterialTheme.colorScheme.surface
-        },
-        border = BorderStroke(
-            1.dp,
-            if (isPrimary) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else OrbitTheme.colors.cardBorder
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = emoji, fontSize = 24.sp)
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isPrimary) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (isPrimary) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    leadingContent = { Text(text = "✏️", fontSize = 24.sp) }
                 )
             }
         }

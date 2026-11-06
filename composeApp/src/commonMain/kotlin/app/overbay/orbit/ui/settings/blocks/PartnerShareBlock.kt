@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HouseholdSharingState
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
 @Composable
@@ -68,45 +69,27 @@ fun PartnerShareBlock(
             )
             Spacer(modifier = Modifier.height(6.dp))
 
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (users.isEmpty()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (users.isEmpty()) {
+                    OrbitCompactListRow(
+                        title = "Current User (Workspace Owner)",
+                        leadingContent = {
                             Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.size(8.dp))
-                            Text("Current User (Workspace Owner)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         }
-                    } else {
-                        users.forEachIndexed { idx, user ->
-                            if (idx > 0) HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(
-                                        text = user.displayName.ifBlank { user.email ?: user.username ?: "Household Member" },
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = "Role: ${user.role} · Access: ${user.accessLevel}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                if (sharingState?.canRemoveUsers == true && user.id != sharingState.currentUserId) {
+                    )
+                } else {
+                    users.forEach { user ->
+                        OrbitCompactListRow(
+                            title = user.displayName.ifBlank { user.email ?: user.username ?: "Household Member" },
+                            subtitle = "Role: ${user.role} · Access: ${user.accessLevel}",
+                            trailingContent = if (sharingState?.canRemoveUsers == true && user.id != sharingState.currentUserId) {
+                                {
                                     IconButton(onClick = { onRemoveUser(user.id) }) {
                                         Icon(imageVector = Icons.Default.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
                                     }
                                 }
-                            }
-                        }
+                            } else null
+                        )
                     }
                 }
             }
@@ -122,28 +105,17 @@ fun PartnerShareBlock(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
 
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        shares.forEachIndexed { idx, share ->
-                            if (idx > 0) HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(text = share.invitedEmail, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                    Text(text = "Invited as ${share.accessLevel}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    shares.forEach { share ->
+                        OrbitCompactListRow(
+                            title = share.invitedEmail,
+                            subtitle = "Invited as ${share.accessLevel}",
+                            trailingContent = {
                                 IconButton(onClick = { onRevokeShare(share.id) }) {
                                     Icon(imageVector = Icons.Default.Delete, contentDescription = "Revoke Invite", tint = MaterialTheme.colorScheme.error)
                                 }
                             }
-                        }
+                        )
                     }
                 }
             }

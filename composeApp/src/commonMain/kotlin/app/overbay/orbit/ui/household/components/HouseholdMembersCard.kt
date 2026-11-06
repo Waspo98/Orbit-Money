@@ -32,7 +32,9 @@ import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.SelectableListRow
 
 @Composable
 fun HouseholdMembersCard(
@@ -114,93 +116,63 @@ fun HouseholdMembersCard(
                 description = "Add partners, children, or dependents to track household allowances."
             )
         } else {
-            members.forEach { member ->
-                val isInspected = inspectingMemberId == member.id
-                Surface(
-                    onClick = {
-                        if (onInspectMember != null) {
-                            onInspectMember(member)
-                        } else {
-                            onEditMember(member)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                members.forEach { member ->
+                    val isInspected = inspectingMemberId == member.id
+                    val subtitleParts = buildList {
+                        if (member.employer != null) add(member.employer)
+                        if (member.jobTitle != null) add(member.jobTitle)
+                        if (member.grossIncomeAnnualCents > 0L) {
+                            add(MoneyUtils.formatCents(member.grossIncomeAnnualCents) + "/yr")
                         }
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isInspected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surface.copy(alpha = 0f),
-                    border = if (isInspected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = member.name,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                    }
+                    SelectableListRow(
+                        title = member.name,
+                        subtitle = subtitleParts.joinToString(" • ").ifBlank { null },
+                        isSelected = isInspected,
+                        onClick = {
+                            if (onInspectMember != null) {
+                                onInspectMember(member)
+                            } else {
+                                onEditMember(member)
+                            }
+                        },
+                        trailingContent = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                OrbitBadge(
+                                    text = member.role.replaceFirstChar { it.uppercase() },
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
-                                Spacer(modifier = Modifier.size(8.dp))
-                                Surface(
-                                    shape = MaterialTheme.shapes.extraSmall,
-                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                IconButton(
+                                    onClick = { onEditMember(member) },
+                                    modifier = Modifier.size(32.dp)
                                 ) {
-                                    Text(
-                                        text = member.role.replaceFirstChar { it.uppercase() },
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit member",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { onDeleteMember(member.id) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete member",
+                                        tint = MaterialTheme.colorScheme.outlineVariant,
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
-
-                            val subtitleParts = buildList {
-                                if (member.employer != null) add(member.employer)
-                                if (member.jobTitle != null) add(member.jobTitle)
-                                if (member.grossIncomeAnnualCents > 0L) {
-                                    add(MoneyUtils.formatCents(member.grossIncomeAnnualCents) + "/yr")
-                                }
-                            }
-                            if (subtitleParts.isNotEmpty()) {
-                                Text(
-                                    text = subtitleParts.joinToString(" • "),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
                         }
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { onEditMember(member) },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit member",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            IconButton(
-                                onClick = { onDeleteMember(member.id) },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete member",
-                                    tint = MaterialTheme.colorScheme.outlineVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
+                    )
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
             }
         }
     }

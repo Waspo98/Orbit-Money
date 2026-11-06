@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.NetWorthSnapshot
 import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import kotlin.math.abs
 
@@ -298,23 +299,9 @@ private fun BreakdownRow(
     amountCents: Long,
     isNegative: Boolean = false
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = MoneyUtils.formatCents(amountCents),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = if (isNegative && amountCents != 0L) OrbitColorTokens.Red else MaterialTheme.colorScheme.onSurface
-        )
-    }
+    OrbitMiniStatRow(
+        label = label,
+        value = MoneyUtils.formatCents(amountCents),
+        valueColor = if (isNegative && amountCents != 0L) OrbitColorTokens.Red else MaterialTheme.colorScheme.onSurface
+    )
 }

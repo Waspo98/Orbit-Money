@@ -25,7 +25,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,6 +47,7 @@ import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitAlertDialog
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.settings.blocks.AboutSettingsBlock
@@ -251,7 +251,7 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
+                    OrbitTextField(
                         value = uiState.backupExportJson ?: "",
                         onValueChange = {},
                         readOnly = true,
@@ -280,7 +280,7 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
+                    OrbitTextField(
                         value = uiState.restoreJsonText,
                         onValueChange = viewModel::setRestoreJsonText,
                         placeholder = { Text("Paste JSON here...") },

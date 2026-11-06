@@ -23,6 +23,8 @@ import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import kotlin.math.min
 import kotlin.math.roundToLong
@@ -142,13 +144,13 @@ private fun MemberContributionItem(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
             // Breakdown Rows
-            ContributionRow("Employee Savings", MoneyUtils.formatCents(empContribCents, showCents = false))
-            ContributionRow(
+            OrbitMiniStatRow("Employee Savings", MoneyUtils.formatCents(empContribCents, showCents = false))
+            OrbitMiniStatRow(
                 "Employer Match",
                 "${MoneyUtils.formatCents(matchCents, showCents = false)}${if (matchCap > 0L && uncappedMatchCents > matchCap) " (Cap Reached)" else ""}"
             )
             if (hsaCents > 0L) {
-                ContributionRow("HSA Annual Contribution", MoneyUtils.formatCents(hsaCents, showCents = false))
+                OrbitMiniStatRow("HSA Annual Contribution", MoneyUtils.formatCents(hsaCents, showCents = false))
             }
 
             // Linked Accounts Chips
@@ -165,44 +167,14 @@ private fun MemberContributionItem(
                 ) {
                     member.retirementAccounts.forEach { link ->
                         val acct = accountMap[link.accountId]
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh
-                        ) {
-                            Text(
-                                text = "${link.accountKind.uppercase()}: ${acct?.name ?: "Account #${link.accountId}"}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
+                        OrbitBadge(
+                            text = "${link.accountKind.uppercase()}: ${acct?.name ?: "Account #${link.accountId}"}",
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun ContributionRow(
-    label: String,
-    value: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
     }
 }

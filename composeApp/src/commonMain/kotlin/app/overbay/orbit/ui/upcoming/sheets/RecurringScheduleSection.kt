@@ -18,31 +18,27 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.AmountStrategy
 import app.overbay.orbit.data.model.RecurrenceFrequency
-import app.overbay.orbit.data.model.RecurrenceRule
 import app.overbay.orbit.data.model.UpcomingKind
 import app.overbay.orbit.data.model.UpcomingStatus
-import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecurringKindSelector(
     selectedKind: UpcomingKind,
@@ -52,7 +48,7 @@ fun RecurringKindSelector(
     val haptics = LocalOrbitHaptics.current
     val kinds = listOf(
         UpcomingKind.BILL to "Bill",
-        UpcomingKind.SUBSCRIPTION to "Subscription",
+        UpcomingKind.SUBSCRIPTION to "Sub",
         UpcomingKind.GIVING to "Giving",
         UpcomingKind.INCOME to "Income"
     )
@@ -65,54 +61,31 @@ fun RecurringKindSelector(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(6.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            kinds.forEach { (kind, label) ->
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            kinds.forEachIndexed { index, (kind, label) ->
                 val isSelected = selectedKind == kind
-                Surface(
+                SegmentedButton(
+                    selected = isSelected,
                     onClick = {
                         haptics.tick()
                         onKindSelected(kind)
                     },
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isSelected) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerLow
-                    },
-                    border = BorderStroke(
-                        width = if (isSelected) 1.5.dp else 1.dp,
-                        color = if (isSelected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                        }
-                    ),
-                    modifier = Modifier.weight(1f).height(38.dp)
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = kinds.size),
+                    icon = {},
+                    label = {
                         Text(
                             text = label,
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            }
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
                     }
-                }
+                )
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecurringAmountStrategySection(
     amountStrategy: AmountStrategy,
@@ -122,6 +95,11 @@ fun RecurringAmountStrategySection(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
+    val strategies = listOf(
+        AmountStrategy.FIXED to "Fixed Amount",
+        AmountStrategy.HISTORY_AVERAGE to "History Average"
+    )
+    val lookbackWindows = listOf(3, 6, 12)
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -132,50 +110,25 @@ fun RecurringAmountStrategySection(
         )
         Spacer(modifier = Modifier.height(6.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val isFixed = amountStrategy == AmountStrategy.FIXED
-            Surface(
-                onClick = {
-                    haptics.tick()
-                    onStrategyChanged(AmountStrategy.FIXED)
-                },
-                shape = RoundedCornerShape(12.dp),
-                color = if (isFixed) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
-                border = BorderStroke(1.dp, if (isFixed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                modifier = Modifier.weight(1f).height(38.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "Fixed Amount",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (isFixed) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isFixed) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-
-            val isAvg = amountStrategy == AmountStrategy.HISTORY_AVERAGE
-            Surface(
-                onClick = {
-                    haptics.tick()
-                    onStrategyChanged(AmountStrategy.HISTORY_AVERAGE)
-                },
-                shape = RoundedCornerShape(12.dp),
-                color = if (isAvg) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
-                border = BorderStroke(1.dp, if (isAvg) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                modifier = Modifier.weight(1f).height(38.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "History Average",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (isAvg) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isAvg) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                    )
-                }
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            strategies.forEachIndexed { index, (strategy, label) ->
+                val isSelected = amountStrategy == strategy
+                SegmentedButton(
+                    selected = isSelected,
+                    onClick = {
+                        haptics.tick()
+                        onStrategyChanged(strategy)
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = strategies.size),
+                    icon = {},
+                    label = {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                )
             }
         }
 
@@ -191,27 +144,25 @@ fun RecurringAmountStrategySection(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(3, 6, 12).forEach { months ->
+                SingleChoiceSegmentedButtonRow {
+                    lookbackWindows.forEachIndexed { index, months ->
                         val isSel = lookbackMonths == months
-                        Surface(
+                        SegmentedButton(
+                            selected = isSel,
                             onClick = {
                                 haptics.tick()
                                 onLookbackChanged(months)
                             },
-                            shape = CircleShape,
-                            color = if (isSel) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
-                            border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                            modifier = Modifier.height(28.dp)
-                        ) {
-                            Text(
-                                text = "$months Months",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSel) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = lookbackWindows.size),
+                            icon = {},
+                            label = {
+                                Text(
+                                    text = "${months}M",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        )
                     }
                 }
             }
@@ -260,6 +211,7 @@ fun RecurringCustomScheduleFields(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecurringStatusAndNotesSection(
     status: UpcomingStatus,
@@ -269,6 +221,10 @@ fun RecurringStatusAndNotesSection(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
+    val statuses = listOf(
+        UpcomingStatus.ACTIVE to "Active",
+        UpcomingStatus.PAUSED to "Paused"
+    )
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -283,44 +239,24 @@ fun RecurringStatusAndNotesSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val isActive = status == UpcomingStatus.ACTIVE
-                Surface(
-                    onClick = {
-                        haptics.tick()
-                        onStatusChanged(UpcomingStatus.ACTIVE)
-                    },
-                    shape = CircleShape,
-                    color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = BorderStroke(1.dp, if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                    modifier = Modifier.height(30.dp)
-                ) {
-                    Text(
-                        text = "Active",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
-
-                val isPaused = status == UpcomingStatus.PAUSED
-                Surface(
-                    onClick = {
-                        haptics.tick()
-                        onStatusChanged(UpcomingStatus.PAUSED)
-                    },
-                    shape = CircleShape,
-                    color = if (isPaused) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = BorderStroke(1.dp, if (isPaused) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                    modifier = Modifier.height(30.dp)
-                ) {
-                    Text(
-                        text = "Paused",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (isPaused) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isPaused) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+            SingleChoiceSegmentedButtonRow {
+                statuses.forEachIndexed { index, (st, label) ->
+                    val isSelected = status == st
+                    SegmentedButton(
+                        selected = isSelected,
+                        onClick = {
+                            haptics.tick()
+                            onStatusChanged(st)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = statuses.size),
+                        icon = {},
+                        label = {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
                     )
                 }
             }

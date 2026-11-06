@@ -27,7 +27,9 @@ import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MhaTaxCalculationResult
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitStatTile
 import app.overbay.orbit.ui.components.RollingTickerCents
 
 @Composable
@@ -70,18 +72,11 @@ fun MhaTaxSavingsCard(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Text(
-                        text = "$effectiveRatePercent% Rate",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
+                OrbitBadge(
+                    text = "$effectiveRatePercent% Rate",
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -91,22 +86,25 @@ fun MhaTaxSavingsCard(
                 val fedRate = ((taxResult?.federalMarginalRate ?: 0.0) * 100).toInt()
                 val stRate = (((taxResult?.stateRate ?: 0.0) * 10000).toLong() / 100.0)
 
-                TaxBreakdownColumn(
+                OrbitStatTile(
                     label = "Federal Savings",
-                    amountCents = fedSavings,
+                    value = MoneyUtils.formatCents(fedSavings),
                     subtitle = "Marginal rate: $fedRate%",
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.weight(1f)
                 )
-                TaxBreakdownColumn(
+                OrbitStatTile(
                     label = "State Savings (${taxProfile.state})",
-                    amountCents = stateSavings,
+                    value = MoneyUtils.formatCents(stateSavings),
                     subtitle = "State rate: $stRate%",
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.weight(1f)
                 )
-                TaxBreakdownColumn(
+                OrbitStatTile(
                     label = "Projected Full Year",
-                    amountCents = projectedAnnualSavingsCents,
+                    value = MoneyUtils.formatCents(projectedAnnualSavingsCents),
                     subtitle = "Extrapolated to Dec 31",
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -147,28 +145,6 @@ fun MhaTaxSavingsCard(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun TaxBreakdownColumn(
-    label: String,
-    amountCents: Cents,
-    subtitle: String,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = modifier
-    ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(MoneyUtils.formatCents(amountCents), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
         }
     }
 }

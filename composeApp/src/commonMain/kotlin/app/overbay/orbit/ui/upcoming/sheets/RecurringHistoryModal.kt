@@ -37,6 +37,8 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
@@ -167,77 +169,46 @@ fun RecurringHistoryModal(
                         val cat = txn.effectiveCategoryId?.let { categoryMap[it] }
                         val acct = accountMap[txn.accountId]
                         val isNegative = txn.effectiveAmountCents < 0L
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = txn.effectiveDate,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        val badgeColor = when (match.matchTier) {
-                                            "HIGH" -> MaterialTheme.colorScheme.primaryContainer
-                                            "MEDIUM" -> MaterialTheme.colorScheme.secondaryContainer
-                                            else -> MaterialTheme.colorScheme.surfaceContainerHighest
-                                        }
-                                        val textColor = when (match.matchTier) {
-                                            "HIGH" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                            "MEDIUM" -> MaterialTheme.colorScheme.onSecondaryContainer
-                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                        }
-                                        Surface(shape = CircleShape, color = badgeColor) {
-                                            Text(
-                                                text = "${match.matchScore}% Match",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = textColor,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(2.dp))
-
-                                    val subtitle = listOfNotNull(
-                                        acct?.name,
-                                        cat?.labelWithEmoji
-                                    ).joinToString(" • ")
-
-                                    if (subtitle.isNotBlank()) {
-                                        Text(
-                                            text = subtitle,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
-                                Text(
-                                    text = "${if (isNegative) "-" else "+"}${MoneyUtils.formatCents(abs(txn.effectiveAmountCents))}",
-                                    style = TabularNumStyle.copy(
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isNegative) OrbitTheme.colors.expense else OrbitTheme.colors.income
-                                    )
-                                )
-                            }
+                        val badgeColor = when (match.matchTier) {
+                            "HIGH" -> MaterialTheme.colorScheme.primaryContainer
+                            "MEDIUM" -> MaterialTheme.colorScheme.secondaryContainer
+                            else -> MaterialTheme.colorScheme.surfaceContainerHighest
                         }
+                        val textColor = when (match.matchTier) {
+                            "HIGH" -> MaterialTheme.colorScheme.onPrimaryContainer
+                            "MEDIUM" -> MaterialTheme.colorScheme.onSecondaryContainer
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        val subtitle = listOfNotNull(
+                            acct?.name,
+                            cat?.labelWithEmoji
+                        ).joinToString(" • ").ifBlank { null }
+
+                        OrbitCompactListRow(
+                            title = txn.effectiveDate,
+                            subtitle = subtitle,
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            trailingContent = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OrbitBadge(
+                                        text = "${match.matchScore}% Match",
+                                        containerColor = badgeColor,
+                                        contentColor = textColor
+                                    )
+                                    Text(
+                                        text = "${if (isNegative) "-" else "+"}${MoneyUtils.formatCents(abs(txn.effectiveAmountCents))}",
+                                        style = TabularNumStyle.copy(
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isNegative) OrbitTheme.colors.expense else OrbitTheme.colors.income
+                                        )
+                                    )
+                                }
+                            }
+                        )
                     }
                 }
             }

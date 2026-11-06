@@ -43,9 +43,11 @@ import app.overbay.orbit.data.model.UpcomingStatus
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitAmountTypeCard
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.datetime.LocalDate
@@ -114,50 +116,23 @@ fun RecurringItemEditorContent(
             .padding(horizontal = 20.dp, vertical = 12.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (isEditing) "Edit Recurring Schedule" else "New Recurring Schedule",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            if (item != null && item.id > 0L) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .clickable {
+        OrbitSheetHeader(
+            title = if (isEditing) "Edit Recurring Schedule" else "New Recurring Schedule",
+            onDismiss = onDismiss,
+            trailingActions = {
+                if (item != null && item.id > 0L) {
+                    OrbitActionChip(
+                        label = "Delete",
+                        leadingIcon = Icons.Default.Delete,
+                        isDestructive = true,
+                        onClick = {
                             haptics.reject()
                             onDelete(item.id)
                         }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete Schedule",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Delete",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
+                    )
                 }
             }
-        }
+        )
 
         Spacer(modifier = Modifier.height(14.dp))
 

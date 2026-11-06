@@ -23,7 +23,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -39,7 +38,9 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.mha.MhaTransactionItem
 import app.overbay.orbit.ui.mha.MhaTransactionTabFilter
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -71,7 +72,7 @@ fun MhaTransactionsTab(
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
             // Search Input
-            OutlinedTextField(
+            OrbitTextField(
                 value = searchQuery,
                 onValueChange = onSearchChange,
                 placeholder = { Text("Search housing merchant or notes...") },
@@ -84,7 +85,6 @@ fun MhaTransactionsTab(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(999.dp),
                 singleLine = true
             )
 
@@ -190,19 +190,11 @@ private fun MhaTransactionRow(
                             )
                             if (item.isExplicitOverride) {
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer
-                                ) {
-                                    Text(
-                                        text = "USER",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                    )
-                                }
+                                OrbitBadge(
+                                    text = "USER",
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
                             }
                         }
                         Spacer(modifier = Modifier.height(2.dp))

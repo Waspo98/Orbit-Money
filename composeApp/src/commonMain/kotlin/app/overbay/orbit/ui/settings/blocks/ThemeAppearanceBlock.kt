@@ -2,7 +2,8 @@ package app.overbay.orbit.ui.settings.blocks
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -12,10 +13,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -25,7 +24,7 @@ import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ThemeAppearanceBlock(
     preferences: OrbitPreferences,
@@ -102,27 +101,19 @@ fun ThemeAppearanceBlock(
         )
         Spacer(modifier = Modifier.height(6.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            val presets = OrbitThemePreset.entries
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                presets.take(3).forEach { preset ->
-                    FilterChip(
-                        selected = preferences.themePreset == preset,
-                        onClick = { onPresetChange(preset) },
-                        label = { Text(preset.displayName) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                presets.drop(3).forEach { preset ->
-                    FilterChip(
-                        selected = preferences.themePreset == preset,
-                        onClick = { onPresetChange(preset) },
-                        label = { Text(preset.displayName) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            maxItemsInEachRow = 3
+        ) {
+            OrbitThemePreset.entries.forEach { preset ->
+                FilterChip(
+                    selected = preferences.themePreset == preset,
+                    onClick = { onPresetChange(preset) },
+                    label = { Text(preset.displayName) },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 

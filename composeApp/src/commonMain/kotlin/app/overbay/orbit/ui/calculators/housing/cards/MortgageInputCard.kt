@@ -21,7 +21,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -43,6 +42,7 @@ import app.overbay.orbit.ui.calculators.housing.HousingUiState
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitTextField
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -132,21 +132,21 @@ fun MortgageInputCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    OutlinedTextField(
+                    OrbitTextField(
                         value = uiState.agentCommissionPercent.toString(),
                         onValueChange = { onAgentCommissionChange(it.toDoubleOrNull() ?: 0.0) },
                         label = { Text("Agent Comm. %") },
                         modifier = Modifier.weight(1f),
                         singleLine = true
                     )
-                    OutlinedTextField(
+                    OrbitTextField(
                         value = uiState.sellerClosingPercent.toString(),
                         onValueChange = { onSellerClosingChange(it.toDoubleOrNull() ?: 0.0) },
                         label = { Text("Seller Closing %") },
                         modifier = Modifier.weight(1f),
                         singleLine = true
                     )
-                    OutlinedTextField(
+                    OrbitTextField(
                         value = uiState.buyerClosingPercent.toString(),
                         onValueChange = { onBuyerClosingChange(it.toDoubleOrNull() ?: 0.0) },
                         label = { Text("Buyer Closing %") },
@@ -225,7 +225,7 @@ fun MortgageInputCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
+            OrbitTextField(
                 value = uiState.interestRatePercent.toString(),
                 onValueChange = { str ->
                     val clean = str.toDoubleOrNull() ?: 0.0
@@ -278,7 +278,7 @@ fun MortgageInputCard(
 
                 if (isCustomTerm) {
                     Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
+                    OrbitTextField(
                         value = customYearsInput,
                         onValueChange = { str ->
                             customYearsInput = str

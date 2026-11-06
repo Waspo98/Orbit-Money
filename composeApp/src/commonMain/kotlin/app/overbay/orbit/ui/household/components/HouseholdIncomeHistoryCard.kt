@@ -38,6 +38,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSectionCard
@@ -92,65 +93,33 @@ fun HouseholdIncomeHistoryCard(
             ) {
                 sortedRecords.forEach { record ->
                     val memberName = memberMap[record.memberId]?.name ?: "Member #${record.memberId}"
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
+                    val subtitleText = buildString {
+                        append("Effective ${record.effectiveDate}")
+                        if (!record.notes.isNullOrBlank()) {
+                            append(" • ${record.notes}")
+                        }
+                    }
+                    OrbitCompactListRow(
+                        title = memberName,
+                        subtitle = subtitleText,
+                        trailingContent = {
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "${MoneyUtils.formatCents(record.grossIncomeAnnualCents, showCents = false)} / yr",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                if (record.netPayPerPeriodCents > 0L) {
                                     Text(
-                                        text = memberName,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "Effective ${record.effectiveDate}",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        text = "${MoneyUtils.formatCents(record.netPayPerPeriodCents, showCents = false)} / period",
+                                        style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.outline
                                     )
                                 }
-
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = "${MoneyUtils.formatCents(record.grossIncomeAnnualCents, showCents = false)} / yr",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    if (record.netPayPerPeriodCents > 0L) {
-                                        Text(
-                                            text = "${MoneyUtils.formatCents(record.netPayPerPeriodCents, showCents = false)} / period",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.outline
-                                        )
-                                    }
-                                }
-                            }
-
-                            if (!record.notes.isNullOrBlank()) {
-                                HorizontalDivider(
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                                    modifier = Modifier.padding(vertical = 4.dp)
-                                )
-                                Text(
-                                    text = record.notes,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                             }
                         }
-                    }
+                    )
                 }
             }
         }

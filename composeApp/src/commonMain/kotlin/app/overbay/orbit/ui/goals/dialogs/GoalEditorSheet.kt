@@ -19,14 +19,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,7 +52,9 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.goals.components.GoalAllocationRowEditor
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -82,6 +87,7 @@ fun GoalEditorSheet(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalEditorContent(
     goal: Goal?,
@@ -135,50 +141,23 @@ fun GoalEditorContent(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // Top Header Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (isEditing) "Edit Savings Goal" else "New Savings Goal",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            if (goal != null && goal.id > 0L) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .clickable {
+        OrbitSheetHeader(
+            title = if (isEditing) "Edit Savings Goal" else "New Savings Goal",
+            onDismiss = onDismiss,
+            trailingActions = {
+                if (goal != null && goal.id > 0L) {
+                    OrbitActionChip(
+                        label = "Delete",
+                        leadingIcon = Icons.Default.Delete,
+                        isDestructive = true,
+                        onClick = {
                             haptics.reject()
                             onDelete(goal.id)
                         }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete Goal",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Delete",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
+                    )
                 }
             }
-        }
+        )
 
         // Preset Chips
         Row(
@@ -189,38 +168,26 @@ fun GoalEditorContent(
         ) {
             GOAL_PRESETS.forEach { preset ->
                 val isSelected = selectedKind == preset.kind
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    border = BorderStroke(
-                        if (isSelected) 1.5.dp else 1.dp,
-                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                    ),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable {
-                            haptics.tick()
-                            selectedKind = preset.kind
-                            selectedIcon = preset.emoji
-                            if (preset.kind != "custom" && (name.isBlank() || GOAL_PRESETS.any { it.label == name })) {
-                                name = preset.label
-                            }
+                FilterChip(
+                    selected = isSelected,
+                    onClick = {
+                        haptics.tick()
+                        selectedKind = preset.kind
+                        selectedIcon = preset.emoji
+                        if (preset.kind != "custom" && (name.isBlank() || GOAL_PRESETS.any { it.label == name })) {
+                            name = preset.label
                         }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(text = preset.emoji, style = MaterialTheme.typography.bodyMedium)
+                    },
+                    leadingIcon = { Text(text = preset.emoji, style = MaterialTheme.typography.bodyMedium) },
+                    label = {
                         Text(
                             text = preset.label,
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
-                    }
-                }
+                    },
+                    shape = RoundedCornerShape(14.dp)
+                )
             }
         }
 
@@ -267,36 +234,29 @@ fun GoalEditorContent(
         }
 
         // Target Date Mode Toggle: Target Date vs Ongoing
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Timeline Mode:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                FilterChip(
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
                     selected = !isOngoing,
                     onClick = {
                         haptics.tick()
                         isOngoing = false
                         if (targetDate == null) targetDate = LocalDateUtils.todayLocalDate()
                     },
-                    label = { Text("Target Date") },
-                    shape = RoundedCornerShape(8.dp)
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    icon = {},
+                    label = { Text("Target Date", style = MaterialTheme.typography.labelMedium) }
                 )
-                FilterChip(
+                SegmentedButton(
                     selected = isOngoing,
                     onClick = {
                         haptics.tick()
                         isOngoing = true
                         targetDate = null
                     },
-                    label = { Text("Ongoing / Open-Ended") },
-                    shape = RoundedCornerShape(8.dp)
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    icon = {},
+                    label = { Text("Ongoing / Open-Ended", style = MaterialTheme.typography.labelMedium) }
                 )
             }
 

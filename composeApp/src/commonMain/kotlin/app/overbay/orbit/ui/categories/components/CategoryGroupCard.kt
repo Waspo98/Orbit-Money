@@ -36,9 +36,12 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.categories.CategoryGroupDisplay
 import app.overbay.orbit.ui.categories.CategorySummary
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitDragHandle
+import app.overbay.orbit.ui.components.SelectableListRow
 import app.overbay.orbit.ui.components.dragReorderItem
 import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -160,124 +163,68 @@ private fun CategoryRowItem(
     modifier: Modifier = Modifier
 ) {
     val cat = summary.category
-    val catColor = try {
-        val hex = cat.color.trim().removePrefix("#")
-        Color(hex.toLong(16) or 0xFF000000)
-    } catch (_: Exception) {
-        MaterialTheme.colorScheme.primary
-    }
-
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = if (isInspected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surface,
-        border = if (isInspected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (dragHandle != null) {
-                dragHandle()
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-
-            // Tinted Emoji Badge
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(catColor.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = cat.displayEmoji ?: "#",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = catColor
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Category Name & Details
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = cat.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    if (cat.mhaDefaultEligible) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
-                        ) {
-                            Text(
-                                text = "MHA",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = "${summary.transactionCount} txns",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (summary.ruleCount > 0) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
-                        ) {
-                            Text(
-                                text = "${summary.ruleCount} rule${if (summary.ruleCount == 1) "" else "s"}",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // Total Spend in this category
-            Text(
-                text = MoneyUtils.formatCents(summary.totalAmountCents),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.width(4.dp))
-
-            // Edit icon
-            IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "Edit",
-                    tint = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
+    val catColor = cat.color.toComposeColor(MaterialTheme.colorScheme.primary)
+    val subtitle = buildString {
+        append("${summary.transactionCount} txns")
+        if (summary.ruleCount > 0) {
+            append(" • ${summary.ruleCount} rule${if (summary.ruleCount == 1) "" else "s"}")
         }
     }
+
+    SelectableListRow(
+        title = cat.name,
+        subtitle = subtitle,
+        isSelected = isInspected,
+        onClick = onClick,
+        modifier = modifier,
+        leadingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (dragHandle != null) {
+                    dragHandle()
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(catColor.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = cat.displayEmoji ?: "#",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = catColor
+                    )
+                }
+            }
+        },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (cat.mhaDefaultEligible) {
+                    OrbitBadge(
+                        text = "MHA",
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(
+                    text = MoneyUtils.formatCents(summary.totalAmountCents),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit",
+                        tint = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    )
 }

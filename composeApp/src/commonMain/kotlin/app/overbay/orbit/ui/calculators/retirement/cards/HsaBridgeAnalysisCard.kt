@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HsaBridgeAnalysis
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
 @Composable
@@ -35,26 +38,11 @@ fun HsaBridgeAnalysisCard(
         modifier = modifier
     ) {
         if (hsaBridge == null || hsaBridge.bridgeYears <= 0) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = "No Early-Retirement Bridge Required",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Your target retirement age (${retirementAge.toInt()}) is at or above 65. All HSA distributions for any purpose can be taken penalty-free starting at age 65.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-            }
+            EmptyStateCard(
+                title = "No Early-Retirement Bridge Required",
+                description = "Your target retirement age (${retirementAge.toInt()}) is at or above 65. All HSA distributions for any purpose can be taken penalty-free starting at age 65.",
+                modifier = Modifier.padding(top = 8.dp)
+            )
             return@OrbitSectionCard
         }
 
@@ -92,18 +80,11 @@ fun HsaBridgeAnalysisCard(
                         )
                     }
 
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (hsaBridge.isBridgeCovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                    ) {
-                        Text(
-                            text = if (hsaBridge.isBridgeCovered) "Covered" else "-${MoneyUtils.formatCents(hsaBridge.shortfallCents, showCents = false)} Short",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.surface,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
+                    OrbitBadge(
+                        text = if (hsaBridge.isBridgeCovered) "Covered" else "-${MoneyUtils.formatCents(hsaBridge.shortfallCents, showCents = false)} Short",
+                        containerColor = if (hsaBridge.isBridgeCovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.surface
+                    )
                 }
             }
 
@@ -116,22 +97,22 @@ fun HsaBridgeAnalysisCard(
             ) {
                 Column(
                     modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    BridgeMetricRow(
+                    OrbitMiniStatRow(
                         label = "Bridge Duration",
                         value = "${hsaBridge.bridgeYears} Years (Age ${retirementAge.toInt()} -> 65)"
                     )
-                    BridgeMetricRow(
+                    OrbitMiniStatRow(
                         label = "Total Bridge Need",
                         value = MoneyUtils.formatCents(hsaBridge.bridgeNeedCents, showCents = false)
                     )
-                    BridgeMetricRow(
+                    OrbitMiniStatRow(
                         label = "Projected Non-HSA at Retirement",
                         value = MoneyUtils.formatCents(hsaBridge.projectedNonHsaAtRetirementCents, showCents = false),
-                        isEmphasized = true
+                        valueColor = MaterialTheme.colorScheme.primary
                     )
-                    BridgeMetricRow(
+                    OrbitMiniStatRow(
                         label = "Projected HSA at Retirement (Preserved)",
                         value = MoneyUtils.formatCents(hsaBridge.projectedHsaAtRetirementCents, showCents = false)
                     )
@@ -145,30 +126,5 @@ fun HsaBridgeAnalysisCard(
                 color = MaterialTheme.colorScheme.outline
             )
         }
-    }
-}
-
-@Composable
-private fun BridgeMetricRow(
-    label: String,
-    value: String,
-    isEmphasized: Boolean = false
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = if (isEmphasized) FontWeight.Bold else FontWeight.SemiBold,
-            color = if (isEmphasized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-        )
     }
 }

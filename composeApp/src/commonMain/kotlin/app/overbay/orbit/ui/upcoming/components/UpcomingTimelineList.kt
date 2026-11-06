@@ -42,7 +42,9 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.ProjectedAmountResult
 import app.overbay.orbit.domain.UpcomingScheduleHelper
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.upcoming.UpcomingFilterOption
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
@@ -143,12 +145,7 @@ private fun UpcomingItemRow(
     val amountColor = if (isExpense) OrbitTheme.colors.expense else OrbitTheme.colors.income
     val effectiveAmountCents = projected?.amountCents ?: item.amountCents
 
-    val catColor = try {
-        val hex = category?.color?.trim()?.removePrefix("#") ?: "9E9E9E"
-        Color(hex.toLong(16) or 0xFF000000)
-    } catch (_: Exception) {
-        MaterialTheme.colorScheme.primary
-    }
+    val catColor = category?.color.toComposeColor(MaterialTheme.colorScheme.primary)
 
     val rowBgColor = if (isInspected) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
@@ -201,19 +198,11 @@ private fun UpcomingItemRow(
                         if (item.kind == UpcomingKind.GIVING || item.kind == UpcomingKind.SUBSCRIPTION) {
                             Spacer(modifier = Modifier.width(6.dp))
                             val kindLabel = if (item.kind == UpcomingKind.GIVING) "Giving" else "Sub"
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
-                            ) {
-                                Text(
-                                    text = kindLabel,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
+                            OrbitBadge(
+                                text = kindLabel,
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
                         }
                     }
 
@@ -229,18 +218,11 @@ private fun UpcomingItemRow(
 
                     if (projected?.isProjectedAverage == true) {
                         Spacer(modifier = Modifier.height(3.dp))
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest
-                        ) {
-                            Text(
-                                text = "Projected from ${projected.sampleCount} transactions",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
+                        OrbitBadge(
+                            text = "Projected from ${projected.sampleCount} transactions",
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }

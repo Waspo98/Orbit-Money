@@ -39,7 +39,8 @@ import app.overbay.orbit.ui.budgets.components.NotablePanel
 import app.overbay.orbit.ui.budgets.components.budgetCategoryGroupItems
 import app.overbay.orbit.ui.budgets.dialogs.AddBudgetCategorySheet
 import app.overbay.orbit.ui.budgets.dialogs.BudgetAmountEditorSheet
-import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.CanopyMenuAction
+import app.overbay.orbit.ui.components.CanopyMoreMenuButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
@@ -87,7 +88,6 @@ fun BudgetsScreen(
                     .padding(paddingValues)
                     .nestedScroll(heroScrollState.nestedScrollConnection)
             ) {
-                var sortMenuExpanded by remember { mutableStateOf(false) }
                 var monthMenuExpanded by remember { mutableStateOf(false) }
 
                 MorphingPageHero(
@@ -153,55 +153,25 @@ fun BudgetsScreen(
                             }
                         }
 
-                        Box {
-                            CanopyIconButton(
-                                icon = OrbitIcons.Filter,
-                                contentDescription = "Filter & Sort Budgets",
-                                onClick = { sortMenuExpanded = true },
-                                buttonSize = barHeight,
-                                isActive = state.sortOption != CategorySortOption.OVER_BUDGET_FIRST
-                            )
-
-                            if (sortMenuExpanded) {
-                                DropdownMenu(
-                                    expanded = true,
-                                    onDismissRequest = { sortMenuExpanded = false }
-                                ) {
-                                    val sortOptions = listOf(
-                                        CategorySortOption.OVER_BUDGET_FIRST to "Over Budget First",
-                                        CategorySortOption.LEAST_ROOM_LEFT to "Least Room Left",
-                                        CategorySortOption.MOST_SPENT to "Most Spent",
-                                        CategorySortOption.NAME_A_TO_Z to "Name A-Z"
-                                    )
-                                    sortOptions.forEach { (option, label) ->
-                                        val selected = state.sortOption == option
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = label,
-                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                                )
-                                            },
-                                            trailingIcon = if (selected) {
-                                                {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Check,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                }
-                                            } else null,
-                                            onClick = {
-                                                viewModel.setSortOption(option)
-                                                sortMenuExpanded = false
-                                            }
-                                        )
-                                    }
-                                }
+                        val sortOptions = listOf(
+                            CategorySortOption.OVER_BUDGET_FIRST to "Over Budget First",
+                            CategorySortOption.LEAST_ROOM_LEFT to "Least Room Left",
+                            CategorySortOption.MOST_SPENT to "Most Spent",
+                            CategorySortOption.NAME_A_TO_Z to "Name A-Z"
+                        )
+                        CanopyMoreMenuButton(
+                            buttonSize = barHeight,
+                            icon = OrbitIcons.Filter,
+                            contentDescription = "Filter & Sort Budgets",
+                            isActive = state.sortOption != CategorySortOption.OVER_BUDGET_FIRST,
+                            actions = sortOptions.map { (option, label) ->
+                                CanopyMenuAction(
+                                    label = label,
+                                    isChecked = state.sortOption == option,
+                                    onClick = { viewModel.setSortOption(option) }
+                                )
                             }
-                        }
+                        )
 
                         CanopySettingsButton(
                             buttonSize = barHeight,

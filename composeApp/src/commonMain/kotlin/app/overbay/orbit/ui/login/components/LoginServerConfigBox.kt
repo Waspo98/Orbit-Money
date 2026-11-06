@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.components.OrbitFormDefaults
 import app.overbay.orbit.ui.login.LoginIntent
 import app.overbay.orbit.ui.login.LoginUiState
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -113,7 +114,8 @@ fun LoginServerUrlStep(
                     onIntent(LoginIntent.ConnectAndSaveServer)
                 }
             ),
-            shape = RoundedCornerShape(12.dp),
+            shape = OrbitFormDefaults.FieldShape,
+            colors = OrbitFormDefaults.textFieldColors(),
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester)

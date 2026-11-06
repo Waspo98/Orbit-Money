@@ -46,8 +46,10 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitAmountTypeCard
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.transactions.components.TransactionOptionsBlock
 import app.overbay.orbit.ui.transactions.components.TransactionProvenanceCard
@@ -114,102 +116,39 @@ fun TransactionEditorContent(
             .verticalScroll(rememberScrollState())
     ) {
         // Title Header + Top-Right Quick Actions (Import CSV when new, Split & Delete when editing)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (isEditing) "Edit Transaction" else "New Transaction",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            if (!isEditing && onImportCsv != null) {
-                OutlinedButton(
-                    onClick = {
-                        haptics.tick()
-                        onImportCsv()
-                    },
-                    shape = CircleShape,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                    modifier = Modifier.height(34.dp)
-                ) {
-                    Text(
-                        text = "Import CSV",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold
+        OrbitSheetHeader(
+            title = if (isEditing) "Edit Transaction" else "New Transaction",
+            onDismiss = onDismiss,
+            trailingActions = {
+                if (!isEditing && onImportCsv != null) {
+                    OrbitActionChip(
+                        label = "Import CSV",
+                        onClick = {
+                            haptics.tick()
+                            onImportCsv()
+                        }
+                    )
+                } else if (transaction != null && transaction.id > 0L) {
+                    OrbitActionChip(
+                        label = "Split",
+                        leadingIcon = Icons.Default.Share,
+                        onClick = {
+                            haptics.tick()
+                            onSplit(transaction.id)
+                        }
+                    )
+                    OrbitActionChip(
+                        label = "Delete",
+                        leadingIcon = Icons.Default.Delete,
+                        isDestructive = true,
+                        onClick = {
+                            haptics.reject()
+                            onDelete(transaction.id)
+                        }
                     )
                 }
-            } else if (transaction != null && transaction.id > 0L) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .clickable {
-                                haptics.tick()
-                                onSplit(transaction.id)
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Split",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = "Split",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .clickable {
-                                haptics.reject()
-                                onDelete(transaction.id)
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete",
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Delete",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                }
             }
-        }
+        )
 
         // Compact Provenance Pill (if imported original values exist)
         if (transaction != null && transaction.id > 0L) {

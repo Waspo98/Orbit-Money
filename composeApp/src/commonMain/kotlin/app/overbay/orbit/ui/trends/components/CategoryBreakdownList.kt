@@ -29,6 +29,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -129,17 +130,11 @@ fun CategoryBreakdownList(
                         // Over budget badge if applicable
                         if (trend.overBudgetMonthCount > 0) {
                             Spacer(modifier = Modifier.height(4.dp))
-                            Surface(
-                                shape = RoundedCornerShape(999.dp),
-                                color = OrbitColorTokens.Red.copy(alpha = 0.12f)
-                            ) {
-                                Text(
-                                    text = "${trend.overBudgetMonthCount} mo over budget",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = OrbitColorTokens.Red,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                )
-                            }
+                            OrbitBadge(
+                                text = "${trend.overBudgetMonthCount} mo over budget",
+                                containerColor = OrbitColorTokens.Red.copy(alpha = 0.12f),
+                                contentColor = OrbitColorTokens.Red
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(6.dp))

@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,7 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -194,49 +192,16 @@ fun GlobalStatusBanners(
                         }
                     }
 
-                    Surface(
-                        onClick = {
-                            haptics.tick()
-                            doNotWarnAgain = !doNotWarnAgain
+                    OrbitSwitchRow(
+                        title = if (distinctAccountLabels.size > 1) {
+                            "Do not warn me about these accounts again"
+                        } else {
+                            "Do not warn me about this account again"
                         },
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                Text(
-                                    text = if (distinctAccountLabels.size > 1) {
-                                        "Do not warn me about these accounts again"
-                                    } else {
-                                        "Do not warn me about this account again"
-                                    },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = distinctAccountLabels.joinToString(", "),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Switch(
-                                checked = doNotWarnAgain,
-                                onCheckedChange = { checked ->
-                                    haptics.tick()
-                                    doNotWarnAgain = checked
-                                }
-                            )
-                        }
-                    }
+                        subtitle = distinctAccountLabels.joinToString(", "),
+                        checked = doNotWarnAgain,
+                        onCheckedChange = { doNotWarnAgain = it }
+                    )
                 }
             },
             dismissButton = {

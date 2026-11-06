@@ -9,17 +9,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,7 +23,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.dragReorderItem
+import app.overbay.orbit.ui.components.rememberDragReorderState
 
 private data class NavCustomItem(val routeName: String, val title: String)
 
@@ -63,6 +62,12 @@ fun NavigationCustomizeBlock(
     }
 
     val currentRouteStrings = remember(orderedRoutes) { orderedRoutes.map { it.routeName } }
+    val reorderState = rememberDragReorderState(
+        items = orderedRoutes,
+        keySelector = { it.routeName },
+        onMove = { from, to -> onMoveRoute(from, to, currentRouteStrings) },
+        itemSpacingDp = 1.dp
+    )
 
     OrbitSectionCard(
         title = "Navigation & Feature Visibility",
@@ -84,56 +89,36 @@ fun NavigationCustomizeBlock(
             ) {
                 Column(modifier = Modifier.padding(vertical = 4.dp)) {
                     orderedRoutes.forEachIndexed { index, item ->
-                        val isVisible = !preferences.hiddenRouteNames.contains(item.routeName)
+                        key(item.routeName) {
+                            val isVisible = !preferences.hiddenRouteNames.contains(item.routeName)
 
-                        if (index > 0) {
-                            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = isVisible,
-                                onCheckedChange = { onToggleRouteHidden(item.routeName) }
-                            )
-
-                            Text(
-                                text = item.title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isVisible) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (isVisible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f).padding(start = 8.dp)
-                            )
-
-                            // Up button
-                            IconButton(
-                                onClick = { onMoveRoute(index, index - 1, currentRouteStrings) },
-                                enabled = index > 0,
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowUp,
-                                    contentDescription = "Move Up",
-                                    tint = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outlineVariant,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                            if (index > 0) {
+                                HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
                             }
 
-                            // Down button
-                            IconButton(
-                                onClick = { onMoveRoute(index, index + 1, currentRouteStrings) },
-                                enabled = index < orderedRoutes.lastIndex,
-                                modifier = Modifier.size(32.dp)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .dragReorderItem(reorderState, item.routeName)
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Move Down",
-                                    tint = if (index < orderedRoutes.lastIndex) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outlineVariant,
-                                    modifier = Modifier.size(20.dp)
+                                OrbitDragHandle(
+                                    state = reorderState,
+                                    key = item.routeName
+                                )
+
+                                Checkbox(
+                                    checked = isVisible,
+                                    onCheckedChange = { onToggleRouteHidden(item.routeName) }
+                                )
+
+                                Text(
+                                    text = item.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isVisible) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (isVisible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f).padding(start = 8.dp)
                                 )
                             }
                         }

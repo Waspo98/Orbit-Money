@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.retirement.RetirementUiState
+import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.RollingTickerCents
 import app.overbay.orbit.ui.components.charts.RetirementProjectionChart
@@ -132,68 +133,29 @@ fun RetirementProjectionHeroCard(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Coast FIRE Target Today",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = if (scenario.isCoastFireReached) "Coast FIRE Reached! 🎉" else MoneyUtils.formatCents(scenario.coastFireTargetCents),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (scenario.isCoastFireReached) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                    )
-                }
+                OrbitMiniStatRow(
+                    label = "Coast FIRE Target Today",
+                    value = if (scenario.isCoastFireReached) "Coast FIRE Reached! 🎉" else MoneyUtils.formatCents(scenario.coastFireTargetCents),
+                    valueColor = if (scenario.isCoastFireReached) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
 
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Portfolio Runway",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    val runwayText = if (scenario.depletionAge != null) {
-                        "Depletes at Age ${scenario.depletionAge.roundToInt()}"
-                    } else {
-                        "Sustainable Past Age ${uiState.runwayEndAge.toInt()} ♾️"
-                    }
-                    Text(
-                        text = runwayText,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (scenario.depletionAge != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                    )
+                val runwayText = if (scenario.depletionAge != null) {
+                    "Depletes at Age ${scenario.depletionAge.roundToInt()}"
+                } else {
+                    "Sustainable Past Age ${uiState.runwayEndAge.toInt()} ♾️"
                 }
+                OrbitMiniStatRow(
+                    label = "Portfolio Runway",
+                    value = runwayText,
+                    valueColor = if (scenario.depletionAge != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                )
 
                 if (scenario.earliestRetirementAge != null && scenario.earliestRetirementAge < uiState.retirementAge) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Earliest Achievable Retirement",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "Age ${scenario.earliestRetirementAge.roundToInt()}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
-                    }
+                    OrbitMiniStatRow(
+                        label = "Earliest Achievable Retirement",
+                        value = "Age ${scenario.earliestRetirementAge.roundToInt()}",
+                        valueColor = MaterialTheme.colorScheme.tertiary
+                    )
                 }
             }
         }

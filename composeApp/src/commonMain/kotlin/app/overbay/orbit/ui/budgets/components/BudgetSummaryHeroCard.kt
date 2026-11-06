@@ -24,6 +24,7 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitStatTile
 import kotlin.math.roundToInt
 
 /**
@@ -115,18 +116,18 @@ fun BudgetSummaryHeroCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Tile 1: Budgeted
-                SnapshotStatTile(
+                OrbitStatTile(
                     label = "BUDGETED",
-                    primaryText = "${MoneyUtils.formatCents(spentInBudget)} / ${MoneyUtils.formatCents(totalBudgeted)}",
+                    value = "${MoneyUtils.formatCents(spentInBudget)} / ${MoneyUtils.formatCents(totalBudgeted)}",
                     subText = "$budgetPercent% used",
                     subTextColor = if (spentInBudget > totalBudgeted && totalBudgeted > 0L) colors.danger else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
 
                 // Tile 2: Unbudgeted
-                SnapshotStatTile(
+                OrbitStatTile(
                     label = "UNBUDGETED",
-                    primaryText = MoneyUtils.formatCents(spentUnbudgeted),
+                    value = MoneyUtils.formatCents(spentUnbudgeted),
                     subText = "$unbudgetedPercent% of expenses",
                     modifier = Modifier.weight(1f)
                 )
@@ -139,72 +140,20 @@ fun BudgetSummaryHeroCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Tile 3: Cash Flow
-                SnapshotStatTile(
+                OrbitStatTile(
                     label = "CASH FLOW",
-                    primaryText = MoneyUtils.formatCents(netCashflow, signed = true),
-                    primaryColor = if (netCashflow >= 0L) colors.income else colors.danger,
+                    value = MoneyUtils.formatCents(netCashflow, signed = true),
+                    valueColor = if (netCashflow >= 0L) colors.income else colors.danger,
                     subText = "${MoneyUtils.formatCents(totalIncome)} income",
                     modifier = Modifier.weight(1f)
                 )
 
                 // Tile 4: Spend Pace
-                SnapshotStatTile(
+                OrbitStatTile(
                     label = "SPEND PACE",
-                    primaryText = "${MoneyUtils.formatCents(safeDailySpend)} / day",
+                    value = "${MoneyUtils.formatCents(safeDailySpend)} / day",
                     subText = "$daysRemaining days left",
                     modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SnapshotStatTile(
-    label: String,
-    primaryText: String,
-    modifier: Modifier = Modifier,
-    primaryColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
-    subText: String? = null,
-    subTextColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-        ) {
-            Text(
-                text = label.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.6.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = primaryText,
-                style = TabularNumStyle.copy(
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = primaryColor,
-                maxLines = 1
-            )
-            if (subText != null) {
-                Spacer(modifier = Modifier.height(1.dp))
-                Text(
-                    text = subText,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.sp,
-                    color = subTextColor,
-                    maxLines = 1
                 )
             }
         }

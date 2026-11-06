@@ -1,11 +1,7 @@
 package app.overbay.orbit.ui.dashboard.dialogs
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -23,40 +18,36 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleCondition
 import app.overbay.orbit.domain.ReviewQueueCandidate
 import app.overbay.orbit.domain.RuleMatcherEngine
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
+import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.dashboard.CategorizeReviewState
 import app.overbay.orbit.ui.dashboard.DashboardAction
 import app.overbay.orbit.ui.rules.sheets.RuleEditorSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
-import kotlin.math.roundToInt
 
 /**
  * Interactive "Categorize Recent Transactions" modal dialog matching `TransactionReviewModal` on `main`.
@@ -70,33 +61,12 @@ fun TransactionReviewSheet(
     },
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
-    val density = LocalDensity.current
     val currentTxn = state.currentTxn
 
     val categoryById = remember(state.categories) { state.categories.associateBy { it.id } }
 
-    var rawDragX by remember(currentTxn?.id, state.currentIndex) { mutableFloatStateOf(0f) }
-    var isDragging by remember(currentTxn?.id, state.currentIndex) { mutableStateOf(false) }
-    var readySide by remember(currentTxn?.id, state.currentIndex) { mutableStateOf<String?>(null) }
-
-    val animatedDragX by animateFloatAsState(
-        targetValue = rawDragX,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
-        label = "reviewCardDragX"
-    )
-    val effectiveDragX = if (isDragging) rawDragX else animatedDragX
-    val thresholdPx = with(density) { 90.dp.toPx() }
-    val toneThresholdPx = with(density) { 40.dp.toPx() }
-    val cardRotation = (effectiveDragX / 18f).coerceIn(-10f, 10f)
-    val cardTone = when {
-        effectiveDragX > toneThresholdPx -> "yes"
-        effectiveDragX < -toneThresholdPx -> "no"
-        else -> ""
-    }
-
-    app.overbay.orbit.ui.components.OrbitModalSheet(
+    OrbitModalSheet(
         onDismissRequest = { onAction(DashboardAction.CloseCategorizeReview) },
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.surface
@@ -107,34 +77,10 @@ fun TransactionReviewSheet(
                 .padding(20.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Is this category correct?",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = BorderStroke(1.dp, colors.cardBorder),
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .clickable {
-                            haptics.tick()
-                            onAction(DashboardAction.CloseCategorizeReview)
-                        }
-                ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Text("x", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
+            OrbitSheetHeader(
+                title = "Is this category correct?",
+                onDismiss = { onAction(DashboardAction.CloseCategorizeReview) }
+            )
 
             Spacer(modifier = Modifier.height(14.dp))
             HorizontalDivider(color = colors.cardBorder)
@@ -173,17 +119,6 @@ fun TransactionReviewSheet(
                     currentIndex = state.currentIndex,
                     batchReviewed = state.batchReviewed,
                     category = currentTxn.categoryId?.let { categoryById[it] },
-                    cardTone = cardTone,
-                    effectiveDragX = effectiveDragX,
-                    cardRotation = cardRotation,
-                    thresholdPx = thresholdPx,
-                    rawDragX = rawDragX,
-                    readySide = readySide,
-                    onUpdateDragState = { dragging, nextX, nextSide ->
-                        isDragging = dragging
-                        rawDragX = nextX
-                        readySide = nextSide
-                    },
                     onAction = onAction
                 )
             }
@@ -220,19 +155,13 @@ fun TransactionReviewSheet(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReviewSwipeStage(
     currentTxn: ReviewQueueCandidate,
     currentIndex: Int,
     batchReviewed: Int,
     category: Category?,
-    cardTone: String,
-    effectiveDragX: Float,
-    cardRotation: Float,
-    thresholdPx: Float,
-    rawDragX: Float,
-    readySide: String?,
-    onUpdateDragState: (isDragging: Boolean, rawX: Float, readySide: String?) -> Unit,
     onAction: (DashboardAction) -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -269,53 +198,53 @@ private fun ReviewSwipeStage(
 
     Spacer(modifier = Modifier.height(14.dp))
 
-    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Change", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-            Text("Confirm", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+    key(currentTxn.id, currentIndex) {
+        val dismissState = rememberSwipeToDismissBoxState(
+            confirmValueChange = { value ->
+                when (value) {
+                    SwipeToDismissBoxValue.StartToEnd -> {
+                        haptics.confirm()
+                        onAction(DashboardAction.ApproveReviewTransaction)
+                        false
+                    }
+                    SwipeToDismissBoxValue.EndToStart -> {
+                        haptics.tick()
+                        onAction(DashboardAction.RejectReviewTransaction)
+                        false
+                    }
+                    SwipeToDismissBoxValue.Settled -> false
+                }
+            }
+        )
+        val cardTone = when (dismissState.targetValue) {
+            SwipeToDismissBoxValue.StartToEnd -> "yes"
+            SwipeToDismissBoxValue.EndToStart -> "no"
+            SwipeToDismissBoxValue.Settled -> ""
         }
 
-        ReviewTransactionCardContent(
-            txn = currentTxn,
-            category = category,
-            cardTone = cardTone,
-            modifier = Modifier
-                .widthIn(max = 390.dp)
-                .offset { IntOffset(effectiveDragX.roundToInt(), 0) }
-                .graphicsLayer { rotationZ = cardRotation }
-                .pointerInput(currentTxn.id, currentIndex) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { onUpdateDragState(true, rawDragX, null) },
-                        onHorizontalDrag = { change, dragAmount ->
-                            change.consume()
-                            val nextX = rawDragX + dragAmount
-                            val nextSide = when {
-                                nextX > thresholdPx -> "yes"
-                                nextX < -thresholdPx -> "no"
-                                else -> null
-                            }
-                            if (nextSide != null && nextSide != readySide) haptics.tick()
-                            onUpdateDragState(true, nextX, nextSide)
-                        },
-                        onDragEnd = {
-                            val finalX = rawDragX
-                            onUpdateDragState(false, 0f, null)
-                            if (finalX > thresholdPx) {
-                                haptics.confirm()
-                                onAction(DashboardAction.ApproveReviewTransaction)
-                            } else if (finalX < -thresholdPx) {
-                                haptics.tick()
-                                onAction(DashboardAction.RejectReviewTransaction)
-                            }
-                        },
-                        onDragCancel = { onUpdateDragState(false, 0f, null) }
-                    )
+        SwipeToDismissBox(
+            state = dismissState,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            backgroundContent = {
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Change", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    Text("Confirm", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                 }
-        )
+            }
+        ) {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                ReviewTransactionCardContent(
+                    txn = currentTxn,
+                    category = category,
+                    cardTone = cardTone,
+                    modifier = Modifier.widthIn(max = 390.dp)
+                )
+            }
+        }
     }
 
     Spacer(modifier = Modifier.height(14.dp))

@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.SellingProceedsResult
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.OrbitMiniStatRow
 
 @Composable
 fun SellingProceedsBreakdownCard(
@@ -84,21 +85,9 @@ private fun ProceedsLineItem(
     value: String,
     isBold: Boolean = false
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = if (isBold) FontWeight.SemiBold else FontWeight.Normal,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
-        )
-    }
+    OrbitMiniStatRow(
+        label = label,
+        value = value,
+        valueColor = if (isBold) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
+    )
 }

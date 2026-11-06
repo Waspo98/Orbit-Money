@@ -27,9 +27,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,7 +37,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,6 +50,8 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.goals.GoalsUiState
 import app.overbay.orbit.ui.goals.GoalsViewModel
 import app.overbay.orbit.ui.goals.dialogs.GoalAllocationContent
@@ -199,14 +198,10 @@ private fun GoalReadOnlyDetailContent(
             }
         }
 
-        LinearProgressIndicator(
-            progress = { progress },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp)),
-            color = progressColor,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        OrbitPillProgressBar(
+            percent = progress,
+            customFillColor = progressColor,
+            height = 8.dp
         )
 
         // Historical Chart & What-If Simulator Card
@@ -258,14 +253,14 @@ private fun GoalReadOnlyDetailContent(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            GoalPillAction(label = "Edit Goal", onClick = onEdit)
+            OrbitActionChip(label = "Edit Goal", onClick = onEdit)
             if (!isDone) {
-                GoalPillAction(label = "Deposit", onClick = onDeposit)
+                OrbitActionChip(label = "Deposit", onClick = onDeposit)
             }
             if (onOpenLinkedAccount != null) {
-                GoalPillAction(label = "View Linked Account", onClick = onOpenLinkedAccount)
+                OrbitActionChip(label = "View Linked Account", onClick = onOpenLinkedAccount)
             }
-            GoalPillAction(label = "Delete", isDestructive = true, onClick = onDelete)
+            OrbitActionChip(label = "Delete", isDestructive = true, onClick = onDelete)
         }
     }
 }
@@ -285,26 +280,6 @@ private fun GoalMetaField(label: String, value: String) {
             text = value,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
-private fun GoalPillAction(label: String, onClick: () -> Unit, isDestructive: Boolean = false) {
-    val haptics = LocalOrbitHaptics.current
-    OutlinedButton(
-        onClick = { haptics.tick(); onClick() },
-        shape = CircleShape,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-        border = BorderStroke(1.dp, if (isDestructive) OrbitTheme.colors.danger else OrbitTheme.colors.cardBorder),
-        modifier = Modifier.height(34.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isDestructive) OrbitTheme.colors.danger else MaterialTheme.colorScheme.onSurface
         )
     }
 }

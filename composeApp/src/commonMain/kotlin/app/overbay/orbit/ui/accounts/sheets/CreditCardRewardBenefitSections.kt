@@ -23,11 +23,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,9 +46,8 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.RewardCategory
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitColorTokens
-import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -83,23 +83,20 @@ fun CardArtworkAndNetworkSection(
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             NETWORKS.forEach { net ->
                 val isSelected = network.equals(net, ignoreCase = true)
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
-                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder),
-                    modifier = Modifier.clickable {
+                FilterChip(
+                    selected = isSelected,
+                    onClick = {
                         haptics.tick()
                         onNetworkChange(net)
+                    },
+                    label = {
+                        Text(
+                            text = net,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
                     }
-                ) {
-                    Text(
-                        text = net,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
-                }
+                )
             }
         }
 
@@ -155,22 +152,20 @@ fun CardArtworkAndNetworkSection(
         Text("Quick-pick Preset Art:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PRESET_CARD_ARTS.forEach { preset ->
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.clickable {
+                SuggestionChip(
+                    onClick = {
                         haptics.tick()
                         onImageUrlChange(preset.url)
                         if (network.isBlank()) onNetworkChange(preset.network)
+                    },
+                    label = {
+                        Text(
+                            text = preset.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 11.sp
+                        )
                     }
-                ) {
-                    Text(
-                        text = preset.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
-                }
+                )
             }
         }
     }
@@ -213,28 +208,18 @@ fun AuthorizedUsersSection(
         if (users.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 users.forEachIndexed { idx, user ->
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 2.dp, bottom = 2.dp)
-                        ) {
-                            Text(user, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium)
-                            IconButton(
-                                onClick = {
-                                    haptics.reject()
-                                    val updated = users.toMutableList().apply { removeAt(idx) }
-                                    onUsersChange(updated)
-                                },
-                                modifier = Modifier.size(20.dp)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(12.dp))
-                            }
+                    InputChip(
+                        selected = true,
+                        onClick = {
+                            haptics.reject()
+                            val updated = users.toMutableList().apply { removeAt(idx) }
+                            onUsersChange(updated)
+                        },
+                        label = { Text(user, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium) },
+                        trailingIcon = {
+                            Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(14.dp))
                         }
-                    }
+                    )
                 }
             }
         }
@@ -256,21 +241,10 @@ fun RewardCategoriesEditorSection(
         Text("Reward Categories (${rewards.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
 
         rewards.forEachIndexed { index, r ->
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("${r.multiplier}x • ${r.label.ifBlank { r.category }}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                        r.notes?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline) }
-                    }
+            OrbitCompactListRow(
+                title = "${r.multiplier}x • ${r.label.ifBlank { r.category }}",
+                subtitle = r.notes,
+                trailingContent = {
                     IconButton(onClick = {
                         haptics.reject()
                         val updated = rewards.toMutableList().apply { removeAt(index) }
@@ -279,7 +253,7 @@ fun RewardCategoriesEditorSection(
                         Icon(Icons.Default.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                     }
                 }
-            }
+            )
         }
 
         // Add reward row
@@ -316,22 +290,11 @@ fun CardBenefitsEditorSection(
         Text("Statement Credits & Benefits (${benefits.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
 
         benefits.forEachIndexed { index, b ->
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(b.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                        val valStr = b.annualCreditValueCents?.let { MoneyUtils.formatCents(it) } ?: ""
-                        if (valStr.isNotBlank()) Text("Annual Credit: $valStr", style = MaterialTheme.typography.bodySmall, color = OrbitColorTokens.Green)
-                    }
+            val valStr = b.annualCreditValueCents?.let { "Annual Credit: ${MoneyUtils.formatCents(it)}" }
+            OrbitCompactListRow(
+                title = b.title,
+                subtitle = valStr,
+                trailingContent = {
                     IconButton(onClick = {
                         haptics.reject()
                         val updated = benefits.toMutableList().apply { removeAt(index) }
@@ -340,7 +303,7 @@ fun CardBenefitsEditorSection(
                         Icon(Icons.Default.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                     }
                 }
-            }
+            )
         }
 
         // Add benefit row

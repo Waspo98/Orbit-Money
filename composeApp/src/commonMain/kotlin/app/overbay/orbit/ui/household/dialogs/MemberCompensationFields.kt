@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -125,7 +124,7 @@ fun MemberCompensationFields(
         )
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(
+            OrbitTextField(
                 value = if (employeeContribPercent > 0.0) employeeContribPercent.toString() else "",
                 onValueChange = { onEmployeeContribPercentChange(it.toDoubleOrNull() ?: 0.0) },
                 label = { Text("Employee %") },
@@ -142,14 +141,14 @@ fun MemberCompensationFields(
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(
+            OrbitTextField(
                 value = if (employerMatchPercent > 0.0) employerMatchPercent.toString() else "",
                 onValueChange = { onEmployerMatchPercentChange(it.toDoubleOrNull() ?: 0.0) },
                 label = { Text("Match % (e.g. 100)") },
                 modifier = Modifier.weight(1f),
                 singleLine = true
             )
-            OutlinedTextField(
+            OrbitTextField(
                 value = if (employerMatchLimitPercent > 0.0) employerMatchLimitPercent.toString() else "",
                 onValueChange = { onEmployerMatchLimitPercentChange(it.toDoubleOrNull() ?: 0.0) },
                 label = { Text("Match Limit % (e.g. 5)") },

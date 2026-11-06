@@ -37,16 +37,19 @@ fun SelectableListRow(
     sidePrimary: String? = null,
     sideSecondary: String? = null,
     selected: Boolean = false,
+    isSelected: Boolean = selected,
     leadingIcon: (@Composable () -> Unit)? = null,
+    leadingContent: (@Composable () -> Unit)? = leadingIcon,
+    trailingContent: (@Composable () -> Unit)? = null,
     enabled: Boolean = true
 ) {
     val haptics = LocalOrbitHaptics.current
-    val containerColor = if (selected) {
+    val containerColor = if (isSelected) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
         MaterialTheme.colorScheme.surfaceContainerLow
     }
-    val border = if (selected) {
+    val border = if (isSelected) {
         BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
     } else {
         BorderStroke(1.dp, OrbitTheme.colors.cardBorder)
@@ -69,9 +72,9 @@ fun SelectableListRow(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (leadingIcon != null) {
+            if (leadingContent != null) {
                 Box(contentAlignment = Alignment.Center) {
-                    leadingIcon()
+                    leadingContent()
                 }
                 Spacer(modifier = Modifier.width(12.dp))
             }
@@ -83,7 +86,7 @@ fun SelectableListRow(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -123,6 +126,11 @@ fun SelectableListRow(
                         )
                     }
                 }
+            }
+
+            if (trailingContent != null) {
+                Spacer(modifier = Modifier.width(10.dp))
+                trailingContent()
             }
         }
     }

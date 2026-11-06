@@ -37,6 +37,9 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -90,18 +93,11 @@ fun NotablePanel(
                     )
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                ) {
-                    Text(
-                        text = "${notables.totalCount} Alert${if (notables.totalCount == 1) "" else "s"}",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                    )
-                }
+                OrbitBadge(
+                    text = "${notables.totalCount} Alert${if (notables.totalCount == 1) "" else "s"}",
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
             }
 
             // Bucket 1: Over Budget
@@ -207,113 +203,62 @@ private fun NotableItemRow(
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
     val catColor = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
+    val subtitle = when {
+        isOverBudget -> {
+            val overCents = item.spentCents - item.amountCents
+            "${MoneyUtils.formatCents(overCents)} over (${MoneyUtils.formatCents(item.spentCents)} of ${MoneyUtils.formatCents(item.amountCents)})"
+        }
+        isNearLimit -> {
+            val pct = (item.utilizationRatio * 100).toInt()
+            "$pct% used · ${MoneyUtils.formatCents(item.remainingCents)} left"
+        }
+        item.spentCents < 0L -> {
+            "Net refund: +${MoneyUtils.formatCents(-item.spentCents)}"
+        }
+        item.amountCents <= 0L -> {
+            "${MoneyUtils.formatCents(item.spentCents)} unbudgeted spend"
+        }
+        else -> {
+            "${MoneyUtils.formatCents(item.spentCents)} spent"
+        }
+    }
 
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, colors.cardBorder),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                haptics.tick()
-                onInspect()
-            }
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.weight(1f)
+    OrbitCompactListRow(
+        title = item.category.name,
+        subtitle = subtitle,
+        containerColor = MaterialTheme.colorScheme.surface,
+        borderColor = colors.cardBorder,
+        onClick = {
+            haptics.tick()
+            onInspect()
+        },
+        leadingContent = {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Surface(
-                        color = catColor.copy(alpha = 0.18f),
-                        shape = CircleShape,
-                        modifier = Modifier.fillMaxWidth().height(32.dp)
-                    ) {}
-                    Text(
-                        text = item.category.icon ?: "📁",
-                        fontSize = 15.sp
-                    )
-                }
-
-                Column {
-                    Text(
-                        text = item.category.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    val subtitle = when {
-                        isOverBudget -> {
-                            val overCents = item.spentCents - item.amountCents
-                            "${MoneyUtils.formatCents(overCents)} over (${MoneyUtils.formatCents(item.spentCents)} of ${MoneyUtils.formatCents(item.amountCents)})"
-                        }
-                        isNearLimit -> {
-                            val pct = (item.utilizationRatio * 100).toInt()
-                            "$pct% used · ${MoneyUtils.formatCents(item.remainingCents)} left"
-                        }
-                        item.spentCents < 0L -> {
-                            "Net refund: +${MoneyUtils.formatCents(-item.spentCents)}"
-                        }
-                        item.amountCents <= 0L -> {
-                            "${MoneyUtils.formatCents(item.spentCents)} unbudgeted spend"
-                        }
-                        else -> {
-                            "${MoneyUtils.formatCents(item.spentCents)} spent"
-                        }
-                    }
-
-                    Text(
-                        text = subtitle,
-                        style = TabularNumStyle.copy(fontSize = 11.sp),
-                        color = when {
-                            isOverBudget -> colors.danger
-                            isNearLimit -> colors.warning
-                            item.spentCents < 0L -> colors.income
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                }
+                Surface(
+                    color = catColor.copy(alpha = 0.18f),
+                    shape = CircleShape,
+                    modifier = Modifier.fillMaxWidth().height(32.dp)
+                ) {}
+                Text(
+                    text = item.category.icon ?: "📁",
+                    fontSize = 15.sp
+                )
             }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
+        },
+        trailingContent = {
             if (isVariance && item.amountCents <= 0L) {
-                OutlinedButton(
+                OrbitActionChip(
+                    label = "+ Set Budget",
                     onClick = {
                         haptics.tick()
                         onAddBudget()
-                    },
-                    shape = CircleShape,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
-                    ),
-                    modifier = Modifier.height(28.dp)
-                ) {
-                    Text(
-                        text = "+ Set Budget",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                    }
+                )
             } else {
                 Text(
                     text = MoneyUtils.formatCents(item.spentCents),
@@ -322,5 +267,5 @@ private fun NotableItemRow(
                 )
             }
         }
-    }
+    )
 }

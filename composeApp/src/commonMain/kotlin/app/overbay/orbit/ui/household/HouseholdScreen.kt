@@ -23,7 +23,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,10 +44,12 @@ import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.household.components.HouseholdIncomeHistoryCard
 import app.overbay.orbit.ui.household.components.HouseholdInspectorPane
@@ -160,7 +161,7 @@ fun HouseholdScreen(
                                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        OutlinedTextField(
+                                        OrbitTextField(
                                             value = editingName,
                                             onValueChange = { editingName = it },
                                             label = { Text("Household Name") },
@@ -252,37 +253,23 @@ fun HouseholdScreen(
                                             modifier = Modifier.padding(vertical = 8.dp)
                                         )
                                     } else {
-                                        uiState.shares.forEach { share ->
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 8.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Column {
-                                                    Text(
-                                                        text = share.invitedEmail,
-                                                        style = MaterialTheme.typography.bodyMedium,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                    Text(
-                                                        text = "Role: ${share.role.name} • Status: ${if (share.acceptedAt != null) "Accepted" else "Pending Invite"}",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                                IconButton(onClick = { viewModel.revokeInvite(share.id) }) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Person,
-                                                        contentDescription = "Revoke",
-                                                        tint = MaterialTheme.colorScheme.error,
-                                                        modifier = Modifier.size(20.dp)
-                                                    )
-                                                }
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            uiState.shares.forEach { share ->
+                                                OrbitCompactListRow(
+                                                    title = share.invitedEmail,
+                                                    subtitle = "Role: ${share.role.name} • Status: ${if (share.acceptedAt != null) "Accepted" else "Pending Invite"}",
+                                                    trailingContent = {
+                                                        IconButton(onClick = { viewModel.revokeInvite(share.id) }) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Person,
+                                                                contentDescription = "Revoke",
+                                                                tint = MaterialTheme.colorScheme.error,
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                )
                                             }
-                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
                                         }
                                     }
                                 }

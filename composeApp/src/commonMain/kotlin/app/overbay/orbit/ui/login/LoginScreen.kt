@@ -33,7 +33,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.login.components.ConfirmedServerPill
 import app.overbay.orbit.ui.login.components.LoginBrandLockup
 import app.overbay.orbit.ui.login.components.LoginErrorBanner
@@ -224,7 +224,7 @@ private fun LoginServerAuthStep(
         )
 
         if (state.localEnabled) {
-            OutlinedTextField(
+            OrbitTextField(
                 value = state.username,
                 onValueChange = { onIntent(LoginIntent.UpdateUsername(it)) },
                 label = { Text("Username") },
@@ -233,13 +233,12 @@ private fun LoginServerAuthStep(
                     keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Next
                 ),
-                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            OutlinedTextField(
+            OrbitTextField(
                 value = state.password,
                 onValueChange = { onIntent(LoginIntent.UpdatePassword(it)) },
                 label = { Text("Password") },
@@ -272,7 +271,6 @@ private fun LoginServerAuthStep(
                         onIntent(LoginIntent.SubmitPasswordLogin)
                     }
                 ),
-                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             )
 

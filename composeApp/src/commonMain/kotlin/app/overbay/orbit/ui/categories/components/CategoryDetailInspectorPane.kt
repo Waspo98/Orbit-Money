@@ -48,6 +48,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.categories.CategoriesUiState
 import app.overbay.orbit.ui.categories.CategorySummary
 import app.overbay.orbit.ui.categories.dialogs.CategoryEditorContent
+import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -358,21 +359,5 @@ private fun CategoryMetadataRow(
     label: String,
     value: String
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
+    OrbitMiniStatRow(label = label, value = value)
 }

@@ -42,9 +42,11 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -100,50 +102,23 @@ fun AccountEditorContent(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (account.id == 0L) "Add New Account" else "Edit Account",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            if (account.id != 0L && onDelete != null) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .clickable {
+        OrbitSheetHeader(
+            title = if (account.id == 0L) "Add New Account" else "Edit Account",
+            onDismiss = onDismiss,
+            trailingActions = {
+                if (account.id != 0L && onDelete != null) {
+                    OrbitActionChip(
+                        label = "Delete",
+                        leadingIcon = Icons.Default.Delete,
+                        isDestructive = true,
+                        onClick = {
                             haptics.reject()
                             onDelete(account.id)
                         }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete Account",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Delete",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
+                    )
                 }
             }
-        }
+        )
 
         // SimpleFIN link status banner with Unlink button
         if (!account.simplefinAccountId.isNullOrBlank()) {
@@ -188,16 +163,13 @@ fun AccountEditorContent(
                     }
 
                     if (onUnlinkSimpleFin != null) {
-                        OutlinedButton(
+                        OrbitActionChip(
+                            label = "Unlink",
                             onClick = {
                                 haptics.tick()
                                 showUnlinkConfirm = true
-                            },
-                            shape = CircleShape,
-                            modifier = Modifier.height(30.dp)
-                        ) {
-                            Text("Unlink", style = MaterialTheme.typography.labelSmall)
-                        }
+                            }
+                        )
                     }
                 }
             }

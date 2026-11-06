@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -152,6 +153,28 @@ fun MhaTrackerScreen(
                     }
                 }
 
+                val summaryCards: LazyListScope.() -> Unit = {
+                    item {
+                        MhaThreeLimitHeroCard(
+                            actualSpentCents = state.actualEligibleHousingSpentCents,
+                            designatedCapCents = state.designatedCapCents,
+                            fairMarketRentalValueCents = state.fairMarketRentalValueCents,
+                            excludableCapCents = state.excludableAllowanceCents,
+                            bindingLimit = state.limitingFactor,
+                            onConfigureClick = {
+                                if (isTwoPane && state.showConfigSheet) viewModel.closeConfigSheet() else viewModel.openConfigSheet()
+                            }
+                        )
+                    }
+                    item {
+                        MhaTaxSavingsCard(
+                            taxResult = state.taxCalculationResult,
+                            projectedAnnualSavingsCents = state.projectedAnnualSavingsCents,
+                            taxProfile = state.taxProfile
+                        )
+                    }
+                }
+
                 if (state.activeScreenTab == MhaScreenTab.DEFAULTS) {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
@@ -180,28 +203,9 @@ fun MhaTrackerScreen(
                         LazyColumn(
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(bottom = 32.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            item {
-                                MhaThreeLimitHeroCard(
-                                    actualSpentCents = state.actualEligibleHousingSpentCents,
-                                    designatedCapCents = state.designatedCapCents,
-                                    fairMarketRentalValueCents = state.fairMarketRentalValueCents,
-                                    excludableCapCents = state.excludableAllowanceCents,
-                                    bindingLimit = state.limitingFactor,
-                                    onConfigureClick = {
-                                        if (state.showConfigSheet) viewModel.closeConfigSheet() else viewModel.openConfigSheet()
-                                    }
-                                )
-                            }
-                            item {
-                                MhaTaxSavingsCard(
-                                    taxResult = state.taxCalculationResult,
-                                    projectedAnnualSavingsCents = state.projectedAnnualSavingsCents,
-                                    taxProfile = state.taxProfile
-                                )
-                            }
-                        }
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            content = summaryCards
+                        )
 
                         // Right Pane: Morphs between Transaction Review Queue and MHA Settings Content
                         AnimatedContent(
@@ -262,24 +266,7 @@ fun MhaTrackerScreen(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        item {
-                            MhaThreeLimitHeroCard(
-                                actualSpentCents = state.actualEligibleHousingSpentCents,
-                                designatedCapCents = state.designatedCapCents,
-                                fairMarketRentalValueCents = state.fairMarketRentalValueCents,
-                                excludableCapCents = state.excludableAllowanceCents,
-                                bindingLimit = state.limitingFactor,
-                                onConfigureClick = { viewModel.openConfigSheet() }
-                            )
-                        }
-
-                        item {
-                            MhaTaxSavingsCard(
-                                taxResult = state.taxCalculationResult,
-                                projectedAnnualSavingsCents = state.projectedAnnualSavingsCents,
-                                taxProfile = state.taxProfile
-                            )
-                        }
+                        summaryCards()
 
                         item {
                             MhaTransactionsTab(

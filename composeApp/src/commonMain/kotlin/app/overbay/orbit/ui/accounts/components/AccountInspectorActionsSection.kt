@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.theme.OrbitColorTokens
-import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -115,21 +115,13 @@ fun AccountInspectorActionsSection(
                     }
 
                     if (onUnlinkSimpleFin != null) {
-                        OutlinedButton(
+                        OrbitActionChip(
+                            label = "Unlink",
                             onClick = {
                                 haptics.tick()
                                 showUnlinkConfirm = true
-                            },
-                            shape = CircleShape,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.height(30.dp)
-                        ) {
-                            Text(
-                                text = "Unlink",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                            }
+                        )
                     }
                 }
             }
@@ -141,40 +133,40 @@ fun AccountInspectorActionsSection(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            AccountPillButton(
+            OrbitActionChip(
                 label = "Edit Account",
-                onClick = onEdit
+                onClick = { haptics.tick(); onEdit() }
             )
             if (isCredit) {
-                AccountPillButton(
+                OrbitActionChip(
                     label = "Card Perks",
-                    onClick = onPerks
+                    onClick = { haptics.tick(); onPerks() }
                 )
             }
-            AccountPillButton(
+            OrbitActionChip(
                 label = "Balance History",
-                onClick = onHistory
+                onClick = { haptics.tick(); onHistory() }
             )
-            AccountPillButton(
+            OrbitActionChip(
                 label = "Snapshot Reminder",
-                onClick = onSnapshotReminder
+                onClick = { haptics.tick(); onSnapshotReminder() }
             )
-            AccountPillButton(
+            OrbitActionChip(
                 label = "Merge",
-                onClick = onMerge
+                onClick = { haptics.tick(); onMerge() }
             )
-            AccountPillButton(
+            OrbitActionChip(
                 label = "See Transactions",
-                onClick = onSeeTransactions
+                onClick = { haptics.tick(); onSeeTransactions() }
             )
-            AccountPillButton(
+            OrbitActionChip(
                 label = if (account.isArchived) "Unarchive" else "Archive",
-                onClick = onToggleArchive
+                onClick = { haptics.tick(); onToggleArchive() }
             )
-            AccountPillButton(
+            OrbitActionChip(
                 label = "Delete",
                 isDestructive = true,
-                onClick = onDelete
+                onClick = { haptics.tick(); onDelete() }
             )
         }
     }
@@ -190,37 +182,6 @@ fun AccountInspectorActionsSection(
                 onUnlinkSimpleFin()
             },
             onDismiss = { showUnlinkConfirm = false }
-        )
-    }
-}
-
-@Composable
-private fun AccountPillButton(
-    label: String,
-    onClick: () -> Unit,
-    isDestructive: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    val haptics = LocalOrbitHaptics.current
-    OutlinedButton(
-        onClick = {
-            haptics.tick()
-            onClick()
-        },
-        shape = CircleShape,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-        border = BorderStroke(
-            1.dp,
-            if (isDestructive) OrbitTheme.colors.danger else OrbitTheme.colors.cardBorder
-        ),
-        modifier = modifier.height(34.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isDestructive) OrbitTheme.colors.danger else MaterialTheme.colorScheme.onSurface
         )
     }
 }

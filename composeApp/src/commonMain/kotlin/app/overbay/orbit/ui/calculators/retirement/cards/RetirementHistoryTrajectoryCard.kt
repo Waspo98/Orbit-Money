@@ -22,6 +22,7 @@ import app.overbay.orbit.data.model.RetirementHistoryPoint
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -143,22 +144,10 @@ fun RetirementHistoryTrajectoryCard(
                             color = MaterialTheme.colorScheme.primary
                         )
                         filteredPoints.takeLast(5).reversed().forEach { point ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = point.month,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = MoneyUtils.formatCents(point.balanceCents),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+                            OrbitMiniStatRow(
+                                label = point.month,
+                                value = MoneyUtils.formatCents(point.balanceCents)
+                            )
                         }
                     }
                 }

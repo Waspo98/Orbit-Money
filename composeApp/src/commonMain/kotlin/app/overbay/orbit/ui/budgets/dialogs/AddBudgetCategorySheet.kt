@@ -20,16 +20,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,6 +47,7 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -61,7 +57,6 @@ import app.overbay.orbit.util.LocalOrbitHaptics
  * with quick 3-month average spend chips and rollover toggle.
  * Strictly <= 390 lines.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddBudgetCategorySheet(
     availableCategories: List<Category>,
@@ -81,7 +76,6 @@ fun AddBudgetCategorySheet(
         }
         var amountCents by remember { mutableStateOf(10000L) }
         var rollover by remember { mutableStateOf(false) }
-        var dropdownExpanded by remember { mutableStateOf(false) }
 
         val threeMonthAvg = selectedCategory?.let { threeMonthAvgProvider(it.id) } ?: 0L
 
@@ -131,57 +125,13 @@ fun AddBudgetCategorySheet(
                     color = MaterialTheme.colorScheme.outline
                 )
             } else {
-                ExposedDropdownMenuBox(
-                    expanded = dropdownExpanded,
-                    onExpandedChange = { dropdownExpanded = it }
-                ) {
-                    OutlinedTextField(
-                        value = selectedCategory?.let { "${it.icon ?: "📁"} ${it.name}" } ?: "Select Category",
-                        onValueChange = {},
-                        readOnly = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp)
-                    )
-
-                    ExposedDropdownMenu(
-                        expanded = dropdownExpanded,
-                        onDismissRequest = { dropdownExpanded = false }
-                    ) {
-                        availableCategories.forEach { category ->
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        val color = category.color.toComposeColor(MaterialTheme.colorScheme.primary)
-                                        Box(
-                                            modifier = Modifier
-                                                .size(24.dp)
-                                                .clip(CircleShape)
-                                        ) {
-                                            Surface(color = color.copy(alpha = 0.2f), modifier = Modifier.fillMaxWidth().height(24.dp)) {}
-                                            Text(
-                                                text = category.icon ?: "📁",
-                                                fontSize = 12.sp,
-                                                modifier = Modifier.align(Alignment.Center)
-                                            )
-                                        }
-                                        Text(text = category.name, fontWeight = FontWeight.Medium)
-                                    }
-                                },
-                                onClick = {
-                                    haptics.tick()
-                                    selectedCategory = category
-                                    dropdownExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
+                OrbitDropdownField(
+                    label = null,
+                    selectedText = selectedCategory?.labelWithEmoji ?: "Select Category",
+                    options = availableCategories,
+                    optionLabel = { it.labelWithEmoji },
+                    onOptionSelected = { selectedCategory = it }
+                )
             }
 
             Spacer(modifier = Modifier.height(20.dp))

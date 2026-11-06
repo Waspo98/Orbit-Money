@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.networth.AccountContributionItem
@@ -43,10 +45,9 @@ fun AccountContributionsCard(
         modifier = modifier.fillMaxWidth()
     ) {
         if (contributions.isEmpty()) {
-            Text(
-                text = "No active accounts contributing to net worth.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            EmptyStateCard(
+                title = "No Active Accounts",
+                description = "No active accounts contributing to net worth."
             )
         } else {
             Column(
@@ -78,19 +79,12 @@ fun AccountContributionsCard(
                                 modifier = Modifier.weight(1f)
                             ) {
                                 // Account Type Badge
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                OrbitBadge(
+                                    text = acct.type.name.take(4),
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(end = 8.dp)
-                                ) {
-                                    Text(
-                                        text = acct.type.name.take(4),
-                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                                    )
-                                }
+                                )
 
                                 Column {
                                     Text(

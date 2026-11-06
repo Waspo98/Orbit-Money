@@ -48,6 +48,8 @@ import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -181,74 +183,41 @@ fun AccountBalanceHistoryContent(
                 itemsIndexed(balanceRecords, key = { _, rec -> rec.id }) { index, record ->
                     val older = balanceRecords.getOrNull(index + 1)
                     val deltaCents = older?.let { record.balanceCents - it.balanceCents }
-
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(
-                                        text = record.recordDate,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Surface(
-                                        shape = RoundedCornerShape(4.dp),
-                                        color = if (record.source == BalanceRecordSource.SIMPLEFIN) {
-                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceContainerHighest
-                                        }
-                                    ) {
-                                        Text(
-                                            text = if (record.source == BalanceRecordSource.SIMPLEFIN) "SimpleFIN" else "Manual",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = if (record.source == BalanceRecordSource.SIMPLEFIN) {
-                                                MaterialTheme.colorScheme.onPrimaryContainer
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            },
-                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                        )
-                                    }
-                                }
-
-                                if (deltaCents != null) {
-                                    val deltaColor = if (deltaCents > 0L) colors.income else if (deltaCents < 0L) colors.expense else MaterialTheme.colorScheme.outline
-                                    Text(
-                                        text = "Change: ${MoneyUtils.formatCents(deltaCents, signed = true)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = deltaColor
-                                    )
-                                } else {
-                                    Text(
-                                        text = "Initial Record",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.outline
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = MoneyUtils.formatCents(record.balanceCents),
-                                style = TabularNumStyle.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                    val subtitleText = if (deltaCents != null) {
+                        "Change: ${MoneyUtils.formatCents(deltaCents, signed = true)}"
+                    } else {
+                        "Initial Record"
                     }
+
+                    OrbitCompactListRow(
+                        title = record.recordDate,
+                        subtitle = subtitleText,
+                        trailingContent = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OrbitBadge(
+                                    text = if (record.source == BalanceRecordSource.SIMPLEFIN) "SimpleFIN" else "Manual",
+                                    containerColor = if (record.source == BalanceRecordSource.SIMPLEFIN) {
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceContainerHighest
+                                    },
+                                    contentColor = if (record.source == BalanceRecordSource.SIMPLEFIN) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                                Text(
+                                    text = MoneyUtils.formatCents(record.balanceCents),
+                                    style = TabularNumStyle.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    )
                 }
             }
 
@@ -273,35 +242,18 @@ fun AccountBalanceHistoryContent(
                 }
             } else {
                 itemsIndexed(transactions.take(20), key = { _, txn -> txn.id }) { _, txn ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                    val isIncome = txn.effectiveAmountCents > 0L
+                    OrbitCompactListRow(
+                        title = txn.effectiveMerchant,
+                        subtitle = txn.effectiveDate,
+                        trailingContent = {
                             Text(
-                                text = txn.effectiveMerchant,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1
-                            )
-                            Text(
-                                text = txn.effectiveDate,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline
+                                text = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
+                                style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                                color = if (isIncome) OrbitColorTokens.Green else MaterialTheme.colorScheme.onSurface
                             )
                         }
-                        val isIncome = txn.effectiveAmountCents > 0L
-                        Text(
-                            text = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
-                            style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
-                            color = if (isIncome) OrbitColorTokens.Green else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.3f))
+                    )
                 }
             }
         }

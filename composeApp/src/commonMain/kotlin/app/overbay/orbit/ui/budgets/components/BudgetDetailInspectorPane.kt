@@ -57,9 +57,12 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.budgets.BudgetsUiState
 import app.overbay.orbit.ui.budgets.BudgetsViewModel
 import app.overbay.orbit.ui.budgets.dialogs.BudgetAmountEditorContent
+import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -161,12 +164,7 @@ private fun BudgetReadOnlyDetailContent(
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
-    val categoryColor = try {
-        val hex = item.category.color.trim().removePrefix("#")
-        Color(hex.toLong(16) or 0xFF000000)
-    } catch (_: Exception) {
-        MaterialTheme.colorScheme.primary
-    }
+    val categoryColor = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
     val isOverBudget = item.spentCents > item.amountCents && item.amountCents > 0L
     val isWatch = item.paceStatus == BudgetPaceStatus.WATCH
     val statusColor = when {
@@ -279,19 +277,19 @@ private fun BudgetReadOnlyDetailContent(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                BudgetPillAction(
+                OrbitActionChip(
                     label = if (item.amountCents > 0L) "Edit Budget" else "Set Budget",
-                    onClick = onEdit
+                    onClick = { haptics.tick(); onEdit() }
                 )
-                BudgetPillAction(
+                OrbitActionChip(
                     label = "View All in Transactions",
-                    onClick = onViewTransactions
+                    onClick = { haptics.tick(); onViewTransactions() }
                 )
                 if (item.budgetId != null) {
-                    BudgetPillAction(
+                    OrbitActionChip(
                         label = "Delete Budget",
                         isDestructive = true,
-                        onClick = onDelete
+                        onClick = { haptics.tick(); onDelete() }
                     )
                 }
             }
@@ -319,61 +317,18 @@ private fun BudgetReadOnlyDetailContent(
             }
         } else {
             items(transactions, key = { it.id }) { txn ->
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = txn.effectiveMerchant,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = txn.effectiveDate,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
+                OrbitCompactListRow(
+                    title = txn.effectiveMerchant,
+                    subtitle = txn.effectiveDate,
+                    trailingContent = {
                         Text(
                             text = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
                             style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
                             color = colors.expense
                         )
                     }
-                }
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun BudgetPillAction(label: String, onClick: () -> Unit, isDestructive: Boolean = false) {
-    val haptics = LocalOrbitHaptics.current
-    OutlinedButton(
-        onClick = { haptics.tick(); onClick() },
-        shape = CircleShape,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-        border = BorderStroke(1.dp, if (isDestructive) OrbitTheme.colors.danger else OrbitTheme.colors.cardBorder),
-        modifier = Modifier.height(34.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isDestructive) OrbitTheme.colors.danger else MaterialTheme.colorScheme.onSurface
-        )
     }
 }

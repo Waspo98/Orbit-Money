@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.RollingTickerCents
 import app.overbay.orbit.ui.mha.MhaLimitingFactor
@@ -213,11 +213,11 @@ private fun LimitProgressRow(
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
-        LinearProgressIndicator(
-            progress = { animatedProgress },
-            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(999.dp)),
-            color = tint,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        OrbitPillProgressBar(
+            percent = animatedProgress,
+            customFillColor = tint,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            height = 8.dp
         )
     }
 }

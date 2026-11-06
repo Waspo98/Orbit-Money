@@ -36,6 +36,7 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.labelWithEmoji
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -85,18 +86,11 @@ fun RuleItemCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
-                    ) {
-                        Text(
-                            text = "P${rule.priority}",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
+                    OrbitBadge(
+                        text = "P${rule.priority}",
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
 
                     Spacer(modifier = Modifier.width(8.dp))
 
@@ -169,17 +163,11 @@ fun RuleItemCard(
                     )
                 } else {
                     rule.conditions.forEach { cond ->
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant
-                        ) {
-                            Text(
-                                text = "${cond.field.name} ${cond.operator.name} '${cond.value}'",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
+                        OrbitBadge(
+                            text = "${cond.field.name} ${cond.operator.name} '${cond.value}'",
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -220,18 +208,11 @@ fun RuleItemCard(
                             RuleActionType.MARK_IGNORED -> "Mark as Ignored"
                             RuleActionType.SET_MHA_ELIGIBLE -> "Set MHA Eligible"
                         }
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer
-                        ) {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
+                        OrbitBadge(
+                            text = label,
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     }
                 }
             }

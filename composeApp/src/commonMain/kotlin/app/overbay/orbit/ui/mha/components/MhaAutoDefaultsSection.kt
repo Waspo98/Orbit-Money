@@ -21,8 +21,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,7 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
@@ -39,6 +36,8 @@ import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitSwitchGroupCard
+import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -147,22 +146,21 @@ private fun AutoIncludeAccountsCard(
                         description = "Enable any account below to automatically mark all its outflows as eligible housing expenses."
                     )
                 } else {
-                    displayAccounts.forEachIndexed { index, account ->
-                        DefaultToggleRow(
-                            title = account.name,
-                            subtitle = "${account.type.displayName} • ${account.institution ?: "Manual"}",
-                            trailingInfo = MoneyUtils.formatCents(account.currentBalanceCents),
-                            isChecked = account.mhaDefaultEligible,
-                            onCheckedChange = { checked ->
-                                haptics.tick()
-                                onToggle(account.id, checked)
-                            }
-                        )
-                        if (index < displayAccounts.lastIndex) {
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                                modifier = Modifier.padding(horizontal = 8.dp)
+                    OrbitSwitchGroupCard {
+                        displayAccounts.forEachIndexed { index, account ->
+                            OrbitSwitchRow(
+                                title = account.name,
+                                subtitle = "${account.type.displayName} • ${account.institution ?: "Manual"} • Balance: ${MoneyUtils.formatCents(account.currentBalanceCents)}",
+                                checked = account.mhaDefaultEligible,
+                                onCheckedChange = { checked -> onToggle(account.id, checked) },
+                                showContainer = false
                             )
+                            if (index < displayAccounts.lastIndex) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -242,81 +240,32 @@ private fun CategoryDefaultsCard(
                         description = emptyDesc
                     )
                 } else {
-                    display.forEachIndexed { index, cat ->
-                        val isChecked = if (isIgnoredMode) cat.mhaDefaultIgnored else cat.mhaDefaultEligible
-                        val subText = if (isIgnoredMode) {
-                            if (isChecked) "Blocked from MHA eligibility" else "Normal eligibility evaluation"
-                        } else {
-                            if (isChecked) "Auto-included in MHA" else "Standard category"
-                        }
-
-                        DefaultToggleRow(
-                            title = cat.labelWithEmoji,
-                            subtitle = subText,
-                            trailingInfo = null,
-                            isChecked = isChecked,
-                            onCheckedChange = { checked ->
-                                haptics.tick()
-                                onToggle(cat.id, checked)
+                    OrbitSwitchGroupCard {
+                        display.forEachIndexed { index, cat ->
+                            val isChecked = if (isIgnoredMode) cat.mhaDefaultIgnored else cat.mhaDefaultEligible
+                            val subText = if (isIgnoredMode) {
+                                if (isChecked) "Blocked from MHA eligibility" else "Normal eligibility evaluation"
+                            } else {
+                                if (isChecked) "Auto-included in MHA" else "Standard category"
                             }
-                        )
-                        if (index < display.lastIndex) {
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                                modifier = Modifier.padding(horizontal = 8.dp)
+
+                            OrbitSwitchRow(
+                                title = cat.labelWithEmoji,
+                                subtitle = subText,
+                                checked = isChecked,
+                                onCheckedChange = { checked -> onToggle(cat.id, checked) },
+                                showContainer = false
                             )
+                            if (index < display.lastIndex) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun DefaultToggleRow(
-    title: String,
-    subtitle: String,
-    trailingInfo: String?,
-    isChecked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-                if (trailingInfo != null) {
-                    Text(
-                        text = "Balance: $trailingInfo",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Switch(
-                checked = isChecked,
-                onCheckedChange = onCheckedChange
-            )
         }
     }
 }

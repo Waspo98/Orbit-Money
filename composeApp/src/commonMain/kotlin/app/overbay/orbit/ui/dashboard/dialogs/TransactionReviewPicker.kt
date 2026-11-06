@@ -42,6 +42,8 @@ import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.domain.ReviewQueueCandidate
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.SelectableListRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -188,32 +190,15 @@ internal fun CategoryReviewPickerContent(
                 val isCurrent = category.id == txn.categoryId
                 val isSuggested = category.id == txn.suggestedCategoryId
                 val catColor = category.color.toComposeColor(MaterialTheme.colorScheme.primary)
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (isCurrent) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerLow
+                SelectableListRow(
+                    title = category.name,
+                    subtitle = if (isSuggested) "Usual category for this merchant" else null,
+                    isSelected = isCurrent,
+                    onClick = {
+                        haptics.tick()
+                        onChooseCategory(category.id)
                     },
-                    border = BorderStroke(
-                        1.dp,
-                        if (isCurrent) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable {
-                            haptics.tick()
-                            onChooseCategory(category.id)
-                        }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                    leadingContent = {
                         Surface(
                             shape = RoundedCornerShape(14.dp),
                             color = catColor.copy(alpha = 0.18f),
@@ -228,31 +213,17 @@ internal fun CategoryReviewPickerContent(
                                 )
                             }
                         }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = category.name,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            if (isSuggested) {
-                                Text(
-                                    text = "Usual category for this merchant",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                        if (isCurrent) {
-                            Text(
+                    },
+                    trailingContent = if (isCurrent) {
+                        {
+                            OrbitBadge(
                                 text = "Current",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                contentColor = MaterialTheme.colorScheme.primary
                             )
                         }
-                    }
-                }
+                    } else null
+                )
             }
         }
     }

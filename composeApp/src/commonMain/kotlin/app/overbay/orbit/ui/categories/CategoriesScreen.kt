@@ -18,18 +18,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -53,6 +49,7 @@ import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.components.dragReorderItem
 import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.ui.components.rememberHeroScrollState
@@ -144,43 +141,36 @@ fun CategoriesScreen(
                             )
                         },
                         persistentBottomBar = {
-                            Surface(
+                            OrbitTextField(
+                                value = state.searchQuery,
+                                onValueChange = { viewModel.setSearchQuery(it) },
+                                placeholder = { Text("Search categories by name or emoji...") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = "Search",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                trailingIcon = if (state.searchQuery.isNotBlank()) {
+                                    {
+                                        IconButton(
+                                            onClick = { viewModel.setSearchQuery("") },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Clear",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                } else null,
+                                singleLine = true,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainer
-                            ) {
-                                OutlinedTextField(
-                                    value = state.searchQuery,
-                                    onValueChange = { viewModel.setSearchQuery(it) },
-                                    placeholder = { Text("Search categories by name or emoji...") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Search,
-                                            contentDescription = "Search",
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    },
-                                    trailingIcon = if (state.searchQuery.isNotBlank()) {
-                                        {
-                                            IconButton(
-                                                onClick = { viewModel.setSearchQuery("") },
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Close,
-                                                    contentDescription = "Clear",
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
-                                        }
-                                    } else null,
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                            }
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                            )
                         }
                     )
 
@@ -279,27 +269,16 @@ fun CategoriesScreen(
 
         val blockedSummary = state.ruleBlockedDeleteCategory
         if (blockedSummary != null) {
-            AlertDialog(
-                onDismissRequest = { viewModel.dismissRuleBlockedDialog() },
-                title = { Text("Category in Use by Rules", fontWeight = FontWeight.Bold) },
-                text = {
-                    Text(
-                        "Cannot delete '${blockedSummary.category.name}' because ${blockedSummary.ruleCount} automation rule(s) use it. Update or delete those rules first."
-                    )
+            OrbitConfirmationDialog(
+                title = "Category in Use by Rules",
+                message = "Cannot delete '${blockedSummary.category.name}' because ${blockedSummary.ruleCount} automation rule(s) use it. Update or delete those rules first.",
+                confirmText = "View Rules",
+                dismissText = "Dismiss",
+                onConfirm = {
+                    viewModel.dismissRuleBlockedDialog()
+                    onNavigate(OrbitNavKey.Rules)
                 },
-                confirmButton = {
-                    Button(onClick = {
-                        viewModel.dismissRuleBlockedDialog()
-                        onNavigate(OrbitNavKey.Rules)
-                    }) {
-                        Text("View Rules")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { viewModel.dismissRuleBlockedDialog() }) {
-                        Text("Dismiss")
-                    }
-                }
+                onDismiss = { viewModel.dismissRuleBlockedDialog() }
             )
         }
 

@@ -43,6 +43,7 @@ import app.overbay.orbit.data.model.RuleOperator
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.rules.RuleDraftDefaults
 import app.overbay.orbit.ui.rules.components.ActionEditorRow
@@ -158,10 +159,9 @@ fun RuleEditorContent(
             .padding(horizontal = 20.dp, vertical = 12.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Text(
-            text = if (isEditingExisting) "Edit Rule" else "New Rule",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
+        OrbitSheetHeader(
+            title = if (isEditingExisting) "Edit Rule" else "New Rule",
+            onDismiss = onDismiss
         )
 
         Spacer(modifier = Modifier.height(14.dp))

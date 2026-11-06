@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,11 +41,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.data.model.GoalMonthlyPoint
-import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.GoalAllocationEngine
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 
@@ -51,6 +54,7 @@ import kotlin.math.max
  * ETA pill, and interactive "Imagine" What-If monthly boost simulator.
  * Strictly <= 390 lines.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalHistoryAndImagineCard(
     goal: Goal,
@@ -115,18 +119,19 @@ fun GoalHistoryAndImagineCard(
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(6, 12, 24).forEach { m ->
-                        FilterChip(
+                val monthOptions = listOf(6, 12, 24)
+                SingleChoiceSegmentedButtonRow {
+                    monthOptions.forEachIndexed { idx, m ->
+                        SegmentedButton(
                             selected = selectedMonths == m,
                             onClick = {
                                 haptics.tick()
                                 selectedMonths = m
                                 onTimeframeChanged(m)
                             },
-                            label = { Text("${m}M", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(28.dp)
+                            shape = SegmentedButtonDefaults.itemShape(index = idx, count = monthOptions.size),
+                            icon = {},
+                            label = { Text("${m}M", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
                         )
                     }
                 }
@@ -171,18 +176,11 @@ fun GoalHistoryAndImagineCard(
                     "stalled" -> "Pace Stalled"
                     else -> "${goal.eta?.date ?: "Unknown"} (${goal.eta?.months ?: 0} mos left)"
                 }
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                ) {
-                    Text(
-                        text = etaText,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
+                OrbitBadge(
+                    text = etaText,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
             }
 
             HorizontalDivider(thickness = 1.dp, color = colors.cardBorder)

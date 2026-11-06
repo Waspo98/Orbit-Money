@@ -25,6 +25,7 @@ import app.overbay.orbit.data.model.NotificationPreferencesConfig
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.PushNotificationConfigInfo
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 
@@ -59,41 +60,17 @@ fun PushNotificationsBlock(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "VAPID Push Server",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = if (pushConfig.configured) "Configured · Ready" else "Standard Local Alerts",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (pushConfig.configured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                OrbitMiniStatRow(
+                    label = "VAPID Push Server",
+                    value = if (pushConfig.configured) "Configured · Ready" else "Standard Local Alerts",
+                    valueColor = if (pushConfig.configured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Active Subscriptions",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "${pushConfig.activeSubscriptionCount} devices",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
+                OrbitMiniStatRow(
+                    label = "Active Subscriptions",
+                    value = "${pushConfig.activeSubscriptionCount} devices"
+                )
 
                 Button(
                     onClick = onSendTestNotification,

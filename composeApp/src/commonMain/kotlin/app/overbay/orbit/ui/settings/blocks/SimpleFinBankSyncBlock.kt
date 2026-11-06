@@ -22,15 +22,14 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,6 +47,9 @@ import app.overbay.orbit.data.model.SimpleFinSyncLogEntry
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.OrbitCompactListRow
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
@@ -127,7 +129,7 @@ fun SimpleFinBankSyncBlock(
         Spacer(modifier = Modifier.height(14.dp))
 
         // Setup Token input
-        OutlinedTextField(
+        OrbitTextField(
             value = rawToken,
             onValueChange = { rawToken = it },
             label = { Text("SimpleFIN Setup Token") },
@@ -223,39 +225,23 @@ fun SimpleFinBankSyncBlock(
                 enter = expandVertically(animationSpec = OrbitSprings.spatialDefault()) + fadeIn(),
                 exit = shrinkVertically(animationSpec = OrbitSprings.spatialDefault()) + fadeOut()
             ) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        syncLogs.take(5).forEachIndexed { idx, log ->
-                            if (idx > 0) HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = log.startedAt.take(19).replace("T", " "),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = "${log.accountsSynced} accounts · +${log.transactionsInserted} new",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Text(
+                    syncLogs.take(5).forEach { log ->
+                        val isError = log.status.contains("error", ignoreCase = true)
+                        OrbitCompactListRow(
+                            title = log.startedAt.take(19).replace("T", " "),
+                            subtitle = "${log.accountsSynced} accounts · +${log.transactionsInserted} new",
+                            trailingContent = {
+                                OrbitBadge(
                                     text = log.status.uppercase(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (log.status.contains("error", ignoreCase = true)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                    containerColor = if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                    contentColor = if (isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.primary
                                 )
                             }
-                        }
+                        )
                     }
                 }
             }
@@ -279,7 +265,8 @@ fun SimpleFinBankSyncBlock(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 mutedAccounts.forEach { accountLabel ->
-                    AssistChip(
+                    InputChip(
+                        selected = true,
                         onClick = { onUnmuteAccount(accountLabel) },
                         label = { Text(accountLabel, style = MaterialTheme.typography.labelMedium) },
                         trailingIcon = {

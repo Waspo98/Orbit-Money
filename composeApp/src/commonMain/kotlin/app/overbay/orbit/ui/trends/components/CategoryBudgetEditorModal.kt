@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,6 +29,7 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -72,32 +72,12 @@ fun CategoryBudgetEditorModal(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Rollover Unused Funds",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Carry over surpluses or deficits into the next month",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = rollover,
-                    onCheckedChange = {
-                        haptics.tick()
-                        rollover = it
-                    }
-                )
-            }
+            OrbitSwitchRow(
+                title = "Rollover Unused Funds",
+                subtitle = "Carry over surpluses or deficits into the next month",
+                checked = rollover,
+                onCheckedChange = { rollover = it }
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 

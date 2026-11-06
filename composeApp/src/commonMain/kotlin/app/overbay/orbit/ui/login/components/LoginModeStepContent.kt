@@ -24,7 +24,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitIcons
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.components.SelectableListRow
 import app.overbay.orbit.ui.login.LocalSeedChoice
 import app.overbay.orbit.ui.login.LoginIntent
@@ -202,13 +202,12 @@ fun LoginLocalSetupStep(
                     }
                 }
 
-                OutlinedTextField(
+                OrbitTextField(
                     value = state.backupJsonContent.orEmpty(),
                     onValueChange = { onIntent(LoginIntent.SetBackupFile("Pasted JSON", it)) },
                     label = { Text("Or Paste Backup JSON") },
                     placeholder = { Text("{\"schemaVersion\": 1, ...}") },
                     maxLines = 3,
-                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             }

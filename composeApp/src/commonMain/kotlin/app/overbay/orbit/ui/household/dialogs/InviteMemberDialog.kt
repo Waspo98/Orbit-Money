@@ -12,7 +12,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -28,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HouseholdRole
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitTextField
 
 @Composable
 fun InviteMemberDialog(
@@ -116,7 +116,7 @@ private fun InviteMemberFormFields(
         )
         Spacer(modifier = Modifier.height(14.dp))
 
-        OutlinedTextField(
+        OrbitTextField(
             value = email,
             onValueChange = onEmailChange,
             label = { Text("Member Email Address") },

@@ -14,17 +14,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Goal
@@ -32,6 +28,8 @@ import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -137,14 +135,10 @@ fun GoalProgressCard(
             Spacer(modifier = Modifier.height(14.dp))
 
             // Progress Bar
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = progressColor,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            OrbitPillProgressBar(
+                percent = progress,
+                customFillColor = progressColor,
+                height = 8.dp
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -176,25 +170,11 @@ fun GoalProgressCard(
                 }
 
                 if (!isDone) {
-                    OutlinedButton(
-                        onClick = {
-                            haptics.tick()
-                            onDepositClick()
-                        },
-                        contentPadding = ButtonDefaults.TextButtonContentPadding,
-                        modifier = Modifier.height(34.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Deposit",
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Deposit",
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
+                    OrbitActionChip(
+                        label = "Deposit",
+                        icon = Icons.Default.Add,
+                        onClick = onDepositClick
+                    )
                 }
             }
         }

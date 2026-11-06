@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -117,8 +116,11 @@ fun OrbitTextInputDialog(
     description: String? = null,
     initialValue: String = "",
     label: String = "Name",
+    placeholder: String? = null,
+    supportingText: String? = null,
     confirmText: String = "Save",
-    dismissText: String = "Cancel"
+    dismissText: String = "Cancel",
+    allowBlank: Boolean = false
 ) {
     var text by remember(initialValue) { mutableStateOf(initialValue) }
 
@@ -141,10 +143,12 @@ fun OrbitTextInputDialog(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                 }
-                OutlinedTextField(
+                OrbitTextField(
                     value = text,
                     onValueChange = { text = it },
                     label = { Text(label) },
+                    placeholder = if (placeholder != null) { { Text(placeholder) } } else null,
+                    supportingText = if (supportingText != null) { { Text(supportingText) } } else null,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -153,7 +157,7 @@ fun OrbitTextInputDialog(
         confirmButton = {
             TextButton(
                 onClick = { onConfirm(text) },
-                enabled = text.isNotBlank()
+                enabled = allowBlank || text.isNotBlank()
             ) {
                 Text(confirmText)
             }

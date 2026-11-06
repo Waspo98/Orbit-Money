@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.HouseholdRole
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.household.HouseholdUiState
 import app.overbay.orbit.ui.household.dialogs.HouseholdMemberEditorContent
 import app.overbay.orbit.ui.household.dialogs.InviteMemberContent
@@ -265,21 +266,5 @@ private fun MemberDetailRow(
     label: String,
     value: String
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
+    OrbitMiniStatRow(label = label, value = value)
 }

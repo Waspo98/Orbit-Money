@@ -51,6 +51,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -297,13 +298,13 @@ fun SwipeableTransactionRow(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                CompactPillAction(label = "Edit", onClick = onEdit)
-                                CompactPillAction(label = "Split", onClick = onSplit)
-                                CompactPillAction(label = "Create Rule", onClick = onCreateRule)
-                                CompactPillAction(label = "Recurring", onClick = onMarkRecurring)
-                                CompactPillAction(label = if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Transfer", onClick = onToggleTransfer)
-                                CompactPillAction(label = if (transaction.effectiveIsIgnored) "Unignore" else "Ignore", onClick = onToggleIgnore)
-                                CompactPillAction(label = "Delete", isDestructive = true, onClick = onDelete)
+                                OrbitActionChip(label = "Edit", onClick = { haptics.tick(); onEdit() })
+                                OrbitActionChip(label = "Split", onClick = { haptics.tick(); onSplit() })
+                                OrbitActionChip(label = "Create Rule", onClick = { haptics.tick(); onCreateRule() })
+                                OrbitActionChip(label = "Recurring", onClick = { haptics.tick(); onMarkRecurring() })
+                                OrbitActionChip(label = if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Transfer", onClick = { haptics.tick(); onToggleTransfer() })
+                                OrbitActionChip(label = if (transaction.effectiveIsIgnored) "Unignore" else "Ignore", onClick = { haptics.tick(); onToggleIgnore() })
+                                OrbitActionChip(label = "Delete", isDestructive = true, onClick = { haptics.tick(); onDelete() })
                             }
                         }
                     }
@@ -329,30 +330,6 @@ private fun MetaItem(label: String, value: String, isMono: Boolean = false) {
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun CompactPillAction(
-    label: String,
-    onClick: () -> Unit,
-    isDestructive: Boolean = false
-) {
-    val haptics = LocalOrbitHaptics.current
-    OutlinedButton(
-        onClick = { haptics.tick(); onClick() },
-        shape = CircleShape,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-        border = BorderStroke(1.dp, if (isDestructive) OrbitTheme.colors.danger else OrbitTheme.colors.cardBorder),
-        modifier = Modifier.height(30.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isDestructive) OrbitTheme.colors.danger else MaterialTheme.colorScheme.onSurface
         )
     }
 }
