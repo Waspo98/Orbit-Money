@@ -35,6 +35,7 @@ fun SelectableListRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    subtitleMaxLines: Int = 1,
     sidePrimary: String? = null,
     sideSecondary: String? = null,
     selected: Boolean = false,
@@ -95,7 +96,7 @@ fun SelectableListRow(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        maxLines = subtitleMaxLines,
                         overflow = TextOverflow.Ellipsis
                     )
                 }

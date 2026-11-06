@@ -78,6 +78,7 @@ fun LoginServerUrlStep(
     }
 
     LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(150)
         runCatching { focusRequester.requestFocus() }
     }
 

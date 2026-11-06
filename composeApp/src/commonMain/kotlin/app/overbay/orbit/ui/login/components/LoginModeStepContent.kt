@@ -61,6 +61,7 @@ fun LoginModeSelectionStep(
         SelectableListRow(
             title = "Local",
             subtitle = "Private offline storage right on this device",
+            subtitleMaxLines = 3,
             leadingIcon = {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -84,6 +85,7 @@ fun LoginModeSelectionStep(
         SelectableListRow(
             title = "Self-Hosted",
             subtitle = "Connect to your Orbit Money server",
+            subtitleMaxLines = 3,
             leadingIcon = {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -130,6 +132,7 @@ fun LoginLocalSetupStep(
         SelectableListRow(
             title = "Start Fresh",
             subtitle = "Clean workspace with standard categories",
+            subtitleMaxLines = 3,
             selected = state.selectedLocalSeed == LocalSeedChoice.FRESH,
             onClick = { onIntent(LoginIntent.SelectLocalSeed(LocalSeedChoice.FRESH)) }
         )
@@ -137,6 +140,7 @@ fun LoginLocalSetupStep(
         SelectableListRow(
             title = "Sample Data",
             subtitle = "Explore with realistic accounts and transactions",
+            subtitleMaxLines = 3,
             selected = state.selectedLocalSeed == LocalSeedChoice.DEMO,
             onClick = { onIntent(LoginIntent.SelectLocalSeed(LocalSeedChoice.DEMO)) }
         )
@@ -144,6 +148,7 @@ fun LoginLocalSetupStep(
         SelectableListRow(
             title = "Restore Backup JSON",
             subtitle = "Import an existing Orbit Money backup export",
+            subtitleMaxLines = 3,
             selected = state.selectedLocalSeed == LocalSeedChoice.RESTORE_FILE,
             onClick = { onIntent(LoginIntent.SelectLocalSeed(LocalSeedChoice.RESTORE_FILE)) }
         )
