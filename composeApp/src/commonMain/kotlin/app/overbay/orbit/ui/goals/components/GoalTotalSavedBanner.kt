@@ -23,7 +23,7 @@ import app.overbay.orbit.ui.components.OrbitPillProgressBar
 
 /**
  * Editorial snapshot banner displaying total saved vs total target across all goals.
- * Strictly <= 150 lines.
+ *
  */
 @Composable
 fun GoalTotalSavedBanner(

@@ -51,7 +51,7 @@ fun CategoryBreakdownList(
         if (categoryTrends.isEmpty()) {
             EmptyStateCard(
                 title = "No Category Spending",
-                description = "No category spending recorded in this period."
+                description = "Transactions with spending categories will appear here once recorded."
             )
             return@OrbitSectionCard
         }

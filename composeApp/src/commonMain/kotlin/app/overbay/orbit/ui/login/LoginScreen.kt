@@ -71,7 +71,7 @@ import app.overbay.orbit.util.PlatformRuntime
  * Progressively morphs from Mode Selection (Local vs Self-Hosted) ->
  * Server URL confirmation (`https://` prefilled) -> Credentials / OIDC,
  * or Local Workspace initialization.
- * Conforms strictly to the <= 6 parameter rule and < 400-line ceiling.
+ * Root Login screen composable.
  */
 @Composable
 fun LoginScreen(

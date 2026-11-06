@@ -11,7 +11,7 @@ fun GoogleDriveClientIdDialog(
 ) {
     OrbitTextInputDialog(
         title = "Google Drive Web Client ID",
-        description = "Configure your Google Cloud OAuth 2.0 Web Client ID to enable private appDataFolder sync in Web PWA browsers.",
+        description = "Enter your Google Cloud Web Client ID to enable Google Drive sign-in in web browsers.",
         initialValue = initialClientId,
         label = "Web Client ID",
         placeholder = "123456789-abc.apps.googleusercontent.com",

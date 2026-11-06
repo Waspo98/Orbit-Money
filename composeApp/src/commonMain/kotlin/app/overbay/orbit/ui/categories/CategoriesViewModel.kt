@@ -30,8 +30,9 @@ class CategoriesViewModel(
     private val _ruleBlockedCategory = MutableStateFlow<CategorySummary?>(null)
     private val _isReorderMode = MutableStateFlow(false)
     private val _searchQuery = MutableStateFlow("")
+    private val _isSearchActive = MutableStateFlow(false)
     private val _groupOrder = MutableStateFlow(
-        listOf("Income", "Living Needs (Fixed)", "Discretionary (Variable)", "Transfers & Savings")
+        listOf("Expenses", "Income", "Transfers")
     )
     private val _categorySortOverrides = MutableStateFlow<Map<Long, Int>>(emptyMap())
 
@@ -53,6 +54,8 @@ class CategoriesViewModel(
         state.copy(isReorderMode = isReorder)
     }.combine(_searchQuery) { state, query ->
         state.copy(searchQuery = query)
+    }.combine(_isSearchActive) { state, active ->
+        state.copy(isSearchActive = active)
     }
 
     private val repoFlow = combine(
@@ -135,29 +138,22 @@ class CategoriesViewModel(
             }
         } else allSummaries
 
-        // Group into 4 M3E groups
+        val expenseList = mutableListOf<CategorySummary>()
         val incomeList = mutableListOf<CategorySummary>()
         val transferList = mutableListOf<CategorySummary>()
-        val fixedNeedsList = mutableListOf<CategorySummary>()
-        val variableDiscretionaryList = mutableListOf<CategorySummary>()
-
-        val fixedKeywords = setOf("rent", "mortgage", "housing", "utilities", "electric", "water", "groceries", "insurance", "medical", "health", "auto", "gas", "loan")
 
         for (item in filteredSummaries) {
-            val nameLower = item.category.name.lowercase()
             when {
                 item.category.isIncome -> incomeList.add(item)
-                item.category.isTransfer || nameLower.contains("transfer") || nameLower.contains("saving") -> transferList.add(item)
-                fixedKeywords.any { nameLower.contains(it) } -> fixedNeedsList.add(item)
-                else -> variableDiscretionaryList.add(item)
+                item.category.isTransfer -> transferList.add(item)
+                else -> expenseList.add(item)
             }
         }
 
         val groups = listOf(
+            CategoryGroupDisplay("Expenses", expenseList, expenseList.sumOf { it.totalAmountCents }),
             CategoryGroupDisplay("Income", incomeList, incomeList.sumOf { it.totalAmountCents }),
-            CategoryGroupDisplay("Living Needs (Fixed)", fixedNeedsList, fixedNeedsList.sumOf { it.totalAmountCents }),
-            CategoryGroupDisplay("Discretionary (Variable)", variableDiscretionaryList, variableDiscretionaryList.sumOf { it.totalAmountCents }),
-            CategoryGroupDisplay("Transfers & Savings", transferList, transferList.sumOf { it.totalAmountCents })
+            CategoryGroupDisplay("Transfers", transferList, transferList.sumOf { it.totalAmountCents })
         ).filter { it.items.isNotEmpty() }.sortedBy { grp ->
             val idx = groupOrder.indexOf(grp.title)
             if (idx >= 0) idx else Int.MAX_VALUE
@@ -176,6 +172,11 @@ class CategoriesViewModel(
     )
 
     fun setSearchQuery(query: String) { _searchQuery.value = query }
+
+    fun setSearchActive(active: Boolean) {
+        _isSearchActive.value = active
+        if (!active) _searchQuery.value = ""
+    }
 
     fun selectCategoryForInspect(id: Long?) {
         val nextId = if (_inspectingCategoryId.value == id) null else id

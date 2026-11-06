@@ -95,7 +95,7 @@ fun HouseholdPlanningSignalsCard(
     } else 0.0
 
     OrbitSectionCard(
-        title = "Household Financial Signals",
+        title = "Household Summary",
         subtitle = "Consolidated income, benefits, and retirement accumulation",
         modifier = modifier
     ) {

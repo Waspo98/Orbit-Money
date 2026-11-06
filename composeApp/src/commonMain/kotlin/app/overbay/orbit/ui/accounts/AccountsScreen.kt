@@ -52,7 +52,7 @@ import app.overbay.orbit.util.LocalDevicePosture
  * Editorial Accounts screen with curved green canopy hero, 2x2 bento stats grid,
  * 3-pill action row, collapsed-by-default white accordion account group cards,
  * and morphing dual-screen inspector pane / phone OrbitModalSheet.
- * Conforms strictly to <= 6 parameters and < 390-line ceiling.
+ * Root Accounts screen composable.
  */
 @Composable
 fun AccountsScreen(

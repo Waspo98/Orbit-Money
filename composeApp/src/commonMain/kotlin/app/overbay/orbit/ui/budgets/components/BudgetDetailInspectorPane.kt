@@ -73,7 +73,7 @@ private enum class BudgetInspectorSubMode { DETAIL, EDIT }
  * Right-hand morphing inspector pane for Budgets on unfolded phones, tablets, and desktops.
  * Shows the category budget breakdown + full monthly transactions list by default when a category row is tapped,
  * and morphs smoothly into the BudgetAmountEditorContent when editing or adding a budget.
- * Strictly under the 400-line ceiling.
+ *
  */
 @Composable
 fun BudgetDetailInspectorPane(

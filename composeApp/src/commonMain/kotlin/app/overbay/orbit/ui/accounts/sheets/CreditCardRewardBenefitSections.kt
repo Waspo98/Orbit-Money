@@ -54,11 +54,11 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 data class CardArtPreset(val label: String, val network: String, val url: String)
 
 val PRESET_CARD_ARTS = listOf(
-    CardArtPreset("Sapphire Blue", "Visa", "https://assets.orbit.money/cards/sapphire-blue.png"),
-    CardArtPreset("Amex Gold", "Amex", "https://assets.orbit.money/cards/amex-gold.png"),
-    CardArtPreset("Capital Silver", "Mastercard", "https://assets.orbit.money/cards/venture-silver.png"),
-    CardArtPreset("Apple Titanium", "Mastercard", "https://assets.orbit.money/cards/apple-card.png"),
-    CardArtPreset("Discover Plum", "Discover", "https://assets.orbit.money/cards/discover-plum.png")
+    CardArtPreset("Sapphire Blue", "Visa", "preset://sapphire-blue"),
+    CardArtPreset("Amex Gold", "Amex", "preset://amex-gold"),
+    CardArtPreset("Capital Silver", "Mastercard", "preset://venture-silver"),
+    CardArtPreset("Apple Titanium", "Mastercard", "preset://apple-card"),
+    CardArtPreset("Discover Plum", "Discover", "preset://discover-plum")
 )
 
 val NETWORKS = listOf("Visa", "Mastercard", "Amex", "Discover")

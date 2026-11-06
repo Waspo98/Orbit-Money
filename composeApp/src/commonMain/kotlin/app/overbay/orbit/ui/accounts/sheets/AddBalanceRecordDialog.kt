@@ -1,7 +1,6 @@
 package app.overbay.orbit.ui.accounts.sheets
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -30,12 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitModalSheet
@@ -44,10 +40,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Editorial modal dialog for adding a dated BalanceRecord snapshot to an account.
- * Features DateFieldButton (defaults to today), CurrencyTextField, and a 25% delta
- * confirmation warning banner when new balance sharply deviates from current balance.
- * Strictly under the 390-line ceiling.
+ * Modal dialog for recording a dated balance update on an account.
  */
 @Composable
 fun AddBalanceRecordDialog(
@@ -59,7 +52,6 @@ fun AddBalanceRecordDialog(
     val haptics = LocalOrbitHaptics.current
     var date by remember { mutableStateOf(LocalDateUtils.todayLocalDate()) }
     var balanceCents by remember { mutableStateOf(account.currentBalanceCents) }
-    var confirmedLargeDelta by remember { mutableStateOf(false) }
 
     val current = account.currentBalanceCents
     val diff = abs(balanceCents - current)
@@ -69,8 +61,6 @@ fun AddBalanceRecordDialog(
     val deltaPercent = if (current != 0L) {
         ((diff.toDouble() / abs(current).toDouble()) * 100.0).roundToInt()
     } else 0
-
-    val canSave = !isLargeDelta || confirmedLargeDelta
 
     OrbitModalSheet(
         onDismissRequest = onDismiss,
@@ -83,14 +73,14 @@ fun AddBalanceRecordDialog(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                text = "Add Balance Snapshot",
+                text = "Update Balance",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
             Text(
-                text = "Record a balance snapshot for ${account.name}. Current balance is ${MoneyUtils.formatCents(current)}.",
+                text = "Record a balance entry for ${account.name}. Current balance is ${MoneyUtils.formatCents(current)}.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -98,16 +88,13 @@ fun AddBalanceRecordDialog(
             DateFieldButton(
                 date = date,
                 onDateSelected = { date = it },
-                label = "Snapshot Date"
+                label = "Date"
             )
 
             CurrencyTextField(
                 cents = balanceCents,
-                onCentsChange = {
-                    balanceCents = it
-                    confirmedLargeDelta = false
-                },
-                label = "Balance on Date",
+                onCentsChange = { balanceCents = it },
+                label = "Balance",
                 allowNegative = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -129,7 +116,7 @@ fun AddBalanceRecordDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Significant Balance Change ($deltaPercent% Diff)",
+                                text = "Large Balance Change ($deltaPercent%)",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.error
@@ -137,29 +124,10 @@ fun AddBalanceRecordDialog(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "The entered balance of ${MoneyUtils.formatCents(balanceCents)} differs by $deltaPercent% from current account balance ${MoneyUtils.formatCents(current)}.",
+                            text = "This entry (${MoneyUtils.formatCents(balanceCents)}) differs by $deltaPercent% from the previous balance (${MoneyUtils.formatCents(current)}).",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { confirmedLargeDelta = !confirmedLargeDelta }
-                        ) {
-                            Checkbox(
-                                checked = confirmedLargeDelta,
-                                onCheckedChange = { confirmedLargeDelta = it }
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "I confirm this balance snapshot is accurate",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
                     }
                 }
             }
@@ -181,10 +149,9 @@ fun AddBalanceRecordDialog(
                         haptics.confirm()
                         onAddRecord(LocalDateUtils.formatIsoDate(date), balanceCents)
                     },
-                    enabled = canSave,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Save Record")
+                    Text("Save Balance")
                 }
             }
         }

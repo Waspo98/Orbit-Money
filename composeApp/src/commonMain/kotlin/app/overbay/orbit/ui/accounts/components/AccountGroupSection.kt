@@ -57,7 +57,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
  * Collapsed by default with 20dp corners, 1dp cardBorder, tracked uppercase header,
  * bold colored balance, circular 30dp bordered chevron button, left-side drag handle,
  * and support for 1-column vs 2-column wideSpan layout.
- * Strictly under the 390-line ceiling.
+ *
  */
 @Composable
 fun AccountGroupSection(

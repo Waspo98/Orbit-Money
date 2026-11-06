@@ -26,7 +26,6 @@ fun PreferencesSubpageContent(
             .padding(bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Theme & Appearance (Presets, Mode, Soft Dark vs AMOLED Black, Dynamic Color)
         ThemeAppearanceBlock(
             preferences = uiState.preferences,
             onPresetChange = viewModel::setThemePreset,
@@ -35,7 +34,6 @@ fun PreferencesSubpageContent(
             onAmoledDarkChange = viewModel::setAmoledDark
         )
 
-        // 2. Push Notifications & Pulse Alerts
         PushNotificationsBlock(
             preferences = uiState.preferences,
             pushConfig = uiState.pushConfig,
@@ -44,14 +42,13 @@ fun PreferencesSubpageContent(
             onUpdateNotificationPreferences = viewModel::updateNotificationPreferences
         )
 
-        // 3. Navigation & Feature Visibility
         NavigationCustomizeBlock(
             preferences = uiState.preferences,
             onToggleRouteHidden = viewModel::toggleRouteHidden,
-            onMoveRoute = viewModel::moveRouteOrder
+            onMoveRoute = viewModel::moveRouteOrder,
+            onMhaTrackerChange = viewModel::setMhaTrackerEnabled
         )
 
-        // 4. Security & Biometrics
         SecurityBiometricsBlock(
             preferences = uiState.preferences,
             onBiometricLockChange = viewModel::setBiometricLock,

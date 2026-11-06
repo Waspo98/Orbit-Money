@@ -377,7 +377,7 @@ class SettingsViewModel(
                 )
             }
         } else {
-            _uiState.update { it.copy(statusMessage = "Invalid backup JSON: ${preview.exceptionOrNull()?.message}") }
+            _uiState.update { it.copy(statusMessage = "Could not read backup file. Please make sure it is a valid Orbit Money backup.") }
         }
     }
 

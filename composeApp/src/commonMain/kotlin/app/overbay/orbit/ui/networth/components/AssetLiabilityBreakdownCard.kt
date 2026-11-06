@@ -48,7 +48,7 @@ fun AssetLiabilityBreakdownCard(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             OrbitSectionCard(
-                title = "BALANCE ALLOCATION",
+                title = "Balance Allocation",
                 modifier = Modifier.fillMaxWidth()
             ) {
                 AllocationBar(snapshot = snapshot)

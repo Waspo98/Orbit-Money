@@ -47,7 +47,7 @@ fun WipeRulesDialog(
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "This will permanently delete all $ruleCount automated rule(s) from your vault. Transactions will no longer be categorized or renamed automatically.\n\nTo confirm, type DELETE below:",
+                    text = "This will permanently delete all $ruleCount automated rule(s). Transactions will no longer be categorized or renamed automatically.\n\nTo confirm, type DELETE below:",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

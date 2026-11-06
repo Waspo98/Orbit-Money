@@ -45,7 +45,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 /**
  * Editorial Notable Insights panel highlighting Over Budget categories, Near Limit (>= 80%) categories,
  * and Unbudgeted spend / notable refund variances with 1-tap category inspection and "+ Add Budget".
- * Strictly <= 390 lines.
+ *
  */
 @Composable
 fun NotablePanel(

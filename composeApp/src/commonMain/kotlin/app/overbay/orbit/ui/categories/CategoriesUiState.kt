@@ -27,6 +27,7 @@ data class CategoriesUiState(
     val ruleBlockedDeleteCategory: CategorySummary? = null,
     val isReorderMode: Boolean = false,
     val searchQuery: String = "",
+    val isSearchActive: Boolean = false,
     val isLoading: Boolean = false,
     val totalCategoriesCount: Int = 0,
     val mhaEnabled: Boolean = false

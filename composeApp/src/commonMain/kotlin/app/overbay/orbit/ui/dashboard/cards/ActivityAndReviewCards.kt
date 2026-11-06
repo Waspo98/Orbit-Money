@@ -62,7 +62,7 @@ fun UncategorizedCard(
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
-        title = "UNCATEGORIZED TRANSACTIONS",
+        title = "Uncategorized Transactions",
         actionText = "Categorize",
         onActionClick = onClick,
         modifier = modifier
@@ -114,7 +114,7 @@ fun CategorizeRecentCard(
     val haptics = LocalOrbitHaptics.current
 
     OrbitSectionCard(
-        title = "CATEGORIZE RECENT TRANSACTIONS",
+        title = "Categorize Recent Transactions",
         actionText = "Open",
         onActionClick = onOpenReview,
         modifier = modifier
@@ -140,7 +140,7 @@ fun CategorizeRecentCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Swipe through recent transactions that need a little human judgment.",
+                    text = "Quickly categorize recent transactions that need your review.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 19.sp
@@ -253,7 +253,7 @@ fun RecentTransactionsCard(
     var expandedTransactionId by remember { mutableStateOf<Long?>(null) }
 
     OrbitSectionCard(
-        title = "RECENT TRANSACTIONS",
+        title = "Recent Transactions",
         actionText = "See All",
         onActionClick = onViewAll,
         modifier = modifier

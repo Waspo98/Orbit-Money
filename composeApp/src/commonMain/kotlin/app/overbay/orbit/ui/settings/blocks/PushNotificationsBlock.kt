@@ -2,7 +2,6 @@ package app.overbay.orbit.ui.settings.blocks
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,11 +12,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,19 +38,17 @@ fun PushNotificationsBlock(
     val config = preferences.notificationPreferences
 
     OrbitSectionCard(
-        title = "Push Notifications & Alerts",
-        subtitle = "Web push & scheduled financial pulse summaries",
+        title = "Notifications & Reminders",
+        subtitle = "Weekly summaries, deposit alerts, and account reminders",
         modifier = modifier
     ) {
-        // Master switch
         OrbitSwitchRow(
             title = "Enable Notifications",
-            subtitle = "Receive periodic financial summaries and critical account alerts",
+            subtitle = "Receive weekly summaries and helpful account reminders",
             checked = config.enabled,
             onCheckedChange = { onUpdateNotificationPreferences(config.copy(enabled = it)) }
         )
 
-        // VAPID & Device status card
         Spacer(modifier = Modifier.height(12.dp))
         Surface(
             shape = RoundedCornerShape(12.dp),
@@ -62,13 +57,13 @@ fun PushNotificationsBlock(
         ) {
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 OrbitMiniStatRow(
-                    label = "VAPID Push Server",
-                    value = if (pushConfig.configured) "Configured · Ready" else "Standard Local Alerts",
+                    label = "Delivery Method",
+                    value = if (pushConfig.configured) "Push Notifications Ready" else "Local Device Alerts",
                     valueColor = if (pushConfig.configured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 OrbitMiniStatRow(
-                    label = "Active Subscriptions",
+                    label = "Connected Devices",
                     value = "${pushConfig.activeSubscriptionCount} devices"
                 )
 
@@ -92,7 +87,6 @@ fun PushNotificationsBlock(
             HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Show Dollar Amounts toggle
             OrbitSwitchRow(
                 title = "Show Dollar Amounts",
                 subtitle = "Include exact balances and transaction figures in notification previews",
@@ -102,17 +96,16 @@ fun PushNotificationsBlock(
 
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "SCHEDULED PULSE ALERTS",
-                style = MaterialTheme.typography.labelSmall,
+                text = "Scheduled Alerts",
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Weekly Snapshot
             OrbitSwitchRow(
-                title = "Weekly Snapshot",
-                subtitle = "Weekly net worth momentum, savings velocity, and top spend categories",
+                title = "Weekly Summary",
+                subtitle = "Weekly recap of net worth changes, savings progress, and top spending categories",
                 checked = config.weeklySnapshot.enabled,
                 onCheckedChange = {
                     onUpdateNotificationPreferences(config.copy(weeklySnapshot = config.weeklySnapshot.copy(enabled = it)))
@@ -121,7 +114,6 @@ fun PushNotificationsBlock(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Income Alerts
             OrbitSwitchRow(
                 title = "Income & Paycheck Alerts",
                 subtitle = "Notify when paychecks and deposits over $100 post",
@@ -133,10 +125,9 @@ fun PushNotificationsBlock(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Sync Issues
             OrbitSwitchRow(
                 title = "Bank Sync Issues",
-                subtitle = "Notify when bank connections or SimpleFIN feeds require attention",
+                subtitle = "Notify when bank connections require attention",
                 checked = config.syncIssues.enabled,
                 onCheckedChange = {
                     onUpdateNotificationPreferences(config.copy(syncIssues = config.syncIssues.copy(enabled = it)))
@@ -145,10 +136,9 @@ fun PushNotificationsBlock(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Account Snapshot Reminders
             OrbitSwitchRow(
-                title = "Account Snapshot Reminders",
-                subtitle = "Gentle reminder to review uncategorized transactions",
+                title = "Manual Balance Reminders",
+                subtitle = "Periodic reminder to update balances on manual accounts",
                 checked = config.accountSnapshots.enabled,
                 onCheckedChange = {
                     onUpdateNotificationPreferences(config.copy(accountSnapshots = config.accountSnapshots.copy(enabled = it)))

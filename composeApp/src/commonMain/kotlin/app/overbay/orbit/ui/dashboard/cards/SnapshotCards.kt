@@ -47,7 +47,7 @@ fun RetirementSnapshotCard(
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
-        title = "RETIREMENT SNAPSHOT",
+        title = "Retirement Overview",
         actionText = "Retirement Calc",
         onActionClick = onClick,
         modifier = modifier
@@ -157,7 +157,7 @@ fun MhaSummaryCard(
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
-        title = "MHA TRACKER SUMMARY",
+        title = "MHA Summary",
         actionText = "MHA Tracker",
         onActionClick = onClick,
         modifier = modifier
@@ -201,7 +201,7 @@ fun MortgageSnapshotCard(
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
-        title = "MORTGAGE SNAPSHOT",
+        title = "Mortgage Overview",
         actionText = "Accounts",
         onActionClick = onClick,
         modifier = modifier

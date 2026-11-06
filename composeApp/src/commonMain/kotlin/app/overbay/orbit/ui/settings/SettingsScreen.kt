@@ -247,7 +247,7 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text(
-                        text = "Backup snapshot generated. Copy the JSON below to safely store off-device:",
+                        text = "Copy the backup data below to store a copy off-device:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -276,7 +276,7 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text(
-                        text = "Paste JSON snapshot below to preview and restore:",
+                        text = "Paste your exported backup data below to preview and restore:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -284,7 +284,7 @@ fun SettingsScreen(
                     OrbitTextField(
                         value = uiState.restoreJsonText,
                         onValueChange = viewModel::setRestoreJsonText,
-                        placeholder = { Text("Paste JSON here...") },
+                        placeholder = { Text("Paste backup data here...") },
                         modifier = Modifier.fillMaxWidth().height(180.dp)
                     )
                 }

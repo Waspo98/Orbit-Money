@@ -31,7 +31,7 @@ import kotlin.math.roundToInt
  * Editorial Budget Snapshot panel matching original Orbit Money design.
  * Features 36sp hero spent figure, 12dp pill progress bar, remaining pace,
  * and a 2x2 grid of tiles (BUDGETED, UNBUDGETED, CASH FLOW, SPEND PACE).
- * Strictly under the 400-line ceiling.
+ *
  */
 @Composable
 fun BudgetSummaryHeroCard(

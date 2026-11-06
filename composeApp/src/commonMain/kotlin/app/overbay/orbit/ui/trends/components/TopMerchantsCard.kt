@@ -43,7 +43,7 @@ fun TopMerchantsCard(
         if (topMerchants.isEmpty()) {
             EmptyStateCard(
                 title = "No Merchant Spending",
-                description = "No merchant spending recorded in this period."
+                description = "Your most-visited merchants will appear here as expenses are recorded."
             )
             return@OrbitSectionCard
         }

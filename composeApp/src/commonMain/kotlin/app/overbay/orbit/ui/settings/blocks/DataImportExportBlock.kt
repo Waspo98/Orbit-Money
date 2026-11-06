@@ -119,7 +119,7 @@ fun DataImportExportBlock(
             // Full snapshot backup & restore
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "PORTABLE WORKSPACE BACKUP (.ORBIT.JSON)",
+                    text = "Full Workspace Backup",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary

@@ -24,7 +24,7 @@ fun NetWorthSignalsCard(
     modifier: Modifier = Modifier
 ) {
     OrbitSectionCard(
-        title = "KEY SIGNALS",
+        title = "Net Worth Highlights",
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {

@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
  * Native Compose Multiplatform modal sheet for finding and overriding vendor/merchant logos.
  * Port of main's LogoFinderModal / ImageUrlFinderModal with Logo.dev brand search,
  * direct image URL input, live logo preview, DuckDuckGo image search, and category icon fallback.
- * Strictly under the 400-line ceiling.
+ *
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,7 +135,7 @@ fun MerchantLogoFinderDialog(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Search Logo.dev results for ${transaction.effectiveMerchant}, or paste a direct image URL.",
+                text = "Search brand logos for ${transaction.effectiveMerchant}, or paste a direct image URL.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

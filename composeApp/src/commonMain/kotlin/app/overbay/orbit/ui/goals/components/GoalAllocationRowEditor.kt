@@ -47,7 +47,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 /**
  * Multi-account allocation rows editor allowing household owners to assign savings percentages
  * or fixed dollar amounts across eligible asset accounts with reserve protection.
- * Strictly <= 390 lines.
+ *
  */
 @Composable
 fun GoalAllocationRowEditor(

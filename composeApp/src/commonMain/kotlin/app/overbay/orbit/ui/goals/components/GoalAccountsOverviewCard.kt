@@ -42,7 +42,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 /**
  * Account Overview Card showing how each savings, checking, or cash account is divided across
  * active goals vs unallocated cash and reserve protection.
- * Strictly <= 390 lines.
+ *
  */
 @Composable
 fun GoalAccountsOverviewCard(

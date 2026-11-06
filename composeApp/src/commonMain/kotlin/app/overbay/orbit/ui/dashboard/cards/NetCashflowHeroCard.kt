@@ -41,7 +41,7 @@ fun NetCashflowHeroCard(
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
-        title = "THIS MONTH",
+        title = "This Month",
         subtitle = "Day ${cashflow.dayOfMonth} of ${cashflow.totalDaysInMonth}",
         actionText = "Details",
         onActionClick = onClick,

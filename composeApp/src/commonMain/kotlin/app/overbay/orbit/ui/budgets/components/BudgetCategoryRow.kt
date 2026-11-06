@@ -48,7 +48,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 /**
  * Editorial category budget row with expandable inline transaction preview
  * and direct Edit/Delete budget actions.
- * Strictly under the 400-line ceiling.
+ *
  */
 @Composable
 fun BudgetCategoryRow(

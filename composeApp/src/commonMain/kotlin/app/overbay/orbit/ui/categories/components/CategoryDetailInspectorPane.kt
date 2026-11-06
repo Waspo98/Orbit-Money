@@ -214,7 +214,7 @@ private fun CategoryInspectorDetailView(
             ) {
                 Column {
                     Text(
-                        text = "TOTAL VOLUME",
+                        text = "Total Activity",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -272,7 +272,7 @@ private fun CategoryInspectorDetailView(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "CLASSIFICATION & FLAGS",
+                    text = "Category Settings",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary

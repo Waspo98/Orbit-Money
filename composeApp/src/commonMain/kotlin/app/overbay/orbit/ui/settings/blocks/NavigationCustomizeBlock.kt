@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
@@ -25,6 +24,7 @@ import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.dragReorderItem
 import app.overbay.orbit.ui.components.rememberDragReorderState
 
@@ -35,6 +35,7 @@ fun NavigationCustomizeBlock(
     preferences: OrbitPreferences,
     onToggleRouteHidden: (String) -> Unit,
     onMoveRoute: (fromIndex: Int, toIndex: Int, currentList: List<String>) -> Unit,
+    onMhaTrackerChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val defaultRoutes = remember {
@@ -70,14 +71,23 @@ fun NavigationCustomizeBlock(
     )
 
     OrbitSectionCard(
-        title = "Navigation & Feature Visibility",
-        subtitle = "Toggle secondary tool visibility and customize ordering in More menu",
+        title = "Navigation & Optional Features",
+        subtitle = "Choose which tools appear in the More menu and reorder them",
         modifier = modifier
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            OrbitSwitchRow(
+                title = "Ministerial Housing Allowance (MHA)",
+                subtitle = "Enable clergy housing allowance tracking and tax estimates",
+                checked = preferences.mhaTrackerEnabled,
+                onCheckedChange = onMhaTrackerChange
+            )
+
+            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+
             Text(
-                text = "MORE MENU DESTINATIONS",
-                style = MaterialTheme.typography.labelSmall,
+                text = "More Menu Destinations",
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )

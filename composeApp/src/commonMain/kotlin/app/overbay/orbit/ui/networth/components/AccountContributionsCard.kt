@@ -41,7 +41,7 @@ fun AccountContributionsCard(
     val haptics = LocalOrbitHaptics.current
 
     OrbitSectionCard(
-        title = "ACCOUNT CONTRIBUTIONS",
+        title = "Account Contributions",
         modifier = modifier.fillMaxWidth()
     ) {
         if (contributions.isEmpty()) {

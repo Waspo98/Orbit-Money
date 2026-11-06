@@ -53,7 +53,7 @@ fun TopSpendingCard(
     val haptics = LocalOrbitHaptics.current
 
     OrbitSectionCard(
-        title = "TOP SPENDING THIS MONTH",
+        title = "Top Spending This Month",
         actionText = "Browse",
         onActionClick = onClick,
         modifier = modifier
@@ -149,7 +149,7 @@ fun BiggestTransactionsCard(
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
-        title = "BIGGEST MONTHLY TRANSACTIONS",
+        title = "Biggest Monthly Transactions",
         actionText = "View All",
         onActionClick = onClick,
         modifier = modifier
@@ -234,7 +234,7 @@ fun MonthComparisonCard(
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
-        title = "MONTH VS LAST MONTH",
+        title = "Month vs. Last Month",
         actionText = "Details",
         onActionClick = onClick,
         modifier = modifier

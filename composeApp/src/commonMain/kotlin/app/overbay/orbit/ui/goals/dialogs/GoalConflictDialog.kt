@@ -27,7 +27,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 /**
  * M3E confirmation dialog prompt shown when an account's total goal allocations exceed 100% or allocatable funds.
  * Allows household owners to rebalance by reducing allocations on other goals, or cancel to adjust allocations.
- * Strictly <= 390 lines.
+ *
  */
 @Composable
 fun GoalConflictDialog(

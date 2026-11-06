@@ -45,7 +45,7 @@ import app.overbay.orbit.util.LocalDevicePosture
 
 /**
  * Editorial Orbit Money Dashboard screen supporting all 16 customizable cards.
- * Conforms strictly to <= 6 parameter rule and < 400-line ceiling.
+ * Root Dashboard screen composable.
  */
 @Composable
 fun DashboardScreen(

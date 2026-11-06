@@ -79,7 +79,7 @@ fun RestorePreviewDialog(
                 if (stats.exportedAt.isNotBlank()) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Snapshot Exported: ${stats.exportedAt}",
+                        text = "Backup Created: ${stats.exportedAt}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline
                     )

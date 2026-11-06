@@ -21,7 +21,7 @@ enum class DashboardCardType(
     val defaultWideSpan: Int = 1
 ) {
     ACCOUNTS_OVERVIEW("accounts", "Accounts", "Net worth and account balance groups.", 0),
-    BUDGET_PULSE("budget_pulse", "Budget Pulse", "Budget usage, pace, and categories to watch.", 1),
+    BUDGET_PULSE("budget_pulse", "Monthly Budget", "Budget usage, pace, and categories to watch.", 1),
     TOP_SPENDING("top_spending", "Top Spending", "Largest spending categories this month.", 2),
     CASHFLOW_HERO("this_month", "This Month", "Income, expenses, and net cash flow.", 3),
     BIGGEST_TRANSACTIONS("biggest_transactions", "Biggest Monthly Transactions", "Top 5 current-month expense transactions with dashboard-only hiding.", 4),

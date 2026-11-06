@@ -29,9 +29,8 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * Editorial Material Design 3 Expressive section card for Orbit Money matching main branch `.dashboard-card`.
- * Features 16dp rounded corners, crisp surface, subtle 1dp cardBorder,
- * DM Sans SemiBold tracked uppercase header, optional action link, and a header divider.
+ * Standard section card for Orbit Money with 16dp rounded corners, subtle border,
+ * clean title header, optional action link, and header divider.
  */
 @Composable
 fun OrbitSectionCard(
@@ -70,12 +69,11 @@ fun OrbitSectionCard(
                     Column(modifier = Modifier.weight(1f, fill = false)) {
                         if (title != null) {
                             Text(
-                                text = title.uppercase(),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontSize = 13.sp,
+                                text = title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.78.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                         if (subtitle != null) {

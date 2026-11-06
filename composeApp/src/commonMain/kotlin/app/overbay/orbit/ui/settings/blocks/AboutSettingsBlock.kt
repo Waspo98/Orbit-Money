@@ -3,9 +3,7 @@ package app.overbay.orbit.ui.settings.blocks
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
@@ -37,7 +35,6 @@ fun AboutSettingsBlock(
         modifier = modifier
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Environment info card
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -73,7 +70,7 @@ fun AboutSettingsBlock(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = if (preferences.storageMode == StorageMode.LOCAL) "Local Offline" else "Self-Hosted",
+                            text = if (preferences.storageMode == StorageMode.LOCAL) "On This Device" else "Self-Hosted Server",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -101,14 +98,12 @@ fun AboutSettingsBlock(
                 }
             }
 
-            // Developer & GitHub note
             Text(
-                text = "Built with Kotlin Multiplatform, Compose Multiplatform, and Material Design 3 Expressive motion tokens.",
+                text = "Designed for simple, private household budgeting across phone, tablet, and web.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            // Buttons: Walkthrough, Donate, Sign Out
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)

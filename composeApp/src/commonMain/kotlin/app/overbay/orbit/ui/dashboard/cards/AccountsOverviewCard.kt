@@ -36,7 +36,7 @@ fun AccountsOverviewCard(
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
-        title = "ACCOUNTS",
+        title = "Accounts",
         actionText = "See All",
         onActionClick = onClick,
         modifier = modifier

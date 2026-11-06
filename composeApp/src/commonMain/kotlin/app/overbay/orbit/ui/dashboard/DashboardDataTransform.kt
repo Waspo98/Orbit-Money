@@ -368,11 +368,11 @@ object DashboardDataTransform {
         val realReturn = RetirementCalculatorEngine.computeRealReturn(annualReturn, inflation)
         val yearsToRetire = (retirementAge - 35).coerceAtLeast(1) // assume current age 35 if not set
         val monthlyContributionEst = 500_00L // estimated $500 monthly
-        val projectedNestEgg = (investmentsCents * (1.0 + realReturn).let { r ->
-            var p = 1.0
-            repeat(yearsToRetire) { p *= r }
-            p
-        } + (monthlyContributionEst * 12 * yearsToRetire)).toLong()
+        val projectedNestEgg = RetirementCalculatorEngine.futureValue(investmentsCents, monthlyContributionEst, realReturn, yearsToRetire * 12)
+
+
+
+
 
         val retirementState = RetirementSnapshotState(
             currentBalanceCents = investmentsCents,
@@ -383,7 +383,7 @@ object DashboardDataTransform {
         )
 
         // 12. MHA Summary
-        val mhaSavings = (mhaSpending * 0.22).toLong() // 22% estimated marginal savings
+        val mhaSavings = (mhaSpending * 0.27).toLong() // 27% estimated income + SE tax savings
         val mhaState = MhaSummaryState(
             eligibleSpendingCents = mhaSpending,
             estimatedTaxSavingsCents = mhaSavings,

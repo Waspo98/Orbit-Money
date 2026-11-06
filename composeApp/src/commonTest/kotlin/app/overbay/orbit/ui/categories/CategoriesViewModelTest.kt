@@ -47,7 +47,7 @@ class CategoriesViewModelTest {
     }
 
     @Test
-    fun testGroupingAndAggregation_groupsInto4CategoriesAccurately() = runTest(testDispatcher) {
+    fun testGroupingAndAggregation_groupsInto3CategoriesAccurately() = runTest(testDispatcher) {
         // Setup categories
         val catSalary = Category(id = 1L, name = "Salary Income", isIncome = true, isTransfer = false)
         val catRent = Category(id = 2L, name = "Apartment Rent", isIncome = false, isTransfer = false)
@@ -75,24 +75,18 @@ class CategoriesViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(4, state.totalCategoriesCount)
-        assertEquals(4, state.groups.size)
+        assertEquals(3, state.groups.size)
+
+        val expensesGroup = state.groups.first { it.title == "Expenses" }
+        assertEquals(2, expensesGroup.items.size)
+        assertEquals(132500L, expensesGroup.totalCents)
 
         val incomeGroup = state.groups.first { it.title == "Income" }
         assertEquals(1, incomeGroup.items.size)
         assertEquals(500000L, incomeGroup.totalCents)
         assertEquals(1, incomeGroup.items[0].transactionCount)
 
-        val livingGroup = state.groups.first { it.title == "Living Needs (Fixed)" }
-        assertEquals(1, livingGroup.items.size)
-        assertEquals(128000L, livingGroup.totalCents)
-        assertEquals(2, livingGroup.items[0].transactionCount)
-
-        val discretionaryGroup = state.groups.first { it.title == "Discretionary (Variable)" }
-        assertEquals(1, discretionaryGroup.items.size)
-        assertEquals(4500L, discretionaryGroup.totalCents)
-        assertEquals(1, discretionaryGroup.items[0].transactionCount)
-
-        val transferGroup = state.groups.first { it.title == "Transfers & Savings" }
+        val transferGroup = state.groups.first { it.title == "Transfers" }
         assertEquals(1, transferGroup.items.size)
         assertEquals(50000L, transferGroup.totalCents)
         assertEquals(1, transferGroup.items[0].transactionCount)

@@ -142,8 +142,8 @@ private fun AutoIncludeAccountsCard(
 
                 if (displayAccounts.isEmpty()) {
                     EmptyStateCard(
-                        title = "No Accounts Selected",
-                        description = "Enable any account below to automatically mark all its outflows as eligible housing expenses."
+                        title = "No Accounts Available",
+                        description = "Add a checking, savings, or credit card account first to configure automatic housing allowance defaults."
                     )
                 } else {
                     OrbitSwitchGroupCard {

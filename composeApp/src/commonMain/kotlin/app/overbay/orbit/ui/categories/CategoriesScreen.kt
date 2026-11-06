@@ -1,39 +1,35 @@
 package app.overbay.orbit.ui.categories
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
+import androidx.compose.ui.util.lerp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.ui.categories.components.CategoryDetailInspectorPane
 import app.overbay.orbit.ui.categories.components.CategoryGroupCard
@@ -41,20 +37,20 @@ import app.overbay.orbit.ui.categories.dialogs.CategoryEditorDialog
 import app.overbay.orbit.ui.components.CanopyMenuAction
 import app.overbay.orbit.ui.components.CanopyMoreMenuButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
-import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
-import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
-import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.components.dragReorderItem
 import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.transactions.components.TransactionsSearchBar
+import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalDevicePosture
+import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
 fun CategoriesScreen(
@@ -64,8 +60,30 @@ fun CategoriesScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val haptics = LocalOrbitHaptics.current
+    val density = LocalDensity.current
     val heroScrollState = rememberHeroScrollState()
+    heroScrollState.scrollEnabled = !state.isSearchActive
     val catCount = if (state.totalCategoriesCount > 0) state.totalCategoriesCount else state.categories.size
+
+    BackHandler(enabled = state.isSearchActive) {
+        haptics.tick()
+        viewModel.setSearchActive(false)
+    }
+
+    val searchActiveProgress by animateFloatAsState(
+        targetValue = if (state.isSearchActive) 1f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "categoriesSearchActiveProgress"
+    )
+
+    val contentAlpha = (1f - searchActiveProgress * 1.5f).coerceIn(0f, 1f)
+    val activeHeightOverrideDp = if (searchActiveProgress > 0.001f) {
+        val restingMorphHeightDp = with(density) {
+            lerp(heroScrollState.maxHeightPx, heroScrollState.minHeightPx, heroScrollState.collapseFraction).toDp()
+        }
+        lerp(restingMorphHeightDp, 60.dp, searchActiveProgress)
+    } else null
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
@@ -101,73 +119,88 @@ fun CategoriesScreen(
                         .nestedScroll(heroScrollState.nestedScrollConnection)
                 ) {
                     MorphingPageHero(
-                        kicker = "SPENDING CLUSTERS",
+                        kicker = "CATEGORIES",
                         title = "Category Manager",
                         subtitle = "$catCount categories across ${state.groups.size} groups",
                         scrollState = heroScrollState,
-                        canopyBar = { _, isCompact, barHeight ->
-                            CanopySurfacePill(
-                                expandedText = "$catCount Categories · ${state.groups.size} Groups",
-                                compactText = "$catCount Categories",
-                                isCompact = isCompact,
-                                leadingIcon = OrbitIcons.Categories,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                            )
+                        contentAlpha = contentAlpha,
+                        activeHeightOverrideDp = activeHeightOverrideDp,
+                        morphingContent = { collapseFraction, collapsedTitleRightDp, expandedTextBottomDp ->
+                            val restingHeight = lerp(46.dp, 38.dp, collapseFraction)
+                            val controlsWidth = restingHeight * 2 + 8.dp
+                            val gapToControls = 8.dp
+                            val totalTrailingReserve = controlsWidth + gapToControls
 
-                            CanopyMoreMenuButton(
-                                buttonSize = barHeight,
-                                contentDescription = "Category Options",
-                                actions = listOf(
-                                    CanopyMenuAction(
-                                        label = "Reorder Categories",
-                                        isChecked = state.isReorderMode,
-                                        onClick = { viewModel.toggleReorderMode() }
-                                    ),
-                                    CanopyMenuAction(
-                                        label = "Add Category",
-                                        onClick = { viewModel.openAddCategory() }
-                                    )
-                                )
-                            )
+                            val collapsedRowLeft = collapsedTitleRightDp + 10.dp
+                            val restingLeft = lerp(20.dp, collapsedRowLeft, collapseFraction)
+                            val restingTop = lerp(expandedTextBottomDp, 9.dp, collapseFraction)
+                            val restingRowRightMargin = lerp(20.dp, 16.dp, collapseFraction)
+                            val restingTotalRowWidth = (maxWidth - restingRowRightMargin - restingLeft).coerceAtLeast(160.dp)
+                            val restingSearchWidth = (restingTotalRowWidth - totalTrailingReserve).coerceAtLeast(72.dp)
 
-                            CanopySettingsButton(
-                                buttonSize = barHeight,
-                                onClick = { onNavigate(OrbitNavKey.Settings) }
-                            )
-                        },
-                        persistentBottomBar = {
-                            OrbitTextField(
-                                value = state.searchQuery,
-                                onValueChange = { viewModel.setSearchQuery(it) },
-                                placeholder = { Text("Search categories by name or emoji...") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = "Search",
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                },
-                                trailingIcon = if (state.searchQuery.isNotBlank()) {
-                                    {
-                                        IconButton(
-                                            onClick = { viewModel.setSearchQuery("") },
-                                            modifier = Modifier.size(24.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Clear",
-                                                modifier = Modifier.size(16.dp)
+                            val currentLeft = lerp(restingLeft, 12.dp, searchActiveProgress)
+                            val currentTop = lerp(restingTop, 6.dp, searchActiveProgress)
+                            val currentSearchWidth = lerp(restingSearchWidth, (maxWidth - 24.dp).coerceAtLeast(100.dp), searchActiveProgress)
+                            val currentHeight = lerp(restingHeight, 48.dp, searchActiveProgress)
+
+                            val controlsLeft = restingLeft + restingSearchWidth + gapToControls
+                            val controlsAlpha = (1f - searchActiveProgress * 2.2f).coerceIn(0f, 1f)
+
+                            val isCompact = !state.isSearchActive && (collapseFraction > 0.45f)
+                            val placeholder = if (state.isSearchActive || collapseFraction <= 0.45f) {
+                                "Search categories by name or emoji..."
+                            } else {
+                                "Search..."
+                            }
+
+                            if (controlsAlpha > 0.01f) {
+                                Row(
+                                    modifier = Modifier
+                                        .offset(x = controlsLeft, y = restingTop)
+                                        .height(restingHeight)
+                                        .graphicsLayer { alpha = controlsAlpha },
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CanopyMoreMenuButton(
+                                        buttonSize = restingHeight,
+                                        contentDescription = "Category Options",
+                                        actions = listOf(
+                                            CanopyMenuAction(
+                                                label = "Reorder Categories",
+                                                isChecked = state.isReorderMode,
+                                                onClick = { viewModel.toggleReorderMode() }
+                                            ),
+                                            CanopyMenuAction(
+                                                label = "Add Category",
+                                                onClick = { viewModel.openAddCategory() }
                                             )
-                                        }
-                                    }
-                                } else null,
-                                singleLine = true,
+                                        )
+                                    )
+
+                                    CanopySettingsButton(
+                                        buttonSize = restingHeight,
+                                        onClick = { onNavigate(OrbitNavKey.Settings) }
+                                    )
+                                }
+                            }
+
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                            )
+                                    .offset(x = currentLeft, y = currentTop)
+                                    .width(currentSearchWidth)
+                                    .height(currentHeight)
+                            ) {
+                                TransactionsSearchBar(
+                                    searchQuery = state.searchQuery,
+                                    onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                                    isSearchActive = state.isSearchActive,
+                                    onSearchActiveChange = { viewModel.setSearchActive(it) },
+                                    isCompact = isCompact,
+                                    placeholderText = placeholder,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     )
 
@@ -184,12 +217,19 @@ fun CategoriesScreen(
                                         .padding(24.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    EmptyStateCard(
-                                        title = "No Categories Yet",
-                                        description = "Add your first category to start organizing your transactions.",
-                                        actionButtonText = "+ Add Category",
-                                        onActionClick = { viewModel.openAddCategory() }
-                                    )
+                                    if (state.searchQuery.isNotBlank()) {
+                                        EmptyStateCard(
+                                            title = "No Matching Categories",
+                                            description = "No categories matched \"${state.searchQuery}\"."
+                                        )
+                                    } else {
+                                        EmptyStateCard(
+                                            title = "No Categories Yet",
+                                            description = "Add your first category to start organizing your transactions.",
+                                            actionButtonText = "+ Add Category",
+                                            onActionClick = { viewModel.openAddCategory() }
+                                        )
+                                    }
                                 }
                             } else {
                                 val groupReorderState = rememberDragReorderState(

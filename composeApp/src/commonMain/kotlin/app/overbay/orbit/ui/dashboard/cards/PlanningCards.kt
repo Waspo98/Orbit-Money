@@ -56,7 +56,7 @@ fun SubscriptionsCard(
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
-        title = "SUBSCRIPTIONS / RECURRING",
+        title = "Subscriptions & Recurring",
         actionText = "Review",
         onActionClick = onClick,
         modifier = modifier
@@ -105,7 +105,7 @@ fun UpcomingBillsCard(
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
-        title = "UPCOMING: BILLS AND INCOME",
+        title = "Upcoming Bills & Income",
         actionText = "Upcoming",
         onActionClick = onViewAll,
         modifier = modifier
@@ -175,7 +175,7 @@ fun GoalsProgressCard(
     val haptics = LocalOrbitHaptics.current
 
     OrbitSectionCard(
-        title = "GOALS PROGRESS",
+        title = "Goals Progress",
         actionText = "Goals",
         onActionClick = onClick,
         modifier = modifier
@@ -250,7 +250,7 @@ fun GoalFocusCard(
     val goal = state.focusedGoal
 
     OrbitSectionCard(
-        title = "GOAL FOCUS",
+        title = "Goal Focus",
         actionText = "Pick Goal",
         onActionClick = { showGoalPicker = true },
         modifier = modifier

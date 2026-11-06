@@ -8,9 +8,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,7 +23,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,11 +52,10 @@ import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * Editorial 3-line transaction row featuring 40dp avatar, 3-line metadata,
- * circular 3-dots button, and inline accordion detail drawer.
- * Strictly under the 400-line ceiling.
+ * 3-line transaction row featuring 40dp avatar, metadata summary,
+ * circular 3-dots action menu, and inline detail drawer.
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SwipeableTransactionRow(
     transaction: Transaction,
@@ -114,7 +109,6 @@ fun SwipeableTransactionRow(
         border = BorderStroke(if (isInspected) 1.5.dp else 1.dp, rowBorderColor)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Main 3-line summary row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -130,7 +124,6 @@ fun SwipeableTransactionRow(
                     Spacer(modifier = Modifier.width(10.dp))
                 }
 
-                // 40dp Avatar / Vendor Logo Mark
                 TransactionMerchantMark(
                     transaction = transaction,
                     categoryIcon = category?.displayEmoji,
@@ -144,9 +137,7 @@ fun SwipeableTransactionRow(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // 3-Line Center Metadata
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                    // Line 1: Bold Merchant + Badges
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = transaction.effectiveMerchant,
@@ -165,7 +156,6 @@ fun SwipeableTransactionRow(
 
                     Spacer(modifier = Modifier.height(2.dp))
 
-                    // Line 2: Date • Category
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(transaction.effectiveDate, style = MaterialTheme.typography.bodySmall, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(" • ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outlineVariant)
@@ -182,7 +172,6 @@ fun SwipeableTransactionRow(
 
                     Spacer(modifier = Modifier.height(2.dp))
 
-                    // Line 3: Account Name
                     Text(
                         text = accountName ?: transaction.accountName.ifBlank { "Account" },
                         style = MaterialTheme.typography.bodySmall,
@@ -195,7 +184,6 @@ fun SwipeableTransactionRow(
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                // Right Column: Amount + Circular 3-Dots Button
                 Column(horizontalAlignment = Alignment.End) {
                     val amountColor = when {
                         transaction.effectiveIsTransfer -> MaterialTheme.colorScheme.secondary
@@ -210,7 +198,6 @@ fun SwipeableTransactionRow(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // 28dp circular bordered 3-dots button
                     Box {
                         Surface(
                             shape = CircleShape,
@@ -254,7 +241,6 @@ fun SwipeableTransactionRow(
                 }
             }
 
-            // Inline Accordion Detail Panel
             if (everExpanded) {
                 AnimatedVisibility(visible = isExpanded) {
                     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
@@ -262,15 +248,14 @@ fun SwipeableTransactionRow(
                             HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // 2-Column Metadata Grid
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    MetaItem(label = "DATE", value = transaction.effectiveDate)
+                                    MetaItem(label = "Date", value = transaction.effectiveDate)
                                     Spacer(modifier = Modifier.height(6.dp))
-                                    MetaItem(label = "ACCOUNT", value = accountName ?: transaction.accountName)
+                                    MetaItem(label = "Account", value = accountName ?: transaction.accountName)
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        MetaItem(label = "MERCHANT", value = transaction.effectiveMerchant)
+                                        MetaItem(label = "Merchant", value = transaction.effectiveMerchant)
                                         if (transaction.editedMerchant != null) {
                                             Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetMerchant() }.padding(start = 6.dp))
                                         }
@@ -278,33 +263,27 @@ fun SwipeableTransactionRow(
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        MetaItem(label = "CATEGORY", value = category?.labelWithEmoji ?: "❓ Uncategorized")
+                                        MetaItem(label = "Category", value = category?.labelWithEmoji ?: "❓ Uncategorized")
                                         if (transaction.editedCategoryId != null) {
                                             Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetCategory() }.padding(start = 6.dp))
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
-                                    MetaItem(label = "ORIGINAL DESCRIPTION", value = transaction.originalDescription ?: transaction.originalMerchant, isMono = true)
+                                    MetaItem(label = "Bank Statement", value = transaction.originalDescription ?: transaction.originalMerchant, isMono = true)
                                     Spacer(modifier = Modifier.height(6.dp))
-                                    MetaItem(label = "NOTES", value = transaction.notes ?: "None")
+                                    MetaItem(label = "Notes", value = transaction.notes ?: "None")
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                            // Compact Pill Action Buttons Row
-                            FlowRow(
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                OrbitActionChip(label = "Edit", onClick = { haptics.tick(); onEdit() })
+                                OrbitActionChip(label = "Edit Transaction", onClick = { haptics.tick(); onEdit() })
                                 OrbitActionChip(label = "Split", onClick = { haptics.tick(); onSplit() })
                                 OrbitActionChip(label = "Create Rule", onClick = { haptics.tick(); onCreateRule() })
-                                OrbitActionChip(label = "Recurring", onClick = { haptics.tick(); onMarkRecurring() })
-                                OrbitActionChip(label = if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Transfer", onClick = { haptics.tick(); onToggleTransfer() })
-                                OrbitActionChip(label = if (transaction.effectiveIsIgnored) "Unignore" else "Ignore", onClick = { haptics.tick(); onToggleIgnore() })
-                                OrbitActionChip(label = "Delete", isDestructive = true, onClick = { haptics.tick(); onDelete() })
                             }
                         }
                     }
@@ -320,8 +299,8 @@ private fun MetaItem(label: String, value: String, isMono: Boolean = false) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(

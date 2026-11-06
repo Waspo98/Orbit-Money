@@ -1,7 +1,6 @@
 package app.overbay.orbit.ui.settings.blocks
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
@@ -36,10 +35,9 @@ fun ThemeAppearanceBlock(
 ) {
     OrbitSectionCard(
         title = "Appearance & Theme",
-        subtitle = "Material Design 3 Expressive tokens and color schemes",
+        subtitle = "Light and dark mode, color palettes, and wallpaper colors",
         modifier = modifier
     ) {
-        // Theme Mode (Light / Dark / System)
         Text(
             text = "Display Mode",
             style = MaterialTheme.typography.labelMedium,
@@ -61,7 +59,6 @@ fun ThemeAppearanceBlock(
             }
         }
 
-        // AMOLED Pure Black Selector (shown when Dark or System mode selected)
         if (preferences.themeMode != OrbitThemeMode.LIGHT) {
             Spacer(modifier = Modifier.height(14.dp))
             Text(
@@ -92,9 +89,8 @@ fun ThemeAppearanceBlock(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Preset Palette
         Text(
-            text = "Color Palette Preset",
+            text = "Color Palette",
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
@@ -119,10 +115,9 @@ fun ThemeAppearanceBlock(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Dynamic Color Switch
         OrbitSwitchRow(
-            title = "Dynamic Material You Colors",
-            subtitle = "Harmonize with device wallpaper palette (Android 12+)",
+            title = "Match Wallpaper Colors",
+            subtitle = "Use your device wallpaper color palette (Android 12+)",
             checked = preferences.dynamicColor,
             onCheckedChange = onDynamicColorChange
         )

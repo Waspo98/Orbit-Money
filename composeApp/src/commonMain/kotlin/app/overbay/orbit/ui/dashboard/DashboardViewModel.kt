@@ -28,7 +28,7 @@ import kotlin.math.abs
 
 /**
  * ViewModel orchestrating data transformations and user mutations for the M3E Dashboard.
- * Keeps under the 600-line ceiling by delegating snapshot transformation to [DashboardDataTransform].
+ * Delegates workspace snapshot transformation to [DashboardDataTransform].
  */
 class DashboardViewModel(
     private val repository: OrbitRepository,

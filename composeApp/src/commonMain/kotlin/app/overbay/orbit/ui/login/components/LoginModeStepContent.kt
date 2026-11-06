@@ -205,8 +205,8 @@ fun LoginLocalSetupStep(
                 OrbitTextField(
                     value = state.backupJsonContent.orEmpty(),
                     onValueChange = { onIntent(LoginIntent.SetBackupFile("Pasted JSON", it)) },
-                    label = { Text("Or Paste Backup JSON") },
-                    placeholder = { Text("{\"schemaVersion\": 1, ...}") },
+                    label = { Text("Or Paste Backup Data") },
+                    placeholder = { Text("Paste exported backup text here...") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )

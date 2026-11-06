@@ -52,7 +52,7 @@ import kotlin.math.max
 /**
  * Historical 6-24 month balance trend canvas chart paired with 7-month trailing pace,
  * ETA pill, and interactive "Imagine" What-If monthly boost simulator.
- * Strictly <= 390 lines.
+ *
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -196,7 +196,7 @@ fun GoalHistoryAndImagineCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "✨ \"IMAGINE\" SIMULATOR",
+                        text = "✨ What-If Contribution Boost",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -225,14 +225,14 @@ fun GoalHistoryAndImagineCard(
 
                 val simulationSummary = if (simulatedEta.date != null) {
                     if (monthsSaved > 0) {
-                        "Lands in ${simulatedEta.date} ($simMonths mos · Saves $monthsSaved months! 🚀)"
+                        "Reaches target ${simulatedEta.date} ($simMonths mos · Saves $monthsSaved months! 🚀)"
                     } else {
-                        "Lands in ${simulatedEta.date} ($simMonths months)"
+                        "Reaches target ${simulatedEta.date} ($simMonths months)"
                     }
                 } else if (goal.isCompleted) {
                     "Goal already reached! Extra funds accelerate your next priority."
                 } else {
-                    "Add monthly deposits to project landing date."
+                    "Add monthly deposits to estimate completion date."
                 }
 
                 Surface(

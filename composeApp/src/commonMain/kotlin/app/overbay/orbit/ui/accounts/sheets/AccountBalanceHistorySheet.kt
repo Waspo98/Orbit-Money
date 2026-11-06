@@ -163,7 +163,7 @@ fun AccountBalanceHistoryContent(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "BALANCE SNAPSHOTS (${balanceRecords.size})",
+                        text = "Balance History (${balanceRecords.size})",
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
@@ -175,8 +175,8 @@ fun AccountBalanceHistoryContent(
             if (balanceRecords.isEmpty()) {
                 item {
                     EmptyStateCard(
-                        title = "No Balance Snapshots Yet",
-                        description = "Tap \"Add Record\" above to record your first dated snapshot for this account."
+                        title = "No Balance History Yet",
+                        description = "Tap \"Add Record\" above to record your first balance entry for this account."
                     )
                 }
             } else {

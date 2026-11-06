@@ -18,7 +18,7 @@ import kotlin.math.min
  * Pure Kotlin domain calculation engine for savings goal allocations,
  * multi-account asset attribution, 6-24 month historical reconstructions,
  * over-allocation conflict detection, and trailing pace & ETA projections.
- * Strictly <= 380 lines, zero java.* dependencies.
+ * Pure Kotlin engine with zero java.* dependencies.
  */
 object GoalAllocationEngine {
 

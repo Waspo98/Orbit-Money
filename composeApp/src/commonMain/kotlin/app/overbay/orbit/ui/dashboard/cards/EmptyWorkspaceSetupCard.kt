@@ -68,7 +68,7 @@ fun EmptyWorkspaceSetupCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Your household financial orbit is ready to launch.",
+                        text = "Let's set up your household finances.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -3,9 +3,7 @@ package app.overbay.orbit.ui.settings.blocks
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -18,7 +16,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
@@ -41,23 +38,21 @@ fun GoogleDriveBackupBlock(
 ) {
     OrbitSectionCard(
         title = "Google Drive Cloud Backup",
-        subtitle = "Encrypted snapshots stored inside private Google Drive appDataFolder",
+        subtitle = "Private backups stored in your personal Google Drive",
         modifier = modifier
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Google Drive Switch
             OrbitSwitchRow(
-                title = "Private Google Drive Sync",
+                title = "Google Drive Sync",
                 subtitle = if (isDriveSyncEnabled) {
-                    "Backs up to hidden appDataFolder ${if (lastSyncAt != null) "• Last: $lastSyncAt" else ""}"
+                    "Private backup active ${if (lastSyncAt != null) "• Last backup: $lastSyncAt" else ""}"
                 } else {
-                    "Store encrypted snapshot in personal Google Drive"
+                    "Automatically back up your workspace to your personal Google Drive"
                 },
                 checked = isDriveSyncEnabled,
                 onCheckedChange = onToggleDriveSync
             )
 
-            // Connection status and OAuth Client ID
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -76,7 +71,7 @@ fun GoogleDriveBackupBlock(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Web Client ID",
+                            text = "Google Sign-In Setup",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -87,7 +82,6 @@ fun GoogleDriveBackupBlock(
                 }
             }
 
-            // Action buttons
             if (isDriveSyncEnabled) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),

@@ -49,7 +49,7 @@ import kotlin.math.roundToInt
 /**
  * Editorial account list row featuring account badges, credit card limits,
  * bold balance, compact "See transactions" action pill, and circular 3-dots menu.
- * Strictly under the 400-line ceiling.
+ *
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

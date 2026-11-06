@@ -45,7 +45,7 @@ private enum class InspectorSubMode { DETAIL, EDIT, SPLIT }
  * Right-hand morphing inspector pane for Transactions on unfolded phones, tablets, and desktops.
  * Shows the read-only Transaction Detail view by default when a row is tapped, and morphs
  * smoothly into the Edit or Split form when those actions are triggered.
- * Strictly under the 400-line ceiling.
+ *
  */
 @Composable
 fun TransactionDetailInspectorPane(

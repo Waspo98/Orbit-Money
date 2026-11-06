@@ -54,7 +54,7 @@ import app.overbay.orbit.util.LocalDevicePosture
  * Editorial Budgets screen featuring flat emerald canopy hero with period navigation & active month selector,
  * 2x2 snapshot metrics panel, notable actionable insights panel, spending mix strip, inline expandable category rows,
  * morphing dual-screen inspector pane, and scroll-reactive FAB.
- * Conforms strictly to <= 6 parameters and < 390-line ceiling.
+ * Root Budgets screen composable.
  */
 @Composable
 fun BudgetsScreen(

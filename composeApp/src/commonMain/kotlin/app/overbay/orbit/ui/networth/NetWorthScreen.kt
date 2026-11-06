@@ -119,7 +119,7 @@ fun NetWorthScreen(
                     ) {
                         EmptyStateCard(
                             title = "No Accounts Tracked",
-                            description = "Add your financial accounts to reconstruct historical net worth, monitor asset allocation, and track debts.",
+                            description = "Add your accounts to track assets, debts, and net worth over time.",
                             actionButtonText = "Add First Account",
                             onActionClick = { onNavigate(OrbitNavKey.Accounts()) }
                         )

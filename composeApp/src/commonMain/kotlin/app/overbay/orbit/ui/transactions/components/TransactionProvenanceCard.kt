@@ -137,13 +137,13 @@ fun TransactionProvenanceCard(
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Icon(
                         imageVector = Icons.Default.Info,
-                        contentDescription = "Provenance",
+                        contentDescription = "Bank Statement Details",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(15.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Data Provenance",
+                        text = "Bank Statement Details",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -162,7 +162,7 @@ fun TransactionProvenanceCard(
                             }
                     ) {
                         Text(
-                            text = "Reset All",
+                            text = "Restore Original",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -174,14 +174,14 @@ fun TransactionProvenanceCard(
 
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Original: ${transaction.originalMerchant} • $friendlyDate • ${MoneyUtils.formatCents(transaction.originalAmountCents)}",
+                text = "Statement: ${transaction.originalMerchant} • $friendlyDate • ${MoneyUtils.formatCents(transaction.originalAmountCents)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
-            // Per-field provenance badges and individual reset chips
+            // Per-field edit badges and individual reset chips
             if (editedFields.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 FlowRow(
@@ -194,10 +194,9 @@ fun TransactionProvenanceCard(
                         val isRule = src.startsWith("rule:")
                         val ruleId = if (isRule) src.removePrefix("rule:").toLongOrNull() else null
                         val badgeLabel = when {
-                            isRule && ruleId != null -> "${item.label}: Rule #$ruleId"
-                            isRule -> "${item.label}: Rule"
-                            src == "user" -> "${item.label}: User Edited"
-                            else -> "${item.label}: $src"
+                            isRule -> "${item.label}: Auto-Rule"
+                            src == "user" -> "${item.label}: Edited"
+                            else -> "${item.label}: Edited"
                         }
 
                         Surface(

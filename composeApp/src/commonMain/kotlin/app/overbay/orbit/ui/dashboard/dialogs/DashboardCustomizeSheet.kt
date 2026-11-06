@@ -50,7 +50,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
  * - '⋮⋮' drag-handle reordering
  * - Animated 2-button column width picker (standard left/right placement vs full-width span) on wide screens
  * - Tactile visibility toggle switch
- * Strictly under the 400-line ceiling.
+ *
  */
 @Composable
 fun DashboardCustomizeSheet(

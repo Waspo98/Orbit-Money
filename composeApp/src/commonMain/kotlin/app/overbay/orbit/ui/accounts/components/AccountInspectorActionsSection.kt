@@ -47,7 +47,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
  * Editorial actions section for Account Detail view.
  * Encapsulates action pills (Edit, Perks, Balance History, Snapshot Reminder,
  * Merge, Transactions, Archive, Delete) and SimpleFIN sync link status.
- * Strictly under the 390-line ceiling.
+ *
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -148,7 +148,7 @@ fun AccountInspectorActionsSection(
                 onClick = { haptics.tick(); onHistory() }
             )
             OrbitActionChip(
-                label = "Snapshot Reminder",
+                label = "Balance Reminder",
                 onClick = { haptics.tick(); onSnapshotReminder() }
             )
             OrbitActionChip(

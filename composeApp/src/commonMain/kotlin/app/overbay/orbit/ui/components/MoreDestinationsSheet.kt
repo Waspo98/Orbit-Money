@@ -4,14 +4,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -45,7 +42,7 @@ private data class DestinationItem(
 )
 
 /**
- * Categorized M3E bottom sheet displaying Orbit Money's secondary navigation destinations.
+ * Bottom sheet displaying Orbit Money's secondary navigation destinations.
  */
 @Composable
 fun MoreDestinationsSheet(
@@ -62,14 +59,14 @@ fun MoreDestinationsSheet(
     val allSecondary = buildList {
         add(DestinationItem(OrbitNavKey.Upcoming, "Upcoming", "Bills, subscriptions & recurring paychecks", OrbitIcons.Upcoming))
         add(DestinationItem(OrbitNavKey.Goals, "Goals", "Target savings & sinking funds", OrbitIcons.Goals))
-        add(DestinationItem(OrbitNavKey.Categories, "Categories", "Budget structures & monthly caps", OrbitIcons.Categories))
-        add(DestinationItem(OrbitNavKey.Rules, "Rules", "Automated merchant categorizations", OrbitIcons.Rules))
-        add(DestinationItem(OrbitNavKey.SpendingTrends, "Spending Trends", "Income vs expense breakdown & velocity", OrbitIcons.SpendingTrends))
-        add(DestinationItem(OrbitNavKey.NetWorth, "Net Worth", "Historical assets, liabilities & trajectory", OrbitIcons.NetWorth))
+        add(DestinationItem(OrbitNavKey.Categories, "Categories", "Organize spending, income & transfer categories", OrbitIcons.Categories))
+        add(DestinationItem(OrbitNavKey.Rules, "Rules", "Automated merchant categorization rules", OrbitIcons.Rules))
+        add(DestinationItem(OrbitNavKey.SpendingTrends, "Spending Trends", "Monthly income vs. spending breakdown", OrbitIcons.SpendingTrends))
+        add(DestinationItem(OrbitNavKey.NetWorth, "Net Worth", "Assets, debts, and net worth over time", OrbitIcons.NetWorth))
         if (mhaEnabled) {
             add(DestinationItem(OrbitNavKey.MhaTracker, "MHA Tracker", "Ministerial housing allowance & tax tracking", OrbitIcons.MhaTracker))
         }
-        add(DestinationItem(OrbitNavKey.HousingCalculator, "Housing Calculator", "Mortgage, rent vs buy & affordability", OrbitIcons.HousingCalculator))
+        add(DestinationItem(OrbitNavKey.HousingCalculator, "Housing Calculator", "Mortgage, rent vs. buy & affordability", OrbitIcons.HousingCalculator))
         add(DestinationItem(OrbitNavKey.RetirementCalculator, "Retirement Calculator", "Coast FIRE, nest egg & drawdowns", OrbitIcons.RetirementCalculator))
         add(DestinationItem(OrbitNavKey.Household, "Household", "Member profiles & account sharing", OrbitIcons.Household))
     }
@@ -99,7 +96,7 @@ fun MoreDestinationsSheet(
     }
 
     val systemGroup = listOf(
-        DestinationItem(OrbitNavKey.Settings, "Settings", "Preferences, sync connections & data management", OrbitIcons.Settings)
+        DestinationItem(OrbitNavKey.Settings, "Settings", "Preferences, sync connections & backups", OrbitIcons.Settings)
     )
 
     OrbitModalSheet(
@@ -114,7 +111,7 @@ fun MoreDestinationsSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "More Destinations",
+                text = "More",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -127,12 +124,12 @@ fun MoreDestinationsSheet(
             }
 
             if (insightsGroup.isNotEmpty()) {
-                DestinationSection("Insights & Analytics", insightsGroup, currentKey, onNavigate, onDismiss, haptics::tick)
+                DestinationSection("Reports & Trends", insightsGroup, currentKey, onNavigate, onDismiss, haptics::tick)
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
             if (calculatorsGroup.isNotEmpty()) {
-                DestinationSection("Calculators & Projections", calculatorsGroup, currentKey, onNavigate, onDismiss, haptics::tick)
+                DestinationSection("Calculators", calculatorsGroup, currentKey, onNavigate, onDismiss, haptics::tick)
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
@@ -141,7 +138,7 @@ fun MoreDestinationsSheet(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            DestinationSection("System", systemGroup, currentKey, onNavigate, onDismiss, haptics::tick)
+            DestinationSection("App Settings", systemGroup, currentKey, onNavigate, onDismiss, haptics::tick)
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
@@ -157,9 +154,9 @@ private fun DestinationSection(
     onTick: () -> Unit
 ) {
     Text(
-        text = sectionTitle.uppercase(),
-        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.8.sp),
-        fontWeight = FontWeight.Bold,
+        text = sectionTitle,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(bottom = 8.dp)
     )

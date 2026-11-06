@@ -223,7 +223,7 @@ private fun InactiveBudgetCategoriesSection(
 /**
  * Categorized budget groups list with Spending Mix strip, sort chips,
  * and inline expandable category rows.
- * Conforms strictly to the < 400-line ceiling.
+ *
  */
 @Composable
 fun BudgetCategoryGroupList(

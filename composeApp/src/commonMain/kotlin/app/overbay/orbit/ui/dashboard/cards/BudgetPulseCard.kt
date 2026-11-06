@@ -42,7 +42,7 @@ fun BudgetPulseCard(
     val colors = OrbitTheme.colors
 
     OrbitSectionCard(
-        title = "BUDGET PULSE",
+        title = "Monthly Budget",
         actionText = "Manage",
         onActionClick = onClick,
         modifier = modifier

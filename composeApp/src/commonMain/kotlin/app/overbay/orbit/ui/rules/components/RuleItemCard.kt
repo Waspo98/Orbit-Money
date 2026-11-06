@@ -10,20 +10,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,6 +31,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleActionType
+import app.overbay.orbit.data.model.RuleCondition
+import app.overbay.orbit.data.model.RuleConditionField
+import app.overbay.orbit.data.model.RuleOperator
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.ui.components.OrbitBadge
@@ -76,7 +76,6 @@ fun RuleItemCard(
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Header Row: Name, Priority, Switch
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -87,7 +86,7 @@ fun RuleItemCard(
                     modifier = Modifier.weight(1f)
                 ) {
                     OrbitBadge(
-                        text = "P${rule.priority}",
+                        text = "#${rule.priority}",
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -141,11 +140,10 @@ fun RuleItemCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Conditions Section
             Text(
-                text = "WHEN ALL MATCH:",
+                text = "When matching",
                 style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(4.dp))
@@ -164,7 +162,7 @@ fun RuleItemCard(
                 } else {
                     rule.conditions.forEach { cond ->
                         OrbitBadge(
-                            text = "${cond.field.name} ${cond.operator.name} '${cond.value}'",
+                            text = formatRuleCondition(cond, categoryMap),
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -174,11 +172,10 @@ fun RuleItemCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Actions Section
             Text(
-                text = "THEN PERFORM:",
+                text = "Then",
                 style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.secondary
             )
             Spacer(modifier = Modifier.height(4.dp))
@@ -199,14 +196,14 @@ fun RuleItemCard(
                         val targetCatName = act.targetCategoryId?.let { categoryMap[it]?.labelWithEmoji }
                         val label = when (act.type) {
                             RuleActionType.CATEGORIZE, RuleActionType.SET_CATEGORY -> {
-                                "Set Category -> ${targetCatName ?: act.value}"
+                                "Categorize as ${targetCatName ?: act.value}"
                             }
                             RuleActionType.RENAME, RuleActionType.RENAME_MERCHANT -> {
-                                "Rename -> '${act.textValue ?: act.value}'"
+                                "Rename to \"${act.textValue ?: act.value}\""
                             }
                             RuleActionType.MARK_TRANSFER -> "Mark as Transfer"
-                            RuleActionType.MARK_IGNORED -> "Mark as Ignored"
-                            RuleActionType.SET_MHA_ELIGIBLE -> "Set MHA Eligible"
+                            RuleActionType.MARK_IGNORED -> "Ignore Transaction"
+                            RuleActionType.SET_MHA_ELIGIBLE -> "Mark MHA Eligible"
                         }
                         OrbitBadge(
                             text = label,
@@ -218,4 +215,33 @@ fun RuleItemCard(
             }
         }
     }
+}
+
+private fun formatRuleCondition(cond: RuleCondition, categoryMap: Map<Long, Category>): String {
+    val fieldName = when (cond.field) {
+        RuleConditionField.MERCHANT -> "Merchant"
+        RuleConditionField.ORIGINAL_DESCRIPTION -> "Description"
+        RuleConditionField.NOTES -> "Notes"
+        RuleConditionField.AMOUNT -> "Amount"
+        RuleConditionField.ACCOUNT, RuleConditionField.ACCOUNT_ID -> "Account"
+        RuleConditionField.CATEGORY, RuleConditionField.CATEGORY_ID -> "Category"
+    }
+    val opName = when (cond.operator) {
+        RuleOperator.CONTAINS -> "contains"
+        RuleOperator.EXACT, RuleOperator.EQUALS, RuleOperator.IS -> "is"
+        RuleOperator.IS_NOT -> "is not"
+        RuleOperator.STARTS_WITH -> "starts with"
+        RuleOperator.ENDS_WITH -> "ends with"
+        RuleOperator.GREATER_THAN -> ">"
+        RuleOperator.LESS_THAN -> "<"
+        RuleOperator.BETWEEN -> "between"
+        RuleOperator.REGEX -> "matches"
+    }
+    val valueText = if (cond.field == RuleConditionField.CATEGORY || cond.field == RuleConditionField.CATEGORY_ID) {
+        val catId = cond.targetId ?: cond.value.toLongOrNull()
+        catId?.let { categoryMap[it]?.labelWithEmoji } ?: "\"${cond.value}\""
+    } else {
+        "\"${cond.value}\""
+    }
+    return "$fieldName $opName $valueText"
 }

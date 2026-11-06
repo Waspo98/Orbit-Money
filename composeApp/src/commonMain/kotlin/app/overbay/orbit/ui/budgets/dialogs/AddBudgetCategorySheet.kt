@@ -55,7 +55,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 /**
  * Editorial modal sheet allowing users to add or configure a budget for any unbudgeted category,
  * with quick 3-month average spend chips and rollover toggle.
- * Strictly <= 390 lines.
+ *
  */
 @Composable
 fun AddBudgetCategorySheet(

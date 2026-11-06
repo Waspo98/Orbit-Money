@@ -65,7 +65,7 @@ private enum class AccountInspectorSubMode { DETAIL, EDIT, PERKS, HISTORY }
  * Right-hand morphing inspector pane for Accounts on unfolded phones, tablets, and desktops.
  * Shows the read-only Account Detail view by default when an account row is tapped, and morphs
  * smoothly into the Edit, Credit Card Perks, or Balance History views when triggered.
- * Strictly under the 390-line ceiling.
+ *
  */
 @Composable
 fun AccountDetailInspectorPane(
