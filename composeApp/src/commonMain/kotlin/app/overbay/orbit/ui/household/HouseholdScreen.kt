@@ -127,17 +127,15 @@ fun HouseholdScreen(
                     }
                 )
 
-                OrbitMorphingSplitLayout(
-                    isDetailOpen = isDetailOpen,
-                    onDismissDetail = viewModel::dismissInspectorPane,
-                    masterWeightWhenOpen = 0.56f,
-                    modifier = Modifier.fillMaxSize(),
-                    masterContent = {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
+                val startPad = if (isTwoPane) 20.dp else 16.dp
+                val endPad = if (isTwoPane) 0.dp else 16.dp
+
+                val masterList: @Composable () -> Unit = {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
                             // 1. Planning Signals & KPI Tiles
                             item {
                                 HouseholdPlanningSignalsCard(
@@ -276,20 +274,31 @@ fun HouseholdScreen(
                                 Spacer(modifier = Modifier.height(32.dp))
                             }
                         }
-                    },
-                    detailContent = {
-                        HouseholdInspectorPane(
-                            state = uiState,
-                            onOpenEditMember = { member -> viewModel.openMemberEditor(member) },
-                            onSaveMember = viewModel::saveMember,
-                            onCloseEditMember = viewModel::closeMemberEditor,
-                            onDeleteMember = viewModel::deleteMember,
-                            onInviteMember = viewModel::inviteMember,
-                            onCloseInvite = viewModel::closeInviteDialog,
-                            onDismissPane = viewModel::dismissInspectorPane
-                        )
-                    }
-                )
+                }
+
+                if (isTwoPane) {
+                    OrbitMorphingSplitLayout(
+                        isDetailOpen = isDetailOpen,
+                        onDismissDetail = viewModel::dismissInspectorPane,
+                        masterWeightWhenOpen = 0.56f,
+                        modifier = Modifier.fillMaxSize(),
+                        masterContent = masterList,
+                        detailContent = {
+                            HouseholdInspectorPane(
+                                state = uiState,
+                                onOpenEditMember = { member -> viewModel.openMemberEditor(member) },
+                                onSaveMember = viewModel::saveMember,
+                                onCloseEditMember = viewModel::closeMemberEditor,
+                                onDeleteMember = viewModel::deleteMember,
+                                onInviteMember = viewModel::inviteMember,
+                                onCloseInvite = viewModel::closeInviteDialog,
+                                onDismissPane = viewModel::dismissInspectorPane
+                            )
+                        }
+                    )
+                } else {
+                    masterList()
+                }
             }
         }
 

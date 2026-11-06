@@ -32,7 +32,7 @@ class CategoriesViewModel(
     private val _searchQuery = MutableStateFlow("")
     private val _isSearchActive = MutableStateFlow(false)
     private val _groupOrder = MutableStateFlow(
-        listOf("Expenses", "Income", "Transfers")
+        listOf("Income", "Expenses", "Transfers")
     )
     private val _categorySortOverrides = MutableStateFlow<Map<Long, Int>>(emptyMap())
 
@@ -151,8 +151,8 @@ class CategoriesViewModel(
         }
 
         val groups = listOf(
-            CategoryGroupDisplay("Expenses", expenseList, expenseList.sumOf { it.totalAmountCents }),
             CategoryGroupDisplay("Income", incomeList, incomeList.sumOf { it.totalAmountCents }),
+            CategoryGroupDisplay("Expenses", expenseList, expenseList.sumOf { it.totalAmountCents }),
             CategoryGroupDisplay("Transfers", transferList, transferList.sumOf { it.totalAmountCents })
         ).filter { it.items.isNotEmpty() }.sortedBy { grp ->
             val idx = groupOrder.indexOf(grp.title)

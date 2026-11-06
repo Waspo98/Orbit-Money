@@ -204,88 +204,97 @@ fun CategoriesScreen(
                         }
                     )
 
-                    OrbitMorphingSplitLayout(
-                        isDetailOpen = isDetailOpen,
-                        onDismissDetail = { viewModel.dismissInspectorPane() },
-                        masterWeightWhenOpen = 0.56f,
-                        modifier = Modifier.fillMaxSize(),
-                        masterContent = {
-                            if (state.groups.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (state.searchQuery.isNotBlank()) {
-                                        EmptyStateCard(
-                                            title = "No Matching Categories",
-                                            description = "No categories matched \"${state.searchQuery}\"."
-                                        )
-                                    } else {
-                                        EmptyStateCard(
-                                            title = "No Categories Yet",
-                                            description = "Add your first category to start organizing your transactions.",
-                                            actionButtonText = "+ Add Category",
-                                            onActionClick = { viewModel.openAddCategory() }
-                                        )
-                                    }
-                                }
-                            } else {
-                                val groupReorderState = rememberDragReorderState(
-                                    items = state.groups,
-                                    keySelector = { it.title },
-                                    onMove = { from, to -> viewModel.moveCategoryGroup(from, to) },
-                                    itemSpacingDp = 16.dp
-                                )
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-                                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                                ) {
-                                    items(
-                                        items = state.groups,
-                                        key = { it.title }
-                                    ) { group ->
-                                        CategoryGroupCard(
-                                            group = group,
-                                            inspectingCategoryId = if (isTwoPane) state.inspectingCategoryId else null,
-                                            onInspectCategory = if (isTwoPane) {
-                                                { cat -> viewModel.selectCategoryForInspect(cat.id) }
-                                            } else {
-                                                null
-                                            },
-                                            onEditCategory = { cat -> viewModel.openEditCategory(cat) },
-                                            onDeleteCategory = { id -> viewModel.requestDeleteCategory(id) },
-                                            isReorderMode = state.isReorderMode,
-                                            groupDragHandle = if (state.isReorderMode) {
-                                                { OrbitDragHandle(state = groupReorderState, key = group.title) }
-                                            } else null,
-                                            onMoveCategory = { from, to -> viewModel.moveCategoryInGroup(group.title, from, to) },
-                                            showMhaBadge = state.mhaEnabled,
-                                            modifier = Modifier.dragReorderItem(
-                                                state = if (state.isReorderMode) groupReorderState else null,
-                                                key = group.title
-                                            )
-                                        )
-                                    }
+                    val startPad = if (isTwoPane) 20.dp else 16.dp
+                    val endPad = if (isTwoPane) 0.dp else 16.dp
+
+                    val masterList: @Composable () -> Unit = {
+                        if (state.groups.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (state.searchQuery.isNotBlank()) {
+                                    EmptyStateCard(
+                                        title = "No Matching Categories",
+                                        description = "No categories matched \"${state.searchQuery}\"."
+                                    )
+                                } else {
+                                    EmptyStateCard(
+                                        title = "No Categories Yet",
+                                        description = "Add your first category to start organizing your transactions.",
+                                        actionButtonText = "+ Add Category",
+                                        onActionClick = { viewModel.openAddCategory() }
+                                    )
                                 }
                             }
-                        },
-                        detailContent = {
-                            CategoryDetailInspectorPane(
-                                state = state,
-                                onOpenEdit = { cat -> viewModel.openEditCategory(cat) },
-                                onSaveCategory = { id, name, color, icon, isTrans, isInc, mha ->
-                                    viewModel.saveCategory(id, name, color, icon, isTrans, isInc, mha)
-                                },
-                                onCloseEdit = { viewModel.closeEditorDialog() },
-                                onDeleteCategory = { id -> viewModel.requestDeleteCategory(id) },
-                                onViewTransactions = { onNavigate(OrbitNavKey.Transactions(categoryId = state.inspectingCategoryId)) },
-                                onDismissPane = { viewModel.dismissInspectorPane() }
+                        } else {
+                            val groupReorderState = rememberDragReorderState(
+                                items = state.groups,
+                                keySelector = { it.title },
+                                onMove = { from, to -> viewModel.moveCategoryGroup(from, to) },
+                                itemSpacingDp = 16.dp
                             )
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                items(
+                                    items = state.groups,
+                                    key = { it.title }
+                                ) { group ->
+                                    CategoryGroupCard(
+                                        group = group,
+                                        inspectingCategoryId = if (isTwoPane) state.inspectingCategoryId else null,
+                                        onInspectCategory = if (isTwoPane) {
+                                            { cat -> viewModel.selectCategoryForInspect(cat.id) }
+                                        } else {
+                                            null
+                                        },
+                                        onEditCategory = { cat -> viewModel.openEditCategory(cat) },
+                                        onDeleteCategory = { id -> viewModel.requestDeleteCategory(id) },
+                                        isReorderMode = state.isReorderMode,
+                                        groupDragHandle = if (state.isReorderMode) {
+                                            { OrbitDragHandle(state = groupReorderState, key = group.title) }
+                                        } else null,
+                                        onMoveCategory = { from, to -> viewModel.moveCategoryInGroup(group.title, from, to) },
+                                        showMhaBadge = state.mhaEnabled,
+                                        modifier = Modifier.dragReorderItem(
+                                            state = if (state.isReorderMode) groupReorderState else null,
+                                            key = group.title
+                                        )
+                                    )
+                                }
+                            }
                         }
-                    )
+                    }
+
+                    if (isTwoPane) {
+                        OrbitMorphingSplitLayout(
+                            isDetailOpen = isDetailOpen,
+                            onDismissDetail = { viewModel.dismissInspectorPane() },
+                            masterWeightWhenOpen = 0.56f,
+                            modifier = Modifier.fillMaxSize(),
+                            masterContent = masterList,
+                            detailContent = {
+                                CategoryDetailInspectorPane(
+                                    state = state,
+                                    onOpenEdit = { cat -> viewModel.openEditCategory(cat) },
+                                    onSaveCategory = { id, name, color, icon, isTrans, isInc, mha ->
+                                        viewModel.saveCategory(id, name, color, icon, isTrans, isInc, mha)
+                                    },
+                                    onCloseEdit = { viewModel.closeEditorDialog() },
+                                    onDeleteCategory = { id -> viewModel.requestDeleteCategory(id) },
+                                    onViewTransactions = { onNavigate(OrbitNavKey.Transactions(categoryId = state.inspectingCategoryId)) },
+                                    onDismissPane = { viewModel.dismissInspectorPane() }
+                                )
+                            }
+                        )
+                    } else {
+                        masterList()
+                    }
                 }
             }
         }

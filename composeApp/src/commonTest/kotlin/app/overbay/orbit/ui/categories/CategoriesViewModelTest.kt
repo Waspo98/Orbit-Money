@@ -76,6 +76,7 @@ class CategoriesViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(4, state.totalCategoriesCount)
         assertEquals(3, state.groups.size)
+        assertEquals(listOf("Income", "Expenses", "Transfers"), state.groups.map { it.title })
 
         val expensesGroup = state.groups.first { it.title == "Expenses" }
         assertEquals(2, expensesGroup.items.size)

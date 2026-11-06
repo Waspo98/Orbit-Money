@@ -136,70 +136,79 @@ fun RulesScreen(
                         }
                     )
 
-                    OrbitMorphingSplitLayout(
-                        isDetailOpen = isDetailOpen,
-                        onDismissDetail = { viewModel.dismissInspectorPane() },
-                        masterWeightWhenOpen = 0.56f,
-                        modifier = Modifier.fillMaxSize(),
-                        masterContent = {
-                            if (state.rules.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    EmptyStateCard(
-                                        title = "No Rules Configured",
-                                        description = "Create automated rules to rename merchants, assign categories, or flag transfers automatically.",
-                                        actionButtonText = "+ Add First Rule",
-                                        onActionClick = { viewModel.openAddRule() }
+                    val startPad = if (isTwoPane) 20.dp else 16.dp
+                    val endPad = if (isTwoPane) 0.dp else 16.dp
+
+                    val masterList: @Composable () -> Unit = {
+                        if (state.rules.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                EmptyStateCard(
+                                    title = "No Rules Configured",
+                                    description = "Create automated rules to rename merchants, assign categories, or flag transfers automatically.",
+                                    actionButtonText = "+ Add First Rule",
+                                    onActionClick = { viewModel.openAddRule() }
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(
+                                    items = state.rules,
+                                    key = { it.id }
+                                ) { rule ->
+                                    RuleItemCard(
+                                        rule = rule,
+                                        categoryMap = state.categoryMap,
+                                        isInspected = isTwoPane && state.inspectingRuleId == rule.id,
+                                        onClick = if (isTwoPane) {
+                                            { viewModel.selectRuleForInspect(rule.id) }
+                                        } else {
+                                            null
+                                        },
+                                        onToggleEnabled = { enabled -> viewModel.toggleRuleEnabled(rule.id, enabled) },
+                                        onEdit = { viewModel.openEditRule(rule) },
+                                        onDelete = { viewModel.requestDeleteRule(rule.id) }
                                     )
                                 }
-                            } else {
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    items(
-                                        items = state.rules,
-                                        key = { it.id }
-                                    ) { rule ->
-                                        RuleItemCard(
-                                            rule = rule,
-                                            categoryMap = state.categoryMap,
-                                            isInspected = isTwoPane && state.inspectingRuleId == rule.id,
-                                            onClick = if (isTwoPane) {
-                                                { viewModel.selectRuleForInspect(rule.id) }
-                                            } else {
-                                                null
-                                            },
-                                            onToggleEnabled = { enabled -> viewModel.toggleRuleEnabled(rule.id, enabled) },
-                                            onEdit = { viewModel.openEditRule(rule) },
-                                            onDelete = { viewModel.requestDeleteRule(rule.id) }
-                                        )
-                                    }
-                                }
                             }
-                        },
-                        detailContent = {
-                            RuleDetailInspectorPane(
-                                state = state,
-                                onToggleEnabled = { id, enabled -> viewModel.toggleRuleEnabled(id, enabled) },
-                                onOpenEdit = { rule -> viewModel.openEditRule(rule) },
-                                onSaveRule = { rule -> viewModel.saveRule(rule) },
-                                onCloseEdit = { viewModel.closeEditorSheet() },
-                                onDeleteRule = { id -> viewModel.requestDeleteRule(id) },
-                                onRunRulesNow = { viewModel.runRulesNow() },
-                                onPreviewCount = { conditions -> viewModel.previewMatchCount(conditions) },
-                                onPreviewMatches = { conditions -> viewModel.previewMatchingTransactions(conditions) },
-                                onPreviewRule = { rule -> viewModel.previewRule(rule) },
-                                onOpenRule = { id -> viewModel.selectRuleForInspect(id) },
-                                onDismissPane = { viewModel.dismissInspectorPane() }
-                            )
                         }
-                    )
+                    }
+
+                    if (isTwoPane) {
+                        OrbitMorphingSplitLayout(
+                            isDetailOpen = isDetailOpen,
+                            onDismissDetail = { viewModel.dismissInspectorPane() },
+                            masterWeightWhenOpen = 0.56f,
+                            modifier = Modifier.fillMaxSize(),
+                            masterContent = masterList,
+                            detailContent = {
+                                RuleDetailInspectorPane(
+                                    state = state,
+                                    onToggleEnabled = { id, enabled -> viewModel.toggleRuleEnabled(id, enabled) },
+                                    onOpenEdit = { rule -> viewModel.openEditRule(rule) },
+                                    onSaveRule = { rule -> viewModel.saveRule(rule) },
+                                    onCloseEdit = { viewModel.closeEditorSheet() },
+                                    onDeleteRule = { id -> viewModel.requestDeleteRule(id) },
+                                    onRunRulesNow = { viewModel.runRulesNow() },
+                                    onPreviewCount = { conditions -> viewModel.previewMatchCount(conditions) },
+                                    onPreviewMatches = { conditions -> viewModel.previewMatchingTransactions(conditions) },
+                                    onPreviewRule = { rule -> viewModel.previewRule(rule) },
+                                    onOpenRule = { id -> viewModel.selectRuleForInspect(id) },
+                                    onDismissPane = { viewModel.dismissInspectorPane() }
+                                )
+                            }
+                        )
+                    } else {
+                        masterList()
+                    }
                 }
             }
         }
