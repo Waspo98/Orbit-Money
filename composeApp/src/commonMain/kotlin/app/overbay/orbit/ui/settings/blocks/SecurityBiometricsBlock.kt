@@ -16,8 +16,6 @@ fun SecurityBiometricsBlock(
     preferences: OrbitPreferences,
     onBiometricLockChange: (Boolean) -> Unit,
     onHapticsChange: (Boolean) -> Unit,
-    onMhaTrackerChange: (Boolean) -> Unit = {},
-    onResetData: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val biometricHelper = LocalBiometricAuthHelper.current

@@ -39,7 +39,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
-import app.overbay.orbit.data.model.CategorySortOption
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
@@ -214,95 +213,6 @@ private fun InactiveBudgetCategoriesSection(
                     )
                 }
             }
-        }
-    }
-}
-
-/**
- * Categorized budget groups list with Spending Mix strip, sort chips,
- * and inline expandable category rows.
- *
- */
-@Composable
-fun BudgetCategoryGroupList(
-    budgeted: List<CategoryBudgetOverviewItem>,
-    unbudgeted: List<CategoryBudgetOverviewItem>,
-    inactive: List<CategoryBudgetOverviewItem>,
-    activeSort: CategorySortOption,
-    expandedCategoryId: Long?,
-    categoryTransactions: Map<Long, List<Transaction>>,
-    onSortSelected: (CategorySortOption) -> Unit,
-    onToggleExpand: (Long) -> Unit,
-    onEditBudget: (CategoryBudgetOverviewItem) -> Unit,
-    onDeleteBudget: (Long) -> Unit,
-    onViewTransactions: (Long) -> Unit,
-    isWideScreen: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        val allActive = (budgeted + unbudgeted).filter { it.spentCents > 0L }
-        if (allActive.isNotEmpty()) {
-            SpendingMixPanel(items = allActive)
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        if (budgeted.isNotEmpty()) {
-            val totalBudgeted = budgeted.sumOf { it.amountCents }
-            SectionHeader(
-                title = "Budgeted Categories",
-                subtitle = "${budgeted.size} categories • ${MoneyUtils.formatCents(totalBudgeted, showCents = false)}"
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            budgeted.forEach { item ->
-                BudgetCategoryRow(
-                    item = item,
-                    isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
-                    isInspected = isWideScreen && item.category.id == expandedCategoryId,
-                    transactions = categoryTransactions[item.category.id] ?: emptyList(),
-                    onClick = { onToggleExpand(item.category.id) },
-                    onEditBudget = { onEditBudget(item) },
-                    onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
-                    onViewTransactions = { onViewTransactions(item.category.id) }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        if (unbudgeted.isNotEmpty()) {
-            val totalUnbudgeted = unbudgeted.sumOf { it.spentCents }
-            SectionHeader(
-                title = "Unbudgeted Spending",
-                subtitle = "${unbudgeted.size} categories • ${MoneyUtils.formatCents(totalUnbudgeted, showCents = false)}"
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            unbudgeted.forEach { item ->
-                BudgetCategoryRow(
-                    item = item,
-                    isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
-                    isInspected = isWideScreen && item.category.id == expandedCategoryId,
-                    transactions = categoryTransactions[item.category.id] ?: emptyList(),
-                    onClick = { onToggleExpand(item.category.id) },
-                    onEditBudget = { onEditBudget(item) },
-                    onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
-                    onViewTransactions = { onViewTransactions(item.category.id) }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        if (inactive.isNotEmpty()) {
-            InactiveBudgetCategoriesSection(
-                inactive = inactive,
-                expandedCategoryId = expandedCategoryId,
-                categoryTransactions = categoryTransactions,
-                onToggleExpand = onToggleExpand,
-                onEditBudget = onEditBudget,
-                onDeleteBudget = onDeleteBudget,
-                onViewTransactions = onViewTransactions,
-                isWideScreen = isWideScreen
-            )
         }
     }
 }

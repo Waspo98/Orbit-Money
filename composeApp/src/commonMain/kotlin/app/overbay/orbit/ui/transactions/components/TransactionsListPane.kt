@@ -92,66 +92,25 @@ fun TransactionsListPane(
                 contentAlpha = contentAlpha,
                 activeHeightOverrideDp = activeHeightOverrideDp,
                 morphingContent = { collapseFraction, collapsedTitleRightDp, expandedTextBottomDp ->
-                    val restingHeight = lerp(46.dp, 38.dp, collapseFraction)
-                    val controlsWidth = restingHeight * 2 + 8.dp
-                    val gapToControls = 8.dp
-                    val totalTrailingReserve = controlsWidth + gapToControls
-
-                    val collapsedRowLeft = collapsedTitleRightDp + 10.dp
-                    val restingLeft = lerp(20.dp, collapsedRowLeft, collapseFraction)
-                    val restingTop = lerp(expandedTextBottomDp, 9.dp, collapseFraction)
-                    val restingRowRightMargin = lerp(20.dp, 16.dp, collapseFraction)
-                    val restingTotalRowWidth = (maxWidth - restingRowRightMargin - restingLeft).coerceAtLeast(160.dp)
-                    val restingSearchWidth = (restingTotalRowWidth - totalTrailingReserve).coerceAtLeast(72.dp)
-
-                    val currentLeft = lerp(restingLeft, 12.dp, searchActiveProgress)
-                    val currentTop = lerp(restingTop, 6.dp, searchActiveProgress)
-                    val currentSearchWidth = lerp(restingSearchWidth, (maxWidth - 24.dp).coerceAtLeast(100.dp), searchActiveProgress)
-                    val currentHeight = lerp(restingHeight, 48.dp, searchActiveProgress)
-
-                    val controlsLeft = restingLeft + restingSearchWidth + gapToControls
-                    val controlsAlpha = (1f - searchActiveProgress * 2.2f).coerceIn(0f, 1f)
-
-                    val isCompact = !state.isSearchActive && (collapseFraction > 0.45f)
-                    val placeholder = if (state.isSearchActive || collapseFraction <= 0.45f) {
-                        "Search transactions"
-                    } else {
-                        "Search..."
-                    }
-
-                    if (controlsAlpha > 0.01f) {
-                        Box(
-                            modifier = Modifier
-                                .offset(x = controlsLeft, y = restingTop)
-                                .height(restingHeight)
-                                .graphicsLayer { alpha = controlsAlpha },
-                            contentAlignment = Alignment.CenterEnd
-                        ) {
+                    CanopyMorphingSearchContent(
+                        collapseFraction = collapseFraction,
+                        collapsedTitleRightDp = collapsedTitleRightDp,
+                        expandedTextBottomDp = expandedTextBottomDp,
+                        searchActiveProgress = searchActiveProgress,
+                        isSearchActive = state.isSearchActive,
+                        searchQuery = state.searchQuery,
+                        onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                        onSearchActiveChange = { viewModel.setSearchActive(it) },
+                        expandedPlaceholder = "Search transactions",
+                        trailingControls = { buttonSize ->
                             TransactionsSearchTrailingControls(
                                 activeFilterCount = activeChips.size,
                                 onOpenFilter = { viewModel.openFilterSheet() },
                                 onOpenSettings = { onNavigate(OrbitNavKey.Settings) },
-                                buttonSize = restingHeight
+                                buttonSize = buttonSize
                             )
                         }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .offset(x = currentLeft, y = currentTop)
-                            .width(currentSearchWidth)
-                            .height(currentHeight)
-                    ) {
-                        TransactionsSearchBar(
-                            searchQuery = state.searchQuery,
-                            onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                            isSearchActive = state.isSearchActive,
-                            onSearchActiveChange = { viewModel.setSearchActive(it) },
-                            isCompact = isCompact,
-                            placeholderText = placeholder,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
+                    )
                 },
                 persistentBottomBar = {
                     TransactionsActiveFilterChipsBar(

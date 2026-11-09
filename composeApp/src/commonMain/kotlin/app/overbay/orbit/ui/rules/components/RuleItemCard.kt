@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.RuleAction
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
 import app.overbay.orbit.data.model.RuleConditionField
@@ -46,6 +47,7 @@ fun RuleItemCard(
     onToggleEnabled: (Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    accountMap: Map<Long, String> = emptyMap(),
     isInspected: Boolean = false,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -162,7 +164,7 @@ fun RuleItemCard(
                 } else {
                     rule.conditions.forEach { cond ->
                         OrbitBadge(
-                            text = formatRuleCondition(cond, categoryMap),
+                            text = formatRuleCondition(cond, categoryMap, accountMap),
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -193,20 +195,8 @@ fun RuleItemCard(
                     )
                 } else {
                     rule.actions.forEach { act ->
-                        val targetCatName = act.targetCategoryId?.let { categoryMap[it]?.labelWithEmoji }
-                        val label = when (act.type) {
-                            RuleActionType.CATEGORIZE, RuleActionType.SET_CATEGORY -> {
-                                "Categorize as ${targetCatName ?: act.value}"
-                            }
-                            RuleActionType.RENAME, RuleActionType.RENAME_MERCHANT -> {
-                                "Rename to \"${act.textValue ?: act.value}\""
-                            }
-                            RuleActionType.MARK_TRANSFER -> "Mark as Transfer"
-                            RuleActionType.MARK_IGNORED -> "Ignore Transaction"
-                            RuleActionType.SET_MHA_ELIGIBLE -> "Mark MHA Eligible"
-                        }
                         OrbitBadge(
-                            text = label,
+                            text = formatRuleAction(act, categoryMap),
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                         )
@@ -217,7 +207,11 @@ fun RuleItemCard(
     }
 }
 
-private fun formatRuleCondition(cond: RuleCondition, categoryMap: Map<Long, Category>): String {
+internal fun formatRuleCondition(
+    cond: RuleCondition,
+    categoryMap: Map<Long, Category>,
+    accountMap: Map<Long, String> = emptyMap()
+): String {
     val fieldName = when (cond.field) {
         RuleConditionField.MERCHANT -> "Merchant"
         RuleConditionField.ORIGINAL_DESCRIPTION -> "Description"
@@ -237,11 +231,31 @@ private fun formatRuleCondition(cond: RuleCondition, categoryMap: Map<Long, Cate
         RuleOperator.BETWEEN -> "between"
         RuleOperator.REGEX -> "matches"
     }
-    val valueText = if (cond.field == RuleConditionField.CATEGORY || cond.field == RuleConditionField.CATEGORY_ID) {
-        val catId = cond.targetId ?: cond.value.toLongOrNull()
-        catId?.let { categoryMap[it]?.labelWithEmoji } ?: "\"${cond.value}\""
-    } else {
-        "\"${cond.value}\""
+    val valueText = when (cond.field) {
+        RuleConditionField.CATEGORY, RuleConditionField.CATEGORY_ID -> {
+            val catId = cond.targetId ?: cond.value.toLongOrNull()
+            catId?.let { categoryMap[it]?.labelWithEmoji } ?: "\"${cond.value}\""
+        }
+        RuleConditionField.ACCOUNT, RuleConditionField.ACCOUNT_ID -> {
+            val acctId = cond.targetId ?: cond.value.toLongOrNull()
+            acctId?.let { accountMap[it] } ?: "\"${cond.value}\""
+        }
+        else -> "\"${cond.value}\""
     }
     return "$fieldName $opName $valueText"
+}
+
+internal fun formatRuleAction(act: RuleAction, categoryMap: Map<Long, Category>): String {
+    val targetCatName = act.targetCategoryId?.let { categoryMap[it]?.labelWithEmoji }
+    return when (act.type) {
+        RuleActionType.CATEGORIZE, RuleActionType.SET_CATEGORY -> {
+            "Categorize as ${targetCatName ?: act.value}"
+        }
+        RuleActionType.RENAME, RuleActionType.RENAME_MERCHANT -> {
+            "Rename to \"${act.textValue ?: act.value}\""
+        }
+        RuleActionType.MARK_TRANSFER -> "Mark as Transfer"
+        RuleActionType.MARK_IGNORED -> "Ignore Transaction"
+        RuleActionType.SET_MHA_ELIGIBLE -> "Mark MHA Eligible"
+    }
 }

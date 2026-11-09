@@ -101,6 +101,39 @@ fun CardArtworkAndNetworkSection(
         }
 
         // Preview Badge & Image URL
+        val activePreset = PRESET_CARD_ARTS.find { it.url == imageUrl }
+        val cardGradient = when (activePreset?.url) {
+            "preset://sapphire-blue" -> listOf(
+                MaterialTheme.colorScheme.primary,
+                MaterialTheme.colorScheme.primaryContainer
+            )
+            "preset://amex-gold" -> listOf(
+                MaterialTheme.colorScheme.tertiary,
+                MaterialTheme.colorScheme.tertiaryContainer
+            )
+            "preset://venture-silver" -> listOf(
+                MaterialTheme.colorScheme.secondary,
+                MaterialTheme.colorScheme.surfaceVariant
+            )
+            "preset://apple-card" -> listOf(
+                MaterialTheme.colorScheme.outline,
+                MaterialTheme.colorScheme.surfaceContainerHighest
+            )
+            "preset://discover-plum" -> listOf(
+                MaterialTheme.colorScheme.secondaryContainer,
+                MaterialTheme.colorScheme.tertiaryContainer
+            )
+            else -> listOf(
+                MaterialTheme.colorScheme.primaryContainer,
+                MaterialTheme.colorScheme.tertiaryContainer
+            )
+        }
+        val badgeTextColor = if (activePreset?.url in listOf("preset://sapphire-blue", "preset://amex-gold", "preset://venture-silver")) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -110,14 +143,7 @@ fun CardArtworkAndNetworkSection(
                 modifier = Modifier
                     .size(width = 64.dp, height = 40.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primaryContainer,
-                                MaterialTheme.colorScheme.tertiaryContainer
-                            )
-                        )
-                    ),
+                    .background(Brush.linearGradient(cardGradient)),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -126,23 +152,29 @@ fun CardArtworkAndNetworkSection(
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = badgeTextColor
                     )
-                    if (cardName.isNotBlank()) {
+                    val subtitleText = cardName.ifBlank { activePreset?.label.orEmpty() }
+                    if (subtitleText.isNotBlank()) {
                         Text(
-                            text = cardName.take(6),
+                            text = subtitleText.take(6),
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 8.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            color = badgeTextColor.copy(alpha = 0.85f)
                         )
                     }
                 }
             }
 
             OrbitTextField(
-                value = imageUrl,
+                value = if (activePreset != null) "" else imageUrl,
                 onValueChange = onImageUrlChange,
                 label = { Text("Card Artwork URL") },
+                placeholder = {
+                    Text(
+                        if (activePreset != null) "${activePreset.label} preset active" else "https://..."
+                    )
+                },
                 singleLine = true,
                 modifier = Modifier.weight(1f)
             )
@@ -152,10 +184,12 @@ fun CardArtworkAndNetworkSection(
         Text("Quick-pick Preset Art:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PRESET_CARD_ARTS.forEach { preset ->
-                SuggestionChip(
+                val isPresetSelected = imageUrl == preset.url
+                FilterChip(
+                    selected = isPresetSelected,
                     onClick = {
                         haptics.tick()
-                        onImageUrlChange(preset.url)
+                        onImageUrlChange(if (isPresetSelected) "" else preset.url)
                         if (network.isBlank()) onNetworkChange(preset.network)
                     },
                     label = {

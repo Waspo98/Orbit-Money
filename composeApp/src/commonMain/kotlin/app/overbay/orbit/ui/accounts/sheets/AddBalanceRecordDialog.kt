@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.accounts.sheets
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -52,6 +54,7 @@ fun AddBalanceRecordDialog(
     val haptics = LocalOrbitHaptics.current
     var date by remember { mutableStateOf(LocalDateUtils.todayLocalDate()) }
     var balanceCents by remember { mutableStateOf(account.currentBalanceCents) }
+    var confirmedLargeDelta by remember { mutableStateOf(false) }
 
     val current = account.currentBalanceCents
     val diff = abs(balanceCents - current)
@@ -61,6 +64,7 @@ fun AddBalanceRecordDialog(
     val deltaPercent = if (current != 0L) {
         ((diff.toDouble() / abs(current).toDouble()) * 100.0).roundToInt()
     } else 0
+    val canSave = !isLargeDelta || confirmedLargeDelta
 
     OrbitModalSheet(
         onDismissRequest = onDismiss,
@@ -93,7 +97,10 @@ fun AddBalanceRecordDialog(
 
             CurrencyTextField(
                 cents = balanceCents,
-                onCentsChange = { balanceCents = it },
+                onCentsChange = {
+                    balanceCents = it
+                    confirmedLargeDelta = false
+                },
                 label = "Balance",
                 allowNegative = true,
                 modifier = Modifier.fillMaxWidth()
@@ -128,6 +135,25 @@ fun AddBalanceRecordDialog(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { confirmedLargeDelta = !confirmedLargeDelta }
+                        ) {
+                            Checkbox(
+                                checked = confirmedLargeDelta,
+                                onCheckedChange = { confirmedLargeDelta = it }
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "I confirm this balance update is accurate",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
@@ -149,6 +175,7 @@ fun AddBalanceRecordDialog(
                         haptics.confirm()
                         onAddRecord(LocalDateUtils.formatIsoDate(date), balanceCents)
                     },
+                    enabled = canSave,
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Save Balance")

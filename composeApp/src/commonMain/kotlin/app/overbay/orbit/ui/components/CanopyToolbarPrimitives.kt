@@ -287,7 +287,7 @@ fun <T> CanopySegmentedBar(
                         Text(
                             text = labelProvider(item),
                             fontSize = if (isCompact) 11.sp else 12.sp,
-                            fontWeight = FontWeight.Normal,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                             color = if (selected) {
                                 MaterialTheme.colorScheme.onPrimaryContainer
                             } else {

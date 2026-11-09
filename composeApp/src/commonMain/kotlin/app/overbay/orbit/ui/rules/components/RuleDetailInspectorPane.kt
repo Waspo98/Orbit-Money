@@ -110,9 +110,13 @@ fun RuleDetailInspectorPane(
                 "DETAIL" -> {
                     val rule = state.inspectingRule
                     if (rule != null) {
+                        val accountMap = remember(state.accounts) {
+                            state.accounts.associate { it.id to it.name }
+                        }
                         RuleInspectorDetailView(
                             rule = rule,
                             categoryMap = state.categoryMap,
+                            accountMap = accountMap,
                             isApplyingRules = state.isApplyingRules,
                             onToggleEnabled = { enabled -> onToggleEnabled(rule.id, enabled) },
                             onOpenEdit = { onOpenEdit(rule) },
@@ -133,6 +137,7 @@ fun RuleDetailInspectorPane(
 private fun RuleInspectorDetailView(
     rule: TransactionRule,
     categoryMap: Map<Long, Category>,
+    accountMap: Map<Long, String>,
     isApplyingRules: Boolean,
     onToggleEnabled: (Boolean) -> Unit,
     onOpenEdit: () -> Unit,
@@ -267,7 +272,7 @@ private fun RuleInspectorDetailView(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "${cond.field.name} ${cond.operator.name} '${cond.value}'",
+                                text = formatRuleCondition(cond, categoryMap, accountMap),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -304,25 +309,13 @@ private fun RuleInspectorDetailView(
                     )
                 } else {
                     rule.actions.forEach { act ->
-                        val targetCatName = act.targetCategoryId?.let { categoryMap[it]?.labelWithEmoji }
-                        val label = when (act.type) {
-                            RuleActionType.CATEGORIZE, RuleActionType.SET_CATEGORY -> {
-                                "Set Category -> ${targetCatName ?: act.value}"
-                            }
-                            RuleActionType.RENAME, RuleActionType.RENAME_MERCHANT -> {
-                                "Rename -> '${act.textValue ?: act.value}'"
-                            }
-                            RuleActionType.MARK_TRANSFER -> "Mark as Transfer"
-                            RuleActionType.MARK_IGNORED -> "Mark as Ignored"
-                            RuleActionType.SET_MHA_ELIGIBLE -> "Set MHA Eligible"
-                        }
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.secondaryContainer,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = label,
+                                text = formatRuleAction(act, categoryMap),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,

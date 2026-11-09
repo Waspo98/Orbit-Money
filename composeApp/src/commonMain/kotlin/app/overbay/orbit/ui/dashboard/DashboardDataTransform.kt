@@ -370,10 +370,6 @@ object DashboardDataTransform {
         val monthlyContributionEst = 500_00L // estimated $500 monthly
         val projectedNestEgg = RetirementCalculatorEngine.futureValue(investmentsCents, monthlyContributionEst, realReturn, yearsToRetire * 12)
 
-
-
-
-
         val retirementState = RetirementSnapshotState(
             currentBalanceCents = investmentsCents,
             monthlyContributionCents = monthlyContributionEst,

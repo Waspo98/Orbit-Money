@@ -193,11 +193,7 @@ fun TransactionProvenanceCard(
                         val src = item.source?.lowercase() ?: "user"
                         val isRule = src.startsWith("rule:")
                         val ruleId = if (isRule) src.removePrefix("rule:").toLongOrNull() else null
-                        val badgeLabel = when {
-                            isRule -> "${item.label}: Auto-Rule"
-                            src == "user" -> "${item.label}: Edited"
-                            else -> "${item.label}: Edited"
-                        }
+                        val badgeLabel = if (isRule) "${item.label}: Auto-Rule" else "${item.label}: Edited"
 
                         Surface(
                             shape = RoundedCornerShape(8.dp),

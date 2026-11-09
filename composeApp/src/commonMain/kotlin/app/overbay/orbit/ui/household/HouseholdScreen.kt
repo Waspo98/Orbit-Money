@@ -129,9 +129,11 @@ fun HouseholdScreen(
 
                 val startPad = if (isTwoPane) 20.dp else 16.dp
                 val endPad = if (isTwoPane) 0.dp else 16.dp
+                val listState = androidx.compose.foundation.lazy.rememberLazyListState()
 
                 val masterList: @Composable () -> Unit = {
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)

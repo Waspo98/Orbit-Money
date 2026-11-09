@@ -138,6 +138,10 @@ fun RulesScreen(
 
                     val startPad = if (isTwoPane) 20.dp else 16.dp
                     val endPad = if (isTwoPane) 0.dp else 16.dp
+                    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                    val accountMap = androidx.compose.runtime.remember(state.accounts) {
+                        state.accounts.associate { it.id to it.name }
+                    }
 
                     val masterList: @Composable () -> Unit = {
                         if (state.rules.isEmpty()) {
@@ -156,6 +160,7 @@ fun RulesScreen(
                             }
                         } else {
                             LazyColumn(
+                                state = listState,
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -167,6 +172,7 @@ fun RulesScreen(
                                     RuleItemCard(
                                         rule = rule,
                                         categoryMap = state.categoryMap,
+                                        accountMap = accountMap,
                                         isInspected = isTwoPane && state.inspectingRuleId == rule.id,
                                         onClick = if (isTwoPane) {
                                             { viewModel.selectRuleForInspect(rule.id) }
