@@ -65,6 +65,7 @@ fun CardEditorFormSections(
 ) {
     val haptics = LocalOrbitHaptics.current
     var showCustomHolderDialog by remember { mutableStateOf(false) }
+    var showCustomAuDialog by remember { mutableStateOf(false) }
 
     val historySuggestions = remember(draft.accountId, transactions, draft.annualFeeCents) {
         CreditCardStrategyEngine.detectHistorySuggestions(
@@ -107,13 +108,47 @@ fun CardEditorFormSections(
                     val sel = draft.cardholderMemberId == m.id || draft.cardholder.equals(m.name, ignoreCase = true)
                     FilterChip(selected = sel, onClick = {
                         haptics.tick()
-                        controller.updateDraft { d -> if (sel) d.copy(cardholderMemberId = null, cardholder = null) else d.copy(cardholderMemberId = m.id, cardholder = m.name) }
+                        if (sel) controller.selectPrimaryCardholder(null, null) else controller.selectPrimaryCardholder(m.id, m.name)
                     }, label = { Text(m.name) })
                 }
                 FilterChip(
                     selected = draft.cardholderMemberId == null && !draft.cardholder.isNullOrBlank() && householdMembers.none { it.name.equals(draft.cardholder, ignoreCase = true) },
                     onClick = { showCustomHolderDialog = true },
                     label = { Text(draft.cardholder?.takeIf { h -> householdMembers.none { it.name.equals(h, ignoreCase = true) } } ?: "Someone Else") }
+                )
+            }
+
+            Text("Authorized Users", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                householdMembers
+                    .filter { m -> m.id != draft.cardholderMemberId && !m.name.equals(draft.cardholder, ignoreCase = true) }
+                    .forEach { m ->
+                        val isAu = draft.authorizedUserMemberIds.contains(m.id) ||
+                            draft.authorizedUsers.any { it.equals(m.name, ignoreCase = true) }
+                        FilterChip(
+                            selected = isAu,
+                            onClick = {
+                                haptics.tick()
+                                controller.toggleAuthorizedMember(m.id, m.name)
+                            },
+                            label = { Text(m.name, fontWeight = if (isAu) FontWeight.Bold else FontWeight.Medium) }
+                        )
+                    }
+                draft.authorizedUsers
+                    .filter { custom -> householdMembers.none { it.name.equals(custom, ignoreCase = true) } }
+                    .forEach { customName ->
+                        FilterChip(
+                            selected = true,
+                            onClick = {
+                                haptics.tick()
+                                controller.removeCustomAuthorizedUser(customName)
+                            },
+                            label = { Text("$customName ×", fontWeight = FontWeight.Bold) }
+                        )
+                    }
+                AssistChip(
+                    onClick = { haptics.tick(); showCustomAuDialog = true },
+                    label = { Text("+ Add Person") }
                 )
             }
         }
@@ -174,8 +209,11 @@ fun CardEditorFormSections(
             }
         }
 
-        // Section 3: Reward Multipliers
-        OrbitSectionCard(title = "3. Reward Multipliers (${draft.rewardCategories.size})") {
+        // Section 3: Billing & Statement Cycle
+        CardEditorBillingCard(draft = draft, controller = controller)
+
+        // Section 4: Reward Multipliers
+        OrbitSectionCard(title = "4. Reward Multipliers (${draft.rewardCategories.size})") {
             draft.rewardCategories.forEachIndexed { idx, r ->
                 val typeLabel = if (r.rateType == "percent") "% Cash" else "x Points"
                 OrbitCompactListRow(
@@ -194,9 +232,9 @@ fun CardEditorFormSections(
             }
         }
 
-        // Section 4: Rewards Strategy (only if rewardsToolsEnabled)
+        // Section 5: Rewards Strategy (only if rewardsToolsEnabled)
         if (rewardsToolsEnabled) {
-            OrbitSectionCard(title = "4. Welcome Bonus & 5/24 Strategy") {
+            OrbitSectionCard(title = "5. Welcome Bonus & 5/24 Strategy") {
                 historySuggestions.suggestedOpenedDate?.let { opDate ->
                     AssistChip(
                         onClick = { controller.setOpenedDate(opDate) },
@@ -260,8 +298,8 @@ fun CardEditorFormSections(
             }
         }
 
-        // Section 5: Notes
-        OrbitSectionCard(title = "5. Notes & Memo") {
+        // Section 6: Notes
+        OrbitSectionCard(title = "6. Notes & Memo") {
             OrbitTextField(
                 value = draft.notes.orEmpty(),
                 onValueChange = { t -> controller.updateDraft { it.copy(notes = t.ifBlank { null }) } },
@@ -276,9 +314,20 @@ fun CardEditorFormSections(
             title = "Cardholder Name", initialValue = draft.cardholder.orEmpty(),
             onConfirm = { name ->
                 showCustomHolderDialog = false
-                controller.updateDraft { it.copy(cardholderMemberId = null, cardholder = name.trim().ifBlank { null }) }
+                controller.selectPrimaryCardholder(null, name)
             },
             onDismiss = { showCustomHolderDialog = false }
+        )
+    }
+
+    if (showCustomAuDialog) {
+        OrbitTextInputDialog(
+            title = "Add Authorized User", initialValue = "",
+            onConfirm = { name ->
+                showCustomAuDialog = false
+                controller.addCustomAuthorizedUser(name)
+            },
+            onDismiss = { showCustomAuDialog = false }
         )
     }
 }

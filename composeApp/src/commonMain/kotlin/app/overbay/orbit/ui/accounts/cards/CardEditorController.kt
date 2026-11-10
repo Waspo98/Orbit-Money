@@ -112,6 +112,57 @@ class CardEditorController(
         }
     }
 
+    fun selectPrimaryCardholder(memberId: Long?, name: String?) {
+        val cleanName = name?.trim()?.ifBlank { null }
+        _draftState.update { current ->
+            if (current == null) return@update null
+            val filteredMemberIds = if (memberId != null) {
+                current.authorizedUserMemberIds.filterNot { it == memberId }
+            } else current.authorizedUserMemberIds
+            val filteredNames = if (cleanName != null) {
+                current.authorizedUsers.filterNot { it.equals(cleanName, ignoreCase = true) }
+            } else current.authorizedUsers
+            current.copy(
+                cardholderMemberId = memberId,
+                cardholder = cleanName,
+                authorizedUserMemberIds = filteredMemberIds,
+                authorizedUsers = filteredNames
+            )
+        }
+    }
+
+    fun toggleAuthorizedMember(memberId: Long, memberName: String) {
+        _draftState.update { current ->
+            if (current == null || current.cardholderMemberId == memberId) return@update current
+            val exists = current.authorizedUserMemberIds.contains(memberId)
+            val updatedIds = if (exists) {
+                current.authorizedUserMemberIds - memberId
+            } else {
+                (current.authorizedUserMemberIds + memberId).distinct()
+            }
+            val cleanedCustom = current.authorizedUsers.filterNot { it.equals(memberName.trim(), ignoreCase = true) }
+            current.copy(authorizedUserMemberIds = updatedIds, authorizedUsers = cleanedCustom)
+        }
+    }
+
+    fun addCustomAuthorizedUser(name: String) {
+        val clean = name.trim()
+        if (clean.isEmpty()) return
+        _draftState.update { current ->
+            if (current == null) return@update null
+            if (current.cardholder?.equals(clean, ignoreCase = true) == true) return@update current
+            if (current.authorizedUsers.any { it.equals(clean, ignoreCase = true) }) return@update current
+            current.copy(authorizedUsers = current.authorizedUsers + clean)
+        }
+    }
+
+    fun removeCustomAuthorizedUser(name: String) {
+        _draftState.update { current ->
+            if (current == null) return@update null
+            current.copy(authorizedUsers = current.authorizedUsers.filterNot { it.equals(name, ignoreCase = true) })
+        }
+    }
+
     fun addBenefit(benefit: CardBenefit) {
         val resolved = if (benefit.id.isBlank()) benefit.copy(id = CreditCardBenefitEngine.newBenefitId()) else benefit
         _draftState.update { it?.copy(benefits = it.benefits + resolved) }

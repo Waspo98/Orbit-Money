@@ -1,8 +1,16 @@
 package app.overbay.orbit.ui.accounts.cards
 
+import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.data.model.CreditCardProfile
+import app.overbay.orbit.data.model.CreditCardStrategy
+import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.RewardCategory
+import app.overbay.orbit.domain.CreditCardStrategyEngine
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class CardFormatTest {
 
@@ -61,5 +69,52 @@ class CardFormatTest {
         assertEquals("-1%", CardFormat.formatBps(-100))
         assertEquals("-1.5%", CardFormat.formatBps(-150))
         assertEquals("-24.99%", CardFormat.formatBps(-2499))
+    }
+
+    @Test
+    fun testResolveCardholderAndAuthorizedUsers() {
+        val members = listOf(
+            HouseholdMember(id = 1L, name = "Alex"),
+            HouseholdMember(id = 2L, name = "Sam"),
+            HouseholdMember(id = 3L, name = "Taylor")
+        )
+        val profile = CreditCardProfile(
+            accountId = 99L,
+            authorizedUsers = listOf("sam", "Jordan", "Alex", "  "),
+            strategy = CreditCardStrategy(
+                cardholderMemberId = 1L,
+                cardholder = "Old Label",
+                authorizedUserMemberIds = listOf(1L, 2L, 3L)
+            )
+        )
+
+        assertEquals("Alex", CardFormat.resolveCardholderName(profile, members))
+        assertEquals(listOf("Sam", "Taylor", "Jordan"), CardFormat.resolveAuthorizedUsers(profile, members))
+    }
+
+    @Test
+    fun testMatchesSelectedPlayerIncludesAuthorizedUsers() {
+        val members = listOf(
+            HouseholdMember(id = 1L, name = "Alex"),
+            HouseholdMember(id = 2L, name = "Sam")
+        )
+        val account = Account(
+            id = 50L,
+            name = "Sapphire Preferred",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 50L,
+                strategy = CreditCardStrategy(
+                    cardholderMemberId = 1L,
+                    cardholder = "Alex",
+                    authorizedUserMemberIds = listOf(2L)
+                )
+            )
+        )
+
+        assertTrue(CardFormat.matchesSelectedPlayer(account, CreditCardStrategyEngine.ALL_PLAYERS, members))
+        assertTrue(CardFormat.matchesSelectedPlayer(account, "m:1", members))
+        assertTrue(CardFormat.matchesSelectedPlayer(account, "m:2", members))
+        assertFalse(CardFormat.matchesSelectedPlayer(account, "m:99", members))
     }
 }

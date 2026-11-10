@@ -399,4 +399,44 @@ class CardEditorControllerTest {
         assertEquals(androidx.compose.ui.graphics.Color(0xFF0D9488), resolved.second)
         assertEquals(androidx.compose.ui.graphics.Color(0xFFFFFFFF), resolved.third)
     }
+
+    @Test
+    fun testAuthorizedUsersAndPrimaryCardholderExclusion() = runTest(testDispatcher) {
+        val cardAcct = Account(id = 110L, name = "Household Card", type = AccountType.CREDIT)
+        repository.saveAccount(cardAcct)
+
+        controller.open(cardAcct)
+        controller.selectPrimaryCardholder(10L, "Alex")
+        controller.toggleAuthorizedMember(20L, "Sam")
+        controller.addCustomAuthorizedUser("Jordan")
+        // Attempt to add primary cardholder as custom or member AU — must be ignored
+        controller.toggleAuthorizedMember(10L, "Alex")
+        controller.addCustomAuthorizedUser("alex")
+
+        val draft1 = controller.draft.value!!
+        assertEquals(10L, draft1.cardholderMemberId)
+        assertEquals("Alex", draft1.cardholder)
+        assertEquals(listOf(20L), draft1.authorizedUserMemberIds)
+        assertEquals(listOf("Jordan"), draft1.authorizedUsers)
+        assertTrue(draft1.isDirty)
+
+        // Switching primary cardholder to Sam (20L) automatically removes Sam from authorizedUserMemberIds
+        controller.selectPrimaryCardholder(20L, "Sam")
+        val draft2 = controller.draft.value!!
+        assertEquals(20L, draft2.cardholderMemberId)
+        assertTrue(draft2.authorizedUserMemberIds.isEmpty())
+        assertEquals(listOf("Jordan"), draft2.authorizedUsers)
+
+        // Add Alex as household AU, persist via save(), and verify repository round-trip
+        controller.toggleAuthorizedMember(10L, "Alex")
+        val result = controller.save()
+        assertTrue(result.isSuccess)
+
+        val savedProfile = repository.accounts.value.find { it.id == 110L }?.creditCardProfile
+        assertNotNull(savedProfile)
+        assertEquals(20L, savedProfile.strategy.cardholderMemberId)
+        assertEquals("Sam", savedProfile.strategy.cardholder)
+        assertEquals(listOf(10L), savedProfile.strategy.authorizedUserMemberIds)
+        assertEquals(listOf("Jordan"), savedProfile.authorizedUsers)
+    }
 }
