@@ -40,6 +40,7 @@ fun OrbitSectionCard(
     actionText: String? = null,
     onActionClick: (() -> Unit)? = null,
     action: (@Composable () -> Unit)? = null,
+    showHeaderDivider: Boolean = true,
     shape: Shape = RoundedCornerShape(16.dp),
     containerColor: Color = MaterialTheme.colorScheme.surface,
     border: BorderStroke? = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
@@ -105,11 +106,15 @@ fun OrbitSectionCard(
                     }
                 }
 
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = OrbitTheme.colors.cardBorder,
-                    modifier = Modifier.padding(top = 10.dp, bottom = 12.dp)
-                )
+                if (showHeaderDivider) {
+                    HorizontalDivider(
+                        thickness = 1.dp,
+                        color = OrbitTheme.colors.cardBorder,
+                        modifier = Modifier.padding(top = 10.dp, bottom = 12.dp)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
             }
 
             content()

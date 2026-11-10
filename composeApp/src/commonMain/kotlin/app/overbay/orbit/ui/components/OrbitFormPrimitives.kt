@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -49,31 +50,38 @@ fun OrbitFieldLabel(
     text: String,
     modifier: Modifier = Modifier
 ) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier.padding(start = 2.dp, bottom = 4.dp)
-    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(22.dp)
+            .padding(start = 2.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 object OrbitFormDefaults {
-    val FieldShape: Shape = RoundedCornerShape(16.dp)
+    val FieldShape: Shape = RoundedCornerShape(14.dp)
     val CardShape: Shape = RoundedCornerShape(18.dp)
     val HeroCardShape: Shape = RoundedCornerShape(20.dp)
 
     @Composable
     fun textFieldColors(): TextFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f),
-        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.45f),
-        errorContainerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.65f),
+        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.38f),
+        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.22f),
+        errorContainerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.22f),
         focusedBorderColor = MaterialTheme.colorScheme.primary,
-        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f),
-        disabledBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.16f)
+        unfocusedBorderColor = OrbitTheme.colors.cardBorder,
+        disabledBorderColor = OrbitTheme.colors.cardBorder.copy(alpha = 0.5f)
     )
 }
 
@@ -89,6 +97,7 @@ fun OrbitTextField(
     placeholder: (@Composable () -> Unit)? = null,
     leadingIcon: (@Composable () -> Unit)? = null,
     trailingIcon: (@Composable () -> Unit)? = null,
+    suffixText: String? = null,
     supportingText: (@Composable () -> Unit)? = null,
     isError: Boolean = false,
     visualTransformation: VisualTransformation = VisualTransformation.None,
@@ -98,6 +107,28 @@ fun OrbitTextField(
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
     minLines: Int = 1
 ) {
+    val resolvedTrailing: (@Composable () -> Unit)? = when {
+        trailingIcon != null -> trailingIcon
+        !suffixText.isNullOrBlank() -> {
+            {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.padding(end = 6.dp)
+                ) {
+                    Text(
+                        text = suffixText,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                    )
+                }
+            }
+        }
+        else -> null
+    }
+
     Column(modifier = modifier) {
         if (label != null) {
             ProvideTextStyle(
@@ -106,7 +137,13 @@ fun OrbitTextField(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             ) {
-                Row(modifier = Modifier.padding(start = 2.dp, bottom = 4.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(22.dp)
+                        .padding(start = 2.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     label()
                 }
             }
@@ -121,7 +158,7 @@ fun OrbitTextField(
             label = null,
             placeholder = placeholder,
             leadingIcon = leadingIcon,
-            trailingIcon = trailingIcon,
+            trailingIcon = resolvedTrailing,
             supportingText = supportingText,
             isError = isError,
             visualTransformation = visualTransformation,
