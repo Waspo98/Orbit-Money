@@ -19,6 +19,7 @@ import app.overbay.orbit.data.saveCreditCardProfile
 import app.overbay.orbit.data.setAccountArchived
 import app.overbay.orbit.data.unlinkSimpleFinAccount
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.NetWorthEngine
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +58,8 @@ class AccountsViewModel(
     private val _accountSortOverrides = MutableStateFlow<Map<Long, Int>>(emptyMap())
     private val _isSyncing = MutableStateFlow(false)
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
+    private val _masterMode = MutableStateFlow(AccountsMasterMode.ALL_ACCOUNTS)
+    private val _selectedCardPlayer = MutableStateFlow(CreditCardStrategyEngine.ALL_PLAYERS)
 
     private val dataFlow = combine(
         repository.accounts, repository.transactions, repository.snapshot, repository.preferences
@@ -104,6 +107,12 @@ class AccountsViewModel(
                 .sortedWith(compareByDescending<BalanceRecord> { it.recordDate }.thenByDescending { it.id })
         } else emptyList()
 
+        val cardSummary = CreditCardStrategyEngine.summarizePortfolio(
+            accounts = data.accounts,
+            transactions = data.transactions,
+            selectedPlayer = _selectedCardPlayer.value
+        )
+
         AccountsUiState(
             accounts = sorted, accountGroups = groups, totalAssetsCents = snapshot.totalAssetsCents,
             totalLiabilitiesCents = snapshot.totalLiabilitiesCents, netWorthCents = snapshot.netWorthCents,
@@ -118,9 +127,23 @@ class AccountsViewModel(
             historyBalanceRecords = historyRecords, showAddRecordDialog = addRecord.showAddRecordDialog,
             addRecordAccount = addRecord.addRecordAccount, accountGroupWideSpans = data.preferences.accountGroupWideSpans,
             isSyncing = syncReorder.syncing, syncErrorMessage = syncReorder.err, isLoading = false,
-            mhaEnabled = data.preferences.mhaTrackerEnabled
+            mhaEnabled = data.preferences.mhaTrackerEnabled,
+            cardPortfolioSummary = cardSummary
         )
     }.combine(_isPhoneViewingDetail) { state, phoneDetail -> state.copy(isPhoneViewingDetail = phoneDetail)
+    }.combine(combine(_masterMode, _selectedCardPlayer) { m, p -> m to p }) { state, (mode, player) ->
+        val updatedSummary = if (player != state.cardPortfolioSummary.selectedPlayer) {
+            CreditCardStrategyEngine.summarizePortfolio(
+                accounts = repository.accounts.value,
+                transactions = repository.transactions.value,
+                selectedPlayer = player
+            )
+        } else state.cardPortfolioSummary
+        state.copy(
+            masterMode = mode,
+            selectedCardPlayer = updatedSummary.selectedPlayer,
+            cardPortfolioSummary = updatedSummary
+        )
     }.combine(_deleteConfirmAccountId) { state, delId -> state.copy(deleteConfirmAccountId = delId)
     }.combine(combine(_deleteBlockedAccount, _deleteBlockedTxnCount) { a, c -> a to c }) { state, (acct, count) ->
         state.copy(deleteBlockedAccount = acct, deleteBlockedTransactionCount = count)
@@ -137,6 +160,8 @@ class AccountsViewModel(
 
     fun selectAccount(accountId: Long?) { _selectedAccountId.value = accountId }
     fun setPhoneViewingDetail(viewing: Boolean) { _isPhoneViewingDetail.value = viewing }
+    fun setMasterMode(mode: AccountsMasterMode) { _masterMode.value = mode }
+    fun selectCardPlayer(player: String) { _selectedCardPlayer.value = player }
 
     fun requestDeleteAccount(accountId: Long) {
         val count = repository.accountTransactionCount(accountId)
@@ -331,7 +356,7 @@ class AccountsViewModel(
         val currentBenefits = profile.benefits.toMutableList()
         if (benefitIndex in currentBenefits.indices) {
             val item = currentBenefits[benefitIndex]
-            currentBenefits[benefitIndex] = item.copy(usedThisYear = !item.usedThisYear)
+            currentBenefits[benefitIndex] = CreditCardStrategyEngine.toggleBenefitCurrentPeriod(item)
             val updated = profile.copy(benefits = currentBenefits)
             viewModelScope.launch { repository.saveCreditCardProfile(accountId, updated) }
         }

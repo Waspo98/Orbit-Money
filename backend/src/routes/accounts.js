@@ -37,9 +37,11 @@ function serializeCreditCardProfile(row) {
   profile.authorized_users = safeJsonParse(profile.authorized_users_json, []);
   profile.reward_categories = safeJsonParse(profile.reward_categories_json, []);
   profile.benefits = safeJsonParse(profile.benefits_json, []);
+  profile.strategy = safeJsonParse(profile.strategy_json, {});
   delete profile.authorized_users_json;
   delete profile.reward_categories_json;
   delete profile.benefits_json;
+  delete profile.strategy_json;
   return profile;
 }
 
@@ -74,13 +76,22 @@ function normalizeOptionalTextLength(value, maxLength = 500) {
   return text ? text.slice(0, maxLength) : null;
 }
 
-function normalizeOptionalDateOnly(value) {
+function normalizeOptionalDateOnly(value, fieldName = 'annual_fee_post_date') {
   const text = normalizeOptionalText(value);
   if (!text) return null;
   if (!isValidDateOnly(text)) {
-    throw new Error('annual_fee_post_date must be a valid YYYY-MM-DD date.');
+    throw new Error(`${fieldName} must be a valid YYYY-MM-DD date.`);
   }
   return text;
+}
+
+function normalizeOptionalCycleDay(value, fieldName) {
+  if (value === null || value === undefined || value === '') return null;
+  const day = parseInteger(value);
+  if (day === null || day < 1 || day > 31) {
+    throw new Error(`${fieldName} must be an integer between 1 and 31.`);
+  }
+  return day;
 }
 
 function normalizeOptionalMoney(value, fieldName) {
@@ -115,16 +126,21 @@ function normalizeRewardCategories(value) {
       const rate = item.rate === null || item.rate === undefined || item.rate === ''
         ? null
         : Number(item.rate);
+      const cap = item.cap === null || item.cap === undefined || item.cap === ''
+        ? null
+        : Number(item.cap);
       return {
         label: label.slice(0, 80),
         category: normalizeOptionalTextLength(item.category, 80),
         rate: Number.isFinite(rate) ? rate : null,
+        is_rotating: Boolean(item.is_rotating ?? item.isRotating ?? false),
+        cap: Number.isFinite(cap) && cap >= 0 ? cap : null,
         type: normalizeOptionalTextLength(item.type, 40),
         notes: normalizeOptionalTextLength(item.notes || item.note, 180)
       };
     })
     .filter(Boolean)
-    .slice(0, 12);
+    .slice(0, 16);
 }
 
 function normalizeBenefits(value) {
@@ -133,22 +149,60 @@ function normalizeBenefits(value) {
     .map((item) => {
       if (typeof item === 'string') {
         const name = item.trim();
-        return name ? { name: name.slice(0, 120) } : null;
+        return name ? { name: name.slice(0, 120), title: name.slice(0, 120) } : null;
       }
       if (!item || typeof item !== 'object') return null;
-      const name = String(item.name || item.label || '').trim();
+      const name = String(item.name || item.title || item.label || '').trim();
       if (!name) return null;
+      const trimmedName = name.slice(0, 120);
       return {
-        name: name.slice(0, 120),
+        name: trimmedName,
+        title: trimmedName,
         value: item.value === null || item.value === undefined || item.value === ''
           ? null
           : Number(item.value),
         description: normalizeOptionalTextLength(item.description || item.notes, 300),
-        category: normalizeOptionalTextLength(item.category, 80)
+        category: normalizeOptionalTextLength(item.category, 80),
+        cadence: normalizeOptionalTextLength(item.cadence, 32) || 'annual',
+        used_this_year: Boolean(item.used_this_year ?? item.usedThisYear ?? false),
+        used_periods: normalizeTextList(item.used_periods || item.usedPeriods, 48, 24)
       };
     })
     .filter(Boolean)
-    .slice(0, 20);
+    .slice(0, 24);
+}
+
+function normalizeStrategy(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const estVal = value.sub_estimated_value === null || value.sub_estimated_value === undefined || value.sub_estimated_value === ''
+    ? null
+    : Number(value.sub_estimated_value);
+  const targetSpend = value.sub_target_spend === null || value.sub_target_spend === undefined || value.sub_target_spend === ''
+    ? null
+    : Number(value.sub_target_spend);
+  const offsetSpend = Number(value.sub_manual_spend_offset ?? 0);
+  const cooldownRaw = value.sub_cooldown_months;
+  const cooldown = cooldownRaw === null || cooldownRaw === undefined || cooldownRaw === ''
+    ? null
+    : parseInteger(cooldownRaw);
+  const overrideRaw = value.counts_toward_524_override ?? value.countsToward524Override;
+
+  return {
+    cardholder: normalizeOptionalTextLength(value.cardholder, 60),
+    opened_date: normalizeOptionalDateOnly(value.opened_date ?? value.openedDate, 'opened_date'),
+    closed_date: normalizeOptionalDateOnly(value.closed_date ?? value.closedDate, 'closed_date'),
+    is_business_card: Boolean(value.is_business_card ?? value.isBusinessCard ?? false),
+    counts_toward_524_override: overrideRaw === null || overrideRaw === undefined ? null : Boolean(overrideRaw),
+    product_changed_from: normalizeOptionalTextLength(value.product_changed_from ?? value.productChangedFrom, 120),
+    sub_reward_text: normalizeOptionalTextLength(value.sub_reward_text ?? value.subRewardText, 140),
+    sub_estimated_value: Number.isFinite(estVal) && estVal >= 0 ? estVal : null,
+    sub_target_spend: Number.isFinite(targetSpend) && targetSpend >= 0 ? targetSpend : null,
+    sub_deadline_date: normalizeOptionalDateOnly(value.sub_deadline_date ?? value.subDeadlineDate, 'sub_deadline_date'),
+    sub_manual_spend_offset: Number.isFinite(offsetSpend) ? offsetSpend : 0,
+    sub_completed: Boolean(value.sub_completed ?? value.subCompleted ?? false),
+    sub_received_date: normalizeOptionalDateOnly(value.sub_received_date ?? value.subReceivedDate, 'sub_received_date'),
+    sub_cooldown_months: cooldown !== null && cooldown >= 0 && cooldown <= 1200 ? cooldown : null
+  };
 }
 
 function stringifyProfileJson(value, fieldName) {
@@ -163,6 +217,7 @@ function normalizeCreditCardProfileBody(body = {}) {
   const authorizedUsers = normalizeTextList(body.authorized_users);
   const rewardCategories = normalizeRewardCategories(body.reward_categories);
   const benefits = normalizeBenefits(body.benefits);
+  const strategy = normalizeStrategy(body.strategy);
   const accountName = typeof body.account_name === 'string' ? body.account_name.trim() : null;
 
   if (!accountName) {
@@ -177,11 +232,14 @@ function normalizeCreditCardProfileBody(body = {}) {
     network: normalizeOptionalTextLength(body.network, 40),
     image_url: normalizeOptionalTextLength(body.image_url, 1000),
     annual_fee: normalizeOptionalMoney(body.annual_fee, 'annual_fee'),
-    annual_fee_post_date: normalizeOptionalDateOnly(body.annual_fee_post_date),
+    annual_fee_post_date: normalizeOptionalDateOnly(body.annual_fee_post_date, 'annual_fee_post_date'),
     credit_limit: normalizeOptionalMoney(body.credit_limit, 'credit_limit'),
+    statement_closing_day: normalizeOptionalCycleDay(body.statement_closing_day, 'statement_closing_day'),
+    payment_due_day: normalizeOptionalCycleDay(body.payment_due_day, 'payment_due_day'),
     authorized_users_json: stringifyProfileJson(authorizedUsers, 'authorized_users'),
     reward_categories_json: stringifyProfileJson(rewardCategories, 'reward_categories'),
     benefits_json: stringifyProfileJson(benefits, 'benefits'),
+    strategy_json: stringifyProfileJson(strategy, 'strategy'),
     notes: normalizeOptionalTextLength(body.notes, 2000)
   };
 }
@@ -461,10 +519,11 @@ router.put('/:id/credit-card-profile', requireAuth, (req, res) => {
       db.prepare(
         `INSERT INTO credit_card_profiles (
            household_id, account_id, card_name, issuer_name, network, image_url,
-           annual_fee, annual_fee_post_date, credit_limit, authorized_users_json,
-           reward_categories_json, benefits_json, notes
+           annual_fee, annual_fee_post_date, credit_limit,
+           statement_closing_day, payment_due_day,
+           authorized_users_json, reward_categories_json, benefits_json, strategy_json, notes
          ) VALUES (
-           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          )
          ON CONFLICT(household_id, account_id) DO UPDATE SET
            card_name = excluded.card_name,
@@ -474,9 +533,12 @@ router.put('/:id/credit-card-profile', requireAuth, (req, res) => {
            annual_fee = excluded.annual_fee,
            annual_fee_post_date = excluded.annual_fee_post_date,
            credit_limit = excluded.credit_limit,
+           statement_closing_day = excluded.statement_closing_day,
+           payment_due_day = excluded.payment_due_day,
            authorized_users_json = excluded.authorized_users_json,
            reward_categories_json = excluded.reward_categories_json,
            benefits_json = excluded.benefits_json,
+           strategy_json = excluded.strategy_json,
            notes = excluded.notes,
            updated_at = datetime('now')`
       ).run(
@@ -489,9 +551,12 @@ router.put('/:id/credit-card-profile', requireAuth, (req, res) => {
         profile.annual_fee,
         profile.annual_fee_post_date,
         profile.credit_limit,
+        profile.statement_closing_day,
+        profile.payment_due_day,
         profile.authorized_users_json,
         profile.reward_categories_json,
         profile.benefits_json,
+        profile.strategy_json,
         profile.notes
       );
     })();

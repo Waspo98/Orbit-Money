@@ -76,6 +76,24 @@ data class Account(
 }
 
 @Serializable
+enum class BenefitCadence(val storageKey: String, val displayName: String, val periodsPerYear: Int) {
+    MONTHLY("monthly", "Monthly", 12),
+    QUARTERLY("quarterly", "Quarterly", 4),
+    SEMI_ANNUAL("semi_annual", "Semi-Annual", 2),
+    ANNUAL("annual", "Annual", 1),
+    EVERY_4_YEARS("every_4_years", "Every 4 Years", 1);
+
+    companion object {
+        fun fromStorage(raw: String?): BenefitCadence {
+            if (raw.isNullOrBlank()) return ANNUAL
+            return entries.firstOrNull { it.storageKey.equals(raw, ignoreCase = true) }
+                ?: entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
+                ?: ANNUAL
+        }
+    }
+}
+
+@Serializable
 data class RewardCategory(
     val category: String = "",
     val multiplier: Double = 1.0,
@@ -94,8 +112,31 @@ data class CardBenefit(
     val annualCreditValueCents: Cents? = null,
     val usedThisYear: Boolean = false,
     val category: String? = null,
-    val valueText: String? = null
+    val valueText: String? = null,
+    val cadence: BenefitCadence = BenefitCadence.ANNUAL,
+    val usedPeriods: List<String> = emptyList()
 )
+
+@Serializable
+data class CreditCardStrategy(
+    val cardholder: String? = null, // e.g. "Player 1", "Player 2"
+    val openedDate: String? = null, // YYYY-MM-DD
+    val closedDate: String? = null, // YYYY-MM-DD
+    val isBusinessCard: Boolean = false,
+    val countsToward524Override: Boolean? = null, // null = !isBusinessCard
+    val productChangedFrom: String? = null,
+    val subRewardText: String? = null, // e.g. "75,000 UR Points"
+    val subEstimatedValueCents: Cents? = null,
+    val subTargetSpendCents: Cents? = null,
+    val subDeadlineDate: String? = null, // YYYY-MM-DD
+    val subManualSpendOffsetCents: Cents = 0L,
+    val subCompleted: Boolean = false,
+    val subReceivedDate: String? = null, // YYYY-MM-DD
+    val subCooldownMonths: Int? = null // 24, 48, 999 (Lifetime)
+) {
+    val countsToward524: Boolean
+        get() = countsToward524Override ?: !isBusinessCard
+}
 
 @Serializable
 data class CreditCardProfile(
@@ -114,6 +155,7 @@ data class CreditCardProfile(
     val authorizedUsers: List<String> = emptyList(),
     val rewardCategories: List<RewardCategory> = emptyList(),
     val benefits: List<CardBenefit> = emptyList(),
+    val strategy: CreditCardStrategy = CreditCardStrategy(),
     val notes: String? = null,
     val createdAt: String = "",
     val updatedAt: String = ""

@@ -85,6 +85,7 @@ data class CreditCardProfileDto(
     @SerialName("authorized_users") val authorizedUsers: List<String> = emptyList(),
     @SerialName("reward_categories") val rewardCategories: List<RewardCategoryWireDto> = emptyList(),
     val benefits: List<CardBenefitWireDto> = emptyList(),
+    val strategy: CreditCardStrategyWireDto? = null,
     val notes: String? = null
 ) {
     fun toDomain(): CreditCardProfile = CreditCardProfile(
@@ -102,6 +103,7 @@ data class CreditCardProfileDto(
         authorizedUsers = authorizedUsers,
         rewardCategories = rewardCategories.map { it.toDomain() },
         benefits = benefits.map { it.toDomain() },
+        strategy = strategy?.toDomain() ?: app.overbay.orbit.data.model.CreditCardStrategy(),
         notes = notes
     )
 }

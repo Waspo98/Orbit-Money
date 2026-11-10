@@ -43,6 +43,7 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
@@ -319,8 +320,12 @@ private fun AccountReadOnlyDetailContent(
 
         if (isCredit && account.creditCardProfile != null) {
             item {
+                val subProgress = remember(account, transactions) {
+                    CreditCardStrategyEngine.computeSubProgress(account, transactions)
+                }
                 CreditCardPerksPanel(
                     profile = account.creditCardProfile,
+                    subProgress = subProgress,
                     onEditPerks = onPerks,
                     onToggleBenefit = onToggleBenefit
                 )

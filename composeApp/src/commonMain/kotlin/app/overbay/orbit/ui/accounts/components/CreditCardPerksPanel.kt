@@ -18,16 +18,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
-import app.overbay.orbit.ui.components.OrbitIcons
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,19 +35,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
+import app.overbay.orbit.domain.CreditCardStrategyEngine
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.domain.SubProgressSummary
 import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.ui.components.OrbitIcons
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CreditCardPerksPanel(
     profile: CreditCardProfile,
+    subProgress: SubProgressSummary? = null,
     onEditPerks: () -> Unit,
     onToggleBenefit: ((benefitIndex: Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val subEligibility = remember(profile) { CreditCardStrategyEngine.computeSubEligibility(profile) }
+    val netFeeCents = remember(profile) { CreditCardStrategyEngine.computeCardEffectiveAnnualFeeCents(profile) }
+    val strategy = profile.strategy
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -65,7 +72,6 @@ fun CreditCardPerksPanel(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    // Stylized mini credit card artwork badge
                     Box(
                         modifier = Modifier
                             .size(width = 46.dp, height = 30.dp)
@@ -103,7 +109,7 @@ fun CreditCardPerksPanel(
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                text = profile.cardName ?: "Credit Card Perks",
+                                text = profile.cardName ?: "Credit Card Strategy & Perks",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -146,6 +152,44 @@ fun CreditCardPerksPanel(
                 }
             }
 
+            // Strategy Badges: Player, Opened Date, 5/24 Status, SUB Cooldown
+            if (!strategy.cardholder.isNullOrBlank() || strategy.openedDate != null || strategy.isBusinessCard || subEligibility != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    strategy.cardholder?.takeIf { it.isNotBlank() }?.let { holder ->
+                        StrategyPillBadge(text = holder, isAccent = true)
+                    }
+                    if (strategy.isBusinessCard) {
+                        StrategyPillBadge(text = "Business • 5/24 Exempt")
+                    } else if (strategy.openedDate != null) {
+                        val opened = LocalDateUtils.parseIsoDate(strategy.openedDate)
+                        val dropOff = opened?.let { LocalDateUtils.addMonthsClamped(it, 24) }
+                        val today = LocalDateUtils.todayLocalDate()
+                        if (dropOff != null && dropOff > today) {
+                            StrategyPillBadge(text = "5/24 until ${LocalDateUtils.formatIsoDate(dropOff)}")
+                        }
+                    }
+                    strategy.openedDate?.let { opened ->
+                        StrategyPillBadge(text = "Opened $opened")
+                    }
+                    subEligibility?.let { elig ->
+                        StrategyPillBadge(
+                            text = elig.statusLabel,
+                            isPositive = elig.isEligibleNow
+                        )
+                    }
+                }
+            }
+
+            // Active SUB Spend Tracker Card
+            if (subProgress != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                SubTrackerMiniCard(sub = subProgress)
+            }
+
             Spacer(modifier = Modifier.height(14.dp))
 
             // Annual fee & cycle status
@@ -172,13 +216,16 @@ fun CreditCardPerksPanel(
                                 fontWeight = FontWeight.Bold,
                                 color = OrbitColorTokens.Purple
                             )
-                            profile.annualFeePostDate?.let { date ->
-                                Text(
-                                    text = "Renews $date",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
+                            val netText = if (netFeeCents < fee) {
+                                "Net ${MoneyUtils.formatCents(netFeeCents)} after perks"
+                            } else {
+                                profile.annualFeePostDate?.let { "Renews $it" } ?: "No credits used yet"
                             }
+                            Text(
+                                text = netText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (netFeeCents <= 0L) OrbitColorTokens.Green else MaterialTheme.colorScheme.outline
+                            )
                         }
                     }
                 }
@@ -291,11 +338,11 @@ fun CreditCardPerksPanel(
                 }
             }
 
-            // Annual Benefits Checklist
+            // Cadence-Aware Statement Credits Checklist
             if (profile.benefits.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "ANNUAL STATEMENT CREDITS",
+                    text = "STATEMENT CREDITS & PERKS",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                     fontWeight = FontWeight.SemiBold
@@ -303,7 +350,7 @@ fun CreditCardPerksPanel(
                 Spacer(modifier = Modifier.height(6.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     profile.benefits.forEachIndexed { index, benefit ->
-                        BenefitRow(
+                        CardBenefitChecklistRow(
                             benefit = benefit,
                             onToggle = { onToggleBenefit?.invoke(index) }
                         )
@@ -311,50 +358,12 @@ fun CreditCardPerksPanel(
                 }
             }
 
-            // Notes if present
             profile.notes?.takeIf { it.isNotBlank() }?.let { notesText ->
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
                     text = notesText,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun BenefitRow(benefit: CardBenefit, onToggle: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(checked = benefit.usedThisYear, onCheckedChange = { onToggle() }, modifier = Modifier.size(24.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = benefit.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = if (benefit.usedThisYear) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
-                )
-                benefit.description?.let { desc ->
-                    Text(text = desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                }
-            }
-            benefit.annualCreditValueCents?.let { creditVal ->
-                Text(
-                    text = MoneyUtils.formatCents(creditVal),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (benefit.usedThisYear) OrbitColorTokens.Green else MaterialTheme.colorScheme.primary
                 )
             }
         }

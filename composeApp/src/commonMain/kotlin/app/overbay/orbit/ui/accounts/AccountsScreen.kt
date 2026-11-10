@@ -5,17 +5,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -24,11 +28,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.accounts.components.AccountDetailInspectorPane
 import app.overbay.orbit.ui.accounts.components.AccountGroupSection
+import app.overbay.orbit.ui.accounts.components.CreditCardStrategyHubPane
 import app.overbay.orbit.ui.accounts.sheets.AccountMergeDialog
 import app.overbay.orbit.ui.accounts.sheets.AddBalanceRecordDialog
 import app.overbay.orbit.ui.components.CanopyMenuAction
@@ -258,6 +264,53 @@ private fun AccountsMasterContent(
 
         val startPad = if (isWideScreen) 20.dp else 16.dp
         val endPad = if (isWideScreen) 0.dp else 16.dp
+
+        // Mode switcher: All Accounts vs Card Strategy Hub
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = startPad, end = endPad, top = 8.dp, bottom = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val allSelected = state.masterMode == AccountsMasterMode.ALL_ACCOUNTS
+            val hubSelected = state.masterMode == AccountsMasterMode.CARD_STRATEGY_HUB
+            val count524 = state.cardPortfolioSummary.chase524.count
+            FilterChip(
+                selected = allSelected,
+                onClick = { viewModel.setMasterMode(AccountsMasterMode.ALL_ACCOUNTS) },
+                label = {
+                    Text(
+                        text = "All Accounts (${state.accounts.size})",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (allSelected) FontWeight.Bold else FontWeight.Medium
+                    )
+                }
+            )
+            FilterChip(
+                selected = hubSelected,
+                onClick = { viewModel.setMasterMode(AccountsMasterMode.CARD_STRATEGY_HUB) },
+                label = {
+                    Text(
+                        text = "Card Strategy Hub • $count524/24",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (hubSelected) FontWeight.Bold else FontWeight.Medium
+                    )
+                }
+            )
+        }
+
+        if (state.masterMode == AccountsMasterMode.CARD_STRATEGY_HUB) {
+            CreditCardStrategyHubPane(
+                summary = state.cardPortfolioSummary,
+                onSelectPlayer = { viewModel.selectCardPlayer(it) },
+                onInspectAccount = { acctId -> viewModel.selectAccountForInspect(acctId) },
+                onToggleBenefit = { acctId, idx -> viewModel.toggleCardBenefit(acctId, idx) },
+                isWideScreen = isWideScreen,
+                modifier = Modifier.fillMaxSize()
+            )
+            return@Column
+        }
+
         val groupReorderState = rememberDragReorderState(
             items = state.accountGroups,
             keySelector = { it.category },

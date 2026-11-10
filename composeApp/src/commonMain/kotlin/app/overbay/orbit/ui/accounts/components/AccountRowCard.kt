@@ -167,6 +167,18 @@ fun AccountRowCard(
                             modifier = Modifier.align(Alignment.CenterVertically)
                         )
                     }
+                    profile.strategy.cardholder?.takeIf { it.isNotBlank() }?.let { holder ->
+                        AccountBadge(
+                            text = holder,
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        )
+                    }
+                    if (profile.strategy.isBusinessCard) {
+                        AccountBadge(
+                            text = "Biz",
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        )
+                    }
                 }
 
                 if (account.isManual && account.simplefinAccountId.isNullOrBlank()) {

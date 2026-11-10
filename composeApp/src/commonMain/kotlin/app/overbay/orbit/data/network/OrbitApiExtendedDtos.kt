@@ -48,26 +48,122 @@ import kotlinx.serialization.json.intOrNull
 
 @Serializable
 data class RewardCategoryWireDto(
-    val label: String = "", val category: String? = null, val rate: Double? = 1.0, val type: String? = "multiplier", val notes: String? = null
+    val label: String = "",
+    val category: String? = null,
+    val rate: Double? = 1.0,
+    @SerialName("is_rotating") @Serializable(with = FlexibleBooleanSerializer::class) val isRotating: Boolean = false,
+    val cap: Double? = null,
+    val type: String? = "multiplier",
+    val notes: String? = null
 ) {
-    fun toDomain(): RewardCategory = RewardCategory(category ?: label, rate ?: 1.0, false, null, notes, label, type ?: "multiplier", notes)
+    fun toDomain(): RewardCategory = RewardCategory(
+        category = category ?: label,
+        multiplier = rate ?: 1.0,
+        isRotating = isRotating,
+        capCents = cap?.let { MoneyUtils.dollarsToCents(it) },
+        description = notes,
+        label = label,
+        rateType = type ?: "multiplier",
+        notes = notes
+    )
     companion object {
-        fun fromDomain(d: RewardCategory): RewardCategoryWireDto = RewardCategoryWireDto(d.label.ifBlank { d.category }, d.category.takeIf { it.isNotBlank() }, d.multiplier, d.rateType, d.notes ?: d.description)
+        fun fromDomain(d: RewardCategory): RewardCategoryWireDto = RewardCategoryWireDto(
+            label = d.label.ifBlank { d.category },
+            category = d.category.takeIf { it.isNotBlank() },
+            rate = d.multiplier,
+            isRotating = d.isRotating,
+            cap = d.capCents?.let { MoneyUtils.centsToDollars(it) },
+            type = d.rateType,
+            notes = d.notes ?: d.description
+        )
     }
 }
 
 @Serializable
-data class CardBenefitWireDto(val name: String = "", val title: String = "", val value: JsonElement? = null, val description: String? = null, val category: String? = null) {
+data class CardBenefitWireDto(
+    val name: String = "",
+    val title: String = "",
+    val value: JsonElement? = null,
+    val description: String? = null,
+    val category: String? = null,
+    val cadence: String? = "annual",
+    @SerialName("used_this_year") @Serializable(with = FlexibleBooleanSerializer::class) val usedThisYear: Boolean = false,
+    @SerialName("used_periods") val usedPeriods: List<String> = emptyList()
+) {
     fun toDomain(): CardBenefit = CardBenefit(
-        title = title.ifBlank { name }, description = description,
+        title = title.ifBlank { name },
+        description = description,
         annualCreditValueCents = (value as? JsonPrimitive)?.content?.toDoubleOrNull()?.let { MoneyUtils.dollarsToCents(it) },
-        usedThisYear = false, category = category, valueText = (value as? JsonPrimitive)?.content
+        usedThisYear = usedThisYear,
+        category = category,
+        valueText = (value as? JsonPrimitive)?.content,
+        cadence = app.overbay.orbit.data.model.BenefitCadence.fromStorage(cadence),
+        usedPeriods = usedPeriods
     )
     companion object {
         fun fromDomain(d: CardBenefit): CardBenefitWireDto = CardBenefitWireDto(
-            name = d.title, title = d.title,
+            name = d.title,
+            title = d.title,
             value = d.annualCreditValueCents?.let { JsonPrimitive(MoneyUtils.centsToDollars(it)) } ?: d.valueText?.let { JsonPrimitive(it) },
-            description = d.description, category = d.category
+            description = d.description,
+            category = d.category,
+            cadence = d.cadence.storageKey,
+            usedThisYear = d.usedThisYear,
+            usedPeriods = d.usedPeriods
+        )
+    }
+}
+
+@Serializable
+data class CreditCardStrategyWireDto(
+    val cardholder: String? = null,
+    @SerialName("opened_date") val openedDate: String? = null,
+    @SerialName("closed_date") val closedDate: String? = null,
+    @SerialName("is_business_card") @Serializable(with = FlexibleBooleanSerializer::class) val isBusinessCard: Boolean = false,
+    @SerialName("counts_toward_524_override") @Serializable(with = FlexibleNullableBooleanSerializer::class) val countsToward524Override: Boolean? = null,
+    @SerialName("product_changed_from") val productChangedFrom: String? = null,
+    @SerialName("sub_reward_text") val subRewardText: String? = null,
+    @SerialName("sub_estimated_value") val subEstimatedValue: Double? = null,
+    @SerialName("sub_target_spend") val subTargetSpend: Double? = null,
+    @SerialName("sub_deadline_date") val subDeadlineDate: String? = null,
+    @SerialName("sub_manual_spend_offset") val subManualSpendOffset: Double = 0.0,
+    @SerialName("sub_completed") @Serializable(with = FlexibleBooleanSerializer::class) val subCompleted: Boolean = false,
+    @SerialName("sub_received_date") val subReceivedDate: String? = null,
+    @SerialName("sub_cooldown_months") val subCooldownMonths: Int? = null
+) {
+    fun toDomain(): app.overbay.orbit.data.model.CreditCardStrategy = app.overbay.orbit.data.model.CreditCardStrategy(
+        cardholder = cardholder,
+        openedDate = openedDate,
+        closedDate = closedDate,
+        isBusinessCard = isBusinessCard,
+        countsToward524Override = countsToward524Override,
+        productChangedFrom = productChangedFrom,
+        subRewardText = subRewardText,
+        subEstimatedValueCents = subEstimatedValue?.let { MoneyUtils.dollarsToCents(it) },
+        subTargetSpendCents = subTargetSpend?.let { MoneyUtils.dollarsToCents(it) },
+        subDeadlineDate = subDeadlineDate,
+        subManualSpendOffsetCents = MoneyUtils.dollarsToCents(subManualSpendOffset),
+        subCompleted = subCompleted,
+        subReceivedDate = subReceivedDate,
+        subCooldownMonths = subCooldownMonths
+    )
+
+    companion object {
+        fun fromDomain(d: app.overbay.orbit.data.model.CreditCardStrategy): CreditCardStrategyWireDto = CreditCardStrategyWireDto(
+            cardholder = d.cardholder,
+            openedDate = d.openedDate,
+            closedDate = d.closedDate,
+            isBusinessCard = d.isBusinessCard,
+            countsToward524Override = d.countsToward524Override,
+            productChangedFrom = d.productChangedFrom,
+            subRewardText = d.subRewardText,
+            subEstimatedValue = d.subEstimatedValueCents?.let { MoneyUtils.centsToDollars(it) },
+            subTargetSpend = d.subTargetSpendCents?.let { MoneyUtils.centsToDollars(it) },
+            subDeadlineDate = d.subDeadlineDate,
+            subManualSpendOffset = MoneyUtils.centsToDollars(d.subManualSpendOffsetCents),
+            subCompleted = d.subCompleted,
+            subReceivedDate = d.subReceivedDate,
+            subCooldownMonths = d.subCooldownMonths
         )
     }
 }
@@ -81,7 +177,9 @@ data class CreditCardProfileUpsertRequestDto(
     @SerialName("credit_limit") val creditLimit: Double? = null, @SerialName("statement_closing_day") val statementClosingDay: Int? = null,
     @SerialName("payment_due_day") val paymentDueDay: Int? = null, @SerialName("authorized_users") val authorizedUsers: List<String> = emptyList(),
     @SerialName("reward_categories") val rewardCategories: List<RewardCategoryWireDto> = emptyList(),
-    val benefits: List<CardBenefitWireDto> = emptyList(), val notes: String? = null
+    val benefits: List<CardBenefitWireDto> = emptyList(),
+    val strategy: CreditCardStrategyWireDto? = null,
+    val notes: String? = null
 )
 
 @Serializable

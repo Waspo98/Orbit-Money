@@ -5,6 +5,13 @@ import app.overbay.orbit.data.model.BalanceRecord
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.CreditCardPortfolioSummary
+import app.overbay.orbit.domain.CreditCardStrategyEngine
+
+enum class AccountsMasterMode {
+    ALL_ACCOUNTS,
+    CARD_STRATEGY_HUB
+}
 
 enum class AccountTypeCategory(val displayName: String) {
     CASH_AND_CHECKING("Cash & Checking"),
@@ -55,7 +62,10 @@ data class AccountsUiState(
     val isSyncing: Boolean = false,
     val syncErrorMessage: String? = null,
     val isLoading: Boolean = false,
-    val mhaEnabled: Boolean = false
+    val mhaEnabled: Boolean = false,
+    val masterMode: AccountsMasterMode = AccountsMasterMode.ALL_ACCOUNTS,
+    val selectedCardPlayer: String = CreditCardStrategyEngine.ALL_PLAYERS,
+    val cardPortfolioSummary: CreditCardPortfolioSummary = CreditCardPortfolioSummary()
 ) {
     val selectedAccount: Account?
         get() = accounts.find { it.id == selectedAccountId }

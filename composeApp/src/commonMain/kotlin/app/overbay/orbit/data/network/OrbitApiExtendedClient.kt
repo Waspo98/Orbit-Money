@@ -112,7 +112,9 @@ suspend fun OrbitApiClient.saveCreditCardProfileRemote(
         annualFeePostDate = profile.annualFeePostDate, creditLimit = profile.creditLimitCents?.let { MoneyUtils.centsToDollars(it) },
         statementClosingDay = profile.statementClosingDay, paymentDueDay = profile.paymentDueDay,
         authorizedUsers = profile.authorizedUsers, rewardCategories = profile.rewardCategories.map { RewardCategoryWireDto.fromDomain(it) },
-        benefits = profile.benefits.map { CardBenefitWireDto.fromDomain(it) }, notes = profile.notes
+        benefits = profile.benefits.map { CardBenefitWireDto.fromDomain(it) },
+        strategy = CreditCardStrategyWireDto.fromDomain(profile.strategy),
+        notes = profile.notes
     )
     val res = client.put(url("/api/accounts/$accountId/credit-card-profile")) {
         contentType(ContentType.Application.Json); auth(sessionCookie); setBody(req)

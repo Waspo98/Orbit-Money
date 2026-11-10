@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.data.model.BenefitCadence
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.RewardCategory
 import app.overbay.orbit.domain.MoneyUtils
@@ -309,6 +310,7 @@ fun RewardCategoriesEditorSection(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CardBenefitsEditorSection(
     benefits: List<CardBenefit>,
@@ -318,13 +320,19 @@ fun CardBenefitsEditorSection(
     val haptics = LocalOrbitHaptics.current
     var title by remember { mutableStateOf("") }
     var creditValCents by remember { mutableStateOf(0L) }
+    var selectedCadence by remember { mutableStateOf(BenefitCadence.ANNUAL) }
     var descText by remember { mutableStateOf("") }
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Statement Credits & Benefits (${benefits.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
 
         benefits.forEachIndexed { index, b ->
-            val valStr = b.annualCreditValueCents?.let { "Annual Credit: ${MoneyUtils.formatCents(it)}" }
+            val valStr = buildString {
+                append(b.cadence.displayName)
+                b.annualCreditValueCents?.let {
+                    append(" • ${MoneyUtils.formatCents(it)}/yr")
+                }
+            }
             OrbitCompactListRow(
                 title = b.title,
                 subtitle = valStr,
@@ -340,17 +348,45 @@ fun CardBenefitsEditorSection(
             )
         }
 
+        // Cadence selector for new benefit
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            BenefitCadence.entries.forEach { cadence ->
+                val isSelected = selectedCadence == cadence
+                FilterChip(
+                    selected = isSelected,
+                    onClick = {
+                        haptics.tick()
+                        selectedCadence = cadence
+                    },
+                    label = {
+                        Text(
+                            text = cadence.displayName,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 11.sp
+                        )
+                    }
+                )
+            }
+        }
+
         // Add benefit row
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OrbitTextField(value = title, onValueChange = { title = it }, label = { Text("Benefit Title") }, singleLine = true, modifier = Modifier.weight(1.8f))
             Box(modifier = Modifier.weight(1.2f)) {
-                CurrencyTextField(cents = creditValCents, onCentsChange = { creditValCents = it }, label = "Credit $")
+                CurrencyTextField(cents = creditValCents, onCentsChange = { creditValCents = it }, label = "Annual $")
             }
             Button(onClick = {
                 val amt = if (creditValCents > 0L) creditValCents else null
                 if (title.isNotBlank()) {
                     haptics.tick()
-                    onBenefitsChange(benefits + CardBenefit(title = title.trim(), annualCreditValueCents = amt, description = descText.takeIf { it.isNotBlank() }))
+                    onBenefitsChange(
+                        benefits + CardBenefit(
+                            title = title.trim(),
+                            annualCreditValueCents = amt,
+                            description = descText.takeIf { it.isNotBlank() },
+                            cadence = selectedCadence
+                        )
+                    )
                     title = ""
                     creditValCents = 0L
                     descText = ""

@@ -86,6 +86,7 @@ fun CreditCardProfileEditorContent(
     var authorizedUsers by remember(profile) { mutableStateOf(profile.authorizedUsers) }
     var rewardList by remember(profile) { mutableStateOf(profile.rewardCategories) }
     var benefitList by remember(profile) { mutableStateOf(profile.benefits) }
+    var strategy by remember(profile) { mutableStateOf(profile.strategy) }
     var notes by remember(profile) { mutableStateOf(profile.notes ?: "") }
 
     Column(
@@ -96,10 +97,39 @@ fun CreditCardProfileEditorContent(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Credit Card Perks & Profile",
+            text = "Credit Card Strategy & Perks",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
+        )
+
+        // 1-Tap Popular Card Templates
+        CardTemplateQuickPickerSection(
+            selectedCardName = cardName,
+            onApplyTemplate = { tpl ->
+                val applied = tpl.applyToProfile(
+                    profile.copy(
+                        cardName = cardName,
+                        issuerName = issuerName,
+                        network = network,
+                        imageUrl = imageUrl,
+                        annualFeeCents = annualFeeCents,
+                        rewardCategories = rewardList,
+                        benefits = benefitList,
+                        strategy = strategy
+                    )
+                )
+                cardName = applied.cardName ?: ""
+                issuerName = applied.issuerName ?: ""
+                if (accountName.isBlank()) accountName = applied.cardName ?: ""
+                if (accountInstitution.isBlank()) accountInstitution = applied.issuerName ?: ""
+                network = applied.network ?: "Visa"
+                imageUrl = applied.imageUrl ?: ""
+                annualFeeCents = applied.annualFeeCents ?: 0L
+                rewardList = applied.rewardCategories
+                benefitList = applied.benefits
+                strategy = applied.strategy
+            }
         )
 
         // Account Name & Institution (persisted to Account)
@@ -197,6 +227,12 @@ fun CreditCardProfileEditorContent(
             )
         }
 
+        // Lifecycle, Chase 5/24 & SUB Tracker Section
+        CreditCardStrategyEditorSection(
+            strategy = strategy,
+            onStrategyChange = { strategy = it }
+        )
+
         // Authorized Users Section
         AuthorizedUsersSection(
             users = authorizedUsers,
@@ -251,6 +287,7 @@ fun CreditCardProfileEditorContent(
                         authorizedUsers = authorizedUsers,
                         rewardCategories = rewardList,
                         benefits = benefitList,
+                        strategy = strategy,
                         notes = notes.trim().ifBlank { null }
                     )
                     onSave(updated, accountName.trim(), accountInstitution.trim())
