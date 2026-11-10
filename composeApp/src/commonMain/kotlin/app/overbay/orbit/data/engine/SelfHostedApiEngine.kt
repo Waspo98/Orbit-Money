@@ -31,6 +31,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -138,6 +139,7 @@ class SelfHostedApiEngine(
 
         val resolvedPrefs = currentPrefs.copy(
             mhaTrackerEnabled = mhaDto?.enabled ?: currentPrefs.mhaTrackerEnabled,
+            cardRewardsToolsEnabled = remotePrefs?.prefOr<Boolean?>("cardRewardsToolsEnabled", currentPrefs.cardRewardsToolsEnabled) ?: currentPrefs.cardRewardsToolsEnabled,
             amoledDarkMode = remotePrefs?.prefOr("amoledDarkMode", currentPrefs.amoledDarkMode) ?: currentPrefs.amoledDarkMode,
             hiddenRouteNames = remotePrefs?.prefOr("hiddenRouteNames", currentPrefs.hiddenRouteNames) ?: currentPrefs.hiddenRouteNames,
             moreRouteOrder = remotePrefs?.prefOr("moreRouteOrder", currentPrefs.moreRouteOrder) ?: currentPrefs.moreRouteOrder,
@@ -387,6 +389,7 @@ class SelfHostedApiEngine(
     override suspend fun pushPreferences(preferences: OrbitPreferences): Result<OrbitPreferences> {
         runCatching {
             val map = mutableMapOf<String, JsonElement>()
+            map["cardRewardsToolsEnabled"] = preferences.cardRewardsToolsEnabled?.let { JsonPrimitive(it) } ?: JsonNull
             map["amoledDarkMode"] = JsonPrimitive(preferences.amoledDarkMode)
             map["budgetSortOption"] = JsonPrimitive(preferences.budgetSortOption.name)
             map["dashboardRetirementAge"] = JsonPrimitive(preferences.dashboardRetirementAge)

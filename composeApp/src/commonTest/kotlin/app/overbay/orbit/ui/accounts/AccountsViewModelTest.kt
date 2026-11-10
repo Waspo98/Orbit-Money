@@ -313,4 +313,78 @@ class AccountsViewModelTest {
         viewModel.dismissDeleteAccount()
         collectJob.cancel()
     }
+
+    @Test
+    fun testRewardsToolsEnabled_autoMode_and_explicitOverride() = runTest(testDispatcher) {
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        // 1. By default with no strategy data on any account, auto mode resolves to false
+        assertFalse(viewModel.uiState.value.rewardsToolsEnabled)
+
+        // 2. Add an account with strategy openedDate -> auto mode resolves to true
+        val card = Account(
+            id = 100L,
+            name = "Chase Sapphire",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 100L,
+                strategy = CreditCardStrategy(openedDate = "2025-01-15")
+            )
+        )
+        repository.saveAccount(card)
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.rewardsToolsEnabled)
+
+        // 3. Explicit preference false overrides auto mode
+        repository.updatePreferences(repository.preferences.value.copy(cardRewardsToolsEnabled = false))
+        testScheduler.advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.rewardsToolsEnabled)
+
+        // 4. Explicit preference true forces it on
+        repository.updatePreferences(repository.preferences.value.copy(cardRewardsToolsEnabled = true))
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.rewardsToolsEnabled)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testOpenPerkUsage_populatesTargetAndCloseClearsIt() = runTest(testDispatcher) {
+        val benefit = CardBenefit(id = "b_dining", title = "Dining Credit", periodValueCents = 2500L)
+        val card = Account(
+            id = 200L,
+            name = "Amex Gold",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 200L,
+                benefits = listOf(benefit)
+            )
+        )
+        repository.saveAccount(card)
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.perkUsageTarget)
+
+        viewModel.openPerkUsage(200L, "b_dining")
+        testScheduler.advanceUntilIdle()
+
+        val target = viewModel.uiState.value.perkUsageTarget
+        assertNotNull(target)
+        assertEquals(200L, target.accountId)
+        assertEquals("b_dining", target.benefitId)
+        assertEquals("Dining Credit", target.title)
+        assertEquals(2500L, target.valueCents)
+
+        viewModel.closePerkUsage()
+        testScheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.perkUsageTarget)
+
+        collectJob.cancel()
+    }
 }

@@ -46,7 +46,8 @@ fun PreferencesSubpageContent(
             preferences = uiState.preferences,
             onToggleRouteHidden = viewModel::toggleRouteHidden,
             onMoveRoute = viewModel::moveRouteOrder,
-            onMhaTrackerChange = viewModel::setMhaTrackerEnabled
+            onMhaTrackerChange = viewModel::setMhaTrackerEnabled,
+            onCardRewardsToolsChange = viewModel::setCardRewardsToolsEnabled
         )
 
         SecurityBiometricsBlock(

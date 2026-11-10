@@ -29,6 +29,15 @@ data class AccountGroupDisplay(
     val totalCents: Cents
 )
 
+data class PerkUsageTarget(
+    val accountId: Long,
+    val benefitId: String,
+    val title: String = "",
+    val periodLabel: String = "",
+    val valueCents: Cents = 0L,
+    val initialUsedCents: Cents = 0L
+)
+
 data class AccountsUiState(
     val accounts: List<Account> = emptyList(),
     val accountGroups: List<AccountGroupDisplay> = emptyList(),
@@ -64,6 +73,8 @@ data class AccountsUiState(
     val syncErrorMessage: String? = null,
     val isLoading: Boolean = false,
     val mhaEnabled: Boolean = false,
+    val rewardsToolsEnabled: Boolean = false,
+    val perkUsageTarget: PerkUsageTarget? = null,
     val masterMode: AccountsMasterMode = AccountsMasterMode.ALL_ACCOUNTS,
     val selectedCardPlayer: String = CreditCardStrategyEngine.ALL_PLAYERS,
     val cardPortfolioSummary: CreditCardPortfolioSummary = CreditCardPortfolioSummary()

@@ -71,6 +71,7 @@ class AccountsViewModel(
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
     private val _masterMode = MutableStateFlow(AccountsMasterMode.ALL_ACCOUNTS)
     private val _selectedCardPlayer = MutableStateFlow(CreditCardStrategyEngine.ALL_PLAYERS)
+    private val _perkUsageTarget = MutableStateFlow<PerkUsageTarget?>(null)
 
     private val resolvedTodayFlow = todayFlow ?: flow {
         while (true) {
@@ -135,6 +136,12 @@ class AccountsViewModel(
                 .sortedWith(compareByDescending<BalanceRecord> { it.recordDate }.thenByDescending { it.id })
         } else emptyList()
 
+        val hasRewardsData = data.accounts.any { acct ->
+            val strat = acct.creditCardProfile?.strategy
+            !strat?.openedDate.isNullOrBlank() || (strat?.subTargetSpendCents ?: 0L) > 0L
+        }
+        val resolvedRewardsToolsEnabled = data.preferences.cardRewardsToolsEnabled ?: hasRewardsData
+
         AccountsUiState(
             accounts = sorted, accountGroups = groups, totalAssetsCents = snapshot.totalAssetsCents,
             totalLiabilitiesCents = snapshot.totalLiabilitiesCents, netWorthCents = snapshot.netWorthCents,
@@ -149,9 +156,11 @@ class AccountsViewModel(
             historyBalanceRecords = historyRecords, showAddRecordDialog = addRecord.showAddRecordDialog,
             addRecordAccount = addRecord.addRecordAccount, accountGroupWideSpans = data.preferences.accountGroupWideSpans,
             isSyncing = syncReorder.syncing, syncErrorMessage = syncReorder.err, isLoading = false,
-            mhaEnabled = data.preferences.mhaTrackerEnabled
+            mhaEnabled = data.preferences.mhaTrackerEnabled,
+            rewardsToolsEnabled = resolvedRewardsToolsEnabled
         )
     }.combine(_isPhoneViewingDetail) { state, phoneDetail -> state.copy(isPhoneViewingDetail = phoneDetail)
+    }.combine(_perkUsageTarget) { state, target -> state.copy(perkUsageTarget = target)
     }.combine(combine(_masterMode, cardPortfolioFlow) { m, s -> m to s }) { state, (mode, summary) ->
         state.copy(masterMode = mode, selectedCardPlayer = summary.selectedPlayer, cardPortfolioSummary = summary)
     }.combine(combine(_deleteConfirmAccountId, _deleteWarning524Date) { delId, warnDate -> delId to warnDate }) { state, (delId, warnDate) ->
@@ -416,6 +425,30 @@ class AccountsViewModel(
         val profile = account.creditCardProfile ?: return
         val benefitId = profile.benefits.getOrNull(benefitIndex)?.id ?: return
         toggleCardBenefit(accountId, benefitId)
+    }
+
+    fun openPerkUsage(accountId: Long, benefitId: String) {
+        val account = uiState.value.accounts.find { it.id == accountId }
+        val profile = account?.creditCardProfile
+        val benefit = profile?.benefits?.find { it.id == benefitId }
+        val (periodLabel, used, value) = if (benefit != null) {
+            val today = LocalDateUtils.todayLocalDate()
+            val opened = profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
+            val p = CreditCardBenefitEngine.currentPeriod(benefit, opened, today)
+            Triple(p.label, CreditCardBenefitEngine.usedCents(benefit, p), CreditCardBenefitEngine.periodValueCents(benefit))
+        } else Triple("", 0L, 0L)
+        _perkUsageTarget.value = PerkUsageTarget(
+            accountId = accountId,
+            benefitId = benefitId,
+            title = benefit?.title.orEmpty(),
+            periodLabel = periodLabel,
+            valueCents = value,
+            initialUsedCents = used
+        )
+    }
+
+    fun closePerkUsage() {
+        _perkUsageTarget.value = null
     }
 
     fun openMergeDialog(sourceAccount: Account) {

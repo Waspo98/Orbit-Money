@@ -47,20 +47,11 @@ import app.overbay.orbit.data.model.BenefitCadence
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.RewardCategory
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.CardArtPalette
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
-
-data class CardArtPreset(val label: String, val network: String, val url: String)
-
-val PRESET_CARD_ARTS = listOf(
-    CardArtPreset("Sapphire Blue", "Visa", "preset://sapphire-blue"),
-    CardArtPreset("Amex Gold", "Amex", "preset://amex-gold"),
-    CardArtPreset("Capital Silver", "Mastercard", "preset://venture-silver"),
-    CardArtPreset("Apple Titanium", "Mastercard", "preset://apple-card"),
-    CardArtPreset("Discover Plum", "Discover", "preset://discover-plum")
-)
 
 val NETWORKS = listOf("Visa", "Mastercard", "Amex", "Discover")
 
@@ -102,38 +93,14 @@ fun CardArtworkAndNetworkSection(
         }
 
         // Preview Badge & Image URL
-        val activePreset = PRESET_CARD_ARTS.find { it.url == imageUrl }
-        val cardGradient = when (activePreset?.url) {
-            "preset://sapphire-blue" -> listOf(
-                MaterialTheme.colorScheme.primary,
-                MaterialTheme.colorScheme.primaryContainer
-            )
-            "preset://amex-gold" -> listOf(
-                MaterialTheme.colorScheme.tertiary,
-                MaterialTheme.colorScheme.tertiaryContainer
-            )
-            "preset://venture-silver" -> listOf(
-                MaterialTheme.colorScheme.secondary,
-                MaterialTheme.colorScheme.surfaceVariant
-            )
-            "preset://apple-card" -> listOf(
-                MaterialTheme.colorScheme.outline,
-                MaterialTheme.colorScheme.surfaceContainerHighest
-            )
-            "preset://discover-plum" -> listOf(
-                MaterialTheme.colorScheme.secondaryContainer,
-                MaterialTheme.colorScheme.tertiaryContainer
-            )
-            else -> listOf(
-                MaterialTheme.colorScheme.primaryContainer,
-                MaterialTheme.colorScheme.tertiaryContainer
-            )
-        }
-        val badgeTextColor = if (activePreset?.url in listOf("preset://sapphire-blue", "preset://amex-gold", "preset://venture-silver")) {
-            MaterialTheme.colorScheme.onPrimary
-        } else {
+        val activePreset = CardArtPalette.resolve(imageUrl)
+        val (startColor, endColor, badgeTextColor) = CardArtPalette.resolveColors(
+            imageUrl,
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.tertiaryContainer,
             MaterialTheme.colorScheme.onPrimaryContainer
-        }
+        )
+        val cardGradient = listOf(startColor, endColor)
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -184,14 +151,14 @@ fun CardArtworkAndNetworkSection(
         // Preset quick-picks
         Text("Quick-pick Preset Art:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            PRESET_CARD_ARTS.forEach { preset ->
-                val isPresetSelected = imageUrl == preset.url
+            CardArtPalette.ALL.forEach { preset ->
+                val isPresetSelected = imageUrl == preset.key
                 FilterChip(
                     selected = isPresetSelected,
                     onClick = {
                         haptics.tick()
-                        onImageUrlChange(if (isPresetSelected) "" else preset.url)
-                        if (network.isBlank()) onNetworkChange(preset.network)
+                        onImageUrlChange(if (isPresetSelected) "" else preset.key)
+                        if (network.isBlank()) onNetworkChange(preset.defaultNetwork)
                     },
                     label = {
                         Text(

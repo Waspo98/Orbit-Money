@@ -11,6 +11,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +39,7 @@ fun NavigationCustomizeBlock(
     onToggleRouteHidden: (String) -> Unit,
     onMoveRoute: (fromIndex: Int, toIndex: Int, currentList: List<String>) -> Unit,
     onMhaTrackerChange: (Boolean) -> Unit = {},
+    onCardRewardsToolsChange: (Boolean?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val defaultRoutes = remember {
@@ -82,6 +86,50 @@ fun NavigationCustomizeBlock(
                 checked = preferences.mhaTrackerEnabled,
                 onCheckedChange = onMhaTrackerChange
             )
+
+            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+
+            // Show Rewards Strategy Tools
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Show Rewards Strategy Tools",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = when (preferences.cardRewardsToolsEnabled) {
+                        null -> "Auto · Active when any card tracks bonus or opened dates"
+                        true -> "Always On · Showing 5/24, bonuses, and earn rates"
+                        false -> "Off · Hiding strategy tools across cards"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val options = listOf("Auto", "On", "Off")
+                    val selectedIndex = when (preferences.cardRewardsToolsEnabled) {
+                        null -> 0
+                        true -> 1
+                        false -> 2
+                    }
+                    options.forEachIndexed { index, label ->
+                        SegmentedButton(
+                            selected = selectedIndex == index,
+                            onClick = {
+                                val newValue = when (index) {
+                                    0 -> null
+                                    1 -> true
+                                    else -> false
+                                }
+                                onCardRewardsToolsChange(newValue)
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                            label = { Text(label, style = MaterialTheme.typography.labelMedium) }
+                        )
+                    }
+                }
+            }
 
             HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
 

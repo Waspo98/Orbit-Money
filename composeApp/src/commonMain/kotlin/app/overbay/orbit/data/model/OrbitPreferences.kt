@@ -40,6 +40,7 @@ data class OrbitPreferences(
     val biometricTimeoutSeconds: Int = 300, // 5 minutes
     val hapticsEnabled: Boolean = true,
     val mhaTrackerEnabled: Boolean = false,
+    val cardRewardsToolsEnabled: Boolean? = null,
     val defaultCurrency: String = "USD",
     val defaultAccountId: Long? = null,
     val googleDriveSyncEnabled: Boolean = false,

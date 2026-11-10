@@ -182,6 +182,12 @@ class SettingsViewModel(
         scope.launch { repository.setMhaEnabled(enabled) }
     }
 
+    fun setCardRewardsToolsEnabled(enabled: Boolean?) {
+        val updated = _uiState.value.preferences.copy(cardRewardsToolsEnabled = enabled)
+        _uiState.update { it.copy(preferences = updated) }
+        scope.launch { repository.updatePreferences(updated) }
+    }
+
     fun toggleRouteHidden(routeName: String) {
         val current = _uiState.value.preferences.hiddenRouteNames
         val updatedList = if (current.contains(routeName)) current - routeName else current + routeName

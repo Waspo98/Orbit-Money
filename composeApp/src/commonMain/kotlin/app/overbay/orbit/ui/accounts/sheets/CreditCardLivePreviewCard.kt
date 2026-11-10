@@ -53,6 +53,8 @@ import app.overbay.orbit.data.model.CreditCardStrategy
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 
+import app.overbay.orbit.theme.CardArtPalette
+
 @Composable
 fun CreditCardLivePreviewCard(
     accountName: String,
@@ -64,18 +66,12 @@ fun CreditCardLivePreviewCard(
     strategy: CreditCardStrategy,
     modifier: Modifier = Modifier
 ) {
-    val (targetStart, targetEnd, targetText) = when (imageUrl) {
-        "preset://sapphire-blue" -> Triple(Color(0xFF0F2B5B), Color(0xFF1E56A0), Color.White)
-        "preset://amex-gold" -> Triple(Color(0xFF8C621E), Color(0xFFD4AF37), Color(0xFF1B1406))
-        "preset://venture-silver" -> Triple(Color(0xFF232931), Color(0xFF4E5B6E), Color.White)
-        "preset://apple-card" -> Triple(Color(0xFFD8DCE3), Color(0xFFF5F7FA), Color(0xFF1D1F23))
-        "preset://discover-plum" -> Triple(Color(0xFF4A1C40), Color(0xFF8A307F), Color.White)
-        else -> Triple(
-            MaterialTheme.colorScheme.primary,
-            MaterialTheme.colorScheme.tertiary,
-            MaterialTheme.colorScheme.onPrimary
-        )
-    }
+    val (targetStart, targetEnd, targetText) = CardArtPalette.resolveColors(
+        key = imageUrl,
+        fallbackStart = MaterialTheme.colorScheme.primary,
+        fallbackEnd = MaterialTheme.colorScheme.tertiary,
+        fallbackText = MaterialTheme.colorScheme.onPrimary
+    )
 
     val startColor by animateColorAsState(targetStart, spring(stiffness = Spring.StiffnessLow), label = "cardGradStart")
     val endColor by animateColorAsState(targetEnd, spring(stiffness = Spring.StiffnessLow), label = "cardGradEnd")
