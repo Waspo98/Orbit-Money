@@ -134,6 +134,7 @@ fun AccountDetailInspectorPane(
                         profile = profile,
                         initialAccountName = targetAccount?.name ?: "",
                         initialInstitution = targetAccount?.institution ?: "",
+                        transactions = state.selectedAccountTransactions,
                         onSave = { updatedProfile, acctName, acctInst ->
                             viewModel.saveCreditCardProfile(
                                 profile = updatedProfile,

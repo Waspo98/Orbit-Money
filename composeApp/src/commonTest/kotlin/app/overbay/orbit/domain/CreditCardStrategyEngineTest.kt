@@ -150,4 +150,19 @@ class CreditCardStrategyEngineTest {
         assertTrue(applied.benefits.isNotEmpty())
         assertTrue(applied.rewardCategories.any { it.multiplier == 4.0 })
     }
+
+    @Test
+    fun detectHistorySuggestionsFindsEarliestTransactionAndAnnualFeePostDate() {
+        val txns = listOf(
+            Transaction(id = 1L, accountId = 55L, originalDate = "2025-04-10", originalMerchant = "Whole Foods", originalAmountCents = -64_20L),
+            Transaction(id = 2L, accountId = 55L, originalDate = "2025-04-18", originalMerchant = "ANNUAL MEMBERSHIP FEE", originalAmountCents = -95_00L),
+            Transaction(id = 3L, accountId = 55L, originalDate = "2026-04-18", originalMerchant = "ANNUAL MEMBERSHIP FEE", originalAmountCents = -95_00L)
+        )
+
+        val suggestions = CreditCardStrategyEngine.detectHistorySuggestions(55L, txns, 95_00L)
+        assertEquals("2025-04-10", suggestions.suggestedOpenedDate)
+        assertEquals("Whole Foods", suggestions.earliestTxnMerchant)
+        assertEquals("2026-04-18", suggestions.suggestedAnnualFeeDate)
+        assertEquals(95_00L, suggestions.detectedAnnualFeeCents)
+    }
 }

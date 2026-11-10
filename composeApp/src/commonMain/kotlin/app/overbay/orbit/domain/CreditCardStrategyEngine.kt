@@ -85,6 +85,14 @@ data class CategoryBestCardPick(
     val notes: String?
 )
 
+data class CardHistorySuggestions(
+    val suggestedOpenedDate: String? = null,
+    val earliestTxnMerchant: String? = null,
+    val suggestedAnnualFeeDate: String? = null,
+    val detectedAnnualFeeCents: Cents? = null,
+    val detectedFeeMerchant: String? = null
+)
+
 data class CreditCardPortfolioSummary(
     val availablePlayers: List<String> = emptyList(),
     val selectedPlayer: String = "ALL",
@@ -510,6 +518,43 @@ object CreditCardStrategyEngine {
 
     private fun isAnnualFeeMerchant(merchant: String): Boolean {
         val lower = merchant.lowercase()
-        return "annual fee" in lower || "annual membership fee" in lower || "renewal fee" in lower
+        return "annual fee" in lower ||
+            "annual membership" in lower ||
+            "membership fee" in lower ||
+            "renewal fee" in lower
+    }
+
+    fun detectHistorySuggestions(
+        accountId: Long,
+        transactions: List<Transaction>,
+        templateAnnualFeeCents: Cents? = null
+    ): CardHistorySuggestions {
+        val acctTxns = transactions.filter {
+            (accountId == 0L || it.accountId == accountId) && !it.effectiveIsIgnored
+        }
+        if (acctTxns.isEmpty()) return CardHistorySuggestions()
+
+        val earliest = acctTxns.minByOrNull { it.effectiveDate }
+        val feeKeywordMatches = acctTxns.filter { txn ->
+            txn.effectiveAmountCents < 0L && isAnnualFeeMerchant(txn.effectiveMerchant)
+        }.sortedByDescending { it.effectiveDate }
+
+        val detectedFeeTxn = feeKeywordMatches.firstOrNull() ?: run {
+            val tplFee = templateAnnualFeeCents ?: return@run null
+            if (tplFee < 50_00L) return@run null
+            acctTxns.filter { txn ->
+                txn.effectiveAmountCents < 0L &&
+                    abs(txn.effectiveAmountCents) == tplFee &&
+                    ("fee" in txn.effectiveMerchant.lowercase() || "membership" in txn.effectiveMerchant.lowercase())
+            }.maxByOrNull { it.effectiveDate }
+        }
+
+        return CardHistorySuggestions(
+            suggestedOpenedDate = earliest?.effectiveDate?.take(10),
+            earliestTxnMerchant = earliest?.effectiveMerchant,
+            suggestedAnnualFeeDate = detectedFeeTxn?.effectiveDate?.take(10),
+            detectedAnnualFeeCents = detectedFeeTxn?.let { abs(it.effectiveAmountCents) },
+            detectedFeeMerchant = detectedFeeTxn?.effectiveMerchant
+        )
     }
 }
