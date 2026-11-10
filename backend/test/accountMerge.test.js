@@ -131,20 +131,24 @@ test('mergeAccounts preserves account-owned records before deleting the source a
     db.prepare(
       `INSERT INTO credit_card_profiles (
          household_id, account_id, issuer_name, annual_fee,
-         authorized_users_json, reward_categories_json, benefits_json
+         payment_due_day,
+         authorized_users_json, reward_categories_json, benefits_json, strategy_json
        )
-       VALUES (1, ?, 'Target Bank', 0, '["Alex"]', '[]', '[{"name":"Warranty"}]')`
+       VALUES (1, ?, 'Target Bank', 0, 15, '["Alex"]', '[]', '[{"name":"Warranty","value":100}]', '{"cardholder":"Alex"}')`
     ).run(targetId);
     db.prepare(
       `INSERT INTO credit_card_profiles (
          household_id, account_id, card_name, issuer_name, annual_fee,
-         authorized_users_json, reward_categories_json, benefits_json, notes
+         statement_closing_day, payment_due_day,
+         authorized_users_json, reward_categories_json, benefits_json, strategy_json, notes
        )
        VALUES (
          1, ?, 'Orbit Rewards', 'Source Bank', 9500,
+         25, 20,
          '["Alex","Sam"]',
          '[{"label":"Groceries","rate":3}]',
-         '[{"name":"Warranty"},{"name":"Travel"}]',
+         '[{"title":"warranty","value":100},{"name":"Travel"}]',
+         '{"opened_date":"2024-01-15","sub_target_spend":4000}',
          'source note'
        )`
     ).run(sourceId);
@@ -244,12 +248,19 @@ test('mergeAccounts preserves account-owned records before deleting the source a
     assert.equal(profile.card_name, 'Orbit Rewards');
     assert.equal(profile.issuer_name, 'Target Bank');
     assert.equal(profile.annual_fee, 0);
+    assert.equal(profile.payment_due_day, 15);
+    assert.equal(profile.statement_closing_day, 25);
     assert.deepEqual(JSON.parse(profile.authorized_users_json), ['Alex', 'Sam']);
     assert.deepEqual(JSON.parse(profile.reward_categories_json), [{ label: 'Groceries', rate: 3 }]);
     assert.deepEqual(JSON.parse(profile.benefits_json), [
-      { name: 'Warranty' },
+      { name: 'Warranty', value: 100 },
       { name: 'Travel' }
     ]);
+    assert.deepEqual(JSON.parse(profile.strategy_json), {
+      opened_date: '2024-01-15',
+      sub_target_spend: 4000,
+      cardholder: 'Alex'
+    });
   } finally {
     db.close();
   }

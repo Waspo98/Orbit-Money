@@ -6,12 +6,14 @@ import app.overbay.orbit.data.model.BenefitCadence
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.CreditCardStrategy
+import app.overbay.orbit.data.model.RewardCategory
 import app.overbay.orbit.data.model.Transaction
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CreditCardStrategyEngineTest {
@@ -62,6 +64,7 @@ class CreditCardStrategyEngineTest {
         assertEquals(5, status.count)
         assertFalse(status.isUnder524)
         assertEquals(1, status.excludedBusinessCount)
+        assertEquals(0, status.missingOpenDateCount)
         assertEquals("2027-01-15", status.nextSlotFreeDate)
         assertEquals("2027-01-15", status.under524DropDate)
     }
@@ -80,11 +83,11 @@ class CreditCardStrategyEngineTest {
 
         val txns = listOf(
             // Qualifying purchase: $1,200
-            Transaction(id = 1L, accountId = 10L, originalDate = "2026-10-05", originalMerchant = "Delta Air Lines", originalAmountCents = -1200_00L),
+            Transaction(id = 1L, accountId = 10L, originalDate = "2026-10-15", originalMerchant = "Delta Air Lines", originalAmountCents = -1200_00L),
             // Qualifying purchase: $800
-            Transaction(id = 2L, accountId = 10L, originalDate = "2026-10-12", originalMerchant = "Costco Wholesale", originalAmountCents = -800_00L),
+            Transaction(id = 2L, accountId = 10L, originalDate = "2026-10-20", originalMerchant = "Costco Wholesale", originalAmountCents = -800_00L),
             // Refund/return: +$100 (reduces net spend)
-            Transaction(id = 3L, accountId = 10L, originalDate = "2026-10-15", originalMerchant = "Costco Return", originalAmountCents = 100_00L),
+            Transaction(id = 3L, accountId = 10L, originalDate = "2026-10-22", originalMerchant = "Costco Return", originalAmountCents = 100_00L),
             // Annual Fee: should be excluded automatically
             Transaction(id = 4L, accountId = 10L, originalDate = "2026-10-02", originalMerchant = "ANNUAL MEMBERSHIP FEE", originalAmountCents = -95_00L),
             // Credit card payment / transfer: excluded
@@ -126,6 +129,18 @@ class CreditCardStrategyEngineTest {
         val elig2 = CreditCardStrategyEngine.computeSubEligibility(oldSapphire, refToday)
         assertNotNull(elig2)
         assertTrue(elig2.isEligibleNow)
+
+        val amexPlatinum = CreditCardProfile(
+            accountId = 3L,
+            strategy = CreditCardStrategy(
+                openedDate = "2023-01-01",
+                subCooldownMonths = LIFETIME_COOLDOWN_MONTHS
+            )
+        )
+        val elig3 = CreditCardStrategyEngine.computeSubEligibility(amexPlatinum, refToday)
+        assertNotNull(elig3)
+        assertFalse(elig3.isEligibleNow)
+        assertEquals("Once per Lifetime", elig3.statusLabel)
     }
 
     @Test
@@ -164,5 +179,151 @@ class CreditCardStrategyEngineTest {
         assertEquals("Whole Foods", suggestions.earliestTxnMerchant)
         assertEquals("2026-04-18", suggestions.suggestedAnnualFeeDate)
         assertEquals(95_00L, suggestions.detectedAnnualFeeCents)
+    }
+
+    @Test
+    fun summarizePortfolioPartitions524ByPerson() {
+        val accounts = listOf(
+            creditAccount(1L, "Card A1", openedDate = "2025-01-15", cardholder = "Alex"),
+            creditAccount(2L, "Card A2", openedDate = "2025-06-20", cardholder = "Alex"),
+            creditAccount(3L, "Card A3", openedDate = "2026-02-10", cardholder = "Alex"),
+            creditAccount(4L, "Card S1", openedDate = "2025-03-10", cardholder = "Sam"),
+            creditAccount(5L, "Card S2", openedDate = "2025-08-05", cardholder = "Sam"),
+            creditAccount(6L, "Card S3", openedDate = "2026-01-12", cardholder = "Sam")
+        )
+        val summary = CreditCardStrategyEngine.summarizePortfolio(accounts, emptyList(), today = refToday)
+        assertEquals(2, summary.chase524ByPerson.size)
+        val alex524 = summary.chase524ByPerson.first { it.holderKey == "alex" }
+        val sam524 = summary.chase524ByPerson.first { it.holderKey == "sam" }
+        assertEquals(3, alex524.summary.count)
+        assertEquals(3, sam524.summary.count)
+        assertTrue(alex524.summary.isUnder524)
+        assertTrue(sam524.summary.isUnder524)
+    }
+
+    @Test
+    fun summarizePortfolioDeDuplicatesPlayerNamesCaseInsensitively() {
+        val accounts = listOf(
+            creditAccount(1L, "Card 1", openedDate = "2025-01-15", cardholder = "Neal"),
+            creditAccount(2L, "Card 2", openedDate = "2025-06-20", cardholder = "neal ")
+        )
+        val summary = CreditCardStrategyEngine.summarizePortfolio(accounts, emptyList(), today = refToday)
+        assertEquals(1, summary.availablePlayers.size)
+        assertEquals("neal", summary.availablePlayers.first().first)
+        assertEquals("Neal", summary.availablePlayers.first().second)
+        assertEquals(1, summary.chase524ByPerson.size)
+        assertEquals(2, summary.chase524ByPerson.first().summary.count)
+    }
+
+    @Test
+    fun computeChase524StatusTracksCardsWithMissingOpenedDate() {
+        val accounts = listOf(
+            creditAccount(1L, "Active Card No Date", openedDate = null),
+            creditAccount(2L, "Normal Card", openedDate = "2025-05-01")
+        )
+        val status = CreditCardStrategyEngine.computeChase524Status(accounts, refToday)
+        assertEquals(1, status.count)
+        assertEquals(1, status.missingOpenDateCount)
+    }
+
+    @Test
+    fun computeSubProgressReturnsNullWhenOpenedDateIsMissing() {
+        val account = creditAccount(
+            1L, "Card Without Date",
+            strategy = CreditCardStrategy(openedDate = null, subTargetSpendCents = 4000_00L)
+        )
+        val progress = CreditCardStrategyEngine.computeSubProgress(account, emptyList(), refToday)
+        assertNull(progress)
+    }
+
+    @Test
+    fun cardTransactionClassifierFiltersUntaggedPaymentsAndNonSpendCharges() {
+        val purchase = Transaction(id = 1L, accountId = 1L, originalDate = "2026-10-05", originalMerchant = "Best Buy", originalAmountCents = -1000_00L)
+        val untaggedPayment = Transaction(id = 2L, accountId = 1L, originalDate = "2026-10-10", originalMerchant = "PAYMENT THANK YOU", originalAmountCents = 1500_00L, isTransfer = false)
+        val dashPayment = Transaction(id = 6L, accountId = 1L, originalDate = "2026-10-11", originalMerchant = "AUTOMATIC PAYMENT - THANK YOU", originalAmountCents = 2000_00L, isTransfer = false)
+        val interest = Transaction(id = 3L, accountId = 1L, originalDate = "2026-10-12", originalMerchant = "PURCHASE INTEREST CHARGE", originalAmountCents = -25_50L)
+        val lateFee = Transaction(id = 4L, accountId = 1L, originalDate = "2026-10-15", originalMerchant = "LATE PAYMENT FEE", originalAmountCents = -40_00L)
+        val statementCredit = Transaction(id = 5L, accountId = 1L, originalDate = "2026-10-18", originalMerchant = "AMEX UBER STATEMENT CREDIT", originalAmountCents = 15_00L)
+
+        assertEquals(1000_00L, CardTransactionClassifier.bonusSpendDeltaCents(purchase))
+        assertEquals(0L, CardTransactionClassifier.bonusSpendDeltaCents(untaggedPayment))
+        assertEquals(0L, CardTransactionClassifier.bonusSpendDeltaCents(dashPayment))
+        assertEquals(0L, CardTransactionClassifier.bonusSpendDeltaCents(interest))
+        assertEquals(0L, CardTransactionClassifier.bonusSpendDeltaCents(lateFee))
+        assertEquals(0L, CardTransactionClassifier.bonusSpendDeltaCents(statementCredit))
+    }
+
+    @Test
+    fun computeSubProgressDistinguishesSpendMetFromReceived() {
+        val strategyAwaiting = CreditCardStrategy(
+            openedDate = "2026-10-01",
+            subTargetSpendCents = 1000_00L,
+            subDeadlineDate = "2027-01-01",
+            subReceivedDate = null
+        )
+        val txns = listOf(
+            Transaction(id = 1L, accountId = 1L, originalDate = "2026-10-15", originalMerchant = "Apple Store", originalAmountCents = -1000_00L)
+        )
+        val p1 = CreditCardStrategyEngine.computeSubProgress(creditAccount(1L, "Card", strategy = strategyAwaiting), txns, refToday)
+        assertNotNull(p1)
+        assertEquals(SubTrackerStatus.SPEND_MET, p1.status)
+
+        val strategyReceived = strategyAwaiting.copy(subReceivedDate = "2026-11-05")
+        val p2 = CreditCardStrategyEngine.computeSubProgress(creditAccount(1L, "Card", strategy = strategyReceived), txns, refToday)
+        assertNotNull(p2)
+        assertEquals(SubTrackerStatus.RECEIVED, p2.status)
+    }
+
+    @Test
+    fun computeSubProgressPaceFlagsAtRiskWhenRecentSpendStalls() {
+        // Target $4,000, opened 2026-08-01 (100 days ago), deadline in 20 days (2026-11-29).
+        // $500 spent back in August, $0 in last 30 days.
+        val strategy = CreditCardStrategy(
+            openedDate = "2026-08-01",
+            subTargetSpendCents = 4000_00L,
+            subDeadlineDate = "2026-11-29"
+        )
+        val txns = listOf(
+            Transaction(id = 1L, accountId = 1L, originalDate = "2026-08-05", originalMerchant = "Home Depot", originalAmountCents = -500_00L)
+        )
+        val progress = CreditCardStrategyEngine.computeSubProgress(creditAccount(1L, "Card", strategy = strategy), txns, refToday)
+        assertNotNull(progress)
+        assertEquals(3500_00L, progress.remainingSpendCents)
+        assertEquals(SubTrackerStatus.AT_RISK, progress.status)
+    }
+
+    @Test
+    fun templateApplyToProfilePreservesUsedPeriodsAndCustomCategories() {
+        val existing = CreditCardProfile(
+            accountId = 5L,
+            benefits = listOf(
+                CardBenefit(
+                    title = "$10/mo Uber Cash ($120/yr)",
+                    annualCreditValueCents = 120_00L,
+                    cadence = BenefitCadence.MONTHLY,
+                    usedPeriods = listOf("2026-01", "2026-02", "2026-03")
+                ),
+                CardBenefit(title = "Custom Airport Lounge Pass", annualCreditValueCents = 150_00L)
+            ),
+            rewardCategories = listOf(
+                RewardCategory(category = "Custom Retail", label = "Local Boutiques", multiplier = 3.0)
+            )
+        )
+        val amexGold = CreditCardTemplates.ALL.first { it.id == "amex_gold" }
+        val merged = amexGold.applyToProfile(existing)
+
+        val uberBenefit = merged.benefits.first { it.title.contains("Uber Cash") }
+        assertEquals(listOf("2026-01", "2026-02", "2026-03"), uberBenefit.usedPeriods)
+        assertTrue(merged.benefits.any { it.title == "Custom Airport Lounge Pass" })
+        assertTrue(merged.rewardCategories.any { it.label == "Local Boutiques" })
+        assertEquals(325_00L, merged.annualFeeCents)
+    }
+
+    @Test
+    fun normalizeCategoryBucketMatchesWholeWordsWithoutSubwordFalsePositives() {
+        assertEquals("Travel & Flights", CreditCardStrategyEngine.normalizeCategoryBucket("Las Vegas Hotels"))
+        assertEquals("Dining & Restaurants", CreditCardStrategyEngine.normalizeCategoryBucket("Fine Dining Experiences"))
+        assertEquals("Gas & Transit", CreditCardStrategyEngine.normalizeCategoryBucket("Shell Gas & EV Charging"))
+        assertEquals("Everything Else (Catch-All)", CreditCardStrategyEngine.normalizeCategoryBucket("Everything Else Base"))
     }
 }

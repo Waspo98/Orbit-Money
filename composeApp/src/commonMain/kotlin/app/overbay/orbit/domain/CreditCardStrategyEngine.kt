@@ -5,99 +5,68 @@ import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.BenefitCadence
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
+import app.overbay.orbit.data.model.CreditCardStrategy
 import app.overbay.orbit.data.model.Transaction
 import kotlinx.datetime.LocalDate
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
 enum class SubTrackerStatus {
-    COMPLETED,
     ON_TRACK,
     AT_RISK,
+    SPEND_MET,
+    RECEIVED,
     EXPIRED
 }
 
 data class Chase524SlotItem(
-    val accountId: Long,
-    val cardTitle: String,
-    val issuerName: String?,
-    val cardholder: String?,
-    val openedDate: String,
-    val dropOffDate: String,
-    val daysUntilDropOff: Int,
-    val isClosed: Boolean
+    val accountId: Long, val cardTitle: String, val issuerName: String?, val cardholder: String?,
+    val openedDate: String, val dropOffDate: String, val daysUntilDropOff: Int, val isClosed: Boolean
 )
 
 data class Chase524Summary(
-    val count: Int = 0,
-    val maxSlots: Int = 5,
-    val isUnder524: Boolean = true,
-    val nextSlotFreeDate: String? = null,
-    val daysUntilNextSlotFree: Int? = null,
-    val under524DropDate: String? = null,
-    val slots: List<Chase524SlotItem> = emptyList(),
-    val excludedBusinessCount: Int = 0
+    val count: Int = 0, val maxSlots: Int = 5, val isUnder524: Boolean = true,
+    val nextSlotFreeDate: String? = null, val daysUntilNextSlotFree: Int? = null, val under524DropDate: String? = null,
+    val slots: List<Chase524SlotItem> = emptyList(), val excludedBusinessCount: Int = 0, val missingOpenDateCount: Int = 0
 )
 
+data class Chase524PersonSummary(val holderKey: String, val holderLabel: String, val summary: Chase524Summary)
+
 data class SubProgressSummary(
-    val accountId: Long,
-    val cardTitle: String,
-    val cardholder: String?,
-    val rewardText: String,
-    val estimatedValueCents: Cents?,
-    val targetSpendCents: Cents,
-    val currentSpendCents: Cents,
-    val remainingSpendCents: Cents,
-    val progressRatio: Float,
-    val deadlineDate: String?,
-    val daysRemaining: Int?,
-    val dailyPaceNeededCents: Cents?,
-    val status: SubTrackerStatus
+    val accountId: Long, val cardTitle: String, val cardholder: String?, val rewardText: String,
+    val estimatedValueCents: Cents?, val targetSpendCents: Cents, val currentSpendCents: Cents,
+    val remainingSpendCents: Cents, val progressRatio: Float, val deadlineDate: String?,
+    val daysRemaining: Int?, val dailyPaceNeededCents: Cents?, val status: SubTrackerStatus,
+    val deadlineIsEstimated: Boolean = false
 )
 
 data class SubEligibilityInfo(
-    val isEligibleNow: Boolean,
-    val statusLabel: String,
-    val eligibleDate: String? = null,
-    val daysUntilEligible: Int? = null
+    val isEligibleNow: Boolean, val statusLabel: String, val eligibleDate: String? = null,
+    val daysUntilEligible: Int? = null, val isEstimated: Boolean = false
 )
 
 data class ActivePerkItem(
-    val accountId: Long,
-    val cardTitle: String,
-    val cardholder: String?,
-    val benefitIndex: Int,
-    val benefit: CardBenefit,
-    val periodKey: String,
-    val periodLabel: String,
-    val periodValueCents: Cents,
-    val isUsedInCurrentPeriod: Boolean
+    val accountId: Long, val cardTitle: String, val cardholder: String?, val benefitIndex: Int,
+    val benefit: CardBenefit, val periodKey: String, val periodLabel: String,
+    val periodValueCents: Cents, val isUsedInCurrentPeriod: Boolean
 )
 
 data class CategoryBestCardPick(
-    val categoryName: String,
-    val accountId: Long,
-    val cardTitle: String,
-    val cardholder: String?,
-    val multiplier: Double,
-    val rateType: String,
-    val isRotating: Boolean,
-    val notes: String?
+    val categoryName: String, val accountId: Long, val cardTitle: String, val cardholder: String?,
+    val multiplier: Double, val rateType: String, val isRotating: Boolean, val notes: String?
 )
 
 data class CardHistorySuggestions(
-    val suggestedOpenedDate: String? = null,
-    val earliestTxnMerchant: String? = null,
-    val suggestedAnnualFeeDate: String? = null,
-    val detectedAnnualFeeCents: Cents? = null,
+    val suggestedOpenedDate: String? = null, val earliestTxnMerchant: String? = null,
+    val suggestedAnnualFeeDate: String? = null, val detectedAnnualFeeCents: Cents? = null,
     val detectedFeeMerchant: String? = null
 )
 
 data class CreditCardPortfolioSummary(
-    val availablePlayers: List<String> = emptyList(),
-    val selectedPlayer: String = "ALL",
+    val availablePlayers: List<Pair<String, String>> = emptyList(),
+    val selectedPlayer: String = CreditCardStrategyEngine.ALL_PLAYERS,
     val totalCardsCount: Int = 0,
-    val chase524: Chase524Summary = Chase524Summary(),
+    val chase524ByPerson: List<Chase524PersonSummary> = emptyList(),
     val activeSubs: List<SubProgressSummary> = emptyList(),
     val totalAnnualFeesCents: Cents = 0L,
     val totalAnnualCreditsPotentialCents: Cents = 0L,
@@ -106,6 +75,12 @@ data class CreditCardPortfolioSummary(
     val currentPeriodPerks: List<ActivePerkItem> = emptyList(),
     val bestCardsByCategory: List<CategoryBestCardPick> = emptyList()
 )
+
+const val UNASSIGNED_KEY = "~unassigned"
+const val LIFETIME_COOLDOWN_MONTHS = 999
+
+internal fun holderKey(s: CreditCardStrategy): String =
+    s.cardholder?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: UNASSIGNED_KEY
 
 object CreditCardStrategyEngine {
 
@@ -118,12 +93,18 @@ object CreditCardStrategyEngine {
         today: LocalDate = LocalDateUtils.todayLocalDate()
     ): CreditCardPortfolioSummary {
         val creditAccounts = accounts.filter { it.type == AccountType.CREDIT }
-        val players = creditAccounts
-            .mapNotNull { it.creditCardProfile?.strategy?.cardholder?.trim()?.takeIf(String::isNotEmpty) }
-            .distinct()
-            .sorted()
 
-        val effectivePlayer = if (selectedPlayer != ALL_PLAYERS && selectedPlayer !in players) {
+        val playerMap = linkedMapOf<String, String>()
+        for (account in creditAccounts) {
+            val strat = account.creditCardProfile?.strategy ?: continue
+            val k = holderKey(strat)
+            if (k != UNASSIGNED_KEY && !playerMap.containsKey(k)) {
+                playerMap[k] = strat.cardholder!!.trim()
+            }
+        }
+        val players = playerMap.entries.map { it.key to it.value }.sortedBy { it.second }
+
+        val effectivePlayer = if (selectedPlayer != ALL_PLAYERS && players.none { it.first == selectedPlayer }) {
             ALL_PLAYERS
         } else {
             selectedPlayer
@@ -133,18 +114,44 @@ object CreditCardStrategyEngine {
             creditAccounts
         } else {
             creditAccounts.filter {
-                it.creditCardProfile?.strategy?.cardholder?.equals(effectivePlayer, ignoreCase = true) == true
+                it.creditCardProfile?.let { p -> holderKey(p.strategy) } == effectivePlayer
             }
         }
 
         val activeCards = playerFiltered.filter { !it.isArchived && it.creditCardProfile?.strategy?.closedDate.isNullOrBlank() }
-        val chase524 = computeChase524Status(playerFiltered, today)
 
+        // Group all credit accounts (including closed/archived) by holderKey for 5/24
+        val groupedByHolder = creditAccounts.groupBy { it.creditCardProfile?.let { p -> holderKey(p.strategy) } ?: UNASSIGNED_KEY }
+        val chase524List = mutableListOf<Chase524PersonSummary>()
+        for ((hKey, accts) in groupedByHolder) {
+            if (effectivePlayer != ALL_PLAYERS && hKey != effectivePlayer) continue
+            val label = if (hKey == UNASSIGNED_KEY) "Unassigned" else (playerMap[hKey] ?: hKey.replaceFirstChar { it.uppercase() })
+            val sum = computeChase524Status(accts, today)
+            chase524List.add(Chase524PersonSummary(hKey, label, sum))
+        }
+        val chase524ByPerson = chase524List.sortedWith(
+            compareBy<Chase524PersonSummary> { it.holderKey == UNASSIGNED_KEY }.thenBy { it.holderLabel }
+        )
+
+        val cutoffReceivedDate = LocalDateUtils.addDays(today, -90)
         val activeSubs = playerFiltered.mapNotNull { account ->
             computeSubProgress(account, transactions, today)
+        }.filter { sub ->
+            if (sub.status != SubTrackerStatus.RECEIVED) true else {
+                val strat = playerFiltered.firstOrNull { it.id == sub.accountId }?.creditCardProfile?.strategy
+                val recDate = LocalDateUtils.parseIsoDate(strat?.subReceivedDate)
+                recDate == null || recDate >= cutoffReceivedDate
+            }
         }.sortedWith(
-            compareBy<SubProgressSummary> { it.status == SubTrackerStatus.COMPLETED }
-                .thenBy { it.daysRemaining ?: Int.MAX_VALUE }
+            compareBy<SubProgressSummary> {
+                when (it.status) {
+                    SubTrackerStatus.AT_RISK -> 0
+                    SubTrackerStatus.ON_TRACK -> 1
+                    SubTrackerStatus.SPEND_MET -> 2
+                    SubTrackerStatus.EXPIRED -> 3
+                    SubTrackerStatus.RECEIVED -> 4
+                }
+            }.thenBy { it.daysRemaining ?: Int.MAX_VALUE }
         )
 
         var totalFees = 0L
@@ -198,7 +205,7 @@ object CreditCardStrategyEngine {
             availablePlayers = players,
             selectedPlayer = effectivePlayer,
             totalCardsCount = activeCards.size,
-            chase524 = chase524,
+            chase524ByPerson = chase524ByPerson,
             activeSubs = activeSubs,
             totalAnnualFeesCents = totalFees,
             totalAnnualCreditsPotentialCents = totalPotentialCredits,
@@ -215,19 +222,23 @@ object CreditCardStrategyEngine {
     ): Chase524Summary {
         val cutoffDate = LocalDateUtils.addMonthsClamped(today, -24)
         var excludedBiz = 0
+        var missingOpenDates = 0
         val slots = mutableListOf<Chase524SlotItem>()
 
         for (account in creditAccounts) {
             val profile = account.creditCardProfile ?: continue
             val strategy = profile.strategy
-            val opened = LocalDateUtils.parseIsoDate(strategy.openedDate) ?: continue
+            if (!strategy.countsToward524) {
+                excludedBiz++
+                continue
+            }
+            val opened = LocalDateUtils.parseIsoDate(strategy.openedDate)
+            if (opened == null) {
+                missingOpenDates++
+                continue
+            }
 
-            // Opened within the trailing 24 months
             if (opened > cutoffDate && opened <= today) {
-                if (!strategy.countsToward524) {
-                    excludedBiz++
-                    continue
-                }
                 val dropOff = LocalDateUtils.addMonthsClamped(opened, 24)
                 val daysLeft = LocalDateUtils.daysBetween(today, dropOff).coerceAtLeast(0)
                 val title = profile.cardName?.takeIf { it.isNotBlank() } ?: account.name
@@ -255,11 +266,12 @@ object CreditCardStrategyEngine {
             count = count,
             maxSlots = 5,
             isUnder524 = count < 5,
-            nextSlotFreeDate = nextFree?.dropOffDate,
-            daysUntilNextSlotFree = nextFree?.daysUntilDropOff,
+            nextSlotFreeDate = if (count >= 1) nextFree?.dropOffDate else null,
+            daysUntilNextSlotFree = if (count >= 1) nextFree?.daysUntilDropOff else null,
             under524DropDate = under524Slot?.dropOffDate,
             slots = sortedSlots,
-            excludedBusinessCount = excludedBiz
+            excludedBusinessCount = excludedBiz,
+            missingOpenDateCount = missingOpenDates
         )
     }
 
@@ -273,48 +285,52 @@ object CreditCardStrategyEngine {
         val targetCents = strategy.subTargetSpendCents ?: return null
         if (targetCents <= 0L && strategy.subRewardText.isNullOrBlank()) return null
 
-        val openedIso = strategy.openedDate ?: "0000-01-01"
-        val deadlineIso = strategy.subDeadlineDate
-        val upperBoundIso = deadlineIso ?: "9999-12-31"
+        val opened = LocalDateUtils.parseIsoDate(strategy.openedDate) ?: return null
+        val deadlineIsEstimated = strategy.subDeadlineDate.isNullOrBlank()
+        val deadline = LocalDateUtils.parseIsoDate(strategy.subDeadlineDate)
+            ?: LocalDateUtils.addMonthsClamped(opened, 3)
 
-        val qualifyingTxns = transactions.filter { txn ->
+        val openedIso = LocalDateUtils.formatIsoDate(opened)
+        val deadlineIso = LocalDateUtils.formatIsoDate(deadline)
+
+        val window = transactions.filter { txn ->
             txn.accountId == account.id &&
-                !txn.effectiveIsTransfer &&
-                !txn.effectiveIsIgnored &&
                 txn.effectiveDate >= openedIso &&
-                txn.effectiveDate <= upperBoundIso &&
-                !isAnnualFeeMerchant(txn.effectiveMerchant)
+                txn.effectiveDate <= deadlineIso
         }
 
-        var netSpendCents = strategy.subManualSpendOffsetCents
-        for (txn in qualifyingTxns) {
-            val amt = txn.effectiveAmountCents
-            if (amt < 0L) {
-                netSpendCents += abs(amt)
-            } else if (amt > 0L) {
-                netSpendCents -= amt
-            }
-        }
-        val currentSpend = netSpendCents.coerceAtLeast(0L)
-        val effectiveSpend = if (strategy.subCompleted && currentSpend < targetCents) targetCents else currentSpend
+        val spendDelta = window.sumOf { CardTransactionClassifier.bonusSpendDeltaCents(it) }
+        val netSpend = (strategy.subManualSpendOffsetCents + spendDelta).coerceAtLeast(0L)
+        val effectiveSpend = if (strategy.subCompleted && netSpend < targetCents) targetCents else netSpend
         val remaining = (targetCents - effectiveSpend).coerceAtLeast(0L)
         val ratio = if (targetCents > 0L) {
             (effectiveSpend.toFloat() / targetCents.toFloat()).coerceIn(0f, 1f)
         } else 1f
 
-        val deadlineDate = LocalDateUtils.parseIsoDate(deadlineIso)
-        val daysLeft = deadlineDate?.let { LocalDateUtils.daysBetween(today, it) }
-        val dailyPace = if (remaining > 0L && daysLeft != null && daysLeft > 0) {
-            (remaining.toDouble() / daysLeft.toDouble()).roundToLong()
-        } else if (remaining > 0L && daysLeft != null && daysLeft <= 0) {
+        val daysLeft = LocalDateUtils.daysBetween(today, deadline)
+
+        // Trailing 30-day pace projection
+        val since = maxOf(opened, LocalDateUtils.addDays(today, -30))
+        val paceDays = LocalDateUtils.daysBetween(since, today).coerceAtLeast(1)
+        val sinceIso = LocalDateUtils.formatIsoDate(since)
+        val recent = window.filter { it.effectiveDate >= sinceIso }
+            .sumOf { CardTransactionClassifier.bonusSpendDeltaCents(it) }
+            .coerceAtLeast(0L)
+        val projected = netSpend + (recent * daysLeft.coerceAtLeast(0)) / paceDays
+
+        val dailyPace = if (remaining > 0L && daysLeft > 0) {
+            remaining / daysLeft.toLong()
+        } else if (remaining > 0L && daysLeft <= 0) {
             remaining
         } else null
 
-        val isDone = strategy.subCompleted || remaining == 0L || !strategy.subReceivedDate.isNullOrBlank()
+        val daysSinceOpened = LocalDateUtils.daysBetween(opened, today)
         val status = when {
-            isDone -> SubTrackerStatus.COMPLETED
-            daysLeft != null && daysLeft < 0 -> SubTrackerStatus.EXPIRED
-            daysLeft != null && daysLeft <= 14 && ratio < 0.85f -> SubTrackerStatus.AT_RISK
+            !strategy.subReceivedDate.isNullOrBlank() -> SubTrackerStatus.RECEIVED
+            strategy.subCompleted || remaining == 0L -> SubTrackerStatus.SPEND_MET
+            daysLeft < 0 -> SubTrackerStatus.EXPIRED
+            daysSinceOpened >= 14 && projected < targetCents -> SubTrackerStatus.AT_RISK
+            daysLeft <= 14 && ratio < 0.85f -> SubTrackerStatus.AT_RISK
             else -> SubTrackerStatus.ON_TRACK
         }
 
@@ -332,7 +348,8 @@ object CreditCardStrategyEngine {
             deadlineDate = deadlineIso,
             daysRemaining = daysLeft,
             dailyPaceNeededCents = dailyPace,
-            status = status
+            status = status,
+            deadlineIsEstimated = deadlineIsEstimated
         )
     }
 
@@ -343,38 +360,48 @@ object CreditCardStrategyEngine {
         val strategy = profile.strategy
         val cooldown = strategy.subCooldownMonths ?: return null
         if (cooldown <= 0) return null
-        if (cooldown >= 999) {
+        if (cooldown >= LIFETIME_COOLDOWN_MONTHS) {
             return SubEligibilityInfo(
                 isEligibleNow = false,
-                statusLabel = "Once-per-Lifetime Rule (Amex)"
+                statusLabel = "Once per Lifetime",
+                isEstimated = false
             )
         }
 
-        val anchorIso = strategy.subReceivedDate?.takeIf { it.isNotBlank() } ?: strategy.openedDate
-        val anchorDate = LocalDateUtils.parseIsoDate(anchorIso) ?: return SubEligibilityInfo(
+        val hasReceivedDate = !strategy.subReceivedDate.isNullOrBlank()
+        val isEstimated = !hasReceivedDate
+        val anchorDate = if (hasReceivedDate) {
+            LocalDateUtils.parseIsoDate(strategy.subReceivedDate)
+        } else {
+            LocalDateUtils.parseIsoDate(strategy.openedDate)?.let { LocalDateUtils.addMonthsClamped(it, 3) }
+        } ?: return SubEligibilityInfo(
             isEligibleNow = true,
-            statusLabel = "${cooldown}-Mo Rule (Set SUB/Open Date)"
+            statusLabel = "${cooldown}-Mo Rule (Set SUB/Open Date)",
+            isEstimated = false
         )
 
         val eligibleLocalDate = LocalDateUtils.addMonthsClamped(anchorDate, cooldown)
         val eligibleIso = LocalDateUtils.formatIsoDate(eligibleLocalDate)
         val daysUntil = LocalDateUtils.daysBetween(today, eligibleLocalDate)
+        val estPrefix = if (isEstimated) "Est. " else ""
 
         return if (daysUntil <= 0) {
             SubEligibilityInfo(
                 isEligibleNow = true,
-                statusLabel = "SUB Eligible Now (Passed $eligibleIso)",
+                statusLabel = "${estPrefix}SUB Eligible Now (Passed $eligibleIso)",
                 eligibleDate = eligibleIso,
-                daysUntilEligible = 0
+                daysUntilEligible = 0,
+                isEstimated = isEstimated
             )
         } else {
             val approxMonths = ((daysUntil + 15) / 30).coerceAtLeast(1)
             val disp = LocalDateUtils.formatMonthShortLabel(eligibleIso.take(7))
             SubEligibilityInfo(
                 isEligibleNow = false,
-                statusLabel = "Eligible $disp ($approxMonths mo)",
+                statusLabel = "${estPrefix}Eligible $disp ($approxMonths mo)",
                 eligibleDate = eligibleIso,
-                daysUntilEligible = daysUntil
+                daysUntilEligible = daysUntil,
+                isEstimated = isEstimated
             )
         }
     }
@@ -472,6 +499,23 @@ object CreditCardStrategyEngine {
         return fee - captured
     }
 
+    private val CATEGORY_SYNONYMS = listOf(
+        "Dining & Restaurants" to setOf("dining", "restaurant", "restaurants"),
+        "Groceries" to setOf("grocery", "groceries", "supermarket", "supermarkets"),
+        "Travel & Flights" to setOf("travel", "flight", "flights", "hotel", "hotels", "airline", "airlines"),
+        "Gas & Transit" to setOf("gas", "fuel", "ev", "transit", "rideshare"),
+        "Streaming & Entertainment" to setOf("streaming", "entertainment"),
+        "Online Shopping" to setOf("online", "amazon"),
+        "Drugstores" to setOf("drugstore", "drugstores", "pharmacy"),
+        "Rent" to setOf("rent"),
+        "Everything Else (Catch-All)" to setOf("everything", "catch-all", "base")
+    )
+
+    internal fun normalizeCategoryBucket(raw: String): String {
+        val tokens = raw.lowercase().split(Regex("[^a-z0-9-]+")).filter(String::isNotBlank).toSet()
+        return CATEGORY_SYNONYMS.firstOrNull { (_, w) -> w.any(tokens::contains) }?.first ?: raw.trim()
+    }
+
     fun computeBestCardsByCategory(accounts: List<Account>): List<CategoryBestCardPick> {
         val bestByCat = mutableMapOf<String, CategoryBestCardPick>()
         for (account in accounts) {
@@ -479,11 +523,14 @@ object CreditCardStrategyEngine {
             val cardTitle = profile.cardName?.takeIf { it.isNotBlank() } ?: account.name
             val holder = profile.strategy.cardholder?.takeIf { it.isNotBlank() }
             for (reward in profile.rewardCategories) {
-                val rawCat = reward.label.ifBlank { reward.category }.trim()
+                if (reward.isRotating) continue
+                val rawCat = reward.category.ifBlank { reward.label }.trim()
                 if (rawCat.isEmpty()) continue
                 val normCat = normalizeCategoryBucket(rawCat)
                 val existing = bestByCat[normCat]
-                if (existing == null || reward.multiplier > existing.multiplier) {
+                if (existing == null || reward.multiplier > existing.multiplier ||
+                    (reward.multiplier == existing.multiplier && cardTitle < existing.cardTitle)
+                ) {
                     bestByCat[normCat] = CategoryBestCardPick(
                         categoryName = normCat,
                         accountId = account.id,
@@ -491,37 +538,15 @@ object CreditCardStrategyEngine {
                         cardholder = holder,
                         multiplier = reward.multiplier,
                         rateType = reward.rateType,
-                        isRotating = reward.isRotating,
+                        isRotating = false,
                         notes = reward.notes ?: reward.description
                     )
                 }
             }
         }
-        return bestByCat.values.sortedByDescending { it.multiplier }
-    }
-
-    private fun normalizeCategoryBucket(raw: String): String {
-        val lower = raw.lowercase()
-        return when {
-            "dining" in lower || "restaurant" in lower -> "Dining & Restaurants"
-            "grocer" in lower || "supermarket" in lower -> "Groceries"
-            "travel" in lower || "flight" in lower || "hotel" in lower || "air" in lower -> "Travel & Flights"
-            "gas" in lower || "EV" in raw || "transit" in lower -> "Gas & Transit"
-            "stream" in lower || "entertain" in lower -> "Streaming & Entertainment"
-            "online" in lower || "amazon" in lower -> "Online Shopping"
-            "drug" in lower || "pharm" in lower -> "Drugstores"
-            "rent" in lower -> "Rent"
-            "every" in lower || "catch" in lower || "all other" in lower || "base" in lower -> "Everything Else (Catch-All)"
-            else -> raw
-        }
-    }
-
-    private fun isAnnualFeeMerchant(merchant: String): Boolean {
-        val lower = merchant.lowercase()
-        return "annual fee" in lower ||
-            "annual membership" in lower ||
-            "membership fee" in lower ||
-            "renewal fee" in lower
+        return bestByCat.values.sortedWith(
+            compareByDescending<CategoryBestCardPick> { it.multiplier }.thenBy { it.cardTitle }
+        )
     }
 
     fun detectHistorySuggestions(
@@ -536,7 +561,9 @@ object CreditCardStrategyEngine {
 
         val earliest = acctTxns.minByOrNull { it.effectiveDate }
         val feeKeywordMatches = acctTxns.filter { txn ->
-            txn.effectiveAmountCents < 0L && isAnnualFeeMerchant(txn.effectiveMerchant)
+            txn.effectiveAmountCents < 0L &&
+                CardTransactionClassifier.isNonSpendCharge(txn) &&
+                ("fee" in txn.effectiveMerchant.lowercase() || "membership" in txn.effectiveMerchant.lowercase())
         }.sortedByDescending { it.effectiveDate }
 
         val detectedFeeTxn = feeKeywordMatches.firstOrNull() ?: run {

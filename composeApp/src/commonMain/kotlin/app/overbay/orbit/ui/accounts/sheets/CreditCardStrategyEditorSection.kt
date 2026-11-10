@@ -102,7 +102,7 @@ fun ProgressiveSubAndCooldownFields(
                                 SubWizardMode.CHASING_NOW -> {
                                     val defaultDeadline = strategy.subDeadlineDate
                                         ?: LocalDateUtils.formatIsoDate(LocalDateUtils.addMonthsClamped(openedLocal, 3))
-                                    onStrategyChange(strategy.copy(subCompleted = false, subDeadlineDate = defaultDeadline))
+                                    onStrategyChange(strategy.copy(subCompleted = false, subDeadlineDate = defaultDeadline, subReceivedDate = null))
                                 }
                                 SubWizardMode.ALREADY_EARNED -> {
                                     val defaultEarned = strategy.subReceivedDate

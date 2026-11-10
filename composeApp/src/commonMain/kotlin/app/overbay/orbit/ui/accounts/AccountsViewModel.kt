@@ -20,20 +20,27 @@ import app.overbay.orbit.data.setAccountArchived
 import app.overbay.orbit.data.unlinkSimpleFinAccount
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardStrategyEngine
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.NetWorthEngine
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
 
 class AccountsViewModel(
     private val repository: OrbitRepository,
-    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    todayFlow: Flow<LocalDate>? = null
 ) : ViewModel() {
 
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
@@ -60,6 +67,19 @@ class AccountsViewModel(
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
     private val _masterMode = MutableStateFlow(AccountsMasterMode.ALL_ACCOUNTS)
     private val _selectedCardPlayer = MutableStateFlow(CreditCardStrategyEngine.ALL_PLAYERS)
+
+    private val resolvedTodayFlow = todayFlow ?: flow {
+        while (true) {
+            emit(LocalDateUtils.todayLocalDate())
+            delay(60_000)
+        }
+    }.flowOn(Dispatchers.Default).distinctUntilChanged()
+
+    private val cardPortfolioFlow = combine(
+        repository.accounts, repository.transactions, _selectedCardPlayer, resolvedTodayFlow
+    ) { a, t, p, d ->
+        CreditCardStrategyEngine.summarizePortfolio(a, t, p, d)
+    }.distinctUntilChanged().flowOn(computeDispatcher)
 
     private val dataFlow = combine(
         repository.accounts, repository.transactions, repository.snapshot, repository.preferences
@@ -107,12 +127,6 @@ class AccountsViewModel(
                 .sortedWith(compareByDescending<BalanceRecord> { it.recordDate }.thenByDescending { it.id })
         } else emptyList()
 
-        val cardSummary = CreditCardStrategyEngine.summarizePortfolio(
-            accounts = data.accounts,
-            transactions = data.transactions,
-            selectedPlayer = _selectedCardPlayer.value
-        )
-
         AccountsUiState(
             accounts = sorted, accountGroups = groups, totalAssetsCents = snapshot.totalAssetsCents,
             totalLiabilitiesCents = snapshot.totalLiabilitiesCents, netWorthCents = snapshot.netWorthCents,
@@ -127,23 +141,11 @@ class AccountsViewModel(
             historyBalanceRecords = historyRecords, showAddRecordDialog = addRecord.showAddRecordDialog,
             addRecordAccount = addRecord.addRecordAccount, accountGroupWideSpans = data.preferences.accountGroupWideSpans,
             isSyncing = syncReorder.syncing, syncErrorMessage = syncReorder.err, isLoading = false,
-            mhaEnabled = data.preferences.mhaTrackerEnabled,
-            cardPortfolioSummary = cardSummary
+            mhaEnabled = data.preferences.mhaTrackerEnabled
         )
     }.combine(_isPhoneViewingDetail) { state, phoneDetail -> state.copy(isPhoneViewingDetail = phoneDetail)
-    }.combine(combine(_masterMode, _selectedCardPlayer) { m, p -> m to p }) { state, (mode, player) ->
-        val updatedSummary = if (player != state.cardPortfolioSummary.selectedPlayer) {
-            CreditCardStrategyEngine.summarizePortfolio(
-                accounts = repository.accounts.value,
-                transactions = repository.transactions.value,
-                selectedPlayer = player
-            )
-        } else state.cardPortfolioSummary
-        state.copy(
-            masterMode = mode,
-            selectedCardPlayer = updatedSummary.selectedPlayer,
-            cardPortfolioSummary = updatedSummary
-        )
+    }.combine(combine(_masterMode, cardPortfolioFlow) { m, s -> m to s }) { state, (mode, summary) ->
+        state.copy(masterMode = mode, selectedCardPlayer = summary.selectedPlayer, cardPortfolioSummary = summary)
     }.combine(_deleteConfirmAccountId) { state, delId -> state.copy(deleteConfirmAccountId = delId)
     }.combine(combine(_deleteBlockedAccount, _deleteBlockedTxnCount) { a, c -> a to c }) { state, (acct, count) ->
         state.copy(deleteBlockedAccount = acct, deleteBlockedTransactionCount = count)
@@ -345,8 +347,11 @@ class AccountsViewModel(
                 profile = profile,
                 accountName = accountName,
                 accountInstitution = accountInstitution
-            )
-            closeCreditCardProfile()
+            ).onSuccess {
+                closeCreditCardProfile()
+            }.onFailure { e ->
+                _syncErrorMessage.value = "Couldn't save card: ${e.message ?: "unknown error"}"
+            }
         }
     }
 
@@ -358,7 +363,12 @@ class AccountsViewModel(
             val item = currentBenefits[benefitIndex]
             currentBenefits[benefitIndex] = CreditCardStrategyEngine.toggleBenefitCurrentPeriod(item)
             val updated = profile.copy(benefits = currentBenefits)
-            viewModelScope.launch { repository.saveCreditCardProfile(accountId, updated) }
+            viewModelScope.launch {
+                repository.saveCreditCardProfile(accountId, updated)
+                    .onFailure { e ->
+                        _syncErrorMessage.value = "Couldn't update perk: ${e.message ?: "unknown error"}"
+                    }
+            }
         }
     }
 

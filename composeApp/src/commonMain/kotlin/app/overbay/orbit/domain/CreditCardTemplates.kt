@@ -18,20 +18,42 @@ data class CreditCardTemplate(
     val defaultSubRewardText: String? = null,
     val defaultSubTargetSpendCents: Cents? = null,
     val rewardCategories: List<RewardCategory> = emptyList(),
-    val benefits: List<CardBenefit> = emptyList()
+    val benefits: List<CardBenefit> = emptyList(),
+    val asOf: String = "2025-01"
 ) {
     fun applyToProfile(existing: CreditCardProfile): CreditCardProfile {
+        val existingBenefitsByTitle = existing.benefits.associateBy { it.title.trim().lowercase() }
+        val mergedBenefits = benefits.map { templateBenefit ->
+            val existingBenefit = existingBenefitsByTitle[templateBenefit.title.trim().lowercase()]
+            if (existingBenefit != null) {
+                templateBenefit.copy(
+                    usedThisYear = existingBenefit.usedThisYear,
+                    usedPeriods = existingBenefit.usedPeriods
+                )
+            } else {
+                templateBenefit
+            }
+        } + existing.benefits.filter { existingBenefit ->
+            val key = existingBenefit.title.trim().lowercase()
+            benefits.none { it.title.trim().lowercase() == key }
+        }
+
+        val templateCategoryLabels = rewardCategories.map { it.label.trim().lowercase() }.toSet()
+        val mergedRewardCategories = rewardCategories + existing.rewardCategories.filter {
+            it.label.trim().lowercase() !in templateCategoryLabels
+        }
+
         return existing.copy(
             cardName = cardName,
             issuerName = issuerName,
             network = network,
             imageUrl = imageUrl,
-            annualFeeCents = annualFeeCents.takeIf { it > 0L },
-            rewardCategories = rewardCategories,
-            benefits = benefits,
+            annualFeeCents = annualFeeCents,
+            rewardCategories = mergedRewardCategories,
+            benefits = mergedBenefits,
             strategy = existing.strategy.copy(
-                isBusinessCard = isBusinessCard,
-                subCooldownMonths = subCooldownMonths,
+                isBusinessCard = existing.strategy.isBusinessCard || isBusinessCard,
+                subCooldownMonths = existing.strategy.subCooldownMonths ?: subCooldownMonths,
                 subRewardText = existing.strategy.subRewardText ?: defaultSubRewardText,
                 subTargetSpendCents = existing.strategy.subTargetSpendCents ?: defaultSubTargetSpendCents
             )

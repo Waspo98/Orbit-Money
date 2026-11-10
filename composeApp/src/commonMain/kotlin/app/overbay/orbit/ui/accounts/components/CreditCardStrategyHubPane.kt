@@ -15,12 +15,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.domain.Chase524PersonSummary
 import app.overbay.orbit.domain.Chase524Summary
 import app.overbay.orbit.domain.CreditCardPortfolioSummary
 import app.overbay.orbit.domain.CreditCardStrategyEngine
@@ -74,43 +80,28 @@ fun CreditCardStrategyHubPane(
                     val allSelected = summary.selectedPlayer == CreditCardStrategyEngine.ALL_PLAYERS
                     FilterChip(
                         selected = allSelected,
-                        onClick = {
-                            haptics.tick()
-                            onSelectPlayer(CreditCardStrategyEngine.ALL_PLAYERS)
-                        },
-                        label = {
-                            Text(
-                                text = "All Household",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (allSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        }
+                        onClick = { haptics.tick(); onSelectPlayer(CreditCardStrategyEngine.ALL_PLAYERS) },
+                        label = { Text("All Household", style = MaterialTheme.typography.labelMedium, fontWeight = if (allSelected) FontWeight.Bold else FontWeight.Medium) }
                     )
-                    summary.availablePlayers.forEach { player ->
-                        val selected = summary.selectedPlayer.equals(player, ignoreCase = true)
+                    summary.availablePlayers.forEach { (playerKey, playerLabel) ->
+                        val selected = summary.selectedPlayer == playerKey
                         FilterChip(
                             selected = selected,
-                            onClick = {
-                                haptics.tick()
-                                onSelectPlayer(player)
-                            },
-                            label = {
-                                Text(
-                                    text = player,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
-                                )
-                            }
+                            onClick = { haptics.tick(); onSelectPlayer(playerKey) },
+                            label = { Text(playerLabel, style = MaterialTheme.typography.labelMedium, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) }
                         )
                     }
                 }
             }
         }
 
-        // 2. Chase 5/24 & Velocity Bento Card
-        item(key = "chase_524") {
+        // 2. Chase 5/24 & Velocity Bento Cards per Person
+        items(
+            items = summary.chase524ByPerson,
+            key = { "chase_524_${it.holderKey}" }
+        ) { personSummary ->
             Chase524HeroCard(
-                chase524 = summary.chase524,
+                personSummary = personSummary,
                 onInspectAccount = onInspectAccount
             )
         }
@@ -148,19 +139,17 @@ fun CreditCardStrategyHubPane(
 
 @Composable
 private fun Chase524HeroCard(
-    chase524: Chase524Summary,
+    personSummary: Chase524PersonSummary,
     onInspectAccount: (Long) -> Unit
 ) {
+    val chase524 = personSummary.summary
     val haptics = LocalOrbitHaptics.current
-    val statusColor = when {
-        chase524.count < 4 -> OrbitColorTokens.Green
-        chase524.count == 4 -> OrbitColorTokens.Amber
-        else -> MaterialTheme.colorScheme.error
-    }
-    val statusText = when {
-        chase524.count < 4 -> "Under 5/24 • Eligible"
-        chase524.count == 4 -> "4/24 • 1 Slot Left"
-        else -> "At/Over 5/24 • Locked"
+    val hasMissingDates = chase524.count == 0 && chase524.missingOpenDateCount > 0
+    val (statusColor, statusText) = when {
+        hasMissingDates -> MaterialTheme.colorScheme.outline to "Add Opened Dates"
+        chase524.count < 4 -> OrbitColorTokens.Green to "Under 5/24 • Eligible"
+        chase524.count == 4 -> OrbitColorTokens.Amber to "4/24 • 1 Slot Left"
+        else -> MaterialTheme.colorScheme.error to "At/Over 5/24 • Locked"
     }
 
     Card(
@@ -177,7 +166,7 @@ private fun Chase524HeroCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "CHASE 5/24 VELOCITY",
+                        text = "${personSummary.holderLabel.uppercase()} · CHASE 5/24",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline,
                         fontWeight = FontWeight.Bold
@@ -240,6 +229,10 @@ private fun Chase524HeroCard(
                     append(dropSubtitle)
                     if (chase524.excludedBusinessCount > 0) {
                         append(" • ${chase524.excludedBusinessCount} Business card(s) excluded")
+                    }
+                    if (chase524.missingOpenDateCount > 0) {
+                        val cardWord = if (chase524.missingOpenDateCount == 1) "1 card" else "${chase524.missingOpenDateCount} cards"
+                        append(" • $cardWord missing opened date")
                     }
                 },
                 style = MaterialTheme.typography.bodySmall,
@@ -341,33 +334,53 @@ private fun ActiveSubsSectionCard(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
+                            val (badgeText, badgeColor) = when (sub.status) {
+                                SubTrackerStatus.RECEIVED -> "Bonus Received" to OrbitColorTokens.Green
+                                SubTrackerStatus.SPEND_MET -> "Spend Met · Awaiting Bonus" to OrbitColorTokens.Green
+                                SubTrackerStatus.EXPIRED -> "Expired" to MaterialTheme.colorScheme.outline
+                                SubTrackerStatus.AT_RISK -> "$pct%" to MaterialTheme.colorScheme.error
+                                SubTrackerStatus.ON_TRACK -> "$pct%" to MaterialTheme.colorScheme.onSurface
+                            }
                             Text(
-                                text = if (sub.status == SubTrackerStatus.COMPLETED) "Earned ✓" else "$pct%",
+                                text = badgeText,
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = if (sub.status == SubTrackerStatus.COMPLETED) OrbitColorTokens.Green else MaterialTheme.colorScheme.onSurface
+                                color = badgeColor
                             )
                         }
                         OrbitPillProgressBar(percent = sub.progressRatio, overBudget = false, height = 7.dp)
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = "${MoneyUtils.formatCents(sub.currentSpendCents)} of ${MoneyUtils.formatCents(sub.targetSpendCents)}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            val paceLabel = when {
-                                sub.status == SubTrackerStatus.COMPLETED -> "Minimum spend met"
-                                sub.daysRemaining != null && sub.daysRemaining >= 0 -> {
-                                    val daily = sub.dailyPaceNeededCents?.let { "${MoneyUtils.formatCents(it)}/day • " }.orEmpty()
-                                    "${daily}${sub.daysRemaining}d left"
+                            val paceLabel = when (sub.status) {
+                                SubTrackerStatus.RECEIVED -> "Bonus credited to account"
+                                SubTrackerStatus.SPEND_MET -> "Target spend met"
+                                SubTrackerStatus.EXPIRED -> "Deadline passed"
+                                SubTrackerStatus.AT_RISK, SubTrackerStatus.ON_TRACK -> {
+                                    if (sub.daysRemaining != null && sub.daysRemaining >= 0) {
+                                        val daily = sub.dailyPaceNeededCents?.let { "${MoneyUtils.formatCents(it)}/day • " }.orEmpty()
+                                        "${daily}${sub.daysRemaining}d left"
+                                    } else "${MoneyUtils.formatCents(sub.remainingSpendCents)} left"
                                 }
-                                else -> "${MoneyUtils.formatCents(sub.remainingSpendCents)} left"
                             }
-                            Text(
-                                text = paceLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (sub.status == SubTrackerStatus.AT_RISK) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                if (sub.status == SubTrackerStatus.AT_RISK) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = "At Risk",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                                Text(
+                                    text = paceLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (sub.status == SubTrackerStatus.AT_RISK) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
+                                )
+                            }
                         }
                     }
                 }

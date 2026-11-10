@@ -81,6 +81,7 @@ fun AccountsScreen(
     LaunchedEffect(state.syncErrorMessage) {
         state.syncErrorMessage?.let { err ->
             snackbarHostState.showSnackbar(err)
+            viewModel.clearSyncError()
         }
     }
 
@@ -274,7 +275,6 @@ private fun AccountsMasterContent(
         ) {
             val allSelected = state.masterMode == AccountsMasterMode.ALL_ACCOUNTS
             val hubSelected = state.masterMode == AccountsMasterMode.CARD_STRATEGY_HUB
-            val count524 = state.cardPortfolioSummary.chase524.count
             FilterChip(
                 selected = allSelected,
                 onClick = { viewModel.setMasterMode(AccountsMasterMode.ALL_ACCOUNTS) },
@@ -291,7 +291,7 @@ private fun AccountsMasterContent(
                 onClick = { viewModel.setMasterMode(AccountsMasterMode.CARD_STRATEGY_HUB) },
                 label = {
                     Text(
-                        text = "Card Strategy Hub • $count524/24",
+                        text = "Credit Cards",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = if (hubSelected) FontWeight.Bold else FontWeight.Medium
                     )

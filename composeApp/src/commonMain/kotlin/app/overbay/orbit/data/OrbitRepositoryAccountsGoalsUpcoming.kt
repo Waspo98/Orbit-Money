@@ -61,6 +61,21 @@ suspend fun OrbitRepository.saveCreditCardProfile(
     profile: CreditCardProfile,
     accountName: String? = null,
     accountInstitution: String? = null
+): Result<CreditCardProfile> {
+    val previousAccount = accounts.value.find { it.id == accountId }
+    val previousProfile = snapshot.value.creditCardProfiles.find { it.accountId == accountId }
+    applyLocalCardProfile(accountId, profile, accountName, accountInstitution)
+    if (storageMode.value != StorageMode.SELF_HOSTED) return Result.success(profile)
+    return createApiClient().saveCreditCardProfileRemote(accountId, accountName, accountInstitution, profile)
+        .onSuccess { saved -> applyLocalCardProfile(accountId, saved, accountName, accountInstitution) }
+        .onFailure { revertLocalCardProfile(accountId, previousAccount, previousProfile) }
+}
+
+private suspend fun OrbitRepository.applyLocalCardProfile(
+    accountId: Long,
+    profile: CreditCardProfile,
+    accountName: String?,
+    accountInstitution: String?
 ) {
     val currentAccounts = accounts.value
     val targetAccount = currentAccounts.find { it.id == accountId }
@@ -82,9 +97,32 @@ suspend fun OrbitRepository.saveCreditCardProfile(
     }
 
     commitSnapshot(snapshot.value.copy(accounts = updatedAccounts, creditCardProfiles = updatedProfiles))
-    if (storageMode.value == StorageMode.SELF_HOSTED) {
-        createApiClient().saveCreditCardProfileRemote(accountId, accountName, accountInstitution, profile)
+}
+
+private suspend fun OrbitRepository.revertLocalCardProfile(
+    accountId: Long,
+    previousAccount: Account?,
+    previousProfile: CreditCardProfile?
+) {
+    val currentAccounts = accounts.value
+    val updatedAccounts = if (previousAccount != null) {
+        currentAccounts.map { if (it.id == accountId) previousAccount else it }
+    } else {
+        currentAccounts.map { if (it.id == accountId) it.copy(creditCardProfile = null) else it }
     }
+
+    val currentProfiles = snapshot.value.creditCardProfiles
+    val updatedProfiles = if (previousProfile != null) {
+        if (currentProfiles.any { it.accountId == accountId }) {
+            currentProfiles.map { if (it.accountId == accountId) previousProfile else it }
+        } else {
+            currentProfiles + previousProfile
+        }
+    } else {
+        currentProfiles.filterNot { it.accountId == accountId }
+    }
+
+    commitSnapshot(snapshot.value.copy(accounts = updatedAccounts, creditCardProfiles = updatedProfiles))
 }
 
 suspend fun OrbitRepository.addBalanceRecord(

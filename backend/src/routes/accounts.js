@@ -103,13 +103,15 @@ function normalizeOptionalMoney(value, fieldName) {
   return dollarsToCents(number);
 }
 
-function normalizeTextList(value, maxItems = 12, maxLength = 80) {
+function normalizeTextList(value, maxItems = 12, maxLength = 80, keep = 'first') {
   if (!Array.isArray(value)) return [];
-  return value
+  const items = value
     .map((item) => String(item || '').trim())
-    .filter(Boolean)
-    .slice(0, maxItems)
-    .map((item) => item.slice(0, maxLength));
+    .filter(Boolean);
+  const sliced = keep === 'last'
+    ? (maxItems > 0 ? items.slice(-maxItems) : [])
+    : items.slice(0, maxItems);
+  return sliced.map((item) => item.slice(0, maxLength));
 }
 
 function normalizeRewardCategories(value) {
@@ -155,18 +157,30 @@ function normalizeBenefits(value) {
       const name = String(item.name || item.title || item.label || '').trim();
       if (!name) return null;
       const trimmedName = name.slice(0, 120);
-      return {
+
+      const rawNumber = item.value === null || item.value === undefined || item.value === ''
+        ? null
+        : Number(item.value);
+      const isNumeric = Number.isFinite(rawNumber) && rawNumber >= 0;
+      const numericValue = isNumeric ? rawNumber : null;
+      const valueText = !isNumeric && typeof item.value === 'string'
+        ? normalizeOptionalTextLength(item.value, 120)
+        : normalizeOptionalTextLength(item.value_text || item.valueText, 120);
+
+      const benefit = {
         name: trimmedName,
         title: trimmedName,
-        value: item.value === null || item.value === undefined || item.value === ''
-          ? null
-          : Number(item.value),
+        value: numericValue,
         description: normalizeOptionalTextLength(item.description || item.notes, 300),
         category: normalizeOptionalTextLength(item.category, 80),
         cadence: normalizeOptionalTextLength(item.cadence, 32) || 'annual',
         used_this_year: Boolean(item.used_this_year ?? item.usedThisYear ?? false),
-        used_periods: normalizeTextList(item.used_periods || item.usedPeriods, 48, 24)
+        used_periods: normalizeTextList(item.used_periods || item.usedPeriods, 120, 24, 'last')
       };
+      if (valueText) {
+        benefit.value_text = valueText;
+      }
+      return benefit;
     })
     .filter(Boolean)
     .slice(0, 24);

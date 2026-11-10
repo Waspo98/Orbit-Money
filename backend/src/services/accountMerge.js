@@ -21,16 +21,52 @@ function parseJsonArray(value) {
   }
 }
 
-function mergeJsonArrayText(targetValue, sourceValue) {
+function mergeJsonArrayText(targetValue, sourceValue, keyFn = (item) => JSON.stringify(item)) {
   const items = [];
   const seen = new Set();
   for (const item of [...parseJsonArray(targetValue), ...parseJsonArray(sourceValue)]) {
-    const key = JSON.stringify(item);
+    const key = keyFn(item);
     if (seen.has(key)) continue;
     seen.add(key);
     items.push(item);
   }
   return JSON.stringify(items);
+}
+
+function parseJsonObject(value) {
+  if (typeof value !== 'string') return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function stripNullish(obj) {
+  if (!obj || typeof obj !== 'object') return {};
+  const result = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== null && v !== undefined && v !== '') {
+      result[k] = v;
+    }
+  }
+  return result;
+}
+
+function mergeJsonObjectText(targetText, sourceText) {
+  const source = parseJsonObject(sourceText);
+  const target = parseJsonObject(targetText);
+  return JSON.stringify({ ...source, ...stripNullish(target) });
+}
+
+function benefitKey(item) {
+  if (typeof item === 'string') return item.trim().toLowerCase();
+  if (item && typeof item === 'object') {
+    const name = String(item.name || item.title || '').trim().toLowerCase();
+    if (name) return name;
+  }
+  return JSON.stringify(item);
 }
 
 function balanceSourceRank(source) {
@@ -318,9 +354,12 @@ function mergeCreditCardProfiles(db, { householdId, sourceId, targetId }) {
             annual_fee = ?,
             annual_fee_post_date = ?,
             credit_limit = ?,
+            statement_closing_day = ?,
+            payment_due_day = ?,
             authorized_users_json = ?,
             reward_categories_json = ?,
             benefits_json = ?,
+            strategy_json = ?,
             notes = ?,
             updated_at = datetime('now')
       WHERE id = ?
@@ -333,9 +372,12 @@ function mergeCreditCardProfiles(db, { householdId, sourceId, targetId }) {
     preferTarget(targetProfile.annual_fee, sourceProfile.annual_fee),
     preferTarget(targetProfile.annual_fee_post_date, sourceProfile.annual_fee_post_date),
     preferTarget(targetProfile.credit_limit, sourceProfile.credit_limit),
+    preferTarget(targetProfile.statement_closing_day, sourceProfile.statement_closing_day),
+    preferTarget(targetProfile.payment_due_day, sourceProfile.payment_due_day),
     mergeJsonArrayText(targetProfile.authorized_users_json, sourceProfile.authorized_users_json),
     mergeJsonArrayText(targetProfile.reward_categories_json, sourceProfile.reward_categories_json),
-    mergeJsonArrayText(targetProfile.benefits_json, sourceProfile.benefits_json),
+    mergeJsonArrayText(targetProfile.benefits_json, sourceProfile.benefits_json, benefitKey),
+    mergeJsonObjectText(targetProfile.strategy_json, sourceProfile.strategy_json),
     preferTarget(targetProfile.notes, sourceProfile.notes),
     targetProfile.id,
     householdId

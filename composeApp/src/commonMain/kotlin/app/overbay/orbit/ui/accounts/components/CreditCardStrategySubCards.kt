@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -84,34 +87,55 @@ fun SubTrackerMiniCard(sub: SubProgressSummary) {
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
+                val (badgeText, badgeColor) = when (sub.status) {
+                    SubTrackerStatus.RECEIVED -> "Bonus Received" to OrbitColorTokens.Green
+                    SubTrackerStatus.SPEND_MET -> "Spend Met · Awaiting Bonus" to OrbitColorTokens.Green
+                    SubTrackerStatus.EXPIRED -> "Expired" to MaterialTheme.colorScheme.outline
+                    SubTrackerStatus.AT_RISK -> "$pct%" to MaterialTheme.colorScheme.error
+                    SubTrackerStatus.ON_TRACK -> "$pct%" to MaterialTheme.colorScheme.onSurface
+                }
                 Text(
-                    text = if (sub.status == SubTrackerStatus.COMPLETED) "Earned!" else "$pct%",
+                    text = badgeText,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (sub.status == SubTrackerStatus.COMPLETED) OrbitColorTokens.Green else MaterialTheme.colorScheme.onSurface
+                    color = badgeColor
                 )
             }
             OrbitPillProgressBar(percent = sub.progressRatio, overBudget = false, height = 6.dp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "${MoneyUtils.formatCents(sub.currentSpendCents)} / ${MoneyUtils.formatCents(sub.targetSpendCents)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                val rightMeta = when {
-                    sub.status == SubTrackerStatus.COMPLETED -> "Bonus Unlocked"
-                    sub.daysRemaining != null && sub.daysRemaining >= 0 -> {
-                        val pace = sub.dailyPaceNeededCents?.let { "${MoneyUtils.formatCents(it)}/d • " }.orEmpty()
-                        "${pace}${sub.daysRemaining}d left"
+                val rightMeta = when (sub.status) {
+                    SubTrackerStatus.RECEIVED -> "Bonus Received"
+                    SubTrackerStatus.SPEND_MET -> "Spend Met"
+                    SubTrackerStatus.EXPIRED -> "Expired"
+                    SubTrackerStatus.AT_RISK, SubTrackerStatus.ON_TRACK -> {
+                        if (sub.daysRemaining != null && sub.daysRemaining >= 0) {
+                            val pace = sub.dailyPaceNeededCents?.let { "${MoneyUtils.formatCents(it)}/d • " }.orEmpty()
+                            "${pace}${sub.daysRemaining}d left"
+                        } else if (sub.deadlineDate != null) {
+                            "Due ${sub.deadlineDate}"
+                        } else "${MoneyUtils.formatCents(sub.remainingSpendCents)} to go"
                     }
-                    sub.deadlineDate != null -> "Due ${sub.deadlineDate}"
-                    else -> "${MoneyUtils.formatCents(sub.remainingSpendCents)} to go"
                 }
-                Text(
-                    text = rightMeta,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (sub.status == SubTrackerStatus.AT_RISK) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (sub.status == SubTrackerStatus.AT_RISK) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = "At Risk",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                    Text(
+                        text = rightMeta,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (sub.status == SubTrackerStatus.AT_RISK) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
+                    )
+                }
             }
         }
     }

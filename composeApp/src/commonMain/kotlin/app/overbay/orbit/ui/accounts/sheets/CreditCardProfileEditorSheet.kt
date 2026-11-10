@@ -149,7 +149,7 @@ fun CreditCardProfileEditorContent(
         haptics.confirm()
         val feeCents = if (annualFeeCents > 0L) annualFeeCents else null
         val limitCents = if (creditLimitCents > 0L) creditLimitCents else null
-        val feePostDate = if (hasAnnualFeeDate || annualFeeCents > 0L) LocalDateUtils.formatIsoDate(annualFeeDate) else null
+        val feePostDate = if (hasAnnualFeeDate) LocalDateUtils.formatIsoDate(annualFeeDate) else null
 
         val updated = profile.copy(
             cardName = cardName.trim().ifBlank { null },
@@ -159,8 +159,8 @@ fun CreditCardProfileEditorContent(
             annualFeeCents = feeCents,
             annualFeePostDate = feePostDate,
             creditLimitCents = limitCents,
-            statementClosingDay = statementClosingDayText.toIntOrNull(),
-            paymentDueDay = paymentDueDayText.toIntOrNull(),
+            statementClosingDay = statementClosingDayText.toIntOrNull()?.takeIf { it in 1..31 },
+            paymentDueDay = paymentDueDayText.toIntOrNull()?.takeIf { it in 1..31 },
             authorizedUsers = authorizedUsers,
             rewardCategories = rewardList,
             benefits = benefitList,
