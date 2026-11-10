@@ -47,6 +47,7 @@ import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.upcoming.components.CardPaymentsDueCard
 import app.overbay.orbit.ui.upcoming.components.UpcomingCalendarStrip
 import app.overbay.orbit.ui.upcoming.components.UpcomingCashFlowCard
 import app.overbay.orbit.ui.upcoming.components.UpcomingDetailInspectorPane
@@ -227,6 +228,17 @@ fun UpcomingScreen(
                                     onSelectDate = { viewModel.setSelectedDateFilter(it) },
                                     modifier = Modifier.padding(bottom = 6.dp)
                                 )
+                            }
+
+                            // Credit Card Payments Due Card
+                            if (state.cardPayments.isNotEmpty()) {
+                                item(key = "upcoming_card_payments_due", contentType = "card_payments_due") {
+                                    CardPaymentsDueCard(
+                                        cardPayments = state.cardPayments,
+                                        onNavigate = onNavigate,
+                                        modifier = Modifier.padding(bottom = 6.dp)
+                                    )
+                                }
                             }
 
                             // Recurring Bills/Suggestions Banner

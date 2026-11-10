@@ -6,6 +6,7 @@ import app.overbay.orbit.data.model.BenefitCadence
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.CreditCardStrategy
+import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.RewardCategory
 import app.overbay.orbit.data.model.Transaction
 import kotlinx.datetime.LocalDate
@@ -311,5 +312,70 @@ class CreditCardStrategyEngineTest {
         assertEquals("Dining & Restaurants", CreditCardStrategyEngine.normalizeCategoryBucket("Fine Dining Experiences"))
         assertEquals("Gas & Transit", CreditCardStrategyEngine.normalizeCategoryBucket("Shell Gas & EV Charging"))
         assertEquals("Everything Else (Catch-All)", CreditCardStrategyEngine.normalizeCategoryBucket("Everything Else Base"))
+    }
+
+    @Test
+    fun summarizePortfolioWithHouseholdMembersAndAuthorizedUsers() {
+        val member1 = HouseholdMember(id = 10L, name = "Alex Smith")
+        val member2 = HouseholdMember(id = 20L, name = "Sam Smith")
+
+        val accounts = listOf(
+            creditAccount(
+                1L, "Sapphire Reserve",
+                strategy = CreditCardStrategy(
+                    cardholderMemberId = 10L,
+                    authorizedUserMemberIds = listOf(20L),
+                    openedDate = "2025-06-15"
+                )
+            ),
+            creditAccount(
+                2L, "Amex Gold",
+                strategy = CreditCardStrategy(
+                    cardholderMemberId = 20L,
+                    openedDate = "2025-09-20"
+                )
+            ),
+            creditAccount(
+                3L, "Ink Business Cash",
+                isBusinessCard = true,
+                strategy = CreditCardStrategy(
+                    cardholderMemberId = 10L,
+                    authorizedUserMemberIds = listOf(20L),
+                    openedDate = "2025-03-10",
+                    isBusinessCard = true
+                )
+            )
+        )
+
+        val summary = CreditCardStrategyEngine.summarizePortfolio(
+            accounts,
+            emptyList(),
+            today = refToday,
+            householdMembers = listOf(member1, member2)
+        )
+
+        assertEquals(2, summary.availablePlayers.size)
+        val player1 = summary.availablePlayers.find { it.first == "m:10" }
+        val player2 = summary.availablePlayers.find { it.first == "m:20" }
+        assertNotNull(player1)
+        assertNotNull(player2)
+        assertEquals("Alex Smith", player1.second)
+        assertEquals("Sam Smith", player2.second)
+
+        val alex524 = summary.chase524ByPerson.find { it.holderKey == "m:10" }
+        assertNotNull(alex524)
+        assertEquals(1, alex524.summary.count)
+        assertEquals(1, alex524.summary.slots.size)
+        assertFalse(alex524.summary.slots[0].isAuthorizedUser)
+
+        val sam524 = summary.chase524ByPerson.find { it.holderKey == "m:20" }
+        assertNotNull(sam524)
+        assertEquals(2, sam524.summary.count)
+        val csrSlot = sam524.summary.slots.find { it.accountId == 1L }
+        val amexSlot = sam524.summary.slots.find { it.accountId == 2L }
+        assertNotNull(csrSlot)
+        assertNotNull(amexSlot)
+        assertTrue(csrSlot.isAuthorizedUser)
+        assertFalse(amexSlot.isAuthorizedUser)
     }
 }

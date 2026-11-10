@@ -148,6 +148,8 @@ data class CardBenefit(
 
 @Serializable
 data class CreditCardStrategy(
+    val cardholderMemberId: Long? = null,
+    val authorizedUserMemberIds: List<Long> = emptyList(),
     val cardholder: String? = null, // e.g. "Player 1", "Player 2"
     val openedDate: String? = null, // YYYY-MM-DD
     val closedDate: String? = null, // YYYY-MM-DD
@@ -181,6 +183,9 @@ data class CreditCardProfile(
     val creditLimitCents: Cents? = null,
     val statementClosingDay: Int? = null,
     val paymentDueDay: Int? = null,
+    val aprBps: Int? = null,
+    val promoAprBps: Int? = null,
+    val promoEndDate: String? = null, // YYYY-MM-DD
     val authorizedUsers: List<String> = emptyList(),
     val rewardCategories: List<RewardCategory> = emptyList(),
     val benefits: List<CardBenefit> = emptyList(),

@@ -56,6 +56,7 @@ data class AccountsUiState(
     val addRecordAccount: Account? = null,
     val isPhoneViewingDetail: Boolean = false,
     val deleteConfirmAccountId: Long? = null,
+    val deleteWarning524Date: String? = null,
     val deleteBlockedAccount: Account? = null,
     val deleteBlockedTransactionCount: Int = 0,
     val accountGroupWideSpans: Map<String, Int> = emptyMap(),

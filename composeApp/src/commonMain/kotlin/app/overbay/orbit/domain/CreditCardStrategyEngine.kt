@@ -2,10 +2,10 @@ package app.overbay.orbit.domain
 
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
-import app.overbay.orbit.data.model.BenefitCadence
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.CreditCardStrategy
+import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.Transaction
 import kotlinx.datetime.LocalDate
 import kotlin.math.abs
@@ -21,7 +21,9 @@ enum class SubTrackerStatus {
 
 data class Chase524SlotItem(
     val accountId: Long, val cardTitle: String, val issuerName: String?, val cardholder: String?,
-    val openedDate: String, val dropOffDate: String, val daysUntilDropOff: Int, val isClosed: Boolean
+    val openedDate: String, val dropOffDate: String, val daysUntilDropOff: Int, val isClosed: Boolean,
+    /** True if counted via authorized user status. Note: approximates opening date using card opened date. */
+    val isAuthorizedUser: Boolean = false
 )
 
 data class Chase524Summary(
@@ -96,7 +98,7 @@ const val UNASSIGNED_KEY = "~unassigned"
 const val LIFETIME_COOLDOWN_MONTHS = 999
 
 internal fun holderKey(s: CreditCardStrategy): String =
-    s.cardholder?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: UNASSIGNED_KEY
+    s.cardholderMemberId?.let { "m:$it" } ?: s.cardholder?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: UNASSIGNED_KEY
 
 object CreditCardStrategyEngine {
 
@@ -106,16 +108,28 @@ object CreditCardStrategyEngine {
         accounts: List<Account>,
         transactions: List<Transaction>,
         selectedPlayer: String = ALL_PLAYERS,
-        today: LocalDate = LocalDateUtils.todayLocalDate()
+        today: LocalDate = LocalDateUtils.todayLocalDate(),
+        householdMembers: List<HouseholdMember> = emptyList()
     ): CreditCardPortfolioSummary {
         val creditAccounts = accounts.filter { it.type == AccountType.CREDIT }
+        val memberMap = householdMembers.associateBy { it.id }
 
         val playerMap = linkedMapOf<String, String>()
         for (account in creditAccounts) {
             val strat = account.creditCardProfile?.strategy ?: continue
             val k = holderKey(strat)
             if (k != UNASSIGNED_KEY && !playerMap.containsKey(k)) {
-                playerMap[k] = strat.cardholder!!.trim()
+                val label = strat.cardholderMemberId?.let { memberMap[it]?.name }
+                    ?: strat.cardholder?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: "Member #${strat.cardholderMemberId}"
+                playerMap[k] = label
+            }
+            for (auId in strat.authorizedUserMemberIds) {
+                val auKey = "m:$auId"
+                if (!playerMap.containsKey(auKey)) {
+                    val label = memberMap[auId]?.name ?: "Member #$auId"
+                    playerMap[auKey] = label
+                }
             }
         }
         val players = playerMap.entries.map { it.key to it.value }.sortedBy { it.second }
@@ -136,13 +150,26 @@ object CreditCardStrategyEngine {
 
         val activeCards = playerFiltered.filter { !it.isArchived && it.creditCardProfile?.strategy?.closedDate.isNullOrBlank() }
 
-        // Group all credit accounts (including closed/archived) by holderKey for 5/24
-        val groupedByHolder = creditAccounts.groupBy { it.creditCardProfile?.let { p -> holderKey(p.strategy) } ?: UNASSIGNED_KEY }
+        // Partition 5/24 by person including authorized users
+        val allKeys = if (creditAccounts.any { (it.creditCardProfile?.let { p -> holderKey(p.strategy) } ?: UNASSIGNED_KEY) == UNASSIGNED_KEY }) {
+            playerMap.keys + UNASSIGNED_KEY
+        } else {
+            playerMap.keys
+        }
         val chase524List = mutableListOf<Chase524PersonSummary>()
-        for ((hKey, accts) in groupedByHolder) {
+        for (hKey in allKeys) {
             if (effectivePlayer != ALL_PLAYERS && hKey != effectivePlayer) continue
             val label = if (hKey == UNASSIGNED_KEY) "Unassigned" else (playerMap[hKey] ?: hKey.replaceFirstChar { it.uppercase() })
-            val sum = computeChase524Status(accts, today)
+            val mId = if (hKey.startsWith("m:")) hKey.removePrefix("m:").toLongOrNull() else null
+            val acctsForPerson = when {
+                hKey == UNASSIGNED_KEY -> creditAccounts.filter { (it.creditCardProfile?.let { p -> holderKey(p.strategy) } ?: UNASSIGNED_KEY) == UNASSIGNED_KEY }
+                mId != null -> creditAccounts.filter {
+                    val s = it.creditCardProfile?.strategy
+                    s != null && (s.cardholderMemberId == mId || s.authorizedUserMemberIds.contains(mId))
+                }
+                else -> creditAccounts.filter { it.creditCardProfile?.let { p -> holderKey(p.strategy) } == hKey }
+            }
+            val sum = computeChase524Status(acctsForPerson, today, forMemberId = mId)
             chase524List.add(Chase524PersonSummary(hKey, label, sum))
         }
         val chase524ByPerson = chase524List.sortedWith(
@@ -240,7 +267,8 @@ object CreditCardStrategyEngine {
 
     fun computeChase524Status(
         creditAccounts: List<Account>,
-        today: LocalDate = LocalDateUtils.todayLocalDate()
+        today: LocalDate = LocalDateUtils.todayLocalDate(),
+        forMemberId: Long? = null
     ): Chase524Summary {
         val cutoffDate = LocalDateUtils.addMonthsClamped(today, -24)
         var excludedBiz = 0
@@ -264,6 +292,7 @@ object CreditCardStrategyEngine {
                 val dropOff = LocalDateUtils.addMonthsClamped(opened, 24)
                 val daysLeft = LocalDateUtils.daysBetween(today, dropOff).coerceAtLeast(0)
                 val title = profile.cardName?.takeIf { it.isNotBlank() } ?: account.name
+                val isAu = forMemberId != null && strategy.cardholderMemberId != forMemberId && strategy.authorizedUserMemberIds.contains(forMemberId)
                 slots.add(
                     Chase524SlotItem(
                         accountId = account.id,
@@ -273,7 +302,8 @@ object CreditCardStrategyEngine {
                         openedDate = LocalDateUtils.formatIsoDate(opened),
                         dropOffDate = LocalDateUtils.formatIsoDate(dropOff),
                         daysUntilDropOff = daysLeft,
-                        isClosed = account.isArchived || !strategy.closedDate.isNullOrBlank()
+                        isClosed = account.isArchived || !strategy.closedDate.isNullOrBlank(),
+                        isAuthorizedUser = isAu
                     )
                 )
             }
@@ -427,56 +457,6 @@ object CreditCardStrategyEngine {
             )
         }
     }
-
-    @Deprecated("Use CreditCardBenefitEngine.currentPeriod", ReplaceWith("CreditCardBenefitEngine.currentPeriod(CardBenefit(cadence = cadence), null, today).key"))
-    fun currentPeriodKey(
-        cadence: BenefitCadence,
-        today: LocalDate = LocalDateUtils.todayLocalDate()
-    ): String = CreditCardBenefitEngine.currentPeriod(CardBenefit(cadence = cadence), null, today).key
-
-    @Deprecated("Use CreditCardBenefitEngine.currentPeriod", ReplaceWith("CreditCardBenefitEngine.currentPeriod(CardBenefit(cadence = cadence), null, today).label"))
-    fun currentPeriodDisplayLabel(
-        cadence: BenefitCadence,
-        today: LocalDate = LocalDateUtils.todayLocalDate()
-    ): String = CreditCardBenefitEngine.currentPeriod(CardBenefit(cadence = cadence), null, today).label
-
-    @Deprecated("Use CreditCardBenefitEngine", ReplaceWith("CreditCardBenefitEngine.usedCents(benefit, CreditCardBenefitEngine.currentPeriod(benefit, null, today)) > 0"))
-    fun isBenefitUsedInCurrentPeriod(
-        benefit: CardBenefit,
-        today: LocalDate = LocalDateUtils.todayLocalDate()
-    ): Boolean {
-        val period = CreditCardBenefitEngine.currentPeriod(benefit, null, today)
-        return CreditCardBenefitEngine.usedCents(benefit, period) > 0L ||
-            (benefit.usedPeriods.isNotEmpty() && period.key in benefit.usedPeriods) ||
-            (benefit.usedPeriods.isEmpty() && benefit.usedThisYear)
-    }
-
-    @Deprecated("Use CreditCardBenefitEngine.setUsage", ReplaceWith("CreditCardBenefitEngine.setUsage(...)"))
-    fun toggleBenefitCurrentPeriod(
-        benefit: CardBenefit,
-        today: LocalDate = LocalDateUtils.todayLocalDate()
-    ): CardBenefit {
-        val period = CreditCardBenefitEngine.currentPeriod(benefit, null, today)
-        val isUsed = isBenefitUsedInCurrentPeriod(benefit, today)
-        val periodVal = CreditCardBenefitEngine.periodValueCents(benefit)
-        val amount = if (isUsed) null else if (periodVal > 0L) periodVal else 1L
-        return CreditCardBenefitEngine.setUsage(benefit, period.key, amount, if (amount != null) LocalDateUtils.formatIsoDate(today) else null)
-    }
-
-    @Deprecated("Use CreditCardBenefitEngine.ledger", ReplaceWith("CreditCardBenefitEngine.ledger(...)"))
-    fun capturedBenefitValueYtdCents(
-        benefit: CardBenefit,
-        today: LocalDate = LocalDateUtils.todayLocalDate()
-    ): Cents {
-        val period = CreditCardBenefitEngine.currentPeriod(benefit, null, today)
-        return CreditCardBenefitEngine.usedCents(benefit, period)
-    }
-
-    @Deprecated("Use CreditCardBenefitEngine.ledger", ReplaceWith("CreditCardBenefitEngine.ledger(profile, today).feeAfterCreditsCents"))
-    fun computeCardEffectiveAnnualFeeCents(
-        profile: CreditCardProfile,
-        today: LocalDate = LocalDateUtils.todayLocalDate()
-    ): Cents = CreditCardBenefitEngine.ledger(profile, today).feeAfterCreditsCents
 
     private val CATEGORY_SYNONYMS = listOf(
         "Dining & Restaurants" to setOf("dining", "restaurant", "restaurants"),

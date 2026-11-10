@@ -5,8 +5,10 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
+import app.overbay.orbit.data.model.CreditCardStrategy
 import app.overbay.orbit.data.model.RewardCategory
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.util.PlatformStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -255,6 +257,60 @@ class AccountsViewModelTest {
         assertEquals(1, viewModel.uiState.value.selectedAccountTransactions.size)
         assertEquals(2L, viewModel.uiState.value.selectedAccountTransactions.first().id)
 
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testRequestDeleteAccount_setsDeleteWarning524DateWhenWithin24Months() = runTest(testDispatcher) {
+        val today = LocalDateUtils.todayLocalDate()
+        val opened12MonthsAgo = LocalDateUtils.formatIsoDate(LocalDateUtils.addMonthsClamped(today, -12))
+        val opened30MonthsAgo = LocalDateUtils.formatIsoDate(LocalDateUtils.addMonthsClamped(today, -30))
+
+        val recentCard = Account(
+            id = 50L,
+            name = "Recent Card",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 50L,
+                strategy = CreditCardStrategy(openedDate = opened12MonthsAgo)
+            )
+        )
+        val oldCard = Account(
+            id = 51L,
+            name = "Old Card",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 51L,
+                strategy = CreditCardStrategy(openedDate = opened30MonthsAgo)
+            )
+        )
+        repository.saveAccount(recentCard)
+        repository.saveAccount(oldCard)
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        // 1. Request delete on recent card (< 24 months)
+        viewModel.requestDeleteAccount(50L)
+        testScheduler.advanceUntilIdle()
+        assertEquals(50L, viewModel.uiState.value.deleteConfirmAccountId)
+        assertNotNull(viewModel.uiState.value.deleteWarning524Date)
+
+        // Dismiss clears both
+        viewModel.dismissDeleteAccount()
+        testScheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.deleteConfirmAccountId)
+        assertNull(viewModel.uiState.value.deleteWarning524Date)
+
+        // 2. Request delete on old card (> 24 months) -> warning date is null
+        viewModel.requestDeleteAccount(51L)
+        testScheduler.advanceUntilIdle()
+        assertEquals(51L, viewModel.uiState.value.deleteConfirmAccountId)
+        assertNull(viewModel.uiState.value.deleteWarning524Date)
+
+        viewModel.dismissDeleteAccount()
         collectJob.cancel()
     }
 }

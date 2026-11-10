@@ -7,6 +7,7 @@ import app.overbay.orbit.data.model.RecurringCandidate
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.UpcomingItem
 import app.overbay.orbit.data.model.UpcomingStatus
+import app.overbay.orbit.domain.CardCycleStatus
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MatchedTransactionHistory
 import app.overbay.orbit.domain.ProjectedAmountResult
@@ -24,6 +25,7 @@ enum class UpcomingCashFlowPeriod {
 }
 
 data class UpcomingUiState(
+    val cardPayments: List<CardCycleStatus> = emptyList(),
     val items: List<UpcomingItem> = emptyList(),
     val occurrences: List<ProjectedOccurrence> = emptyList(),
     val candidates: List<RecurringCandidate> = emptyList(),

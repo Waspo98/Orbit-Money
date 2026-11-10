@@ -31,6 +31,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.accounts.components.AccountDetailInspectorPane
 import app.overbay.orbit.ui.accounts.components.AccountGroupSection
@@ -235,9 +236,17 @@ fun AccountsScreen(
 
     if (state.deleteConfirmAccountId != null) {
         val delId = state.deleteConfirmAccountId!!
+        val formatted = state.deleteWarning524Date?.let { iso ->
+            LocalDateUtils.parseIsoDate(iso)?.let { LocalDateUtils.formatDisplayDate(it) } ?: iso
+        }
+        val message = if (formatted != null) {
+            "This card counts toward Chase 5/24 until $formatted. Deleting removes that history; Archive keeps it. Delete anyway?"
+        } else {
+            "Are you sure you want to permanently delete this account?"
+        }
         OrbitConfirmationDialog(
             title = "Delete Account?",
-            message = "Are you sure you want to permanently delete this account?",
+            message = message,
             confirmText = "Delete",
             isDestructive = true,
             onConfirm = { viewModel.deleteAccount(delId) },

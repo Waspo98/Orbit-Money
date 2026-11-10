@@ -167,6 +167,8 @@ data class CardBenefitWireDto(
 
 @Serializable
 data class CreditCardStrategyWireDto(
+    @SerialName("cardholder_member_id") val cardholderMemberId: Long? = null,
+    @SerialName("authorized_user_member_ids") val authorizedUserMemberIds: List<Long> = emptyList(),
     val cardholder: String? = null,
     @SerialName("opened_date") val openedDate: String? = null,
     @SerialName("closed_date") val closedDate: String? = null,
@@ -183,6 +185,8 @@ data class CreditCardStrategyWireDto(
     @SerialName("sub_cooldown_months") val subCooldownMonths: Int? = null
 ) {
     fun toDomain(): app.overbay.orbit.data.model.CreditCardStrategy = app.overbay.orbit.data.model.CreditCardStrategy(
+        cardholderMemberId = cardholderMemberId,
+        authorizedUserMemberIds = authorizedUserMemberIds,
         cardholder = cardholder,
         openedDate = openedDate,
         closedDate = closedDate,
@@ -201,6 +205,8 @@ data class CreditCardStrategyWireDto(
 
     companion object {
         fun fromDomain(d: app.overbay.orbit.data.model.CreditCardStrategy): CreditCardStrategyWireDto = CreditCardStrategyWireDto(
+            cardholderMemberId = d.cardholderMemberId,
+            authorizedUserMemberIds = d.authorizedUserMemberIds,
             cardholder = d.cardholder,
             openedDate = d.openedDate,
             closedDate = d.closedDate,
@@ -226,7 +232,11 @@ data class CreditCardProfileUpsertRequestDto(
     val network: String? = null, @SerialName("image_url") val imageUrl: String? = null,
     @SerialName("annual_fee") val annualFee: Double? = null, @SerialName("annual_fee_post_date") val annualFeePostDate: String? = null,
     @SerialName("credit_limit") val creditLimit: Double? = null, @SerialName("statement_closing_day") val statementClosingDay: Int? = null,
-    @SerialName("payment_due_day") val paymentDueDay: Int? = null, @SerialName("authorized_users") val authorizedUsers: List<String> = emptyList(),
+    @SerialName("payment_due_day") val paymentDueDay: Int? = null,
+    @SerialName("apr_bps") val aprBps: Int? = null,
+    @SerialName("promo_apr_bps") val promoAprBps: Int? = null,
+    @SerialName("promo_end_date") val promoEndDate: String? = null,
+    @SerialName("authorized_users") val authorizedUsers: List<String> = emptyList(),
     @SerialName("reward_categories") val rewardCategories: List<RewardCategoryWireDto> = emptyList(),
     val benefits: List<CardBenefitWireDto> = emptyList(),
     val strategy: CreditCardStrategyWireDto? = null,

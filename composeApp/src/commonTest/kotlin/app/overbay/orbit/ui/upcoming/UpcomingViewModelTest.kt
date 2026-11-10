@@ -4,6 +4,8 @@ import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.CreditCardProfile
+import app.overbay.orbit.data.model.CreditCardStrategy
 import app.overbay.orbit.data.model.RecurrenceFrequency
 import app.overbay.orbit.data.model.RecurringCandidate
 import app.overbay.orbit.data.model.Transaction
@@ -14,6 +16,7 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.util.PlatformStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -43,7 +46,7 @@ class UpcomingViewModelTest {
         storage.clear()
         repository = OrbitRepository(storage)
         repository.initialize()
-        viewModel = UpcomingViewModel(repository, testDispatcher)
+        viewModel = UpcomingViewModel(repository, testDispatcher, flowOf(LocalDateUtils.todayLocalDate()))
     }
 
     @AfterTest
@@ -304,6 +307,48 @@ class UpcomingViewModelTest {
         assertFalse(viewModel.uiState.value.showEditorSheet)
         assertEquals(0, repository.upcomingItems.value.size)
 
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testCardPaymentsDue_filtersNext35DaysAndSortsByDaysUntilDue() = runTest(testDispatcher) {
+        val today = LocalDateUtils.todayLocalDate()
+        val card1 = Account(
+            id = 101L,
+            name = "Sapphire Reserve",
+            type = AccountType.CREDIT,
+            currentBalanceCents = -85000L,
+            creditCardProfile = CreditCardProfile(
+                accountId = 101L,
+                statementClosingDay = LocalDateUtils.addDays(today, -10).dayOfMonth,
+                paymentDueDay = LocalDateUtils.addDays(today, 15).dayOfMonth,
+                strategy = CreditCardStrategy(cardholder = "Neal")
+            )
+        )
+        val cardFarOut = Account(
+            id = 102L,
+            name = "Freedom Flex",
+            type = AccountType.CREDIT,
+            currentBalanceCents = -20000L,
+            creditCardProfile = CreditCardProfile(
+                accountId = 102L,
+                statementClosingDay = LocalDateUtils.addDays(today, 20).dayOfMonth,
+                paymentDueDay = null
+            )
+        )
+        repository.saveAccount(card1)
+        repository.saveAccount(cardFarOut)
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.cardPayments.size)
+        assertEquals(101L, state.cardPayments[0].accountId)
+        assertEquals("Sapphire Reserve", state.cardPayments[0].cardTitle)
+        assertEquals("Neal", state.cardPayments[0].holderLabel)
         collectJob.cancel()
     }
 }

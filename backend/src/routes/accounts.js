@@ -96,6 +96,15 @@ function normalizeOptionalCycleDay(value, fieldName) {
   return day;
 }
 
+function normalizeOptionalBps(value, fieldName) {
+  if (value === null || value === undefined || value === '') return null;
+  const bps = parseInteger(value);
+  if (bps === null || bps < 0 || bps > 10000) {
+    throw new Error(`${fieldName} must be an integer between 0 and 10000.`);
+  }
+  return bps;
+}
+
 function normalizeOptionalMoney(value, fieldName) {
   if (value === null || value === undefined || value === '') return null;
   const number = Number(value);
@@ -239,6 +248,15 @@ function normalizeBenefits(value) {
 
 function normalizeStrategy(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const cardholderMemberIdRaw = value.cardholder_member_id ?? value.cardholderMemberId;
+  const cardholderMemberId = cardholderMemberIdRaw === null || cardholderMemberIdRaw === undefined || cardholderMemberIdRaw === ''
+    ? null
+    : parseId(cardholderMemberIdRaw);
+  const auRaw = value.authorized_user_member_ids ?? value.authorizedUserMemberIds;
+  const authorizedUserMemberIds = Array.isArray(auRaw)
+    ? Array.from(new Set(auRaw.map(parseId).filter((id) => id !== null && id > 0))).slice(0, 12)
+    : [];
+
   const estVal = value.sub_estimated_value === null || value.sub_estimated_value === undefined || value.sub_estimated_value === ''
     ? null
     : Number(value.sub_estimated_value);
@@ -253,6 +271,8 @@ function normalizeStrategy(value) {
   const overrideRaw = value.counts_toward_524_override ?? value.countsToward524Override;
 
   return {
+    cardholder_member_id: cardholderMemberId,
+    authorized_user_member_ids: authorizedUserMemberIds,
     cardholder: normalizeOptionalTextLength(value.cardholder, 60),
     opened_date: normalizeOptionalDateOnly(value.opened_date ?? value.openedDate, 'opened_date'),
     closed_date: normalizeOptionalDateOnly(value.closed_date ?? value.closedDate, 'closed_date'),
@@ -301,6 +321,9 @@ function normalizeCreditCardProfileBody(body = {}) {
     credit_limit: normalizeOptionalMoney(body.credit_limit, 'credit_limit'),
     statement_closing_day: normalizeOptionalCycleDay(body.statement_closing_day, 'statement_closing_day'),
     payment_due_day: normalizeOptionalCycleDay(body.payment_due_day, 'payment_due_day'),
+    apr_bps: normalizeOptionalBps(body.apr_bps ?? body.aprBps, 'apr_bps'),
+    promo_apr_bps: normalizeOptionalBps(body.promo_apr_bps ?? body.promoAprBps, 'promo_apr_bps'),
+    promo_end_date: normalizeOptionalDateOnly(body.promo_end_date ?? body.promoEndDate, 'promo_end_date'),
     authorized_users_json: stringifyProfileJson(authorizedUsers, 'authorized_users'),
     reward_categories_json: stringifyProfileJson(rewardCategories, 'reward_categories'),
     benefits_json: stringifyProfileJson(benefits, 'benefits'),
@@ -586,9 +609,10 @@ router.put('/:id/credit-card-profile', requireAuth, (req, res) => {
            household_id, account_id, card_name, issuer_name, network, image_url,
            annual_fee, annual_fee_post_date, credit_limit,
            statement_closing_day, payment_due_day,
+           apr_bps, promo_apr_bps, promo_end_date,
            authorized_users_json, reward_categories_json, benefits_json, strategy_json, notes
          ) VALUES (
-           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          )
          ON CONFLICT(household_id, account_id) DO UPDATE SET
            card_name = excluded.card_name,
@@ -600,6 +624,9 @@ router.put('/:id/credit-card-profile', requireAuth, (req, res) => {
            credit_limit = excluded.credit_limit,
            statement_closing_day = excluded.statement_closing_day,
            payment_due_day = excluded.payment_due_day,
+           apr_bps = excluded.apr_bps,
+           promo_apr_bps = excluded.promo_apr_bps,
+           promo_end_date = excluded.promo_end_date,
            authorized_users_json = excluded.authorized_users_json,
            reward_categories_json = excluded.reward_categories_json,
            benefits_json = excluded.benefits_json,
@@ -618,6 +645,9 @@ router.put('/:id/credit-card-profile', requireAuth, (req, res) => {
         profile.credit_limit,
         profile.statement_closing_day,
         profile.payment_due_day,
+        profile.apr_bps,
+        profile.promo_apr_bps,
+        profile.promo_end_date,
         profile.authorized_users_json,
         profile.reward_categories_json,
         profile.benefits_json,

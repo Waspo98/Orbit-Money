@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
@@ -59,6 +60,7 @@ class AccountsViewModel(
     private val _addRecordAccount = MutableStateFlow<Account?>(null)
     private val _isPhoneViewingDetail = MutableStateFlow(false)
     private val _deleteConfirmAccountId = MutableStateFlow<Long?>(null)
+    private val _deleteWarning524Date = MutableStateFlow<String?>(null)
     private val _deleteBlockedAccount = MutableStateFlow<Account?>(null)
     private val _deleteBlockedTxnCount = MutableStateFlow(0)
     private val _showArchived = MutableStateFlow(false)
@@ -78,9 +80,13 @@ class AccountsViewModel(
     }.flowOn(Dispatchers.Default).distinctUntilChanged()
 
     private val cardPortfolioFlow = combine(
-        repository.accounts, repository.transactions, _selectedCardPlayer, resolvedTodayFlow
-    ) { a, t, p, d ->
-        CreditCardStrategyEngine.summarizePortfolio(a, t, p, d)
+        repository.accounts,
+        repository.transactions,
+        _selectedCardPlayer,
+        resolvedTodayFlow,
+        repository.snapshot.map { it.householdMembers }.distinctUntilChanged()
+    ) { a, t, p, d, members ->
+        CreditCardStrategyEngine.summarizePortfolio(a, t, p, d, members)
     }.distinctUntilChanged().flowOn(computeDispatcher)
 
     private val dataFlow = combine(
@@ -148,7 +154,8 @@ class AccountsViewModel(
     }.combine(_isPhoneViewingDetail) { state, phoneDetail -> state.copy(isPhoneViewingDetail = phoneDetail)
     }.combine(combine(_masterMode, cardPortfolioFlow) { m, s -> m to s }) { state, (mode, summary) ->
         state.copy(masterMode = mode, selectedCardPlayer = summary.selectedPlayer, cardPortfolioSummary = summary)
-    }.combine(_deleteConfirmAccountId) { state, delId -> state.copy(deleteConfirmAccountId = delId)
+    }.combine(combine(_deleteConfirmAccountId, _deleteWarning524Date) { delId, warnDate -> delId to warnDate }) { state, (delId, warnDate) ->
+        state.copy(deleteConfirmAccountId = delId, deleteWarning524Date = warnDate)
     }.combine(combine(_deleteBlockedAccount, _deleteBlockedTxnCount) { a, c -> a to c }) { state, (acct, count) ->
         state.copy(deleteBlockedAccount = acct, deleteBlockedTransactionCount = count)
     }.combine(_accountSortOverrides) { state, overrides ->
@@ -173,11 +180,23 @@ class AccountsViewModel(
             _deleteBlockedAccount.value = uiState.value.accounts.find { it.id == accountId }
             _deleteBlockedTxnCount.value = count
         } else {
+            val account = uiState.value.accounts.find { it.id == accountId }
+            val strat = account?.creditCardProfile?.strategy
+            val opened = strat?.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
+            val today = LocalDateUtils.todayLocalDate()
+            val warningDate = if (account?.type == AccountType.CREDIT && strat?.countsToward524 == true && opened != null) {
+                val dropOff = LocalDateUtils.addMonthsClamped(opened, 24)
+                if (dropOff > today) LocalDateUtils.formatIsoDate(dropOff) else null
+            } else null
+            _deleteWarning524Date.value = warningDate
             _deleteConfirmAccountId.value = accountId
         }
     }
 
-    fun dismissDeleteAccount() { _deleteConfirmAccountId.value = null }
+    fun dismissDeleteAccount() {
+        _deleteConfirmAccountId.value = null
+        _deleteWarning524Date.value = null
+    }
     fun dismissDeleteBlocked() { _deleteBlockedAccount.value = null; _deleteBlockedTxnCount.value = 0 }
 
     fun openMergeFromDeleteBlocked() {
@@ -265,6 +284,7 @@ class AccountsViewModel(
                 _isPhoneViewingDetail.value = false
             }
             _deleteConfirmAccountId.value = null
+            _deleteWarning524Date.value = null
             closeEditorSheet()
         }
     }

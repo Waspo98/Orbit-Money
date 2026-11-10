@@ -13,6 +13,8 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.UpcomingItem
 import app.overbay.orbit.data.model.UpcomingKind
 import app.overbay.orbit.data.model.UpcomingStatus
+import app.overbay.orbit.domain.CardCycleStatus
+import app.overbay.orbit.domain.CreditCardCycleEngine
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.ProjectedAmountResult
 import app.overbay.orbit.domain.UpcomingCashFlowSummary
@@ -20,18 +22,24 @@ import app.overbay.orbit.domain.UpcomingEngine
 import app.overbay.orbit.domain.UpcomingScheduleHelper
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
 import kotlin.math.abs
 
 class UpcomingViewModel(
     private val repository: OrbitRepository,
-    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    todayFlow: Flow<LocalDate>? = null
 ) : ViewModel() {
 
     private val _filterOption = MutableStateFlow(UpcomingFilterOption.ALL)
@@ -130,6 +138,24 @@ class UpcomingViewModel(
         UpcomingControlBundle(filter, date, editing, showSheet, reconciling)
     }
 
+    private val resolvedTodayFlow = todayFlow ?: flow {
+        while (true) {
+            emit(LocalDateUtils.todayLocalDate())
+            delay(60_000)
+        }
+    }.flowOn(Dispatchers.Default).distinctUntilChanged()
+
+    private val cardPaymentsFlow = combine(
+        repository.accounts,
+        repository.transactions,
+        resolvedTodayFlow
+    ) { accounts, transactions, today ->
+        CreditCardCycleEngine.summarize(accounts, transactions, today)
+            .second
+            .filter { it.daysUntilDue != null && it.daysUntilDue in 0..35 }
+            .sortedBy { it.daysUntilDue }
+    }.distinctUntilChanged().flowOn(computeDispatcher)
+
     val uiState: StateFlow<UpcomingUiState> = combine(
         computedCoreFlow,
         controlFlow,
@@ -202,6 +228,8 @@ class UpcomingViewModel(
             recentTransactions = core.recentTxns,
             isLoading = false
         )
+    }.combine(cardPaymentsFlow) { state, cardPayments ->
+        state.copy(cardPayments = cardPayments)
     }.flowOn(computeDispatcher).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
