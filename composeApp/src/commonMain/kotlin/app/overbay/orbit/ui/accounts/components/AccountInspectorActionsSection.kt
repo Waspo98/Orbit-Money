@@ -37,7 +37,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
-import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
@@ -54,7 +53,6 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 fun AccountInspectorActionsSection(
     account: Account,
     onEdit: () -> Unit,
-    onPerks: () -> Unit,
     onHistory: () -> Unit,
     onSnapshotReminder: () -> Unit,
     onMerge: () -> Unit,
@@ -65,7 +63,6 @@ fun AccountInspectorActionsSection(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
-    val isCredit = account.type == AccountType.CREDIT
     var showUnlinkConfirm by remember { mutableStateOf(false) }
 
     Column(
@@ -137,12 +134,6 @@ fun AccountInspectorActionsSection(
                 label = "Edit Account",
                 onClick = { haptics.tick(); onEdit() }
             )
-            if (isCredit) {
-                OrbitActionChip(
-                    label = "Credit Card Tracker",
-                    onClick = { haptics.tick(); onPerks() }
-                )
-            }
             OrbitActionChip(
                 label = "Balance History",
                 onClick = { haptics.tick(); onHistory() }

@@ -3,43 +3,42 @@ package app.overbay.orbit.ui.accounts.cards
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
+import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.*
 import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
-import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CreditCardDetailSection(
     account: Account,
     profile: CreditCardProfile,
     transactions: List<Transaction> = emptyList(),
     subProgress: SubProgressSummary? = null,
+    householdMembers: List<HouseholdMember> = emptyList(),
     rewardsToolsEnabled: Boolean = true,
-    showBillingDetails: Boolean = false,
-    onEditCard: () -> Unit,
+    showBillingDetails: Boolean = true,
     onToggleBenefit: (benefitId: String) -> Unit,
     onOpenPerkUsage: (benefitId: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val today = remember { LocalDateUtils.todayLocalDate() }
     val openedDate = remember(profile.strategy.openedDate) {
         profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
@@ -56,9 +55,15 @@ fun CreditCardDetailSection(
     val subEligibility = remember(profile) {
         CreditCardStrategyEngine.computeSubEligibility(profile)
     }
-    val holderLabel = cycleStatus?.holderLabel
-        ?: profile.strategy.cardholder?.takeIf { it.isNotBlank() }
-        ?: "Unassigned"
+    val holderName = remember(profile, householdMembers, cycleStatus) {
+        CardFormat.resolveCardholderName(profile, householdMembers)
+            ?: cycleStatus?.holderLabel?.takeIf { it.isNotBlank() && it != "Unassigned" }
+    }
+    val auNames = remember(profile, householdMembers) {
+        CardFormat.resolveAuthorizedUsers(profile, householdMembers)
+    }
+    val network = profile.network?.takeIf { it.isNotBlank() }
+    val balanceColor = if (account.currentBalanceCents != 0L) OrbitTheme.colors.expense else MaterialTheme.colorScheme.onSurface
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -67,33 +72,71 @@ fun CreditCardDetailSection(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            // 1. CardFace Preview & Edit Action
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                CardFace(
+            // 1. Fixed-width Card Plate + Balance & Cardholder/AU Badges
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                CardVisualPlate(
                     name = profile.cardName ?: account.name,
                     issuer = profile.issuerName ?: account.institution,
-                    network = profile.network,
                     artKey = profile.imageUrl,
-                    holderLabel = holderLabel,
-                    compact = true,
                     artworkUrl = profile.artworkUrl,
-                    modifier = Modifier.weight(1f)
+                    last4 = account.accountNumberLast4,
+                    modifier = Modifier
+                        .width(132.dp)
+                        .aspectRatio(1.586f)
                 )
-                Spacer(Modifier.width(12.dp))
-                FilledTonalButton(
-                    onClick = { haptics.tick(); onEditCard() },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Edit Card", style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text = "Current Balance",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = MoneyUtils.formatCents(account.currentBalanceCents),
+                        style = TabularNumStyle.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold),
+                        color = balanceColor
+                    )
+                    if (network != null || holderName != null || auNames.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            if (network != null) {
+                                OrbitBadge(
+                                    text = network,
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                            if (holderName != null) {
+                                OrbitBadge(
+                                    text = holderName,
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            auNames.forEach { au ->
+                                OrbitBadge(
+                                    text = "AU · $au",
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
             // 2. Stats Row
-            CardDetailStatsRow(account, profile, cycleStatus, holderLabel)
+            CardDetailStatsRow(account, profile, cycleStatus)
 
-            // 3. Billing & Payment Details (optional; primary home is Accounts inspector)
+            // 3. Billing & Payment Details
             if (showBillingDetails) {
                 CardDetailBillingDetails(profile, cycleStatus)
             }
@@ -126,8 +169,7 @@ fun CreditCardDetailSection(
 private fun CardDetailStatsRow(
     account: Account,
     profile: CreditCardProfile,
-    cycle: CardCycleStatus?,
-    holder: String
+    cycle: CardCycleStatus?
 ) {
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         cycle?.daysUntilDue?.let { days ->
@@ -148,9 +190,6 @@ private fun CardDetailStatsRow(
             CardStatusPill("Promo APR ${CardFormat.formatBps(profile.promoAprBps)}", CardStatusTone.POSITIVE)
         } else if (profile.aprBps != null) {
             CardStatusPill("APR ${CardFormat.formatBps(profile.aprBps)}", CardStatusTone.NEUTRAL)
-        }
-        if (holder.isNotBlank() && holder != "Unassigned") {
-            CardStatusPill(holder, CardStatusTone.NEUTRAL)
         }
     }
 }

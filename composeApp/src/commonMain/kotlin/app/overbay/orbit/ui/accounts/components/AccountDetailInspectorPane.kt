@@ -52,6 +52,7 @@ import app.overbay.orbit.ui.accounts.AccountsViewModel
 import app.overbay.orbit.ui.accounts.sheets.AccountBalanceHistoryContent
 import app.overbay.orbit.ui.accounts.sheets.AccountEditorContent
 import app.overbay.orbit.ui.accounts.cards.CardEditorSheetContent
+import app.overbay.orbit.ui.accounts.cards.CreditCardInspectorDetailContent
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.util.BackHandler
@@ -154,22 +155,35 @@ fun AccountDetailInspectorPane(
             }
             AccountInspectorSubMode.DETAIL -> {
                 if (inspecting != null) {
-                    AccountReadOnlyDetailContent(
-                        account = inspecting,
-                        transactions = state.selectedAccountTransactions,
-                        onClose = onClosePane,
-                        onEdit = { viewModel.openEditAccount(inspecting) },
-                        onPerks = { onNavigate(OrbitNavKey.CardPerks(accountId = inspecting.id)) },
-                        onHistory = { viewModel.openBalanceHistory(inspecting) },
-                        onSnapshotReminder = { viewModel.requestSnapshotReminder(onNavigate) },
-                        onMerge = { viewModel.openMergeDialog(inspecting) },
-                        onToggleArchive = { viewModel.toggleArchiveAccount(inspecting) },
-                        onDelete = { viewModel.requestDeleteAccount(inspecting.id) },
-                        onUnlinkSimpleFin = if (!inspecting.simplefinAccountId.isNullOrBlank()) {
-                            { viewModel.unlinkSimpleFin(inspecting.id) }
-                        } else null,
-                        onSeeTransactions = { onNavigate(OrbitNavKey.Transactions(accountId = inspecting.id)) }
-                    )
+                    if (inspecting.type == AccountType.CREDIT) {
+                        CreditCardInspectorDetailContent(
+                            account = inspecting,
+                            transactions = state.selectedAccountTransactions,
+                            householdMembers = state.householdMembers,
+                            rewardsToolsEnabled = state.rewardsToolsEnabled,
+                            onEditCard = { viewModel.openCreditCardProfile(inspecting) },
+                            onToggleBenefit = { bId -> viewModel.toggleCardBenefit(inspecting.id, bId) },
+                            onOpenPerkUsage = { bId -> viewModel.openPerkUsage(inspecting.id, bId) },
+                            onSeeFullTransactions = { onNavigate(OrbitNavKey.Transactions(accountId = inspecting.id)) },
+                            onClosePane = onClosePane
+                        )
+                    } else {
+                        AccountReadOnlyDetailContent(
+                            account = inspecting,
+                            transactions = state.selectedAccountTransactions,
+                            onClose = onClosePane,
+                            onEdit = { viewModel.openEditAccount(inspecting) },
+                            onHistory = { viewModel.openBalanceHistory(inspecting) },
+                            onSnapshotReminder = { viewModel.requestSnapshotReminder(onNavigate) },
+                            onMerge = { viewModel.openMergeDialog(inspecting) },
+                            onToggleArchive = { viewModel.toggleArchiveAccount(inspecting) },
+                            onDelete = { viewModel.requestDeleteAccount(inspecting.id) },
+                            onUnlinkSimpleFin = if (!inspecting.simplefinAccountId.isNullOrBlank()) {
+                                { viewModel.unlinkSimpleFin(inspecting.id) }
+                            } else null,
+                            onSeeTransactions = { onNavigate(OrbitNavKey.Transactions(accountId = inspecting.id)) }
+                        )
+                    }
                 }
             }
         }
@@ -182,7 +196,6 @@ private fun AccountReadOnlyDetailContent(
     transactions: List<Transaction>,
     onClose: () -> Unit,
     onEdit: () -> Unit,
-    onPerks: () -> Unit,
     onHistory: () -> Unit,
     onSnapshotReminder: () -> Unit,
     onMerge: () -> Unit,
@@ -193,10 +206,9 @@ private fun AccountReadOnlyDetailContent(
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
-    val isCredit = account.type == AccountType.CREDIT
     val isLiability = account.type.isLiability
     val balanceColor = when {
-        isCredit || isLiability -> if (account.currentBalanceCents != 0L) colors.expense else MaterialTheme.colorScheme.onSurface
+        isLiability -> if (account.currentBalanceCents != 0L) colors.expense else MaterialTheme.colorScheme.onSurface
         account.currentBalanceCents >= 0L -> colors.income
         else -> colors.expense
     }
@@ -251,16 +263,6 @@ private fun AccountReadOnlyDetailContent(
             }
         }
 
-        if (isCredit) {
-            item {
-                CreditAccountBillingCard(
-                    account = account,
-                    transactions = transactions,
-                    onOpenCardPerks = onPerks
-                )
-            }
-        }
-
         if (account.type == AccountType.MORTGAGE && account.homeEquityCents != null) {
             item {
                 Text(
@@ -278,7 +280,6 @@ private fun AccountReadOnlyDetailContent(
             AccountInspectorActionsSection(
                 account = account,
                 onEdit = onEdit,
-                onPerks = onPerks,
                 onHistory = onHistory,
                 onSnapshotReminder = onSnapshotReminder,
                 onMerge = onMerge,

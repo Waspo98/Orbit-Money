@@ -154,6 +154,14 @@ fun AccountRowCard(
                             modifier = Modifier.align(Alignment.CenterVertically)
                         )
                     }
+                    account.creditCardProfile.authorizedUsers.forEach { au ->
+                        if (au.isNotBlank()) {
+                            AccountBadge(
+                                text = "AU · $au",
+                                modifier = Modifier.align(Alignment.CenterVertically)
+                            )
+                        }
+                    }
                 }
 
                 if (account.isManual && account.simplefinAccountId.isNullOrBlank()) {
@@ -292,7 +300,7 @@ fun AccountRowCard(
                     onDismissRequest = { menuExpanded = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Edit") },
+                        text = { Text("Edit Account") },
                         onClick = { menuExpanded = false; onEdit() }
                     )
                     if (onPerks != null) {
