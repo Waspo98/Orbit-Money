@@ -297,7 +297,7 @@ fun AccountRowCard(
                     )
                     if (onPerks != null) {
                         DropdownMenuItem(
-                            text = { Text("Card Perks") },
+                            text = { Text("Credit Card Tracker") },
                             onClick = { menuExpanded = false; onPerks() }
                         )
                     }

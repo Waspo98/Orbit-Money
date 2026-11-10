@@ -179,7 +179,7 @@ fun CardPerksInspectorPane(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 OrbitActionChip(
-                                    label = "Edit Perks & Rewards",
+                                    label = "Edit Card",
                                     onClick = { haptics.tick(); viewModel.openCreditCardProfile(inspecting) }
                                 )
                                 OrbitActionChip(

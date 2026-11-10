@@ -110,7 +110,7 @@ fun CardPerksScreen(
             ) {
                 MorphingPageHero(
                     kicker = "REWARDS & STATEMENT CREDITS",
-                    title = "Card Perks",
+                    title = "Credit Card Tracker",
                     subtitle = "$unusedFormatted in unused perks this period across ${creditAccounts.size} cards",
                     scrollState = heroScrollState,
                     canopyBar = { _, isCompact, barHeight ->
@@ -154,7 +154,7 @@ fun CardPerksScreen(
 
                         CanopyIconButton(
                             icon = OrbitIcons.ViewSliders,
-                            contentDescription = "Customize Card Perks",
+                            contentDescription = "Customize Credit Card Tracker",
                             onClick = { isCustomizing = true },
                             buttonSize = barHeight,
                             isActive = isCustomizing
@@ -289,7 +289,7 @@ fun CardPerksScreen(
 
     if (isCustomizing) {
         OrbitBentoCustomizeSheet(
-            title = "Customize Card Perks",
+            title = "Customize Credit Card Tracker",
             items = allItems,
             onToggleVisibility = { targetType ->
                 viewModel.updateCardPerksWidgets {

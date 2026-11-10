@@ -187,7 +187,7 @@ sealed interface OrbitNavKey {
             is Transactions -> "Transactions"
             Budgets -> "Budgets"
             is Accounts -> "Accounts"
-            is CardPerks -> "Card Perks"
+            is CardPerks -> "Credit Card Tracker"
             Upcoming -> "Upcoming"
             Goals -> "Goals"
             Categories -> "Categories"

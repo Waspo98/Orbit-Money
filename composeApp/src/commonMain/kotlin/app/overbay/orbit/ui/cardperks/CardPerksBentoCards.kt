@@ -84,19 +84,9 @@ private fun CardWalletRoiBentoCard(
     val creditAccounts = remember(uiState.accounts) {
         uiState.accounts.filter { it.type == AccountType.CREDIT && !it.isArchived }
     }
-    val totalFees = uiState.cardPortfolioSummary.totalAnnualFeesCents
-    val totalCaptured = remember(creditAccounts, today) {
-        creditAccounts.sumOf { acct ->
-            acct.creditCardProfile?.let {
-                CreditCardBenefitEngine.ledger(CreditCardBenefitEngine.upgradeProfile(it, today), today).creditsCapturedCents
-            } ?: 0L
-        }
-    }
-    val subtitle = "${MoneyUtils.formatCents(totalCaptured, showCents = false)} credits captured vs. ${MoneyUtils.formatCents(totalFees, showCents = false)}/yr fees"
 
     OrbitSectionCard(
-        title = "Card Wallet & Fee ROI (${creditAccounts.size})",
-        subtitle = subtitle,
+        title = "Card Wallet (${creditAccounts.size})",
         modifier = modifier
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -152,7 +142,7 @@ private fun CardWalletRoiBentoCard(
                                 )
                             } else {
                                 Text(
-                                    text = "Set Up Perks",
+                                    text = "Edit Card",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.primary
@@ -241,7 +231,7 @@ private fun Chase524BentoSection(
     if (people.isEmpty()) {
         OrbitSectionCard(title = "Chase 5/24 Status", modifier = modifier) {
             Text(
-                text = "Add card opening dates in your card perks settings to track personal 5/24 eligibility.",
+                text = "Add card opening dates in your credit card tracker settings to track personal 5/24 eligibility.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(vertical = 4.dp)

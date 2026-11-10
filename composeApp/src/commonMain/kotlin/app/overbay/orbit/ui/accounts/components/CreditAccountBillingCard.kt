@@ -184,7 +184,7 @@ fun CreditAccountBillingCard(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "Card Perks & Rewards Strategy",
+                                text = "Credit Card Tracker & Rewards Strategy",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -203,7 +203,7 @@ fun CreditAccountBillingCard(
                     }
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = "Open Card Perks",
+                        contentDescription = "Open Credit Card Tracker",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
                     )

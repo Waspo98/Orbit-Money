@@ -139,7 +139,7 @@ fun AccountInspectorActionsSection(
             )
             if (isCredit) {
                 OrbitActionChip(
-                    label = "Card Perks",
+                    label = "Credit Card Tracker",
                     onClick = { haptics.tick(); onPerks() }
                 )
             }

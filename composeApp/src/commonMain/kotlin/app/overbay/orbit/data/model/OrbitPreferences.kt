@@ -90,8 +90,8 @@ data class OrbitPreferences(
         )
 
         fun defaultCardPerksWidgets(): List<DashboardWidgetConfig> = listOf(
-            DashboardWidgetConfig("perks_this_period", "Perks This Period", isVisible = true, sortOrder = 0, wideSpan = 2),
-            DashboardWidgetConfig("card_wallet_roi", "Card Wallet & Fee ROI", isVisible = true, sortOrder = 1, wideSpan = 2),
+            DashboardWidgetConfig("card_wallet_roi", "Card Wallet", isVisible = true, sortOrder = 0, wideSpan = 2),
+            DashboardWidgetConfig("perks_this_period", "Perks This Period", isVisible = true, sortOrder = 1, wideSpan = 2),
             DashboardWidgetConfig("which_card_where", "Which Card Where", isVisible = true, sortOrder = 2, wideSpan = 1),
             DashboardWidgetConfig("welcome_bonuses", "Welcome Bonuses", isVisible = true, sortOrder = 3, wideSpan = 1),
             DashboardWidgetConfig("chase_524", "Chase 5/24 Status", isVisible = true, sortOrder = 4, wideSpan = 1),

@@ -17,17 +17,17 @@ enum class CardPerksCardType(
     val defaultWideSpan: Int = 1,
     val isStrategyTool: Boolean = false
 ) {
+    CARD_WALLET_ROI(
+        widgetId = "card_wallet_roi",
+        defaultTitle = "Card Wallet",
+        defaultDescription = "Your credit cards with annual fee vs. credits captured value ledger.",
+        defaultSortOrder = 0,
+        defaultWideSpan = 2
+    ),
     PERKS_THIS_PERIOD(
         widgetId = "perks_this_period",
         defaultTitle = "Perks This Period",
         defaultDescription = "Monthly, quarterly, and annual statement credits left to use.",
-        defaultSortOrder = 0,
-        defaultWideSpan = 2
-    ),
-    CARD_WALLET_ROI(
-        widgetId = "card_wallet_roi",
-        defaultTitle = "Card Wallet & Fee ROI",
-        defaultDescription = "Your credit cards with annual fee vs. credits captured value ledger.",
         defaultSortOrder = 1,
         defaultWideSpan = 2
     ),

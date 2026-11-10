@@ -73,7 +73,7 @@ fun CardEditorSheetContent(
                             controller.updateDraft { it.copy(step = CardEditorStep.PICK_TEMPLATE) }
                         }
                     ) {
-                        Text("Change Template", fontWeight = FontWeight.Bold)
+                        Text("Link to Real Card", fontWeight = FontWeight.Bold)
                     }
                 }
             }

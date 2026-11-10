@@ -185,7 +185,7 @@ fun AccountEditorBillingSection(
             }
 
             Text(
-                text = "Statement credits, reward multipliers & 5/24 strategy are managed in Card Perks.",
+                text = "Statement credits, reward multipliers & 5/24 strategy are managed in Credit Card Tracker.",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.outline

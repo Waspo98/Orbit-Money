@@ -145,7 +145,7 @@ private fun DesktopSidebar(
 ) {
     val allSecondary = remember(mhaEnabled) {
         buildList {
-            add(NavTabItem(OrbitNavKey.CardPerks(), "Card Perks", OrbitIcons.CardPerks))
+            add(NavTabItem(OrbitNavKey.CardPerks(), "Credit Card Tracker", OrbitIcons.CardPerks))
             add(NavTabItem(OrbitNavKey.Upcoming, "Upcoming", OrbitIcons.Upcoming))
             add(NavTabItem(OrbitNavKey.Goals, "Goals", OrbitIcons.Goals))
             add(NavTabItem(OrbitNavKey.Categories, "Categories", OrbitIcons.Categories))

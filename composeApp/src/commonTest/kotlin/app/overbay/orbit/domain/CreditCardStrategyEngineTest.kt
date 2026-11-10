@@ -157,7 +157,7 @@ class CreditCardStrategyEngineTest {
     fun templateApplyToProfileAppliesDefaultFeeAndCategories() {
         val amexGoldTemplate = CreditCardTemplates.ALL.first { it.id == "amex_gold" }
         val applied = amexGoldTemplate.applyToProfile(CreditCardProfile(accountId = 99L))
-        assertEquals(325_00L, applied.annualFeeCents)
+        assertEquals(350_00L, applied.annualFeeCents)
         assertTrue(applied.benefits.isNotEmpty())
         assertTrue(applied.rewardCategories.any { it.multiplier == 4.0 })
     }
@@ -312,7 +312,7 @@ class CreditCardStrategyEngineTest {
         assertEquals(listOf("2026-01", "2026-02", "2026-03"), uberBenefit.usedPeriods)
         assertTrue(merged.benefits.any { it.title == "Custom Airport Lounge Pass" })
         assertTrue(merged.rewardCategories.any { it.label == "Local Boutiques" })
-        assertEquals(325_00L, merged.annualFeeCents)
+        assertEquals(350_00L, merged.annualFeeCents)
     }
 
     @Test

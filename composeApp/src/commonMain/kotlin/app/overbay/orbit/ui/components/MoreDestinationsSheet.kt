@@ -57,7 +57,7 @@ fun MoreDestinationsSheet(
     val haptics = LocalOrbitHaptics.current
 
     val allSecondary = buildList {
-        add(DestinationItem(OrbitNavKey.CardPerks(), "Card Perks", "Statement credits, multipliers, bonuses & 5/24", OrbitIcons.CardPerks))
+        add(DestinationItem(OrbitNavKey.CardPerks(), "Credit Card Tracker", "Statement credits, multipliers, bonuses & 5/24", OrbitIcons.CardPerks))
         add(DestinationItem(OrbitNavKey.Upcoming, "Upcoming", "Bills, subscriptions & recurring paychecks", OrbitIcons.Upcoming))
         add(DestinationItem(OrbitNavKey.Goals, "Goals", "Target savings & sinking funds", OrbitIcons.Goals))
         add(DestinationItem(OrbitNavKey.Categories, "Categories", "Organize spending, income & transfer categories", OrbitIcons.Categories))

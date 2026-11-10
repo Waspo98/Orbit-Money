@@ -86,7 +86,7 @@ fun CreditCardDetailSection(
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Edit Perks", style = MaterialTheme.typography.labelMedium)
+                    Text("Edit Card", style = MaterialTheme.typography.labelMedium)
                 }
             }
 
