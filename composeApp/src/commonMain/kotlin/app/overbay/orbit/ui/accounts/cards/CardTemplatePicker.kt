@@ -174,7 +174,8 @@ private fun CardTemplatePickerHeader(
         OrbitTextField(
             value = query,
             onValueChange = onQueryChange,
-            label = { Text("Search $totalMatching cards (e.g. Sapphire, Amex Gold, Venture X)") },
+            label = { Text("Search $totalMatching Cards") },
+            placeholder = { Text("Sapphire, Amex Gold, Venture X…") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()

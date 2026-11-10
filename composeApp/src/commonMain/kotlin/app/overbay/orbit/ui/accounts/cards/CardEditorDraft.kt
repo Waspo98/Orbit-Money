@@ -10,9 +10,17 @@ import app.overbay.orbit.domain.LocalDateUtils
 enum class CardEditorStep { PICK_TEMPLATE, FORM }
 enum class WelcomeBonusMode { NONE, WORKING, EARNED }
 
+enum class CardEditorTab(val label: String) {
+    CARD("Card"),
+    BILLING("Billing"),
+    REWARDS("Rewards"),
+    STRATEGY("Strategy")
+}
+
 data class CardEditorDraft(
     val accountId: Long,
     val step: CardEditorStep = CardEditorStep.FORM,
+    val activeTab: CardEditorTab = CardEditorTab.CARD,
     val accountName: String = "",
     val accountInstitution: String = "",
     // Appearance & Identity (CRITICAL D4: artKey preset only, NO artworkUrl)
@@ -117,6 +125,17 @@ data class CardEditorDraft(
         }
 
     val isValid: Boolean get() = errors.isEmpty()
+
+    fun tabForErrorKey(key: String): CardEditorTab = when (key) {
+        "statementCloseDay", "paymentDueDay", "apr", "promoApr", "promoEndDate", "annualFeePostDate" -> CardEditorTab.BILLING
+        "openedDate", "targetDeadlineDate" -> CardEditorTab.STRATEGY
+        else -> CardEditorTab.CARD
+    }
+
+    fun tabHasErrors(tab: CardEditorTab): Boolean = errors.keys.any { tabForErrorKey(it) == tab }
+
+    val firstErrorBanner: Pair<CardEditorTab, String>?
+        get() = errors.entries.firstOrNull()?.let { (key, msg) -> tabForErrorKey(key) to msg }
 
     val isDirty: Boolean
         get() = toProfile() != (originalProfile ?: CreditCardProfile(accountId = accountId)) ||

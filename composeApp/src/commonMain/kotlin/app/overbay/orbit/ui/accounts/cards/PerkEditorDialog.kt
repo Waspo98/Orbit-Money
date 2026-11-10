@@ -4,14 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,11 +24,17 @@ import app.overbay.orbit.data.model.BenefitAnchor
 import app.overbay.orbit.data.model.BenefitCadence
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.domain.CreditCardBenefitEngine
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitFieldLabel
+import app.overbay.orbit.ui.components.OrbitModalFooter
+import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
+import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PerkEditorDialog(
     benefit: CardBenefit,
@@ -36,114 +42,156 @@ fun PerkEditorDialog(
     onSave: (CardBenefit) -> Unit,
     onDismiss: () -> Unit
 ) {
+    OrbitModalSheet(onDismissRequest = onDismiss) {
+        PerkEditorSubform(
+            benefit = benefit,
+            isNew = isNew,
+            onSave = onSave,
+            onDismiss = onDismiss,
+            showBackButton = false
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun PerkEditorSubform(
+    benefit: CardBenefit,
+    isNew: Boolean,
+    onSave: (CardBenefit) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    showBackButton: Boolean = true
+) {
     val haptics = LocalOrbitHaptics.current
-    var title by remember { mutableStateOf(benefit.title) }
-    var cadence by remember { mutableStateOf(benefit.cadence) }
-    var anchor by remember { mutableStateOf(benefit.anchor) }
-    var amountCents by remember { mutableStateOf(benefit.periodValueCents ?: benefit.annualCreditValueCents ?: 0L) }
-    var description by remember { mutableStateOf(benefit.description.orEmpty()) }
+    var title by remember(benefit.id) { mutableStateOf(benefit.title) }
+    var cadence by remember(benefit.id) { mutableStateOf(benefit.cadence) }
+    var anchor by remember(benefit.id) { mutableStateOf(benefit.anchor) }
+    var amountCents by remember(benefit.id) {
+        mutableStateOf(benefit.periodValueCents ?: benefit.annualCreditValueCents ?: 0L)
+    }
+    var description by remember(benefit.id) { mutableStateOf(benefit.description.orEmpty()) }
 
     val isValid = title.isNotBlank() && amountCents > 0L
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = if (isNew) "Add Card Perk" else "Edit Card Perk",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OrbitTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Perk Name (e.g. DoorDash, Uber Cash)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+    val cadenceAmountLabel = when (cadence) {
+        BenefitCadence.MONTHLY -> "Credit per Month"
+        BenefitCadence.QUARTERLY -> "Credit per Quarter"
+        BenefitCadence.SEMI_ANNUAL -> "Credit per Half-Year"
+        BenefitCadence.ANNUAL -> "Credit per Year"
+        BenefitCadence.EVERY_4_YEARS -> "Credit per 4 Years"
+    }
 
-                Text("Cadence", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    BenefitCadence.entries.forEach { c ->
-                        val sel = cadence == c
-                        FilterChip(
-                            selected = sel,
-                            onClick = { haptics.tick(); cadence = c },
-                            label = { Text(c.displayName) }
-                        )
-                    }
-                }
+    Column(modifier = modifier.fillMaxWidth()) {
+        OrbitSheetHeader(
+            title = if (isNew) "Add Card Perk" else "Edit Card Perk",
+            subtitle = "Recurring statement credit or cardmember benefit",
+            onNavigateBack = if (showBackButton) onDismiss else null,
+            onDismiss = if (!showBackButton) onDismiss else null,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+        )
 
-                val cadenceLabel = when (cadence) {
-                    BenefitCadence.MONTHLY -> "$ per month"
-                    BenefitCadence.QUARTERLY -> "$ per quarter"
-                    BenefitCadence.SEMI_ANNUAL -> "$ per half-year"
-                    BenefitCadence.ANNUAL -> "$ per year"
-                    BenefitCadence.EVERY_4_YEARS -> "$ per 4 years"
-                }
+        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
 
-                CurrencyTextField(
-                    cents = amountCents,
-                    onCentsChange = { amountCents = it },
-                    label = cadenceLabel,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                if (cadence == BenefitCadence.ANNUAL) {
-                    Text("Reset Anchor", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = anchor == BenefitAnchor.CALENDAR,
-                            onClick = { haptics.tick(); anchor = BenefitAnchor.CALENDAR },
-                            label = { Text("Calendar Year") }
-                        )
-                        FilterChip(
-                            selected = anchor == BenefitAnchor.CARDMEMBER_YEAR,
-                            onClick = { haptics.tick(); anchor = BenefitAnchor.CARDMEMBER_YEAR },
-                            label = { Text("Cardmember Year") }
-                        )
-                    }
-                }
-
-                OrbitTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Notes / Restrictions (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    haptics.confirm()
-                    val resolvedId = if (benefit.id.isBlank()) CreditCardBenefitEngine.newBenefitId() else benefit.id
-                    onSave(
-                        benefit.copy(
-                            id = resolvedId,
-                            title = title.trim(),
-                            cadence = cadence,
-                            anchor = anchor,
-                            periodValueCents = amountCents,
-                            annualCreditValueCents = amountCents,
-                            description = description.trim().ifBlank { null }
-                        )
-                    )
-                },
-                enabled = isValid
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            OrbitSectionCard(
+                title = "Perk Details",
+                showHeaderDivider = false
             ) {
-                Text("Save")
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OrbitTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = { Text("Perk Name") },
+                        placeholder = { Text("e.g. Uber Cash, Dining Credit, Travel Credit") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Column {
+                        OrbitFieldLabel("Reset Cadence")
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            BenefitCadence.entries.forEach { c ->
+                                val sel = cadence == c
+                                FilterChip(
+                                    selected = sel,
+                                    onClick = {
+                                        haptics.tick()
+                                        cadence = c
+                                    },
+                                    label = {
+                                        Text(
+                                            text = c.displayName,
+                                            fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    CurrencyTextField(
+                        cents = amountCents,
+                        onCentsChange = { amountCents = it },
+                        label = cadenceAmountLabel,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (cadence == BenefitCadence.ANNUAL) {
+                        Column {
+                            OrbitFieldLabel("Annual Reset Schedule")
+                            OrbitSegmentedTabRow(
+                                items = listOf(BenefitAnchor.CALENDAR, BenefitAnchor.CARDMEMBER_YEAR),
+                                selected = anchor,
+                                onSelect = { anchor = it },
+                                label = { a ->
+                                    if (a == BenefitAnchor.CALENDAR) "Calendar Year" else "Cardmember Year"
+                                }
+                            )
+                        }
+                    }
+
+                    OrbitTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Notes / Restrictions (Optional)") },
+                        placeholder = { Text("e.g. Enrollment required, valid on U.S. orders") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-        shape = MaterialTheme.shapes.extraLarge,
-        containerColor = MaterialTheme.colorScheme.surfaceContainer
-    )
+        }
+
+        OrbitModalFooter(
+            confirmText = "Save Perk",
+            confirmEnabled = isValid,
+            onConfirm = {
+                val resolvedId = if (benefit.id.isBlank()) CreditCardBenefitEngine.newBenefitId() else benefit.id
+                onSave(
+                    benefit.copy(
+                        id = resolvedId,
+                        title = title.trim(),
+                        cadence = cadence,
+                        anchor = anchor,
+                        periodValueCents = amountCents,
+                        annualCreditValueCents = amountCents,
+                        description = description.trim().ifBlank { null }
+                    )
+                )
+            },
+            onDismiss = onDismiss
+        )
+    }
 }

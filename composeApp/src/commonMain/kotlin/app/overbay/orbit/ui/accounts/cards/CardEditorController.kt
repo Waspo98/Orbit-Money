@@ -63,6 +63,10 @@ class CardEditorController(
         _draftState.update { it?.copy(step = CardEditorStep.FORM) }
     }
 
+    fun selectTab(tab: CardEditorTab) {
+        _draftState.update { it?.copy(activeTab = tab) }
+    }
+
     fun updateDraft(transform: (CardEditorDraft) -> CardEditorDraft) {
         _draftState.update { current -> current?.let(transform) }
     }

@@ -1,23 +1,27 @@
 package app.overbay.orbit.ui.accounts.cards
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,16 +29,29 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.RewardCategory
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.CreditCardTemplates
+import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
+import app.overbay.orbit.ui.components.OrbitIcons
+import app.overbay.orbit.ui.components.OrbitModalFooter
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
+import app.overbay.orbit.ui.components.OrbitSheetHeader
+import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.coroutines.launch
+
+private enum class CardEditorSurfaceMode { FORM, TEMPLATE_PICKER, PERK_EDITOR, REWARD_EDITOR }
 
 @Composable
 fun CardEditorSheetContent(
@@ -50,142 +67,215 @@ fun CardEditorSheetContent(
     val scope = rememberCoroutineScope()
     val catalog by CreditCardTemplates.catalogFlow.collectAsState()
 
-    Box(modifier = modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Header bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (draft.step == CardEditorStep.PICK_TEMPLATE) "Choose a Card Template" else "Card Settings & Perks",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                if (draft.step == CardEditorStep.FORM) {
-                    TextButton(
-                        onClick = {
-                            haptics.tick()
-                            controller.updateDraft { it.copy(step = CardEditorStep.PICK_TEMPLATE) }
-                        }
-                    ) {
-                        Text("Link to Real Card", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
+    val surfaceMode = when {
+        draft.editingPerkId != null -> CardEditorSurfaceMode.PERK_EDITOR
+        draft.editingRewardIndex != null -> CardEditorSurfaceMode.REWARD_EDITOR
+        draft.step == CardEditorStep.PICK_TEMPLATE -> CardEditorSurfaceMode.TEMPLATE_PICKER
+        else -> CardEditorSurfaceMode.FORM
+    }
 
-            // Single LazyColumn scroll container (NO nested verticalScroll, NO heightIn caps)
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                if (draft.step == CardEditorStep.PICK_TEMPLATE) {
-                    cardTemplatePickerItems(
-                        catalog = catalog,
-                        query = draft.templateQuery,
-                        selectedFilter = draft.templateCategoryFilter,
-                        onQueryChange = { controller.updateDraft { d -> d.copy(templateQuery = it) } },
-                        onFilterChange = { filter ->
-                            haptics.tick()
-                            controller.updateDraft { d -> d.copy(templateCategoryFilter = filter) }
-                        },
-                        onSelectTemplate = { tpl ->
-                            haptics.confirm()
-                            controller.applyTemplate(tpl)
-                        },
-                        onSkip = {
-                            haptics.tick()
-                            controller.skipTemplate()
-                        }
-                    )
-                } else {
-                    // Pinned live CardFace preview (compact)
-                    item(key = "card_preview") {
-                        CardFace(
-                            name = draft.accountName.ifBlank { draft.cardName.ifBlank { "Credit Card" } },
-                            issuer = draft.issuer.ifBlank { null },
-                            network = draft.network.ifBlank { null },
-                            artKey = draft.artKey,
-                            holderLabel = draft.cardholder,
-                            compact = true,
-                            artworkUrl = draft.artworkUrl,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    // Form sections
-                    item(key = "card_form_sections") {
-                        CardEditorFormSections(
-                            draft = draft,
-                            controller = controller,
-                            householdMembers = householdMembers,
-                            transactions = transactions,
-                            rewardsToolsEnabled = rewardsToolsEnabled
-                        )
-                    }
-                }
-            }
+    val handleCloseRequest = {
+        if (draft.isDirty) {
+            controller.requestClose()
+        } else {
+            controller.clearDraft()
+            onDismiss()
         }
+    }
 
-        // Sticky bottom action bar
-        Surface(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
-            tonalElevation = 8.dp,
-            shadowElevation = 8.dp,
-            color = MaterialTheme.colorScheme.surface
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        haptics.tick()
-                        controller.requestClose()
+    BackHandler(enabled = surfaceMode != CardEditorSurfaceMode.FORM) {
+        haptics.tick()
+        when (surfaceMode) {
+            CardEditorSurfaceMode.PERK_EDITOR -> controller.updateDraft { it.copy(editingPerkId = null) }
+            CardEditorSurfaceMode.REWARD_EDITOR -> controller.updateDraft { it.copy(editingRewardIndex = null) }
+            CardEditorSurfaceMode.TEMPLATE_PICKER -> controller.skipTemplate()
+            CardEditorSurfaceMode.FORM -> {}
+        }
+    }
+
+    AnimatedContent(
+        targetState = surfaceMode,
+        transitionSpec = { fadeIn(OrbitSprings.effectsDefault()) togetherWith fadeOut(OrbitSprings.effectsDefault()) },
+        modifier = modifier.fillMaxSize(),
+        label = "cardEditorSurfaceTransition"
+    ) { mode ->
+        when (mode) {
+            CardEditorSurfaceMode.PERK_EDITOR -> {
+                val existingBenefit = draft.benefits.find { it.id == draft.editingPerkId }
+                val targetBenefit = existingBenefit ?: CardBenefit(id = draft.editingPerkId?.takeIf { it.isNotBlank() } ?: "")
+                PerkEditorSubform(
+                    benefit = targetBenefit,
+                    isNew = existingBenefit == null,
+                    onSave = { updated ->
+                        controller.upsertBenefit(updated)
+                        controller.updateDraft { it.copy(editingPerkId = null) }
                     },
-                    modifier = Modifier.weight(1f),
-                    enabled = !draft.isSaving
-                ) {
-                    Text("Cancel")
+                    onDismiss = { controller.updateDraft { it.copy(editingPerkId = null) } },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            CardEditorSurfaceMode.REWARD_EDITOR -> {
+                val idx = draft.editingRewardIndex ?: -1
+                val targetReward = if (idx >= 0 && idx in draft.rewardCategories.indices) {
+                    draft.rewardCategories[idx]
+                } else {
+                    RewardCategory()
                 }
-
-                Button(
-                    onClick = {
-                        haptics.confirm()
-                        scope.launch {
-                            controller.save()
-                        }
+                RewardEditorSubform(
+                    reward = targetReward,
+                    isNew = idx < 0,
+                    onSave = { updated ->
+                        controller.upsertReward(if (idx >= 0) idx else null, updated)
+                        controller.updateDraft { it.copy(editingRewardIndex = null) }
                     },
-                    modifier = Modifier.weight(1.2f),
-                    enabled = draft.isValid && !draft.isSaving && draft.step == CardEditorStep.FORM
-                ) {
-                    if (draft.isSaving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
+                    onDismiss = { controller.updateDraft { it.copy(editingRewardIndex = null) } },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            CardEditorSurfaceMode.TEMPLATE_PICKER -> {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    OrbitSheetHeader(
+                        title = "Choose Card Template",
+                        subtitle = "Auto-fill card artwork, perks & earn rates",
+                        onNavigateBack = { controller.skipTemplate() },
+                        onDismiss = handleCloseRequest,
+                        trailingActions = {
+                            OrbitActionChip(
+                                label = "Custom",
+                                onClick = { controller.skipTemplate() }
+                            )
+                        },
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                    )
+                    HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        cardTemplatePickerItems(
+                            catalog = catalog,
+                            query = draft.templateQuery,
+                            selectedFilter = draft.templateCategoryFilter,
+                            onQueryChange = { controller.updateDraft { d -> d.copy(templateQuery = it) } },
+                            onFilterChange = { filter ->
+                                haptics.tick()
+                                controller.updateDraft { d -> d.copy(templateCategoryFilter = filter) }
+                            },
+                            onSelectTemplate = { tpl ->
+                                haptics.confirm()
+                                controller.applyTemplate(tpl)
+                            },
+                            onSkip = {
+                                haptics.tick()
+                                controller.skipTemplate()
+                            }
                         )
-                        Spacer(modifier = Modifier.size(8.dp))
                     }
-                    Text(if (draft.isSaving) "Saving..." else "Save Card", fontWeight = FontWeight.Bold)
+                }
+            }
+
+            CardEditorSurfaceMode.FORM -> {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                            .padding(top = 8.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OrbitSheetHeader(
+                            title = "Edit Card",
+                            onDismiss = handleCloseRequest,
+                            trailingActions = {
+                                OrbitActionChip(
+                                    label = if (draft.cardName.isNotBlank()) "Switch Card" else "Link Card",
+                                    leadingIcon = OrbitIcons.CardPerks,
+                                    onClick = {
+                                        controller.updateDraft { it.copy(step = CardEditorStep.PICK_TEMPLATE) }
+                                    }
+                                )
+                            }
+                        )
+
+                        CardEditorHeroPreview(draft = draft)
+
+                        OrbitSegmentedTabRow(
+                            items = CardEditorTab.entries,
+                            selected = draft.activeTab,
+                            onSelect = { controller.selectTab(it) },
+                            label = { tab ->
+                                if (tab == CardEditorTab.STRATEGY && !rewardsToolsEnabled) "Notes" else tab.label
+                            },
+                            badgeCount = { tab ->
+                                if (tab == CardEditorTab.REWARDS) draft.benefits.size + draft.rewardCategories.size else 0
+                            },
+                            hasError = { tab -> draft.tabHasErrors(tab) }
+                        )
+                    }
+
+                    HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+
+                    AnimatedContent(
+                        targetState = draft.activeTab,
+                        transitionSpec = { fadeIn(OrbitSprings.effectsFast()) togetherWith fadeOut(OrbitSprings.effectsFast()) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        label = "cardEditorTabTransition"
+                    ) { activeTab ->
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            item(key = "tab_${activeTab.name}") {
+                                when (activeTab) {
+                                    CardEditorTab.CARD -> CardEditorIdentityTab(
+                                        draft = draft,
+                                        controller = controller,
+                                        householdMembers = householdMembers
+                                    )
+                                    CardEditorTab.BILLING -> CardEditorBillingTab(
+                                        draft = draft,
+                                        controller = controller,
+                                        transactions = transactions
+                                    )
+                                    CardEditorTab.REWARDS -> CardEditorRewardsTab(
+                                        draft = draft,
+                                        controller = controller
+                                    )
+                                    CardEditorTab.STRATEGY -> CardEditorStrategyTab(
+                                        draft = draft,
+                                        controller = controller,
+                                        transactions = transactions,
+                                        rewardsToolsEnabled = rewardsToolsEnabled
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    OrbitModalFooter(
+                        confirmText = if (draft.isSaving) "Saving..." else "Save Card",
+                        confirmEnabled = draft.isValid && !draft.isSaving,
+                        isSaving = draft.isSaving,
+                        errorBannerText = draft.firstErrorBanner?.second,
+                        onErrorClick = draft.firstErrorBanner?.first?.let { targetTab ->
+                            { controller.selectTab(targetTab) }
+                        },
+                        onConfirm = { scope.launch { controller.save() } },
+                        onDismiss = handleCloseRequest
+                    )
                 }
             }
         }
     }
 
-    // Discard Confirmation Dialog
     if (draft.showDiscardConfirm) {
         OrbitConfirmationDialog(
             title = "Discard Changes?",
@@ -200,39 +290,86 @@ fun CardEditorSheetContent(
             onDismiss = { controller.dismissDiscardConfirm() }
         )
     }
+}
 
-    // Perk Editor Dialog
-    if (draft.editingPerkId != null) {
-        val existingBenefit = draft.benefits.find { it.id == draft.editingPerkId }
-        val targetBenefit = existingBenefit ?: CardBenefit(id = draft.editingPerkId.takeIf { it.isNotBlank() } ?: "")
-        PerkEditorDialog(
-            benefit = targetBenefit,
-            isNew = existingBenefit == null,
-            onSave = { updated ->
-                controller.upsertBenefit(updated)
-                controller.updateDraft { it.copy(editingPerkId = null) }
-            },
-            onDismiss = { controller.updateDraft { it.copy(editingPerkId = null) } }
-        )
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CardEditorHeroPreview(
+    draft: CardEditorDraft,
+    modifier: Modifier = Modifier
+) {
+    val displayTitle = draft.cardName.ifBlank { draft.accountName.ifBlank { "Credit Card" } }
+    val displayIssuer = draft.issuer.ifBlank { draft.accountInstitution.ifBlank { "Card Issuer" } }
+    val feeLabel = if (draft.hasAnnualFee && (draft.annualFeeCents ?: 0L) > 0L) {
+        "${MoneyUtils.formatCents(draft.annualFeeCents ?: 0L, showCents = false)}/yr"
+    } else {
+        "\$0 Fee"
     }
 
-    // Reward Editor Dialog
-    if (draft.editingRewardIndex != null) {
-        val idx = draft.editingRewardIndex
-        val targetReward = if (idx >= 0 && idx in draft.rewardCategories.indices) {
-            draft.rewardCategories[idx]
-        } else {
-            RewardCategory()
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            CardVisualPlate(
+                name = displayTitle,
+                issuer = displayIssuer,
+                artKey = draft.artKey,
+                artworkUrl = draft.artworkUrl,
+                modifier = Modifier
+                    .width(92.dp)
+                    .aspectRatio(1.586f)
+            )
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = displayTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = listOfNotNull(
+                        displayIssuer.takeIf { it.isNotBlank() },
+                        draft.network.takeIf { it.isNotBlank() }
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    OrbitBadge(
+                        text = feeLabel,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    draft.cardholder?.takeIf { it.isNotBlank() }?.let { holder ->
+                        OrbitBadge(
+                            text = holder,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
-        RewardEditorDialog(
-            reward = targetReward,
-            isNew = idx < 0,
-            onSave = { updated ->
-                controller.upsertReward(if (idx >= 0) idx else null, updated)
-                controller.updateDraft { it.copy(editingRewardIndex = null) }
-            },
-            onDismiss = { controller.updateDraft { it.copy(editingRewardIndex = null) } }
-        )
     }
 }
 
