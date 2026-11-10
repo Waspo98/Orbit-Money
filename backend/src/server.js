@@ -29,6 +29,8 @@ import upcomingRoutes from './routes/upcoming.js';
 import dataRoutes from './routes/data.js';
 import preferencesRoutes from './routes/preferences.js';
 import notificationsRoutes from './routes/notifications.js';
+import cardCatalogRoutes from './routes/cardCatalog.js';
+import { ensureCreditCardCatalogSeeded } from './services/creditCardCatalogSync.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -36,6 +38,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 console.log('Orbit Money starting...');
 console.log('Running migrations...');
 runMigrations();
+ensureCreditCardCatalogSeeded(db);
 if (config.seedDemoData) {
   seedDemoData(db);
 }
@@ -87,6 +90,7 @@ app.use('/api/goals', goalsRoutes);
 app.use('/api/household', householdRoutes);
 app.use('/api/household-sharing', householdSharingRoutes);
 app.use('/api/merchant-logos', merchantLogosRoutes);
+app.use('/api/card-catalog', cardCatalogRoutes);
 app.use('/api/upcoming', upcomingRoutes);
 app.use('/api/data', dataRoutes);
 

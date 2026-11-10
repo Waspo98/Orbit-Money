@@ -130,6 +130,7 @@ private fun CardWalletRoiBentoCard(
                             artKey = profile?.imageUrl,
                             holderLabel = profile?.strategy?.cardholder,
                             compact = true,
+                            artworkUrl = profile?.artworkUrl,
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(modifier = Modifier.width(10.dp))

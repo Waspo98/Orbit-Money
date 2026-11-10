@@ -20,6 +20,7 @@ data class CardEditorDraft(
     val issuer: String = "",
     val network: String = "Visa",
     val artKey: String? = null,
+    val artworkUrl: String? = null,
     // Billing & Cycle
     val creditLimitCents: Cents? = null,
     val creditLimitText: String = "",
@@ -55,6 +56,7 @@ data class CardEditorDraft(
     val subCompleted: Boolean = false,
     val subReceivedDate: String? = null,
     val subCooldownMonths: Int? = null,
+    val subSpendWindowDays: Int? = null,
     // Lists & Notes
     val benefits: List<CardBenefit> = emptyList(),
     val rewardCategories: List<RewardCategory> = emptyList(),
@@ -63,6 +65,7 @@ data class CardEditorDraft(
     val notes: String? = null,
     // UI Controls & baselines
     val templateQuery: String = "",
+    val templateCategoryFilter: String = "All",
     val editingPerkId: String? = null,
     val editingRewardIndex: Int? = null,
     val isSaving: Boolean = false,
@@ -131,6 +134,7 @@ data class CardEditorDraft(
             issuerName = issuer.trim().ifBlank { null },
             network = network.trim().ifBlank { null },
             imageUrl = artKey?.trim()?.ifBlank { null },
+            artworkUrl = artworkUrl?.trim()?.ifBlank { null },
             creditLimitCents = limitCents,
             annualFeeCents = feeCents,
             annualFeePostDate = feePost,
@@ -178,6 +182,7 @@ data class CardEditorDraft(
                 issuer = p.issuerName.orEmpty(),
                 network = p.network ?: "Visa",
                 artKey = p.imageUrl,
+                artworkUrl = p.artworkUrl,
                 creditLimitCents = p.creditLimitCents, creditLimitText = p.creditLimitCents?.let { (it / 100).toString() }.orEmpty(),
                 statementCloseDay = p.statementClosingDay, statementCloseDayText = p.statementClosingDay?.toString().orEmpty(),
                 paymentDueDay = p.paymentDueDay, paymentDueDayText = p.paymentDueDay?.toString().orEmpty(),

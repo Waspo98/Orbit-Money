@@ -344,4 +344,48 @@ class CardEditorControllerTest {
         assertEquals("99", controller.draft.value!!.statementCloseDayText)
         assertFalse(controller.draft.value!!.isSaving)
     }
+
+    @Test
+    fun testSmartAutoFillDeadlineEstimatedValueAnd524Override() {
+        val account = Account(id = 109L, name = "New Business Card", institution = null, type = AccountType.CREDIT)
+        controller.open(account)
+
+        val sparkTemplate = CreditCardTemplates.ALL.first { it.id == "spark_cash_select" }
+        controller.applyTemplate(sparkTemplate)
+
+        val draftAfterTemplate = controller.draft.value!!
+        assertEquals("Capital One", draftAfterTemplate.accountInstitution)
+        assertEquals(500_00L, draftAfterTemplate.subEstimatedValueCents)
+        assertEquals(true, draftAfterTemplate.countsToward524Override)
+        assertEquals(90, draftAfterTemplate.subSpendWindowDays)
+        assertNull(draftAfterTemplate.targetDeadlineDate)
+
+        // Setting openedDate automatically populates targetDeadlineDate (+90 days)
+        controller.setOpenedDate("2026-01-01")
+        assertEquals("2026-04-01", controller.draft.value!!.targetDeadlineDate)
+    }
+
+    @Test
+    fun testFilterCardTemplatesAndHexPalette() {
+        val chaseCards = filterCardTemplates(CreditCardTemplates.BUNDLED, "", "Chase")
+        assertTrue(chaseCards.size >= 8)
+        assertTrue(chaseCards.all { it.issuerName == "Chase" })
+
+        val bizCards = filterCardTemplates(CreditCardTemplates.BUNDLED, "", "Business")
+        assertTrue(bizCards.isNotEmpty())
+        assertTrue(bizCards.all { it.isBusinessCard })
+
+        val noFeeAmex = filterCardTemplates(CreditCardTemplates.BUNDLED, "Blue", "\$0 Fee")
+        assertTrue(noFeeAmex.any { it.id == "amex_bce" })
+
+        val resolved = app.overbay.orbit.theme.CardArtPalette.resolveColors(
+            key = "hex://#0F172A:#0D9488:#FFFFFF",
+            fallbackStart = androidx.compose.ui.graphics.Color.Black,
+            fallbackEnd = androidx.compose.ui.graphics.Color.Black,
+            fallbackText = androidx.compose.ui.graphics.Color.Black
+        )
+        assertEquals(androidx.compose.ui.graphics.Color(0xFF0F172A), resolved.first)
+        assertEquals(androidx.compose.ui.graphics.Color(0xFF0D9488), resolved.second)
+        assertEquals(androidx.compose.ui.graphics.Color(0xFFFFFFFF), resolved.third)
+    }
 }

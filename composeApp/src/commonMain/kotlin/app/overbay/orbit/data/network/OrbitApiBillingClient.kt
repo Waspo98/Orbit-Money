@@ -2,9 +2,11 @@ package app.overbay.orbit.data.network
 
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.CreditCardTemplate
 import app.overbay.orbit.domain.MoneyUtils
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -28,6 +30,7 @@ suspend fun OrbitApiClient.saveCreditCardProfileRemote(
         issuerName = profile.issuerName,
         network = profile.network,
         imageUrl = profile.imageUrl,
+        artworkUrl = profile.artworkUrl,
         annualFee = profile.annualFeeCents?.let { MoneyUtils.centsToDollars(it) },
         annualFeePostDate = profile.annualFeePostDate,
         creditLimit = profile.creditLimitCents?.let { MoneyUtils.centsToDollars(it) },
@@ -69,4 +72,39 @@ suspend fun OrbitApiClient.saveBenefitUsageRemote(
     ensureSuccess(res)
     res.body<CreditCardProfileMutationResponseDto>().profile?.toDomain()?.copy(accountId = accountId)
         ?: throw IllegalStateException("Missing profile in response")
+}
+
+suspend fun OrbitApiClient.fetchCardCatalogRemote(): Result<List<CreditCardTemplate>> = runCatching {
+    val res = client.get(url("/api/card-catalog")) {
+        auth(sessionCookie)
+    }
+    extractSessionCookie(res)
+    ensureSuccess(res)
+    val body = res.body<CardCatalogResponseDto>()
+    body.items.map { dto ->
+        CreditCardTemplate(
+            id = dto.id,
+            shortLabel = dto.shortLabel.ifBlank { dto.cardName },
+            cardName = dto.cardName,
+            issuerName = dto.issuerName,
+            network = dto.network,
+            imageUrl = dto.imageUrl,
+            artworkUrl = dto.artworkUrl?.takeIf { it.isNotBlank() }?.let { raw ->
+                if (raw.startsWith("http://") || raw.startsWith("https://")) raw else url(raw)
+            },
+            annualFeeCents = dto.annualFeeCents,
+            isAnnualFeeWaived = dto.isAnnualFeeWaived,
+            isBusinessCard = dto.isBusinessCard,
+            countsToward524Override = dto.countsToward524Override,
+            subCooldownMonths = dto.subCooldownMonths,
+            defaultSubRewardText = dto.defaultSubRewardText,
+            defaultSubEstimatedValueCents = dto.defaultSubEstimatedValueCents,
+            defaultSubTargetSpendCents = dto.defaultSubTargetSpendCents,
+            subSpendWindowDays = dto.subSpendWindowDays,
+            isElevatedSubOffer = dto.isElevatedSubOffer,
+            rewardCategories = dto.rewardCategories.map { it.toDomain() },
+            benefits = dto.benefits.map { it.toDomain() },
+            asOf = dto.asOf
+        )
+    }
 }

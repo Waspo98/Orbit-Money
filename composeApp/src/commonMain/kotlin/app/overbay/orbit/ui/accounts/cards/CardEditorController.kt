@@ -5,23 +5,33 @@ import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.RewardCategory
 import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.refreshCardCatalog
 import app.overbay.orbit.data.saveCreditCardProfile
 import app.overbay.orbit.domain.CreditCardBenefitEngine
 import app.overbay.orbit.domain.CreditCardTemplate
+import app.overbay.orbit.domain.LocalDateUtils
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 class CardEditorController(
     private val repository: OrbitRepository
 ) {
+    private val catalogScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _draftState = MutableStateFlow<CardEditorDraft?>(null)
     val draftState: StateFlow<CardEditorDraft?> = _draftState.asStateFlow()
     val draft: StateFlow<CardEditorDraft?> get() = draftState
 
     fun startDraft(account: Account, profile: CreditCardProfile? = null) {
         _draftState.value = CardEditorDraft.fromAccountAndProfile(account, profile ?: account.creditCardProfile)
+        catalogScope.launch {
+            runCatching { repository.refreshCardCatalog() }
+        }
     }
 
     fun open(account: Account) {
@@ -62,24 +72,43 @@ class CardEditorController(
             if (current == null) return@update null
             val baseProfile = current.toProfile()
             val applied = template.applyToProfile(baseProfile)
+            val resolvedInst = current.accountInstitution.takeIf { it.isNotBlank() } ?: template.issuerName
 
             current.copy(
                 step = CardEditorStep.FORM,
+                accountInstitution = resolvedInst,
                 cardName = applied.cardName.orEmpty(),
                 issuer = applied.issuerName.orEmpty(),
                 network = applied.network ?: "Visa",
                 artKey = applied.imageUrl,
+                artworkUrl = applied.artworkUrl,
                 annualFeeCents = applied.annualFeeCents,
                 annualFeeText = applied.annualFeeCents?.let { (it / 100).toString() }.orEmpty(),
                 hasAnnualFee = (applied.annualFeeCents ?: 0L) > 0L,
                 benefits = applied.benefits,
                 rewardCategories = applied.rewardCategories,
                 isBusinessCard = applied.strategy.isBusinessCard,
+                countsToward524Override = applied.strategy.countsToward524Override,
                 subCooldownMonths = applied.strategy.subCooldownMonths,
+                subSpendWindowDays = template.subSpendWindowDays,
                 subRewardText = applied.strategy.subRewardText,
+                subEstimatedValueCents = applied.strategy.subEstimatedValueCents,
                 targetSpendCents = applied.strategy.subTargetSpendCents,
-                targetSpendText = applied.strategy.subTargetSpendCents?.let { (it / 100).toString() }.orEmpty()
+                targetSpendText = applied.strategy.subTargetSpendCents?.let { (it / 100).toString() }.orEmpty(),
+                targetDeadlineDate = applied.strategy.subDeadlineDate
             )
+        }
+    }
+
+    fun setOpenedDate(isoDate: String?) {
+        _draftState.update { current ->
+            if (current == null) return@update null
+            val autoDeadline = if (current.targetDeadlineDate.isNullOrBlank() && !isoDate.isNullOrBlank()) {
+                LocalDateUtils.addDaysIso(isoDate, current.subSpendWindowDays ?: 90)
+            } else {
+                current.targetDeadlineDate
+            }
+            current.copy(openedDate = isoDate, targetDeadlineDate = autoDeadline)
         }
     }
 

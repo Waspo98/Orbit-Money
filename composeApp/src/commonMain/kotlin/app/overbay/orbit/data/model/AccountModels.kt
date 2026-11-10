@@ -178,6 +178,7 @@ data class CreditCardProfile(
     val issuerName: String? = null,
     val network: String? = null,
     val imageUrl: String? = null,
+    val artworkUrl: String? = null,
     val annualFeeCents: Cents? = null,
     val annualFeePostDate: String? = null, // YYYY-MM-DD
     val creditLimitCents: Cents? = null,

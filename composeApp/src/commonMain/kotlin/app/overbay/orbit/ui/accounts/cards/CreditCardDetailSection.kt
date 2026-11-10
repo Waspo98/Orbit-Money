@@ -76,6 +76,7 @@ fun CreditCardDetailSection(
                     artKey = profile.imageUrl,
                     holderLabel = holderLabel,
                     compact = true,
+                    artworkUrl = profile.artworkUrl,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(12.dp))

@@ -199,13 +199,13 @@ fun CardEditorFormSections(
             OrbitSectionCard(title = "4. Welcome Bonus & 5/24 Strategy") {
                 historySuggestions.suggestedOpenedDate?.let { opDate ->
                     AssistChip(
-                        onClick = { controller.updateDraft { it.copy(openedDate = opDate) } },
+                        onClick = { controller.setOpenedDate(opDate) },
                         label = { Text("Earliest activity: ${CardFormat.formatCardDate(opDate)}. Use as Opened Date?") }
                     )
                 }
                 DateFieldButton(
                     date = draft.openedDate?.let { LocalDateUtils.parseIsoDate(it) } ?: LocalDateUtils.todayLocalDate(),
-                    onDateSelected = { dt -> controller.updateDraft { it.copy(openedDate = LocalDateUtils.formatIsoDate(dt)) } },
+                    onDateSelected = { dt -> controller.setOpenedDate(LocalDateUtils.formatIsoDate(dt)) },
                     label = draft.openedDate?.let { "Card Opened (${CardFormat.formatCardDate(it)})" } ?: "Set Opened Date"
                 )
                 OrbitSwitchRow(

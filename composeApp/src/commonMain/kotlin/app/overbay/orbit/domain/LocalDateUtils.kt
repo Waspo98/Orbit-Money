@@ -101,6 +101,12 @@ object LocalDateUtils {
 
     fun addDays(date: LocalDate, days: Int): LocalDate = date.plus(days, DateTimeUnit.DAY)
 
+    fun addDaysIso(isoDate: String?, days: Int?): String? {
+        if (isoDate.isNullOrBlank() || days == null || days <= 0) return null
+        val parsed = parseIsoDate(isoDate) ?: return null
+        return formatIsoDate(addDays(parsed, days))
+    }
+
     fun daysBetween(startDate: LocalDate, endDate: LocalDate): Int {
         return startDate.daysUntil(endDate)
     }

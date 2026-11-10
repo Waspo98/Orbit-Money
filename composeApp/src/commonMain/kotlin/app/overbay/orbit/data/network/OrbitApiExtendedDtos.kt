@@ -230,6 +230,7 @@ data class CreditCardProfileUpsertRequestDto(
     @SerialName("account_name") val accountName: String, @SerialName("account_institution") val accountInstitution: String? = null,
     @SerialName("card_name") val cardName: String? = null, @SerialName("issuer_name") val issuerName: String? = null,
     val network: String? = null, @SerialName("image_url") val imageUrl: String? = null,
+    @SerialName("artwork_url") val artworkUrl: String? = null,
     @SerialName("annual_fee") val annualFee: Double? = null, @SerialName("annual_fee_post_date") val annualFeePostDate: String? = null,
     @SerialName("credit_limit") val creditLimit: Double? = null, @SerialName("statement_closing_day") val statementClosingDay: Int? = null,
     @SerialName("payment_due_day") val paymentDueDay: Int? = null,
@@ -245,6 +246,35 @@ data class CreditCardProfileUpsertRequestDto(
 
 @Serializable
 data class CreditCardProfileMutationResponseDto(val success: Boolean = true, val account: AccountDto? = null, val profile: CreditCardProfileDto? = null)
+
+@Serializable
+data class CardCatalogItemDto(
+    val id: String,
+    @SerialName("short_label") val shortLabel: String = "",
+    @SerialName("card_name") val cardName: String = "",
+    @SerialName("issuer_name") val issuerName: String = "",
+    val network: String = "Visa",
+    @SerialName("image_url") val imageUrl: String = "preset://sapphire-blue",
+    @SerialName("artwork_url") val artworkUrl: String? = null,
+    @SerialName("annual_fee_cents") val annualFeeCents: Long = 0L,
+    @SerialName("is_annual_fee_waived") val isAnnualFeeWaived: Boolean = false,
+    @SerialName("is_business_card") val isBusinessCard: Boolean = false,
+    @SerialName("counts_toward_524_override") val countsToward524Override: Boolean? = null,
+    @SerialName("sub_cooldown_months") val subCooldownMonths: Int? = 24,
+    @SerialName("default_sub_reward_text") val defaultSubRewardText: String? = null,
+    @SerialName("default_sub_estimated_value_cents") val defaultSubEstimatedValueCents: Long? = null,
+    @SerialName("default_sub_target_spend_cents") val defaultSubTargetSpendCents: Long? = null,
+    @SerialName("sub_spend_window_days") val subSpendWindowDays: Int? = 90,
+    @SerialName("is_elevated_sub_offer") val isElevatedSubOffer: Boolean = false,
+    @SerialName("reward_categories") val rewardCategories: List<RewardCategoryWireDto> = emptyList(),
+    val benefits: List<CardBenefitWireDto> = emptyList(),
+    @SerialName("as_of") val asOf: String = "2026-11"
+)
+
+@Serializable
+data class CardCatalogResponseDto(
+    val items: List<CardCatalogItemDto> = emptyList()
+)
 
 @Serializable
 data class BalanceRecordWireDto(

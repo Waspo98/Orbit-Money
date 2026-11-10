@@ -316,6 +316,7 @@ function normalizeCreditCardProfileBody(body = {}) {
     issuer_name: normalizeOptionalTextLength(body.issuer_name, 180),
     network: normalizeOptionalTextLength(body.network, 40),
     image_url: normalizeOptionalTextLength(body.image_url, 1000),
+    artwork_url: normalizeOptionalTextLength(body.artwork_url ?? body.artworkUrl, 1000),
     annual_fee: normalizeOptionalMoney(body.annual_fee, 'annual_fee'),
     annual_fee_post_date: normalizeOptionalDateOnly(body.annual_fee_post_date, 'annual_fee_post_date'),
     credit_limit: normalizeOptionalMoney(body.credit_limit, 'credit_limit'),
@@ -606,19 +607,20 @@ router.put('/:id/credit-card-profile', requireAuth, (req, res) => {
 
       db.prepare(
         `INSERT INTO credit_card_profiles (
-           household_id, account_id, card_name, issuer_name, network, image_url,
+           household_id, account_id, card_name, issuer_name, network, image_url, artwork_url,
            annual_fee, annual_fee_post_date, credit_limit,
            statement_closing_day, payment_due_day,
            apr_bps, promo_apr_bps, promo_end_date,
            authorized_users_json, reward_categories_json, benefits_json, strategy_json, notes
          ) VALUES (
-           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          )
          ON CONFLICT(household_id, account_id) DO UPDATE SET
            card_name = excluded.card_name,
            issuer_name = excluded.issuer_name,
            network = excluded.network,
            image_url = excluded.image_url,
+           artwork_url = excluded.artwork_url,
            annual_fee = excluded.annual_fee,
            annual_fee_post_date = excluded.annual_fee_post_date,
            credit_limit = excluded.credit_limit,
@@ -640,6 +642,7 @@ router.put('/:id/credit-card-profile', requireAuth, (req, res) => {
         profile.issuer_name,
         profile.network,
         profile.image_url,
+        profile.artwork_url,
         profile.annual_fee,
         profile.annual_fee_post_date,
         profile.credit_limit,

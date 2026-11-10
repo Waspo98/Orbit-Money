@@ -49,6 +49,13 @@ suspend fun OrbitRepository.saveCreditCardProfile(
         .onFailure { revertLocalCardProfile(accountId, previousAccount, previousProfile) }
 }
 
+suspend fun OrbitRepository.refreshCardCatalog() {
+    if (storageMode.value != StorageMode.SELF_HOSTED) return
+    createApiClient().fetchCardCatalogRemote().onSuccess { items ->
+        app.overbay.orbit.domain.CreditCardTemplates.updateFromRemote(items)
+    }
+}
+
 suspend fun OrbitRepository.setCardBenefitUsage(
     accountId: Long,
     benefitId: String,

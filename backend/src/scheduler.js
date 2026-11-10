@@ -20,6 +20,7 @@ import { cleanupExpiredSampleHouseholds } from './services/sampleHouseholds.js';
 import { runSync } from './services/simplefinSync.js';
 import { reconcileUpcomingTransactions } from './services/upcomingReconciliation.js';
 import { runScheduledNotificationChecks } from './services/notifications.js';
+import { syncCreditCardCatalogFromUpstream } from './services/creditCardCatalogSync.js';
 
 const TICK_MS = 60 * 60 * 1000; // 60 minutes
 const STARTUP_WARMUP_MS = 30 * 1000;
@@ -59,6 +60,21 @@ async function tick() {
     }
   } catch (err) {
     console.error('[scheduler] Notification check failed:', err.message || err);
+  }
+
+  try {
+    const lastCatalogSync = db
+      .prepare('SELECT MAX(last_synced_at) AS last_synced_at FROM credit_card_catalog')
+      .get()?.last_synced_at;
+    const lastSyncDate = lastCatalogSync
+      ? new Date(lastCatalogSync + 'Z').toLocaleDateString('en-CA')
+      : null;
+    if (!lastSyncDate || (new Date().getHours() >= SCHEDULED_HOUR && lastSyncDate !== localTodayIsoDate())) {
+      const catalogResult = await syncCreditCardCatalogFromUpstream(db);
+      console.log('[scheduler] Credit card catalog sync done:', catalogResult);
+    }
+  } catch (err) {
+    console.error('[scheduler] Credit card catalog sync failed:', err.message || err);
   }
 
   const now = new Date();

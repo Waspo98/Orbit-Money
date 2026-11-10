@@ -19,6 +19,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +30,7 @@ import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.RewardCategory
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.domain.CreditCardTemplates
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -45,6 +48,7 @@ fun CardEditorSheetContent(
 ) {
     val haptics = LocalOrbitHaptics.current
     val scope = rememberCoroutineScope()
+    val catalog by CreditCardTemplates.catalogFlow.collectAsState()
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -83,20 +87,24 @@ fun CardEditorSheetContent(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 if (draft.step == CardEditorStep.PICK_TEMPLATE) {
-                    item(key = "template_picker") {
-                        CardTemplatePicker(
-                            query = draft.templateQuery,
-                            onQueryChange = { controller.updateDraft { d -> d.copy(templateQuery = it) } },
-                            onSelectTemplate = { tpl ->
-                                haptics.confirm()
-                                controller.applyTemplate(tpl)
-                            },
-                            onSkip = {
-                                haptics.tick()
-                                controller.skipTemplate()
-                            }
-                        )
-                    }
+                    cardTemplatePickerItems(
+                        catalog = catalog,
+                        query = draft.templateQuery,
+                        selectedFilter = draft.templateCategoryFilter,
+                        onQueryChange = { controller.updateDraft { d -> d.copy(templateQuery = it) } },
+                        onFilterChange = { filter ->
+                            haptics.tick()
+                            controller.updateDraft { d -> d.copy(templateCategoryFilter = filter) }
+                        },
+                        onSelectTemplate = { tpl ->
+                            haptics.confirm()
+                            controller.applyTemplate(tpl)
+                        },
+                        onSkip = {
+                            haptics.tick()
+                            controller.skipTemplate()
+                        }
+                    )
                 } else {
                     // Pinned live CardFace preview (compact)
                     item(key = "card_preview") {
@@ -107,6 +115,7 @@ fun CardEditorSheetContent(
                             artKey = draft.artKey,
                             holderLabel = draft.cardholder,
                             compact = true,
+                            artworkUrl = draft.artworkUrl,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

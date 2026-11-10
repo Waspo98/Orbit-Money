@@ -5,6 +5,9 @@ import app.overbay.orbit.data.model.BenefitCadence
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.RewardCategory
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 data class CreditCardTemplate(
     val id: String,
@@ -13,11 +16,17 @@ data class CreditCardTemplate(
     val issuerName: String,
     val network: String,
     val imageUrl: String,
+    val artworkUrl: String? = null,
     val annualFeeCents: Cents,
+    val isAnnualFeeWaived: Boolean = false,
     val isBusinessCard: Boolean = false,
+    val countsToward524Override: Boolean? = null,
     val subCooldownMonths: Int? = 24,
     val defaultSubRewardText: String? = null,
+    val defaultSubEstimatedValueCents: Cents? = null,
     val defaultSubTargetSpendCents: Cents? = null,
+    val subSpendWindowDays: Int? = 90,
+    val isElevatedSubOffer: Boolean = false,
     val rewardCategories: List<RewardCategory> = emptyList(),
     val benefits: List<CardBenefit> = emptyList(),
     val asOf: String = "2026-11"
@@ -55,19 +64,26 @@ data class CreditCardTemplate(
             it.label.trim().lowercase() !in templateCategoryLabels
         }
 
+        val computedDeadline = existing.strategy.subDeadlineDate?.takeIf { it.isNotBlank() }
+            ?: LocalDateUtils.addDaysIso(existing.strategy.openedDate, subSpendWindowDays)
+
         return existing.copy(
             cardName = cardName,
             issuerName = issuerName,
             network = network,
             imageUrl = imageUrl,
+            artworkUrl = artworkUrl ?: existing.artworkUrl,
             annualFeeCents = annualFeeCents,
             rewardCategories = mergedRewardCategories,
             benefits = mergedBenefits + customBenefits,
             strategy = existing.strategy.copy(
                 isBusinessCard = existing.strategy.isBusinessCard || isBusinessCard,
+                countsToward524Override = existing.strategy.countsToward524Override ?: countsToward524Override,
                 subCooldownMonths = existing.strategy.subCooldownMonths ?: subCooldownMonths,
                 subRewardText = existing.strategy.subRewardText ?: defaultSubRewardText,
-                subTargetSpendCents = existing.strategy.subTargetSpendCents ?: defaultSubTargetSpendCents
+                subEstimatedValueCents = existing.strategy.subEstimatedValueCents ?: defaultSubEstimatedValueCents,
+                subTargetSpendCents = existing.strategy.subTargetSpendCents ?: defaultSubTargetSpendCents,
+                subDeadlineDate = computedDeadline
             )
         )
     }
@@ -75,7 +91,7 @@ data class CreditCardTemplate(
 
 object CreditCardTemplates {
 
-    val ALL: List<CreditCardTemplate> = listOf(
+    private val CORE_CARDS: List<CreditCardTemplate> = listOf(
         CreditCardTemplate(
             id = "csr",
             shortLabel = "Sapphire Reserve",
@@ -86,7 +102,9 @@ object CreditCardTemplates {
             annualFeeCents = 550_00L,
             subCooldownMonths = 48,
             defaultSubRewardText = "60,000 Ultimate Rewards pts",
+            defaultSubEstimatedValueCents = 900_00L,
             defaultSubTargetSpendCents = 4000_00L,
+            subSpendWindowDays = 90,
             rewardCategories = listOf(
                 RewardCategory(category = "Travel & Flights", label = "Travel & Dining", multiplier = 3.0),
                 RewardCategory(category = "Dining & Restaurants", label = "Dining", multiplier = 3.0),
@@ -137,7 +155,9 @@ object CreditCardTemplates {
             annualFeeCents = 95_00L,
             subCooldownMonths = 48,
             defaultSubRewardText = "60,000 Ultimate Rewards pts",
+            defaultSubEstimatedValueCents = 900_00L,
             defaultSubTargetSpendCents = 4000_00L,
+            subSpendWindowDays = 90,
             rewardCategories = listOf(
                 RewardCategory(category = "Dining & Restaurants", label = "Dining", multiplier = 3.0),
                 RewardCategory(category = "Streaming & Entertainment", label = "Select Streaming", multiplier = 3.0),
@@ -173,7 +193,9 @@ object CreditCardTemplates {
             annualFeeCents = 0L,
             subCooldownMonths = 24,
             defaultSubRewardText = "$200 / 20,000 UR Bonus",
+            defaultSubEstimatedValueCents = 300_00L,
             defaultSubTargetSpendCents = 500_00L,
+            subSpendWindowDays = 90,
             rewardCategories = listOf(
                 RewardCategory(category = "Dining & Restaurants", label = "Dining", multiplier = 3.0),
                 RewardCategory(category = "Drugstores", label = "Drugstores", multiplier = 3.0),
@@ -190,7 +212,9 @@ object CreditCardTemplates {
             annualFeeCents = 0L,
             subCooldownMonths = 24,
             defaultSubRewardText = "$200 / 20,000 UR Bonus",
+            defaultSubEstimatedValueCents = 300_00L,
             defaultSubTargetSpendCents = 500_00L,
+            subSpendWindowDays = 90,
             rewardCategories = listOf(
                 RewardCategory(category = "Quarterly Bonus", label = "5x Rotating Quarterly ($1,500 cap)", multiplier = 5.0, isRotating = true, capCents = 1500_00L),
                 RewardCategory(category = "Dining & Restaurants", label = "Dining", multiplier = 3.0),
@@ -208,7 +232,9 @@ object CreditCardTemplates {
             isBusinessCard = true,
             subCooldownMonths = 24,
             defaultSubRewardText = "75,000 Ultimate Rewards pts",
+            defaultSubEstimatedValueCents = 1125_00L,
             defaultSubTargetSpendCents = 6000_00L,
+            subSpendWindowDays = 180,
             rewardCategories = listOf(
                 RewardCategory(category = "Office & Internet", label = "Office Supplies, Internet & Phone", multiplier = 5.0),
                 RewardCategory(category = "Gas & Transit", label = "Gas & Restaurants", multiplier = 2.0)
@@ -224,7 +250,9 @@ object CreditCardTemplates {
             annualFeeCents = 325_00L,
             subCooldownMonths = 999,
             defaultSubRewardText = "90,000 Membership Rewards pts",
+            defaultSubEstimatedValueCents = 1350_00L,
             defaultSubTargetSpendCents = 6000_00L,
+            subSpendWindowDays = 180,
             rewardCategories = listOf(
                 RewardCategory(category = "Dining & Restaurants", label = "Restaurants Worldwide", multiplier = 4.0),
                 RewardCategory(category = "Groceries", label = "U.S. Supermarkets ($25k cap)", multiplier = 4.0, capCents = 25000_00L),
@@ -275,7 +303,9 @@ object CreditCardTemplates {
             annualFeeCents = 695_00L,
             subCooldownMonths = 999,
             defaultSubRewardText = "125,000 Membership Rewards pts",
+            defaultSubEstimatedValueCents = 1875_00L,
             defaultSubTargetSpendCents = 8000_00L,
+            subSpendWindowDays = 180,
             rewardCategories = listOf(
                 RewardCategory(category = "Travel & Flights", label = "Flights & Prepaid Hotels", multiplier = 5.0),
                 RewardCategory(category = "Everything Else", label = "Everything Else", multiplier = 1.0)
@@ -341,7 +371,9 @@ object CreditCardTemplates {
             annualFeeCents = 395_00L,
             subCooldownMonths = 48,
             defaultSubRewardText = "75,000 Capital One Miles",
+            defaultSubEstimatedValueCents = 1050_00L,
             defaultSubTargetSpendCents = 4000_00L,
+            subSpendWindowDays = 90,
             rewardCategories = listOf(
                 RewardCategory(category = "Travel & Flights", label = "Portal Hotels & Rental Cars", multiplier = 10.0),
                 RewardCategory(category = "Everything Else", label = "Everything Else (Catch-All)", multiplier = 2.0)
@@ -389,4 +421,18 @@ object CreditCardTemplates {
             )
         )
     )
+
+    val BUNDLED: List<CreditCardTemplate> = CORE_CARDS + CreditCardCatalogSeed.ADDITIONAL_CARDS
+
+    private val _catalogFlow = MutableStateFlow(BUNDLED)
+    val catalogFlow: StateFlow<List<CreditCardTemplate>> = _catalogFlow.asStateFlow()
+
+    val ALL: List<CreditCardTemplate> get() = _catalogFlow.value
+
+    fun updateFromRemote(remoteItems: List<CreditCardTemplate>) {
+        if (remoteItems.isEmpty()) return
+        val remoteIds = remoteItems.map { it.id }.toSet()
+        val fallbackExtras = BUNDLED.filter { it.id !in remoteIds }
+        _catalogFlow.value = remoteItems + fallbackExtras
+    }
 }
