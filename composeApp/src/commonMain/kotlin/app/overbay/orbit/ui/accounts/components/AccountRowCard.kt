@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,9 +41,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.domain.CardCycleStatus
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.accounts.cards.CardFormat
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.roundToInt
@@ -55,6 +59,7 @@ import kotlin.math.roundToInt
 @Composable
 fun AccountRowCard(
     account: Account,
+    cycleStatus: CardCycleStatus? = null,
     onInspect: () -> Unit = {},
     onSeeTransactions: () -> Unit,
     onEdit: () -> Unit,
@@ -144,25 +149,10 @@ fun AccountRowCard(
 
                 if (isCredit && account.creditCardProfile != null) {
                     val profile = account.creditCardProfile
-                    if (!profile.network.isNullOrBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f),
-                            modifier = Modifier.align(Alignment.CenterVertically)
-                        ) {
-                            Text(
-                                text = profile.network.uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Black,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
-                    if (!profile.cardName.isNullOrBlank()) {
+                    val cardName = profile.cardName?.trim()
+                    if (!cardName.isNullOrBlank() && !cardName.equals(account.name.trim(), ignoreCase = true)) {
                         AccountBadge(
-                            text = profile.cardName,
+                            text = cardName,
                             isAccent = true,
                             modifier = Modifier.align(Alignment.CenterVertically)
                         )
@@ -199,17 +189,40 @@ fun AccountRowCard(
             }
 
             // Credit card glance chips
-            if (isCredit && account.creditCardProfile?.creditLimitCents != null) {
-                val limit = account.creditCardProfile.creditLimitCents
-                val ratio = account.creditCardProfile.creditUtilizationRatio(account.currentBalanceCents)
-                val pct = if (ratio != null) (ratio * 100.0).roundToInt() else null
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = if (pct != null) "$pct% of ${MoneyUtils.formatCents(limit)}" else "Limit ${MoneyUtils.formatCents(limit)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 11.sp,
-                    color = if (pct != null && pct > 30) colors.danger else MaterialTheme.colorScheme.outline
-                )
+            if (isCredit) {
+                val dueDays = cycleStatus?.daysUntilDue
+                val dueDate = cycleStatus?.dueDate
+                val dueText = when {
+                    dueDays != null -> "Due ${CardFormat.formatDaysUntil(dueDays)}"
+                    dueDate != null -> "Due ${CardFormat.formatCardDate(dueDate.toString())}"
+                    else -> null
+                }
+                if (dueText != null) {
+                    val dueColor = when {
+                        dueDays != null && dueDays <= 3 -> colors.danger
+                        dueDays != null && dueDays in 4..7 -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.outline
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = dueText,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 11.sp,
+                        fontWeight = if (dueDays != null && dueDays <= 3) FontWeight.SemiBold else FontWeight.Normal,
+                        color = dueColor
+                    )
+                } else if (account.creditCardProfile?.creditLimitCents != null) {
+                    val limit = account.creditCardProfile.creditLimitCents
+                    val ratio = account.creditCardProfile.creditUtilizationRatio(account.currentBalanceCents)
+                    val pct = if (ratio != null) (ratio * 100.0).roundToInt() else null
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (pct != null) "$pct% of ${MoneyUtils.formatCents(limit)}" else "Limit ${MoneyUtils.formatCents(limit)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 11.sp,
+                        color = if (pct != null && pct > 30) colors.danger else MaterialTheme.colorScheme.outline
+                    )
+                }
             }
         }
 
@@ -252,12 +265,11 @@ fun AccountRowCard(
                     shape = CircleShape,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                     border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                    modifier = Modifier.height(26.dp)
+                    modifier = Modifier.heightIn(min = 32.dp)
                 ) {
                     Text(
                         text = "See Transactions",
                         style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -273,7 +285,8 @@ fun AccountRowCard(
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
                     modifier = Modifier
-                        .size(28.dp)
+                        .minimumInteractiveComponentSize()
+                        .size(32.dp)
                         .clickable {
                             haptics.tick()
                             menuExpanded = true

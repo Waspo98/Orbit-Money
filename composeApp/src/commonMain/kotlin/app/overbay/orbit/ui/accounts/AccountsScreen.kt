@@ -350,6 +350,8 @@ private fun AccountsMasterContent(
             itemSpacingDp = 14.dp
         )
 
+        val cardCyclesById = remember(state.cardCycles) { state.cardCycles.associateBy { it.accountId } }
+
         // Account Groups List
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -361,6 +363,7 @@ private fun AccountsMasterContent(
                 AccountGroupSection(
                     group = group,
                     selectedAccountId = state.selectedAccountId,
+                    cardCycles = cardCyclesById,
                     onInspectAccount = { acct -> onOpenDetail(acct) },
                     onSeeTransactions = { acct ->
                         onNavigate(OrbitNavKey.Transactions(accountId = acct.id))

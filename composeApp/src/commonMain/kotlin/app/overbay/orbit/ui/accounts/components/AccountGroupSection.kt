@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.domain.CardCycleStatus
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
@@ -63,6 +64,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 fun AccountGroupSection(
     group: AccountGroupDisplay,
     selectedAccountId: Long?,
+    cardCycles: Map<Long, CardCycleStatus> = emptyMap(),
     onInspectAccount: (Account) -> Unit = {},
     onSeeTransactions: (Account) -> Unit,
     onEditAccount: (Account) -> Unit,
@@ -223,6 +225,7 @@ fun AccountGroupSection(
                                 pairAccounts.forEachIndexed { colIndex, account ->
                                     AccountRowCard(
                                         account = account,
+                                        cycleStatus = cardCycles[account.id],
                                         isInspected = selectedAccountId == account.id,
                                         onInspect = { onInspectAccount(account) },
                                         onSeeTransactions = { onSeeTransactions(account) },
@@ -253,6 +256,7 @@ fun AccountGroupSection(
                                 )
                                 AccountRowCard(
                                     account = account,
+                                    cycleStatus = cardCycles[account.id],
                                     isInspected = selectedAccountId == account.id,
                                     onInspect = { onInspectAccount(account) },
                                     onSeeTransactions = { onSeeTransactions(account) },

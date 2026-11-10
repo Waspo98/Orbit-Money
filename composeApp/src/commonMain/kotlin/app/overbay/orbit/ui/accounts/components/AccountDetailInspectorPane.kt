@@ -53,12 +53,12 @@ import app.overbay.orbit.ui.accounts.AccountsViewModel
 import app.overbay.orbit.ui.accounts.sheets.AccountBalanceHistoryContent
 import app.overbay.orbit.ui.accounts.sheets.AccountEditorContent
 import app.overbay.orbit.ui.accounts.sheets.CreditCardProfileEditorContent
+import app.overbay.orbit.ui.accounts.cards.CreditCardDetailSection
+import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitCompactListRow
-import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalOrbitHaptics
-import kotlin.math.roundToInt
 
 private enum class AccountInspectorSubMode { DETAIL, EDIT, PERKS, HISTORY }
 
@@ -179,6 +179,8 @@ fun AccountDetailInspectorPane(
                             { viewModel.unlinkSimpleFin(inspecting.id) }
                         } else null,
                         onToggleBenefit = { benefitId -> viewModel.toggleCardBenefit(inspecting.id, benefitId) },
+                        onOpenPerkUsage = { benefitId -> viewModel.openPerkUsage(inspecting.id, benefitId) },
+                        rewardsToolsEnabled = state.rewardsToolsEnabled,
                         onSeeTransactions = { onNavigate(OrbitNavKey.Transactions(accountId = inspecting.id)) }
                     )
                 }
@@ -201,6 +203,8 @@ private fun AccountReadOnlyDetailContent(
     onDelete: () -> Unit,
     onUnlinkSimpleFin: (() -> Unit)? = null,
     onToggleBenefit: (String) -> Unit = {},
+    onOpenPerkUsage: (String) -> Unit = {},
+    rewardsToolsEnabled: Boolean = true,
     onSeeTransactions: () -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -263,29 +267,29 @@ private fun AccountReadOnlyDetailContent(
             }
         }
 
-        if (isCredit && account.creditCardProfile?.creditLimitCents != null) {
+        if (isCredit) {
             item {
-                val limit = account.creditCardProfile.creditLimitCents
-                val ratio = account.creditCardProfile.creditUtilizationRatio(account.currentBalanceCents)
-                val pct = if (ratio != null) (ratio * 100.0).roundToInt() else 0
-                Column {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(
-                            text = "Credit Utilization: $pct%",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (pct > 30) colors.danger else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "Limit ${MoneyUtils.formatCents(limit)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
+                val profile = account.creditCardProfile
+                if (profile != null) {
+                    val subProgress = remember(account, transactions) {
+                        CreditCardStrategyEngine.computeSubProgress(account, transactions)
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OrbitPillProgressBar(
-                        percent = pct / 100f,
-                        overBudget = pct > 30,
-                        height = 6.dp
+                    CreditCardDetailSection(
+                        account = account,
+                        profile = profile,
+                        transactions = transactions,
+                        subProgress = subProgress,
+                        rewardsToolsEnabled = rewardsToolsEnabled,
+                        onEditCard = onPerks,
+                        onToggleBenefit = onToggleBenefit,
+                        onOpenPerkUsage = onOpenPerkUsage
+                    )
+                } else {
+                    EmptyStateCard(
+                        title = "Add Card Details",
+                        description = "Track billing cycles, statement credits, perks, and rewards.",
+                        actionButtonText = "Add Details",
+                        onActionClick = onPerks
                     )
                 }
             }
@@ -317,20 +321,6 @@ private fun AccountReadOnlyDetailContent(
                 onDelete = onDelete,
                 onUnlinkSimpleFin = onUnlinkSimpleFin
             )
-        }
-
-        if (isCredit && account.creditCardProfile != null) {
-            item {
-                val subProgress = remember(account, transactions) {
-                    CreditCardStrategyEngine.computeSubProgress(account, transactions)
-                }
-                CreditCardPerksPanel(
-                    profile = account.creditCardProfile,
-                    subProgress = subProgress,
-                    onEditPerks = onPerks,
-                    onToggleBenefit = onToggleBenefit
-                )
-            }
         }
 
         item {
