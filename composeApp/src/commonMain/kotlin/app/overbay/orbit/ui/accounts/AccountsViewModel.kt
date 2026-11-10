@@ -24,6 +24,7 @@ import app.overbay.orbit.domain.CreditCardBenefitEngine
 import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.NetWorthEngine
+import app.overbay.orbit.ui.accounts.cards.CardEditorController
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -46,12 +47,11 @@ class AccountsViewModel(
     todayFlow: Flow<LocalDate>? = null
 ) : ViewModel() {
 
+    val cardEditor = CardEditorController(repository)
+
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
     private val _editingAccount = MutableStateFlow<Account?>(null)
     private val _showEditorSheet = MutableStateFlow(false)
-    private val _editingCardProfile = MutableStateFlow<CreditCardProfile?>(null)
-    private val _cardProfileAccountId = MutableStateFlow<Long?>(null)
-    private val _showCardProfileSheet = MutableStateFlow(false)
     private val _mergingAccount = MutableStateFlow<Account?>(null)
     private val _showMergeDialog = MutableStateFlow(false)
     private val _historyAccount = MutableStateFlow<Account?>(null)
@@ -104,9 +104,9 @@ class AccountsViewModel(
     ) { accts, txns, snap, prefs -> AccountsDataBundle(accts, txns, snap, prefs) }
 
     private val dialogFlow = combine(
-        _editingAccount, _showEditorSheet, _editingCardProfile, _cardProfileAccountId, _showCardProfileSheet
-    ) { editAcct, showEdit, cardProfile, cardAcctId, showCard ->
-        AccountsSheetBundle(editAcct, showEdit, cardProfile, cardAcctId, showCard)
+        _editingAccount, _showEditorSheet, cardEditor.draft
+    ) { editAcct, showEdit, draft ->
+        AccountsSheetBundle(editAcct, showEdit, draft)
     }
 
     private val actionFlow = combine(
@@ -158,8 +158,8 @@ class AccountsViewModel(
             investmentsCents = snapshot.investmentsCents, showArchived = syncReorder.showArchived,
             isReorderMode = syncReorder.isReorderMode, selectedAccountId = selId,
             selectedAccountTransactions = selectedTxns, editingAccount = dialog.editingAccount,
-            showEditorSheet = dialog.showEditorSheet, editingCardProfile = dialog.editingCardProfile,
-            cardProfileAccountId = dialog.cardProfileAccountId, showCardProfileSheet = dialog.showCardProfileSheet,
+            showEditorSheet = dialog.showEditorSheet, cardEditorDraft = dialog.cardEditorDraft,
+            householdMembers = data.workspaceSnapshot.householdMembers,
             mergingAccount = action.mergingAccount, showMergeDialog = action.showMergeDialog,
             historyAccount = action.historyAccount, showHistorySheet = action.showHistorySheet,
             historyBalanceRecords = historyRecords, showAddRecordDialog = addRecord.showAddRecordDialog,
@@ -243,8 +243,7 @@ class AccountsViewModel(
         _selectedAccountId.value = accountId
         _showEditorSheet.value = false
         _editingAccount.value = null
-        _showCardProfileSheet.value = false
-        _editingCardProfile.value = null
+        cardEditor.clearDraft()
         _showHistorySheet.value = false
         _historyAccount.value = null
         _showAddRecordDialog.value = false
@@ -252,15 +251,14 @@ class AccountsViewModel(
 
     fun selectAccountForInspect(accountId: Long?) {
         if (accountId != null && _selectedAccountId.value == accountId &&
-            !_showEditorSheet.value && !_showCardProfileSheet.value &&
+            !_showEditorSheet.value && cardEditor.draft.value == null &&
             !_showHistorySheet.value && !_showAddRecordDialog.value) {
             _selectedAccountId.value = null
         } else {
             _selectedAccountId.value = accountId
             _showEditorSheet.value = false
             _editingAccount.value = null
-            _showCardProfileSheet.value = false
-            _editingCardProfile.value = null
+            cardEditor.clearDraft()
             _showHistorySheet.value = false
             _historyAccount.value = null
             _showAddRecordDialog.value = false
@@ -271,16 +269,14 @@ class AccountsViewModel(
         _selectedAccountId.value = null
         _showEditorSheet.value = false
         _editingAccount.value = null
-        _showCardProfileSheet.value = false
-        _editingCardProfile.value = null
-        _cardProfileAccountId.value = null
+        cardEditor.clearDraft()
         _showHistorySheet.value = false
         _historyAccount.value = null
         _showAddRecordDialog.value = false
     }
 
     fun openAddAccount(defaultType: AccountType = AccountType.CHECKING) {
-        _showCardProfileSheet.value = false
+        cardEditor.clearDraft()
         _showHistorySheet.value = false
         _editingAccount.value = Account(
             id = 0L, name = "", type = defaultType, institution = "", isManual = true, currentBalanceCents = 0L
@@ -290,7 +286,7 @@ class AccountsViewModel(
 
     fun openEditAccount(account: Account) {
         _selectedAccountId.value = account.id
-        _showCardProfileSheet.value = false
+        cardEditor.clearDraft()
         _showHistorySheet.value = false
         _editingAccount.value = account
         _showEditorSheet.value = true
@@ -378,15 +374,11 @@ class AccountsViewModel(
         _selectedAccountId.value = account.id
         _showEditorSheet.value = false
         _showHistorySheet.value = false
-        _cardProfileAccountId.value = account.id
-        _editingCardProfile.value = account.creditCardProfile ?: CreditCardProfile(accountId = account.id)
-        _showCardProfileSheet.value = true
+        cardEditor.startDraft(account, account.creditCardProfile)
     }
 
     fun closeCreditCardProfile() {
-        _showCardProfileSheet.value = false
-        _editingCardProfile.value = null
-        _cardProfileAccountId.value = null
+        cardEditor.clearDraft()
     }
 
     fun saveCreditCardProfile(
@@ -394,7 +386,7 @@ class AccountsViewModel(
         accountName: String? = null,
         accountInstitution: String? = null
     ) {
-        val accountId = _cardProfileAccountId.value ?: profile.accountId
+        val accountId = cardEditor.draft.value?.accountId ?: profile.accountId
         viewModelScope.launch {
             repository.saveCreditCardProfile(
                 accountId = accountId,
@@ -502,7 +494,7 @@ class AccountsViewModel(
     fun openBalanceHistory(account: Account) {
         _selectedAccountId.value = account.id
         _showEditorSheet.value = false
-        _showCardProfileSheet.value = false
+        cardEditor.clearDraft()
         _historyAccount.value = account
         _showHistorySheet.value = true
     }

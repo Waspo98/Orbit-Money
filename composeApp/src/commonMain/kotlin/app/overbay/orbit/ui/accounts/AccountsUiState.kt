@@ -3,12 +3,14 @@ package app.overbay.orbit.ui.accounts
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.BalanceRecord
 import app.overbay.orbit.data.model.CreditCardProfile
+import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.CardCycleStatus
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardPortfolioSummary
 import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.HouseholdCreditSummary
+import app.overbay.orbit.ui.accounts.cards.CardEditorDraft
 
 enum class AccountsMasterMode {
     ALL_ACCOUNTS,
@@ -60,9 +62,8 @@ data class AccountsUiState(
     val selectedAccountTransactions: List<Transaction> = emptyList(),
     val editingAccount: Account? = null,
     val showEditorSheet: Boolean = false,
-    val editingCardProfile: CreditCardProfile? = null,
-    val cardProfileAccountId: Long? = null,
-    val showCardProfileSheet: Boolean = false,
+    val cardEditorDraft: CardEditorDraft? = null,
+    val householdMembers: List<HouseholdMember> = emptyList(),
     val mergingAccount: Account? = null,
     val showMergeDialog: Boolean = false,
     val historyAccount: Account? = null,
@@ -95,4 +96,13 @@ data class AccountsUiState(
 ) {
     val selectedAccount: Account?
         get() = accounts.find { it.id == selectedAccountId }
+
+    val showCardProfileSheet: Boolean
+        get() = cardEditorDraft != null
+
+    val editingCardProfile: CreditCardProfile?
+        get() = cardEditorDraft?.toProfile() ?: cardEditorDraft?.originalProfile
+
+    val cardProfileAccountId: Long?
+        get() = cardEditorDraft?.accountId
 }

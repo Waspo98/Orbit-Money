@@ -1,10 +1,10 @@
 package app.overbay.orbit.ui.accounts
 
 import app.overbay.orbit.data.model.Account
-import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.ui.accounts.cards.CardEditorDraft
 
 internal data class AccountsDataBundle(
     val accounts: List<Account>,
@@ -16,9 +16,7 @@ internal data class AccountsDataBundle(
 internal data class AccountsSheetBundle(
     val editingAccount: Account?,
     val showEditorSheet: Boolean,
-    val editingCardProfile: CreditCardProfile?,
-    val cardProfileAccountId: Long?,
-    val showCardProfileSheet: Boolean
+    val cardEditorDraft: CardEditorDraft?
 )
 
 internal data class AccountsActionBundle(

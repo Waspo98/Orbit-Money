@@ -52,7 +52,7 @@ import app.overbay.orbit.ui.accounts.AccountsUiState
 import app.overbay.orbit.ui.accounts.AccountsViewModel
 import app.overbay.orbit.ui.accounts.sheets.AccountBalanceHistoryContent
 import app.overbay.orbit.ui.accounts.sheets.AccountEditorContent
-import app.overbay.orbit.ui.accounts.sheets.CreditCardProfileEditorContent
+import app.overbay.orbit.ui.accounts.cards.CardEditorSheetContent
 import app.overbay.orbit.ui.accounts.cards.CreditCardDetailSection
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitBadge
@@ -86,7 +86,7 @@ fun AccountDetailInspectorPane(
 
     val subMode = when {
         state.showEditorSheet && state.editingAccount != null -> AccountInspectorSubMode.EDIT
-        state.showCardProfileSheet && state.editingCardProfile != null -> AccountInspectorSubMode.PERKS
+        state.cardEditorDraft != null -> AccountInspectorSubMode.PERKS
         state.showHistorySheet && state.historyAccount != null -> AccountInspectorSubMode.HISTORY
         else -> AccountInspectorSubMode.DETAIL
     }
@@ -96,7 +96,7 @@ fun AccountDetailInspectorPane(
         haptics.tick()
         when (subMode) {
             AccountInspectorSubMode.EDIT -> viewModel.closeEditorSheet()
-            AccountInspectorSubMode.PERKS -> viewModel.closeCreditCardProfile()
+            AccountInspectorSubMode.PERKS -> viewModel.cardEditor.requestClose()
             AccountInspectorSubMode.HISTORY -> viewModel.closeBalanceHistory()
             else -> {}
         }
@@ -127,23 +127,16 @@ fun AccountDetailInspectorPane(
                 }
             }
             AccountInspectorSubMode.PERKS -> {
-                val profile = state.editingCardProfile
-                val targetAccount = inspecting
-                if (profile != null) {
-                    CreditCardProfileEditorContent(
-                        profile = profile,
-                        initialAccountName = targetAccount?.name ?: "",
-                        initialInstitution = targetAccount?.institution ?: "",
+                val draft = state.cardEditorDraft
+                if (draft != null) {
+                    CardEditorSheetContent(
+                        draft = draft,
+                        controller = viewModel.cardEditor,
+                        householdMembers = state.householdMembers,
                         transactions = state.selectedAccountTransactions,
-                        onSave = { updatedProfile, acctName, acctInst ->
-                            viewModel.saveCreditCardProfile(
-                                profile = updatedProfile,
-                                accountName = acctName.takeIf { it.isNotBlank() },
-                                accountInstitution = acctInst.takeIf { it.isNotBlank() }
-                            )
-                        },
+                        rewardsToolsEnabled = state.rewardsToolsEnabled,
                         onDismiss = {
-                            if (state.selectedAccount != null) viewModel.closeCreditCardProfile() else onClosePane()
+                            if (state.selectedAccount != null) viewModel.cardEditor.requestClose() else onClosePane()
                         }
                     )
                 }
