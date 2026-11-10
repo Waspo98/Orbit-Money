@@ -20,7 +20,7 @@ enum class CardPerksCardType(
     CARD_WALLET_ROI(
         widgetId = "card_wallet_roi",
         defaultTitle = "Card Wallet",
-        defaultDescription = "Your credit cards with annual fee vs. credits captured value ledger.",
+        defaultDescription = "Your credit cards with institution, payment network, and household cardholders.",
         defaultSortOrder = 0,
         defaultWideSpan = 2
     ),

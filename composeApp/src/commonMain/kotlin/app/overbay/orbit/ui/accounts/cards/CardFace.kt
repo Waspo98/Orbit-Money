@@ -44,20 +44,17 @@ import app.overbay.orbit.theme.CardArtPalette
 import app.overbay.orbit.ui.transactions.components.MerchantLogoImageCache
 
 @Composable
-fun CardArtworkThumbnail(
-    name: String,
-    issuer: String?,
-    artKey: String?,
+internal fun rememberCardArtworkBitmap(
     artworkUrl: String?,
-    modifier: Modifier = Modifier
-) {
+    name: String,
+    issuer: String?
+): ImageBitmap? {
     val cleanArtworkUrl = remember(artworkUrl, name, issuer) {
         CreditCardTemplates.resolveArtworkUrl(artworkUrl, name, issuer)
     }
     var artworkBitmap by remember(cleanArtworkUrl) {
         mutableStateOf<ImageBitmap?>(MerchantLogoImageCache.getCached(cleanArtworkUrl))
     }
-
     LaunchedEffect(cleanArtworkUrl) {
         if (cleanArtworkUrl == null) {
             artworkBitmap = null
@@ -65,6 +62,18 @@ fun CardArtworkThumbnail(
             artworkBitmap = MerchantLogoImageCache.fetchBitmap(cleanArtworkUrl)
         }
     }
+    return artworkBitmap
+}
+
+@Composable
+fun CardArtworkThumbnail(
+    name: String,
+    issuer: String?,
+    artKey: String?,
+    artworkUrl: String?,
+    modifier: Modifier = Modifier
+) {
+    val artworkBitmap = rememberCardArtworkBitmap(artworkUrl, name, issuer)
 
     val (startColor, endColor, textColor) = CardArtPalette.resolveColors(
         key = artKey,
@@ -127,20 +136,7 @@ fun CardFace(
     artworkUrl: String? = null,
     modifier: Modifier = Modifier
 ) {
-    val cleanArtworkUrl = remember(artworkUrl, name, issuer) {
-        CreditCardTemplates.resolveArtworkUrl(artworkUrl, name, issuer)
-    }
-    var artworkBitmap by remember(cleanArtworkUrl) {
-        mutableStateOf<ImageBitmap?>(MerchantLogoImageCache.getCached(cleanArtworkUrl))
-    }
-
-    LaunchedEffect(cleanArtworkUrl) {
-        if (cleanArtworkUrl == null) {
-            artworkBitmap = null
-        } else if (artworkBitmap == null && !MerchantLogoImageCache.isKnownFailed(cleanArtworkUrl)) {
-            artworkBitmap = MerchantLogoImageCache.fetchBitmap(cleanArtworkUrl)
-        }
-    }
+    val artworkBitmap = rememberCardArtworkBitmap(artworkUrl, name, issuer)
 
     val (targetStart, targetEnd, targetText) = CardArtPalette.resolveColors(
         key = artKey,

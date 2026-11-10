@@ -4,12 +4,16 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -26,23 +30,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.domain.CardCycleStatus
-import app.overbay.orbit.domain.CreditCardBenefitEngine
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.ui.accounts.AccountsUiState
 import app.overbay.orbit.ui.accounts.AnnualFeeCardItem
-import app.overbay.orbit.ui.accounts.cards.CardFace
 import app.overbay.orbit.ui.accounts.cards.CardFormat
 import app.overbay.orbit.ui.accounts.cards.CardPerkRow
 import app.overbay.orbit.ui.accounts.cards.CardStatusPill
 import app.overbay.orbit.ui.accounts.cards.CardStatusTone
+import app.overbay.orbit.ui.accounts.cards.CardVisualPlate
 import app.overbay.orbit.ui.accounts.cards.Chase524PersonCard
 import app.overbay.orbit.ui.accounts.cards.WelcomeBonusesCard
 import app.overbay.orbit.ui.accounts.cards.WhichCardWhereCard
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
 @Composable
@@ -74,31 +76,41 @@ fun CardPerksBentoItem(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CardWalletRoiBentoCard(
     uiState: AccountsUiState,
     actions: CardPerksBentoActions,
     modifier: Modifier = Modifier
 ) {
-    val today = remember { LocalDateUtils.todayLocalDate() }
-    val creditAccounts = remember(uiState.accounts) {
-        uiState.accounts.filter { it.type == AccountType.CREDIT && !it.isArchived }
+    val creditAccounts = remember(uiState.accounts, uiState.selectedCardPlayer, uiState.householdMembers) {
+        uiState.accounts.filter { acct ->
+            acct.type == AccountType.CREDIT &&
+                !acct.isArchived &&
+                CardFormat.matchesSelectedPlayer(acct, uiState.selectedCardPlayer, uiState.householdMembers)
+        }
     }
 
     OrbitSectionCard(
         title = "Card Wallet (${creditAccounts.size})",
+        subtitle = "Tap card for more details",
         modifier = modifier
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             creditAccounts.forEach { account ->
                 val profile = account.creditCardProfile
-                val upgraded = remember(profile, today) {
-                    profile?.let { CreditCardBenefitEngine.upgradeProfile(it, today) }
-                }
-                val ledger = remember(upgraded, today) {
-                    upgraded?.let { CreditCardBenefitEngine.ledger(it, today) }
-                }
                 val isSelected = uiState.selectedAccountId == account.id
+                val displayName = profile?.cardName?.takeIf { it.isNotBlank() } ?: account.name
+                val institution = account.institution?.takeIf { it.isNotBlank() }
+                    ?: profile?.issuerName?.takeIf { it.isNotBlank() }
+                val metaSubtitle = listOfNotNull(
+                    institution,
+                    account.accountNumberLast4?.takeIf { it.isNotBlank() }?.let { "•••• $it" }
+                ).joinToString(" · ")
+                val holderName = CardFormat.resolveCardholderName(profile, uiState.householdMembers)
+                val auNames = CardFormat.resolveAuthorizedUsers(profile, uiState.householdMembers)
+                val network = profile?.network?.takeIf { it.isNotBlank() }
+
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -110,46 +122,71 @@ private fun CardWalletRoiBentoCard(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        CardFace(
-                            name = profile?.cardName ?: account.name,
-                            issuer = profile?.issuerName ?: account.institution,
-                            network = profile?.network,
+                        CardVisualPlate(
+                            name = displayName,
+                            issuer = institution,
                             artKey = profile?.imageUrl,
-                            holderLabel = profile?.strategy?.cardholder,
-                            compact = true,
                             artworkUrl = profile?.artworkUrl,
-                            modifier = Modifier.weight(1f)
+                            last4 = account.accountNumberLast4,
+                            modifier = Modifier
+                                .fillMaxWidth(0.46f)
+                                .widthIn(max = 176.dp)
+                                .aspectRatio(1.586f)
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(horizontalAlignment = Alignment.End) {
-                            val fee = ledger?.annualFeeCents ?: 0L
-                            val cap = ledger?.creditsCapturedCents ?: 0L
-                            val avail = ledger?.creditsAvailableCents ?: 0L
-                            if (fee > 0L || avail > 0L) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = displayName,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (metaSubtitle.isNotEmpty()) {
                                 Text(
-                                    text = "${MoneyUtils.formatCents(cap, showCents = false)} / ${MoneyUtils.formatCents(avail, showCents = false)} used",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = OrbitColorTokens.Green
-                                )
-                                Text(
-                                    text = if (fee > 0L) "${MoneyUtils.formatCents(fee, showCents = false)}/yr fee" else "No annual fee",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                            } else {
-                                Text(
-                                    text = "Edit Card",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
+                                    text = metaSubtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            if (network != null || holderName != null || auNames.isNotEmpty()) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    if (network != null) {
+                                        OrbitBadge(
+                                            text = network,
+                                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    }
+                                    if (holderName != null) {
+                                        OrbitBadge(
+                                            text = holderName,
+                                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    auNames.forEach { au ->
+                                        OrbitBadge(
+                                            text = "AU · $au",
+                                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                                        )
+                                    }
+                                }
+                            }
                         }
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                             contentDescription = "Inspect Card",
