@@ -5,21 +5,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -28,12 +24,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.ui.accounts.cards.PerkUsageDialog
 import app.overbay.orbit.ui.accounts.components.AccountDetailInspectorPane
 import app.overbay.orbit.ui.accounts.components.AccountGroupSection
@@ -285,64 +279,6 @@ private fun AccountsMasterContent(
         val startPad = if (isWideScreen) 20.dp else 16.dp
         val endPad = if (isWideScreen) 0.dp else 16.dp
 
-        val creditAccountsCount = remember(state.accounts) {
-            state.accounts.count { it.type == AccountType.CREDIT && !it.isArchived }
-        }
-
-        // Mode switcher: All Accounts vs Credit Cards (only if credit cards exist)
-        if (creditAccountsCount > 0) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = startPad, end = endPad, top = 8.dp, bottom = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val allSelected = state.masterMode == AccountsMasterMode.ALL_ACCOUNTS
-                val hubSelected = state.masterMode == AccountsMasterMode.CREDIT_CARDS
-                FilterChip(
-                    selected = allSelected,
-                    onClick = { viewModel.setMasterMode(AccountsMasterMode.ALL_ACCOUNTS) },
-                    label = {
-                        Text(
-                            text = "All Accounts (${state.accounts.size})",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (allSelected) FontWeight.Bold else FontWeight.Medium
-                        )
-                    }
-                )
-                FilterChip(
-                    selected = hubSelected,
-                    onClick = { viewModel.setMasterMode(AccountsMasterMode.CREDIT_CARDS) },
-                    label = {
-                        Text(
-                            text = "Credit Cards ($creditAccountsCount)",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (hubSelected) FontWeight.Bold else FontWeight.Medium
-                        )
-                    }
-                )
-            }
-        }
-
-        if (creditAccountsCount > 0 && state.masterMode == AccountsMasterMode.CREDIT_CARDS) {
-            CreditCardsHubPane(
-                uiState = state,
-                actions = CreditCardsHubActions(
-                    onInspectAccount = { viewModel.selectAccountForInspect(it) },
-                    onOpenCardEditor = { viewModel.openCreditCardProfile(it) },
-                    onToggleBenefit = { aId, bId -> viewModel.toggleCardBenefit(aId, bId) },
-                    onOpenPerkUsage = { aId, bId -> viewModel.openPerkUsage(aId, bId) },
-                    onToggleShowUsedPerks = { viewModel.toggleShowUsedPerks() },
-                    onToggleShowWhichCardWhere = { viewModel.toggleShowWhichCardWhere() },
-                    onSelectRewardCategory = { viewModel.selectRewardCategory(it) },
-                    onSelectPlayer = { viewModel.selectCardPlayer(it) }
-                ),
-                isWideScreen = isWideScreen,
-                modifier = Modifier.fillMaxSize()
-            )
-            return@Column
-        }
-
         val groupReorderState = rememberDragReorderState(
             items = state.accountGroups,
             keySelector = { it.category },
@@ -369,7 +305,7 @@ private fun AccountsMasterContent(
                         onNavigate(OrbitNavKey.Transactions(accountId = acct.id))
                     },
                     onEditAccount = { viewModel.openEditAccount(it) },
-                    onPerksClick = { viewModel.openCreditCardProfile(it) },
+                    onPerksClick = { onNavigate(OrbitNavKey.CardPerks(accountId = it.id)) },
                     onHistoryClick = { viewModel.openBalanceHistory(it) },
                     onMergeClick = { viewModel.openMergeDialog(it) },
                     onToggleArchive = { viewModel.toggleArchiveAccount(it) },

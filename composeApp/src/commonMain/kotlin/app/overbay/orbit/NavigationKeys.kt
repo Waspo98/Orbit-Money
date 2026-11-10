@@ -131,6 +131,9 @@ sealed interface OrbitNavKey {
     data class Accounts(val accountId: Long? = null) : OrbitNavKey
 
     @Serializable
+    data class CardPerks(val accountId: Long? = null) : OrbitNavKey
+
+    @Serializable
     data object Upcoming : OrbitNavKey
 
     @Serializable
@@ -184,6 +187,7 @@ sealed interface OrbitNavKey {
             is Transactions -> "Transactions"
             Budgets -> "Budgets"
             is Accounts -> "Accounts"
+            is CardPerks -> "Card Perks"
             Upcoming -> "Upcoming"
             Goals -> "Goals"
             Categories -> "Categories"
@@ -205,6 +209,7 @@ sealed interface OrbitNavKey {
             is Transactions -> "transactions"
             Budgets -> "budgets"
             is Accounts -> "accounts"
+            is CardPerks -> "card_perks"
             Upcoming -> "upcoming"
             Goals -> "goals"
             Categories -> "categories"

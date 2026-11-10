@@ -43,7 +43,6 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Transaction
-import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
@@ -53,8 +52,6 @@ import app.overbay.orbit.ui.accounts.AccountsViewModel
 import app.overbay.orbit.ui.accounts.sheets.AccountBalanceHistoryContent
 import app.overbay.orbit.ui.accounts.sheets.AccountEditorContent
 import app.overbay.orbit.ui.accounts.cards.CardEditorSheetContent
-import app.overbay.orbit.ui.accounts.cards.CreditCardDetailSection
-import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.util.BackHandler
@@ -162,7 +159,7 @@ fun AccountDetailInspectorPane(
                         transactions = state.selectedAccountTransactions,
                         onClose = onClosePane,
                         onEdit = { viewModel.openEditAccount(inspecting) },
-                        onPerks = { viewModel.openCreditCardProfile(inspecting) },
+                        onPerks = { onNavigate(OrbitNavKey.CardPerks(accountId = inspecting.id)) },
                         onHistory = { viewModel.openBalanceHistory(inspecting) },
                         onSnapshotReminder = { viewModel.requestSnapshotReminder(onNavigate) },
                         onMerge = { viewModel.openMergeDialog(inspecting) },
@@ -171,9 +168,6 @@ fun AccountDetailInspectorPane(
                         onUnlinkSimpleFin = if (!inspecting.simplefinAccountId.isNullOrBlank()) {
                             { viewModel.unlinkSimpleFin(inspecting.id) }
                         } else null,
-                        onToggleBenefit = { benefitId -> viewModel.toggleCardBenefit(inspecting.id, benefitId) },
-                        onOpenPerkUsage = { benefitId -> viewModel.openPerkUsage(inspecting.id, benefitId) },
-                        rewardsToolsEnabled = state.rewardsToolsEnabled,
                         onSeeTransactions = { onNavigate(OrbitNavKey.Transactions(accountId = inspecting.id)) }
                     )
                 }
@@ -195,9 +189,6 @@ private fun AccountReadOnlyDetailContent(
     onToggleArchive: () -> Unit,
     onDelete: () -> Unit,
     onUnlinkSimpleFin: (() -> Unit)? = null,
-    onToggleBenefit: (String) -> Unit = {},
-    onOpenPerkUsage: (String) -> Unit = {},
-    rewardsToolsEnabled: Boolean = true,
     onSeeTransactions: () -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -262,29 +253,11 @@ private fun AccountReadOnlyDetailContent(
 
         if (isCredit) {
             item {
-                val profile = account.creditCardProfile
-                if (profile != null) {
-                    val subProgress = remember(account, transactions) {
-                        CreditCardStrategyEngine.computeSubProgress(account, transactions)
-                    }
-                    CreditCardDetailSection(
-                        account = account,
-                        profile = profile,
-                        transactions = transactions,
-                        subProgress = subProgress,
-                        rewardsToolsEnabled = rewardsToolsEnabled,
-                        onEditCard = onPerks,
-                        onToggleBenefit = onToggleBenefit,
-                        onOpenPerkUsage = onOpenPerkUsage
-                    )
-                } else {
-                    EmptyStateCard(
-                        title = "Add Card Details",
-                        description = "Track billing cycles, statement credits, perks, and rewards.",
-                        actionButtonText = "Add Details",
-                        onActionClick = onPerks
-                    )
-                }
+                CreditAccountBillingCard(
+                    account = account,
+                    transactions = transactions,
+                    onOpenCardPerks = onPerks
+                )
             }
         }
 

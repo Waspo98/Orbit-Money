@@ -33,6 +33,7 @@ fun CreditCardDetailSection(
     transactions: List<Transaction> = emptyList(),
     subProgress: SubProgressSummary? = null,
     rewardsToolsEnabled: Boolean = true,
+    showBillingDetails: Boolean = false,
     onEditCard: () -> Unit,
     onToggleBenefit: (benefitId: String) -> Unit,
     onOpenPerkUsage: (benefitId: String) -> Unit,
@@ -84,15 +85,17 @@ fun CreditCardDetailSection(
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Edit Card", style = MaterialTheme.typography.labelMedium)
+                    Text("Edit Perks", style = MaterialTheme.typography.labelMedium)
                 }
             }
 
             // 2. Stats Row
             CardDetailStatsRow(account, profile, cycleStatus, holderLabel)
 
-            // 3. Billing & Payment Details
-            CardDetailBillingDetails(profile, cycleStatus)
+            // 3. Billing & Payment Details (optional; primary home is Accounts inspector)
+            if (showBillingDetails) {
+                CardDetailBillingDetails(profile, cycleStatus)
+            }
 
             // 4. Perks & Credits Checklist
             if (upgradedProfile.benefits.isNotEmpty()) {

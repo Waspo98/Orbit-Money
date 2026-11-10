@@ -28,6 +28,7 @@ import app.overbay.orbit.data.*
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.ui.accounts.AccountsScreen
 import app.overbay.orbit.ui.accounts.AccountsViewModel
+import app.overbay.orbit.ui.cardperks.CardPerksScreen
 import app.overbay.orbit.ui.networth.NetWorthScreen
 import app.overbay.orbit.ui.networth.NetWorthViewModel
 import app.overbay.orbit.ui.budgets.BudgetsScreen
@@ -194,6 +195,12 @@ fun OrbitNavigation(
             } else if (currentKey is OrbitNavKey.Accounts) {
                 viewModels.accountsViewModel.dismissInspectorPane()
             }
+        } else if (destination is OrbitNavKey.CardPerks) {
+            if (destination.accountId != null) {
+                viewModels.accountsViewModel.openAccountDeepLink(destination.accountId)
+            } else {
+                viewModels.accountsViewModel.dismissInspectorPane()
+            }
         } else if (destination is OrbitNavKey.Settings) {
             viewModels.settingsViewModel.setSubpage(null)
         }
@@ -270,6 +277,7 @@ fun OrbitNavigation(
                             OrbitNavKey.Categories -> CategoriesScreen(viewModels.categoriesViewModel, posture, navigateTo, Modifier.fillMaxSize())
                             OrbitNavKey.Rules -> RulesScreen(viewModels.rulesViewModel, posture, navigateTo, Modifier.fillMaxSize())
                             is OrbitNavKey.Accounts -> AccountsScreen(viewModels.accountsViewModel, key.accountId, navigateTo, Modifier.fillMaxSize())
+                            is OrbitNavKey.CardPerks -> CardPerksScreen(viewModels.accountsViewModel, key.accountId, navigateTo, Modifier.fillMaxSize())
                             OrbitNavKey.NetWorth -> NetWorthScreen(viewModels.netWorthViewModel, posture, navigateTo, Modifier.fillMaxSize())
                             OrbitNavKey.SpendingTrends -> SpendingTrendsScreen(viewModels.spendingTrendsViewModel, posture, navigateTo, Modifier.fillMaxSize())
                             OrbitNavKey.MhaTracker -> MhaTrackerScreen(viewModels.mhaTrackerViewModel, posture, navigateTo, Modifier.fillMaxSize())

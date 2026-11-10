@@ -3,7 +3,9 @@ package app.overbay.orbit.ui.accounts
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.BalanceRecord
 import app.overbay.orbit.data.model.CreditCardProfile
+import app.overbay.orbit.data.model.DashboardWidgetConfig
 import app.overbay.orbit.data.model.HouseholdMember
+import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.CardCycleStatus
 import app.overbay.orbit.domain.Cents
@@ -92,7 +94,8 @@ data class AccountsUiState(
     val missingBillingDatesCount: Int = 0,
     val showUsedPerks: Boolean = false,
     val showWhichCardWhere: Boolean = false,
-    val selectedRewardCategory: String? = null
+    val selectedRewardCategory: String? = null,
+    val cardPerksWidgets: List<DashboardWidgetConfig> = OrbitPreferences.defaultCardPerksWidgets()
 ) {
     val selectedAccount: Account?
         get() = accounts.find { it.id == selectedAccountId }

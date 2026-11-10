@@ -148,24 +148,9 @@ fun AccountRowCard(
                 )
 
                 if (isCredit && account.creditCardProfile != null) {
-                    val profile = account.creditCardProfile
-                    val cardName = profile.cardName?.trim()
-                    if (!cardName.isNullOrBlank() && !cardName.equals(account.name.trim(), ignoreCase = true)) {
-                        AccountBadge(
-                            text = cardName,
-                            isAccent = true,
-                            modifier = Modifier.align(Alignment.CenterVertically)
-                        )
-                    }
-                    profile.strategy.cardholder?.takeIf { it.isNotBlank() }?.let { holder ->
+                    account.creditCardProfile.strategy.cardholder?.takeIf { it.isNotBlank() }?.let { holder ->
                         AccountBadge(
                             text = holder,
-                            modifier = Modifier.align(Alignment.CenterVertically)
-                        )
-                    }
-                    if (profile.strategy.isBusinessCard) {
-                        AccountBadge(
-                            text = "Biz",
                             modifier = Modifier.align(Alignment.CenterVertically)
                         )
                     }
@@ -312,7 +297,7 @@ fun AccountRowCard(
                     )
                     if (onPerks != null) {
                         DropdownMenuItem(
-                            text = { Text("Edit Card") },
+                            text = { Text("Card Perks") },
                             onClick = { menuExpanded = false; onPerks() }
                         )
                     }

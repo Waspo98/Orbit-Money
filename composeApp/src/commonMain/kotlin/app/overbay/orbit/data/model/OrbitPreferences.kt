@@ -47,6 +47,7 @@ data class OrbitPreferences(
     val lastGoogleDriveSyncAt: String? = null,
     val simpleFinToken: String? = null,
     val dashboardWidgets: List<DashboardWidgetConfig> = defaultDashboardWidgets(),
+    val cardPerksWidgets: List<DashboardWidgetConfig> = defaultCardPerksWidgets(),
     val handledReviewTransactionIds: List<Long> = emptyList(),
     val onboardingCompleted: Boolean = false,
     val amoledDarkMode: Boolean = false,
@@ -86,6 +87,16 @@ data class OrbitPreferences(
             DashboardWidgetConfig("upcoming_bills", "Upcoming: Bills and Income", isVisible = true, sortOrder = 13),
             DashboardWidgetConfig("mortgage", "Mortgage Snapshot", isVisible = true, sortOrder = 14),
             DashboardWidgetConfig("recent_transactions", "Recent Transactions", isVisible = true, sortOrder = 15, wideSpan = 2)
+        )
+
+        fun defaultCardPerksWidgets(): List<DashboardWidgetConfig> = listOf(
+            DashboardWidgetConfig("perks_this_period", "Perks This Period", isVisible = true, sortOrder = 0, wideSpan = 2),
+            DashboardWidgetConfig("card_wallet_roi", "Card Wallet & Fee ROI", isVisible = true, sortOrder = 1, wideSpan = 2),
+            DashboardWidgetConfig("which_card_where", "Which Card Where", isVisible = true, sortOrder = 2, wideSpan = 1),
+            DashboardWidgetConfig("welcome_bonuses", "Welcome Bonuses", isVisible = true, sortOrder = 3, wideSpan = 1),
+            DashboardWidgetConfig("chase_524", "Chase 5/24 Status", isVisible = true, sortOrder = 4, wideSpan = 1),
+            DashboardWidgetConfig("annual_fees_ahead", "Annual Fees Ahead", isVisible = true, sortOrder = 5, wideSpan = 1),
+            DashboardWidgetConfig("payments_due", "Billing & Payments Due", isVisible = true, sortOrder = 6, wideSpan = 1)
         )
     }
 }

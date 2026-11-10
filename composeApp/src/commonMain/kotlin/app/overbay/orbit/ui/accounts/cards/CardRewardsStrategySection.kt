@@ -91,7 +91,11 @@ fun CardRewardsStrategySection(
 }
 
 @Composable
-private fun Chase524PersonCard(person: Chase524PersonSummary, onInspectAccount: (Long) -> Unit) {
+fun Chase524PersonCard(
+    person: Chase524PersonSummary,
+    onInspectAccount: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val count = person.summary.count
     val missing = person.summary.missingOpenDateCount
     val (statusText, tone) = when {
@@ -103,7 +107,8 @@ private fun Chase524PersonCard(person: Chase524PersonSummary, onInspectAccount: 
 
     OrbitSectionCard(
         title = "${person.holderLabel} · Chase 5/24",
-        action = { CardStatusPill(text = statusText, tone = tone) }
+        action = { CardStatusPill(text = statusText, tone = tone) },
+        modifier = modifier
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -171,10 +176,27 @@ private fun Chase524SlotRow(slot: Chase524SlotItem, onClick: () -> Unit) {
 }
 
 @Composable
-private fun WelcomeBonusesCard(subs: List<SubProgressSummary>, onInspectAccount: (Long) -> Unit) {
-    OrbitSectionCard(title = "Welcome Bonuses") {
+fun WelcomeBonusesCard(
+    subs: List<SubProgressSummary>,
+    onInspectAccount: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OrbitSectionCard(
+        title = "Welcome Bonuses",
+        subtitle = if (subs.isNotEmpty()) "${subs.size} active minimum-spend tracker${if (subs.size == 1) "" else "s"}" else null,
+        modifier = modifier
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            subs.forEach { sub -> WelcomeBonusRow(sub = sub, onClick = { onInspectAccount(sub.accountId) }) }
+            if (subs.isEmpty()) {
+                Text(
+                    text = "No active welcome bonuses · Set a spend target in any card's perks editor to track progress.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            } else {
+                subs.forEach { sub -> WelcomeBonusRow(sub = sub, onClick = { onInspectAccount(sub.accountId) }) }
+            }
         }
     }
 }
@@ -228,19 +250,29 @@ private fun WelcomeBonusRow(sub: SubProgressSummary, onClick: () -> Unit) {
 }
 
 @Composable
-private fun WhichCardWhereCard(
+fun WhichCardWhereCard(
     picks: List<CategoryBestCardPick>,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
-    onInspectAccount: (Long) -> Unit
+    onInspectAccount: (Long) -> Unit,
+    alwaysExpanded: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
     OrbitSectionCard(
         title = "Which Card Where",
         subtitle = "Best card for each spending category",
-        actionText = if (isExpanded) "Hide" else "Show",
-        onActionClick = onToggleExpand
+        actionText = if (alwaysExpanded || picks.isEmpty()) null else if (isExpanded) "Hide" else "Show",
+        onActionClick = if (alwaysExpanded || picks.isEmpty()) null else onToggleExpand,
+        modifier = modifier
     ) {
-        if (isExpanded) {
+        if (picks.isEmpty()) {
+            Text(
+                text = "No category multipliers configured yet · Pick a card template or add multipliers to build your cheat sheet.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+        } else if (alwaysExpanded || isExpanded) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 picks.forEach { pick -> CategoryPickRow(pick = pick, onClick = { onInspectAccount(pick.accountId) }) }
             }

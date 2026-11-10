@@ -166,7 +166,8 @@ class AccountsViewModel(
             addRecordAccount = addRecord.addRecordAccount, accountGroupWideSpans = data.preferences.accountGroupWideSpans,
             isSyncing = syncReorder.syncing, syncErrorMessage = syncReorder.err, isLoading = false,
             mhaEnabled = data.preferences.mhaTrackerEnabled,
-            rewardsToolsEnabled = resolvedRewardsToolsEnabled
+            rewardsToolsEnabled = resolvedRewardsToolsEnabled,
+            cardPerksWidgets = data.preferences.cardPerksWidgets
         )
     }.combine(_isPhoneViewingDetail) { state, phoneDetail -> state.copy(isPhoneViewingDetail = phoneDetail)
     }.combine(_perkUsageTarget) { state, target -> state.copy(perkUsageTarget = target)
@@ -300,6 +301,17 @@ class AccountsViewModel(
     fun saveAccount(account: Account) {
         viewModelScope.launch {
             repository.saveAccount(account)
+            if (account.type == AccountType.CREDIT && account.creditCardProfile != null) {
+                val savedId = if (account.id != 0L) account.id else repository.accounts.value.lastOrNull()?.id ?: 0L
+                if (savedId != 0L) {
+                    repository.saveCreditCardProfile(
+                        accountId = savedId,
+                        profile = account.creditCardProfile.copy(accountId = savedId),
+                        accountName = account.name,
+                        accountInstitution = account.institution
+                    )
+                }
+            }
             closeEditorSheet()
         }
     }
@@ -367,6 +379,14 @@ class AccountsViewModel(
             val nextSpan = if (currentSpan == 1) 2 else 1
             val updated = currentSpans + (category.name to nextSpan)
             repository.updatePreferences(repository.preferences.value.copy(accountGroupWideSpans = updated))
+        }
+    }
+
+    fun updateCardPerksWidgets(transform: (List<app.overbay.orbit.data.model.DashboardWidgetConfig>) -> List<app.overbay.orbit.data.model.DashboardWidgetConfig>) {
+        viewModelScope.launch {
+            val prefs = repository.preferences.value
+            val updated = transform(prefs.cardPerksWidgets)
+            repository.updatePreferences(prefs.copy(cardPerksWidgets = updated))
         }
     }
 

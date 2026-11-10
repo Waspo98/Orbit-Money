@@ -52,6 +52,14 @@ import app.overbay.orbit.util.LocalOrbitHaptics
  * - Tactile visibility toggle switch
  *
  */
+data class OrbitBentoCustomizeItem<K : Any>(
+    val key: K,
+    val title: String,
+    val description: String,
+    val isVisible: Boolean,
+    val wideSpan: Int = 1
+)
+
 @Composable
 fun DashboardCustomizeSheet(
     cards: List<DashboardCardConfigItem>,
@@ -80,13 +88,39 @@ fun DashboardCustomizeSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val items = remember(cards) {
+        cards.map { OrbitBentoCustomizeItem(it.type, it.title, it.description, it.isVisible, it.wideSpan) }
+    }
+    OrbitBentoCustomizeSheet(
+        title = "Customize Dashboard",
+        items = items,
+        onToggleVisibility = onToggleVisibility,
+        onSetWideSpan = onSetWideSpan,
+        onMoveItem = onMoveCard,
+        onReset = onReset,
+        onDismiss = onDismiss,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun <K : Any> OrbitBentoCustomizeSheet(
+    title: String,
+    items: List<OrbitBentoCustomizeItem<K>>,
+    onToggleVisibility: (K) -> Unit,
+    onSetWideSpan: (K, Int) -> Unit = { _, _ -> },
+    onMoveItem: (Int, Int) -> Unit = { _, _ -> },
+    onReset: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val haptics = LocalOrbitHaptics.current
     val showWidthPicker = true
-    val standardPlacements = remember(cards) { computeStandardPlacements(cards) }
+    val standardPlacements = remember(items) { computeStandardPlacements(items) }
     val reorderState = rememberDragReorderState(
-        items = cards,
-        keySelector = { it.type },
-        onMove = onMoveCard,
+        items = items,
+        keySelector = { it.key },
+        onMove = onMoveItem,
         itemSpacingDp = 8.dp
     )
 
@@ -97,7 +131,7 @@ fun DashboardCustomizeSheet(
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
             OrbitSheetHeader(
-                title = "Customize Dashboard",
+                title = title,
                 onDismiss = onDismiss,
                 trailingActions = {
                     OrbitActionChip(
@@ -118,15 +152,15 @@ fun DashboardCustomizeSheet(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                cards.forEach { config ->
-                    key(config.type) {
+                items.forEach { config ->
+                    key(config.key) {
                         CustomizeCardRow(
                             config = config,
                             reorderState = reorderState,
                             showWidthPicker = showWidthPicker,
-                            isRightPlacement = standardPlacements[config.type] == true,
-                            onToggle = { haptics.tap(); onToggleVisibility(config.type) },
-                            onWideSpanChange = { span -> haptics.tick(); onSetWideSpan(config.type, span) }
+                            isRightPlacement = standardPlacements[config.key] == true,
+                            onToggle = { haptics.tap(); onToggleVisibility(config.key) },
+                            onWideSpanChange = { span -> haptics.tick(); onSetWideSpan(config.key, span) }
                         )
                     }
                 }
@@ -150,19 +184,19 @@ fun DashboardCustomizeSheet(
 }
 
 @Composable
-private fun CustomizeCardRow(
-    config: DashboardCardConfigItem,
-    reorderState: OrbitDragReorderState<DashboardCardType>,
+private fun <K : Any> CustomizeCardRow(
+    config: OrbitBentoCustomizeItem<K>,
+    reorderState: OrbitDragReorderState<K>,
     showWidthPicker: Boolean,
     isRightPlacement: Boolean,
     onToggle: () -> Unit,
     onWideSpanChange: (Int) -> Unit
 ) {
-    val isDragging = reorderState.isDragging(config.type)
+    val isDragging = reorderState.isDragging(config.key)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .dragReorderItem(reorderState, config.type),
+            .dragReorderItem(reorderState, config.key),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(1.dp, if (isDragging) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder)
@@ -171,7 +205,7 @@ private fun CustomizeCardRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OrbitDragHandle(state = reorderState, key = config.type)
+            OrbitDragHandle(state = reorderState, key = config.key)
 
             Spacer(modifier = Modifier.width(8.dp))
 
@@ -283,12 +317,12 @@ private fun DashboardWidthIcon(isWide: Boolean, isRightPlacement: Boolean, tint:
     }
 }
 
-private fun computeStandardPlacements(cards: List<DashboardCardConfigItem>): Map<DashboardCardType, Boolean> {
-    val placements = mutableMapOf<DashboardCardType, Boolean>()
+private fun <K : Any> computeStandardPlacements(cards: List<OrbitBentoCustomizeItem<K>>): Map<K, Boolean> {
+    val placements = mutableMapOf<K, Boolean>()
     var filledColumns = 0
     for (item in cards) {
         val isRight = filledColumns != 0
-        placements[item.type] = isRight
+        placements[item.key] = isRight
         if (!item.isVisible) continue
         filledColumns = if (item.wideSpan == 2) 0 else if (!isRight) 1 else 0
     }

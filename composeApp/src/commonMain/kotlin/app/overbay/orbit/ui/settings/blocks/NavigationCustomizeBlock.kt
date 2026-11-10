@@ -45,6 +45,7 @@ fun NavigationCustomizeBlock(
 ) {
     val defaultRoutes = remember {
         listOf(
+            NavCustomItem("card_perks", "Card Perks"),
             NavCustomItem("upcoming", "Upcoming"),
             NavCustomItem("goals", "Goals"),
             NavCustomItem("categories", "Category Manager", isLocked = true),

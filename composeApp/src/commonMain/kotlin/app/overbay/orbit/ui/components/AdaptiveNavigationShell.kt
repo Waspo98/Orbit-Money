@@ -145,6 +145,7 @@ private fun DesktopSidebar(
 ) {
     val allSecondary = remember(mhaEnabled) {
         buildList {
+            add(NavTabItem(OrbitNavKey.CardPerks(), "Card Perks", OrbitIcons.CardPerks))
             add(NavTabItem(OrbitNavKey.Upcoming, "Upcoming", OrbitIcons.Upcoming))
             add(NavTabItem(OrbitNavKey.Goals, "Goals", OrbitIcons.Goals))
             add(NavTabItem(OrbitNavKey.Categories, "Categories", OrbitIcons.Categories))
@@ -203,7 +204,7 @@ private fun DesktopSidebar(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(text = "MORE TOOLS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
                     orderedSecondary.forEach { item ->
-                        SidebarRow(item.title, item.icon, currentKey == item.key) { onNavigate(item.key) }
+                        SidebarRow(item.title, item.icon, isTabSelected(item.key, currentKey)) { onNavigate(item.key) }
                     }
                 }
             }
@@ -310,5 +311,6 @@ private fun PhoneBottomBar(
 private fun isTabSelected(tabKey: OrbitNavKey, currentKey: OrbitNavKey): Boolean = when (tabKey) {
     is OrbitNavKey.Transactions -> currentKey is OrbitNavKey.Transactions
     is OrbitNavKey.Accounts -> currentKey is OrbitNavKey.Accounts
+    is OrbitNavKey.CardPerks -> currentKey is OrbitNavKey.CardPerks
     else -> currentKey == tabKey
 }

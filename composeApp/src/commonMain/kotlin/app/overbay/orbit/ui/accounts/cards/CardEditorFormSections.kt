@@ -75,20 +75,10 @@ fun CardEditorFormSections(
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         // Section 1: Card Identity & Styling
-        OrbitSectionCard(title = "1. Card Identity & Wallet Look") {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OrbitTextField(
-                    value = draft.accountName, onValueChange = { controller.updateDraft { d -> d.copy(accountName = it) } },
-                    label = { Text("Account Nickname") }, singleLine = true, modifier = Modifier.weight(1f)
-                )
-                OrbitTextField(
-                    value = draft.issuer, onValueChange = { controller.updateDraft { d -> d.copy(issuer = it) } },
-                    label = { Text("Issuer (e.g. Chase)") }, singleLine = true, modifier = Modifier.weight(1f)
-                )
-            }
+        OrbitSectionCard(title = "1. Card Product & Wallet Look") {
             OrbitTextField(
                 value = draft.cardName, onValueChange = { controller.updateDraft { d -> d.copy(cardName = it) } },
-                label = { Text("Card Product Name") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                label = { Text("Card Product Name (e.g. Sapphire Preferred)") }, singleLine = true, modifier = Modifier.fillMaxWidth()
             )
 
             Text("Payment Network", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
@@ -128,60 +118,28 @@ fun CardEditorFormSections(
             }
         }
 
-        // Section 2: Billing & Cycle
-        OrbitSectionCard(title = "2. Billing Cycle & Interest") {
-            CurrencyTextField(
-                cents = draft.creditLimitCents ?: 0L,
-                onCentsChange = { c -> controller.updateDraft { it.copy(creditLimitCents = c.takeIf { it > 0L }) } },
-                label = "Credit Limit", modifier = Modifier.fillMaxWidth()
-            )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OrbitTextField(
-                    value = draft.statementCloseDayText,
-                    onValueChange = { t -> controller.updateDraft { it.copy(statementCloseDayText = t) } },
-                    label = { Text("Statement Close Day (1-31)") },
-                    supportingText = { draft.errors["statementCloseDay"]?.let { Text(it, color = MaterialTheme.colorScheme.error) } ?: Text("Find on statement") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f)
-                )
-                OrbitTextField(
-                    value = draft.paymentDueDayText,
-                    onValueChange = { t -> controller.updateDraft { it.copy(paymentDueDayText = t) } },
-                    label = { Text("Payment Due Day (1-31)") },
-                    supportingText = { draft.errors["paymentDueDay"]?.let { Text(it, color = MaterialTheme.colorScheme.error) } ?: Text("Find on statement") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f)
-                )
-            }
-            OrbitTextField(
-                value = draft.aprText,
-                onValueChange = { t -> controller.updateDraft { it.copy(aprText = t) } },
-                label = { Text("Purchase APR (e.g. 24.99%)") },
-                supportingText = { draft.errors["apr"]?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth()
-            )
-            OrbitSwitchRow(
-                title = "Has Promotional / Intro APR", checked = draft.hasPromo,
-                onCheckedChange = { chk -> controller.updateDraft { it.copy(hasPromo = chk) } }
-            )
-            if (draft.hasPromo) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OrbitTextField(
-                        value = draft.promoAprText, onValueChange = { t -> controller.updateDraft { it.copy(promoAprText = t) } },
-                        label = { Text("Promo APR (e.g. 0.0%)") }, supportingText = { draft.errors["promoApr"]?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
-                        modifier = Modifier.weight(1f)
-                    )
-                    Box(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
-                        DateFieldButton(
-                            date = draft.promoEndDate?.let { LocalDateUtils.parseIsoDate(it) } ?: LocalDateUtils.todayLocalDate(),
-                            onDateSelected = { dt -> controller.updateDraft { it.copy(promoEndDate = LocalDateUtils.formatIsoDate(dt)) } },
-                            label = draft.promoEndDate?.let { "Promo Ends (${CardFormat.formatCardDate(it)})" } ?: "Select End Date"
-                        )
-                    }
+        // Section 2: Statement Credits, Perks & Annual Fee
+        OrbitSectionCard(title = "2. Statement Credits & Perks (${draft.benefits.size})") {
+            draft.benefits.forEach { b ->
+                val subtitle = buildString {
+                    append(b.cadence.displayName)
+                    b.periodValueCents?.let { append(" · ${MoneyUtils.formatCents(it)}") }
+                    if (b.anchor == BenefitAnchor.CARDMEMBER_YEAR) append(" · Cardmember Year")
                 }
+                OrbitCompactListRow(
+                    title = b.title, subtitle = subtitle,
+                    trailingContent = {
+                        IconButton(onClick = { haptics.reject(); controller.removeBenefit(b.id) }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                        }
+                    },
+                    modifier = Modifier.clickable { controller.updateDraft { it.copy(editingPerkId = b.id) } }
+                )
             }
-        }
+            TextButton(onClick = { controller.updateDraft { it.copy(editingPerkId = "") } }, modifier = Modifier.align(Alignment.End)) {
+                Text("Add Perk")
+            }
 
-        // Section 3: Annual Fee
-        OrbitSectionCard(title = "3. Annual Fee") {
             OrbitSwitchRow(
                 title = "Has Annual Fee", checked = draft.hasAnnualFee,
                 onCheckedChange = { chk -> controller.updateDraft { it.copy(hasAnnualFee = chk) } }
@@ -216,31 +174,8 @@ fun CardEditorFormSections(
             }
         }
 
-        // Section 4: Statement Credits & Perks
-        OrbitSectionCard(title = "4. Statement Credits & Perks (${draft.benefits.size})") {
-            draft.benefits.forEach { b ->
-                val subtitle = buildString {
-                    append(b.cadence.displayName)
-                    b.periodValueCents?.let { append(" · ${MoneyUtils.formatCents(it)}") }
-                    if (b.anchor == BenefitAnchor.CARDMEMBER_YEAR) append(" · Cardmember Year")
-                }
-                OrbitCompactListRow(
-                    title = b.title, subtitle = subtitle,
-                    trailingContent = {
-                        IconButton(onClick = { haptics.reject(); controller.removeBenefit(b.id) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
-                        }
-                    },
-                    modifier = Modifier.clickable { controller.updateDraft { it.copy(editingPerkId = b.id) } }
-                )
-            }
-            TextButton(onClick = { controller.updateDraft { it.copy(editingPerkId = "") } }, modifier = Modifier.align(Alignment.End)) {
-                Text("Add Perk")
-            }
-        }
-
-        // Section 5: Reward Multipliers
-        OrbitSectionCard(title = "5. Reward Multipliers (${draft.rewardCategories.size})") {
+        // Section 3: Reward Multipliers
+        OrbitSectionCard(title = "3. Reward Multipliers (${draft.rewardCategories.size})") {
             draft.rewardCategories.forEachIndexed { idx, r ->
                 val typeLabel = if (r.rateType == "percent") "% Cash" else "x Points"
                 OrbitCompactListRow(
@@ -259,9 +194,9 @@ fun CardEditorFormSections(
             }
         }
 
-        // Section 6: Rewards Strategy (only if rewardsToolsEnabled)
+        // Section 4: Rewards Strategy (only if rewardsToolsEnabled)
         if (rewardsToolsEnabled) {
-            OrbitSectionCard(title = "6. Welcome Bonus & Strategy") {
+            OrbitSectionCard(title = "4. Welcome Bonus & 5/24 Strategy") {
                 historySuggestions.suggestedOpenedDate?.let { opDate ->
                     AssistChip(
                         onClick = { controller.updateDraft { it.copy(openedDate = opDate) } },
@@ -325,8 +260,8 @@ fun CardEditorFormSections(
             }
         }
 
-        // Section 7: Notes
-        OrbitSectionCard(title = "7. Notes & Memo") {
+        // Section 5: Notes
+        OrbitSectionCard(title = "5. Notes & Memo") {
             OrbitTextField(
                 value = draft.notes.orEmpty(),
                 onValueChange = { t -> controller.updateDraft { it.copy(notes = t.ifBlank { null }) } },

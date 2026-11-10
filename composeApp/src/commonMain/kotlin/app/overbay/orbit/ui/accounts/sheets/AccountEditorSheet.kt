@@ -97,6 +97,7 @@ fun AccountEditorContent(
     var balanceCents by remember(account) { mutableStateOf(account.currentBalanceCents) }
     var estimatedValueCents by remember(account) { mutableStateOf(account.estimatedValueCents ?: 0L) }
     var mhaEligible by remember(account) { mutableStateOf(account.mhaDefaultEligible) }
+    val billingState = remember(account) { AccountBillingFieldsState(account.creditCardProfile, account.id) }
 
     Column(
         modifier = modifier
@@ -240,6 +241,11 @@ fun AccountEditorContent(
             )
         }
 
+        // Credit Card Billing & Cycle Terms
+        if (selectedType == AccountType.CREDIT) {
+            AccountEditorBillingSection(state = billingState)
+        }
+
         // MHA Default Eligible Switch
         if (showMhaOption) {
             OrbitSwitchRow(
@@ -272,6 +278,14 @@ fun AccountEditorContent(
                     haptics.confirm()
                     val estCents = if (estimatedValueCents > 0L) estimatedValueCents else null
 
+                    val updatedProfile = if (selectedType == AccountType.CREDIT) {
+                        billingState.toUpdatedProfile(
+                            existing = account.creditCardProfile,
+                            accountName = name,
+                            institution = institution
+                        )
+                    } else account.creditCardProfile
+
                     val updated = account.copy(
                         name = name.trim(),
                         institution = institution.trim().ifBlank { null },
@@ -279,7 +293,8 @@ fun AccountEditorContent(
                         currentBalanceCents = balanceCents,
                         estimatedValueCents = estCents,
                         accountNumberLast4 = accountNumberLast4.trim().ifBlank { null },
-                        mhaDefaultEligible = mhaEligible
+                        mhaDefaultEligible = mhaEligible,
+                        creditCardProfile = updatedProfile
                     )
                     onSave(updated)
                 },
