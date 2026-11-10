@@ -21,6 +21,8 @@ fun NetWorthSignalsCard(
     largestAsset: Account?,
     largestLiability: Account?,
     trackedAccountCount: Int,
+    positiveAccountCount: Int = 0,
+    negativeAccountCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
     OrbitSectionCard(
@@ -51,7 +53,8 @@ fun NetWorthSignalsCard(
                 "${it.name}$inst"
             } ?: "None recorded"
             val liabVal = largestLiability?.let {
-                MoneyUtils.formatCents(abs(it.currentBalanceCents))
+                val debtCents = abs(it.currentBalanceCents)
+                if (debtCents > 0L) "-${MoneyUtils.formatCents(debtCents)}" else "$0.00"
             } ?: "$0.00"
 
             OrbitMiniStatRow(
@@ -70,6 +73,7 @@ fun NetWorthSignalsCard(
 
             OrbitMiniStatRow(
                 label = "Tracked Accounts",
+                detail = "$positiveAccountCount positive, $negativeAccountCount negative",
                 value = "$trackedAccountCount active",
                 valueColor = MaterialTheme.colorScheme.primary,
                 showTopDivider = true

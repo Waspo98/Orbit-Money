@@ -448,7 +448,6 @@ class OrbitRepository(
         commitSnapshot(_snapshot.value.copy(accounts = _accounts.value.filterNot { it.id == id }))
         activeEngine.deleteAccount(id)
     }
-
     suspend fun mergeAccounts(sourceAccountId: Long, targetAccountId: Long, combineBalances: Boolean = false) {
         val currentAccounts = _accounts.value
         val source = currentAccounts.find { it.id == sourceAccountId } ?: return
@@ -462,8 +461,6 @@ class OrbitRepository(
         activeEngine.mergeAccounts(sourceAccountId, targetAccountId)
         activeEngine.pushAccount(updatedTarget)
     }
-
-    // Categories & Budgets
     suspend fun saveCategory(category: Category) {
         val current = _categories.value
         val exists = current.any { it.id == category.id && category.id != 0L }
@@ -475,12 +472,20 @@ class OrbitRepository(
             commitSnapshot(_snapshot.value.copy(categories = _categories.value.map { if (it.id == localId) it.copy(id = pushed.id) else it }))
         }
     }
-
     suspend fun deleteCategory(id: Long) {
-        commitSnapshot(_snapshot.value.copy(categories = _categories.value.filterNot { it.id == id }))
+        val updatedCategories = _categories.value.filterNot { it.id == id }
+        val updatedTransactions = _transactions.value.map { tx ->
+            if (tx.originalCategoryId == id || tx.editedCategoryId == id) {
+                tx.copy(
+                    originalCategoryId = tx.originalCategoryId.takeUnless { it == id },
+                    editedCategoryId = tx.editedCategoryId.takeUnless { it == id },
+                    editedCategoryIdSource = if (tx.editedCategoryId == id) null else tx.editedCategoryIdSource
+                )
+            } else tx
+        }
+        commitSnapshot(_snapshot.value.copy(categories = updatedCategories, transactions = updatedTransactions, budgets = _budgets.value.filterNot { it.categoryId == id }))
         activeEngine.deleteCategory(id)
     }
-
     suspend fun saveBudget(categoryId: Long, amountCents: Cents, rollover: Boolean = false) {
         val current = _budgets.value
         val existing = current.find { it.categoryId == categoryId }
@@ -490,13 +495,10 @@ class OrbitRepository(
         commitSnapshot(_snapshot.value.copy(budgets = updatedList))
         activeEngine.pushBudget(updated)
     }
-
     suspend fun deleteBudget(id: Long) {
         commitSnapshot(_snapshot.value.copy(budgets = _budgets.value.filterNot { it.id == id }))
         activeEngine.deleteBudget(id)
     }
-
-    // Goals & Rules
     suspend fun saveGoal(goal: Goal) {
         val current = _goals.value
         val exists = current.any { it.id == goal.id && goal.id != 0L }
@@ -508,12 +510,10 @@ class OrbitRepository(
             commitSnapshot(_snapshot.value.copy(goals = _goals.value.map { if (it.id == localId) it.copy(id = pushed.id) else it }))
         }
     }
-
     suspend fun deleteGoal(id: Long) {
         commitSnapshot(_snapshot.value.copy(goals = _goals.value.filterNot { it.id == id }))
         activeEngine.deleteGoal(id)
     }
-
     suspend fun saveRule(rule: TransactionRule) {
         val current = _rules.value
         val exists = current.any { it.id == rule.id && rule.id != 0L }
@@ -522,8 +522,6 @@ class OrbitRepository(
         val updatedRules = if (exists) current.map { if (it.id == rule.id) saved else it } else current + saved
         val updatedTxns = if (!exists && saved.enabled) RuleMatcherEngine.applyNewRuleIncrementally(_transactions.value, updatedRules, saved) else RuleMatcherEngine.applyRules(_transactions.value, updatedRules)
         commitSnapshot(_snapshot.value.copy(rules = updatedRules, transactions = updatedTxns))
-
-
         val pushed = activeEngine.pushRule(if (exists) rule else rule.copy(id = 0L)).getOrNull()
         if (pushed != null && pushed.id > 0L && pushed.id != localId) {
             commitSnapshot(_snapshot.value.copy(
@@ -532,16 +530,13 @@ class OrbitRepository(
             ))
         }
     }
-
     suspend fun deleteRule(id: Long) {
         val remaining = _rules.value.filterNot { it.id == id }
         commitSnapshot(_snapshot.value.copy(rules = remaining, transactions = RuleMatcherEngine.applyRules(_transactions.value, remaining)))
         activeEngine.deleteRule(id)
     }
-
     suspend fun runRulesOnAllTransactions() {
-        val evaluated = RuleMatcherEngine.evaluateAll(_rules.value, _transactions.value)
-        commitSnapshot(_snapshot.value.copy(transactions = evaluated))
+        commitSnapshot(_snapshot.value.copy(transactions = RuleMatcherEngine.evaluateAll(_rules.value, _transactions.value)))
         activeEngine.runRules()
     }
 

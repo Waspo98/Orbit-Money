@@ -1,22 +1,37 @@
 package app.overbay.orbit.ui.rules
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,6 +50,7 @@ import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
+import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.rules.components.RuleDetailInspectorPane
 import app.overbay.orbit.ui.rules.components.RuleItemCard
@@ -113,13 +129,6 @@ fun RulesScreen(
                                     buttonSize = barHeight,
                                     onClick = { viewModel.runRulesNow() }
                                 )
-
-                                CanopyIconButton(
-                                    icon = Icons.Default.Delete,
-                                    contentDescription = "Wipe All Rules",
-                                    onClick = { viewModel.openWipeAllRulesDialog() },
-                                    buttonSize = barHeight
-                                )
                             }
 
                             CanopyIconButton(
@@ -144,45 +153,105 @@ fun RulesScreen(
                     }
 
                     val masterList: @Composable () -> Unit = {
-                        if (state.rules.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(24.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                EmptyStateCard(
-                                    title = "No Rules Configured",
-                                    description = "Create automated rules to rename merchants, assign categories, or flag transfers automatically.",
-                                    actionButtonText = "+ Add First Rule",
-                                    onActionClick = { viewModel.openAddRule() }
-                                )
-                            }
-                        } else {
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                items(
-                                    items = state.rules,
-                                    key = { it.id }
-                                ) { rule ->
-                                    RuleItemCard(
-                                        rule = rule,
-                                        categoryMap = state.categoryMap,
-                                        accountMap = accountMap,
-                                        isInspected = isTwoPane && state.inspectingRuleId == rule.id,
-                                        onClick = if (isTwoPane) {
-                                            { viewModel.selectRuleForInspect(rule.id) }
-                                        } else {
-                                            null
-                                        },
-                                        onToggleEnabled = { enabled -> viewModel.toggleRuleEnabled(rule.id, enabled) },
-                                        onEdit = { viewModel.openEditRule(rule) },
-                                        onDelete = { viewModel.requestDeleteRule(rule.id) }
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            OrbitTextField(
+                                value = state.searchQuery,
+                                onValueChange = { viewModel.setSearchQuery(it) },
+                                placeholder = { Text("Search rules by name, merchant, or category...") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = "Search",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                },
+                                trailingIcon = if (state.searchQuery.isNotEmpty()) {
+                                    {
+                                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Clear search",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                } else null,
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = startPad, end = if (isTwoPane) 16.dp else endPad, top = 8.dp, bottom = 4.dp)
+                            )
+
+                            if (state.rules.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (state.searchQuery.isNotBlank()) {
+                                        EmptyStateCard(
+                                            title = "No matching rules",
+                                            description = "No rules match \"${state.searchQuery}\". Try searching for a different name, merchant, or category.",
+                                            actionButtonText = "Clear Search",
+                                            onActionClick = { viewModel.setSearchQuery("") }
+                                        )
+                                    } else {
+                                        EmptyStateCard(
+                                            title = "No Rules Configured",
+                                            description = "Create automated rules to rename merchants, assign categories, or flag transfers automatically.",
+                                            actionButtonText = "+ Add First Rule",
+                                            onActionClick = { viewModel.openAddRule() }
+                                        )
+                                    }
+                                }
+                            } else {
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(start = startPad, end = endPad, top = 8.dp, bottom = 88.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    items(
+                                        items = state.rules,
+                                        key = { it.id }
+                                    ) { rule ->
+                                        RuleItemCard(
+                                            rule = rule,
+                                            categoryMap = state.categoryMap,
+                                            accountMap = accountMap,
+                                            matchCount = state.ruleMatchCounts[rule.id] ?: 0,
+                                            isInspected = isTwoPane && state.inspectingRuleId == rule.id,
+                                            onClick = if (isTwoPane) {
+                                                { viewModel.selectRuleForInspect(rule.id) }
+                                            } else {
+                                                null
+                                            },
+                                            onToggleEnabled = { enabled -> viewModel.toggleRuleEnabled(rule.id, enabled) },
+                                            onEdit = { viewModel.openEditRule(rule) },
+                                            onDelete = { viewModel.requestDeleteRule(rule.id) }
+                                        )
+                                    }
+
+                                    item {
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        OutlinedButton(
+                                            onClick = { viewModel.openWipeAllRulesDialog() },
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = MaterialTheme.colorScheme.error
+                                            ),
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Wipe All Rules")
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -207,7 +276,7 @@ fun RulesScreen(
                                     onPreviewCount = { conditions -> viewModel.previewMatchCount(conditions) },
                                     onPreviewMatches = { conditions -> viewModel.previewMatchingTransactions(conditions) },
                                     onPreviewRule = { rule -> viewModel.previewRule(rule) },
-                                    onOpenRule = { id -> viewModel.selectRuleForInspect(id) },
+                                    onOpenRule = { id -> viewModel.openEditRule(id) },
                                     onDismissPane = { viewModel.dismissInspectorPane() }
                                 )
                             }
@@ -228,7 +297,7 @@ fun RulesScreen(
                 onPreviewCount = { conditions -> viewModel.previewMatchCount(conditions) },
                 onPreviewMatches = { conditions -> viewModel.previewMatchingTransactions(conditions) },
                 onPreviewRule = { rule -> viewModel.previewRule(rule) },
-                onOpenRule = { id -> viewModel.selectRuleForInspect(id) },
+                onOpenRule = { id -> viewModel.openEditRule(id) },
                 onDismiss = { viewModel.closeEditorSheet() }
             )
         }

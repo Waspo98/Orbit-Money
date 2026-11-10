@@ -38,8 +38,8 @@ data class UpcomingCashFlowSummary(
 object UpcomingScheduleHelper {
 
     val GIVING_HINTS = setOf(
-        "church", "tithe", "charity", "donation", "ministries",
-        "red cross", "united way", "foundation", "nonprofit"
+        "church", "tithe", "charity", "donation", "donations", "ministries",
+        "red cross", "united way", "foundation", "nonprofit", "non profit"
     )
 
     val SUBSCRIPTION_HINTS = setOf(
@@ -47,6 +47,109 @@ object UpcomingScheduleHelper {
         "icloud", "chatgpt", "openai", "prime", "adobe", "github", "patreon",
         "audible", "xbox", "playstation", "paramount", "peacock", "max.com", "dropbox"
     )
+
+    val GIVING_CATEGORY_HINTS = listOf(
+        "charitable", "charity", "church", "donation", "donations", "giving", "nonprofit", "non profit", "tithe"
+    )
+    val BILL_CATEGORY_HINTS = listOf(
+        "bill", "bills", "electric", "gas", "insurance", "internet", "loan", "mortgage", "rent", "utility", "utilities", "water"
+    )
+    val SOFTWARE_CATEGORY_HINTS = listOf(
+        "app", "apps", "cloud", "hosting", "saas", "software", "subscription software", "tech", "technology"
+    )
+    val INCOME_CATEGORY_HINTS = listOf(
+        "income", "paycheck", "payroll", "salary", "wages"
+    )
+    val GROCERIES_CATEGORY_HINTS = listOf("grocery", "groceries")
+    val SHOPPING_CATEGORY_HINTS = listOf("shop", "shopping")
+    val DINING_CATEGORY_HINTS = listOf("dining", "drink", "drinks", "restaurant", "restaurants")
+
+    fun categoryConfidenceScore(categoryName: String, direction: String = "expense"): Int {
+        val text = categoryName.lowercase().replace(Regex("[^a-z0-9]+"), " ").trim()
+        if (direction.equals("income", ignoreCase = true) || INCOME_CATEGORY_HINTS.any { text.contains(it) }) return 25
+        if (GIVING_CATEGORY_HINTS.any { text.contains(it) }) return 24
+        if (BILL_CATEGORY_HINTS.any { text.contains(it) }) return 22
+        if (SOFTWARE_CATEGORY_HINTS.any { text.contains(it) }) return 18
+        if (DINING_CATEGORY_HINTS.any { text.contains(it) }) return -28
+        if (GROCERIES_CATEGORY_HINTS.any { text.contains(it) }) return -25
+        if (SHOPPING_CATEGORY_HINTS.any { text.contains(it) }) return -22
+        return 0
+    }
+
+    fun frequencyConfidenceScore(averageInterval: Double): Int {
+        if (!averageInterval.isFinite() || averageInterval <= 0.0) return -25
+        if (averageInterval in 6.0..8.0) return 22
+        if (averageInterval in 13.0..15.0) return 24
+        if (averageInterval in 27.0..34.0) return 25
+        if (averageInterval in 358.0..372.0) return 18
+
+        if (
+            (averageInterval in 5.0..9.0) ||
+            (averageInterval in 12.0..18.0) ||
+            (averageInterval in 24.0..38.0) ||
+            (averageInterval in 330.0..400.0)
+        ) {
+            return 8
+        }
+        return -25
+    }
+
+    fun repeatConfidenceScore(transactionCount: Int): Int {
+        return when {
+            transactionCount >= 5 -> 20
+            transactionCount >= 4 -> 15
+            transactionCount >= 3 -> 10
+            transactionCount >= 2 -> 4
+            else -> 0
+        }
+    }
+
+    fun amountConsistencyScore(amounts: List<Long>): Int {
+        val positive = amounts.filter { it > 0L }
+        if (positive.size < 2) return 0
+        val avg = positive.average()
+        if (avg <= 0.0) return 0
+        val maxDev = positive.maxOf { abs(it.toDouble() - avg) / avg }
+        return when {
+            maxDev <= 0.10 -> 15
+            maxDev <= 0.25 -> 8
+            else -> -10
+        }
+    }
+
+    fun recencyConfidenceScore(latestDate: String, today: String = LocalDateUtils.todayIsoDate()): Int {
+        val d1 = LocalDateUtils.parseIsoDate(latestDate) ?: return 0
+        val d2 = LocalDateUtils.parseIsoDate(today) ?: return 0
+        val ageDays = abs(LocalDateUtils.daysBetween(d1, d2))
+        return when {
+            ageDays <= 45 -> 8
+            ageDays <= 90 -> 4
+            else -> -8
+        }
+    }
+
+    fun scoreUpcomingSuggestion(
+        categoryName: String,
+        merchantName: String,
+        direction: String,
+        averageInterval: Double,
+        transactionCount: Int,
+        amounts: List<Long>,
+        latestDate: String,
+        today: String = LocalDateUtils.todayIsoDate()
+    ): Int {
+        var catScore = categoryConfidenceScore(categoryName, direction)
+        if (catScore == 0) {
+            catScore = categoryConfidenceScore(merchantName, direction)
+        }
+        val raw = 20 +
+            catScore +
+            frequencyConfidenceScore(averageInterval) +
+            repeatConfidenceScore(transactionCount) +
+            amountConsistencyScore(amounts) +
+            recencyConfidenceScore(latestDate, today)
+        return max(0, min(95, raw))
+    }
 
     fun detectKind(merchant: String, direction: String = "expense"): UpcomingKind {
         if (direction.equals("income", ignoreCase = true)) {
@@ -118,6 +221,14 @@ object UpcomingScheduleHelper {
         if (rule != null) {
             val fromParsed = LocalDateUtils.parseIsoDate(fromDate) ?: return fromDate
             val horizon = LocalDateUtils.formatIsoDate(LocalDateUtils.addDays(fromParsed, 75))
+            val futureDates = UpcomingEngine.generateDates(item, fromDate, horizon)
+            val next = futureDates.firstOrNull { it > fromDate }
+            if (next != null) return next
+        }
+
+        if (item.frequencyType == RecurrenceFrequency.SEMIMONTHLY) {
+            val fromParsed = LocalDateUtils.parseIsoDate(fromDate) ?: return fromDate
+            val horizon = LocalDateUtils.formatIsoDate(LocalDateUtils.addDays(fromParsed, 45))
             val futureDates = UpcomingEngine.generateDates(item, fromDate, horizon)
             val next = futureDates.firstOrNull { it > fromDate }
             if (next != null) return next

@@ -163,27 +163,75 @@ suspend fun OrbitRepository.saveGoalWithAllocations(
 
     val updatedGoal = goal.copy(currentAmountCents = computedCurrentAmountCents)
 
-    val updatedGoalsList = if (stealFromOthers && goal.allocations.isNotEmpty()) {
-        val allocatedAccountIds = goal.allocations.map { it.accountId }.toSet()
-        currentGoals.map { other ->
-            if (other.id == goal.id) updatedGoal
-            else {
-                val trimmedAllocations = other.allocations.filterNot { it.accountId in allocatedAccountIds }
-                if (trimmedAllocations != other.allocations) {
-                    val otherCurrent = trimmedAllocations.sumOf { alloc ->
-                        val b = accountsMap[alloc.accountId]?.currentBalanceCents ?: 0L
-                        if (alloc.allocationType == GoalAllocationType.PERCENT) {
-                            ((b - alloc.reserveAmountCents).coerceAtLeast(0L) * (alloc.allocationPercent / 100.0)).toLong()
-                        } else alloc.allocationAmountCents
+    val exists = currentGoals.any { it.id == goal.id && goal.id != 0L }
+    val assignedId = if (exists) goal.id else if (goal.id == 0L) (currentGoals.maxOfOrNull { it.id } ?: 0L) + 1L else goal.id
+    val savedGoal = updatedGoal.copy(id = assignedId)
+    val baseList = if (exists) currentGoals.map { if (it.id == goal.id) savedGoal else it } else currentGoals + savedGoal
+
+    val updatedGoalsList = if (stealFromOthers && savedGoal.allocations.isNotEmpty()) {
+        var workingGoals = baseList
+        for (newAlloc in savedGoal.allocations) {
+            val acctId = newAlloc.accountId
+            val acctBalance = (accountsMap[acctId]?.currentBalanceCents ?: 0L).coerceAtLeast(0L)
+            val newAllocCents = if (newAlloc.allocationType == GoalAllocationType.PERCENT) {
+                ((acctBalance - newAlloc.reserveAmountCents).coerceAtLeast(0L) * (newAlloc.allocationPercent / 100.0)).toLong()
+            } else {
+                newAlloc.allocationAmountCents
+            }
+            val otherRows = workingGoals.filter { it.id != savedGoal.id }.mapNotNull { g ->
+                val a = g.allocations.find { it.accountId == acctId } ?: return@mapNotNull null
+                val amt = if (a.allocationType == GoalAllocationType.PERCENT) {
+                    ((acctBalance - a.reserveAmountCents).coerceAtLeast(0L) * (a.allocationPercent / 100.0)).toLong()
+                } else {
+                    a.allocationAmountCents
+                }
+                Triple(g.id, a, amt)
+            }
+            val otherTotal = otherRows.sumOf { it.third }
+            val overflow = (newAllocCents + otherTotal) - acctBalance
+            if (overflow > 0L && otherTotal > 0L) {
+                var remainingReduction = overflow
+                val reductions = mutableMapOf<Long, Long>()
+                otherRows.forEachIndexed { idx, (gId, _, amt) ->
+                    val cut = if (idx == otherRows.lastIndex) {
+                        remainingReduction.coerceAtMost(amt)
+                    } else {
+                        ((overflow.toDouble() * (amt.toDouble() / otherTotal.toDouble())).toLong()).coerceAtMost(amt)
                     }
-                    other.copy(allocations = trimmedAllocations, currentAmountCents = otherCurrent)
-                } else other
+                    reductions[gId] = cut
+                    remainingReduction = (remainingReduction - cut).coerceAtLeast(0L)
+                }
+                workingGoals = workingGoals.map { g ->
+                    val cut = reductions[g.id] ?: return@map g
+                    val nextAllocs = g.allocations.mapNotNull { a ->
+                        if (a.accountId != acctId) a
+                        else {
+                            val basis = (acctBalance - a.reserveAmountCents).coerceAtLeast(0L)
+                            val curAmt = if (a.allocationType == GoalAllocationType.PERCENT) {
+                                (basis * (a.allocationPercent / 100.0)).toLong()
+                            } else a.allocationAmountCents
+                            val nextAmt = (curAmt - cut).coerceAtLeast(0L)
+                            if (nextAmt <= 0L) null
+                            else if (a.allocationType == GoalAllocationType.PERCENT && basis > 0L) {
+                                a.copy(allocationPercent = (nextAmt.toDouble() / basis.toDouble()) * 100.0, allocationAmountCents = nextAmt)
+                            } else {
+                                a.copy(allocationAmountCents = nextAmt)
+                            }
+                        }
+                    }
+                    val nextCurrent = nextAllocs.sumOf { a ->
+                        val b = accountsMap[a.accountId]?.currentBalanceCents ?: 0L
+                        if (a.allocationType == GoalAllocationType.PERCENT) {
+                            ((b - a.reserveAmountCents).coerceAtLeast(0L) * (a.allocationPercent / 100.0)).toLong()
+                        } else a.allocationAmountCents
+                    }
+                    g.copy(allocations = nextAllocs, currentAmountCents = nextCurrent)
+                }
             }
         }
+        workingGoals
     } else {
-        val exists = currentGoals.any { it.id == goal.id && goal.id != 0L }
-        if (exists) currentGoals.map { if (it.id == goal.id) updatedGoal else it }
-        else currentGoals + updatedGoal.copy(id = if (goal.id == 0L) (currentGoals.maxOfOrNull { it.id } ?: 0L) + 1L else goal.id)
+        baseList
     }
 
     commitSnapshot(snapshot.value.copy(goals = updatedGoalsList))
@@ -416,17 +464,38 @@ fun OrbitRepository.previewRuleLocal(rule: TransactionRule): RulePreviewResult {
             if (fieldDiffs.isNotEmpty()) {
                 diffs.add(RuleMutationDiff(tx.id, tx.effectiveDate, tx.effectiveMerchant, tx.effectiveAmountCents, fieldDiffs))
             }
+            val ruleTargetFields = rule.actions.map { act ->
+                when (act.type) {
+                    RuleActionType.RENAME_MERCHANT, RuleActionType.RENAME -> "merchant"
+                    RuleActionType.SET_CATEGORY, RuleActionType.CATEGORIZE -> "category_id"
+                    RuleActionType.MARK_TRANSFER -> "is_transfer"
+                    RuleActionType.MARK_IGNORED -> "is_ignored"
+                    RuleActionType.SET_MHA_ELIGIBLE -> "mha_eligible"
+                }
+            }.toSet()
             for (existing in existingRules) {
                 if (existing.priority >= rule.priority && RuleMatcherEngine.matchesRule(tx, existing)) {
-                    conflicts.add(
-                        RuleConflictEntry(
-                            transactionId = tx.id,
-                            merchant = tx.effectiveMerchant,
-                            field = "priority",
-                            conflictingRuleId = existing.id,
-                            conflictingRuleName = existing.name
+                    val existingFields = existing.actions.map { act ->
+                        when (act.type) {
+                            RuleActionType.RENAME_MERCHANT, RuleActionType.RENAME -> "merchant"
+                            RuleActionType.SET_CATEGORY, RuleActionType.CATEGORIZE -> "category_id"
+                            RuleActionType.MARK_TRANSFER -> "is_transfer"
+                            RuleActionType.MARK_IGNORED -> "is_ignored"
+                            RuleActionType.SET_MHA_ELIGIBLE -> "mha_eligible"
+                        }
+                    }.toSet()
+                    val overlapping = ruleTargetFields.intersect(existingFields)
+                    for (field in overlapping) {
+                        conflicts.add(
+                            RuleConflictEntry(
+                                transactionId = tx.id,
+                                merchant = tx.effectiveMerchant,
+                                field = field,
+                                conflictingRuleId = existing.id,
+                                conflictingRuleName = existing.name
+                            )
                         )
-                    )
+                    }
                 }
             }
         }

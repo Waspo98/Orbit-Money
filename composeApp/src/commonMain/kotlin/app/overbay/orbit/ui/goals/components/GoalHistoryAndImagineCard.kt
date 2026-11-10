@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -42,9 +43,11 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.data.model.GoalMonthlyPoint
 import app.overbay.orbit.domain.GoalAllocationEngine
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
@@ -143,7 +146,7 @@ fun GoalHistoryAndImagineCard(
                     points = history,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(110.dp)
+                        .height(135.dp)
                 )
             } else {
                 Box(
@@ -209,15 +212,31 @@ fun GoalHistoryAndImagineCard(
                     )
                 }
 
-                Slider(
-                    value = boostDollars,
-                    onValueChange = {
-                        boostDollars = it
-                    },
-                    valueRange = 0f..1500f,
-                    steps = 29,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Slider & compact CurrencyTextField for typing exact monthly boost
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Slider(
+                        value = boostDollars.coerceIn(0f, 1500f),
+                        onValueChange = {
+                            boostDollars = it
+                        },
+                        valueRange = 0f..1500f,
+                        steps = 29,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    CurrencyTextField(
+                        cents = (boostDollars.toLong() * 100L),
+                        onCentsChange = { newCents ->
+                            boostDollars = (newCents / 100L).toFloat()
+                        },
+                        label = null,
+                        modifier = Modifier.width(115.dp)
+                    )
+                }
 
                 val baselineMonths = goal.eta?.months ?: 999
                 val simMonths = simulatedEta.months ?: 0
@@ -264,56 +283,84 @@ private fun GoalHistoryCanvasChart(
     val maxVal = remember(values) { max(1f, values.maxOrNull() ?: 1f) }
     val minVal = remember(values) { values.minOrNull() ?: 0f }
 
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val stepX = w / (points.size - 1).coerceAtLeast(1)
-        val range = (maxVal - minVal).coerceAtLeast(1f)
+    val first = points.firstOrNull()
+    val last = points.lastOrNull()
+    val firstLabel = first?.let { LocalDateUtils.formatMonthShortLabel(it.month) } ?: ""
+    val lastLabel = last?.let { LocalDateUtils.formatMonthShortLabel(it.month) } ?: ""
+    val lastAmount = last?.let { MoneyUtils.formatCents(it.amountCents, showCents = false) } ?: ""
 
-        val path = Path()
-        val fillPath = Path()
+    Column(modifier = modifier) {
+        Canvas(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            val w = size.width
+            val h = size.height
+            val stepX = w / (points.size - 1).coerceAtLeast(1)
+            val range = (maxVal - minVal).coerceAtLeast(1f)
 
-        points.forEachIndexed { i, pt ->
-            val x = i * stepX
-            val norm = (pt.amountCents - minVal) / range
-            val y = h - (norm * (h - 18f)) - 8f
+            val path = Path()
+            val fillPath = Path()
 
-            if (i == 0) {
-                path.moveTo(x, y)
-                fillPath.moveTo(x, h)
-                fillPath.lineTo(x, y)
-            } else {
-                path.lineTo(x, y)
-                fillPath.lineTo(x, y)
+            points.forEachIndexed { i, pt ->
+                val x = i * stepX
+                val norm = (pt.amountCents - minVal) / range
+                val y = h - (norm * (h - 18f)) - 8f
+
+                if (i == 0) {
+                    path.moveTo(x, y)
+                    fillPath.moveTo(x, h)
+                    fillPath.lineTo(x, y)
+                } else {
+                    path.lineTo(x, y)
+                    fillPath.lineTo(x, y)
+                }
+
+                if (i == points.size - 1) {
+                    fillPath.lineTo(x, h)
+                    fillPath.close()
+                }
             }
 
-            if (i == points.size - 1) {
-                fillPath.lineTo(x, h)
-                fillPath.close()
-            }
+            // Draw gradient area
+            drawPath(
+                path = fillPath,
+                brush = Brush.verticalGradient(
+                    colors = listOf(primaryColor.copy(alpha = 0.28f), Color.Transparent),
+                    startY = 0f,
+                    endY = h
+                )
+            )
+
+            // Draw stroke line
+            drawPath(
+                path = path,
+                color = primaryColor,
+                style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            )
+
+            // Draw dot at latest point
+            val lastX = (points.size - 1) * stepX
+            val lastNorm = (points.last().amountCents - minVal) / range
+            val lastY = h - (lastNorm * (h - 18f)) - 8f
+            drawCircle(color = primaryColor, radius = 5.dp.toPx(), center = Offset(lastX, lastY))
         }
 
-        // Draw gradient area
-        drawPath(
-            path = fillPath,
-            brush = Brush.verticalGradient(
-                colors = listOf(primaryColor.copy(alpha = 0.28f), Color.Transparent),
-                startY = 0f,
-                endY = h
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Bottom row with start month label, latest month label, and latest amount
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = firstLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        )
-
-        // Draw stroke line
-        drawPath(
-            path = path,
-            color = primaryColor,
-            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-        )
-
-        // Draw dot at latest point
-        val lastX = (points.size - 1) * stepX
-        val lastNorm = (points.last().amountCents - minVal) / range
-        val lastY = h - (lastNorm * (h - 18f)) - 8f
-        drawCircle(color = primaryColor, radius = 5.dp.toPx(), center = Offset(lastX, lastY))
+            Text(
+                text = "$lastLabel · $lastAmount",
+                style = TabularNumStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }

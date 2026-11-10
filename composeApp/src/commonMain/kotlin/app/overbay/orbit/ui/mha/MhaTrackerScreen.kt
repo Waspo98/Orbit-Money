@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -35,12 +37,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.MorphingPageHero
@@ -49,7 +55,6 @@ import app.overbay.orbit.ui.components.PeriodNavigatorPill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.mha.components.MhaAutoDefaultsSection
 import app.overbay.orbit.ui.mha.components.MhaTaxSavingsCard
-import app.overbay.orbit.ui.mha.components.MhaThreeLimitHeroCard
 import app.overbay.orbit.ui.mha.components.MhaTransactionsTab
 import app.overbay.orbit.ui.mha.dialogs.MhaConfigContent
 import app.overbay.orbit.ui.mha.dialogs.MhaConfigSheet
@@ -66,6 +71,11 @@ fun MhaTrackerScreen(
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val heroScrollState = rememberHeroScrollState()
+
+    var showYearMenu by remember { mutableStateOf(false) }
+    val currentYear = remember { LocalDateUtils.todayLocalDate().year }
+    val maxNavYear = maxOf(currentYear, state.availableYears.maxOrNull() ?: currentYear)
+    val canGoNext = state.selectedYear < maxNavYear
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let {
@@ -101,18 +111,42 @@ fun MhaTrackerScreen(
                     subtitle = "Calculate projected MHA tax savings and track eligible housing expenses",
                     scrollState = heroScrollState,
                     canopyBar = { _, isCompact, barHeight ->
-                        PeriodNavigatorPill(
-                            label = "Tax Year ${state.selectedYear}",
-                            compactLabel = "${state.selectedYear}",
-                            isCompact = isCompact,
-                            onPrevious = { viewModel.setYear(state.selectedYear - 1) },
-                            onNext = { viewModel.setYear(state.selectedYear + 1) },
-                            canGoNext = state.selectedYear < 2030,
-                            onClickLabel = { viewModel.setYear(2026) },
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                        )
+                        ) {
+                            PeriodNavigatorPill(
+                                label = "Tax Year ${state.selectedYear}",
+                                compactLabel = "${state.selectedYear}",
+                                isCompact = isCompact,
+                                onPrevious = { viewModel.setYear(state.selectedYear - 1) },
+                                onNext = { viewModel.setYear(state.selectedYear + 1) },
+                                canGoNext = canGoNext,
+                                onClickLabel = { showYearMenu = true },
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                            DropdownMenu(
+                                expanded = showYearMenu,
+                                onDismissRequest = { showYearMenu = false }
+                            ) {
+                                state.availableYears.forEach { yr ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = "$yr",
+                                                fontWeight = if (yr == state.selectedYear) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            viewModel.setYear(yr)
+                                            showYearMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
 
                         CanopyIconButton(
                             icon = OrbitIcons.ViewSliders,
@@ -152,22 +186,15 @@ fun MhaTrackerScreen(
 
                 val summaryCards: LazyListScope.() -> Unit = {
                     item {
-                        MhaThreeLimitHeroCard(
-                            actualSpentCents = state.actualEligibleHousingSpentCents,
-                            designatedCapCents = state.designatedCapCents,
-                            fairMarketRentalValueCents = state.fairMarketRentalValueCents,
-                            excludableCapCents = state.excludableAllowanceCents,
-                            bindingLimit = state.limitingFactor,
-                            onConfigureClick = {
-                                if (isTwoPane && state.showConfigSheet) viewModel.closeConfigSheet() else viewModel.openConfigSheet()
-                            }
-                        )
-                    }
-                    item {
                         MhaTaxSavingsCard(
                             taxResult = state.taxCalculationResult,
-                            projectedAnnualSavingsCents = state.projectedAnnualSavingsCents,
-                            taxProfile = state.taxProfile
+                            eligibleExpensesCents = state.actualEligibleExpensesCents,
+                            eligibleTransactionCount = state.eligibleTransactions.size,
+                            selectedYear = state.selectedYear,
+                            taxProfile = state.taxProfile,
+                            onEditSettings = {
+                                if (isTwoPane && state.showConfigSheet) viewModel.closeConfigSheet() else viewModel.openConfigSheet()
+                            }
                         )
                     }
                 }
@@ -196,13 +223,23 @@ fun MhaTrackerScreen(
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Left Pane: Hero 3-Limit Card + Tax Savings Card
+                        // Left Pane: Summary Card + Auto Defaults
                         LazyColumn(
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(bottom = 32.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            content = summaryCards
-                        )
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            summaryCards()
+                            item {
+                                MhaAutoDefaultsSection(
+                                    accounts = state.accounts,
+                                    categories = state.categories,
+                                    onToggleAccountDefault = viewModel::setMhaAccountDefault,
+                                    onToggleCategoryDefault = viewModel::setMhaCategoryDefault,
+                                    onToggleCategoryIgnoreDefault = viewModel::setMhaCategoryIgnoreDefault
+                                )
+                            }
+                        }
 
                         // Right Pane: Morphs between Transaction Review Queue and MHA Settings Content
                         AnimatedContent(
@@ -223,8 +260,6 @@ fun MhaTrackerScreen(
                                 ) {
                                     MhaConfigContent(
                                         taxProfile = state.taxProfile,
-                                        designatedCapCents = state.designatedCapCents,
-                                        fairMarketRentalValueCents = state.fairMarketRentalValueCents,
                                         mhaEnabled = state.mhaEnabled,
                                         onToggleMhaEnabled = { viewModel.setMhaEnabled(it) },
                                         onDismiss = { viewModel.closeConfigSheet() },
@@ -289,8 +324,6 @@ fun MhaTrackerScreen(
         if (!isTwoPane && state.showConfigSheet) {
             MhaConfigSheet(
                 taxProfile = state.taxProfile,
-                designatedCapCents = state.designatedCapCents,
-                fairMarketRentalValueCents = state.fairMarketRentalValueCents,
                 mhaEnabled = state.mhaEnabled,
                 onToggleMhaEnabled = { viewModel.setMhaEnabled(it) },
                 onDismiss = { viewModel.closeConfigSheet() },

@@ -46,6 +46,15 @@ data class SpendingTrendsOverview(
     val totalPeriodIncomeCents: Cents
 )
 
+const val UNCATEGORIZED_CATEGORY_ID = -1L
+
+val UNCATEGORIZED_CATEGORY = Category(
+    id = UNCATEGORIZED_CATEGORY_ID,
+    name = "Uncategorized",
+    color = "#78909C",
+    icon = "❓"
+)
+
 object SpendingTrendsEngine {
 
     private class MonthFlowAccumulator(var incomeCents: Long = 0L, var expensesCents: Long = 0L)
@@ -64,6 +73,7 @@ object SpendingTrendsEngine {
         }
         val monthSet = months.toHashSet()
         val budgetMap = budgets.associateBy { it.categoryId }
+        val categoriesMap = categories.associateBy { it.id }
 
         val flowByMonth = HashMap<String, MonthFlowAccumulator>(monthsCount * 2)
         val catMonthMap = HashMap<Long, HashMap<String, CatMonthAccumulator>>(categories.size * 2)
@@ -77,31 +87,35 @@ object SpendingTrendsEngine {
 
             val amt = txn.effectiveAmountCents
             val flowAcc = flowByMonth.getOrPut(m) { MonthFlowAccumulator() }
-            if (amt > 0L) {
-                flowAcc.incomeCents += amt
-            } else if (amt < 0L) {
-                val expense = -amt
-                flowAcc.expensesCents += expense
+            val category = txn.effectiveCategoryId?.let { categoriesMap[it] }
 
-                val catId = txn.effectiveCategoryId
+            if (category?.isIncome == true || (category == null && amt > 0L)) {
+                flowAcc.incomeCents += amt
+            } else {
+                val netExpense = -amt
+                flowAcc.expensesCents += netExpense
+
+                val catId = txn.effectiveCategoryId ?: if (amt < 0L) UNCATEGORIZED_CATEGORY_ID else null
                 if (catId != null) {
                     val byMonth = catMonthMap.getOrPut(catId) { HashMap(monthsCount * 2) }
                     val catAcc = byMonth.getOrPut(m) { CatMonthAccumulator() }
-                    catAcc.spentCents += expense
+                    catAcc.spentCents += netExpense
                     catAcc.count += 1
                 }
 
-                val merchAcc = merchantMap.getOrPut(txn.effectiveMerchant) { MerchantAccumulator() }
-                merchAcc.spentCents += expense
-                merchAcc.count += 1
+                if (amt < 0L) {
+                    val merchAcc = merchantMap.getOrPut(txn.effectiveMerchant) { MerchantAccumulator() }
+                    merchAcc.spentCents += -amt
+                    merchAcc.count += 1
+                }
             }
         }
 
         // Flow per month
         val flowSeries = months.map { m ->
             val acc = flowByMonth[m]
-            val income = acc?.incomeCents ?: 0L
-            val expenses = acc?.expensesCents ?: 0L
+            val income = maxOf(0L, acc?.incomeCents ?: 0L)
+            val expenses = maxOf(0L, acc?.expensesCents ?: 0L)
             val net = income - expenses
             val savingsRate = if (income > 0L) (net.toDouble() / income.toDouble()) * 100.0 else 0.0
             MonthlyFlow(
@@ -117,15 +131,17 @@ object SpendingTrendsEngine {
         val totalPeriodIncome = flowSeries.sumOf { it.incomeCents }
 
         // Category trends
-        val spendingCategories = categories.filter { !it.isIncome && !it.isTransfer }
+        val spendingCategories = categories.filter { !it.isIncome && !it.isTransfer } + UNCATEGORIZED_CATEGORY
         val categoryTrends = spendingCategories.mapNotNull { cat ->
-            val byMonth = catMonthMap[cat.id] ?: return@mapNotNull null
+            val byMonth = catMonthMap[cat.id]
             val budget = budgetMap[cat.id]
+            if (byMonth == null && budget == null) return@mapNotNull null
+
             val budgetAmt = budget?.amountCents
 
             val series = months.map { m ->
-                val catAcc = byMonth[m]
-                val spent = catAcc?.spentCents ?: 0L
+                val catAcc = byMonth?.get(m)
+                val spent = maxOf(0L, catAcc?.spentCents ?: 0L)
                 val count = catAcc?.count ?: 0
                 val isOver = budgetAmt != null && budgetAmt > 0L && spent > budgetAmt
                 CategoryTrendPoint(
@@ -137,7 +153,7 @@ object SpendingTrendsEngine {
             }
 
             val totalSpent = series.sumOf { it.spentCents }
-            if (totalSpent <= 0L) return@mapNotNull null
+            if (totalSpent <= 0L && budget == null) return@mapNotNull null
 
             val avgSpent = totalSpent / maxOf(1, months.size)
             val sortedSpents = series.map { it.spentCents }.sorted()

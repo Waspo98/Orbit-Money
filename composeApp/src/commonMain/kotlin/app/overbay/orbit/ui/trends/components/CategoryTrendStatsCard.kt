@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.CategorySpendingTrend
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.TabularNumStyle
@@ -70,7 +71,9 @@ fun CategoryTrendStatsCard(
             ) {
                 // Tile 3: Highest Month
                 val highestLabel = highestMonth?.let {
-                    "${it.month} (${MoneyUtils.formatCents(it.spentCents)})"
+                    if (it.spentCents > 0L) {
+                        "${MoneyUtils.formatCents(it.spentCents)} in ${LocalDateUtils.formatMonthLabel(it.month)}"
+                    } else "None"
                 } ?: "—"
                 StatTile(
                     label = "Highest Month",

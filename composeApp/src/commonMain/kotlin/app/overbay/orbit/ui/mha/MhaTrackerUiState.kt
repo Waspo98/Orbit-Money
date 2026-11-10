@@ -83,6 +83,7 @@ data class MhaTrackerUiState(
     val mhaDesignationCapCents: Cents? get() = designatedCapCents
     val bindingLimit: MhaBindingLimit get() = limitingFactor
     val taxSavingsResult: MhaTaxCalculationResult? get() = taxCalculationResult
+    val actualEligibleExpensesCents: Cents get() = actualEligibleHousingSpentCents
 
     val visibleTransactions: List<MhaTransactionItem>
         get() {

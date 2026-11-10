@@ -47,6 +47,7 @@ fun RuleItemCard(
     onToggleEnabled: (Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    matchCount: Int = 0,
     accountMap: Map<Long, String> = emptyMap(),
     isInspected: Boolean = false,
     onClick: (() -> Unit)? = null,
@@ -102,6 +103,14 @@ fun RuleItemCard(
                         color = if (rule.enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    OrbitBadge(
+                        text = "$matchCount ${if (matchCount == 1) "match" else "matches"}",
+                        containerColor = if (matchCount > 0) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = if (matchCount > 0) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 

@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.settings
 
 import app.overbay.orbit.data.engine.SyncResult
+import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.BackupPreviewStats
 import app.overbay.orbit.data.model.HouseholdSharingState
 import app.overbay.orbit.data.model.OrbitPreferences
@@ -15,6 +16,7 @@ data class SettingsUiState(
     val isSyncing: Boolean = false,
     val activeSubpage: String? = null, // null = Hub, "preferences", "data"
     val statusMessage: String? = null,
+    val accounts: List<Account> = emptyList(),
 
     // Push Notifications
     val pushConfig: PushNotificationConfigInfo = PushNotificationConfigInfo(),

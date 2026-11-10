@@ -12,11 +12,16 @@ import app.overbay.orbit.domain.MatchedTransactionHistory
 import app.overbay.orbit.domain.ProjectedAmountResult
 import app.overbay.orbit.domain.UpcomingCashFlowSummary
 
-enum class UpcomingFilterOption {
-    ALL,
-    BILLS,
-    INCOME
+enum class UpcomingFilter(val label: String) {
+    ALL("All"),
+    INCOME("Income"),
+    GIVING("Giving"),
+    SUBSCRIPTIONS("Subscriptions"),
+    BILLS("Bills"),
+    SUGGESTIONS("Suggestions")
 }
+
+typealias UpcomingFilterOption = UpcomingFilter
 
 enum class UpcomingCashFlowPeriod {
     REST_OF_MONTH,
@@ -31,8 +36,12 @@ data class UpcomingUiState(
     val accounts: List<Account> = emptyList(),
     val categoryMap: Map<Long, Category> = emptyMap(),
     val accountMap: Map<Long, Account> = emptyMap(),
-    val filterOption: UpcomingFilterOption = UpcomingFilterOption.ALL,
+    val selectedFilter: UpcomingFilter = UpcomingFilter.ALL,
     val selectedDateFilter: String? = null,
+    val upcomingIncomeCents: Cents = 0L,
+    val upcomingGivingCents: Cents = 0L,
+    val upcomingBillsCents: Cents = 0L,
+    val upcomingSubscriptionsCents: Cents = 0L,
     val totalUpcomingExpenseCents: Cents = 0L,
     val totalUpcomingIncomeCents: Cents = 0L,
     val netCashflowProjectionCents: Cents = 0L,
@@ -51,6 +60,7 @@ data class UpcomingUiState(
     val recentTransactions: List<Transaction> = emptyList(),
     val isLoading: Boolean = false
 ) {
+    val filterOption: UpcomingFilter get() = selectedFilter
     val activeItems get() = items.filter { it.status == UpcomingStatus.ACTIVE }
     val inspectingItem: UpcomingItem?
         get() = items.find { it.id == inspectingItemId } ?: editingItem

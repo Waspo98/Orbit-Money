@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.SimpleFinSyncLogEntry
@@ -49,6 +50,7 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitCompactListRow
+import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import kotlinx.datetime.Clock
@@ -74,6 +76,22 @@ fun SimpleFinBankSyncBlock(
 ) {
     var rawToken by remember(token) { mutableStateOf(token ?: "") }
     val isConnected = !token.isNullOrBlank()
+    val uriHandler = LocalUriHandler.current
+    var showDisconnectConfirm by remember { mutableStateOf(false) }
+
+    if (showDisconnectConfirm) {
+        OrbitConfirmationDialog(
+            title = "Disconnect SimpleFIN?",
+            message = "Disconnect SimpleFIN? Your transactions stay, but bank sync stops until you reconnect.",
+            confirmText = "Disconnect",
+            isDestructive = true,
+            onConfirm = {
+                showDisconnectConfirm = false
+                onDisconnect()
+            },
+            onDismiss = { showDisconnectConfirm = false }
+        )
+    }
 
     val parsedCutover = remember(cutoverDate) {
         if (!cutoverDate.isNullOrBlank()) {
@@ -135,8 +153,20 @@ fun SimpleFinBankSyncBlock(
             label = { Text("SimpleFIN Setup Token") },
             placeholder = { Text("https://bridge.simplefin.org/simplefin/claim/...") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = false,
+            minLines = 3,
+            maxLines = 5
         )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = { uriHandler.openUri("https://beta-bridge.simplefin.org/") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp)
+        ) {
+            Text("Open SimpleFIN Bridge")
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -170,7 +200,7 @@ fun SimpleFinBankSyncBlock(
                     Text("Sync Now")
                 }
                 OutlinedButton(
-                    onClick = onDisconnect,
+                    onClick = { showDisconnectConfirm = true },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
@@ -229,11 +259,20 @@ fun SimpleFinBankSyncBlock(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    syncLogs.take(5).forEach { log ->
+                    syncLogs.take(20).forEach { log ->
                         val isError = log.status.contains("error", ignoreCase = true)
+                        val subtitleText = buildString {
+                            append("${log.accountsSynced} accounts · +${log.transactionsInserted} new")
+                            if (log.transactionsUpdated > 0) {
+                                append(" · ${log.transactionsUpdated} updated")
+                            }
+                            if (!log.errorMessage.isNullOrBlank()) {
+                                append(" · Error: ${log.errorMessage}")
+                            }
+                        }
                         OrbitCompactListRow(
                             title = log.startedAt.take(19).replace("T", " "),
-                            subtitle = "${log.accountsSynced} accounts · +${log.transactionsInserted} new",
+                            subtitle = subtitleText,
                             trailingContent = {
                                 OrbitBadge(
                                     text = log.status.uppercase(),

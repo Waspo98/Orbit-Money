@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,9 +22,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.UpcomingCashFlowSummary
 import app.overbay.orbit.theme.OrbitSprings
@@ -66,6 +69,19 @@ fun UpcomingCashFlowCard(
         summary.next30DaysCount
     }
 
+    val today = LocalDateUtils.todayLocalDate()
+    val daysRemaining = if (selectedPeriod == UpcomingCashFlowPeriod.REST_OF_MONTH) {
+        val daysInMonth = LocalDateUtils.daysInMonth(today.year, today.monthNumber)
+        maxOf(0, daysInMonth - today.dayOfMonth)
+    } else {
+        30
+    }
+    val remainingSubtitle = "$count transaction${if (count == 1) "" else "s"} remaining in the next $daysRemaining day${if (daysRemaining == 1) "" else "s"}"
+
+    val maxFlow = maxOf(income, expense, 1L).toFloat()
+    val incomeProgress = (income.toFloat() / maxFlow).coerceIn(0.08f, 1f)
+    val expenseProgress = (expense.toFloat() / maxFlow).coerceIn(0.08f, 1f)
+
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -93,6 +109,12 @@ fun UpcomingCashFlowCard(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = remainingSubtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -191,7 +213,44 @@ fun UpcomingCashFlowCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Proportional Visual Progress Bars (Income vs Outflow)
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(incomeProgress)
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(colors.income)
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(expenseProgress)
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(colors.expense)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Bento Sub-row: Projected Income vs Projected Expenses
             Row(

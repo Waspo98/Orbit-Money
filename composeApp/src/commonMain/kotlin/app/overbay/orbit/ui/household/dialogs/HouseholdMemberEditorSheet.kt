@@ -34,7 +34,9 @@ import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.household.HouseholdCalculations
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlin.math.roundToLong
 import kotlinx.datetime.LocalDate
 
 @Composable
@@ -89,11 +91,36 @@ fun HouseholdMemberEditorContent(
     var employerMatchLimitPercent by remember(member) { mutableStateOf(member?.employerMatchLimitPercent ?: 0.0) }
     var employerMatchAnnualCapCents by remember(member) { mutableStateOf(member?.employerMatchAnnualCapCents ?: 0L) }
 
-    // Benefits & notes state
-    var healthPremiumPerMonthCents by remember(member) { mutableStateOf(member?.healthPremiumPerMonthCents ?: 0L) }
-    var hsaContributionAnnualCents by remember(member) { mutableStateOf(member?.hsaContributionAnnualCents ?: 0L) }
-    var dependentCareFsaAnnualCents by remember(member) { mutableStateOf(member?.dependentCareFsaAnnualCents ?: 0L) }
-    var otherBenefitsAnnualCents by remember(member) { mutableStateOf(member?.otherBenefitsAnnualCents ?: 0L) }
+    // Benefits & notes state (converted to/from per-paycheck entry)
+    val initPeriods = HouseholdCalculations.safePayPeriods(member?.payFrequency ?: "biweekly")
+    var healthPerPaycheckCents by remember(member) {
+        mutableStateOf(
+            if (member != null && member.healthPremiumPerMonthCents > 0L) {
+                ((member.healthPremiumPerMonthCents.toDouble() * 12.0) / initPeriods).roundToLong()
+            } else 0L
+        )
+    }
+    var hsaPerPaycheckCents by remember(member) {
+        mutableStateOf(
+            if (member != null && member.hsaContributionAnnualCents > 0L) {
+                (member.hsaContributionAnnualCents.toDouble() / initPeriods).roundToLong()
+            } else 0L
+        )
+    }
+    var fsaPerPaycheckCents by remember(member) {
+        mutableStateOf(
+            if (member != null && member.dependentCareFsaAnnualCents > 0L) {
+                (member.dependentCareFsaAnnualCents.toDouble() / initPeriods).roundToLong()
+            } else 0L
+        )
+    }
+    var otherPerPaycheckCents by remember(member) {
+        mutableStateOf(
+            if (member != null && member.otherBenefitsAnnualCents > 0L) {
+                (member.otherBenefitsAnnualCents.toDouble() / initPeriods).roundToLong()
+            } else 0L
+        )
+    }
     var notes by remember(member) { mutableStateOf(member?.notes ?: "") }
     var effectiveDate by remember { mutableStateOf<LocalDate?>(null) }
 
@@ -135,9 +162,7 @@ fun HouseholdMemberEditorContent(
 
         val roles = listOf(
             "adult" to "Adult",
-            "partner" to "Partner",
-            "child" to "Child",
-            "dependent" to "Dependent"
+            "child" to "Child"
         )
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             roles.forEachIndexed { index, (key, label) ->
@@ -164,9 +189,10 @@ fun HouseholdMemberEditorContent(
         val employmentOptions = listOf(
             "employed" to "Employed",
             "self_employed" to "Self-Employed",
+            "stay_at_home" to "Stay at Home",
             "student" to "Student",
-            "homemaker" to "Homemaker",
             "retired" to "Retired",
+            "unemployed" to "Unemployed",
             "other" to "Other"
         )
         OrbitDropdownField(
@@ -217,14 +243,14 @@ fun HouseholdMemberEditorContent(
             onEmployerMatchLimitPercentChange = { employerMatchLimitPercent = it },
             employerMatchAnnualCapCents = employerMatchAnnualCapCents,
             onEmployerMatchAnnualCapChange = { employerMatchAnnualCapCents = it },
-            healthPremiumPerMonthCents = healthPremiumPerMonthCents,
-            onHealthPremiumChange = { healthPremiumPerMonthCents = it },
-            hsaContributionAnnualCents = hsaContributionAnnualCents,
-            onHsaContributionChange = { hsaContributionAnnualCents = it },
-            dependentCareFsaAnnualCents = dependentCareFsaAnnualCents,
-            onDependentCareFsaChange = { dependentCareFsaAnnualCents = it },
-            otherBenefitsAnnualCents = otherBenefitsAnnualCents,
-            onOtherBenefitsChange = { otherBenefitsAnnualCents = it },
+            healthPremiumPerPaycheckCents = healthPerPaycheckCents,
+            onHealthPremiumChange = { healthPerPaycheckCents = it },
+            hsaContributionPerPaycheckCents = hsaPerPaycheckCents,
+            onHsaContributionChange = { hsaPerPaycheckCents = it },
+            dependentCareFsaPerPaycheckCents = fsaPerPaycheckCents,
+            onDependentCareFsaChange = { fsaPerPaycheckCents = it },
+            otherBenefitsPerPaycheckCents = otherPerPaycheckCents,
+            onOtherBenefitsChange = { otherPerPaycheckCents = it },
             notes = notes,
             onNotesChange = { notes = it },
             effectiveDate = effectiveDate,
@@ -267,6 +293,12 @@ fun HouseholdMemberEditorContent(
                 onClick = {
                     if (name.isNotBlank()) {
                         haptics.tick()
+                        val periods = HouseholdCalculations.periodsPerYear(payFrequency).toDouble()
+                        val healthPremiumMonthly = if (periods > 0) ((healthPerPaycheckCents.toDouble() * periods) / 12.0).roundToLong() else 0L
+                        val hsaAnnual = (hsaPerPaycheckCents.toDouble() * periods).roundToLong()
+                        val fsaAnnual = (fsaPerPaycheckCents.toDouble() * periods).roundToLong()
+                        val otherAnnual = (otherPerPaycheckCents.toDouble() * periods).roundToLong()
+
                         val updated = (member ?: HouseholdMember(name = name.trim())).copy(
                             name = name.trim(),
                             role = role,
@@ -284,10 +316,10 @@ fun HouseholdMemberEditorContent(
                             employerMatchPercent = employerMatchPercent,
                             employerMatchLimitPercent = employerMatchLimitPercent,
                             employerMatchAnnualCapCents = employerMatchAnnualCapCents,
-                            healthPremiumPerMonthCents = healthPremiumPerMonthCents,
-                            hsaContributionAnnualCents = hsaContributionAnnualCents,
-                            dependentCareFsaAnnualCents = dependentCareFsaAnnualCents,
-                            otherBenefitsAnnualCents = otherBenefitsAnnualCents,
+                            healthPremiumPerMonthCents = healthPremiumMonthly,
+                            hsaContributionAnnualCents = hsaAnnual,
+                            dependentCareFsaAnnualCents = fsaAnnual,
+                            otherBenefitsAnnualCents = otherAnnual,
                             notes = notes.ifBlank { null },
                             retirementAccounts = linkedAccounts
                         )

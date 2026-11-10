@@ -56,6 +56,8 @@ data class NetWorthUiState(
     val isLoading: Boolean = false
 ) {
     val selectedPeriod: NetWorthHorizon get() = selectedHorizon
+    val positiveAccountCount: Int get() = assetAccounts.size
+    val negativeAccountCount: Int get() = liabilityAccounts.size
 
     val activePoint: MonthlyNetWorthPoint?
         get() = scrubbedPoint ?: filteredPoints.lastOrNull()

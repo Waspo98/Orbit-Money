@@ -19,15 +19,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,16 +41,18 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.CanopyActionPillButton
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitAlertDialog
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
-import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.settings.blocks.AboutSettingsBlock
+import app.overbay.orbit.ui.settings.dialogs.BackupExportDialog
+import app.overbay.orbit.ui.settings.dialogs.BackupRestoreDialog
 import app.overbay.orbit.ui.settings.dialogs.GoogleDriveClientIdDialog
 import app.overbay.orbit.ui.settings.dialogs.MigrateWorkspaceDialog
 import app.overbay.orbit.ui.settings.dialogs.PartnerInviteDialog
@@ -106,7 +108,38 @@ fun SettingsScreen(
                 title = pageTitle,
                 subtitle = pageSubtitle,
                 scrollState = heroScrollState,
+                actions = {
+                    if (!isHub) {
+                        Button(
+                            onClick = { viewModel.setSubpage(null) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back to Settings",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Back to Settings", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                },
                 canopyBar = { _, isCompact, barHeight ->
+                    if (!isHub) {
+                        CanopyActionPillButton(
+                            icon = Icons.AutoMirrored.Filled.ArrowBack,
+                            label = "Back to Settings",
+                            compactLabel = "Back",
+                            isCompact = isCompact,
+                            buttonSize = barHeight,
+                            onClick = { viewModel.setSubpage(null) }
+                        )
+                    }
                     val isLocal = uiState.preferences.storageMode == StorageMode.LOCAL
                     val modeLabel = if (isLocal) "Local Offline Mode · Ready" else "Self-Hosted Server · Active"
                     val shortMode = if (isLocal) "Local Mode" else "Server Sync"
@@ -239,65 +272,19 @@ fun SettingsScreen(
 
     // Export Dialog
     if (uiState.showBackupExportDialog && uiState.backupExportJson != null) {
-        AlertDialog(
-            onDismissRequest = viewModel::closeBackupExportDialog,
-            shape = MaterialTheme.shapes.extraLarge,
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            title = { Text("Workspace Backup Export") },
-            text = {
-                Column {
-                    Text(
-                        text = "Copy the backup data below to store a copy off-device:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OrbitTextField(
-                        value = uiState.backupExportJson ?: "",
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier.fillMaxWidth().height(180.dp)
-                    )
-                }
-            },
-            confirmButton = {
-                Button(onClick = viewModel::closeBackupExportDialog) { Text("Done") }
-            }
+        BackupExportDialog(
+            jsonText = uiState.backupExportJson ?: "",
+            onDismiss = viewModel::closeBackupExportDialog
         )
     }
 
     // Restore text paste dialog
     if (uiState.showRestoreDialog) {
-        AlertDialog(
-            onDismissRequest = viewModel::closeRestoreDialog,
-            shape = MaterialTheme.shapes.extraLarge,
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            title = { Text("Restore Workspace Backup") },
-            text = {
-                Column {
-                    Text(
-                        text = "Paste your exported backup data below to preview and restore:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OrbitTextField(
-                        value = uiState.restoreJsonText,
-                        onValueChange = viewModel::setRestoreJsonText,
-                        placeholder = { Text("Paste backup data here...") },
-                        modifier = Modifier.fillMaxWidth().height(180.dp)
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.previewBackupForRestore(uiState.restoreJsonText) },
-                    enabled = uiState.restoreJsonText.isNotBlank()
-                ) { Text("Preview Restore") }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::closeRestoreDialog) { Text("Cancel") }
-            }
+        BackupRestoreDialog(
+            jsonText = uiState.restoreJsonText,
+            onTextChange = viewModel::setRestoreJsonText,
+            onPreview = viewModel::previewBackupForRestore,
+            onDismiss = viewModel::closeRestoreDialog
         )
     }
 

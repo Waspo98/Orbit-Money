@@ -173,8 +173,9 @@ object GoalAllocationEngine {
                 goal.allocations.sumOf { alloc ->
                     val acct = accountMap[alloc.accountId]
                     if (acct != null) {
-                        val histAcctBal = estimateHistoricalAccountBalance(
+                        val histAcctBal = reconstructAccountBalanceAtMonth(
                             account = acct,
+                            yearMonth = m,
                             monthEnd = monthEnd,
                             balanceRecords = balanceRecords,
                             transactions = transactions
@@ -190,8 +191,9 @@ object GoalAllocationEngine {
             } else if (goal.linkedAccountId != null) {
                 val acct = accountMap[goal.linkedAccountId]
                 if (acct != null) {
-                    val histAcctBal = estimateHistoricalAccountBalance(
+                    val histAcctBal = reconstructAccountBalanceAtMonth(
                         account = acct,
+                        yearMonth = m,
                         monthEnd = monthEnd,
                         balanceRecords = balanceRecords,
                         transactions = transactions
@@ -217,6 +219,19 @@ object GoalAllocationEngine {
     }
 
     /**
+     * Computes monthly pace matching goals.js lines 80-87:
+     * Takes up to 7 historical monthly points (6 monthly intervals).
+     */
+    fun calculateMonthlyPace(history: List<GoalMonthlyPoint>): Cents {
+        if (history.size < 2) return 0L
+        val recent = history.takeLast(7)
+        val first = recent.first()
+        val last = recent.last()
+        val months = (recent.size - 1).coerceAtLeast(1)
+        return (last.amountCents - first.amountCents) / months
+    }
+
+    /**
      * Computes trailing 7-month average monthly net pace and projected ETA.
      */
     fun computeMonthlyPaceAndEta(
@@ -227,14 +242,7 @@ object GoalAllocationEngine {
             return Pair(0L, GoalEtaInfo(date = null, months = 0, status = "complete"))
         }
 
-        val recentPoints = history.takeLast(8)
-        val paceCents: Cents = if (recentPoints.size >= 2) {
-            val deltas = recentPoints.zipWithNext { a, b -> b.amountCents - a.amountCents }
-            val avg = deltas.sum() / deltas.size
-            avg
-        } else {
-            0L
-        }
+        val paceCents = calculateMonthlyPace(history)
 
         if (paceCents <= 0L) {
             return Pair(paceCents, GoalEtaInfo(date = null, months = null, status = "stalled"))
@@ -244,9 +252,10 @@ object GoalAllocationEngine {
         val monthsNeeded = ceil(remaining.toDouble() / paceCents.toDouble()).toInt()
         val currentYm = LocalDateUtils.currentYearMonth()
         val projectedYm = LocalDateUtils.addMonthsToYearMonth(currentYm, monthsNeeded)
+        val formattedDate = LocalDateUtils.formatMonthShortLabel(projectedYm)
 
         val eta = GoalEtaInfo(
-            date = projectedYm,
+            date = formattedDate,
             months = monthsNeeded,
             status = "projected"
         )
@@ -277,28 +286,30 @@ object GoalAllocationEngine {
         val months = ceil(remaining.toDouble() / effectivePace.toDouble()).toInt()
         val currentYm = LocalDateUtils.currentYearMonth()
         val projectedYm = LocalDateUtils.addMonthsToYearMonth(currentYm, months)
+        val formattedDate = LocalDateUtils.formatMonthShortLabel(projectedYm)
 
-        return GoalEtaInfo(date = projectedYm, months = months, status = "projected")
+        return GoalEtaInfo(date = formattedDate, months = months, status = "projected")
     }
 
-    private fun estimateHistoricalAccountBalance(
+    fun reconstructAccountBalanceAtMonth(
         account: Account,
+        yearMonth: String,
         monthEnd: String,
         balanceRecords: List<BalanceRecord>,
         transactions: List<Transaction>
     ): Cents {
-        val records = balanceRecords
-            .filter { it.accountId == account.id && it.recordDate <= monthEnd }
+        val monthRecords = balanceRecords
+            .filter { it.accountId == account.id && it.recordDate.startsWith(yearMonth) && it.recordDate <= monthEnd }
             .sortedByDescending { it.recordDate }
 
-        if (records.isNotEmpty()) {
-            return records.first().balanceCents
+        if (monthRecords.isNotEmpty()) {
+            return monthRecords.first().balanceCents
         }
 
-        val netAfterMonthEnd = transactions
+        val netSinceMonthEnd = transactions
             .filter { it.accountId == account.id && it.effectiveDate > monthEnd && !it.effectiveIsIgnored }
             .sumOf { it.effectiveAmountCents }
 
-        return max(0L, account.currentBalanceCents - netAfterMonthEnd)
+        return (account.currentBalanceCents - netSinceMonthEnd).coerceAtLeast(0L)
     }
 }

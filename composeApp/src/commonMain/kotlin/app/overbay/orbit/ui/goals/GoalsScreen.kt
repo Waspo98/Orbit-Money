@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.goals
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -10,13 +11,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -27,6 +35,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CanopyMenuAction
 import app.overbay.orbit.ui.components.CanopyMoreMenuButton
@@ -34,6 +43,7 @@ import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
@@ -43,9 +53,9 @@ import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.goals.components.GoalAccountsOverviewCard
 import app.overbay.orbit.ui.goals.components.GoalDetailInspectorPane
+import app.overbay.orbit.ui.goals.components.GoalHistoryAndImagineCard
 import app.overbay.orbit.ui.goals.components.GoalProgressCard
 import app.overbay.orbit.ui.goals.components.GoalTotalSavedBanner
-import app.overbay.orbit.ui.goals.dialogs.GoalAllocationDialog
 import app.overbay.orbit.ui.goals.dialogs.GoalEditorSheet
 import app.overbay.orbit.util.LocalDevicePosture
 import kotlin.math.roundToInt
@@ -63,10 +73,8 @@ fun GoalsScreen(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
         val isDetailOpen = isTwoPane && (
-            state.inspectingGoal != null ||
-                state.showEditorSheet ||
-                state.showAllocationDialog
-            )
+            state.inspectingGoal != null || state.showEditorSheet
+        )
 
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -173,6 +181,17 @@ fun GoalsScreen(
                             contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
+                            if (state.accounts.isEmpty()) {
+                                item {
+                                    EmptyStateCard(
+                                        title = "No Asset Accounts Yet",
+                                        description = "Add a checking, savings, investment, or cash account before creating savings goals.",
+                                        actionButtonText = "Go to Accounts",
+                                        onActionClick = { onNavigate(OrbitNavKey.Accounts()) }
+                                    )
+                                }
+                            }
+
                             if (state.totalTargetCents > 0L) {
                                 item {
                                     GoalTotalSavedBanner(
@@ -189,9 +208,64 @@ fun GoalsScreen(
                                         accountSummaries = state.accountSummaries,
                                         goals = state.goals,
                                         onOpenAccount = { acctId ->
-                                            onNavigate(OrbitNavKey.Accounts(accountId = acctId))
+                                            if (acctId > 0L) {
+                                                onNavigate(OrbitNavKey.Accounts(accountId = acctId))
+                                            } else {
+                                                onNavigate(OrbitNavKey.Accounts())
+                                            }
                                         }
                                     )
+                                }
+                            }
+
+                            // Mobile Focus Card for Selected Goal on compact phone screens
+                            if (!isTwoPane && state.inspectingGoal != null) {
+                                item {
+                                    val selected = state.inspectingGoal!!
+                                    Surface(
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "Goal Focus: ${selected.labelWithEmoji}",
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        text = "${MoneyUtils.formatCents(selected.currentAmountCents, showCents = false)} of ${MoneyUtils.formatCents(selected.targetAmountCents, showCents = false)}",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                                IconButton(onClick = { viewModel.dismissInspectorPane() }) {
+                                                    Icon(Icons.Default.Close, contentDescription = "Close Focus")
+                                                }
+                                            }
+
+                                            GoalHistoryAndImagineCard(goal = selected)
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                OrbitActionChip(label = "Edit Goal", onClick = { viewModel.openEditGoal(selected) })
+                                                OrbitActionChip(label = "Delete", isDestructive = true, onClick = { viewModel.deleteGoal(selected.id) })
+                                            }
+                                        }
+                                    }
                                 }
                             }
 
@@ -212,15 +286,9 @@ fun GoalsScreen(
                                         goal = goal,
                                         accountName = acct?.name,
                                         monthlyNeededCents = monthlyNeeded,
-                                        isInspected = isTwoPane && state.inspectingGoalId == goal.id,
-                                        onClick = {
-                                            if (isTwoPane) {
-                                                viewModel.selectGoalForInspect(goal.id)
-                                            } else {
-                                                viewModel.openEditGoal(goal)
-                                            }
-                                        },
-                                        onDepositClick = { viewModel.openAllocationDialog(goal) },
+                                        isInspected = state.inspectingGoalId == goal.id,
+                                        onClick = { viewModel.selectGoal(goal.id) },
+                                        onEditClick = { viewModel.openEditGoal(goal) },
                                         dragHandle = if (state.isReorderMode) {
                                             { OrbitDragHandle(state = activeReorderState, key = goal.id) }
                                         } else null,
@@ -249,15 +317,9 @@ fun GoalsScreen(
                                         goal = goal,
                                         accountName = acct?.name,
                                         monthlyNeededCents = null,
-                                        isInspected = isTwoPane && state.inspectingGoalId == goal.id,
-                                        onClick = {
-                                            if (isTwoPane) {
-                                                viewModel.selectGoalForInspect(goal.id)
-                                            } else {
-                                                viewModel.openEditGoal(goal)
-                                            }
-                                        },
-                                        onDepositClick = {},
+                                        isInspected = state.inspectingGoalId == goal.id,
+                                        onClick = { viewModel.selectGoal(goal.id) },
+                                        onEditClick = { viewModel.openEditGoal(goal) },
                                         dragHandle = if (state.isReorderMode) {
                                             { OrbitDragHandle(state = completedReorderState, key = goal.id) }
                                         } else null,
@@ -269,7 +331,7 @@ fun GoalsScreen(
                                 }
                             }
 
-                            if (state.goals.isEmpty()) {
+                            if (state.accounts.isNotEmpty() && state.goals.isEmpty()) {
                                 item {
                                     EmptyStateCard(
                                         title = "No Goals Yet",
@@ -304,7 +366,7 @@ fun GoalsScreen(
             }
         }
 
-        // Compact Phone Modal Editor Sheet & Allocation Dialog
+        // Compact Phone Modal Editor Sheet
         if (!isTwoPane && state.showEditorSheet) {
             GoalEditorSheet(
                 goal = state.editingGoal,
@@ -317,17 +379,6 @@ fun GoalsScreen(
                     viewModel.closeEditorSheet()
                     onNavigate(OrbitNavKey.Accounts(accountId = acctId))
                 }
-            )
-        }
-
-        val allocatingGoal = state.allocatingGoal
-        if (!isTwoPane && state.showAllocationDialog && allocatingGoal != null) {
-            GoalAllocationDialog(
-                goal = allocatingGoal,
-                onConfirmDeposit = { goalId, amount ->
-                    viewModel.depositToGoal(goalId, amount)
-                },
-                onDismiss = { viewModel.closeAllocationDialog() }
             )
         }
     }

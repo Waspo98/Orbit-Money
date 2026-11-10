@@ -19,20 +19,19 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.MhaTaxEngine
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
@@ -70,6 +69,25 @@ fun MhaConfigSheet(
     }
 }
 
+@Composable
+fun MhaConfigSheet(
+    taxProfile: MhaTaxProfile,
+    mhaEnabled: Boolean = true,
+    onToggleMhaEnabled: ((Boolean) -> Unit)? = null,
+    onDismiss: () -> Unit,
+    onSave: (MhaTaxProfile) -> Unit,
+    modifier: Modifier = Modifier
+) = MhaConfigSheet(
+    taxProfile = taxProfile,
+    designatedCapCents = null,
+    fairMarketRentalValueCents = null,
+    mhaEnabled = mhaEnabled,
+    onToggleMhaEnabled = onToggleMhaEnabled,
+    onDismiss = onDismiss,
+    onSave = { updated, _, _ -> onSave(updated) },
+    modifier = modifier
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MhaConfigContent(
@@ -86,16 +104,26 @@ fun MhaConfigContent(
 
     var currentMhaEnabled by remember(mhaEnabled) { mutableStateOf(mhaEnabled) }
     var mode by remember(taxProfile) { mutableStateOf(taxProfile.mode) }
-    var enableDesignatedCap by remember(designatedCapCents) { mutableStateOf(designatedCapCents != null) }
-    var inputDesignatedCapCents by remember(designatedCapCents) { mutableStateOf(designatedCapCents ?: 0L) }
-    var enableFmrv by remember(fairMarketRentalValueCents) { mutableStateOf(fairMarketRentalValueCents != null) }
-    var inputFmrvCents by remember(fairMarketRentalValueCents) { mutableStateOf(fairMarketRentalValueCents ?: 0L) }
     var simpleFedRate by remember(taxProfile) { mutableStateOf(taxProfile.simpleFederalRatePercent.toString()) }
     var simpleStateRate by remember(taxProfile) { mutableStateOf(taxProfile.simpleStateRatePercent.toString()) }
     var selectedFilingStatus by remember(taxProfile) { mutableStateOf(taxProfile.filingStatus) }
     var stateCode by remember(taxProfile) { mutableStateOf(taxProfile.state) }
     var deductionMode by remember(taxProfile) { mutableStateOf(taxProfile.deductionMode) }
     var itemizedDeductionCents by remember(taxProfile) { mutableStateOf(taxProfile.itemizedDeductionCents) }
+
+    var enableTaxableIncomeOverride by remember(taxProfile) {
+        mutableStateOf(taxProfile.taxableIncomeOverrideCents != null)
+    }
+    var inputTaxableIncomeOverrideCents by remember(taxProfile) {
+        mutableStateOf(taxProfile.taxableIncomeOverrideCents ?: 0L)
+    }
+
+    var enableStateRateOverride by remember(taxProfile) {
+        mutableStateOf(taxProfile.stateRateOverridePercent != null)
+    }
+    var inputStateRateOverride by remember(taxProfile) {
+        mutableStateOf(taxProfile.stateRateOverridePercent?.toString() ?: "")
+    }
 
     Column(
         modifier = modifier
@@ -105,8 +133,8 @@ fun MhaConfigContent(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         OrbitSheetHeader(
-            title = "MHA & Parsonage Settings",
-            subtitle = "Configure your official advance Church Designation and Fair Market Rental Value to enforce the 3-Limit IRS test under IRC Section 107.",
+            title = "MHA Tax Assumptions",
+            subtitle = "Configure federal and state tax rates or household estimate mode.",
             onDismiss = onDismiss
         )
 
@@ -120,52 +148,8 @@ fun MhaConfigContent(
             }
         )
 
-        // Section 1: Designation & FMRV
         Text(
-            text = "1. Section 107 Caps",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-
-        OrbitSwitchRow(
-            title = "Church Designation Cap",
-            subtitle = if (enableDesignatedCap) "Enforcing official advance designation" else "Uncapped (tracking actual expenses)",
-            checked = enableDesignatedCap,
-            onCheckedChange = { enableDesignatedCap = it }
-        )
-
-        if (enableDesignatedCap) {
-            CurrencyTextField(
-                cents = inputDesignatedCapCents,
-                onCentsChange = { inputDesignatedCapCents = it },
-                label = "Annual Church Designation Cap ($)",
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        OrbitSwitchRow(
-            title = "Fair Market Rental Value (FMRV)",
-            subtitle = if (enableFmrv) "Enforcing annual rental value limit" else "Uncapped (no FMRV limit)",
-            checked = enableFmrv,
-            onCheckedChange = { enableFmrv = it }
-        )
-
-        if (enableFmrv) {
-            CurrencyTextField(
-                cents = inputFmrvCents,
-                onCentsChange = { inputFmrvCents = it },
-                label = "Fair Market Rental Value (Furnished + Utilities) ($)",
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Section 2: Mode Selector
-        Text(
-            text = "2. Tax Calculation Mode",
+            text = "Tax Calculation Mode",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
@@ -211,12 +195,17 @@ fun MhaConfigContent(
                 )
             }
         } else {
-            OrbitTextField(
-                value = stateCode,
-                onValueChange = { stateCode = it.uppercase() },
-                label = { Text("State (e.g. IL, NC, CA)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+            val selectedStatePair = remember(stateCode) {
+                MhaTaxEngine.US_STATES.firstOrNull { it.first.equals(stateCode, ignoreCase = true) }
+                    ?: ("IL" to "Illinois")
+            }
+
+            OrbitDropdownField(
+                label = "State",
+                selectedText = "${selectedStatePair.second} (${selectedStatePair.first})",
+                options = MhaTaxEngine.US_STATES,
+                optionLabel = { "${it.second} (${it.first})" },
+                onOptionSelected = { stateCode = it.first }
             )
 
             OrbitDropdownField(
@@ -252,10 +241,10 @@ fun MhaConfigContent(
 
             if (deductionMode == "standard") {
                 val standardDeductionRef = when (selectedFilingStatus) {
-                    FilingStatus.SINGLE -> "$15,000"
-                    FilingStatus.MARRIED_JOINT -> "$30,000"
-                    FilingStatus.MARRIED_SEPARATE -> "$15,000"
-                    FilingStatus.HEAD_OF_HOUSEHOLD -> "$22,500"
+                    FilingStatus.SINGLE -> "$16,100"
+                    FilingStatus.MARRIED_JOINT -> "$32,200"
+                    FilingStatus.MARRIED_SEPARATE -> "$16,100"
+                    FilingStatus.HEAD_OF_HOUSEHOLD -> "$24,150"
                 }
 
                 Surface(
@@ -286,6 +275,43 @@ fun MhaConfigContent(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            OrbitSwitchRow(
+                title = "Taxable Income Override",
+                subtitle = if (enableTaxableIncomeOverride) "Using custom taxable income" else "Calculated from gross income and deductions",
+                checked = enableTaxableIncomeOverride,
+                onCheckedChange = { enableTaxableIncomeOverride = it }
+            )
+
+            if (enableTaxableIncomeOverride) {
+                CurrencyTextField(
+                    cents = inputTaxableIncomeOverrideCents,
+                    onCentsChange = { inputTaxableIncomeOverrideCents = it },
+                    label = "Taxable Income Override ($)",
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            OrbitSwitchRow(
+                title = "State Tax Rate Override",
+                subtitle = if (enableStateRateOverride) "Using custom state tax rate" else "Using bundled state rate if single-rate state",
+                checked = enableStateRateOverride,
+                onCheckedChange = { enableStateRateOverride = it }
+            )
+
+            if (enableStateRateOverride) {
+                OrbitTextField(
+                    value = inputStateRateOverride,
+                    onValueChange = { inputStateRateOverride = it },
+                    label = { Text("State Tax Rate Override (%)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -309,14 +335,14 @@ fun MhaConfigContent(
                         state = stateCode.take(2).uppercase().ifEmpty { "IL" },
                         filingStatus = selectedFilingStatus,
                         deductionMode = deductionMode,
-                        itemizedDeductionCents = itemizedDeductionCents
+                        itemizedDeductionCents = itemizedDeductionCents,
+                        taxableIncomeOverrideCents = if (enableTaxableIncomeOverride) max(0L, inputTaxableIncomeOverrideCents) else null,
+                        stateRateOverridePercent = if (enableStateRateOverride) inputStateRateOverride.toDoubleOrNull()?.coerceIn(0.0, 100.0) else null
                     )
-                    val cap = if (enableDesignatedCap) max(0L, inputDesignatedCapCents) else null
-                    val fmrv = if (enableFmrv) max(0L, inputFmrvCents) else null
-                    onSave(updated, cap, fmrv)
+                    onSave(updated, null, null)
                 }
             ) {
-                Text("Save Settings")
+                Text("Save")
             }
         }
     }

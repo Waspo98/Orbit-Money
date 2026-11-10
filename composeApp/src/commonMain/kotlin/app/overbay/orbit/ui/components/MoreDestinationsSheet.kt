@@ -71,7 +71,8 @@ fun MoreDestinationsSheet(
         add(DestinationItem(OrbitNavKey.Household, "Household", "Member profiles & account sharing", OrbitIcons.Household))
     }
 
-    val visibleSecondary = allSecondary.filter { !hiddenRouteNames.contains(it.key.routeName) }
+    val lockedKeys = setOf(OrbitNavKey.Rules, OrbitNavKey.Categories, OrbitNavKey.Settings)
+    val visibleSecondary = allSecondary.filter { it.key in lockedKeys || !hiddenRouteNames.contains(it.key.routeName) }
     val orderedSecondary = if (moreRouteOrder.isNotEmpty()) {
         val orderMap = moreRouteOrder.withIndex().associate { it.value to it.index }
         visibleSecondary.sortedBy { orderMap[it.key.routeName] ?: 999 }

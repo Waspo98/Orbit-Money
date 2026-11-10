@@ -50,7 +50,8 @@ import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.upcoming.components.UpcomingCalendarStrip
 import app.overbay.orbit.ui.upcoming.components.UpcomingCashFlowCard
 import app.overbay.orbit.ui.upcoming.components.UpcomingDetailInspectorPane
-import app.overbay.orbit.ui.upcoming.components.UpcomingSuggestionBanner
+import app.overbay.orbit.ui.upcoming.components.UpcomingFilterStrip
+import app.overbay.orbit.ui.upcoming.components.UpcomingSummaryStatsGrid
 import app.overbay.orbit.ui.upcoming.components.upcomingTimelineItems
 import app.overbay.orbit.ui.upcoming.sheets.AddFromTransactionSheet
 import app.overbay.orbit.ui.upcoming.sheets.ReconcileOccurrenceDialog
@@ -86,9 +87,7 @@ fun UpcomingScreen(
         ) { paddingValues ->
             if (state.isLoading) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                    modifier = Modifier.fillMaxSize().padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
@@ -119,12 +118,10 @@ fun UpcomingScreen(
                                 onClick = if (dateFilter != null) {
                                     { viewModel.setSelectedDateFilter(null) }
                                 } else null,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
+                                modifier = Modifier.weight(1f).fillMaxHeight()
                             )
 
-                            val activeFilterCount = (if (state.filterOption != UpcomingFilterOption.ALL) 1 else 0) +
+                            val activeFilterCount = (if (state.selectedFilter != UpcomingFilter.ALL) 1 else 0) +
                                 (if (state.selectedDateFilter != null) 1 else 0)
 
                             Box {
@@ -142,17 +139,12 @@ fun UpcomingScreen(
                                         expanded = true,
                                         onDismissRequest = { filterMenuExpanded = false }
                                     ) {
-                                        val filterOptions = listOf(
-                                            UpcomingFilterOption.ALL to "All Recurring",
-                                            UpcomingFilterOption.BILLS to "Bills, Giving & Subs",
-                                            UpcomingFilterOption.INCOME to "Income"
-                                        )
-                                        filterOptions.forEach { (option, label) ->
-                                            val selected = state.filterOption == option
+                                        UpcomingFilter.entries.forEach { option ->
+                                            val selected = state.selectedFilter == option
                                             DropdownMenuItem(
                                                 text = {
                                                     Text(
-                                                        text = label,
+                                                        text = option.label,
                                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                                         color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                                     )
@@ -168,7 +160,7 @@ fun UpcomingScreen(
                                                     }
                                                 } else null,
                                                 onClick = {
-                                                    viewModel.setFilterOption(option)
+                                                    viewModel.setFilter(option)
                                                     filterMenuExpanded = false
                                                 }
                                             )
@@ -209,13 +201,24 @@ fun UpcomingScreen(
                             contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
+                            // 4-Stat Summary Hero Row/Grid (Income, Giving, Bills, Subscriptions)
+                            item(key = "upcoming_summary_stats", contentType = "summary_stats") {
+                                UpcomingSummaryStatsGrid(
+                                    incomeCents = state.upcomingIncomeCents,
+                                    givingCents = state.upcomingGivingCents,
+                                    billsCents = state.upcomingBillsCents,
+                                    subscriptionsCents = state.upcomingSubscriptionsCents,
+                                    modifier = Modifier.padding(bottom = 2.dp)
+                                )
+                            }
+
                             // Projected Cash Flow Hero Card
                             item(key = "upcoming_cashflow_card", contentType = "cashflow_card") {
                                 UpcomingCashFlowCard(
                                     summary = state.cashFlowSummary,
                                     selectedPeriod = state.cashFlowPeriod,
                                     onPeriodChanged = { viewModel.setCashFlowPeriod(it) },
-                                    modifier = Modifier.padding(bottom = 6.dp)
+                                    modifier = Modifier.padding(bottom = 2.dp)
                                 )
                             }
 
@@ -225,53 +228,56 @@ fun UpcomingScreen(
                                     selectedDate = state.selectedDateFilter,
                                     items = state.activeItems,
                                     onSelectDate = { viewModel.setSelectedDateFilter(it) },
-                                    modifier = Modifier.padding(bottom = 6.dp)
+                                    modifier = Modifier.padding(bottom = 2.dp)
                                 )
                             }
 
-                            // Recurring Bills/Suggestions Banner
-                            if (state.candidates.isNotEmpty()) {
-                                item(key = "upcoming_suggestions_banner", contentType = "suggestions_banner") {
-                                    UpcomingSuggestionBanner(
-                                        candidates = state.candidates,
-                                        onAccept = { viewModel.acceptCandidate(it) },
-                                        onDismiss = { viewModel.dismissCandidate(it) },
-                                        modifier = Modifier.padding(bottom = 6.dp)
-                                    )
-                                }
+                            // 6-Tab Filter Strip (All, Income, Giving, Subscriptions, Bills, Suggestions)
+                            item(key = "upcoming_filter_strip", contentType = "filter_strip") {
+                                UpcomingFilterStrip(
+                                    selectedFilter = state.selectedFilter,
+                                    onFilterSelected = { viewModel.setFilter(it) },
+                                    suggestionsCount = state.candidates.size,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
                             }
 
                             // Action Bar: Add from Transaction
-                            item(key = "upcoming_add_from_tx_bar", contentType = "action_bar") {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                                    horizontalArrangement = Arrangement.End,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    OutlinedButton(
-                                        onClick = { viewModel.openAddFromTxModal() },
-                                        shape = RoundedCornerShape(12.dp)
+                            if (state.selectedFilter != UpcomingFilter.SUGGESTIONS) {
+                                item(key = "upcoming_add_from_tx_bar", contentType = "action_bar") {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                        horizontalArrangement = Arrangement.End,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Add,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "Add From Transaction",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
+                                        OutlinedButton(
+                                            onClick = { viewModel.openAddFromTxModal() },
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "Add From Transaction",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
                                     }
                                 }
                             }
 
-                            // Virtualized Recurring Timeline Rows
+                            // Virtualized Recurring Timeline / Bento Lanes / Suggestions
                             upcomingTimelineItems(
                                 items = state.items,
+                                candidates = state.candidates,
                                 categoryMap = state.categoryMap,
                                 accountMap = state.accountMap,
+                                selectedFilter = state.selectedFilter,
+                                selectedDateFilter = state.selectedDateFilter,
                                 onItemClick = { item ->
                                     if (isTwoPane) {
                                         viewModel.selectUpcomingForInspect(item.id)
@@ -280,7 +286,9 @@ fun UpcomingScreen(
                                     }
                                 },
                                 onMarkPaid = { viewModel.openReconcileDialog(it) },
-                                onAddClick = { viewModel.openAddUpcoming() },
+                                onAddClick = { viewModel.openAddUpcoming(it) },
+                                onReviewCandidate = { viewModel.reviewCandidate(it) },
+                                onDismissCandidate = { viewModel.dismissCandidate(it) },
                                 projectedAmounts = state.projectedAmounts,
                                 inspectingItemId = if (isTwoPane) state.inspectingItemId else null
                             )
@@ -316,7 +324,8 @@ fun UpcomingScreen(
                 accounts = state.accounts,
                 onSave = { viewModel.saveUpcoming(it) },
                 onDelete = { viewModel.deleteUpcoming(it) },
-                onDismiss = { viewModel.closeEditorSheet() }
+                onDismiss = { viewModel.closeEditorSheet() },
+                onViewHistory = { viewModel.openHistoryModal(it) }
             )
         }
     }

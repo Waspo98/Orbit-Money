@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.rules.sheets
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -42,6 +43,7 @@ import app.overbay.orbit.data.model.RuleConditionField
 import app.overbay.orbit.data.model.RuleOperator
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
@@ -50,6 +52,9 @@ import app.overbay.orbit.ui.rules.components.ActionEditorRow
 import app.overbay.orbit.ui.rules.components.ConditionEditorRow
 import app.overbay.orbit.ui.rules.components.RuleMatchPreviewWindow
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 @Composable
 fun RuleEditorSheet(
@@ -144,13 +149,22 @@ fun RuleEditorContent(
 
     val allConditionsValid = currentConditions.isNotEmpty() && currentConditions.all(RuleDraftDefaults::isConditionValid)
     val canSave = allConditionsValid && currentActions.isNotEmpty() && currentActions.all(RuleDraftDefaults::isActionValid)
-    val matchingTransactions = remember(currentConditions) {
-        if (allConditionsValid) onPreviewMatches(currentConditions) else emptyList()
-    }
-    val matchCount = remember(currentConditions, matchingTransactions) {
-        if (!allConditionsValid) 0
-        else if (matchingTransactions.isNotEmpty()) matchingTransactions.size
-        else onPreviewCount(currentConditions)
+    var matchingTransactions by remember { mutableStateOf<List<Transaction>>(emptyList()) }
+    var matchCount by remember { mutableStateOf(0) }
+    LaunchedEffect(currentConditions, allConditionsValid) {
+        if (!allConditionsValid) {
+            matchingTransactions = emptyList()
+            matchCount = 0
+            return@LaunchedEffect
+        }
+        delay(250)
+        val (matches, count) = withContext(Dispatchers.Default) {
+            val list = onPreviewMatches(currentConditions)
+            val c = if (list.isNotEmpty()) list.size else onPreviewCount(currentConditions)
+            list to c
+        }
+        matchingTransactions = matches
+        matchCount = count
     }
 
     Column(
@@ -174,38 +188,16 @@ fun RuleEditorContent(
             },
             label = { Text("Rule Name") },
             placeholder = { Text("Enter custom rule name") },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-            },
+            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp)) },
             trailingIcon = if (name.isNotEmpty()) {
                 {
-                    IconButton(
-                        onClick = {
-                            haptics.tick()
-                            name = ""
-                            hasCustomName = true
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Clear,
-                            contentDescription = "Clear Rule Name",
-                            modifier = Modifier.size(18.dp)
-                        )
+                    IconButton(onClick = { haptics.tick(); name = ""; hasCustomName = true }) {
+                        Icon(Icons.Default.Clear, contentDescription = "Clear Rule Name", modifier = Modifier.size(18.dp))
                     }
                 }
             } else null,
             supportingText = {
-                Text(
-                    text = if (hasCustomName) {
-                        "Custom rule name"
-                    } else {
-                        "Defaults to merchant name — tap to overwrite"
-                    }
-                )
+                Text(if (hasCustomName) "Custom rule name" else "Defaults to merchant name — tap to overwrite")
             },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
@@ -248,6 +240,20 @@ fun RuleEditorContent(
         Spacer(modifier = Modifier.height(8.dp))
 
         conditions.forEachIndexed { index, condition ->
+            if (index > 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    OrbitBadge(
+                        text = "and",
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             ConditionEditorRow(
                 condition = condition,
                 accounts = accounts,

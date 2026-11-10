@@ -48,6 +48,11 @@ class SettingsViewModel(
             }
         }
         scope.launch {
+            repository.accounts.collect { accounts ->
+                _uiState.update { it.copy(accounts = accounts) }
+            }
+        }
+        scope.launch {
             repository.pendingSettingsSubpage.collect { subpage ->
                 _uiState.update { it.copy(activeSubpage = subpage) }
                 if (subpage == "data") {
@@ -315,6 +320,13 @@ class SettingsViewModel(
         }
     }
 
+    fun updateHouseholdMemberAccess(userId: Long, accessLevel: String) {
+        scope.launch {
+            repository.updateHouseholdMemberUserAccess(userId, accessLevel)
+            loadHouseholdSharing()
+        }
+    }
+
     fun revokePartnerShare(shareId: Long) {
         scope.launch {
             repository.revokePartnerShare(shareId)
@@ -333,8 +345,12 @@ class SettingsViewModel(
     fun reapplyAllRules() {
         _uiState.update { it.copy(statusMessage = "Reapplying rules across all transactions...") }
         scope.launch {
+            val initialTx = repository.transactions.value
+            val processed = initialTx.size
             repository.runRulesOnAllTransactions()
-            _uiState.update { it.copy(statusMessage = "Rules reapplied successfully") }
+            val afterTx = repository.transactions.value
+            val updated = initialTx.zip(afterTx).count { (before, after) -> before != after }
+            _uiState.update { it.copy(statusMessage = "Reapplied rules to $processed transactions ($updated updated)") }
         }
     }
 

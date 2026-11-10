@@ -26,8 +26,10 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryBudget
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -36,6 +38,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 fun CategoryBudgetEditorModal(
     category: Category,
     existingBudget: CategoryBudget?,
+    averageSpentCents: Cents = 0L,
     onSave: (amountCents: Cents, rollover: Boolean) -> Unit,
     onDelete: (budgetId: Long) -> Unit,
     onDismiss: () -> Unit,
@@ -44,6 +47,7 @@ fun CategoryBudgetEditorModal(
     val haptics = LocalOrbitHaptics.current
     var amountCents by remember { mutableLongStateOf(existingBudget?.amountCents ?: 0L) }
     var rollover by remember { mutableStateOf(existingBudget?.rollover ?: false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
 
     OrbitModalSheet(
         onDismissRequest = onDismiss,
@@ -70,6 +74,15 @@ fun CategoryBudgetEditorModal(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            if (averageSpentCents > 0L) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "${MoneyUtils.formatCents(averageSpentCents)} average over this range",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             OrbitSwitchRow(
@@ -89,8 +102,8 @@ fun CategoryBudgetEditorModal(
                 if (existingBudget != null) {
                     TextButton(
                         onClick = {
-                            haptics.confirm()
-                            onDelete(existingBudget.id)
+                            haptics.tick()
+                            showDeleteConfirmation = true
                         },
                         colors = ButtonDefaults.textButtonColors(contentColor = OrbitColorTokens.Red)
                     ) {
@@ -116,5 +129,21 @@ fun CategoryBudgetEditorModal(
                 }
             }
         }
+    }
+
+    if (showDeleteConfirmation && existingBudget != null) {
+        OrbitConfirmationDialog(
+            title = "Delete Budget",
+            message = "Are you sure you want to remove the budget for ${category.name}?",
+            confirmText = "Delete",
+            dismissText = "Cancel",
+            isDestructive = true,
+            onConfirm = {
+                showDeleteConfirmation = false
+                haptics.confirm()
+                onDelete(existingBudget.id)
+            },
+            onDismiss = { showDeleteConfirmation = false }
+        )
     }
 }

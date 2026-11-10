@@ -58,12 +58,6 @@ val Category.labelWithEmoji: String
     get() = displayEmoji?.let { "$it $name" } ?: name
 
 @Serializable
-data class CategoryGroup(
-    val name: String,
-    val categories: List<Category> = emptyList()
-)
-
-@Serializable
 enum class RuleConditionField {
     MERCHANT,
     AMOUNT,

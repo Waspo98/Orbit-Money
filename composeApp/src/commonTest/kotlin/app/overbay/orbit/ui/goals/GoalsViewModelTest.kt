@@ -89,31 +89,25 @@ class GoalsViewModelTest {
     }
 
     @Test
-    fun testDepositToGoal_addsAmountAndCompletesGoal() = runTest(testDispatcher) {
+    fun testSaveGoalWithAllocations_updatesGoalAndAllocations() = runTest(testDispatcher) {
+        val account = Account(id = 1L, name = "Savings", type = AccountType.SAVINGS, currentBalanceCents = 1_000_000L)
+        repository.saveAccount(account)
+
         val goal = Goal(
             id = 10L,
             name = "New Laptop",
             targetAmountCents = 200000L, // $2,000
-            currentAmountCents = 150000L // $1,500
+            currentAmountCents = 210000L // $2,100
         )
-        repository.saveGoal(goal)
 
         val collectJob = launch(testDispatcher) {
             viewModel.uiState.collect {}
         }
         testScheduler.advanceUntilIdle()
 
-        // Open dialog
-        viewModel.openAllocationDialog(goal)
-        testScheduler.advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.showAllocationDialog)
-        assertEquals(10L, viewModel.uiState.value.allocatingGoal?.id)
-
-        // Deposit $600 (60000L) -> should reach $2,100 and complete
-        viewModel.depositToGoal(goalId = 10L, depositAmountCents = 60000L)
+        viewModel.saveGoalWithAllocations(goal, stealFromOthers = false)
         testScheduler.advanceUntilIdle()
 
-        assertFalse(viewModel.uiState.value.showAllocationDialog)
         val updatedGoal = repository.goals.value.find { it.id == 10L }
         assertNotNull(updatedGoal)
         assertEquals(210000L, updatedGoal.currentAmountCents)
@@ -125,27 +119,23 @@ class GoalsViewModelTest {
     }
 
     @Test
-    fun testDepositToGoal_negativeDepositClampedToZero() = runTest(testDispatcher) {
-        val goal = Goal(
-            id = 20L,
-            name = "Car Down Payment",
-            targetAmountCents = 500000L,
-            currentAmountCents = 40000L // $400
-        )
-        repository.saveGoal(goal)
+    fun testMoveGoal_reordersActiveGoalsAndPersistsSortOrder() = runTest(testDispatcher) {
+        val g1 = Goal(id = 1L, name = "Goal A", targetAmountCents = 500000L, currentAmountCents = 100000L, sortOrder = 0)
+        val g2 = Goal(id = 2L, name = "Goal B", targetAmountCents = 500000L, currentAmountCents = 100000L, sortOrder = 1)
+        repository.saveGoal(g1)
+        repository.saveGoal(g2)
 
         val collectJob = launch(testDispatcher) {
             viewModel.uiState.collect {}
         }
         testScheduler.advanceUntilIdle()
 
-        // Withdraw $500 (-50000L) -> should clamp to 0L
-        viewModel.depositToGoal(goalId = 20L, depositAmountCents = -50000L)
+        viewModel.moveGoal(completedGroup = false, fromIndex = 0, toIndex = 1)
         testScheduler.advanceUntilIdle()
 
-        val updatedGoal = repository.goals.value.find { it.id == 20L }
-        assertNotNull(updatedGoal)
-        assertEquals(0L, updatedGoal.currentAmountCents)
+        val active = viewModel.uiState.value.activeGoals
+        assertEquals(2L, active[0].id)
+        assertEquals(1L, active[1].id)
 
         collectJob.cancel()
     }

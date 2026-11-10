@@ -21,7 +21,6 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -79,12 +78,13 @@ class RetirementViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(2, state.investmentAccounts.size)
-        assertTrue(state.useConnectedAccounts)
+        assertFalse(state.currentBalanceOverridden)
+        assertEquals(225_000_00L, state.connectedBalanceCents)
         assertEquals(225_000_00L, state.currentBalanceCents)
     }
 
     @Test
-    fun testManualBalanceOverride_disablesConnectedAccounts() = runTest(testDispatcher) {
+    fun testManualBalanceOverride_setsOverriddenFlag() = runTest(testDispatcher) {
         val inv1 = Account(id = 1L, name = "Vanguard 401k", type = AccountType.INVESTMENT, currentBalanceCents = 150_000_00L)
         repository.saveAccount(inv1)
         testScheduler.advanceUntilIdle()
@@ -93,21 +93,20 @@ class RetirementViewModelTest {
         testScheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertFalse(state.useConnectedAccounts)
+        assertTrue(state.currentBalanceOverridden)
         assertEquals(300_000_00L, state.currentBalanceCents)
     }
 
     @Test
-    fun testAgeChange_recalculatesRetirementScenario() = runTest(testDispatcher) {
-        viewModel.setCurrentAge(40.0)
+    fun testRetirementAgeChange_recalculatesRetirementScenario() = runTest(testDispatcher) {
         viewModel.setRetirementAge(65.0)
         testScheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(40.0, state.currentAge)
+        assertEquals(35.0, state.currentAge)
         assertEquals(65.0, state.retirementAge)
-        // 25 years = 300 months
-        assertEquals(300, state.scenario.monthsToRetirement)
+        // 30 years = 360 months
+        assertEquals(360, state.scenario.monthsToRetirement)
     }
 
     @Test

@@ -40,6 +40,7 @@ import kotlin.math.abs
 fun AssetLiabilityBreakdownCard(
     snapshot: NetWorthSnapshot,
     isTwoPane: Boolean = false,
+    onAccountsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (isTwoPane) {
@@ -49,6 +50,8 @@ fun AssetLiabilityBreakdownCard(
         ) {
             OrbitSectionCard(
                 title = "Balance Allocation",
+                actionText = "Accounts",
+                onActionClick = onAccountsClick,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 AllocationBar(snapshot = snapshot)
@@ -79,6 +82,8 @@ fun AssetLiabilityBreakdownCard(
     } else {
         OrbitSectionCard(
             title = "Asset & Liability Breakdown",
+            actionText = "Accounts",
+            onActionClick = onAccountsClick,
             modifier = modifier
         ) {
             AllocationBar(snapshot = snapshot)
@@ -109,24 +114,27 @@ fun AllocationBar(
 ) {
     val cash = maxOf(0L, snapshot.cashCents)
     val investments = maxOf(0L, snapshot.investmentsCents)
-    val realEstateOther = maxOf(0L, snapshot.realEstateEquityCents + snapshot.otherCents)
+    val realEstate = maxOf(0L, snapshot.realEstateEquityCents)
     val credit = maxOf(0L, abs(snapshot.creditDebtCents))
     val loans = maxOf(0L, abs(snapshot.loanDebtCents))
+    val other = maxOf(0L, snapshot.otherCents)
 
-    val total = cash + investments + realEstateOther + credit + loans
+    val total = cash + investments + realEstate + credit + loans + other
     if (total <= 0L) return
 
     val cashFraction = cash.toFloat() / total.toFloat()
     val invFraction = investments.toFloat() / total.toFloat()
-    val reFraction = realEstateOther.toFloat() / total.toFloat()
+    val reFraction = realEstate.toFloat() / total.toFloat()
     val creditFraction = credit.toFloat() / total.toFloat()
     val loansFraction = loans.toFloat() / total.toFloat()
+    val otherFraction = other.toFloat() / total.toFloat()
 
     val cashColor = MaterialTheme.colorScheme.primary
     val invColor = MaterialTheme.colorScheme.secondary
     val reColor = MaterialTheme.colorScheme.tertiary
     val creditColor = OrbitColorTokens.Amber
     val loanColor = OrbitColorTokens.Red
+    val otherColor = MaterialTheme.colorScheme.outline
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -138,7 +146,7 @@ fun AllocationBar(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Horizontal Segmented Bar
+        // Horizontal Segmented Bar (6 Buckets)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -161,11 +169,14 @@ fun AllocationBar(
             if (loansFraction > 0.005f) {
                 Box(modifier = Modifier.weight(loansFraction).fillMaxHeight().background(loanColor))
             }
+            if (otherFraction > 0.005f) {
+                Box(modifier = Modifier.weight(otherFraction).fillMaxHeight().background(otherColor))
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Compact Legend
+        // Compact Legend (6 Buckets)
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
@@ -176,16 +187,19 @@ fun AllocationBar(
                 AllocationLegendItem(label = "Cash (${(cashFraction * 100).toInt()}%)", color = cashColor)
             }
             if (investments > 0L) {
-                AllocationLegendItem(label = "Invest (${(invFraction * 100).toInt()}%)", color = invColor)
+                AllocationLegendItem(label = "Investments (${(invFraction * 100).toInt()}%)", color = invColor)
             }
-            if (realEstateOther > 0L) {
+            if (realEstate > 0L) {
                 AllocationLegendItem(label = "Real Estate (${(reFraction * 100).toInt()}%)", color = reColor)
             }
             if (credit > 0L) {
-                AllocationLegendItem(label = "Cards (${(creditFraction * 100).toInt()}%)", color = creditColor)
+                AllocationLegendItem(label = "Credit Cards (${(creditFraction * 100).toInt()}%)", color = creditColor)
             }
             if (loans > 0L) {
                 AllocationLegendItem(label = "Loans (${(loansFraction * 100).toInt()}%)", color = loanColor)
+            }
+            if (other > 0L) {
+                AllocationLegendItem(label = "Other (${(otherFraction * 100).toInt()}%)", color = otherColor)
             }
         }
     }
@@ -263,8 +277,8 @@ private fun LiabilitiesSectionContent(snapshot: NetWorthSnapshot) {
 
     Spacer(modifier = Modifier.height(6.dp))
 
-    BreakdownRow("Credit Card Debt", snapshot.creditDebtCents, isNegative = true)
-    BreakdownRow("Loans & Mortgages", snapshot.loanDebtCents, isNegative = true)
+    BreakdownRow("Credit Cards", snapshot.creditDebtCents, isNegative = true)
+    BreakdownRow("Loans", snapshot.loanDebtCents, isNegative = true)
 }
 
 @Composable

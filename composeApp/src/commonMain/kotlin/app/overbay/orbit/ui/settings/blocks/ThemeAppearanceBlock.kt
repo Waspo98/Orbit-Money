@@ -59,32 +59,30 @@ fun ThemeAppearanceBlock(
             }
         }
 
-        if (preferences.themeMode != OrbitThemeMode.LIGHT) {
-            Spacer(modifier = Modifier.height(14.dp))
-            Text(
-                text = "Dark Style",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            text = "Dark Theme Style",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(6.dp))
 
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = !preferences.amoledDarkMode,
-                    onClick = { onAmoledDarkChange(false) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    icon = {},
-                    label = { Text("Soft Dark", style = MaterialTheme.typography.labelMedium) }
-                )
-                SegmentedButton(
-                    selected = preferences.amoledDarkMode,
-                    onClick = { onAmoledDarkChange(true) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    icon = {},
-                    label = { Text("AMOLED Black", style = MaterialTheme.typography.labelMedium) }
-                )
-            }
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = !preferences.amoledDarkMode,
+                onClick = { onAmoledDarkChange(false) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                icon = {},
+                label = { Text("Soft Dark", style = MaterialTheme.typography.labelMedium) }
+            )
+            SegmentedButton(
+                selected = preferences.amoledDarkMode,
+                onClick = { onAmoledDarkChange(true) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                icon = {},
+                label = { Text("AMOLED Black", style = MaterialTheme.typography.labelMedium) }
+            )
         }
 
         Spacer(modifier = Modifier.height(14.dp))

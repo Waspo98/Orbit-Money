@@ -26,8 +26,10 @@ class SpendingTrendsViewModel(
     private val _selectedPeriod = MutableStateFlow(TrendsPeriod.SIX_MONTHS)
     private val _chartMode = MutableStateFlow(TrendsChartMode.CASH_FLOW)
     private val _selectedCategoryId = MutableStateFlow<Long?>(null)
-    private val _scrubbedIndex = MutableStateFlow<Int?>(null)
-    private val _scrubbedBarItem = MutableStateFlow<SpendingBarItem?>(null)
+    private val _flowScrubIndex = MutableStateFlow<Int?>(null)
+    private val _flowScrubItem = MutableStateFlow<SpendingBarItem?>(null)
+    private val _categoryScrubIndex = MutableStateFlow<Int?>(null)
+    private val _categoryScrubItem = MutableStateFlow<SpendingBarItem?>(null)
     private val _pendingInspectMonth = MutableStateFlow<String?>(null)
     private val _isInspectMonthDialogOpen = MutableStateFlow(false)
     private val _isBudgetModalOpen = MutableStateFlow(false)
@@ -60,27 +62,30 @@ class SpendingTrendsViewModel(
             _selectedCategoryId
         ) { mode, categoryId -> mode to categoryId },
         combine(
-            _scrubbedIndex,
-            _scrubbedBarItem,
-            _pendingInspectMonth,
+            _flowScrubIndex,
+            _flowScrubItem,
+            _categoryScrubIndex,
+            _categoryScrubItem,
+            _pendingInspectMonth
+        ) { flowIdx, flowItem, catIdx, catItem, inspectMonth ->
+            ScrubData(flowIdx, flowItem, catIdx, catItem, inspectMonth)
+        },
+        combine(
             _isInspectMonthDialogOpen,
             _isBudgetModalOpen
-        ) { scrubIdx, scrubItem, inspectMonth, isInspectOpen, isBudgetOpen ->
-            ModalAndScrubData(scrubIdx, scrubItem, inspectMonth, isInspectOpen, isBudgetOpen)
-        }
-    ) { computed, (mode, categoryId), modalData ->
+        ) { isInspectOpen, isBudgetOpen -> isInspectOpen to isBudgetOpen }
+    ) { computed, (mode, categoryId), scrubData, (isInspectOpen, isBudgetOpen) ->
         val overview = computed.overview
         val budgets = computed.budgets
 
         val validCategoryId = if (categoryId != null && overview.categoryTrends.any { it.category.id == categoryId }) {
             categoryId
-        } else if (mode == TrendsChartMode.CATEGORY_TREND) {
-            overview.categoryTrends.firstOrNull()?.category?.id
         } else {
             null
         }
 
-        val categoryBudget = validCategoryId?.let { catId -> budgets.find { it.categoryId == catId } }
+        val activeCategoryId = validCategoryId ?: overview.categoryTrends.firstOrNull()?.category?.id
+        val categoryBudget = activeCategoryId?.let { catId -> budgets.find { it.categoryId == catId } }
 
         SpendingTrendsUiState(
             overview = overview,
@@ -88,11 +93,13 @@ class SpendingTrendsViewModel(
             chartMode = mode,
             selectedCategoryId = validCategoryId,
             selectedCategoryBudget = categoryBudget,
-            scrubbedIndex = modalData.scrubIndex,
-            scrubbedBarItem = modalData.scrubItem,
-            pendingInspectMonth = modalData.inspectMonth,
-            isInspectMonthDialogOpen = modalData.isInspectOpen,
-            isBudgetModalOpen = modalData.isBudgetOpen,
+            flowScrubIndex = scrubData.flowIndex,
+            flowScrubItem = scrubData.flowItem,
+            categoryScrubIndex = scrubData.categoryIndex,
+            categoryScrubItem = scrubData.categoryItem,
+            pendingInspectMonth = scrubData.inspectMonth,
+            isInspectMonthDialogOpen = isInspectOpen,
+            isBudgetModalOpen = isBudgetOpen,
             isLoading = false
         )
     }.flowOn(computeDispatcher).stateIn(
@@ -116,30 +123,33 @@ class SpendingTrendsViewModel(
 
     fun selectCategory(categoryId: Long?) {
         _selectedCategoryId.value = categoryId
-        if (categoryId != null) {
-            _chartMode.value = TrendsChartMode.CATEGORY_TREND
-        } else {
-            _chartMode.value = TrendsChartMode.CASH_FLOW
-        }
+        _chartMode.value = if (categoryId != null) TrendsChartMode.CATEGORY_TREND else TrendsChartMode.CASH_FLOW
         clearScrub()
     }
 
-    fun onScrubBar(index: Int?, item: SpendingBarItem?) {
-        _scrubbedIndex.value = index
-        _scrubbedBarItem.value = item
+    fun onScrubFlowBar(index: Int?, item: SpendingBarItem?) {
+        _flowScrubIndex.value = index
+        _flowScrubItem.value = item
     }
+
+    fun onScrubCategoryBar(index: Int?, item: SpendingBarItem?) {
+        _categoryScrubIndex.value = index
+        _categoryScrubItem.value = item
+    }
+
+    fun onScrubBar(index: Int?, item: SpendingBarItem?) = onScrubFlowBar(index, item)
 
     fun selectScrubItem(index: Int?, item: SpendingBarItem?) = onScrubBar(index, item)
 
     fun clearScrub() {
-        _scrubbedIndex.value = null
-        _scrubbedBarItem.value = null
+        _flowScrubIndex.value = null
+        _flowScrubItem.value = null
+        _categoryScrubIndex.value = null
+        _categoryScrubItem.value = null
     }
 
     fun clearCategorySelection() {
-        _selectedCategoryId.value = null
-        _chartMode.value = TrendsChartMode.CASH_FLOW
-        clearScrub()
+        selectCategory(null)
     }
 
     fun openInspectMonthDialog(month: String) {
@@ -180,11 +190,11 @@ class SpendingTrendsViewModel(
         val period: TrendsPeriod
     )
 
-    private data class ModalAndScrubData(
-        val scrubIndex: Int?,
-        val scrubItem: SpendingBarItem?,
-        val inspectMonth: String?,
-        val isInspectOpen: Boolean,
-        val isBudgetOpen: Boolean
+    private data class ScrubData(
+        val flowIndex: Int?,
+        val flowItem: SpendingBarItem?,
+        val categoryIndex: Int?,
+        val categoryItem: SpendingBarItem?,
+        val inspectMonth: String?
     )
 }

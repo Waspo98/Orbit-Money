@@ -55,6 +55,7 @@ import app.overbay.orbit.domain.UpcomingScheduleHelper
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.upcoming.UpcomingUiState
 import app.overbay.orbit.ui.upcoming.UpcomingViewModel
 import app.overbay.orbit.ui.upcoming.sheets.RecurringItemEditorContent
@@ -102,7 +103,8 @@ fun UpcomingDetailInspectorPane(
                     onDelete = { viewModel.deleteUpcoming(it) },
                     onDismiss = {
                         if (state.inspectingItemId != null) viewModel.closeEditorSheet() else onClosePane()
-                    }
+                    },
+                    onViewHistory = { viewModel.openHistoryModal(it) }
                 )
             }
             UpcomingInspectorSubMode.DETAIL -> {
@@ -142,9 +144,24 @@ private fun UpcomingReadOnlyDetailContent(
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
+    var showDeleteConfirm by remember(item.id) { mutableStateOf(false) }
     val isExpense = item.direction.lowercase() != "income"
     val amountColor = if (isExpense) colors.expense else colors.income
     val effectiveAmountCents = projected?.amountCents ?: item.amountCents
+
+    if (showDeleteConfirm) {
+        OrbitConfirmationDialog(
+            title = "Delete Recurring Schedule",
+            message = "Are you sure you want to delete \"${item.name.ifBlank { item.merchant ?: "this item" }}\"? This will remove all upcoming projections.",
+            confirmText = "Delete",
+            isDestructive = true,
+            onConfirm = {
+                showDeleteConfirm = false
+                onDelete()
+            },
+            onDismiss = { showDeleteConfirm = false }
+        )
+    }
 
     val catColor = try {
         val hex = category?.color?.trim()?.removePrefix("#") ?: "9E9E9E"
@@ -255,7 +272,7 @@ private fun UpcomingReadOnlyDetailContent(
                 onClick = onMarkPaid
             )
             UpcomingPillAction(label = "View History", onClick = onViewHistory)
-            UpcomingPillAction(label = "Delete", isDestructive = true, onClick = onDelete)
+            UpcomingPillAction(label = "Delete", isDestructive = true, onClick = { showDeleteConfirm = true })
         }
     }
 }

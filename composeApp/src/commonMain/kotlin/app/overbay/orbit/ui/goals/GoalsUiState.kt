@@ -15,8 +15,6 @@ data class GoalsUiState(
     val inspectingGoalId: Long? = null,
     val editingGoal: Goal? = null,
     val showEditorSheet: Boolean = false,
-    val allocatingGoal: Goal? = null,
-    val showAllocationDialog: Boolean = false,
     val isReorderMode: Boolean = false,
     val showAccountsOverview: Boolean = true,
     val isLoading: Boolean = false
@@ -25,5 +23,5 @@ data class GoalsUiState(
     val completedGoals get() = goals.filter { it.isCompleted }
     val overallProgressRatio get() = if (totalTargetCents > 0L) totalSavedCents.toDouble() / totalTargetCents.toDouble() else 0.0
     val inspectingGoal: Goal?
-        get() = goals.find { it.id == inspectingGoalId } ?: editingGoal ?: allocatingGoal
+        get() = goals.find { it.id == inspectingGoalId } ?: editingGoal
 }

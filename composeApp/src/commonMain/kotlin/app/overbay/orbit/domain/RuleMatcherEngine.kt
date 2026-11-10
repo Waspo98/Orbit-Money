@@ -25,13 +25,9 @@ object RuleMatcherEngine {
         val compiledRules = compileSortedRules(rules)
         var anyChanged = false
         val updated = transactions.map { txn ->
-            if (txn.editSource == EditSource.USER) {
-                txn
-            } else {
-                val next = computeCompiledEdits(txn, compiledRules)
-                if (next !== txn) anyChanged = true
-                next
-            }
+            val next = computeCompiledEdits(txn, compiledRules)
+            if (next !== txn) anyChanged = true
+            next
         }
         return if (anyChanged) updated else transactions
     }
@@ -110,7 +106,6 @@ object RuleMatcherEngine {
         transaction: Transaction,
         rules: List<TransactionRule>
     ): Transaction {
-        if (transaction.editSource == EditSource.USER) return transaction
         return computeCompiledEdits(transaction, rules.map(::compileRule))
     }
 
@@ -136,7 +131,6 @@ object RuleMatcherEngine {
         precomputedDescLower: String? = null
     ): Transaction {
         if (transaction.editSource == EditSource.USER) return transaction
-
         var editedMerchant: String? = null
         var editedMerchantSource: String? = null
         var editedCategoryId: Long? = null

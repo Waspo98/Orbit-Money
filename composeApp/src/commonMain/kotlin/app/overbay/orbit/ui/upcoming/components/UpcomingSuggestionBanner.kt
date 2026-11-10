@@ -96,7 +96,7 @@ fun UpcomingSuggestionBanner(
                         onAccept(top)
                     }
                 ) {
-                    Text("Add Bill")
+                    Text("Review")
                 }
             }
         }

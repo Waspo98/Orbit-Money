@@ -7,6 +7,7 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.HouseholdIncomeRecord
 import app.overbay.orbit.data.model.HouseholdInfo
 import app.overbay.orbit.data.model.HouseholdMember
+import app.overbay.orbit.data.model.HouseholdRole
 import app.overbay.orbit.data.model.HouseholdShare
 import app.overbay.orbit.data.model.HouseholdSharingState
 import app.overbay.orbit.data.model.ImportBatchRecord
@@ -81,7 +82,10 @@ suspend fun OrbitRepository.setMhaAccountDefault(accountId: Long, eligible: Bool
 suspend fun OrbitRepository.setMhaCategoryDefault(categoryId: Long, eligible: Boolean) {
     val current = categories.value
     val target = current.find { it.id == categoryId } ?: return
-    val updated = target.copy(mhaDefaultEligible = eligible)
+    val updated = target.copy(
+        mhaDefaultEligible = eligible,
+        mhaDefaultIgnored = if (eligible) false else target.mhaDefaultIgnored
+    )
     commitSnapshot(snapshot.value.copy(categories = current.map { if (it.id == categoryId) updated else it }))
     if (storageMode.value == StorageMode.SELF_HOSTED) {
         createApiClient().putMhaCategoryDefault(categoryId, eligible)
@@ -91,7 +95,10 @@ suspend fun OrbitRepository.setMhaCategoryDefault(categoryId: Long, eligible: Bo
 suspend fun OrbitRepository.setMhaCategoryIgnoreDefault(categoryId: Long, ignored: Boolean) {
     val current = categories.value
     val target = current.find { it.id == categoryId } ?: return
-    val updated = target.copy(mhaDefaultIgnored = ignored)
+    val updated = target.copy(
+        mhaDefaultIgnored = ignored,
+        mhaDefaultEligible = if (ignored) false else target.mhaDefaultEligible
+    )
     commitSnapshot(snapshot.value.copy(categories = current.map { if (it.id == categoryId) updated else it }))
     if (storageMode.value == StorageMode.SELF_HOSTED) {
         createApiClient().putMhaCategoryIgnoreDefault(categoryId, ignored)
@@ -219,7 +226,8 @@ suspend fun OrbitRepository.inviteHouseholdPartner(email: String, role: String =
         created
     } else {
         val nextId = (snapshot.value.shares.maxOfOrNull { it.id } ?: 0L) + 1L
-        val share = HouseholdShare(id = nextId, invitedEmail = email, accessLevel = accessLevel)
+        val parsedRole = HouseholdRole.entries.find { it.name.equals(role, ignoreCase = true) } ?: HouseholdRole.MEMBER
+        val share = HouseholdShare(id = nextId, invitedEmail = email, role = parsedRole, accessLevel = accessLevel)
         saveHouseholdShare(share)
         share
     }

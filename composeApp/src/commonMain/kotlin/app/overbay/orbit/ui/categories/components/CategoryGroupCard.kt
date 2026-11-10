@@ -211,6 +211,13 @@ private fun CategoryRowItem(
                         contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                     )
                     Spacer(modifier = Modifier.width(8.dp))
+                } else if (showMhaBadge && cat.mhaDefaultIgnored) {
+                    OrbitBadge(
+                        text = "MHA Ignored",
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                 }
                 Text(
                     text = MoneyUtils.formatCents(summary.totalAmountCents),

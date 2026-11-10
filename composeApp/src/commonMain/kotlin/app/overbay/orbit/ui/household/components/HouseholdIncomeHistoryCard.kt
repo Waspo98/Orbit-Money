@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -38,12 +39,14 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.EmptyStateCard
-import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.household.HouseholdCalculations
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlin.math.min
+import kotlin.math.roundToLong
 import kotlinx.datetime.LocalDate
 
 @Composable
@@ -89,37 +92,95 @@ fun HouseholdIncomeHistoryCard(
         } else {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 sortedRecords.forEach { record ->
                     val memberName = memberMap[record.memberId]?.name ?: "Member #${record.memberId}"
-                    val subtitleText = buildString {
-                        append("Effective ${record.effectiveDate}")
-                        if (!record.notes.isNullOrBlank()) {
-                            append(" • ${record.notes}")
-                        }
-                    }
-                    OrbitCompactListRow(
-                        title = memberName,
-                        subtitle = subtitleText,
-                        trailingContent = {
-                            Column(horizontalAlignment = Alignment.End) {
+                    val periods = HouseholdCalculations.periodsPerYear(record.payFrequency)
+                    val netPayAnnual = record.netPayPerPeriodCents * periods
+
+                    val gross = record.grossIncomeAnnualCents
+                    val empPct = record.employeeContributionPercent
+                    val matchPct = record.employerMatchPercent
+                    val limitPct = if (record.employerMatchLimitPercent > 0.0) record.employerMatchLimitPercent else empPct
+                    val cap = record.employerMatchAnnualCapCents
+                    val eligiblePct = min(empPct, limitPct)
+                    val matchRate = if (matchPct > 0.0) matchPct / 100.0 else 0.0
+                    val uncappedMatch = if (eligiblePct > 0.0 && gross > 0L) {
+                        ((gross.toDouble() * eligiblePct / 100.0) * matchRate).roundToLong()
+                    } else 0L
+                    val employerMatchAnnual = if (cap > 0L) min(cap, uncappedMatch) else uncappedMatch
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Column 1: Member Name & Date
+                            Column(modifier = Modifier.weight(1.2f)) {
                                 Text(
-                                    text = "${MoneyUtils.formatCents(record.grossIncomeAnnualCents, showCents = false)} / yr",
+                                    text = memberName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = record.effectiveDate + if (!record.notes.isNullOrBlank()) " • ${record.notes}" else "",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // Column 2: Annual Gross & Net Pay
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                horizontalAlignment = Alignment.End
+                            ) {
+                                Text(
+                                    text = MoneyUtils.formatCents(record.grossIncomeAnnualCents, showCents = false),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
-                                if (record.netPayPerPeriodCents > 0L) {
-                                    Text(
-                                        text = "${MoneyUtils.formatCents(record.netPayPerPeriodCents, showCents = false)} / period",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.outline
-                                    )
-                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "${MoneyUtils.formatCents(netPayAnnual, showCents = false)} net",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            // Column 3: Annual Employer Match
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                horizontalAlignment = Alignment.End
+                            ) {
+                                Text(
+                                    text = MoneyUtils.formatCents(employerMatchAnnual, showCents = false),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Employer match",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
-                    )
+                    }
                 }
             }
         }

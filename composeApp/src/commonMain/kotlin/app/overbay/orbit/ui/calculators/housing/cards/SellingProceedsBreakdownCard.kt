@@ -6,88 +6,118 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.overbay.orbit.data.model.SellingProceedsResult
+import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.ui.components.OrbitMiniStatRow
+import app.overbay.orbit.ui.calculators.housing.HousingUiState
+import app.overbay.orbit.ui.components.OrbitSectionCard
 
 @Composable
 fun SellingProceedsBreakdownCard(
-    proceeds: SellingProceedsResult,
-    onUseNetProceeds: () -> Unit,
+    uiState: HousingUiState,
+    onSalePriceChange: (Cents?) -> Unit,
+    onRemainingMortgageChange: (Cents?) -> Unit,
+    onAgentCommissionChange: (Double?) -> Unit,
+    onSellerClosingChange: (Double?) -> Unit,
+    onProratedPropertyTaxChange: (Cents?) -> Unit,
+    onMiscRepairsChange: (Cents?) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-        modifier = modifier.fillMaxWidth()
+    OrbitSectionCard(
+        title = "Selling",
+        subtitle = "Estimate equity, sales commission, and net proceeds",
+        modifier = modifier
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = "Estimated Net Proceeds",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                HousingMoneyField(
+                    label = "Estimated Sale Price",
+                    valueCents = uiState.salePriceCents,
+                    placeholder = "$0",
+                    onValueChange = onSalePriceChange,
+                    modifier = Modifier.weight(1f)
                 )
-                Text(
-                    text = MoneyUtils.formatCents(proceeds.netProceedsCents),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                HousingMoneyField(
+                    label = "Remaining Mortgage Balance",
+                    valueCents = uiState.remainingMortgageCents,
+                    placeholder = "$0",
+                    onValueChange = onRemainingMortgageChange,
+                    modifier = Modifier.weight(1f)
                 )
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
-            ProceedsLineItem("Sale Price", MoneyUtils.formatCents(proceeds.salePriceCents))
-            ProceedsLineItem("Agent Commission", "-${MoneyUtils.formatCents(proceeds.agentCommissionCents)}")
-            ProceedsLineItem("Seller Closing Costs", "-${MoneyUtils.formatCents(proceeds.sellerClosingCents)}")
-            ProceedsLineItem("Prorated Tax & Repairs", "-${MoneyUtils.formatCents(proceeds.proratedPropertyTaxCents + proceeds.miscRepairsCents)}")
-            ProceedsLineItem("Total Selling Fees", "-${MoneyUtils.formatCents(proceeds.totalSellingFeesCents)}", isBold = true)
-            ProceedsLineItem("Remaining Mortgage Payoff", "-${MoneyUtils.formatCents(proceeds.remainingMortgageCents)}")
 
-            if (proceeds.netProceedsCents > 0L) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Button(
-                    onClick = onUseNetProceeds,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Apply Net Proceeds as Down Payment", style = MaterialTheme.typography.labelSmall)
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                HousingPercentField(
+                    label = "Agent Commission (%)",
+                    valuePercent = uiState.agentCommissionPercent,
+                    placeholder = "5%",
+                    onValueChange = onAgentCommissionChange,
+                    modifier = Modifier.weight(1f)
+                )
+                HousingPercentField(
+                    label = "Seller Closing Costs (%)",
+                    valuePercent = uiState.sellerClosingPercent,
+                    placeholder = "2%",
+                    onValueChange = onSellerClosingChange,
+                    modifier = Modifier.weight(1f)
+                )
             }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                HousingMoneyField(
+                    label = "Prorated Property Tax",
+                    valueCents = uiState.proratedPropertyTaxCents,
+                    placeholder = "$2,000",
+                    onValueChange = onProratedPropertyTaxChange,
+                    modifier = Modifier.weight(1f)
+                )
+                HousingMoneyField(
+                    label = "Miscellaneous Repairs",
+                    valueCents = uiState.miscRepairsCents,
+                    placeholder = "$1,000",
+                    onValueChange = onMiscRepairsChange,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            Spacer(modifier = Modifier.height(2.dp))
+
+            // 4 Selling Result Rows
+            HousingResultRow(
+                label = "Agent commission",
+                value = uiState.agentCommissionCents?.let { MoneyUtils.formatCents(it, showCents = false) }
+            )
+            HousingResultRow(
+                label = "Seller closing costs",
+                value = uiState.sellerClosingCents?.let { MoneyUtils.formatCents(it, showCents = false) }
+            )
+            HousingResultRow(
+                label = "Total fees",
+                value = uiState.totalSellingFeesCents?.let { MoneyUtils.formatCents(it, showCents = false) }
+            )
+            HousingResultRow(
+                label = "Net proceeds",
+                value = uiState.netProceedsCents?.let { MoneyUtils.formatCents(it, showCents = false) },
+                isBold = true
+            )
         }
     }
-}
-
-@Composable
-private fun ProceedsLineItem(
-    label: String,
-    value: String,
-    isBold: Boolean = false
-) {
-    OrbitMiniStatRow(
-        label = label,
-        value = value,
-        valueColor = if (isBold) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
-    )
 }

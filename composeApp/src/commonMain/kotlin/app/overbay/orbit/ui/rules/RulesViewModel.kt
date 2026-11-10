@@ -3,6 +3,8 @@ package app.overbay.orbit.ui.rules
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.*
+import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleCondition
 import app.overbay.orbit.data.model.RulePreviewResult
 import app.overbay.orbit.data.model.Transaction
@@ -29,6 +31,15 @@ class RulesViewModel(
     private val _deleteConfirmId = MutableStateFlow<Long?>(null)
     private val _isApplying = MutableStateFlow(false)
     private val _showWipeAllRulesDialog = MutableStateFlow(false)
+    private val _searchQuery = MutableStateFlow("")
+
+    private data class RulesDataSnapshot(
+        val rules: List<TransactionRule>,
+        val categories: List<Category>,
+        val accounts: List<Account>,
+        val categoryMap: Map<Long, Category>,
+        val matchCounts: Map<Long, Int>
+    )
 
     init {
         viewModelScope.launch {
@@ -47,13 +58,17 @@ class RulesViewModel(
     private val dataFlow = combine(
         repository.rules,
         repository.categories,
-        repository.accounts
-    ) { rules, categories, accounts ->
+        repository.accounts,
+        repository.transactions
+    ) { rules, categories, accounts, transactions ->
         val sorted = rules.sortedWith(
             compareByDescending<TransactionRule> { it.priority }.thenBy { it.id }
         )
         val categoryMap = categories.associateBy { it.id }
-        Triple(sorted, categories, Pair(accounts, categoryMap))
+        val matchCounts = sorted.associate { rule ->
+            rule.id to transactions.count { txn -> RuleMatcherEngine.matchesRule(txn, rule) }
+        }
+        RulesDataSnapshot(sorted, categories, accounts, categoryMap, matchCounts)
     }
 
     private val editorFlow = combine(
@@ -76,19 +91,45 @@ class RulesViewModel(
 
     val uiState: StateFlow<RulesUiState> = combine(
         dataFlow,
-        editorFlow
-    ) { (sorted, categories, acctsAndMap), editorState ->
+        editorFlow,
+        _searchQuery
+    ) { dataSnap, editorState, query ->
+        val q = query.trim().lowercase()
+        val filteredRules = if (q.isNotBlank()) {
+            dataSnap.rules.filter { rule ->
+                rule.name.lowercase().contains(q) ||
+                    rule.conditions.any { cond ->
+                        cond.value.lowercase().contains(q) ||
+                        (cond.targetId != null && dataSnap.categoryMap[cond.targetId]?.name?.lowercase()?.contains(q) == true) ||
+                        (cond.targetId != null && dataSnap.accounts.find { it.id == cond.targetId }?.name?.lowercase()?.contains(q) == true)
+                    } ||
+                    rule.actions.any { action ->
+                        action.value.lowercase().contains(q) ||
+                        action.textValue?.lowercase()?.contains(q) == true ||
+                        (action.targetCategoryId != null && dataSnap.categoryMap[action.targetCategoryId]?.name?.lowercase()?.contains(q) == true)
+                    }
+            }
+        } else {
+            dataSnap.rules
+        }
+
         editorState.copy(
-            rules = sorted,
-            categories = categories,
-            accounts = acctsAndMap.first,
-            categoryMap = acctsAndMap.second
+            rules = filteredRules,
+            categories = dataSnap.categories,
+            accounts = dataSnap.accounts,
+            categoryMap = dataSnap.categoryMap,
+            ruleMatchCounts = dataSnap.matchCounts,
+            searchQuery = query
         )
     }.flowOn(computeDispatcher).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = RulesUiState(isLoading = true)
     )
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
 
     fun selectRuleForInspect(id: Long?) {
         val nextId = if (_inspectingRuleId.value == id) null else id
@@ -120,6 +161,14 @@ class RulesViewModel(
         _inspectingRuleId.value = rule.id
         _editingRule.value = rule
         _showEditorSheet.value = true
+    }
+
+    fun openEditRule(ruleId: Long) {
+        val rule = uiState.value.rules.find { it.id == ruleId }
+            ?: repository.rules.value.find { it.id == ruleId }
+        if (rule != null) {
+            openEditRule(rule)
+        }
     }
 
     fun closeEditorSheet() {

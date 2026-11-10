@@ -25,6 +25,7 @@ import app.overbay.orbit.ui.calculators.retirement.cards.MemberRetirementBreakdo
 import app.overbay.orbit.ui.calculators.retirement.cards.RetirementAccountsListCard
 import app.overbay.orbit.ui.calculators.retirement.cards.RetirementHistoryTrajectoryCard
 import app.overbay.orbit.ui.calculators.retirement.cards.RetirementProjectionHeroCard
+import app.overbay.orbit.ui.calculators.retirement.cards.RetirementRunwayCard
 import app.overbay.orbit.ui.calculators.retirement.dialogs.TargetSettingsSheet
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
@@ -32,9 +33,9 @@ import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.rememberHeroScrollState
-import kotlin.math.roundToInt
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalDevicePosture
+import kotlin.math.roundToInt
 
 @Composable
 fun RetirementCalculatorScreen(
@@ -94,7 +95,7 @@ fun RetirementCalculatorScreen(
                         .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Left Column: Assumptions & Retirement Accounts Inputs
+                    // Left Column: Assumptions & Portfolio Accounts Inputs
                     LazyColumn(
                         modifier = Modifier.weight(1f).fillMaxSize(),
                         contentPadding = PaddingValues(top = 12.dp, bottom = 88.dp),
@@ -103,13 +104,24 @@ fun RetirementCalculatorScreen(
                         item {
                             HouseholdIncomeAssumptionsCard(
                                 uiState = uiState,
-                                onCurrentAgeChange = viewModel::setCurrentAge,
                                 onRetirementAgeChange = viewModel::setRetirementAge,
                                 onPresetChange = viewModel::setPreset,
                                 onTargetModeChange = viewModel::setTargetMode,
                                 onAnnualSpendingChange = viewModel::setAnnualSpending,
+                                onResetAnnualSpending = viewModel::resetAnnualSpendingToGuideline,
                                 onCustomTargetChange = viewModel::setCustomTarget,
-                                onLegacyAmountChange = viewModel::setLegacyAmount
+                                onLegacyAmountChange = viewModel::setLegacyAmount,
+                                onNavigateToHousehold = { onNavigate(OrbitNavKey.Household) }
+                            )
+                        }
+
+                        item {
+                            RetirementAccountsListCard(
+                                uiState = uiState,
+                                onCurrentBalanceChange = viewModel::setCurrentBalance,
+                                onResetCurrentBalance = viewModel::resetCurrentBalanceToConnectedAccounts,
+                                onMonthlySavingsChange = viewModel::setMonthlySavings,
+                                onResetMonthlySavings = viewModel::resetMonthlySavingsToHouseholdPace
                             )
                         }
 
@@ -119,18 +131,9 @@ fun RetirementCalculatorScreen(
                                 accounts = uiState.allAccounts
                             )
                         }
-
-                        item {
-                            RetirementAccountsListCard(
-                                uiState = uiState,
-                                onCurrentBalanceChange = viewModel::setCurrentBalance,
-                                onMonthlySavingsChange = viewModel::setMonthlySavings,
-                                onToggleUseConnectedAccounts = viewModel::setUseConnectedAccounts
-                            )
-                        }
                     }
 
-                    // Right Column: Live Projection Hero Chart & Results
+                    // Right Column: Live Projection Hero Chart, Runway, & History
                     LazyColumn(
                         modifier = Modifier.weight(1f).fillMaxSize(),
                         contentPadding = PaddingValues(top = 12.dp, bottom = 88.dp),
@@ -140,6 +143,13 @@ fun RetirementCalculatorScreen(
                             RetirementProjectionHeroCard(
                                 uiState = uiState,
                                 onAgeScrubbed = viewModel::onAgeScrubbed
+                            )
+                        }
+
+                        item {
+                            RetirementRunwayCard(
+                                uiState = uiState,
+                                onRunwayEndAgeChange = viewModel::setRunwayEndAge
                             )
                         }
 
@@ -154,6 +164,7 @@ fun RetirementCalculatorScreen(
                         item {
                             RetirementHistoryTrajectoryCard(
                                 historyPoints = uiState.historyPoints,
+                                linkedAccounts = uiState.linkedAccounts,
                                 selectedHorizon = uiState.selectedHorizon,
                                 onSelectHorizon = viewModel::setSelectedHorizon
                             )
@@ -174,23 +185,33 @@ fun RetirementCalculatorScreen(
                     }
 
                     item {
-                        HsaBridgeAnalysisCard(
-                            hsaBridge = uiState.scenario.hsaBridge,
-                            retirementAge = uiState.retirementAge,
-                            annualSpendingCents = uiState.annualSpendingCents
+                        RetirementRunwayCard(
+                            uiState = uiState,
+                            onRunwayEndAgeChange = viewModel::setRunwayEndAge
                         )
                     }
 
                     item {
                         HouseholdIncomeAssumptionsCard(
                             uiState = uiState,
-                            onCurrentAgeChange = viewModel::setCurrentAge,
                             onRetirementAgeChange = viewModel::setRetirementAge,
                             onPresetChange = viewModel::setPreset,
                             onTargetModeChange = viewModel::setTargetMode,
                             onAnnualSpendingChange = viewModel::setAnnualSpending,
+                            onResetAnnualSpending = viewModel::resetAnnualSpendingToGuideline,
                             onCustomTargetChange = viewModel::setCustomTarget,
-                            onLegacyAmountChange = viewModel::setLegacyAmount
+                            onLegacyAmountChange = viewModel::setLegacyAmount,
+                            onNavigateToHousehold = { onNavigate(OrbitNavKey.Household) }
+                        )
+                    }
+
+                    item {
+                        RetirementAccountsListCard(
+                            uiState = uiState,
+                            onCurrentBalanceChange = viewModel::setCurrentBalance,
+                            onResetCurrentBalance = viewModel::resetCurrentBalanceToConnectedAccounts,
+                            onMonthlySavingsChange = viewModel::setMonthlySavings,
+                            onResetMonthlySavings = viewModel::resetMonthlySavingsToHouseholdPace
                         )
                     }
 
@@ -202,17 +223,17 @@ fun RetirementCalculatorScreen(
                     }
 
                     item {
-                        RetirementAccountsListCard(
-                            uiState = uiState,
-                            onCurrentBalanceChange = viewModel::setCurrentBalance,
-                            onMonthlySavingsChange = viewModel::setMonthlySavings,
-                            onToggleUseConnectedAccounts = viewModel::setUseConnectedAccounts
+                        HsaBridgeAnalysisCard(
+                            hsaBridge = uiState.scenario.hsaBridge,
+                            retirementAge = uiState.retirementAge,
+                            annualSpendingCents = uiState.annualSpendingCents
                         )
                     }
 
                     item {
                         RetirementHistoryTrajectoryCard(
                             historyPoints = uiState.historyPoints,
+                            linkedAccounts = uiState.linkedAccounts,
                             selectedHorizon = uiState.selectedHorizon,
                             onSelectHorizon = viewModel::setSelectedHorizon
                         )

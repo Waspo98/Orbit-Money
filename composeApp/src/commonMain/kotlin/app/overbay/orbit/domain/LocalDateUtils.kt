@@ -181,4 +181,23 @@ object LocalDateUtils {
         }
         return age.coerceAtLeast(0)
     }
+
+    fun ageFromBirthDate(birthIso: String?, asOf: LocalDate = todayLocalDate()): Int? {
+        val parsed = parseIsoDate(birthIso) ?: return null
+        return ageFromBirthDate(parsed, asOf)
+    }
+
+    fun formatRelativeDueLabel(isoDate: String, today: LocalDate = todayLocalDate()): String {
+        val target = parseIsoDate(isoDate) ?: return isoDate
+        val diff = daysBetween(today, target)
+        return when {
+            diff < 0 -> {
+                val overdue = -diff
+                if (overdue == 1) "1 Day Overdue" else "$overdue Days Overdue"
+            }
+            diff == 0 -> "Today"
+            diff == 1 -> "Tomorrow"
+            else -> "$diff Days"
+        }
+    }
 }

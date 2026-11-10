@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.MonthlyNetWorthPoint
 import app.overbay.orbit.theme.OrbitColorTokens
@@ -66,7 +67,7 @@ fun NetWorthChartCard(
             ) {
                 Column {
                     Text(
-                        text = if (scrubbedPoint != null) "Month: ${scrubbedPoint.month}" else "Net Worth History",
+                        text = if (scrubbedPoint != null) "Month: ${LocalDateUtils.formatMonthShortLabel(scrubbedPoint.month)}" else "Net Worth History",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.outline
                     )

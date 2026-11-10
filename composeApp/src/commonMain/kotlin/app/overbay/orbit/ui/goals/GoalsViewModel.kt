@@ -28,8 +28,6 @@ class GoalsViewModel(
     private val _inspectingGoalId = MutableStateFlow<Long?>(null)
     private val _editingGoal = MutableStateFlow<Goal?>(null)
     private val _showEditorSheet = MutableStateFlow(false)
-    private val _allocatingGoal = MutableStateFlow<Goal?>(null)
-    private val _showAllocationDialog = MutableStateFlow(false)
     private val _isReorderMode = MutableStateFlow(false)
     private val _showAccountsOverview = MutableStateFlow(true)
     private val _goalSortOverrides = MutableStateFlow<Map<Long, Int>>(emptyMap())
@@ -45,11 +43,9 @@ class GoalsViewModel(
 
     private val dialogFlow = combine(
         _editingGoal,
-        _showEditorSheet,
-        _allocatingGoal,
-        _showAllocationDialog
-    ) { editing, showSheet, allocating, showAlloc ->
-        GoalsDialogState(editing, showSheet, allocating, showAlloc)
+        _showEditorSheet
+    ) { editing, showSheet ->
+        GoalsDialogState(editing, showSheet)
     }
 
     private val controlFlow = combine(
@@ -111,8 +107,6 @@ class GoalsViewModel(
             inspectingGoalId = inspectingId,
             editingGoal = dialog.editing,
             showEditorSheet = dialog.showSheet,
-            allocatingGoal = dialog.allocating,
-            showAllocationDialog = dialog.showAlloc,
             isReorderMode = isReorder,
             showAccountsOverview = showOverview,
             isLoading = false
@@ -124,28 +118,24 @@ class GoalsViewModel(
     )
 
     fun selectGoalForInspect(id: Long?) {
-        if (id != null && _inspectingGoalId.value == id && !_showEditorSheet.value && !_showAllocationDialog.value) {
+        if (id != null && _inspectingGoalId.value == id && !_showEditorSheet.value) {
             _inspectingGoalId.value = null
         } else {
             _inspectingGoalId.value = id
             _showEditorSheet.value = false
             _editingGoal.value = null
-            _showAllocationDialog.value = false
-            _allocatingGoal.value = null
         }
     }
+
+    fun selectGoal(id: Long?) = selectGoalForInspect(id)
 
     fun dismissInspectorPane() {
         _inspectingGoalId.value = null
         _showEditorSheet.value = false
         _editingGoal.value = null
-        _showAllocationDialog.value = false
-        _allocatingGoal.value = null
     }
 
     fun openAddGoal() {
-        _showAllocationDialog.value = false
-        _allocatingGoal.value = null
         _editingGoal.value = Goal(
             id = 0L,
             name = "",
@@ -157,8 +147,6 @@ class GoalsViewModel(
 
     fun openEditGoal(goal: Goal) {
         _inspectingGoalId.value = goal.id
-        _showAllocationDialog.value = false
-        _allocatingGoal.value = null
         _editingGoal.value = goal
         _showEditorSheet.value = true
     }
@@ -177,15 +165,22 @@ class GoalsViewModel(
     }
 
     fun moveGoal(completedGroup: Boolean, fromIndex: Int, toIndex: Int) {
-        val list = (if (completedGroup) uiState.value.completedGoals else uiState.value.activeGoals).toMutableList()
+        val currentActive = uiState.value.activeGoals.toMutableList()
+        val currentCompleted = uiState.value.completedGoals.toMutableList()
+        val list = if (completedGroup) currentCompleted else currentActive
         if (fromIndex !in list.indices || toIndex !in list.indices || fromIndex == toIndex) return
         val moved = list.removeAt(fromIndex)
         list.add(toIndex, moved)
+
+        val updatedActive = if (completedGroup) currentActive else list
+        val updatedCompleted = if (completedGroup) list else currentCompleted
+        val allReordered = updatedActive + updatedCompleted
+
         val newOverrides = _goalSortOverrides.value.toMutableMap()
-        list.forEachIndexed { idx, goal -> newOverrides[goal.id] = idx }
+        allReordered.forEachIndexed { idx, goal -> newOverrides[goal.id] = idx }
         _goalSortOverrides.value = newOverrides
         viewModelScope.launch {
-            repository.reorderGoals(list.map { it.id })
+            repository.reorderGoals(allReordered.map { it.id })
         }
     }
 
@@ -226,30 +221,6 @@ class GoalsViewModel(
         }
     }
 
-    fun openAllocationDialog(goal: Goal) {
-        _inspectingGoalId.value = goal.id
-        _showEditorSheet.value = false
-        _editingGoal.value = null
-        _allocatingGoal.value = goal
-        _showAllocationDialog.value = true
-    }
-
-    fun closeAllocationDialog() {
-        _showAllocationDialog.value = false
-        _allocatingGoal.value = null
-    }
-
-    fun depositToGoal(goalId: Long, depositAmountCents: Cents) {
-        viewModelScope.launch {
-            val goal = repository.goals.value.find { it.id == goalId } ?: return@launch
-            val updated = goal.copy(
-                currentAmountCents = max(0L, goal.currentAmountCents + depositAmountCents)
-            )
-            repository.saveGoalWithAllocations(updated, stealFromOthers = false)
-            closeAllocationDialog()
-        }
-    }
-
     fun calculateMonthlyRequiredCents(goal: Goal): Cents? {
         val targetDateIso = goal.targetDate ?: return null
         if (goal.isCompleted) return 0L
@@ -264,6 +235,12 @@ class GoalsViewModel(
         return goal.remainingAmountCents / months
     }
 
+    fun calculateNeededExtraMonthlyCents(goal: Goal): Cents? {
+        val requiredMonthly = calculateMonthlyRequiredCents(goal) ?: return null
+        val pace = (goal.monthlyPaceCents ?: 0L).coerceAtLeast(0L)
+        return (requiredMonthly - pace).coerceAtLeast(0L)
+    }
+
     private data class GoalEngineInput(
         val goals: List<Goal>,
         val accounts: List<app.overbay.orbit.data.model.Account>,
@@ -273,9 +250,7 @@ class GoalsViewModel(
 
     private data class GoalsDialogState(
         val editing: Goal?,
-        val showSheet: Boolean,
-        val allocating: Goal?,
-        val showAlloc: Boolean
+        val showSheet: Boolean
     )
 
     private data class GoalsControlState(

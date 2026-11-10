@@ -15,6 +15,8 @@ data class RulesUiState(
     val deleteConfirmRuleId: Long? = null,
     val isApplyingRules: Boolean = false,
     val showWipeAllRulesDialog: Boolean = false,
+    val searchQuery: String = "",
+    val ruleMatchCounts: Map<Long, Int> = emptyMap(),
     val isLoading: Boolean = false
 ) {
     val enabledRulesCount: Int get() = rules.count { it.enabled }

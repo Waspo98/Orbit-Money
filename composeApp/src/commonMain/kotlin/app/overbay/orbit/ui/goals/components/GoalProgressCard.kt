@@ -23,11 +23,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -38,7 +41,7 @@ fun GoalProgressCard(
     accountName: String?,
     monthlyNeededCents: Cents?,
     onClick: () -> Unit,
-    onDepositClick: () -> Unit,
+    onEditClick: () -> Unit,
     isInspected: Boolean = false,
     dragHandle: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -47,6 +50,19 @@ fun GoalProgressCard(
     val progress = goal.progressRatio.toFloat()
     val isDone = goal.isCompleted
     val progressColor = if (isDone) OrbitTheme.colors.income else MaterialTheme.colorScheme.primary
+
+    val desiredEta = goal.targetDate?.let { LocalDateUtils.formatMonthShortLabel(it.take(7)) } ?: "ASAP"
+    val projectedEta = if (isDone) {
+        "Reached"
+    } else {
+        goal.eta?.date?.let { LocalDateUtils.formatMonthShortLabel(it.take(7)) } ?: "Stalled"
+    }
+    val pace = goal.monthlyPaceCents ?: 0L
+    val paceFormatted = when {
+        pace > 0L -> "+${MoneyUtils.formatCents(pace, showCents = false)}/mo"
+        pace < 0L -> "-${MoneyUtils.formatCents(-pace, showCents = false)}/mo"
+        else -> "$0/mo"
+    }
 
     val cardBgColor = if (isInspected) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
@@ -143,13 +159,13 @@ fun GoalProgressCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Amount Readout: Saved vs Target
+            // Amount Readout: Saved vs Target & Edit Action
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "${MoneyUtils.formatCents(goal.currentAmountCents, showCents = false)} of ${MoneyUtils.formatCents(goal.targetAmountCents, showCents = false)}",
                         style = MaterialTheme.typography.titleSmall.copy(
@@ -169,11 +185,67 @@ fun GoalProgressCard(
                     }
                 }
 
-                if (!isDone) {
-                    OrbitActionChip(
-                        label = "Deposit",
-                        icon = Icons.Default.Add,
-                        onClick = onDepositClick
+                OrbitActionChip(
+                    label = "Edit",
+                    onClick = {
+                        haptics.tick()
+                        onEditClick()
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Footer Metadata Row: Desired ETA, Projected ETA, Monthly Pace
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "DESIRED",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = desiredEta,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "PROJECTED",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = projectedEta,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isDone) OrbitTheme.colors.income else MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "MONTHLY PACE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = paceFormatted,
+                        style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+                        color = if (pace > 0L) OrbitTheme.colors.income else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

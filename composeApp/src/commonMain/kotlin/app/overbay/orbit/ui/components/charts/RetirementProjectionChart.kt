@@ -1,16 +1,22 @@
 package app.overbay.orbit.ui.components.charts
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,9 +24,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -29,89 +39,57 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.HsaBridgeAnalysis
+import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.ProjectionPoint
+import app.overbay.orbit.domain.RetirementScenarioModel
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
-/**
- * Multi-phase retirement trajectory chart (accumulation + drawdown).
- * Features Catmull-Rom growth curves, target nest egg threshold line, retirement milestone marker,
- * and touch scrubbing with haptic ticks on age transitions.
- */
+val SCENARIO_PRESET_COLORS = mapOf(
+    RetirementScenarioPreset.CONSERVATIVE to Color(0xFF2563EB), // Blue
+    RetirementScenarioPreset.BALANCED to Color(0xFF059669),     // Green
+    RetirementScenarioPreset.AGGRESSIVE to Color(0xFF7C3AED)   // Purple
+)
+
 @Composable
 fun RetirementProjectionChart(
     currentAge: Double,
     retirementAge: Double,
-    runwayEndAge: Double = 95.0,
-    accumulationPoints: List<ProjectionPoint>,
-    drawdownPoints: List<ProjectionPoint>,
+    currentBalanceCents: Cents,
     targetNestEggCents: Cents,
+    scenarios: Map<RetirementScenarioPreset, RetirementScenarioModel>,
+    selectedPreset: RetirementScenarioPreset,
+    actualHistoryPoints: List<ProjectionPoint>,
+    hsaBridge: HsaBridgeAnalysis? = null,
+    onAgeScrubbed: ((Double?, Cents?) -> Unit)? = null,
     modifier: Modifier = Modifier,
-    height: Dp = 240.dp,
-    coastFireTargetCents: Cents? = null,
-    onAgeScrubbed: ((Double?, Cents?) -> Unit)? = null
+    height: Dp = 250.dp
 ) {
-    val allPoints = remember(accumulationPoints, drawdownPoints) {
-        val list = mutableListOf<ProjectionPoint>()
-        list.addAll(accumulationPoints)
-        if (drawdownPoints.isNotEmpty()) {
-            val lastAge = accumulationPoints.lastOrNull()?.age
-            val filteredDrawdown = drawdownPoints.filter { it.age > (lastAge ?: 0.0) }
-            list.addAll(filteredDrawdown)
-        }
-        list
-    }
-
-    if (allPoints.isEmpty()) return
-
     val haptics = LocalOrbitHaptics.current
     val density = LocalDensity.current
 
     var scrubbedAge by remember { mutableStateOf<Double?>(null) }
     var lastHapticAge by remember { mutableStateOf<Int?>(null) }
 
-    // Pre-allocated paths (Zero allocation in Canvas onDraw)
-    val accumLinePath = remember { Path() }
-    val accumAreaPath = remember { Path() }
-    val drawdownLinePath = remember { Path() }
+    val firstActualAge = actualHistoryPoints.firstOrNull()?.age ?: currentAge
+    val minAge = min(firstActualAge, currentAge)
+    val maxAge = max(retirementAge, currentAge + 1.0)
 
-    // Pre-allocated strokes and brushes
-    val curveStroke = remember(density) {
-        Stroke(width = with(density) { 3.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
-    }
-    val targetStroke = remember(density) {
-        Stroke(width = with(density) { 1.5.dp.toPx() }, pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f)))
-    }
-    val milestoneStroke = remember(density) {
-        Stroke(width = with(density) { 1.5.dp.toPx() }, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
-    }
-    val indicatorStroke = remember(density) {
-        Stroke(width = with(density) { 2.5.dp.toPx() })
-    }
-    val haloRadiusPx = remember(density) { with(density) { 12.dp.toPx() } }
-    val dotRadiusPx = remember(density) { with(density) { 5.dp.toPx() } }
-
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val areaBrush = remember(primaryColor) {
-        Brush.verticalGradient(listOf(primaryColor.copy(alpha = 0.28f), primaryColor.copy(alpha = 0.0f)))
+    val maxBalance = remember(scenarios, actualHistoryPoints, targetNestEggCents) {
+        val peakScenarios = scenarios.values.flatMap { it.accumulationPoints }.maxOfOrNull { it.balanceCents } ?: 0L
+        val peakActual = actualHistoryPoints.maxOfOrNull { it.balanceCents } ?: 0L
+        val peak = maxOf(peakScenarios, peakActual, targetNestEggCents, currentBalanceCents, 100_000_00L)
+        (peak.toDouble() * 1.12).toLong()
     }
 
-    val targetColor = MaterialTheme.colorScheme.tertiary
-    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-    val surfaceColor = MaterialTheme.colorScheme.surface
-
-    // Maximum balance for Y-axis scale
-    val maxBalance = remember(allPoints, targetNestEggCents) {
-        val peak = allPoints.maxOfOrNull { it.balanceCents } ?: targetNestEggCents
-        (max(peak, targetNestEggCents) * 1.15).toLong()
-    }
-
-    // Trigger haptics when scrubbed integer age changes
     LaunchedEffect(scrubbedAge) {
         val age = scrubbedAge
         if (age != null) {
@@ -119,8 +97,9 @@ fun RetirementProjectionChart(
             if (intAge != lastHapticAge) {
                 haptics.tick()
                 lastHapticAge = intAge
-                val pt = allPoints.minByOrNull { kotlin.math.abs(it.age - age) }
-                onAgeScrubbed?.invoke(age, pt?.balanceCents)
+                val activeModel = scenarios[selectedPreset]
+                val bal = interpolateBalanceAtAge(activeModel?.accumulationPoints ?: emptyList(), age)
+                onAgeScrubbed?.invoke(age, bal)
             }
         } else {
             lastHapticAge = null
@@ -128,32 +107,97 @@ fun RetirementProjectionChart(
         }
     }
 
+    val selectedColor = SCENARIO_PRESET_COLORS[selectedPreset] ?: Color(0xFF059669)
+    val areaBrush = remember(selectedColor) {
+        Brush.verticalGradient(listOf(selectedColor.copy(alpha = 0.22f), selectedColor.copy(alpha = 0.01f)))
+    }
+    val targetStroke = remember(density) {
+        Stroke(width = with(density) { 1.5.dp.toPx() }, pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f)))
+    }
+    val markerStroke = remember(density) {
+        Stroke(width = with(density) { 1.dp.toPx() }, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
+    }
+    val thickCurveStroke = remember(density) {
+        Stroke(width = with(density) { 3.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    }
+    val normalCurveStroke = remember(density) {
+        Stroke(width = with(density) { 1.8.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    }
+    val actualStroke = remember(density) {
+        Stroke(width = with(density) { 2.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    }
+
+    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+    val surfaceColor = MaterialTheme.colorScheme.surface
+
     Column(modifier = modifier.fillMaxWidth()) {
+        // Scrubber Tooltip / Header if scrubbed
+        if (scrubbedAge != null) {
+            val age = scrubbedAge!!
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "AGE ${age.roundToInt()}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        RetirementScenarioPreset.entries.forEach { p ->
+                            val color = SCENARIO_PRESET_COLORS[p] ?: Color.Gray
+                            val bal = interpolateBalanceAtAge(scenarios[p]?.accumulationPoints ?: emptyList(), age)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.height(8.dp).width(8.dp).background(color, RoundedCornerShape(2.dp)))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = MoneyUtils.formatCompactCents(bal),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (p == selectedPreset) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (p == selectedPreset) color else onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(height)
-                .pointerInput(allPoints) {
+                .pointerInput(minAge, maxAge) {
                     detectTapGestures(
                         onPress = { offset ->
                             val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                            scrubbedAge = currentAge + fraction * (runwayEndAge - currentAge)
+                            scrubbedAge = minAge + fraction * (maxAge - minAge)
                             tryAwaitRelease()
                             scrubbedAge = null
                         }
                     )
                 }
-                .pointerInput(allPoints) {
+                .pointerInput(minAge, maxAge) {
                     detectDragGestures(
                         onDragStart = { offset ->
                             val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                            scrubbedAge = currentAge + fraction * (runwayEndAge - currentAge)
+                            scrubbedAge = minAge + fraction * (maxAge - minAge)
                         },
                         onDragEnd = { scrubbedAge = null },
                         onDragCancel = { scrubbedAge = null },
                         onDrag = { change, _ ->
                             val fraction = (change.position.x / size.width).coerceIn(0f, 1f)
-                            scrubbedAge = currentAge + fraction * (runwayEndAge - currentAge)
+                            scrubbedAge = minAge + fraction * (maxAge - minAge)
                         }
                     )
                 }
@@ -161,125 +205,195 @@ fun RetirementProjectionChart(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
-                val ageSpan = runwayEndAge - currentAge
+                val ageSpan = max(1.0, maxAge - minAge)
 
-                fun ageToX(age: Double): Float = ((age - currentAge) / ageSpan).toFloat() * w
+                fun ageToX(age: Double): Float = (((age - minAge) / ageSpan) * w).toFloat()
                 fun balToY(bal: Cents): Float = h - ((bal.toDouble() / maxBalance.toDouble()) * h).toFloat()
 
-                // 1. Draw Target Nest Egg Line
+                // 1. Target Nest Egg Horizontal Line
                 val targetY = balToY(targetNestEggCents)
                 drawLine(
-                    color = targetColor.copy(alpha = 0.75f),
+                    color = tertiaryColor.copy(alpha = 0.7f),
                     start = Offset(0f, targetY),
                     end = Offset(w, targetY),
                     strokeWidth = targetStroke.width,
                     pathEffect = targetStroke.pathEffect
                 )
 
-                // 2. Draw Retirement Milestone Line
-                val retireX = ageToX(retirementAge)
+                // 2. Vertical "Today" Marker Line
+                val todayX = ageToX(currentAge)
                 drawLine(
-                    color = onSurfaceVariant.copy(alpha = 0.5f),
-                    start = Offset(retireX, 0f),
-                    end = Offset(retireX, h),
-                    strokeWidth = milestoneStroke.width,
-                    pathEffect = milestoneStroke.pathEffect
+                    color = onSurfaceVariant.copy(alpha = 0.6f),
+                    start = Offset(todayX, 0f),
+                    end = Offset(todayX, h),
+                    strokeWidth = markerStroke.width,
+                    pathEffect = markerStroke.pathEffect
                 )
 
-                // 3. Accumulation Curve & Area
-                accumLinePath.rewind()
-                accumAreaPath.rewind()
-                val accumCoords = accumulationPoints.map { Offset(ageToX(it.age), balToY(it.balanceCents)) }
-                if (accumCoords.size >= 2) {
-                    accumLinePath.moveTo(accumCoords[0].x, accumCoords[0].y)
-                    for (i in 0 until accumCoords.size - 1) {
-                        val p0 = if (i > 0) accumCoords[i - 1] else accumCoords[i]
-                        val p1 = accumCoords[i]
-                        val p2 = accumCoords[i + 1]
-                        val p3 = if (i + 2 < accumCoords.size) accumCoords[i + 2] else p2
-                        accumLinePath.cubicTo(
-                            p1.x + (p2.x - p0.x) / 6f, (p1.y + (p2.y - p0.y) / 6f).coerceIn(0f, h),
-                            p2.x - (p3.x - p1.x) / 6f, (p2.y - (p3.y - p1.y) / 6f).coerceIn(0f, h),
-                            p2.x, p2.y
-                        )
-                    }
-                    accumAreaPath.addPath(accumLinePath)
-                    accumAreaPath.lineTo(accumCoords.last().x, h)
-                    accumAreaPath.lineTo(accumCoords.first().x, h)
-                    accumAreaPath.close()
+                // 3. Vertical Retirement Age Marker Line
+                val retireX = ageToX(retirementAge)
+                drawLine(
+                    color = selectedColor.copy(alpha = 0.6f),
+                    start = Offset(retireX, 0f),
+                    end = Offset(retireX, h),
+                    strokeWidth = markerStroke.width,
+                    pathEffect = markerStroke.pathEffect
+                )
 
-                    drawPath(accumAreaPath, brush = areaBrush)
-                    drawPath(accumLinePath, color = primaryColor, style = curveStroke)
+                // 4. Area fill for selected scenario
+                val selectedModel = scenarios[selectedPreset]
+                if (selectedModel != null && selectedModel.accumulationPoints.size >= 2) {
+                    val pts = selectedModel.accumulationPoints
+                    val path = Path()
+                    path.moveTo(ageToX(pts.first().age), balToY(pts.first().balanceCents))
+                    for (i in 1 until pts.size) {
+                        path.lineTo(ageToX(pts[i].age), balToY(pts[i].balanceCents))
+                    }
+                    path.lineTo(ageToX(pts.last().age), h)
+                    path.lineTo(ageToX(pts.first().age), h)
+                    path.close()
+                    drawPath(path, brush = areaBrush)
                 }
 
-                // 4. Drawdown Curve
-                drawdownLinePath.rewind()
-                val drawdownCoords = drawdownPoints.map { Offset(ageToX(it.age), balToY(it.balanceCents)) }
-                if (drawdownCoords.size >= 2) {
-                    drawdownLinePath.moveTo(drawdownCoords[0].x, drawdownCoords[0].y)
-                    for (i in 0 until drawdownCoords.size - 1) {
-                        val p0 = if (i > 0) drawdownCoords[i - 1] else drawdownCoords[i]
-                        val p1 = drawdownCoords[i]
-                        val p2 = drawdownCoords[i + 1]
-                        val p3 = if (i + 2 < drawdownCoords.size) drawdownCoords[i + 2] else p2
-                        drawdownLinePath.cubicTo(
-                            p1.x + (p2.x - p0.x) / 6f, (p1.y + (p2.y - p0.y) / 6f).coerceIn(0f, h),
-                            p2.x - (p3.x - p1.x) / 6f, (p2.y - (p3.y - p1.y) / 6f).coerceIn(0f, h),
-                            p2.x, p2.y
-                        )
+                // 5. Historical Actual Balances Line (up to currentAge)
+                if (actualHistoryPoints.size >= 2) {
+                    val actualPath = Path()
+                    actualPath.moveTo(ageToX(actualHistoryPoints.first().age), balToY(actualHistoryPoints.first().balanceCents))
+                    for (i in 1 until actualHistoryPoints.size) {
+                        val pt = actualHistoryPoints[i]
+                        actualPath.lineTo(ageToX(pt.age), balToY(pt.balanceCents))
                     }
-                    drawPath(drawdownLinePath, color = onSurfaceVariant.copy(alpha = 0.75f), style = curveStroke)
+                    drawPath(
+                        actualPath,
+                        color = onSurfaceVariant.copy(alpha = 0.65f),
+                        style = actualStroke
+                    )
                 }
 
-                // 5. Active Scrubbing Indicator
+                // 6. Dot at Today's Balance
+                drawCircle(
+                    color = onSurface,
+                    radius = with(density) { 4.5.dp.toPx() },
+                    center = Offset(todayX, balToY(currentBalanceCents))
+                )
+
+                // 7. Simultaneous 3 Accumulation Curves
+                RetirementScenarioPreset.entries.forEach { preset ->
+                    val model = scenarios[preset]
+                    if (model != null && model.accumulationPoints.size >= 2) {
+                        val color = SCENARIO_PRESET_COLORS[preset] ?: Color.Gray
+                        val isSelected = preset == selectedPreset
+                        val linePath = Path()
+                        val pts = model.accumulationPoints
+                        linePath.moveTo(ageToX(pts.first().age), balToY(pts.first().balanceCents))
+                        for (i in 0 until pts.size - 1) {
+                            val p0 = if (i > 0) pts[i - 1] else pts[i]
+                            val p1 = pts[i]
+                            val p2 = pts[i + 1]
+                            val p3 = if (i + 2 < pts.size) pts[i + 2] else p2
+                            val x1 = ageToX(p1.age)
+                            val y1 = balToY(p1.balanceCents)
+                            val x2 = ageToX(p2.age)
+                            val y2 = balToY(p2.balanceCents)
+                            val x0 = ageToX(p0.age)
+                            val y0 = balToY(p0.balanceCents)
+                            val x3 = ageToX(p3.age)
+                            val y3 = balToY(p3.balanceCents)
+                            linePath.cubicTo(
+                                x1 + (x2 - x0) / 6f, (y1 + (y2 - y0) / 6f).coerceIn(0f, h),
+                                x2 - (x3 - x1) / 6f, (y2 - (y3 - y1) / 6f).coerceIn(0f, h),
+                                x2, y2
+                            )
+                        }
+                        drawPath(
+                            linePath,
+                            color = if (isSelected) color else color.copy(alpha = 0.7f),
+                            style = if (isSelected) thickCurveStroke else normalCurveStroke
+                        )
+                    }
+                }
+
+                // 8. Scrub line & indicator
                 val activeAge = scrubbedAge
                 if (activeAge != null) {
-                    val scrubX = ageToX(activeAge)
-                    val pt = allPoints.minByOrNull { kotlin.math.abs(it.age - activeAge) }
-                    val scrubY = if (pt != null) balToY(pt.balanceCents) else h / 2f
+                    val sx = ageToX(activeAge)
+                    val activeBal = interpolateBalanceAtAge(scenarios[selectedPreset]?.accumulationPoints ?: emptyList(), activeAge)
+                    val sy = balToY(activeBal)
 
                     drawLine(
-                        color = onSurfaceVariant.copy(alpha = 0.6f),
-                        start = Offset(scrubX, 0f),
-                        end = Offset(scrubX, h),
-                        strokeWidth = milestoneStroke.width,
-                        pathEffect = milestoneStroke.pathEffect
+                        color = onSurface.copy(alpha = 0.8f),
+                        start = Offset(sx, 0f),
+                        end = Offset(sx, h),
+                        strokeWidth = markerStroke.width
                     )
+                    drawCircle(color = selectedColor.copy(alpha = 0.25f), radius = with(density) { 12.dp.toPx() }, center = Offset(sx, sy))
+                    drawCircle(color = surfaceColor, radius = with(density) { 5.dp.toPx() }, center = Offset(sx, sy))
+                    drawCircle(color = selectedColor, radius = with(density) { 5.dp.toPx() }, center = Offset(sx, sy), style = Stroke(width = with(density) { 2.5.dp.toPx() }))
+                }
+            }
 
-                    drawCircle(color = primaryColor.copy(alpha = 0.22f), radius = haloRadiusPx, center = Offset(scrubX, scrubY))
-                    drawCircle(color = surfaceColor, radius = dotRadiusPx, center = Offset(scrubX, scrubY))
-                    drawCircle(color = primaryColor, radius = dotRadiusPx, center = Offset(scrubX, scrubY), style = indicatorStroke)
+            // 9. On-chart badge for Pre-65 HSA Bridge
+            if (retirementAge < 65.0 && hsaBridge != null) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.9f),
+                    border = Stroke(1f).let { null },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                ) {
+                    val statusText = if (hsaBridge.isBridgeCovered) "Non-HSA: Covered" else "Non-HSA: ${MoneyUtils.formatCompactCents(hsaBridge.shortfallCents)} Short"
+                    val statusColor = if (hsaBridge.isBridgeCovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = statusColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
                 }
             }
         }
 
-        // 6. X-Axis Age Milestones
+        // X-Axis Age Milestones Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 6.dp)
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "Age ${currentAge.toInt()}",
+                text = "Today (${currentAge.toInt()})",
                 style = MaterialTheme.typography.labelSmall,
-                color = onSurfaceVariant,
-                modifier = Modifier.weight(1f)
+                color = onSurfaceVariant
+            )
+            Text(
+                text = "Target: ${MoneyUtils.formatCompactCents(targetNestEggCents)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = tertiaryColor
             )
             Text(
                 text = "Retire (${retirementAge.toInt()})",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = primaryColor,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = "Age ${runwayEndAge.toInt()}",
-                style = MaterialTheme.typography.labelSmall,
-                color = onSurfaceVariant,
-                textAlign = TextAlign.End,
-                modifier = Modifier.weight(1f)
+                color = selectedColor
             )
         }
     }
+}
+
+fun interpolateBalanceAtAge(points: List<ProjectionPoint>, age: Double): Cents {
+    if (points.isEmpty()) return 0L
+    if (age <= points.first().age) return points.first().balanceCents
+    if (age >= points.last().age) return points.last().balanceCents
+    for (i in 1 until points.size) {
+        val prev = points[i - 1]
+        val next = points[i]
+        if (age <= next.age) {
+            val span = max(0.0001, next.age - prev.age)
+            val ratio = (age - prev.age) / span
+            return (prev.balanceCents.toDouble() + (next.balanceCents - prev.balanceCents).toDouble() * ratio).toLong()
+        }
+    }
+    return points.last().balanceCents
 }

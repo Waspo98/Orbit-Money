@@ -2,10 +2,14 @@ package app.overbay.orbit.ui.goals.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +30,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,17 +40,21 @@ import app.overbay.orbit.data.model.AccountAllocationSummary
 import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.data.model.GoalAllocationType
 import app.overbay.orbit.data.model.resolvedEmoji
+import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
-import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlin.math.max
 
-/**
- * Account Overview Card showing how each savings, checking, or cash account is divided across
- * active goals vs unallocated cash and reserve protection.
- *
- */
+private val GoalPalette = listOf(
+    Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFF8B5CF6),
+    Color(0xFFEC4899), Color(0xFF06B6D4), Color(0xFFF97316), Color(0xFF14B8A6)
+)
+
+private fun goalSliceColor(goalId: Long): Color =
+    GoalPalette[((goalId.hashCode().toLong() and 0x7FFFFFFF) % GoalPalette.size).toInt()]
+
 @Composable
 fun GoalAccountsOverviewCard(
     accountSummaries: List<AccountAllocationSummary>,
@@ -52,7 +63,6 @@ fun GoalAccountsOverviewCard(
     modifier: Modifier = Modifier
 ) {
     if (accountSummaries.isEmpty()) return
-
     val colors = OrbitTheme.colors
     var isExpanded by remember { mutableStateOf(false) }
     val haptics = LocalOrbitHaptics.current
@@ -64,19 +74,11 @@ fun GoalAccountsOverviewCard(
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Header Row
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        haptics.tick()
-                        isExpanded = !isExpanded
-                    },
+                modifier = Modifier.fillMaxWidth().clickable { haptics.tick(); isExpanded = !isExpanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -96,32 +98,42 @@ fun GoalAccountsOverviewCard(
                     )
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh
-                ) {
-                    Text(
-                        text = if (isExpanded) "Hide Details ▲" else "View Details ▼",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (onOpenAccount != null) {
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            modifier = Modifier.clickable { haptics.tick(); onOpenAccount(0L) }
+                        ) {
+                            Text(
+                                text = "View Accounts →",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                    Surface(shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        Text(
+                            text = if (isExpanded) "Hide Details ▲" else "View Details ▼",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
                 }
             }
 
             accountSummaries.forEach { summary ->
-                AccountSummaryRow(
-                    summary = summary,
-                    goals = goals,
-                    isDetailsVisible = isExpanded,
-                    onOpenAccount = onOpenAccount
-                )
+                AccountSummaryRow(summary, goals, isExpanded, onOpenAccount)
             }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AccountSummaryRow(
     summary: AccountAllocationSummary,
@@ -130,11 +142,27 @@ private fun AccountSummaryRow(
     onOpenAccount: ((Long) -> Unit)?
 ) {
     val colors = OrbitTheme.colors
+    val haptics = LocalOrbitHaptics.current
     val linkedGoals = remember(goals, summary.accountId) {
         goals.filter { g -> g.allocations.any { it.accountId == summary.accountId } }
     }
+    val goalAllocations = remember(linkedGoals, summary) {
+        linkedGoals.mapNotNull { g ->
+            val alloc = g.allocations.firstOrNull { it.accountId == summary.accountId } ?: return@mapNotNull null
+            val amt = if (alloc.allocationType == GoalAllocationType.PERCENT) {
+                ((summary.allocatableAmountCents * alloc.allocationPercent) / 100.0).toLong()
+            } else {
+                alloc.allocationAmountCents
+            }
+            Triple(g, amt, goalSliceColor(g.id))
+        }
+    }
 
     Surface(
+        onClick = {
+            haptics.tick()
+            onOpenAccount?.invoke(summary.accountId)
+        },
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, colors.cardBorder),
@@ -180,13 +208,48 @@ private fun AccountSummaryRow(
                 }
             }
 
-            // Allocation Progress Bar
-            OrbitPillProgressBar(
-                percent = (summary.allocatedPercent / 100.0).toFloat().coerceIn(0f, 1f),
-                overBudget = summary.allocatedPercent > 100.0,
-                customFillColor = if (summary.allocatedPercent > 100.0) colors.danger else MaterialTheme.colorScheme.primary,
-                height = 6.dp
+            // Multi-Segmented Allocation Bar
+            MultiSegmentedAllocationBar(
+                totalBalanceCents = summary.currentBalanceCents,
+                allocations = goalAllocations
             )
+
+            // Colored Legend Chips Below Bar
+            if (goalAllocations.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    goalAllocations.forEach { (goal, amt, color) ->
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = color.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, color.copy(alpha = 0.35f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                )
+                                Text(
+                                    text = "${goal.name}: ${MoneyUtils.formatCents(amt, showCents = false)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
             // Allocated vs Remaining Unallocated Subtext
             Row(
@@ -275,6 +338,41 @@ private fun AccountSummaryRow(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MultiSegmentedAllocationBar(
+    totalBalanceCents: Cents,
+    allocations: List<Triple<Goal, Cents, Color>>,
+    modifier: Modifier = Modifier
+) {
+    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val basis = max(1L, totalBalanceCents).toFloat()
+
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(RoundedCornerShape(999.dp))
+    ) {
+        val w = size.width
+        val h = size.height
+
+        drawRect(color = trackColor, size = size)
+
+        var currentX = 0f
+        allocations.forEach { (_, amt, color) ->
+            val sliceWidth = ((amt.toFloat() / basis) * w).coerceAtLeast(0f)
+            if (sliceWidth > 0f) {
+                drawRect(
+                    color = color,
+                    topLeft = Offset(currentX, 0f),
+                    size = Size(sliceWidth.coerceAtMost(w - currentX), h)
+                )
+                currentX += sliceWidth
             }
         }
     }
