@@ -38,12 +38,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.HouseholdRole
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
+import app.overbay.orbit.ui.household.HouseholdCalculations
 import app.overbay.orbit.ui.household.HouseholdUiState
 import app.overbay.orbit.ui.household.dialogs.HouseholdMemberEditorContent
 import app.overbay.orbit.ui.household.dialogs.InviteMemberContent
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlin.math.roundToInt
 
 @Composable
 fun HouseholdInspectorPane(
@@ -51,7 +55,7 @@ fun HouseholdInspectorPane(
     onOpenEditMember: (HouseholdMember) -> Unit,
     onSaveMember: (HouseholdMember, String?) -> Unit,
     onCloseEditMember: () -> Unit,
-    onDeleteMember: (Long) -> Unit,
+    onDeleteMember: (HouseholdMember) -> Unit,
     onInviteMember: (email: String, role: HouseholdRole) -> Unit,
     onCloseInvite: () -> Unit,
     onDismissPane: () -> Unit,
@@ -110,8 +114,9 @@ fun HouseholdInspectorPane(
                     if (member != null) {
                         HouseholdMemberDetailView(
                             member = member,
+                            includeHsaInRetirementRate = state.includeHsaInRetirementRate,
                             onOpenEdit = { onOpenEditMember(member) },
-                            onDelete = { onDeleteMember(member.id) },
+                            onDelete = { onDeleteMember(member) },
                             onDismissPane = onDismissPane
                         )
                     }
@@ -125,11 +130,37 @@ fun HouseholdInspectorPane(
 @Composable
 private fun HouseholdMemberDetailView(
     member: HouseholdMember,
+    includeHsaInRetirementRate: Boolean,
     onOpenEdit: () -> Unit,
     onDelete: () -> Unit,
     onDismissPane: () -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
+    val netPay = HouseholdCalculations.memberNetPayAnnual(member)
+    val match = HouseholdCalculations.memberEmployerMatchAnnual(member)
+    val rate = HouseholdCalculations.memberRetirementRatePercent(member, includeHsaInRetirementRate)
+    val age = LocalDateUtils.ageFromBirthDate(member.birthDate)
+
+    val roleLabel = when (member.role.lowercase()) {
+        "child" -> "Child"
+        else -> "Adult"
+    }
+
+    val payFreqLabel = when (member.payFrequency.lowercase()) {
+        "weekly" -> "Weekly"
+        "biweekly" -> "Biweekly"
+        "semimonthly" -> "Semimonthly"
+        "monthly" -> "Monthly"
+        "annual" -> "Annual"
+        "none" -> "No Cadence"
+        else -> member.payFrequency.replaceFirstChar { it.uppercase() }
+    }
+
+    val accountsLabel = if (member.retirementAccounts.isNotEmpty()) {
+        "${member.retirementAccounts.size} linked ${if (member.retirementAccounts.size == 1) "account" else "accounts"}"
+    } else {
+        member.retirementAccountType?.uppercase() ?: "401K"
+    }
 
     Column(
         modifier = Modifier
@@ -152,17 +183,22 @@ private fun HouseholdMemberDetailView(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = member.role.replaceFirstChar { it.uppercase() },
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    OrbitBadge(
+                        text = roleLabel,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     )
+                    if (age != null) {
+                        OrbitBadge(
+                            text = "Age $age",
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -175,37 +211,51 @@ private fun HouseholdMemberDetailView(
             }
         }
 
-        // Compensation Card
+        // 4-Metric Summary Grid
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "COMPENSATION & INCOME",
+                    text = "ANNUAL COMPENSATION METRICS",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Text(
-                    text = MoneyUtils.formatCents(member.grossIncomeAnnualCents) + " / yr",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Monthly Gross: ${MoneyUtils.formatCents(member.grossIncomeAnnualCents / 12)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    InspectorMetricTile(
+                        label = "Gross",
+                        value = MoneyUtils.formatCents(member.grossIncomeAnnualCents, showCents = false),
+                        modifier = Modifier.weight(1f)
+                    )
+                    InspectorMetricTile(
+                        label = "Net Pay",
+                        value = MoneyUtils.formatCents(netPay, showCents = false),
+                        modifier = Modifier.weight(1f)
+                    )
+                    InspectorMetricTile(
+                        label = "Employer Match",
+                        value = MoneyUtils.formatCents(match, showCents = false),
+                        modifier = Modifier.weight(1f)
+                    )
+                    InspectorMetricTile(
+                        label = "Retirement Rate",
+                        value = "${rate.roundToInt()}%",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
 
-        // Employment & Benefits Card
+        // Employment & Benefits Card with Meta Chips
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
@@ -223,7 +273,8 @@ private fun HouseholdMemberDetailView(
                 )
                 MemberDetailRow("Employer", member.employer ?: "Not specified")
                 MemberDetailRow("Job Title", member.jobTitle ?: "Not specified")
-                MemberDetailRow("Retirement Plan", member.retirementAccountType ?: "401k")
+                MemberDetailRow("Pay Cadence", payFreqLabel)
+                MemberDetailRow("Retirement Plan", accountsLabel)
             }
         }
 
@@ -257,6 +308,36 @@ private fun HouseholdMemberDetailView(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Delete")
             }
+        }
+    }
+}
+
+@Composable
+private fun InspectorMetricTile(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }

@@ -82,7 +82,7 @@ private fun MemberContributionItem(
     val matchLimitPct = member.employerMatchLimitPercent
     val matchCap = member.employerMatchAnnualCapCents
     val eligiblePct = if (matchLimitPct > 0.0) min(empPct, matchLimitPct) else empPct
-    val matchRate = if (matchPct > 0.0) matchPct / 100.0 else 1.0
+    val matchRate = if (matchPct > 0.0) matchPct / 100.0 else 0.0
     val uncappedMatchCents = if (eligiblePct > 0.0 && gross > 0L) {
         ((gross.toDouble() * eligiblePct / 100.0) * matchRate).roundToLong()
     } else 0L

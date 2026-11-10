@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -20,9 +17,33 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.datetime.LocalDate
+
+val RETIREMENT_PLAN_OPTIONS = listOf(
+    "none" to "None",
+    "401k" to "401(k)",
+    "403b" to "403(b)",
+    "457b" to "457(b)",
+    "ira" to "Traditional IRA",
+    "roth_ira" to "Roth IRA",
+    "hsa" to "HSA",
+    "sep_ira" to "SEP IRA",
+    "simple_ira" to "SIMPLE IRA",
+    "pension" to "Pension",
+    "other" to "Other"
+)
+
+val PAY_FREQUENCY_OPTIONS = listOf(
+    Triple("weekly", "Weekly (52/yr)", 52.0),
+    Triple("biweekly", "Biweekly (26/yr)", 26.0),
+    Triple("semimonthly", "Semimonthly (24/yr)", 24.0),
+    Triple("monthly", "Monthly (12/yr)", 12.0),
+    Triple("annual", "Annual (1/yr)", 1.0),
+    Triple("none", "None (0/yr)", 0.0)
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,13 +66,13 @@ fun MemberCompensationFields(
     onEmployerMatchLimitPercentChange: (Double) -> Unit,
     employerMatchAnnualCapCents: Cents,
     onEmployerMatchAnnualCapChange: (Cents) -> Unit,
-    healthPremiumPerMonthCents: Cents,
+    healthPremiumPerPaycheckCents: Cents,
     onHealthPremiumChange: (Cents) -> Unit,
-    hsaContributionAnnualCents: Cents,
+    hsaContributionPerPaycheckCents: Cents,
     onHsaContributionChange: (Cents) -> Unit,
-    dependentCareFsaAnnualCents: Cents,
+    dependentCareFsaPerPaycheckCents: Cents,
     onDependentCareFsaChange: (Cents) -> Unit,
-    otherBenefitsAnnualCents: Cents,
+    otherBenefitsPerPaycheckCents: Cents,
     onOtherBenefitsChange: (Cents) -> Unit,
     notes: String,
     onNotesChange: (String) -> Unit,
@@ -70,27 +91,16 @@ fun MemberCompensationFields(
             color = MaterialTheme.colorScheme.primary
         )
 
-        val frequencies = listOf(
-            Triple("weekly", "Weekly", 52.0),
-            Triple("biweekly", "Biweekly", 26.0),
-            Triple("semimonthly", "Semi-Mo", 24.0),
-            Triple("monthly", "Monthly", 12.0)
-        )
-
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            frequencies.forEachIndexed { index, (freqKey, label, periods) ->
-                SegmentedButton(
-                    selected = payFrequency.equals(freqKey, ignoreCase = true),
-                    onClick = {
-                        haptics.tick()
-                        onPayFrequencyChange(freqKey, periods)
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = frequencies.size),
-                    icon = {},
-                    label = { Text(label, style = MaterialTheme.typography.labelSmall) }
-                )
+        OrbitDropdownField(
+            label = "Pay Frequency",
+            selectedText = PAY_FREQUENCY_OPTIONS.find { it.first.equals(payFrequency, ignoreCase = true) }?.second ?: "Biweekly (26/yr)",
+            options = PAY_FREQUENCY_OPTIONS,
+            optionLabel = { it.second },
+            onOptionSelected = {
+                haptics.tick()
+                onPayFrequencyChange(it.first, it.third)
             }
-        }
+        )
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             CurrencyTextField(
@@ -115,12 +125,15 @@ fun MemberCompensationFields(
             color = MaterialTheme.colorScheme.primary
         )
 
-        OrbitTextField(
-            value = retirementAccountType,
-            onValueChange = onRetirementAccountTypeChange,
-            label = { Text("Primary Plan Type (e.g. 401k, 403b, Simple IRA)") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+        OrbitDropdownField(
+            label = "Primary Retirement Plan Type",
+            selectedText = RETIREMENT_PLAN_OPTIONS.find { it.first.equals(retirementAccountType, ignoreCase = true) }?.second ?: "401(k)",
+            options = RETIREMENT_PLAN_OPTIONS,
+            optionLabel = { it.second },
+            onOptionSelected = {
+                haptics.tick()
+                onRetirementAccountTypeChange(it.first)
+            }
         )
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -164,40 +177,47 @@ fun MemberCompensationFields(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Section: Benefits & Deductions
-        Text(
-            text = "Pre-Tax Benefits & Deductions",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
+        // Section: Benefits & Deductions (Per-Paycheck direct entry)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "Pre-Tax Benefits & Deductions",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = "Enter each deduction as it appears on one paycheck. Orbit annualizes it from the pay frequency above.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             CurrencyTextField(
-                cents = healthPremiumPerMonthCents,
+                cents = healthPremiumPerPaycheckCents,
                 onCentsChange = onHealthPremiumChange,
-                label = "Health Premium / Mo",
+                label = "Health Ins. / Paycheck",
                 modifier = Modifier.weight(1f)
             )
             CurrencyTextField(
-                cents = hsaContributionAnnualCents,
+                cents = hsaContributionPerPaycheckCents,
                 onCentsChange = onHsaContributionChange,
-                label = "HSA Contribution / Yr",
+                label = "HSA / Paycheck",
                 modifier = Modifier.weight(1f)
             )
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             CurrencyTextField(
-                cents = dependentCareFsaAnnualCents,
+                cents = dependentCareFsaPerPaycheckCents,
                 onCentsChange = onDependentCareFsaChange,
-                label = "Dep Care FSA / Yr",
+                label = "Dep Care FSA / Paycheck",
                 modifier = Modifier.weight(1f)
             )
             CurrencyTextField(
-                cents = otherBenefitsAnnualCents,
+                cents = otherBenefitsPerPaycheckCents,
                 onCentsChange = onOtherBenefitsChange,
-                label = "Other Pre-Tax / Yr",
+                label = "Other Pre-Tax / Paycheck",
                 modifier = Modifier.weight(1f)
             )
         }

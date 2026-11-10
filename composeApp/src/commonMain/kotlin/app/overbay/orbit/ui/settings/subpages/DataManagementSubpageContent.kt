@@ -74,7 +74,9 @@ fun DataManagementSubpageContent(
             onOpenInviteDialog = { viewModel.openInvitePartnerDialog(true) },
             onUpdateAccess = viewModel::updatePartnerAccess,
             onRevokeShare = viewModel::revokePartnerShare,
-            onRemoveUser = viewModel::removeHouseholdUser
+            onRemoveUser = viewModel::removeHouseholdUser,
+            storageMode = uiState.preferences.storageMode,
+            onUpdateUserAccess = viewModel::updateHouseholdMemberAccess
         )
 
         // 4. Data Import, Export & Rules

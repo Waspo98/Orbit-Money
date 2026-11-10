@@ -22,7 +22,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.domain.NetWorthBucket
+import app.overbay.orbit.domain.NetWorthEngine
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.EmptyStateCard
@@ -36,12 +39,15 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 fun AccountContributionsCard(
     contributions: List<AccountContributionItem>,
     onAccountClick: (Long) -> Unit,
+    onEditValuesClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
 
     OrbitSectionCard(
         title = "Account Contributions",
+        actionText = "Edit Values",
+        onActionClick = onEditValuesClick,
         modifier = modifier.fillMaxWidth()
     ) {
         if (contributions.isEmpty()) {
@@ -58,6 +64,16 @@ fun AccountContributionsCard(
                     val acct = item.account
                     val isPositive = item.signedContributionCents >= 0L
                     val color = if (isPositive) OrbitColorTokens.Green else OrbitColorTokens.Red
+
+                    val bucket = NetWorthEngine.bucketForAccount(acct)
+                    val bucketColor = when (bucket) {
+                        NetWorthBucket.CASH -> MaterialTheme.colorScheme.primary
+                        NetWorthBucket.INVESTMENTS -> MaterialTheme.colorScheme.secondary
+                        NetWorthBucket.REAL_ESTATE -> MaterialTheme.colorScheme.tertiary
+                        NetWorthBucket.CREDIT -> OrbitColorTokens.Amber
+                        NetWorthBucket.LOANS -> OrbitColorTokens.Red
+                        NetWorthBucket.OTHER -> MaterialTheme.colorScheme.outline
+                    }
 
                     Column(
                         modifier = Modifier
@@ -79,10 +95,15 @@ fun AccountContributionsCard(
                                 modifier = Modifier.weight(1f)
                             ) {
                                 // Account Type Badge
-                                val badgeLabel = if (acct.estimatedValueCents != null) {
-                                    "REAL"
-                                } else {
-                                    acct.type.name.take(4)
+                                val badgeLabel = when (acct.type) {
+                                    AccountType.CHECKING -> "Checking"
+                                    AccountType.SAVINGS -> "Savings"
+                                    AccountType.CASH -> "Cash"
+                                    AccountType.INVESTMENT -> "Investment"
+                                    AccountType.MORTGAGE -> if (acct.estimatedValueCents != null) "Real Estate" else "Mortgage"
+                                    AccountType.CREDIT -> "Credit"
+                                    AccountType.LOAN -> "Loan"
+                                    AccountType.OTHER -> "Other"
                                 }
                                 OrbitBadge(
                                     text = badgeLabel,
@@ -130,7 +151,7 @@ fun AccountContributionsCard(
 
                         OrbitPillProgressBar(
                             percent = (item.impactPercent / 100.0).toFloat().coerceIn(0f, 1f),
-                            customFillColor = color,
+                            customFillColor = bucketColor,
                             height = 4.dp
                         )
                     }

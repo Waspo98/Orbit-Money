@@ -3,6 +3,8 @@ package app.overbay.orbit.ui.goals.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,17 +35,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.data.model.GoalAllocation
 import app.overbay.orbit.data.model.GoalAllocationType
 import app.overbay.orbit.domain.GoalAllocationEngine
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Multi-account allocation rows editor allowing household owners to assign savings percentages
@@ -53,6 +60,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 fun GoalAllocationRowEditor(
     allocations: List<GoalAllocation>,
     accounts: List<Account>,
+    existingGoals: List<Goal> = emptyList(),
     onAllocationsChange: (List<GoalAllocation>) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -119,6 +127,7 @@ fun GoalAllocationRowEditor(
                 SingleAllocationCard(
                     allocation = alloc,
                     eligibleAccounts = eligibleAccounts,
+                    existingGoals = existingGoals,
                     onChange = { updated ->
                         val list = allocations.toMutableList()
                         list[index] = updated
@@ -136,16 +145,41 @@ fun GoalAllocationRowEditor(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SingleAllocationCard(
     allocation: GoalAllocation,
     eligibleAccounts: List<Account>,
+    existingGoals: List<Goal>,
     onChange: (GoalAllocation) -> Unit,
     onDelete: () -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
     val currentAccount = eligibleAccounts.find { it.id == allocation.accountId }
+    val currentBalance = currentAccount?.currentBalanceCents ?: 0L
+    val allocatable = max(0L, currentBalance - allocation.reserveAmountCents)
+
+    val otherGoalsOnAccount = remember(existingGoals, allocation.goalId, currentAccount) {
+        if (currentAccount == null) emptyList()
+        else existingGoals
+            .filter { it.id != allocation.goalId && it.id > 0L }
+            .mapNotNull { g ->
+                val match = g.allocations.firstOrNull { it.accountId == currentAccount.id }
+                if (match != null) g.name to match else null
+            }
+    }
+
+    val otherAllocatedCents = remember(otherGoalsOnAccount, allocatable) {
+        otherGoalsOnAccount.sumOf { (_, alloc) ->
+            if (alloc.allocationType == GoalAllocationType.PERCENT) {
+                ((allocatable * alloc.allocationPercent) / 100.0).toLong()
+            } else {
+                min(allocatable, alloc.allocationAmountCents)
+            }
+        }
+    }
+
+    val openBalanceCents = max(0L, allocatable - otherAllocatedCents)
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -188,6 +222,56 @@ private fun SingleAllocationCard(
                 }
             }
 
+            // Open Balance Summary
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Open Balance: ${MoneyUtils.formatCents(openBalanceCents, showCents = false)} (of ${MoneyUtils.formatCents(currentBalance, showCents = false)})",
+                    style = TabularNumStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // Chips for other goals already allocated on this account
+            if (otherGoalsOnAccount.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Other goals on this account:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        otherGoalsOnAccount.forEach { (name, otherAlloc) ->
+                            val desc = if (otherAlloc.allocationType == GoalAllocationType.PERCENT) {
+                                "${otherAlloc.allocationPercent.toInt()}%"
+                            } else {
+                                MoneyUtils.formatCents(otherAlloc.allocationAmountCents, showCents = false)
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh
+                            ) {
+                                Text(
+                                    text = "$name: $desc",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Allocation Type Toggle (% Percent vs $ Fixed)
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(
@@ -212,24 +296,67 @@ private fun SingleAllocationCard(
                 )
             }
 
-            // Percent or Amount input
+            // Percent or Amount input with Interactive Slider
             if (allocation.allocationType == GoalAllocationType.PERCENT) {
-                OrbitTextField(
-                    value = if (allocation.allocationPercent > 0.0) allocation.allocationPercent.toString() else "",
-                    onValueChange = { str ->
-                        val clean = str.filter { it.isDigit() || it == '.' }
-                        val dbl = clean.toDoubleOrNull() ?: 0.0
-                        onChange(allocation.copy(allocationPercent = dbl.coerceIn(0.0, 100.0)))
-                    },
-                    label = { Text("Percent of Allocatable Balance (0-100%)") },
-                    placeholder = { Text("e.g. 50") }
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Allocation Percent",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${allocation.allocationPercent.toInt()}%",
+                            style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Slider(
+                        value = allocation.allocationPercent.toFloat(),
+                        onValueChange = { onChange(allocation.copy(allocationPercent = it.toDouble())) },
+                        valueRange = 0f..100f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             } else {
-                CurrencyTextField(
-                    cents = allocation.allocationAmountCents,
-                    onCentsChange = { onChange(allocation.copy(allocationAmountCents = it)) },
-                    label = "Fixed Allocation Amount"
-                )
+                val maxOpenDollars = max(10f, (openBalanceCents / 100L).toFloat())
+                val currentDollars = (allocation.allocationAmountCents / 100L).toFloat()
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Fixed Allocation Amount",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = MoneyUtils.formatCents(allocation.allocationAmountCents, showCents = false),
+                            style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Slider(
+                        value = currentDollars.coerceIn(0f, maxOpenDollars),
+                        onValueChange = {
+                            val newCents = (it.toLong() * 100L)
+                            onChange(allocation.copy(allocationAmountCents = newCents))
+                        },
+                        valueRange = 0f..maxOpenDollars,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    CurrencyTextField(
+                        cents = allocation.allocationAmountCents,
+                        onCentsChange = { onChange(allocation.copy(allocationAmountCents = it)) },
+                        label = "Type Exact Amount"
+                    )
+                }
             }
 
             // Account Reserve Input

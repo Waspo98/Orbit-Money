@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.*
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleConditionField
 import app.overbay.orbit.domain.Cents
@@ -134,7 +135,8 @@ class CategoriesViewModel(
         val filteredSummaries = if (query.isNotBlank()) {
             allSummaries.filter { item ->
                 item.category.name.lowercase().contains(query) ||
-                        (item.category.icon?.contains(query) == true)
+                        (item.category.icon?.contains(query) == true) ||
+                        (item.category.displayEmoji?.lowercase()?.contains(query) == true)
             }
         } else allSummaries
 
@@ -245,8 +247,8 @@ class CategoriesViewModel(
         name: String,
         color: String,
         icon: String?,
-        isTransfer: Boolean,
-        isIncome: Boolean,
+        isTransfer: Boolean = false,
+        isIncome: Boolean = false,
         mhaEligible: Boolean
     ) {
         viewModelScope.launch {
@@ -256,10 +258,10 @@ class CategoriesViewModel(
                 name = name,
                 color = color,
                 icon = icon,
-                isTransfer = isTransfer,
-                isIncome = isIncome,
+                isTransfer = existing?.isTransfer ?: false,
+                isIncome = existing?.isIncome ?: false,
                 mhaDefaultEligible = mhaEligible,
-                mhaDefaultIgnored = existing?.mhaDefaultIgnored ?: false,
+                mhaDefaultIgnored = if (mhaEligible) false else (existing?.mhaDefaultIgnored ?: false),
                 sortOrder = existing?.sortOrder ?: 0
             )
             repository.saveCategory(category)

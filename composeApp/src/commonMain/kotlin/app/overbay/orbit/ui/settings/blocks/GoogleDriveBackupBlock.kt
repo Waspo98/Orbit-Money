@@ -14,9 +14,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
@@ -36,6 +41,22 @@ fun GoogleDriveBackupBlock(
     onRestoreJsonBackup: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var showRestoreConfirm by remember { mutableStateOf(false) }
+
+    if (showRestoreConfirm) {
+        OrbitConfirmationDialog(
+            title = "Restore from Google Drive?",
+            message = "Restore your database from Google Drive? This will replace your current workspace data with the cloud backup.",
+            confirmText = "Restore",
+            isDestructive = true,
+            onConfirm = {
+                showRestoreConfirm = false
+                onRestoreFromDrive()
+            },
+            onDismiss = { showRestoreConfirm = false }
+        )
+    }
+
     OrbitSectionCard(
         title = "Google Drive Cloud Backup",
         subtitle = "Private backups stored in your personal Google Drive",
@@ -95,7 +116,7 @@ fun GoogleDriveBackupBlock(
                         Text("Back Up Now")
                     }
                     OutlinedButton(
-                        onClick = onRestoreFromDrive,
+                        onClick = { showRestoreConfirm = true },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(10.dp)
                     ) {

@@ -13,12 +13,17 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.StorageMode
+import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
 @Composable
@@ -29,6 +34,22 @@ fun AboutSettingsBlock(
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showSignOutConfirm by remember { mutableStateOf(false) }
+
+    if (showSignOutConfirm) {
+        OrbitConfirmationDialog(
+            title = "Sign Out?",
+            message = "Sign out on this device?",
+            confirmText = "Sign Out",
+            isDestructive = true,
+            onConfirm = {
+                showSignOutConfirm = false
+                onSignOut()
+            },
+            onDismiss = { showSignOutConfirm = false }
+        )
+    }
+
     OrbitSectionCard(
         title = "About Orbit Money",
         subtitle = "Open source, privacy-focused household finance",
@@ -56,6 +77,24 @@ fun AboutSettingsBlock(
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Developer",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Neal Overbay",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
@@ -127,7 +166,7 @@ fun AboutSettingsBlock(
 
             if (preferences.storageMode == StorageMode.SELF_HOSTED) {
                 OutlinedButton(
-                    onClick = onSignOut,
+                    onClick = { showSignOutConfirm = true },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
@@ -135,6 +174,12 @@ fun AboutSettingsBlock(
                     Text("Sign Out")
                 }
             }
+
+            Text(
+                text = "Copyright 2026 Neal Overbay. All rights reserved.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline
+            )
         }
     }
 }

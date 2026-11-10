@@ -1,6 +1,7 @@
 package app.overbay.orbit.domain
 
 import app.overbay.orbit.data.model.AmountStrategy
+import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.OccurrenceStatus
 import app.overbay.orbit.data.model.ProjectedOccurrence
 import app.overbay.orbit.data.model.RecurrenceFrequency
@@ -51,12 +52,10 @@ object UpcomingEngine {
 
         when (item.frequencyType) {
             RecurrenceFrequency.WEEKLY,
-            RecurrenceFrequency.BIWEEKLY,
-            RecurrenceFrequency.SEMIMONTHLY -> {
+            RecurrenceFrequency.BIWEEKLY -> {
                 val stepDays = when (item.frequencyType) {
                     RecurrenceFrequency.WEEKLY -> 7 * interval
                     RecurrenceFrequency.BIWEEKLY -> 14 * interval
-                    RecurrenceFrequency.SEMIMONTHLY -> 15 * interval
                     else -> 7
                 }
                 var cur = anchorDate
@@ -75,17 +74,113 @@ object UpcomingEngine {
                 }
             }
 
+            RecurrenceFrequency.SEMIMONTHLY -> {
+                val anchorDay = anchorDate.dayOfMonth
+                val day1 = if (anchorDay <= 15) anchorDay else max(1, anchorDay - 14)
+                val day2 = if (anchorDay <= 15) min(31, anchorDay + 14) else anchorDay
+
+                var curYear = anchorDate.year
+                var curMonth = anchorDate.monthNumber
+                val endYear = eDate.year
+                val endMonth = eDate.monthNumber
+
+                var guard = 0
+                while (guard < 1200) {
+                    val maxDays = LocalDateUtils.daysInMonth(curYear, curMonth)
+                    val d1 = min(day1, maxDays)
+                    val d2 = min(day2, maxDays)
+
+                    val date1 = LocalDate(curYear, curMonth, d1)
+                    if (date1 in sDate..eDate && date1 >= anchorDate) {
+                        dates.add(LocalDateUtils.formatIsoDate(date1))
+                    }
+
+                    if (d2 != d1) {
+                        val date2 = LocalDate(curYear, curMonth, d2)
+                        if (date2 in sDate..eDate && date2 >= anchorDate) {
+                            dates.add(LocalDateUtils.formatIsoDate(date2))
+                        }
+                    }
+
+                    if (curYear > endYear || (curYear == endYear && curMonth >= endMonth)) break
+                    curMonth++
+                    if (curMonth > 12) {
+                        curMonth = 1
+                        curYear++
+                    }
+                    guard++
+                }
+            }
+
+            RecurrenceFrequency.CUSTOM -> {
+                when (item.frequencyUnit.lowercase()) {
+                    "days" -> {
+                        val stepDays = interval
+                        var cur = anchorDate
+                        var guard = 0
+                        while (cur < sDate && guard < 1000) {
+                            cur = LocalDateUtils.addDays(cur, stepDays)
+                            guard++
+                        }
+                        guard = 0
+                        while (cur <= eDate && guard < 1000) {
+                            if (cur >= sDate) {
+                                dates.add(LocalDateUtils.formatIsoDate(cur))
+                            }
+                            cur = LocalDateUtils.addDays(cur, stepDays)
+                            guard++
+                        }
+                    }
+                    "weeks" -> {
+                        val stepDays = interval * 7
+                        var cur = anchorDate
+                        var guard = 0
+                        while (cur < sDate && guard < 1000) {
+                            cur = LocalDateUtils.addDays(cur, stepDays)
+                            guard++
+                        }
+                        guard = 0
+                        while (cur <= eDate && guard < 1000) {
+                            if (cur >= sDate) {
+                                dates.add(LocalDateUtils.formatIsoDate(cur))
+                            }
+                            cur = LocalDateUtils.addDays(cur, stepDays)
+                            guard++
+                        }
+                    }
+                    else -> {
+                        val stepMonths = interval
+                        val anchorDay = anchorDate.dayOfMonth
+                        var stepIndex = 0
+                        var guard = 0
+                        while (guard < 1200) {
+                            val totalMonths = (anchorDate.year * 12) + (anchorDate.monthNumber - 1) + (stepIndex * stepMonths)
+                            val nextYear = totalMonths / 12
+                            val nextMonth = (totalMonths % 12) + 1
+                            val maxDays = LocalDateUtils.daysInMonth(nextYear, nextMonth)
+                            val nextDay = min(anchorDay, maxDays)
+                            val cur = LocalDate(nextYear, nextMonth, nextDay)
+
+                            if (cur > eDate) break
+                            if (cur >= sDate) {
+                                dates.add(LocalDateUtils.formatIsoDate(cur))
+                            }
+                            stepIndex++
+                            guard++
+                        }
+                    }
+                }
+            }
+
             RecurrenceFrequency.MONTHLY,
             RecurrenceFrequency.BIMONTHLY,
             RecurrenceFrequency.QUARTERLY,
-            RecurrenceFrequency.YEARLY,
-            RecurrenceFrequency.CUSTOM -> {
+            RecurrenceFrequency.YEARLY -> {
                 val stepMonths = when (item.frequencyType) {
                     RecurrenceFrequency.MONTHLY -> 1 * interval
                     RecurrenceFrequency.BIMONTHLY -> 2 * interval
                     RecurrenceFrequency.QUARTERLY -> 3 * interval
                     RecurrenceFrequency.YEARLY -> 12 * interval
-                    RecurrenceFrequency.CUSTOM -> 1 * interval
                     else -> 1
                 }
                 val anchorDay = anchorDate.dayOfMonth
@@ -109,7 +204,7 @@ object UpcomingEngine {
             }
         }
 
-        return dates
+        return dates.distinct().sorted()
     }
 
     /**
@@ -130,7 +225,18 @@ object UpcomingEngine {
         return when (frequency) {
             RecurrenceFrequency.WEEKLY -> LocalDateUtils.formatIsoDate(LocalDateUtils.addDays(d, 7 * safeInterval))
             RecurrenceFrequency.BIWEEKLY -> LocalDateUtils.formatIsoDate(LocalDateUtils.addDays(d, 14 * safeInterval))
-            RecurrenceFrequency.SEMIMONTHLY -> LocalDateUtils.formatIsoDate(LocalDateUtils.addDays(d, 15 * safeInterval))
+            RecurrenceFrequency.SEMIMONTHLY -> {
+                val curDay = d.dayOfMonth
+                val maxDays = LocalDateUtils.daysInMonth(d.year, d.monthNumber)
+                val effectiveAnchor = if (anchorDay in 1..31) anchorDay else curDay
+                val d1 = if (effectiveAnchor <= 15) effectiveAnchor else max(1, effectiveAnchor - 14)
+                val d2 = if (effectiveAnchor <= 15) min(effectiveAnchor + 14, maxDays) else min(effectiveAnchor, maxDays)
+                if (curDay < d2) {
+                    LocalDateUtils.formatIsoDate(LocalDate(d.year, d.monthNumber, d2))
+                } else {
+                    advanceMonths(d, 1, d1)
+                }
+            }
             RecurrenceFrequency.MONTHLY -> advanceMonths(d, 1 * safeInterval, anchorDay)
             RecurrenceFrequency.BIMONTHLY -> advanceMonths(d, 2 * safeInterval, anchorDay)
             RecurrenceFrequency.QUARTERLY -> advanceMonths(d, 3 * safeInterval, anchorDay)
@@ -399,9 +505,11 @@ object UpcomingEngine {
     fun detectRecurringCandidates(
         transactions: List<Transaction>,
         existingMerchants: Set<String> = emptySet(),
-        todayDate: String = ""
+        todayDate: String = "",
+        categoryMap: Map<Long, Category> = emptyMap()
     ): List<RecurringCandidate> {
         val activeTxns = transactions.filter { !it.effectiveIsIgnored && !it.effectiveIsTransfer }
+        val effectiveToday = if (todayDate.isNotBlank()) todayDate else (activeTxns.maxOfOrNull { it.effectiveDate } ?: LocalDateUtils.todayIsoDate())
         val byMerchant = activeTxns.groupBy { normalizeText(it.effectiveMerchant) }
 
         val candidates = mutableListOf<RecurringCandidate>()
@@ -411,6 +519,11 @@ object UpcomingEngine {
             if (existingMerchants.contains(normalizedMerchant)) continue
 
             val sorted = txns.sortedBy { it.effectiveDate }
+
+            // Require transactions to span at least 2 distinct calendar months
+            val months = sorted.mapNotNull { LocalDateUtils.parseYearMonth(it.effectiveDate) }.toSet()
+            if (months.size < 2) continue
+
             val intervals = mutableListOf<Int>()
             for (i in 0 until (sorted.size - 1)) {
                 intervals.add(daysBetween(sorted[i].effectiveDate, sorted[i + 1].effectiveDate))
@@ -419,66 +532,47 @@ object UpcomingEngine {
             val amounts = sorted.map { abs(it.effectiveAmountCents) }
             val avgAmount = amounts.average().roundToLong()
             val latestDate = sorted.last().effectiveDate
+            val lastTxn = sorted.last()
 
             val detectedFrequency = when {
                 avgInterval in 6.0..8.0 -> RecurrenceFrequency.WEEKLY
                 avgInterval in 13.0..16.0 -> RecurrenceFrequency.BIWEEKLY
                 avgInterval in 27.0..34.0 -> RecurrenceFrequency.MONTHLY
                 avgInterval in 355.0..375.0 -> RecurrenceFrequency.YEARLY
-                else -> null
-            } ?: continue
-
-            val amountCoeffVar = if (amounts.size >= 2) {
-                amounts.maxOf { abs(it - avgAmount).toDouble() / max(1L, avgAmount).toDouble() }
-            } else 0.0
-
-            val recencyDays = if (todayDate.isNotBlank()) daysBetween(latestDate, todayDate) else 0
-            if (todayDate.isNotBlank() && recencyDays > 90) continue
-
-            // Score candidate confidence
-            var score = 20
-            score += when {
-                avgInterval in 27.0..34.0 -> 25
-                avgInterval in 13.0..16.0 -> 24
-                avgInterval in 6.0..8.0 -> 22
-                else -> 8
-            }
-            score += when {
-                sorted.size >= 5 -> 20
-                sorted.size >= 4 -> 15
-                sorted.size >= 3 -> 10
-                else -> 4
-            }
-            score += when {
-                amountCoeffVar <= 0.10 -> 15
-                amountCoeffVar <= 0.25 -> 8
-                else -> -10
-            }
-            score += when {
-                recencyDays <= 45 -> 8
-                recencyDays <= 90 -> 4
-                else -> 0
+                else -> RecurrenceFrequency.CUSTOM
             }
 
-            val confidence = max(0, min(95, score))
-            val tier = when {
-                confidence >= 70 -> "HIGH"
-                confidence >= 50 -> "MEDIUM"
-                else -> "LOW"
+            val category = lastTxn.effectiveCategoryId?.let { categoryMap[it] }
+            val categoryName = category?.name ?: ""
+            val isIncome = lastTxn.effectiveAmountCents > 0L
+            val direction = if (isIncome) "income" else "expense"
+
+            val confidence = UpcomingScheduleHelper.scoreUpcomingSuggestion(
+                categoryName = categoryName,
+                merchantName = lastTxn.effectiveMerchant,
+                direction = direction,
+                averageInterval = avgInterval,
+                transactionCount = sorted.size,
+                amounts = amounts,
+                latestDate = latestDate,
+                today = effectiveToday
+            )
+
+            if (confidence <= 0) continue
+
+            val tier = if (confidence >= 70) "HIGH" else if (confidence >= 50) "MEDIUM" else "LOW"
+            val nextDate = if (detectedFrequency == RecurrenceFrequency.CUSTOM) {
+                addDays(latestDate, max(1, avgInterval.roundToLong().toInt()))
+            } else {
+                advanceInterval(latestDate, detectedFrequency)
             }
 
             candidates.add(
                 RecurringCandidate(
-                    merchant = sorted.last().effectiveMerchant,
-                    amountCents = avgAmount,
-                    frequency = detectedFrequency,
-                    transactionCount = sorted.size,
-                    confidenceScore = confidence,
-                    confidenceTier = tier,
-                    suggestedCategoryId = sorted.last().effectiveCategoryId,
-                    suggestedAccountId = sorted.last().accountId,
-                    lastDate = latestDate,
-                    nextProjectedDate = advanceInterval(latestDate, detectedFrequency)
+                    merchant = lastTxn.effectiveMerchant, amountCents = avgAmount, frequency = detectedFrequency,
+                    transactionCount = sorted.size, confidenceScore = confidence, confidenceTier = tier,
+                    suggestedCategoryId = lastTxn.effectiveCategoryId, suggestedAccountId = lastTxn.accountId,
+                    lastDate = latestDate, nextProjectedDate = nextDate
                 )
             )
         }
@@ -488,11 +582,8 @@ object UpcomingEngine {
 
     private val NON_ALPHANUMERIC_REGEX = Regex("[^a-z0-9]+")
 
-    private fun normalizeText(text: String): String {
-        return text.lowercase()
-            .replace(NON_ALPHANUMERIC_REGEX, " ")
-            .trim()
-    }
+    private fun normalizeText(text: String): String =
+        text.lowercase().replace(NON_ALPHANUMERIC_REGEX, " ").trim()
 
     private fun daysBetween(date1: String, date2: String): Int {
         val d1 = LocalDateUtils.parseIsoDate(date1) ?: return 999
@@ -500,8 +591,6 @@ object UpcomingEngine {
         return abs(LocalDateUtils.daysBetween(d1, d2))
     }
 
-    private fun addDays(date: String, days: Int): String {
-        val d = LocalDateUtils.parseIsoDate(date) ?: return date
-        return LocalDateUtils.formatIsoDate(LocalDateUtils.addDays(d, days))
-    }
+    private fun addDays(date: String, days: Int): String =
+        LocalDateUtils.parseIsoDate(date)?.let { LocalDateUtils.formatIsoDate(LocalDateUtils.addDays(it, days)) } ?: date
 }

@@ -31,6 +31,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MonthlyNetWorthPoint
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
@@ -251,25 +252,25 @@ fun NetWorthAreaChart(
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp, vertical = 6.dp)
         ) {
-            val firstMonth = points.firstOrNull()?.month ?: ""
-            val midMonth = if (points.size > 2) points[points.size / 2].month else ""
-            val lastMonth = points.lastOrNull()?.month ?: ""
+            val firstLabel = points.firstOrNull()?.let { LocalDateUtils.formatMonthShortLabel(it.month) } ?: ""
+            val midLabel = if (points.size > 2) LocalDateUtils.formatMonthShortLabel(points[points.size / 2].month) else ""
+            val lastLabel = points.lastOrNull()?.let { LocalDateUtils.formatMonthShortLabel(it.month) } ?: ""
 
             Text(
-                text = firstMonth,
+                text = firstLabel,
                 style = MaterialTheme.typography.labelSmall,
                 color = onSurfaceVariant,
                 modifier = Modifier.weight(1f)
             )
-            if (midMonth.isNotEmpty()) {
+            if (midLabel.isNotEmpty()) {
                 Text(
-                    text = midMonth,
+                    text = midLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = onSurfaceVariant
                 )
             }
             Text(
-                text = lastMonth,
+                text = lastLabel,
                 style = MaterialTheme.typography.labelSmall,
                 color = onSurfaceVariant,
                 modifier = Modifier.weight(1f),

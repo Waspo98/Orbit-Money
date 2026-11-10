@@ -48,6 +48,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.categories.CategoriesUiState
 import app.overbay.orbit.ui.categories.CategorySummary
 import app.overbay.orbit.ui.categories.dialogs.CategoryEditorContent
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -176,12 +177,30 @@ private fun CategoryInspectorDetailView(
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
-                    Text(
-                        text = cat.name,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = cat.name,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (cat.mhaDefaultEligible) {
+                            OrbitBadge(
+                                text = "MHA",
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        } else if (cat.mhaDefaultIgnored) {
+                            OrbitBadge(
+                                text = "MHA Ignored",
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                     Text(
                         text = groupTitle,
                         style = MaterialTheme.typography.bodySmall,
@@ -291,8 +310,12 @@ private fun CategoryInspectorDetailView(
                     }
                 )
                 CategoryMetadataRow(
-                    label = "Default MHA Eligible",
-                    value = if (cat.mhaDefaultEligible) "Yes (MHA Parsonage)" else "No"
+                    label = "MHA Status",
+                    value = when {
+                        cat.mhaDefaultEligible -> "MHA Eligible (Parsonage)"
+                        cat.mhaDefaultIgnored -> "MHA Ignored"
+                        else -> "Standard"
+                    }
                 )
             }
         }
@@ -323,6 +346,7 @@ private fun CategoryInspectorDetailView(
                     haptics.tick()
                     onViewTransactions()
                 },
+                enabled = summary.transactionCount > 0,
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(

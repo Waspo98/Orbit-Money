@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.TabularNumStyle
@@ -78,10 +79,13 @@ fun NetWorthScreen(
                     .padding(innerPadding)
                     .nestedScroll(heroScrollState.nestedScrollConnection)
             ) {
+                val latestMonth = state.filteredPoints.lastOrNull()?.month ?: state.allHistoryPoints.lastOrNull()?.month
+                val heroSubtitle = "Assets minus liabilities" + (latestMonth?.let { ", updated through ${LocalDateUtils.formatMonthShortLabel(it)}" } ?: "")
+
                 MorphingPageHero(
                     kicker = "BALANCE SHEET",
                     title = "Net Worth",
-                    subtitle = "Assets minus liabilities",
+                    subtitle = heroSubtitle,
                     scrollState = heroScrollState,
                     canopyBar = { _, isCompact, barHeight ->
                         CanopySegmentedBar(
@@ -145,7 +149,8 @@ fun NetWorthScreen(
                         item {
                             AssetLiabilityBreakdownCard(
                                 snapshot = state.snapshot,
-                                isTwoPane = isTwoPane
+                                isTwoPane = isTwoPane,
+                                onAccountsClick = { onNavigate(OrbitNavKey.Accounts()) }
                             )
                         }
 
@@ -161,6 +166,8 @@ fun NetWorthScreen(
                                         largestAsset = state.largestAsset,
                                         largestLiability = state.largestLiability,
                                         trackedAccountCount = state.trackedAccountCount,
+                                        positiveAccountCount = state.positiveAccountCount,
+                                        negativeAccountCount = state.negativeAccountCount,
                                         modifier = Modifier.weight(1f)
                                     )
 
@@ -169,6 +176,7 @@ fun NetWorthScreen(
                                         onAccountClick = { acctId ->
                                             onNavigate(OrbitNavKey.Accounts(accountId = acctId))
                                         },
+                                        onEditValuesClick = { onNavigate(OrbitNavKey.Accounts()) },
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
@@ -178,7 +186,9 @@ fun NetWorthScreen(
                                 NetWorthSignalsCard(
                                     largestAsset = state.largestAsset,
                                     largestLiability = state.largestLiability,
-                                    trackedAccountCount = state.trackedAccountCount
+                                    trackedAccountCount = state.trackedAccountCount,
+                                    positiveAccountCount = state.positiveAccountCount,
+                                    negativeAccountCount = state.negativeAccountCount
                                 )
                             }
 
@@ -187,7 +197,8 @@ fun NetWorthScreen(
                                     contributions = state.topContributingAccounts,
                                     onAccountClick = { acctId ->
                                         onNavigate(OrbitNavKey.Accounts(accountId = acctId))
-                                    }
+                                    },
+                                    onEditValuesClick = { onNavigate(OrbitNavKey.Accounts()) }
                                 )
                             }
                         }

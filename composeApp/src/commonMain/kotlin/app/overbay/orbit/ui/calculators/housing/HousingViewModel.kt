@@ -1,15 +1,11 @@
 package app.overbay.orbit.ui.calculators.housing
 
-import app.overbay.orbit.data.OrbitRepository
-import app.overbay.orbit.data.model.Account
-import app.overbay.orbit.data.model.AccountType
-import app.overbay.orbit.data.model.AmortizationMonth
-import app.overbay.orbit.data.model.BuyingScenarioResult
-import app.overbay.orbit.data.model.SellingProceedsResult
-import app.overbay.orbit.domain.Cents
-import app.overbay.orbit.domain.HousingCalculatorEngine
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.HousingCalculatorEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.min
+import kotlin.math.roundToLong
 
 class HousingViewModel(
     private val repository: OrbitRepository,
@@ -32,7 +28,6 @@ class HousingViewModel(
 
     init {
         vmScope.launch {
-            recalculate()
             repository.accounts.collect { accounts ->
                 val mortgages = accounts.filter { !it.isArchived && it.type == AccountType.MORTGAGE }
                 _uiState.update { current ->
@@ -62,8 +57,8 @@ class HousingViewModel(
         }
         recalculate()
 
-        // If net proceeds are positive, set down payment to net proceeds
-        val currentProceeds = _uiState.value.sellingProceeds?.netProceedsCents
+        // If net proceeds are positive, set down payment to net proceeds (matching old-pwa)
+        val currentProceeds = _uiState.value.netProceedsCents
         if (currentProceeds != null && currentProceeds > 0L) {
             _uiState.update { it.copy(downPaymentCents = currentProceeds) }
             recalculate()
@@ -80,80 +75,83 @@ class HousingViewModel(
         recalculate()
     }
 
-    fun setAgentCommissionPercent(percent: Double) {
-        _uiState.update { it.copy(agentCommissionPercent = max(0.0, percent)) }
+    fun setAgentCommissionPercent(percent: Double?) {
+        _uiState.update { it.copy(agentCommissionPercent = percent) }
         recalculate()
     }
 
-    fun setSellerClosingPercent(percent: Double) {
-        _uiState.update { it.copy(sellerClosingPercent = max(0.0, percent)) }
+    fun setSellerClosingPercent(percent: Double?) {
+        _uiState.update { it.copy(sellerClosingPercent = percent) }
         recalculate()
     }
 
-    fun setProratedPropertyTax(cents: Cents) {
-        _uiState.update { it.copy(proratedPropertyTaxCents = max(0L, cents)) }
+    fun setProratedPropertyTax(cents: Cents?) {
+        _uiState.update { it.copy(proratedPropertyTaxCents = cents) }
         recalculate()
     }
 
-    fun setMiscRepairs(cents: Cents) {
-        _uiState.update { it.copy(miscRepairsCents = max(0L, cents)) }
+    fun setMiscRepairs(cents: Cents?) {
+        _uiState.update { it.copy(miscRepairsCents = cents) }
         recalculate()
     }
 
     fun useNetProceedsAsDownPayment() {
-        val proceeds = _uiState.value.sellingProceeds?.netProceedsCents ?: return
+        val proceeds = _uiState.value.netProceedsCents ?: return
         if (proceeds > 0L) {
             _uiState.update { it.copy(downPaymentCents = proceeds) }
             recalculate()
         }
     }
 
-    fun setPurchasePrice(cents: Cents) {
-        _uiState.update { it.copy(purchasePriceCents = max(0L, cents)) }
+    fun setPurchasePrice(cents: Cents?) {
+        _uiState.update { it.copy(purchasePriceCents = cents) }
         recalculate()
     }
 
-    fun setDownPayment(cents: Cents) {
-        _uiState.update { it.copy(downPaymentCents = max(0L, cents)) }
+    fun setDownPayment(cents: Cents?) {
+        _uiState.update { it.copy(downPaymentCents = cents) }
         recalculate()
     }
 
-    fun setInterestRate(ratePercent: Double) {
-        _uiState.update { it.copy(interestRatePercent = max(0.0, ratePercent)) }
+    fun setInterestRate(ratePercent: Double?) {
+        _uiState.update { it.copy(interestRatePercent = ratePercent) }
         recalculate()
     }
 
-    fun setLoanTermYears(years: Int) {
-        _uiState.update { it.copy(loanTermYears = max(1, years)) }
+    fun setLoanTermYears(years: Int?) {
+        _uiState.update { it.copy(loanTermYears = years) }
         recalculate()
     }
 
-    fun setAnnualPropertyTaxes(cents: Cents) {
-        _uiState.update { it.copy(annualPropertyTaxesCents = max(0L, cents)) }
+    fun setAnnualPropertyTaxes(cents: Cents?) {
+        _uiState.update { it.copy(annualPropertyTaxesCents = cents) }
         recalculate()
     }
 
-    fun setAnnualHomeInsurance(cents: Cents) {
-        _uiState.update { it.copy(annualHomeInsuranceCents = max(0L, cents)) }
+    fun setAnnualHomeInsurance(cents: Cents?) {
+        _uiState.update { it.copy(annualHomeInsuranceCents = cents) }
         recalculate()
     }
 
-    fun setMonthlyHoa(cents: Cents) {
-        _uiState.update { it.copy(monthlyHoaCents = max(0L, cents)) }
+    fun setMonthlyHoa(cents: Cents?) {
+        _uiState.update { it.copy(monthlyHoaCents = cents) }
         recalculate()
     }
 
-    fun setBuyerClosingPercent(percent: Double) {
-        _uiState.update { it.copy(buyerClosingPercent = max(0.0, percent)) }
+    fun setBuyerClosingPercent(percent: Double?) {
+        _uiState.update { it.copy(buyerClosingPercent = percent) }
         recalculate()
     }
 
-    fun setExtraMonthlyPrincipal(cents: Cents) {
-        _uiState.update { it.copy(extraMonthlyPrincipalCents = max(0L, cents)) }
-        recalculate()
+    fun requestReset() {
+        _uiState.update { it.copy(showResetConfirmation = true) }
     }
 
-    fun reset() {
+    fun cancelReset() {
+        _uiState.update { it.copy(showResetConfirmation = false) }
+    }
+
+    fun confirmReset() {
         _uiState.value = HousingUiState(
             availableMortgageAccounts = _uiState.value.availableMortgageAccounts
         )
@@ -163,89 +161,89 @@ class HousingViewModel(
     private fun recalculate() {
         val state = _uiState.value
 
-        // 1. Selling proceeds
-        val sellingProceeds = if (state.salePriceCents != null && state.remainingMortgageCents != null) {
-            HousingCalculatorEngine.calculateSelling(
-                salePriceCents = state.salePriceCents,
-                remainingMortgageCents = state.remainingMortgageCents,
-                agentCommissionPercent = state.agentCommissionPercent,
-                sellerClosingPercent = state.sellerClosingPercent,
-                proratedPropertyTaxCents = state.proratedPropertyTaxCents,
-                miscRepairsCents = state.miscRepairsCents
+        // Selling calculations matching old-pwa calculateSelling
+        val salePrice = state.salePriceCents
+        val remainingMortgage = state.remainingMortgageCents
+        val agentPct = state.agentCommissionPercent ?: 5.0
+        val sellerClosingPct = state.sellerClosingPercent ?: 2.0
+        val proratedTax = state.proratedPropertyTaxCents ?: 2000_00L
+        val miscRepairs = state.miscRepairsCents ?: 1000_00L
+
+        val agentComm = if (salePrice != null) {
+            (salePrice.toDouble() * (agentPct / 100.0)).roundToLong()
+        } else null
+
+        val sellerClosing = if (salePrice != null) {
+            (salePrice.toDouble() * (sellerClosingPct / 100.0)).roundToLong()
+        } else null
+
+        val totalFees = if (agentComm != null && sellerClosing != null) {
+            agentComm + sellerClosing + proratedTax + miscRepairs
+        } else null
+
+        val netProceeds = if (salePrice != null && remainingMortgage != null && totalFees != null) {
+            salePrice - remainingMortgage - totalFees
+        } else null
+
+        // Buying calculations matching old-pwa calculateBuying
+        val purchasePrice = state.purchasePriceCents
+        val downPayment = state.downPaymentCents
+        val interestRate = state.interestRatePercent ?: 6.0
+        val loanTermYears = state.loanTermYears ?: 30
+        val annualTaxes = state.annualPropertyTaxesCents ?: 8000_00L
+        val annualInsurance = state.annualHomeInsuranceCents ?: 1500_00L
+        val monthlyHoa = state.monthlyHoaCents ?: 23_00L
+        val buyerClosingPct = state.buyerClosingPercent ?: 3.0
+
+        val buyerClosingCosts = if (purchasePrice != null) {
+            (purchasePrice.toDouble() * (buyerClosingPct / 100.0)).roundToLong()
+        } else null
+
+        val loanAmount = if (purchasePrice != null && downPayment != null) {
+            max(0L, purchasePrice - downPayment)
+        } else null
+
+        val cashToClose = if (downPayment != null && buyerClosingCosts != null) {
+            downPayment + buyerClosingCosts
+        } else null
+
+        val pi = if (loanAmount != null && loanTermYears > 0) {
+            HousingCalculatorEngine.calculateMonthlyMortgagePayment(
+                principalCents = loanAmount,
+                annualRatePercent = interestRate,
+                loanTermYears = loanTermYears
             )
         } else null
 
-        // 2. Buying result
-        val buyingResult = HousingCalculatorEngine.calculateBuying(
-            purchasePriceCents = state.purchasePriceCents,
-            downPaymentCents = state.downPaymentCents,
-            interestRatePercent = state.interestRatePercent,
-            loanTermYears = state.loanTermYears,
-            annualPropertyTaxesCents = state.annualPropertyTaxesCents,
-            annualHomeInsuranceCents = state.annualHomeInsuranceCents,
-            monthlyHoaCents = state.monthlyHoaCents,
-            buyerClosingPercent = state.buyerClosingPercent
-        )
+        val monthlyTax = if (purchasePrice != null || state.annualPropertyTaxesCents != null) {
+            (annualTaxes.toDouble() / 12.0).roundToLong()
+        } else null
 
-        // 3. Baseline amortization schedule
-        val schedule = HousingCalculatorEngine.generateAmortizationSchedule(
-            principalCents = buyingResult.loanAmountCents,
-            annualRatePercent = state.interestRatePercent,
-            loanTermYears = state.loanTermYears
-        )
-        val totalInterestPaid = schedule.sumOf { it.interestPaidCents }
+        val monthlyIns = if (purchasePrice != null || state.annualHomeInsuranceCents != null) {
+            (annualInsurance.toDouble() / 12.0).roundToLong()
+        } else null
 
-        // 4. Extra principal calculation
-        val (monthsSaved, interestSaved) = if (state.extraMonthlyPrincipalCents > 0L && buyingResult.loanAmountCents > 0L) {
-            computeExtraPrincipalSavings(
-                principalCents = buyingResult.loanAmountCents,
-                annualRatePercent = state.interestRatePercent,
-                loanTermYears = state.loanTermYears,
-                baseMonthlyPayment = buyingResult.monthlyPrincipalInterestCents,
-                extraMonthlyPrincipal = state.extraMonthlyPrincipalCents,
-                baselineMonths = schedule.size,
-                baselineInterest = totalInterestPaid
-            )
-        } else 0 to 0L
+        val effectiveMonthlyHoa = if (purchasePrice != null || state.monthlyHoaCents != null) monthlyHoa else null
+
+        val totalMonthly = if (pi != null && monthlyTax != null && monthlyIns != null && effectiveMonthlyHoa != null) {
+            pi + monthlyTax + monthlyIns + effectiveMonthlyHoa
+        } else null
 
         _uiState.update {
             it.copy(
-                sellingProceeds = sellingProceeds,
-                buyingResult = buyingResult,
-                amortizationSchedule = schedule,
-                totalInterestPaidCents = totalInterestPaid,
-                monthsSavedWithExtraPrincipal = monthsSaved,
-                interestSavedWithExtraPrincipalCents = interestSaved
+                agentCommissionCents = agentComm,
+                sellerClosingCents = sellerClosing,
+                totalSellingFeesCents = totalFees,
+                netProceedsCents = netProceeds,
+                buyerClosingCostsCents = buyerClosingCosts,
+                loanAmountCents = loanAmount,
+                cashToCloseCents = cashToClose,
+                monthlyPrincipalInterestCents = pi,
+                monthlyPropertyTaxCents = monthlyTax,
+                monthlyHomeInsuranceCents = monthlyIns,
+                monthlyHoaPaymentCents = effectiveMonthlyHoa,
+                totalMonthlyPaymentCents = totalMonthly
             )
         }
-    }
-
-    private fun computeExtraPrincipalSavings(
-        principalCents: Cents,
-        annualRatePercent: Double,
-        loanTermYears: Int,
-        baseMonthlyPayment: Cents,
-        extraMonthlyPrincipal: Cents,
-        baselineMonths: Int,
-        baselineInterest: Cents
-    ): Pair<Int, Cents> {
-        val totalMonths = loanTermYears * 12
-        val monthlyRate = annualRatePercent / 100.0 / 12.0
-        var balance = principalCents
-        var acceleratedMonths = 0
-        var acceleratedInterest = 0L
-
-        for (m in 1..totalMonths) {
-            val interest = (balance.toDouble() * monthlyRate).toLong()
-            val principal = min(balance, baseMonthlyPayment - interest + extraMonthlyPrincipal)
-            acceleratedInterest += interest
-            balance = max(0L, balance - principal)
-            acceleratedMonths = m
-            if (balance <= 0L) break
-        }
-
-        val monthsSaved = max(0, baselineMonths - acceleratedMonths)
-        val interestSaved = max(0L, baselineInterest - acceleratedInterest)
-        return monthsSaved to interestSaved
     }
 }

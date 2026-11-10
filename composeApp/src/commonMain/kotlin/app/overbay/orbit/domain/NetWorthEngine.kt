@@ -40,7 +40,7 @@ object NetWorthEngine {
         return when (account.type) {
             AccountType.CHECKING, AccountType.SAVINGS, AccountType.CASH -> NetWorthBucket.CASH
             AccountType.INVESTMENT -> NetWorthBucket.INVESTMENTS
-            AccountType.MORTGAGE -> if (account.estimatedValueCents != null) NetWorthBucket.REAL_ESTATE else NetWorthBucket.LOANS
+            AccountType.MORTGAGE -> NetWorthBucket.REAL_ESTATE
             AccountType.CREDIT -> NetWorthBucket.CREDIT
             AccountType.LOAN -> NetWorthBucket.LOANS
             AccountType.OTHER -> NetWorthBucket.OTHER
@@ -48,8 +48,9 @@ object NetWorthEngine {
     }
 
     fun accountContributionCents(account: Account, balanceCents: Cents): Cents {
-        if (account.type == AccountType.MORTGAGE && account.estimatedValueCents != null) {
-            return account.estimatedValueCents - abs(balanceCents)
+        if (account.type == AccountType.MORTGAGE) {
+            val estimatedValue = account.estimatedValueCents ?: 0L
+            return estimatedValue - abs(balanceCents)
         }
         return balanceCents
     }
@@ -68,37 +69,18 @@ object NetWorthEngine {
             if (acct.isArchived) continue
             val contribution = accountContributionCents(acct, acct.currentBalanceCents)
             when (bucketForAccount(acct)) {
-                NetWorthBucket.CASH -> {
-                    cash += contribution
-                    if (contribution >= 0) assets += contribution else liabilities += abs(contribution)
-                }
-                NetWorthBucket.INVESTMENTS -> {
-                    investments += contribution
-                    if (contribution >= 0) assets += contribution else liabilities += abs(contribution)
-                }
-                NetWorthBucket.REAL_ESTATE -> {
-                    val propertyValue = acct.estimatedValueCents ?: 0L
-                    val loanBalance = abs(acct.currentBalanceCents)
-                    val equity = propertyValue - loanBalance
-                    realEstate += equity
-                    if (equity >= 0L) {
-                        assets += equity
-                    } else {
-                        liabilities += abs(equity)
-                    }
-                }
-                NetWorthBucket.CREDIT -> {
-                    credit += contribution
-                    liabilities += abs(minOf(0L, contribution))
-                }
-                NetWorthBucket.LOANS -> {
-                    loans += contribution
-                    liabilities += abs(minOf(0L, contribution))
-                }
-                NetWorthBucket.OTHER -> {
-                    other += contribution
-                    if (contribution >= 0) assets += contribution else liabilities += abs(contribution)
-                }
+                NetWorthBucket.CASH -> cash += contribution
+                NetWorthBucket.INVESTMENTS -> investments += contribution
+                NetWorthBucket.REAL_ESTATE -> realEstate += contribution
+                NetWorthBucket.CREDIT -> credit += contribution
+                NetWorthBucket.LOANS -> loans += contribution
+                NetWorthBucket.OTHER -> other += contribution
+            }
+
+            if (contribution > 0L) {
+                assets += contribution
+            } else if (contribution < 0L) {
+                liabilities += abs(contribution)
             }
         }
 
@@ -129,51 +111,56 @@ object NetWorthEngine {
         val activeAccounts = accounts.filter { !it.isArchived }
         val currentBalances = activeAccounts.associate { it.id to it.currentBalanceCents }.toMutableMap()
 
-        // Group transactions by month and account
+        // Group transactions by month and account (without skipping transfers or ignored,
+        // because all account movements change historical balance)
         val deltasByMonth = mutableMapOf<String, MutableMap<Long, Cents>>()
         for (txn in transactions) {
-            if (txn.effectiveIsIgnored || txn.effectiveIsTransfer) continue
             val m = txn.effectiveDate.take(7)
             val monthMap = deltasByMonth.getOrPut(m) { mutableMapOf() }
             monthMap[txn.accountId] = (monthMap[txn.accountId] ?: 0L) + txn.effectiveAmountCents
         }
 
-        // Snapshot records by account and month (latest record per month per account)
-        val recordsByAcctMonth = balanceRecords
-            .sortedBy { it.recordDate }
-            .associateBy { "${it.accountId}|${it.recordDate.take(7)}" }
+        // Snapshot records by account sorted descending by recordDate
+        val recordsByAccount = balanceRecords
+            .groupBy { it.accountId }
+            .mapValues { (_, recs) -> recs.sortedByDescending { it.recordDate } }
 
-        val actualCount = if (monthsCount == Int.MAX_VALUE) {
+        fun snapshotBalanceForMonth(accountId: Long, month: String): Cents? {
+            val recs = recordsByAccount[accountId] ?: return null
+            val record = recs.firstOrNull { it.recordDate.take(7) == month }
+            return record?.balanceCents
+        }
+
+        // For ALL_TIME (Int.MAX_VALUE), span back to the earliest transaction/record month (at least 12 months)
+        val firstMonth = if (monthsCount == Int.MAX_VALUE) {
             val earliestTxMonth = transactions
-                .filter { !it.effectiveIsIgnored && !it.effectiveIsTransfer }
                 .mapNotNull { it.effectiveDate.take(7).takeIf { d -> d.length == 7 && d.contains("-") } }
                 .minOrNull()
             val earliestRecMonth = balanceRecords
                 .mapNotNull { it.recordDate.take(7).takeIf { d -> d.length == 7 && d.contains("-") } }
                 .minOrNull()
-            val earliestMonth = listOfNotNull(earliestTxMonth, earliestRecMonth).minOrNull() ?: latestMonth
-            val diff = parseYearMonthToTotalMonths(latestMonth) - parseYearMonthToTotalMonths(earliestMonth) + 1
-            maxOf(diff, 12)
+            val min12Month = addMonths(latestMonth, -11)
+            listOfNotNull(earliestTxMonth, earliestRecMonth, min12Month).minOrNull() ?: min12Month
         } else {
-            monthsCount
+            addMonths(latestMonth, -(monthsCount - 1))
         }
 
         val monthsList = mutableListOf<String>()
-        var cur = latestMonth
-        for (i in 0 until actualCount) {
-            monthsList.add(cur)
-            cur = addMonths(cur, -1)
+        var cursor = latestMonth
+        while (cursor >= firstMonth) {
+            monthsList.add(cursor)
+            cursor = addMonths(cursor, -1)
         }
 
         val historyDescending = mutableListOf<MonthlyNetWorthPoint>()
 
         for (m in monthsList) {
             val acctsWithBalances = activeAccounts.map { acct ->
-                val snapshotRec = recordsByAcctMonth["${acct.id}|$m"]
-                val bal = snapshotRec?.balanceCents ?: (currentBalances[acct.id] ?: 0L)
-                if (snapshotRec != null) {
-                    currentBalances[acct.id] = snapshotRec.balanceCents
+                val snapshotBalance = snapshotBalanceForMonth(acct.id, m)
+                if (snapshotBalance != null) {
+                    currentBalances[acct.id] = snapshotBalance
                 }
+                val bal = currentBalances[acct.id] ?: 0L
                 acct.copy(currentBalanceCents = bal)
             }
             val snap = computeCurrentSnapshot(acctsWithBalances)
@@ -181,8 +168,9 @@ object NetWorthEngine {
 
             // Roll balances backward by subtracting net flow of this month
             val monthDeltas = deltasByMonth[m] ?: emptyMap()
-            for ((acctId, netFlow) in monthDeltas) {
-                currentBalances[acctId] = (currentBalances[acctId] ?: 0L) - netFlow
+            for (acct in activeAccounts) {
+                val delta = monthDeltas[acct.id] ?: 0L
+                currentBalances[acct.id] = (currentBalances[acct.id] ?: 0L) - delta
             }
         }
 

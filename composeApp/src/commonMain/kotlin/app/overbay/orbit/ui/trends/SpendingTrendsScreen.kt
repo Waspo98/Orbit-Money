@@ -31,6 +31,7 @@ import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.trends.components.CategoryBreakdownList
 import app.overbay.orbit.ui.trends.components.CategoryBudgetEditorModal
+import app.overbay.orbit.ui.trends.components.CategoryHistoryCard
 import app.overbay.orbit.ui.trends.components.CategoryTrendStatsCard
 import app.overbay.orbit.ui.trends.components.TopMerchantsCard
 import app.overbay.orbit.ui.trends.components.TrendsChartSection
@@ -114,71 +115,35 @@ fun SpendingTrendsScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Interactive Bar Chart Section (Full Width)
-                    item(key = "trends_chart_section", contentType = "chart_section") {
+                    // 1. Income vs Expenses Flow Card
+                    item(key = "income_expenses_card", contentType = "chart_section") {
                         TrendsChartSection(
                             state = state,
-                            onSelectPeriod = { viewModel.setPeriod(it) },
-                            onSelectChartMode = { viewModel.setChartMode(it) },
-                            onSelectCategory = { viewModel.selectCategory(it) },
-                            onScrubBar = { idx, item -> viewModel.onScrubBar(idx, item) },
+                            onScrubBar = { idx, item -> viewModel.onScrubFlowBar(idx, item) },
                             onInspectMonth = { month -> viewModel.openInspectMonthDialog(month) }
                         )
                     }
 
-                    // Category Trend 4-Tile Stats Card when a category is selected
-                    val trend = state.selectedCategoryTrend
-                    if (state.chartMode == TrendsChartMode.CATEGORY_TREND && trend != null) {
-                        item(key = "category_trend_stats", contentType = "trend_stats") {
-                            CategoryTrendStatsCard(
-                                trend = trend,
-                                onOpenBudgetModal = { viewModel.openBudgetModal() }
-                            )
-                        }
+                    // 2. Separate Category History Card with Dropdown and Edit Budget Action
+                    item(key = "category_history_card", contentType = "category_card") {
+                        CategoryHistoryCard(
+                            categoryTrends = state.overview.categoryTrends,
+                            selectedTrend = state.selectedCategoryTrend,
+                            onSelectCategory = { viewModel.selectCategory(it) },
+                            onOpenBudgetModal = { viewModel.openBudgetModal() },
+                            scrubbedBarItem = state.categoryScrubItem,
+                            scrubbedIndex = state.categoryScrubIndex,
+                            onScrubBar = { idx, item -> viewModel.onScrubCategoryBar(idx, item) },
+                            onInspectMonth = { month -> viewModel.openInspectMonthDialog(month) }
+                        )
                     }
 
-                    if (isTwoPane) {
-                        item(key = "two_pane_breakdown_merchants", contentType = "two_pane_row") {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                CategoryBreakdownList(
-                                    categoryTrends = state.overview.categoryTrends,
-                                    selectedCategoryId = state.selectedCategoryId,
-                                    onSelectCategory = { categoryId ->
-                                        viewModel.selectCategory(categoryId)
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                TopMerchantsCard(
-                                    topMerchants = state.overview.topMerchants,
-                                    totalPeriodSpendingCents = state.overview.totalPeriodSpendingCents,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                    } else {
-                        // Category Breakdown List
-                        item(key = "category_breakdown_list", contentType = "category_breakdown") {
-                            CategoryBreakdownList(
-                                categoryTrends = state.overview.categoryTrends,
-                                selectedCategoryId = state.selectedCategoryId,
-                                onSelectCategory = { categoryId ->
-                                    viewModel.selectCategory(categoryId)
-                                }
-                            )
-                        }
-
-                        // Top Merchants Card
-                        item(key = "top_merchants_card", contentType = "top_merchants") {
-                            TopMerchantsCard(
-                                topMerchants = state.overview.topMerchants,
-                                totalPeriodSpendingCents = state.overview.totalPeriodSpendingCents
-                            )
-                        }
+                    // 3. Top Merchants Card
+                    item(key = "top_merchants_card", contentType = "top_merchants") {
+                        TopMerchantsCard(
+                            topMerchants = state.overview.topMerchants,
+                            totalPeriodSpendingCents = state.overview.totalPeriodSpendingCents
+                        )
                     }
                 }
             }
@@ -218,6 +183,7 @@ fun SpendingTrendsScreen(
             CategoryBudgetEditorModal(
                 category = cat,
                 existingBudget = state.selectedCategoryBudget,
+                averageSpentCents = state.selectedCategoryTrend!!.averageSpentCents,
                 onSave = { amountCents, rollover ->
                     viewModel.saveBudget(cat.id, amountCents, rollover)
                 },

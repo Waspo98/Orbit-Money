@@ -33,14 +33,15 @@ import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 val RETIREMENT_ACCOUNT_KINDS = listOf(
+    "none" to "None",
     "401k" to "401(k)",
-    "roth_401k" to "Roth 401(k)",
     "403b" to "403(b)",
     "457b" to "457(b)",
     "ira" to "Traditional IRA",
     "roth_ira" to "Roth IRA",
     "hsa" to "HSA",
-    "brokerage" to "Taxable Brokerage",
+    "sep_ira" to "SEP IRA",
+    "simple_ira" to "SIMPLE IRA",
     "pension" to "Pension",
     "other" to "Other"
 )

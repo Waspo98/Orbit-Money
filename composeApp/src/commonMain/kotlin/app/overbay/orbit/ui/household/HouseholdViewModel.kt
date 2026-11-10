@@ -87,6 +87,20 @@ class HouseholdViewModel(
         }
     }
 
+    fun requestDeleteMember(member: HouseholdMember) {
+        _uiState.update { it.copy(memberToDelete = member) }
+    }
+
+    fun cancelDeleteMember() {
+        _uiState.update { it.copy(memberToDelete = null) }
+    }
+
+    fun confirmDeleteMember() {
+        val member = _uiState.value.memberToDelete ?: return
+        _uiState.update { it.copy(memberToDelete = null) }
+        deleteMember(member.id)
+    }
+
     fun deleteMember(id: Long) {
         scope.launch {
             repository.deleteHouseholdMember(id)
@@ -123,28 +137,19 @@ class HouseholdViewModel(
     }
 
     fun inviteMember(email: String, role: HouseholdRole) {
-        val currentShares = _uiState.value.shares
-        val newShare = HouseholdShare(
-            id = (currentShares.maxOfOrNull { it.id } ?: 0L) + 1L,
-            householdId = _uiState.value.householdInfo.id,
-            invitedEmail = email.trim(),
-            role = role,
-            createdAt = LocalDateUtils.todayIsoDate()
-        )
-        _uiState.update {
-            it.copy(
-                shares = it.shares + newShare,
-                showInviteDialog = false
-            )
+        _uiState.update { it.copy(showInviteDialog = false) }
+        scope.launch {
+            repository.inviteHouseholdPartner(email = email.trim(), role = role.name.lowercase())
         }
-        scope.launch { repository.saveHouseholdShare(newShare) }
     }
 
     fun revokeInvite(shareId: Long) {
         _uiState.update { current ->
             current.copy(shares = current.shares.filterNot { it.id == shareId })
         }
-        scope.launch { repository.deleteHouseholdShare(shareId) }
+        scope.launch {
+            repository.revokePartnerShare(shareId)
+        }
     }
 
     fun openInviteDialog() {

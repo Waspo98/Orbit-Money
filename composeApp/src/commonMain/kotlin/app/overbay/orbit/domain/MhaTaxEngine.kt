@@ -11,7 +11,7 @@ data class FederalBracket(val thresholdCents: Cents, val rate: Double)
 
 data class MhaTaxCalculationResult(
     val eligibleTotalCents: Cents,
-    val excludableAllowanceCents: Cents, // 3-limit cap
+    val excludableAllowanceCents: Cents,
     val totalSavingsCents: Cents,
     val effectiveSavingsRate: Double,
     val federalSavingsCents: Cents,
@@ -20,11 +20,17 @@ data class MhaTaxCalculationResult(
     val stateRate: Double,
     val taxableIncomeBeforeMhaCents: Cents,
     val taxableIncomeAfterMhaCents: Cents,
-    val secaSubjectCents: Cents, // MHA is exempt from income tax, but subject to SECA
-    val secaTaxEstimateCents: Cents, // 15.3% SECA estimate
-    val assumptions: List<String>
+    val secaSubjectCents: Cents,
+    val secaTaxEstimateCents: Cents,
+    val assumptions: List<String>,
+    val grossIncomeCents: Cents = 0L,
+    val reductionCents: Cents = 0L,
+    val isHouseholdMode: Boolean = false
 ) {
     val secaEstimateCents: Cents get() = secaTaxEstimateCents
+    val effectiveSavingsRatePercent: Double get() = (effectiveSavingsRate * 10000).roundToLong() / 100.0
+    val marginalFederalRatePercent: Double get() = (federalMarginalRate * 10000).roundToLong() / 100.0
+    val effectiveStateRatePercent: Double get() = (stateRate * 10000).roundToLong() / 100.0
 }
 
 object MhaTaxEngine {
@@ -78,12 +84,14 @@ object MhaTaxEngine {
         )
     )
 
+    val NO_INCOME_TAX_STATES = setOf("AK", "FL", "NV", "NH", "SD", "TN", "TX", "WY", "WA")
+
     // Flat single rate states for 2026
     val STATE_RATES_2026 = mapOf(
-        "AK" to 0.0, "FL" to 0.0, "NV" to 0.0, "NH" to 0.0, "SD" to 0.0, "TN" to 0.0, "TX" to 0.0, "WY" to 0.0, "WA" to 0.0,
         "AZ" to 0.025,
         "CO" to 0.044,
         "GA" to 0.0519,
+        "ID" to 0.053,
         "IL" to 0.0495,
         "IN" to 0.0295,
         "IA" to 0.038,
@@ -92,9 +100,80 @@ object MhaTaxEngine {
         "MI" to 0.0425,
         "MS" to 0.040,
         "NC" to 0.0399,
+        "OH" to 0.0275,
         "PA" to 0.0307,
         "UT" to 0.045
     )
+
+    val US_STATES: List<Pair<String, String>> = listOf(
+        "AL" to "Alabama",
+        "AK" to "Alaska",
+        "AZ" to "Arizona",
+        "AR" to "Arkansas",
+        "CA" to "California",
+        "CO" to "Colorado",
+        "CT" to "Connecticut",
+        "DE" to "Delaware",
+        "DC" to "District of Columbia",
+        "FL" to "Florida",
+        "GA" to "Georgia",
+        "HI" to "Hawaii",
+        "ID" to "Idaho",
+        "IL" to "Illinois",
+        "IN" to "Indiana",
+        "IA" to "Iowa",
+        "KS" to "Kansas",
+        "KY" to "Kentucky",
+        "LA" to "Louisiana",
+        "ME" to "Maine",
+        "MD" to "Maryland",
+        "MA" to "Massachusetts",
+        "MI" to "Michigan",
+        "MN" to "Minnesota",
+        "MS" to "Mississippi",
+        "MO" to "Missouri",
+        "MT" to "Montana",
+        "NE" to "Nebraska",
+        "NV" to "Nevada",
+        "NH" to "New Hampshire",
+        "NJ" to "New Jersey",
+        "NM" to "New Mexico",
+        "NY" to "New York",
+        "NC" to "North Carolina",
+        "ND" to "North Dakota",
+        "OH" to "Ohio",
+        "OK" to "Oklahoma",
+        "OR" to "Oregon",
+        "PA" to "Pennsylvania",
+        "RI" to "Rhode Island",
+        "SC" to "South Carolina",
+        "SD" to "South Dakota",
+        "TN" to "Tennessee",
+        "TX" to "Texas",
+        "UT" to "Utah",
+        "VT" to "Vermont",
+        "VA" to "Virginia",
+        "WA" to "Washington",
+        "WV" to "West Virginia",
+        "WI" to "Wisconsin",
+        "WY" to "Wyoming"
+    )
+
+    fun isGraduatedState(stateCode: String): Boolean {
+        val code = stateCode.uppercase().trim()
+        return !NO_INCOME_TAX_STATES.contains(code) && !STATE_RATES_2026.containsKey(code)
+    }
+
+    fun getStateThresholdCents(stateCode: String, filingStatus: FilingStatus): Cents =
+        when (stateCode.uppercase().trim()) {
+            "ID" -> when (filingStatus) {
+                FilingStatus.SINGLE, FilingStatus.MARRIED_SEPARATE -> 4_811_00L
+                FilingStatus.MARRIED_JOINT, FilingStatus.HEAD_OF_HOUSEHOLD -> 9_622_00L
+            }
+            "MS" -> 10_000_00L
+            "OH" -> 26_050_00L
+            else -> 0L
+        }
 
     /**
      * Parsonage 3-Limit Rule under IRC Section 107:
@@ -150,9 +229,11 @@ object MhaTaxEngine {
                 secaSubjectCents = excludableCents,
                 secaTaxEstimateCents = secaEstimate,
                 assumptions = listOf(
-                    "Simple mode uses flat rates: ${profile.simpleFederalRatePercent}% federal, ${profile.simpleStateRatePercent}% state.",
-                    "MHA is exempt from federal and state income taxes but subject to SECA (15.3%) unless exempt via Form 4361."
-                )
+                    "Simple mode uses the rates you enter."
+                ),
+                grossIncomeCents = 0L,
+                reductionCents = 0L,
+                isHouseholdMode = false
             )
         }
 
@@ -175,8 +256,16 @@ object MhaTaxEngine {
         val fedSavings = max(0L, fedBefore - fedAfter)
         val fedMarginal = computeMarginalRate(taxableBefore, profile.filingStatus)
 
-        val stRate = profile.stateRateOverridePercent?.let { it / 100.0 }
-            ?: (STATE_RATES_2026[profile.state] ?: 0.0)
+        val stateCode = profile.state.uppercase().trim()
+        val stRate = when {
+            profile.stateRateOverridePercent != null -> profile.stateRateOverridePercent / 100.0
+            NO_INCOME_TAX_STATES.contains(stateCode) -> 0.0
+            STATE_RATES_2026.containsKey(stateCode) -> {
+                val threshold = getStateThresholdCents(stateCode, profile.filingStatus)
+                if (taxableBefore > threshold) (STATE_RATES_2026[stateCode] ?: 0.0) else 0.0
+            }
+            else -> 0.0
+        }
         val stSavings = (excludableCents.toDouble() * stRate).roundToLong()
         val totalSavings = fedSavings + stSavings
         val effRate = if (excludableCents > 0L) totalSavings.toDouble() / excludableCents.toDouble() else (fedMarginal + stRate)
@@ -196,9 +285,12 @@ object MhaTaxEngine {
             secaSubjectCents = excludableCents,
             secaTaxEstimateCents = secaEstimate,
             assumptions = listOf(
-                "Household mode calculates exact 2026 federal brackets and state marginal savings.",
-                "MHA is exempt from federal and state income taxes but subject to SECA (15.3%) unless exempt via Form 4361."
-            )
+                "Household mode assumes listed paycheck contributions are pre-tax.",
+                "Federal savings are calculated as tax before MHA minus tax after MHA."
+            ),
+            grossIncomeCents = grossIncomeCents,
+            reductionCents = pretaxDeductionsCents + deductionCents,
+            isHouseholdMode = true
         )
     }
 

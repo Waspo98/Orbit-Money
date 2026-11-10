@@ -2,6 +2,7 @@ package app.overbay.orbit.domain
 
 import app.overbay.orbit.data.model.HsaBridgeAnalysis
 import app.overbay.orbit.data.model.RetirementPreset
+import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.data.model.RetirementTargetMode
 import app.overbay.orbit.data.model.TargetNestEggMode
 import kotlin.math.abs
@@ -22,6 +23,7 @@ data class DrawdownSimulationResult(
 )
 
 data class RetirementScenarioModel(
+    val preset: RetirementScenarioPreset = RetirementScenarioPreset.BALANCED,
     val realAnnualReturn: Double,
     val effectiveMonthlyRate: Double,
     val monthsToRetirement: Int,
@@ -37,7 +39,9 @@ data class RetirementScenarioModel(
     val accumulationPoints: List<ProjectionPoint>,
     val drawdownPoints: List<ProjectionPoint>,
     val depletionAge: Double?,
-    val hsaBridge: HsaBridgeAnalysis? = null
+    val hsaBridge: HsaBridgeAnalysis? = null,
+    val breakevenAnnualSpendingCents: Cents = 0L,
+    val finalBalanceCents: Cents = 0L
 )
 
 object RetirementCalculatorEngine {
@@ -278,7 +282,10 @@ object RetirementCalculatorEngine {
             )
         } else null
 
+        val breakevenAnnualSpending = max(0.0, projectedBalance.toDouble() * rm * 12.0).roundToLong()
+
         return RetirementScenarioModel(
+            preset = preset,
             realAnnualReturn = realReturn,
             effectiveMonthlyRate = rm,
             monthsToRetirement = months,
@@ -294,7 +301,44 @@ object RetirementCalculatorEngine {
             accumulationPoints = accumPoints,
             drawdownPoints = drawdown.points,
             depletionAge = drawdown.depletionAge,
-            hsaBridge = hsaBridge
+            hsaBridge = hsaBridge,
+            breakevenAnnualSpendingCents = breakevenAnnualSpending,
+            finalBalanceCents = drawdown.finalBalanceCents
         )
+    }
+
+    fun calculateAllScenarios(
+        currentAge: Double,
+        retirementAge: Double,
+        runwayEndAge: Double = 95.0,
+        currentBalanceCents: Cents,
+        monthlySavingsCents: Cents,
+        annualSpendingCents: Cents,
+        targetMode: TargetNestEggMode = TargetNestEggMode.WITHDRAWAL_4_PERCENT,
+        customTargetCents: Cents? = null,
+        legacyAmountCents: Cents = 1_000_000_00L,
+        nonHsaCurrentBalanceCents: Cents = currentBalanceCents,
+        nonHsaMonthlySavingsCents: Cents = monthlySavingsCents,
+        hsaCurrentBalanceCents: Cents = 0L,
+        hsaMonthlySavingsCents: Cents = 0L
+    ): Map<RetirementScenarioPreset, RetirementScenarioModel> {
+        return RetirementScenarioPreset.entries.associateWith { preset ->
+            calculateScenario(
+                currentAge = currentAge,
+                retirementAge = retirementAge,
+                runwayEndAge = runwayEndAge,
+                currentBalanceCents = currentBalanceCents,
+                monthlySavingsCents = monthlySavingsCents,
+                annualSpendingCents = annualSpendingCents,
+                preset = preset,
+                targetMode = targetMode,
+                customTargetCents = customTargetCents,
+                legacyAmountCents = legacyAmountCents,
+                nonHsaCurrentBalanceCents = nonHsaCurrentBalanceCents,
+                nonHsaMonthlySavingsCents = nonHsaMonthlySavingsCents,
+                hsaCurrentBalanceCents = hsaCurrentBalanceCents,
+                hsaMonthlySavingsCents = hsaMonthlySavingsCents
+            )
+        }
     }
 }

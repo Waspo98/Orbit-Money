@@ -39,7 +39,8 @@ fun PreferencesSubpageContent(
             pushConfig = uiState.pushConfig,
             isTesting = uiState.isPushTesting,
             onSendTestNotification = viewModel::sendTestPush,
-            onUpdateNotificationPreferences = viewModel::updateNotificationPreferences
+            onUpdateNotificationPreferences = viewModel::updateNotificationPreferences,
+            accounts = uiState.accounts
         )
 
         NavigationCustomizeBlock(

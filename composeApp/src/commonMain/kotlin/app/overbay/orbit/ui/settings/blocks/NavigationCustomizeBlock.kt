@@ -25,13 +25,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.dragReorderItem
 import app.overbay.orbit.ui.components.rememberDragReorderState
 
-private data class NavCustomItem(val routeName: String, val title: String)
+private data class NavCustomItem(val routeName: String, val title: String, val isLocked: Boolean = false)
 
 @Composable
 fun NavigationCustomizeBlock(
@@ -46,11 +47,10 @@ fun NavigationCustomizeBlock(
         listOf(
             NavCustomItem("upcoming", "Upcoming"),
             NavCustomItem("goals", "Goals"),
-            NavCustomItem("categories", "Categories"),
-            NavCustomItem("rules", "Rules"),
+            NavCustomItem("categories", "Category Manager", isLocked = true),
+            NavCustomItem("rules", "Rules", isLocked = true),
             NavCustomItem("spending_trends", "Spending Trends"),
             NavCustomItem("net_worth", "Net Worth"),
-            NavCustomItem("mha", "MHA Tracker"),
             NavCustomItem("housing_calculator", "Housing Calculator"),
             NavCustomItem("retirement_calculator", "Retirement Calculator"),
             NavCustomItem("household", "Household")
@@ -148,7 +148,7 @@ fun NavigationCustomizeBlock(
                 Column(modifier = Modifier.padding(vertical = 4.dp)) {
                     orderedRoutes.forEachIndexed { index, item ->
                         key(item.routeName) {
-                            val isVisible = !preferences.hiddenRouteNames.contains(item.routeName)
+                            val isVisible = item.isLocked || !preferences.hiddenRouteNames.contains(item.routeName)
 
                             if (index > 0) {
                                 HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
@@ -168,7 +168,8 @@ fun NavigationCustomizeBlock(
 
                                 Checkbox(
                                     checked = isVisible,
-                                    onCheckedChange = { onToggleRouteHidden(item.routeName) }
+                                    enabled = !item.isLocked,
+                                    onCheckedChange = { if (!item.isLocked) onToggleRouteHidden(item.routeName) }
                                 )
 
                                 Text(
@@ -178,6 +179,10 @@ fun NavigationCustomizeBlock(
                                     color = if (isVisible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.weight(1f).padding(start = 8.dp)
                                 )
+
+                                if (item.isLocked) {
+                                    OrbitBadge(text = "Locked")
+                                }
                             }
                         }
                     }

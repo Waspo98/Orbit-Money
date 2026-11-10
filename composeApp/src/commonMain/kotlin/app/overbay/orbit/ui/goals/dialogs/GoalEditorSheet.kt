@@ -45,11 +45,14 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.GOAL_PRESETS
 import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.data.model.GoalAllocation
+import app.overbay.orbit.data.model.GoalAllocationType
 import app.overbay.orbit.data.model.resolvedEmoji
 import app.overbay.orbit.domain.GoalAllocationEngine
 import app.overbay.orbit.domain.GoalAllocationEngine.AllocationConflict
 import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitActionChip
@@ -59,6 +62,8 @@ import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.goals.components.GoalAllocationRowEditor
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.datetime.LocalDate
+import kotlin.math.max
+import kotlin.math.min
 
 @Composable
 fun GoalEditorSheet(
@@ -106,7 +111,6 @@ fun GoalEditorContent(
     var selectedKind by remember(goal) { mutableStateOf(goal?.kind ?: "custom") }
     var selectedIcon by remember(goal) { mutableStateOf(goal?.resolvedEmoji ?: "🎯") }
     var targetAmountCents by remember(goal) { mutableStateOf(goal?.targetAmountCents ?: 0L) }
-    var currentAmountCents by remember(goal) { mutableStateOf(goal?.currentAmountCents ?: 0L) }
     var isOngoing by remember(goal) { mutableStateOf(goal != null && goal.targetDate == null) }
     var targetDate by remember(goal) {
         val parsed = goal?.targetDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
@@ -116,6 +120,21 @@ fun GoalEditorContent(
     var notes by remember(goal) { mutableStateOf(goal?.notes ?: "") }
     var conflicts by remember { mutableStateOf<List<AllocationConflict>>(emptyList()) }
     var pendingGoalToSave by remember { mutableStateOf<Goal?>(null) }
+
+    val totalAllocatedCents = remember(allocations, accounts) {
+        val accountMap = accounts.associateBy { it.id }
+        allocations.sumOf { alloc ->
+            val acct = accountMap[alloc.accountId]
+            if (acct != null) {
+                val allocatable = max(0L, acct.currentBalanceCents - alloc.reserveAmountCents)
+                if (alloc.allocationType == GoalAllocationType.PERCENT) {
+                    ((allocatable * alloc.allocationPercent) / 100.0).toLong()
+                } else {
+                    min(allocatable, alloc.allocationAmountCents)
+                }
+            } else 0L
+        }
+    }
 
     if (conflicts.isNotEmpty() && pendingGoalToSave != null) {
         GoalConflictDialog(
@@ -212,7 +231,7 @@ fun GoalEditorContent(
             )
         }
 
-        // Target Amount & Current Amount
+        // Target Amount & Read-Only Allocated Amount Summary Banner
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -222,15 +241,33 @@ fun GoalEditorContent(
                 cents = targetAmountCents,
                 onCentsChange = { targetAmountCents = it },
                 label = "Target Goal",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1.1f)
             )
 
-            CurrencyTextField(
-                cents = currentAmountCents,
-                onCentsChange = { currentAmountCents = it },
-                label = "Current Saved",
-                modifier = Modifier.weight(1f)
-            )
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                modifier = Modifier.weight(0.9f)
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = "TOTAL ALLOCATED",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = MoneyUtils.formatCents(totalAllocatedCents, showCents = false),
+                        style = TabularNumStyle.copy(fontSize = 17.sp, fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
 
         // Target Date Mode Toggle: Target Date vs Ongoing
@@ -286,6 +323,7 @@ fun GoalEditorContent(
         GoalAllocationRowEditor(
             allocations = allocations,
             accounts = accounts,
+            existingGoals = existingGoals,
             onAllocationsChange = { allocations = it }
         )
 
@@ -308,16 +346,17 @@ fun GoalEditorContent(
                 onClick = {
                     haptics.confirm()
                     val targetDateIso = if (!isOngoing) targetDate?.toString() else null
+                    val currentSaved = if (allocations.isNotEmpty()) totalAllocatedCents else (goal?.currentAmountCents ?: 0L)
                     val updated = (goal ?: Goal(
                         name = name,
                         targetAmountCents = targetAmountCents,
-                        currentAmountCents = currentAmountCents
+                        currentAmountCents = currentSaved
                     )).copy(
                         name = name.trim(),
                         kind = selectedKind,
                         icon = selectedIcon.trim().ifBlank { "🎯" },
                         targetAmountCents = targetAmountCents,
-                        currentAmountCents = currentAmountCents,
+                        currentAmountCents = currentSaved,
                         targetDate = targetDateIso,
                         allocations = allocations,
                         notes = notes.trim().ifBlank { null }

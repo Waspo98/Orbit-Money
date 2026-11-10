@@ -45,6 +45,7 @@ import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitCompactListRow
+import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
@@ -216,7 +217,8 @@ fun HouseholdScreen(
                                     },
                                     onAddMember = { viewModel.openMemberEditor(null) },
                                     onEditMember = { viewModel.openMemberEditor(it) },
-                                    onDeleteMember = viewModel::deleteMember
+                                    onDeleteMember = viewModel::requestDeleteMember,
+                                    includeHsaInRetirementRate = uiState.includeHsaInRetirementRate
                                 )
                             }
 
@@ -291,7 +293,7 @@ fun HouseholdScreen(
                                 onOpenEditMember = { member -> viewModel.openMemberEditor(member) },
                                 onSaveMember = viewModel::saveMember,
                                 onCloseEditMember = viewModel::closeMemberEditor,
-                                onDeleteMember = viewModel::deleteMember,
+                                onDeleteMember = viewModel::requestDeleteMember,
                                 onInviteMember = viewModel::inviteMember,
                                 onCloseInvite = viewModel::closeInviteDialog,
                                 onDismissPane = viewModel::dismissInspectorPane
@@ -317,6 +319,18 @@ fun HouseholdScreen(
                 availableAccounts = uiState.availableAccounts,
                 onDismiss = viewModel::closeMemberEditor,
                 onSave = viewModel::saveMember
+            )
+        }
+
+        uiState.memberToDelete?.let { member ->
+            OrbitConfirmationDialog(
+                title = "Delete household member",
+                message = "Delete ${member.name} and their income history?",
+                confirmText = "Delete",
+                dismissText = "Cancel",
+                isDestructive = true,
+                onConfirm = viewModel::confirmDeleteMember,
+                onDismiss = viewModel::cancelDeleteMember
             )
         }
     }

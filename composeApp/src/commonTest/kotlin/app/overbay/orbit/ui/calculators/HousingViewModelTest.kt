@@ -50,20 +50,18 @@ class HousingViewModelTest {
     }
 
     @Test
-    fun testInitialState_computesDefaultBuyingScenario() = runTest(testDispatcher) {
+    fun testInitialState_startsBlankWithDefaultFeeRates() = runTest(testDispatcher) {
         testScheduler.advanceUntilIdle()
         val state = viewModel.uiState.value
 
-        assertEquals(375_000_00L, state.purchasePriceCents)
-        assertEquals(75_000_00L, state.downPaymentCents)
-        assertEquals(300_000_00L, state.buyingResult.loanAmountCents)
+        assertNull(state.salePriceCents)
+        assertNull(state.remainingMortgageCents)
+        assertNull(state.purchasePriceCents)
+        assertNull(state.downPaymentCents)
         assertEquals(6.0, state.interestRatePercent)
         assertEquals(30, state.loanTermYears)
-
-        // PITI: ~$1,798.65 PI + $666.66 Tax + $125.00 Ins + $23 HOA = ~$2,613.31
-        assertTrue(state.buyingResult.monthlyPrincipalInterestCents in 1798_00L..1800_00L)
-        assertTrue(state.buyingResult.totalMonthlyPaymentCents in 2612_00L..2615_00L)
-        assertTrue(state.amortizationSchedule.isNotEmpty())
+        assertNull(state.netProceedsCents)
+        assertNull(state.totalMonthlyPaymentCents)
     }
 
     @Test
@@ -87,11 +85,10 @@ class HousingViewModelTest {
         assertEquals(200_000_00L, state.remainingMortgageCents)
         assertEquals(350_000_00L, state.salePriceCents)
 
-        assertNotNull(state.sellingProceeds)
-        // Sale 350k - remaining 200k - fees (~5% + 2% + 2k + 1k = 17.5k + 7k + 3k = 27.5k) = 122.5k
-        val proceeds = state.sellingProceeds!!
-        assertEquals(122_500_00L, proceeds.netProceedsCents)
-        // Auto-applied to down payment if proceeds > 0
+        assertNotNull(state.netProceedsCents)
+        // Sale 350k - remaining 200k - fees (5% = 17.5k + 2% = 7k + 2k + 1k = 27.5k) = 122.5k
+        assertEquals(122_500_00L, state.netProceedsCents)
+        // Auto-applied to down payment when proceeds > 0
         assertEquals(122_500_00L, state.downPaymentCents)
     }
 
@@ -105,11 +102,10 @@ class HousingViewModelTest {
         viewModel.setMiscRepairs(1000_00L)
         testScheduler.advanceUntilIdle()
 
-        val proceeds = viewModel.uiState.value.sellingProceeds
-        assertNotNull(proceeds)
-        assertEquals(20_000_00L, proceeds.agentCommissionCents)
-        assertEquals(8_000_00L, proceeds.sellerClosingCents)
-        assertEquals(119_000_00L, proceeds.netProceedsCents)
+        val state = viewModel.uiState.value
+        assertEquals(20_000_00L, state.agentCommissionCents)
+        assertEquals(8_000_00L, state.sellerClosingCents)
+        assertEquals(119_000_00L, state.netProceedsCents)
     }
 
     @Test
@@ -122,7 +118,7 @@ class HousingViewModelTest {
         testScheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        val expectedProceeds = state.sellingProceeds?.netProceedsCents
+        val expectedProceeds = state.netProceedsCents
         assertNotNull(expectedProceeds)
         assertTrue(expectedProceeds > 0L)
         assertEquals(expectedProceeds, state.downPaymentCents)
@@ -140,36 +136,29 @@ class HousingViewModelTest {
         testScheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(400_000_00L, state.buyingResult.loanAmountCents)
+        assertEquals(400_000_00L, state.loanAmountCents)
         assertEquals(15, state.loanTermYears)
-        assertEquals(500_00L, state.buyingResult.monthlyPropertyTaxCents) // 6000 / 12
-        assertEquals(100_00L, state.buyingResult.monthlyHomeInsuranceCents) // 1200 / 12
-        assertEquals(50_00L, state.buyingResult.monthlyHoaCents)
-        assertTrue(state.buyingResult.monthlyPrincipalInterestCents > 0L)
+        assertEquals(500_00L, state.monthlyPropertyTaxCents)
+        assertEquals(100_00L, state.monthlyHomeInsuranceCents)
+        assertEquals(50_00L, state.monthlyHoaPaymentCents)
+        assertNotNull(state.monthlyPrincipalInterestCents)
+        assertTrue(state.monthlyPrincipalInterestCents!! > 0L)
     }
 
     @Test
-    fun testExtraPrincipal_acceleratesPayoffAndSavesInterest() = runTest(testDispatcher) {
-        testScheduler.advanceUntilIdle()
-        viewModel.setExtraMonthlyPrincipal(500_00L) // Add $500/mo extra principal
-        testScheduler.advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertTrue(state.monthsSavedWithExtraPrincipal > 60) // Should save > 5 years (60+ months) on 30y mortgage
-        assertTrue(state.interestSavedWithExtraPrincipalCents > 50_000_00L) // Should save > $50,000 in interest
-    }
-
-    @Test
-    fun testReset_restoresDefaults() = runTest(testDispatcher) {
+    fun testConfirmReset_restoresBlankDefaults() = runTest(testDispatcher) {
         viewModel.setPurchasePrice(999_000_00L)
         viewModel.setLoanTermYears(15)
         testScheduler.advanceUntilIdle()
 
-        viewModel.reset()
+        viewModel.requestReset()
+        assertTrue(viewModel.uiState.value.showResetConfirmation)
+
+        viewModel.confirmReset()
         testScheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(375_000_00L, state.purchasePriceCents)
+        assertNull(state.purchasePriceCents)
         assertEquals(30, state.loanTermYears)
     }
 }

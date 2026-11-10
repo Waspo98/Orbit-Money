@@ -54,8 +54,8 @@ object HousingCalculatorEngine {
             annualRatePercent = interestRatePercent,
             loanTermYears = loanTermYears
         )
-        val monthlyTax = annualPropertyTaxesCents / 12
-        val monthlyIns = annualHomeInsuranceCents / 12
+        val monthlyTax = (annualPropertyTaxesCents.toDouble() / 12.0).roundToLong()
+        val monthlyIns = (annualHomeInsuranceCents.toDouble() / 12.0).roundToLong()
         val totalMonthly = pi + monthlyTax + monthlyIns + monthlyHoaCents
 
         return BuyingScenarioResult(

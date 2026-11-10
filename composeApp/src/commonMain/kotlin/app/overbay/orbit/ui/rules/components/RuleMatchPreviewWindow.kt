@@ -179,7 +179,7 @@ fun RuleMatchPreviewWindow(
                                         }
                                     ) {
                                         Text(
-                                            text = "View Rule",
+                                            text = "Edit Rule",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onError,

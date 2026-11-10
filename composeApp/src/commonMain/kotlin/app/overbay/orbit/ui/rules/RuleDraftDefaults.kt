@@ -14,6 +14,14 @@ import kotlin.math.abs
 
 object RuleDraftDefaults {
 
+    val SUPPORTED_FIELDS: List<RuleConditionField> = listOf(
+        RuleConditionField.MERCHANT,
+        RuleConditionField.ORIGINAL_DESCRIPTION,
+        RuleConditionField.AMOUNT,
+        RuleConditionField.ACCOUNT,
+        RuleConditionField.CATEGORY
+    )
+
     val EDITOR_FIELDS: List<RuleConditionField> = listOf(
         RuleConditionField.MERCHANT,
         RuleConditionField.ORIGINAL_DESCRIPTION,
@@ -22,12 +30,18 @@ object RuleDraftDefaults {
         RuleConditionField.CATEGORY_ID
     )
 
+    val SUPPORTED_ACTIONS: List<RuleActionType> = listOf(
+        RuleActionType.RENAME_MERCHANT,
+        RuleActionType.SET_CATEGORY,
+        RuleActionType.MARK_TRANSFER,
+        RuleActionType.MARK_IGNORED
+    )
+
     val EDITOR_ACTION_TYPES: List<RuleActionType> = listOf(
         RuleActionType.RENAME,
         RuleActionType.CATEGORIZE,
         RuleActionType.MARK_TRANSFER,
-        RuleActionType.MARK_IGNORED,
-        RuleActionType.SET_MHA_ELIGIBLE
+        RuleActionType.MARK_IGNORED
     )
 
     fun canonicalField(field: RuleConditionField): RuleConditionField = when (field) {
@@ -53,7 +67,7 @@ object RuleDraftDefaults {
         RuleConditionField.AMOUNT -> "Amount"
         RuleConditionField.ACCOUNT, RuleConditionField.ACCOUNT_ID -> "Account"
         RuleConditionField.CATEGORY, RuleConditionField.CATEGORY_ID -> "Category"
-        RuleConditionField.NOTES -> "Notes"
+        else -> "Field"
     }
 
     fun operatorsForField(field: RuleConditionField): List<RuleOperator> = when (canonicalField(field)) {
@@ -69,7 +83,7 @@ object RuleDraftDefaults {
         )
         else -> listOf(
             RuleOperator.CONTAINS,
-            RuleOperator.EQUALS,
+            RuleOperator.EXACT,
             RuleOperator.STARTS_WITH,
             RuleOperator.REGEX
         )
@@ -93,7 +107,7 @@ object RuleDraftDefaults {
         RuleActionType.CATEGORIZE, RuleActionType.SET_CATEGORY -> "Set category to"
         RuleActionType.MARK_TRANSFER -> "Mark as transfer"
         RuleActionType.MARK_IGNORED -> "Ignore from budget"
-        RuleActionType.SET_MHA_ELIGIBLE -> "Set MHA eligible"
+        else -> "Action"
     }
 
     /**
@@ -159,10 +173,6 @@ object RuleDraftDefaults {
                 val text = sourceTransaction?.originalDescription?.trim().orEmpty()
                 RuleCondition(field = resolvedField, operator = resolvedOp, value = text)
             }
-            RuleConditionField.NOTES -> {
-                val text = sourceTransaction?.notes?.trim().orEmpty()
-                RuleCondition(field = resolvedField, operator = resolvedOp, value = text)
-            }
             RuleConditionField.AMOUNT -> {
                 if (sourceTransaction != null) {
                     val absCents = abs(sourceTransaction.effectiveAmountCents)
@@ -210,6 +220,7 @@ object RuleDraftDefaults {
                     targetId = catId
                 )
             }
+            else -> RuleCondition(field = resolvedField, operator = resolvedOp, value = "")
         }
     }
 
@@ -272,11 +283,7 @@ object RuleDraftDefaults {
                 value = "true",
                 booleanValue = true
             )
-            RuleActionType.SET_MHA_ELIGIBLE -> RuleAction(
-                type = RuleActionType.SET_MHA_ELIGIBLE,
-                value = "true",
-                booleanValue = true
-            )
+            else -> RuleAction(type = resolvedType, value = "")
         }
     }
 

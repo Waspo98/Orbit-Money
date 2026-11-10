@@ -101,15 +101,15 @@ class MhaTrackerViewModel(
             val isTransfer = txn.effectiveIsTransfer || (txn.effectiveCategoryId?.let { categoryMap[it]?.isTransfer } == true)
             val isIgnored = txn.effectiveIsIgnored
 
-            if (!isOutflow || isTransfer || isIgnored) continue
+            if (!isOutflow || isTransfer) continue
 
             val catId = txn.effectiveCategoryId
             val accId = txn.accountId
 
-            val isEligible = txn.editedMhaEligible ?: run {
+            val isEligible = if (isIgnored && txn.editedMhaEligible != true) false else (txn.editedMhaEligible ?: run {
                 if (catId != null && catId in catIgnoredSet) false
                 else (accId in accountMhaSet) || (catId != null && catId in catMhaSet)
-            }
+            })
 
             val item = MhaTransactionItem(
                 transaction = txn,
@@ -314,6 +314,26 @@ class MhaTrackerViewModel(
             fairMarketRentalValueCents = _fairMarketRentalValueCents.value,
             profile = updatedProfile
         )
+    }
+
+    fun reapplyCategoryDefaults(categoryId: Long) {
+        viewModelScope.launch {
+            val affected = repository.transactions.value.filter {
+                it.effectiveCategoryId == categoryId && it.editedMhaEligible != null
+            }
+            for (txn in affected) {
+                repository.resetTransactionFields(txn.id, listOf("mha_eligible"))
+            }
+        }
+    }
+
+    fun reapplyAllDefaults() {
+        viewModelScope.launch {
+            val overridden = repository.transactions.value.filter { it.editedMhaEligible != null }
+            for (txn in overridden) {
+                repository.resetTransactionFields(txn.id, listOf("mha_eligible"))
+            }
+        }
     }
 
     fun clearError() {

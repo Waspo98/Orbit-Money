@@ -32,16 +32,21 @@ data class SpendingTrendsUiState(
     val chartMode: TrendsChartMode = TrendsChartMode.CASH_FLOW,
     val selectedCategoryId: Long? = null,
     val selectedCategoryBudget: CategoryBudget? = null,
-    val scrubbedIndex: Int? = null,
-    val scrubbedBarItem: SpendingBarItem? = null,
+    val flowScrubIndex: Int? = null,
+    val flowScrubItem: SpendingBarItem? = null,
+    val categoryScrubIndex: Int? = null,
+    val categoryScrubItem: SpendingBarItem? = null,
     val pendingInspectMonth: String? = null,
     val isInspectMonthDialogOpen: Boolean = false,
     val isBudgetModalOpen: Boolean = false,
     val isLoading: Boolean = false
 ) {
+    val scrubbedIndex: Int? get() = flowScrubIndex ?: categoryScrubIndex
+    val scrubbedBarItem: SpendingBarItem? get() = flowScrubItem ?: categoryScrubItem
+
     val selectedCategoryTrend: CategorySpendingTrend?
         get() = overview.categoryTrends.firstOrNull { it.category.id == selectedCategoryId }
-            ?: if (chartMode == TrendsChartMode.CATEGORY_TREND) overview.categoryTrends.firstOrNull() else null
+            ?: overview.categoryTrends.firstOrNull()
 
     val totalPeriodNetCents: Cents
         get() = overview.totalPeriodIncomeCents - overview.totalPeriodSpendingCents

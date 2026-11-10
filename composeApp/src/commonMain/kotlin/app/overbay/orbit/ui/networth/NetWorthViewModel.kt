@@ -73,9 +73,8 @@ class NetWorthViewModel(
             thisMonthDeltaCents
         }
 
-        val totalCombinedBalance = currentSnapshot.totalAssetsCents + currentSnapshot.totalLiabilitiesCents
-        val debtSharePercent = if (totalCombinedBalance > 0L) {
-            (currentSnapshot.totalLiabilitiesCents.toDouble() / totalCombinedBalance.toDouble()) * 100.0
+        val debtSharePercent = if (currentSnapshot.totalAssetsCents > 0L) {
+            (currentSnapshot.totalLiabilitiesCents.toDouble() / currentSnapshot.totalAssetsCents.toDouble()) * 100.0
         } else 0.0
 
         val largestAsset = assetAccounts.maxByOrNull {
@@ -85,6 +84,7 @@ class NetWorthViewModel(
             abs(it.currentBalanceCents)
         }
         val trackedAccountCount = activeAccounts.size
+        val totalCombinedBalance = currentSnapshot.totalAssetsCents + currentSnapshot.totalLiabilitiesCents
 
         val topContributingAccounts = activeAccounts.map { acct ->
             val signedContribution = NetWorthEngine.accountContributionCents(acct, acct.currentBalanceCents)

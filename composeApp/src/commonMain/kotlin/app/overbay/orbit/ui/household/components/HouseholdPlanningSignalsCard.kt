@@ -23,8 +23,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitStatTile
 import app.overbay.orbit.ui.components.OrbitSwitchRow
-import kotlin.math.min
-import kotlin.math.roundToLong
+import app.overbay.orbit.ui.household.HouseholdCalculations
 
 @Composable
 fun HouseholdPlanningSignalsCard(
@@ -35,49 +34,22 @@ fun HouseholdPlanningSignalsCard(
 ) {
     val totalGrossCents = members.sumOf { it.grossIncomeAnnualCents }
 
-    // 1. Annual Take-Home Pay
+    // 1. Annual Take-Home Pay (strictly netPayPerPeriod * periodsPerYear)
     val annualTakeHomeCents = members.sumOf { m ->
-        val periods = if (m.payPeriodsPerYear > 0.0) m.payPeriodsPerYear else 26.0
-        if (m.netPayPerPeriodCents > 0L) {
-            (m.netPayPerPeriodCents.toDouble() * periods).roundToLong()
-        } else if (m.grossIncomeAnnualCents > 0L) {
-            val empPct = (m.employeeContributionPercent ?: 0.0) / 100.0
-            val preTaxDeductions = (m.grossIncomeAnnualCents * empPct).roundToLong() +
-                (m.healthPremiumPerMonthCents * 12) + m.hsaContributionAnnualCents
-            val taxable = (m.grossIncomeAnnualCents - preTaxDeductions).coerceAtLeast(0L)
-            (taxable.toDouble() * 0.78).roundToLong()
-        } else {
-            0L
-        }
+        HouseholdCalculations.memberNetPayAnnual(m)
     }
 
-    // 2. Total Retirement Savings + Match
+    // 2. Total Retirement Savings + Match & Benefits
     var totalEmployeeSavingsCents = 0L
     var totalEmployerMatchCents = 0L
     var totalHsaCents = 0L
     var totalBenefitsValueCents = 0L
 
     for (m in members) {
-        val gross = m.grossIncomeAnnualCents
-        val empPct = m.employeeContributionPercent ?: 0.0
-        val empSavings = if (m.employeeContributionAnnualCents > 0L) {
-            m.employeeContributionAnnualCents
-        } else if (empPct > 0.0 && gross > 0L) {
-            ((gross.toDouble() * empPct) / 100.0).roundToLong()
-        } else 0L
-
-        val matchPct = m.employerMatchPercent
-        val matchLimitPct = m.employerMatchLimitPercent
-        val matchCap = m.employerMatchAnnualCapCents
-        val eligiblePct = if (matchLimitPct > 0.0) min(empPct, matchLimitPct) else empPct
-        val matchRate = if (matchPct > 0.0) matchPct / 100.0 else 1.0
-        val uncappedMatch = if (eligiblePct > 0.0 && gross > 0L) {
-            ((gross.toDouble() * eligiblePct / 100.0) * matchRate).roundToLong()
-        } else 0L
-        val match = if (matchCap > 0L) min(matchCap, uncappedMatch) else uncappedMatch
-
+        val empSavings = HouseholdCalculations.memberEmployeeRetirementAnnual(m)
+        val match = HouseholdCalculations.memberEmployerMatchAnnual(m)
         val hsa = m.hsaContributionAnnualCents
-        val benefits = (m.healthPremiumPerMonthCents * 12) + hsa + m.dependentCareFsaAnnualCents + m.otherBenefitsAnnualCents
+        val benefits = HouseholdCalculations.memberBenefitsAnnual(m)
 
         totalEmployeeSavingsCents += empSavings
         totalEmployerMatchCents += match
@@ -87,8 +59,8 @@ fun HouseholdPlanningSignalsCard(
 
     val totalRetirementAndMatchCents = totalEmployeeSavingsCents + totalEmployerMatchCents
 
-    // 3. Largest Contributor & Effective Savings Rate
-    val largestContributor = members.maxByOrNull { it.grossIncomeAnnualCents }
+    // 3. Top Contributor (ranked by annualNet + memberBenefits) & Effective Savings Rate
+    val largestContributor = members.maxByOrNull { HouseholdCalculations.memberHouseholdValueAnnual(it) }
     val qualifiedSavingsForRate = totalEmployeeSavingsCents + totalEmployerMatchCents + (if (includeHsaInSavingsRate) totalHsaCents else 0L)
     val effectiveSavingsRatePercent = if (totalGrossCents > 0L) {
         (qualifiedSavingsForRate.toDouble() / totalGrossCents.toDouble()) * 100.0
@@ -132,7 +104,7 @@ fun HouseholdPlanningSignalsCard(
                 OrbitStatTile(
                     label = "Effective Savings Rate",
                     value = "${effectiveSavingsRatePercent.toInt()}%",
-                    subtitle = "Top Earner: ${largestContributor?.name?.split(" ")?.firstOrNull() ?: "None"}",
+                    subtitle = "Top Contributor: ${largestContributor?.name?.split(" ")?.firstOrNull() ?: "None"}",
                     valueColor = MaterialTheme.colorScheme.primary,
                     containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                     modifier = Modifier.weight(1f)

@@ -42,7 +42,7 @@ class UpcomingViewModel(
     todayFlow: Flow<LocalDate>? = null
 ) : ViewModel() {
 
-    private val _filterOption = MutableStateFlow(UpcomingFilterOption.ALL)
+    private val _filterOption = MutableStateFlow(UpcomingFilter.ALL)
     private val _selectedDateFilter = MutableStateFlow<String?>(null)
     private val _inspectingItemId = MutableStateFlow<Long?>(null)
     private val _editingItem = MutableStateFlow<UpcomingItem?>(null)
@@ -83,7 +83,8 @@ class UpcomingViewModel(
         val detected = UpcomingEngine.detectRecurringCandidates(
             transactions = data.transactions,
             existingMerchants = existingMerchants,
-            todayDate = todayIso
+            todayDate = todayIso,
+            categoryMap = categoryMap
         )
 
         val snapshotSuggestions = repository.snapshot.value.upcomingSuggestions.filter {
@@ -99,12 +100,30 @@ class UpcomingViewModel(
 
         var totalExpense = 0L
         var totalIncome = 0L
+        var incomeCents = 0L
+        var givingCents = 0L
+        var subscriptionsCents = 0L
+        var billsCents = 0L
+
         for (item in data.items.filter { it.status == UpcomingStatus.ACTIVE }) {
             val amount = projectedAmounts[item.id]?.amountCents ?: item.amountCents
-            if (item.direction.lowercase() == "income") {
-                totalIncome += abs(amount)
+            val absAmount = abs(amount)
+            val cat = categoryMap[item.categoryId]
+            val isInc = item.direction.lowercase() == "income" || item.kind == UpcomingKind.INCOME
+            if (isInc) {
+                totalIncome += absAmount
+                incomeCents += absAmount
             } else {
-                totalExpense += abs(amount)
+                totalExpense += absAmount
+                val text = "${item.name} ${item.merchant ?: ""} ${item.notes ?: ""} ${cat?.name ?: ""}".lowercase()
+                val isGiving = item.kind == UpcomingKind.GIVING || UpcomingScheduleHelper.GIVING_HINTS.any { text.contains(it) }
+                if (isGiving) {
+                    givingCents += absAmount
+                } else if (item.kind == UpcomingKind.SUBSCRIPTION) {
+                    subscriptionsCents += absAmount
+                } else {
+                    billsCents += absAmount
+                }
             }
         }
 
@@ -123,6 +142,10 @@ class UpcomingViewModel(
             projectedAmounts = projectedAmounts,
             totalExpense = totalExpense,
             totalIncome = totalIncome,
+            incomeCents = incomeCents,
+            givingCents = givingCents,
+            subscriptionsCents = subscriptionsCents,
+            billsCents = billsCents,
             cashFlow = cashFlow,
             recentTxns = recentTxns
         )
@@ -178,10 +201,20 @@ class UpcomingViewModel(
         val data = core.data
 
         val filtered = data.items.filter { item ->
+            val cat = core.categoryMap[item.categoryId]
+            val text = "${item.name} ${item.merchant ?: ""} ${item.notes ?: ""} ${cat?.name ?: ""}".lowercase()
+            val isInc = item.direction.lowercase() == "income" || item.kind == UpcomingKind.INCOME
+            val isGiving = !isInc && (item.kind == UpcomingKind.GIVING || UpcomingScheduleHelper.GIVING_HINTS.any { text.contains(it) })
+            val isSub = !isInc && !isGiving && item.kind == UpcomingKind.SUBSCRIPTION
+            val isBill = !isInc && !isGiving && !isSub
+
             val matchesFilter = when (control.filter) {
-                UpcomingFilterOption.ALL -> true
-                UpcomingFilterOption.BILLS -> item.direction.lowercase() != "income"
-                UpcomingFilterOption.INCOME -> item.direction.lowercase() == "income"
+                UpcomingFilter.ALL -> true
+                UpcomingFilter.INCOME -> isInc
+                UpcomingFilter.GIVING -> isGiving
+                UpcomingFilter.SUBSCRIPTIONS -> isSub
+                UpcomingFilter.BILLS -> isBill
+                UpcomingFilter.SUGGESTIONS -> true
             }
             if (!matchesFilter) return@filter false
             if (control.date != null && item.nextDate != control.date) {
@@ -204,8 +237,12 @@ class UpcomingViewModel(
             accounts = data.accounts,
             categoryMap = core.categoryMap,
             accountMap = core.accountMap,
-            filterOption = control.filter,
+            selectedFilter = control.filter,
             selectedDateFilter = control.date,
+            upcomingIncomeCents = core.incomeCents,
+            upcomingGivingCents = core.givingCents,
+            upcomingBillsCents = core.billsCents,
+            upcomingSubscriptionsCents = core.subscriptionsCents,
             totalUpcomingExpenseCents = core.totalExpense,
             totalUpcomingIncomeCents = core.totalIncome,
             netCashflowProjectionCents = if (cfPeriod == UpcomingCashFlowPeriod.REST_OF_MONTH) {
@@ -235,6 +272,10 @@ class UpcomingViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = UpcomingUiState(isLoading = true)
     )
+
+    fun setFilter(filter: UpcomingFilter) {
+        _filterOption.value = filter
+    }
 
     fun setFilterOption(option: UpcomingFilterOption) {
         _filterOption.value = option
@@ -390,26 +431,28 @@ class UpcomingViewModel(
         }
     }
 
+    fun reviewCandidate(candidate: RecurringCandidate) {
+        val detectedKind = UpcomingScheduleHelper.detectKind(candidate.merchant)
+        val draftItem = UpcomingItem(
+            id = 0L,
+            name = candidate.merchant,
+            merchant = candidate.merchant,
+            amountCents = candidate.amountCents,
+            kind = detectedKind,
+            direction = if (detectedKind == UpcomingKind.INCOME) "income" else "expense",
+            frequencyType = candidate.frequency,
+            nextDate = candidate.nextProjectedDate,
+            categoryId = candidate.suggestedCategoryId,
+            accountId = candidate.suggestedAccountId,
+            status = UpcomingStatus.ACTIVE
+        )
+        _editingItem.value = draftItem
+        _showEditorSheet.value = true
+    }
+
     fun acceptCandidate(candidate: RecurringCandidate) {
         viewModelScope.launch(computeDispatcher) {
-            val res = repository.acceptRecurringSuggestion(candidate)
-            if (res.isFailure) {
-                val detectedKind = UpcomingScheduleHelper.detectKind(candidate.merchant)
-                val newItem = UpcomingItem(
-                    id = 0L,
-                    name = candidate.merchant,
-                    merchant = candidate.merchant,
-                    amountCents = candidate.amountCents,
-                    kind = detectedKind,
-                    direction = if (detectedKind == UpcomingKind.INCOME) "income" else "expense",
-                    frequencyType = candidate.frequency,
-                    nextDate = candidate.nextProjectedDate,
-                    categoryId = candidate.suggestedCategoryId,
-                    accountId = candidate.suggestedAccountId,
-                    status = UpcomingStatus.ACTIVE
-                )
-                repository.saveUpcoming(newItem)
-            }
+            repository.acceptRecurringSuggestion(candidate)
         }
     }
 
@@ -439,14 +482,24 @@ class UpcomingViewModel(
     }
 
     fun createFromTransaction(transactionId: Long) {
-        viewModelScope.launch(computeDispatcher) {
-            val res = repository.createUpcomingFromTransaction(transactionId)
-            res.onSuccess { item ->
-                _showAddFromTxModal.value = false
-                _editingItem.value = item
-                _showEditorSheet.value = true
-            }
-        }
+        val tx = repository.transactions.value.find { it.id == transactionId } ?: return
+        val isIncome = tx.effectiveAmountCents > 0L
+        val kind = if (isIncome) UpcomingKind.INCOME else UpcomingScheduleHelper.detectKind(tx.effectiveMerchant)
+        val draftItem = UpcomingItem(
+            id = 0L,
+            name = tx.effectiveMerchant,
+            merchant = tx.effectiveMerchant,
+            amountCents = abs(tx.effectiveAmountCents),
+            kind = kind,
+            direction = if (isIncome) "income" else "expense",
+            accountId = tx.accountId,
+            categoryId = tx.effectiveCategoryId,
+            nextDate = tx.effectiveDate,
+            status = UpcomingStatus.ACTIVE
+        )
+        _showAddFromTxModal.value = false
+        _editingItem.value = draftItem
+        _showEditorSheet.value = true
     }
 }
 
@@ -466,12 +519,16 @@ private data class UpcomingComputedCore(
     val projectedAmounts: Map<Long, ProjectedAmountResult>,
     val totalExpense: Long,
     val totalIncome: Long,
+    val incomeCents: Long,
+    val givingCents: Long,
+    val subscriptionsCents: Long,
+    val billsCents: Long,
     val cashFlow: UpcomingCashFlowSummary,
     val recentTxns: List<Transaction>
 )
 
 private data class UpcomingControlBundle(
-    val filter: UpcomingFilterOption,
+    val filter: UpcomingFilter,
     val date: String?,
     val editing: UpcomingItem?,
     val showSheet: Boolean,

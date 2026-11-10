@@ -54,12 +54,11 @@ import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.goals.GoalsUiState
 import app.overbay.orbit.ui.goals.GoalsViewModel
-import app.overbay.orbit.ui.goals.dialogs.GoalAllocationContent
 import app.overbay.orbit.ui.goals.dialogs.GoalEditorContent
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalOrbitHaptics
 
-private enum class GoalInspectorSubMode { DETAIL, EDIT, DEPOSIT }
+private enum class GoalInspectorSubMode { DETAIL, EDIT }
 
 /**
  * Right-hand morphing inspector pane for Savings Goals on unfolded phones, tablets, and desktops.
@@ -85,7 +84,6 @@ fun GoalDetailInspectorPane(
 
     val subMode = when {
         state.showEditorSheet -> GoalInspectorSubMode.EDIT
-        state.showAllocationDialog && (state.allocatingGoal ?: inspecting) != null -> GoalInspectorSubMode.DEPOSIT
         else -> GoalInspectorSubMode.DETAIL
     }
 
@@ -94,7 +92,6 @@ fun GoalDetailInspectorPane(
         haptics.tick()
         when (subMode) {
             GoalInspectorSubMode.EDIT -> viewModel.closeEditorSheet()
-            GoalInspectorSubMode.DEPOSIT -> viewModel.closeAllocationDialog()
             else -> {}
         }
     }
@@ -118,29 +115,18 @@ fun GoalDetailInspectorPane(
                     }
                 )
             }
-            GoalInspectorSubMode.DEPOSIT -> {
-                val target = state.allocatingGoal ?: inspecting
-                if (target != null) {
-                    GoalAllocationContent(
-                        goal = target,
-                        onConfirmDeposit = { id, amount -> viewModel.depositToGoal(id, amount) },
-                        onDismiss = {
-                            if (state.inspectingGoalId != null) viewModel.closeAllocationDialog() else onClosePane()
-                        }
-                    )
-                }
-            }
             GoalInspectorSubMode.DETAIL -> {
                 if (inspecting != null) {
                     val acct = inspecting.linkedAccountId?.let { state.accountMap[it] }
                     val monthlyNeeded = viewModel.calculateMonthlyRequiredCents(inspecting)
+                    val neededExtra = viewModel.calculateNeededExtraMonthlyCents(inspecting)
                     GoalReadOnlyDetailContent(
                         goal = inspecting,
                         linkedAccount = acct,
                         monthlyNeededCents = monthlyNeeded,
+                        neededExtraMonthlyCents = neededExtra,
                         onClose = onClosePane,
                         onEdit = { viewModel.openEditGoal(inspecting) },
-                        onDeposit = { viewModel.openAllocationDialog(inspecting) },
                         onDelete = { viewModel.deleteGoal(inspecting.id) },
                         onOpenLinkedAccount = if (acct != null) {
                             { onNavigate(OrbitNavKey.Accounts(accountId = acct.id)) }
@@ -158,9 +144,9 @@ private fun GoalReadOnlyDetailContent(
     goal: Goal,
     linkedAccount: Account?,
     monthlyNeededCents: Cents?,
+    neededExtraMonthlyCents: Cents?,
     onClose: () -> Unit,
     onEdit: () -> Unit,
-    onDeposit: () -> Unit,
     onDelete: () -> Unit,
     onOpenLinkedAccount: (() -> Unit)?
 ) {
@@ -215,7 +201,10 @@ private fun GoalReadOnlyDetailContent(
                 GoalMetaField(
                     label = "PACE NEEDED",
                     value = if (monthlyNeededCents != null && monthlyNeededCents > 0L) {
-                        "${MoneyUtils.formatCents(monthlyNeededCents, showCents = false)}/mo"
+                        val extraStr = if (neededExtraMonthlyCents != null && neededExtraMonthlyCents > 0L) {
+                            " (+${MoneyUtils.formatCents(neededExtraMonthlyCents, showCents = false)} extra)"
+                        } else ""
+                        "${MoneyUtils.formatCents(monthlyNeededCents, showCents = false)}/mo$extraStr"
                     } else if (isDone) "Goal reached" else "Ongoing"
                 )
             }
@@ -254,9 +243,6 @@ private fun GoalReadOnlyDetailContent(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OrbitActionChip(label = "Edit Goal", onClick = onEdit)
-            if (!isDone) {
-                OrbitActionChip(label = "Deposit", onClick = onDeposit)
-            }
             if (onOpenLinkedAccount != null) {
                 OrbitActionChip(label = "View Linked Account", onClick = onOpenLinkedAccount)
             }

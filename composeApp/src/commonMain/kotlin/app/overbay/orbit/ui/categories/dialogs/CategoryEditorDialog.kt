@@ -22,7 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -31,7 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,24 +44,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryEmojiMapper
+import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitSwitchGroupCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 private val PRESET_COLORS = listOf(
-    "#2E7D32", // Forest Emerald
-    "#1976D2", // Blue
-    "#00897B", // Teal
-    "#E64A19", // Coral
-    "#F57C00", // Amber
-    "#7B1FA2", // Violet
-    "#C2185B", // Rose
-    "#546E7A", // Slate
-    "#0097A7", // Cyan
-    "#689F38"  // Olive
+    "#2E7D32", "#1976D2", "#00897B", "#E64A19", "#F57C00",
+    "#7B1FA2", "#C2185B", "#546E7A", "#0097A7", "#689F38"
 )
-
 private val PRESET_ICONS = CategoryEmojiMapper.PRESET_EMOJIS
 
 @Composable
@@ -75,18 +66,8 @@ fun CategoryEditorDialog(
     showMhaOption: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    app.overbay.orbit.ui.components.OrbitModalSheet(
-        onDismissRequest = onDismiss,
-        modifier = modifier
-    ) {
-        CategoryEditorContent(
-            category = category,
-            onSave = onSave,
-            onDelete = onDelete,
-            onViewTransactions = onViewTransactions,
-            onDismiss = onDismiss,
-            showMhaOption = showMhaOption
-        )
+    app.overbay.orbit.ui.components.OrbitModalSheet(onDismissRequest = onDismiss, modifier = modifier) {
+        CategoryEditorContent(category, onSave, onDelete, onViewTransactions, onDismiss, showMhaOption)
     }
 }
 
@@ -107,8 +88,6 @@ fun CategoryEditorContent(
     var selectedIcon by remember(category) {
         mutableStateOf(CategoryEmojiMapper.resolveEmoji(category?.icon) ?: PRESET_ICONS.first())
     }
-    var isTransfer by remember(category) { mutableStateOf(category?.isTransfer ?: false) }
-    var isIncome by remember(category) { mutableStateOf(category?.isIncome ?: false) }
     var mhaEligible by remember(category) { mutableStateOf(category?.mhaDefaultEligible ?: false) }
 
     Column(
@@ -123,18 +102,54 @@ fun CategoryEditorContent(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Live Composite Preview
+        val previewComposeColor = remember(selectedColor) {
+            selectedColor.toComposeColor(Color(0xFF2E7D32))
+        }
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(previewComposeColor.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = selectedIcon.ifBlank { "#" },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = previewComposeColor
+                    )
+                }
+                Text(
+                    text = name.ifBlank { "Category Name" },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (name.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(16.dp))
+
         CategoryEditorFormFields(
+            category = category,
             name = name,
             onNameChange = { name = it },
             selectedColor = selectedColor,
             onColorChange = { selectedColor = it },
             selectedIcon = selectedIcon,
             onIconChange = { selectedIcon = it },
-            isIncome = isIncome,
-            onIncomeChange = { isIncome = it; if (it) isTransfer = false },
-            isTransfer = isTransfer,
-            onTransferChange = { isTransfer = it; if (it) isIncome = false },
             mhaEligible = mhaEligible,
             onMhaChange = { mhaEligible = it },
             showMhaOption = showMhaOption
@@ -150,15 +165,7 @@ fun CategoryEditorContent(
             Button(
                 onClick = {
                     haptics.confirm()
-                    onSave(
-                        category?.id ?: 0L,
-                        name.trim(),
-                        selectedColor,
-                        selectedIcon.trim().ifBlank { null },
-                        isTransfer,
-                        isIncome,
-                        mhaEligible
-                    )
+                    onSave(category?.id ?: 0L, name.trim(), selectedColor, selectedIcon.trim().ifBlank { null }, category?.isTransfer ?: false, category?.isIncome ?: false, mhaEligible)
                 },
                 enabled = name.isNotBlank(),
                 modifier = Modifier.weight(1f)
@@ -169,6 +176,7 @@ fun CategoryEditorContent(
             Spacer(modifier = Modifier.height(10.dp))
             OutlinedButton(
                 onClick = { haptics.tick(); onViewTransactions(category.id) },
+                enabled = (category?.transactionCount ?: 0) > 0,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("See Transactions")
@@ -193,16 +201,13 @@ fun CategoryEditorContent(
 
 @Composable
 private fun CategoryEditorFormFields(
+    category: Category?,
     name: String,
     onNameChange: (String) -> Unit,
     selectedColor: String,
     onColorChange: (String) -> Unit,
     selectedIcon: String,
     onIconChange: (String) -> Unit,
-    isIncome: Boolean,
-    onIncomeChange: (Boolean) -> Unit,
-    isTransfer: Boolean,
-    onTransferChange: (Boolean) -> Unit,
     mhaEligible: Boolean,
     onMhaChange: (Boolean) -> Unit,
     showMhaOption: Boolean = false
@@ -344,33 +349,38 @@ private fun CategoryEditorFormFields(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Type Switches
-        app.overbay.orbit.ui.components.OrbitSwitchGroupCard {
-            OrbitSwitchRow(
-                title = "Income Category",
-                checked = isIncome,
-                onCheckedChange = onIncomeChange,
-                showContainer = false
-            )
+        // Category Behavior Information & MHA Setting
+        if (category != null && (category.isIncome || category.isTransfer)) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Income and transfer behavior stays unchanged here. This editor only updates the name, emoji, color, and MHA default.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
 
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
-            )
-
-            OrbitSwitchRow(
-                title = "Transfer Category",
-                checked = isTransfer,
-                onCheckedChange = onTransferChange,
-                showContainer = false
-            )
-
-            if (showMhaOption) {
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
-                )
-
+        if (showMhaOption) {
+            Spacer(modifier = Modifier.height(16.dp))
+            app.overbay.orbit.ui.components.OrbitSwitchGroupCard {
                 OrbitSwitchRow(
                     title = "Default MHA Eligible",
                     checked = mhaEligible,

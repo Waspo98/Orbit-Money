@@ -22,6 +22,7 @@ import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.RollingTickerCents
 import app.overbay.orbit.ui.components.charts.RetirementProjectionChart
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
@@ -40,7 +41,7 @@ fun RetirementProjectionHeroCard(
 
     OrbitSectionCard(
         title = "Retirement Trajectory & Nest Egg",
-        subtitle = "Interactive accumulation and drawdown projection",
+        subtitle = "Live accumulation path across conservative, balanced, and aggressive scenarios",
         modifier = modifier
     ) {
         // Hero Top Metrics
@@ -61,7 +62,11 @@ fun RetirementProjectionHeroCard(
                 ) {
                     Column {
                         Text(
-                            text = if (uiState.scrubbedAge != null) "SCRUBBED BALANCE (AGE ${uiState.scrubbedAge.roundToInt()})" else "PROJECTED AT AGE ${uiState.retirementAge.toInt()}",
+                            text = if (uiState.scrubbedAge != null) {
+                                "SCRUBBED BALANCE (AGE ${uiState.scrubbedAge.roundToInt()})"
+                            } else {
+                                "AT AGE ${uiState.retirementAge.toInt()}"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -95,68 +100,89 @@ fun RetirementProjectionHeroCard(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Target Nest Egg: ${MoneyUtils.formatCompactCents(scenario.targetNestEggCents)}",
+                        text = "Target: ${MoneyUtils.formatCompactCents(scenario.targetNestEggCents)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    val gap = uiState.surplusOrGapCents
                     Text(
-                        text = if (scenario.fundingGapCents > 0L) "Gap: ${MoneyUtils.formatCompactCents(scenario.fundingGapCents)}" else "Fully Funded!",
+                        text = if (gap >= 0L) {
+                            "+${MoneyUtils.formatCompactCents(gap)} ahead of target"
+                        } else {
+                            "-${MoneyUtils.formatCompactCents(abs(gap))} below target"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (scenario.fundingGapCents > 0L) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                        color = if (gap >= 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // Interactive Projection Chart with Scrubbing
+        // Interactive 3-Scenario Projection Chart with Scrubbing
         RetirementProjectionChart(
             currentAge = uiState.currentAge,
             retirementAge = uiState.retirementAge,
-            runwayEndAge = uiState.runwayEndAge,
-            accumulationPoints = scenario.accumulationPoints,
-            drawdownPoints = scenario.drawdownPoints,
+            currentBalanceCents = uiState.currentBalanceCents,
             targetNestEggCents = scenario.targetNestEggCents,
-            coastFireTargetCents = scenario.coastFireTargetCents,
+            scenarios = uiState.scenarios,
+            selectedPreset = uiState.preset,
+            actualHistoryPoints = uiState.actualHistoryPoints,
+            hsaBridge = scenario.hsaBridge,
             onAgeScrubbed = onAgeScrubbed,
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // Coast FIRE & Depletion Summary Pill
+        // Exact Old-PWA Metrics List
         Surface(
             shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 OrbitMiniStatRow(
-                    label = "Coast FIRE Target Today",
-                    value = if (scenario.isCoastFireReached) "Coast FIRE Reached! 🎉" else MoneyUtils.formatCents(scenario.coastFireTargetCents),
-                    valueColor = if (scenario.isCoastFireReached) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    label = "Retirement Target",
+                    value = MoneyUtils.formatCents(scenario.targetNestEggCents, showCents = false)
                 )
 
-                val runwayText = if (scenario.depletionAge != null) {
-                    "Depletes at Age ${scenario.depletionAge.roundToInt()}"
+                val reqLabel = if (scenario.monthsToRetirement > 0) "Required Monthly Savings" else "Required Today"
+                val reqValue = if (scenario.monthsToRetirement > 0) {
+                    "${MoneyUtils.formatCents(scenario.requiredMonthlyContributionCents, showCents = false)} / mo"
                 } else {
-                    "Sustainable Past Age ${uiState.runwayEndAge.toInt()} ♾️"
+                    MoneyUtils.formatCents(scenario.fundingGapCents, showCents = false)
                 }
                 OrbitMiniStatRow(
-                    label = "Portfolio Runway",
-                    value = runwayText,
-                    valueColor = if (scenario.depletionAge != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    label = reqLabel,
+                    value = reqValue,
+                    valueColor = if (scenario.monthlySavingsGapCents > 0L) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                 )
 
-                if (scenario.earliestRetirementAge != null && scenario.earliestRetirementAge < uiState.retirementAge) {
-                    OrbitMiniStatRow(
-                        label = "Earliest Achievable Retirement",
-                        value = "Age ${scenario.earliestRetirementAge.roundToInt()}",
-                        valueColor = MaterialTheme.colorScheme.tertiary
-                    )
+                val earliestText = if (scenario.earliestRetirementAge != null) {
+                    "Age ${scenario.earliestRetirementAge.roundToInt()}"
+                } else {
+                    "After Age ${uiState.runwayEndAge.toInt()}"
                 }
+                OrbitMiniStatRow(
+                    label = "Earliest Target Age",
+                    value = earliestText,
+                    valueColor = if (scenario.earliestRetirementAge != null && scenario.earliestRetirementAge <= uiState.retirementAge) {
+                        MaterialTheme.colorScheme.primary
+                    } else MaterialTheme.colorScheme.onSurface
+                )
+
+                val savingsRateVal = "${uiState.savingsRatePercent.roundToInt()}% of gross income"
+                OrbitMiniStatRow(
+                    label = "Savings Rate",
+                    value = savingsRateVal,
+                    valueColor = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
     }
