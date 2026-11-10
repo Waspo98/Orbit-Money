@@ -38,19 +38,19 @@ if errorlevel 1 (
 for /f "tokens=*" %%b in ('git branch --show-current 2^>nul') do set CURRENT_BRANCH=%%b
 echo Current branch: %CURRENT_BRANCH%
 
-git fetch origin Beta
+git fetch origin beta
 if errorlevel 1 (
   popd
   exit /b 1
 )
 
-git checkout Beta
+git checkout beta
 if errorlevel 1 (
   popd
   exit /b 1
 )
 
-git pull --ff-only origin Beta
+git pull --ff-only origin beta
 if errorlevel 1 (
   popd
   exit /b 1
