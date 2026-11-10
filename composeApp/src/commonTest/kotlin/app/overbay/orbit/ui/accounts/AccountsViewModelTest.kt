@@ -392,4 +392,72 @@ class AccountsViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testCreditCardsHub_computesHouseholdCreditAndCycles() = runTest(testDispatcher) {
+        val card = Account(
+            id = 300L,
+            name = "Chase Sapphire Reserve",
+            type = AccountType.CREDIT,
+            currentBalanceCents = -250000L,
+            creditCardProfile = CreditCardProfile(
+                accountId = 300L,
+                cardName = "Sapphire Reserve",
+                creditLimitCents = 1000000L,
+                statementClosingDay = 15,
+                paymentDueDay = 10,
+                annualFeeCents = 55000L,
+                annualFeePostDate = "2026-11-20"
+            )
+        )
+        repository.saveAccount(card)
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNotNull(state.householdCredit)
+        assertEquals(250000L, state.householdCredit?.totalOwedCents)
+        assertEquals(1000000L, state.householdCredit?.totalLimitCents)
+        assertEquals(2500, state.householdCredit?.utilizationBps) // 25%
+
+        assertEquals(1, state.cardCycles.size)
+        val cycle = state.cardCycles.first()
+        assertEquals(300L, cycle.accountId)
+        assertEquals(250000L, cycle.owedNowCents)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testCreditCardsHub_togglesAndCategorySelection() = runTest(testDispatcher) {
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.showUsedPerks)
+        viewModel.toggleShowUsedPerks()
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.showUsedPerks)
+
+        assertFalse(viewModel.uiState.value.showWhichCardWhere)
+        viewModel.toggleShowWhichCardWhere()
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.showWhichCardWhere)
+
+        assertNull(viewModel.uiState.value.selectedRewardCategory)
+        viewModel.selectRewardCategory("Dining")
+        testScheduler.advanceUntilIdle()
+        assertEquals("Dining", viewModel.uiState.value.selectedRewardCategory)
+
+        viewModel.setMasterMode(AccountsMasterMode.CREDIT_CARDS)
+        testScheduler.advanceUntilIdle()
+        assertEquals(AccountsMasterMode.CREDIT_CARDS, viewModel.uiState.value.masterMode)
+
+        collectJob.cancel()
+    }
 }
+

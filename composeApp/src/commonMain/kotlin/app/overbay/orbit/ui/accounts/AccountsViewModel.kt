@@ -71,6 +71,9 @@ class AccountsViewModel(
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
     private val _masterMode = MutableStateFlow(AccountsMasterMode.ALL_ACCOUNTS)
     private val _selectedCardPlayer = MutableStateFlow(CreditCardStrategyEngine.ALL_PLAYERS)
+    private val _showUsedPerks = MutableStateFlow(false)
+    private val _showWhichCardWhere = MutableStateFlow(false)
+    private val _selectedRewardCategory = MutableStateFlow<String?>(null)
     private val _perkUsageTarget = MutableStateFlow<PerkUsageTarget?>(null)
 
     private val resolvedTodayFlow = (todayFlow ?: flow {
@@ -80,15 +83,21 @@ class AccountsViewModel(
         }
     }).flowOn(computeDispatcher).distinctUntilChanged()
 
-    private val cardPortfolioFlow = combine(
+    private val creditCardsHubFlow = combine(
         repository.accounts,
         repository.transactions,
         _selectedCardPlayer,
         resolvedTodayFlow,
         repository.snapshot.map { it.householdMembers }.distinctUntilChanged()
     ) { a, t, p, d, members ->
-        CreditCardStrategyEngine.summarizePortfolio(a, t, p, d, members)
+        CreditCardHubStateCalculator.calculate(a, t, p, d, members)
     }.distinctUntilChanged().flowOn(computeDispatcher)
+
+    private val hubUiControlFlow = combine(
+        _masterMode, _showUsedPerks, _showWhichCardWhere, _selectedRewardCategory
+    ) { mode, showUsed, showWhich, cat ->
+        AccountsHubUiControl(mode, showUsed, showWhich, cat)
+    }
 
     private val dataFlow = combine(
         repository.accounts, repository.transactions, repository.snapshot, repository.preferences
@@ -161,8 +170,19 @@ class AccountsViewModel(
         )
     }.combine(_isPhoneViewingDetail) { state, phoneDetail -> state.copy(isPhoneViewingDetail = phoneDetail)
     }.combine(_perkUsageTarget) { state, target -> state.copy(perkUsageTarget = target)
-    }.combine(combine(_masterMode, cardPortfolioFlow) { m, s -> m to s }) { state, (mode, summary) ->
-        state.copy(masterMode = mode, selectedCardPlayer = summary.selectedPlayer, cardPortfolioSummary = summary)
+    }.combine(combine(hubUiControlFlow, creditCardsHubFlow) { ctrl, hub -> ctrl to hub }) { state, (ctrl, hub) ->
+        state.copy(
+            masterMode = ctrl.mode,
+            showUsedPerks = ctrl.showUsedPerks,
+            showWhichCardWhere = ctrl.showWhichCardWhere,
+            selectedRewardCategory = ctrl.selectedRewardCategory,
+            selectedCardPlayer = hub.portfolio.selectedPlayer,
+            cardPortfolioSummary = hub.portfolio,
+            householdCredit = hub.householdCredit,
+            cardCycles = hub.cardCycles,
+            feesAhead = hub.feesAhead,
+            missingBillingDatesCount = hub.missingBillingDatesCount
+        )
     }.combine(combine(_deleteConfirmAccountId, _deleteWarning524Date) { delId, warnDate -> delId to warnDate }) { state, (delId, warnDate) ->
         state.copy(deleteConfirmAccountId = delId, deleteWarning524Date = warnDate)
     }.combine(combine(_deleteBlockedAccount, _deleteBlockedTxnCount) { a, c -> a to c }) { state, (acct, count) ->
@@ -182,6 +202,9 @@ class AccountsViewModel(
     fun setPhoneViewingDetail(viewing: Boolean) { _isPhoneViewingDetail.value = viewing }
     fun setMasterMode(mode: AccountsMasterMode) { _masterMode.value = mode }
     fun selectCardPlayer(player: String) { _selectedCardPlayer.value = player }
+    fun toggleShowUsedPerks() { _showUsedPerks.value = !_showUsedPerks.value }
+    fun toggleShowWhichCardWhere() { _showWhichCardWhere.value = !_showWhichCardWhere.value }
+    fun selectRewardCategory(category: String?) { _selectedRewardCategory.value = category }
 
     fun requestDeleteAccount(accountId: Long) {
         val count = repository.accountTransactionCount(accountId)
@@ -524,62 +547,4 @@ class AccountsViewModel(
 
     fun clearSyncError() { _syncErrorMessage.value = null }
 
-    companion object {
-        fun groupAccounts(accounts: List<Account>): List<AccountGroupDisplay> {
-            val map = listOf(
-                AccountTypeCategory.CASH_AND_CHECKING to ("Cash & Checking" to accounts.filter { it.type in setOf(AccountType.CHECKING, AccountType.SAVINGS, AccountType.CASH) }),
-                AccountTypeCategory.CREDIT_CARDS to ("Credit Cards" to accounts.filter { it.type == AccountType.CREDIT }),
-                AccountTypeCategory.INVESTMENTS to ("Investments" to accounts.filter { it.type == AccountType.INVESTMENT }),
-                AccountTypeCategory.REAL_ESTATE to ("Real Estate" to accounts.filter { it.type == AccountType.MORTGAGE && it.estimatedValueCents != null }),
-                AccountTypeCategory.LOANS to ("Loans & Mortgages" to accounts.filter { it.type == AccountType.LOAN || (it.type == AccountType.MORTGAGE && it.estimatedValueCents == null) }),
-                AccountTypeCategory.OTHER to ("Other" to accounts.filter { it.type == AccountType.OTHER })
-            )
-            return map.mapNotNull { (cat, pair) ->
-                val (title, list) = pair
-                if (list.isEmpty()) null
-                else AccountGroupDisplay(
-                    category = cat,
-                    title = title,
-                    accounts = list,
-                    totalCents = if (cat == AccountTypeCategory.REAL_ESTATE) list.sumOf { it.homeEquityCents ?: 0L } else list.sumOf { it.currentBalanceCents }
-                )
-            }
-        }
-    }
 }
-
-private data class AccountsDataBundle(
-    val accounts: List<Account>,
-    val transactions: List<Transaction>,
-    val workspaceSnapshot: OrbitWorkspaceSnapshot,
-    val preferences: OrbitPreferences
-)
-
-private data class AccountsSheetBundle(
-    val editingAccount: Account?,
-    val showEditorSheet: Boolean,
-    val editingCardProfile: CreditCardProfile?,
-    val cardProfileAccountId: Long?,
-    val showCardProfileSheet: Boolean
-)
-
-private data class AccountsActionBundle(
-    val selectedAccountId: Long?,
-    val mergingAccount: Account?,
-    val showMergeDialog: Boolean,
-    val historyAccount: Account?,
-    val showHistorySheet: Boolean
-)
-
-private data class AddRecordBundle(
-    val showAddRecordDialog: Boolean,
-    val addRecordAccount: Account?
-)
-
-private data class SyncReorderBundle(
-    val syncing: Boolean,
-    val err: String?,
-    val showArchived: Boolean,
-    val isReorderMode: Boolean,
-    val groupOrder: List<AccountTypeCategory> = AccountTypeCategory.entries.toList()
-)

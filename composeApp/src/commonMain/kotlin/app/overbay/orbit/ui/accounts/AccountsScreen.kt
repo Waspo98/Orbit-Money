@@ -33,9 +33,10 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.ui.accounts.cards.PerkUsageDialog
 import app.overbay.orbit.ui.accounts.components.AccountDetailInspectorPane
 import app.overbay.orbit.ui.accounts.components.AccountGroupSection
-import app.overbay.orbit.ui.accounts.components.CreditCardStrategyHubPane
 import app.overbay.orbit.ui.accounts.sheets.AccountMergeDialog
 import app.overbay.orbit.ui.accounts.sheets.AddBalanceRecordDialog
 import app.overbay.orbit.ui.components.CanopyMenuAction
@@ -253,6 +254,15 @@ fun AccountsScreen(
             onDismiss = { viewModel.dismissDeleteAccount() }
         )
     }
+
+    state.perkUsageTarget?.let { target ->
+        PerkUsageDialog(
+            title = target.title, periodLabel = target.periodLabel,
+            valueCents = target.valueCents, initialUsedCents = target.initialUsedCents,
+            onSave = { amount -> viewModel.setCardBenefitUsage(target.accountId, target.benefitId, amount) },
+            onDismiss = { viewModel.closePerkUsage() }
+        )
+    }
 }
 
 @Composable
@@ -275,45 +285,58 @@ private fun AccountsMasterContent(
         val startPad = if (isWideScreen) 20.dp else 16.dp
         val endPad = if (isWideScreen) 0.dp else 16.dp
 
-        // Mode switcher: All Accounts vs Card Strategy Hub
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = startPad, end = endPad, top = 8.dp, bottom = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val allSelected = state.masterMode == AccountsMasterMode.ALL_ACCOUNTS
-            val hubSelected = state.masterMode == AccountsMasterMode.CARD_STRATEGY_HUB
-            FilterChip(
-                selected = allSelected,
-                onClick = { viewModel.setMasterMode(AccountsMasterMode.ALL_ACCOUNTS) },
-                label = {
-                    Text(
-                        text = "All Accounts (${state.accounts.size})",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (allSelected) FontWeight.Bold else FontWeight.Medium
-                    )
-                }
-            )
-            FilterChip(
-                selected = hubSelected,
-                onClick = { viewModel.setMasterMode(AccountsMasterMode.CARD_STRATEGY_HUB) },
-                label = {
-                    Text(
-                        text = "Credit Cards",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (hubSelected) FontWeight.Bold else FontWeight.Medium
-                    )
-                }
-            )
+        val creditAccountsCount = remember(state.accounts) {
+            state.accounts.count { it.type == AccountType.CREDIT && !it.isArchived }
         }
 
-        if (state.masterMode == AccountsMasterMode.CARD_STRATEGY_HUB) {
-            CreditCardStrategyHubPane(
-                summary = state.cardPortfolioSummary,
-                onSelectPlayer = { viewModel.selectCardPlayer(it) },
-                onInspectAccount = { acctId -> viewModel.selectAccountForInspect(acctId) },
-                onToggleBenefit = { acctId, benefitId -> viewModel.toggleCardBenefit(acctId, benefitId) },
+        // Mode switcher: All Accounts vs Credit Cards (only if credit cards exist)
+        if (creditAccountsCount > 0) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = startPad, end = endPad, top = 8.dp, bottom = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val allSelected = state.masterMode == AccountsMasterMode.ALL_ACCOUNTS
+                val hubSelected = state.masterMode == AccountsMasterMode.CREDIT_CARDS
+                FilterChip(
+                    selected = allSelected,
+                    onClick = { viewModel.setMasterMode(AccountsMasterMode.ALL_ACCOUNTS) },
+                    label = {
+                        Text(
+                            text = "All Accounts (${state.accounts.size})",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (allSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                )
+                FilterChip(
+                    selected = hubSelected,
+                    onClick = { viewModel.setMasterMode(AccountsMasterMode.CREDIT_CARDS) },
+                    label = {
+                        Text(
+                            text = "Credit Cards ($creditAccountsCount)",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (hubSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                )
+            }
+        }
+
+        if (creditAccountsCount > 0 && state.masterMode == AccountsMasterMode.CREDIT_CARDS) {
+            CreditCardsHubPane(
+                uiState = state,
+                actions = CreditCardsHubActions(
+                    onInspectAccount = { viewModel.selectAccountForInspect(it) },
+                    onOpenCardEditor = { viewModel.openCreditCardProfile(it) },
+                    onToggleBenefit = { aId, bId -> viewModel.toggleCardBenefit(aId, bId) },
+                    onOpenPerkUsage = { aId, bId -> viewModel.openPerkUsage(aId, bId) },
+                    onToggleShowUsedPerks = { viewModel.toggleShowUsedPerks() },
+                    onToggleShowWhichCardWhere = { viewModel.toggleShowWhichCardWhere() },
+                    onSelectRewardCategory = { viewModel.selectRewardCategory(it) },
+                    onSelectPlayer = { viewModel.selectCardPlayer(it) }
+                ),
                 isWideScreen = isWideScreen,
                 modifier = Modifier.fillMaxSize()
             )

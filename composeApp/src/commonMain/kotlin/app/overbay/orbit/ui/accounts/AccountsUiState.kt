@@ -4,13 +4,20 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.BalanceRecord
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.domain.CardCycleStatus
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardPortfolioSummary
 import app.overbay.orbit.domain.CreditCardStrategyEngine
+import app.overbay.orbit.domain.HouseholdCreditSummary
 
 enum class AccountsMasterMode {
     ALL_ACCOUNTS,
-    CARD_STRATEGY_HUB
+    CREDIT_CARDS;
+
+    companion object {
+        @Deprecated("Renamed to CREDIT_CARDS", ReplaceWith("CREDIT_CARDS"))
+        val CARD_STRATEGY_HUB = CREDIT_CARDS
+    }
 }
 
 enum class AccountTypeCategory(val displayName: String) {
@@ -77,7 +84,14 @@ data class AccountsUiState(
     val perkUsageTarget: PerkUsageTarget? = null,
     val masterMode: AccountsMasterMode = AccountsMasterMode.ALL_ACCOUNTS,
     val selectedCardPlayer: String = CreditCardStrategyEngine.ALL_PLAYERS,
-    val cardPortfolioSummary: CreditCardPortfolioSummary = CreditCardPortfolioSummary()
+    val cardPortfolioSummary: CreditCardPortfolioSummary = CreditCardPortfolioSummary(),
+    val householdCredit: HouseholdCreditSummary? = null,
+    val cardCycles: List<CardCycleStatus> = emptyList(),
+    val feesAhead: List<AnnualFeeCardItem> = emptyList(),
+    val missingBillingDatesCount: Int = 0,
+    val showUsedPerks: Boolean = false,
+    val showWhichCardWhere: Boolean = false,
+    val selectedRewardCategory: String? = null
 ) {
     val selectedAccount: Account?
         get() = accounts.find { it.id == selectedAccountId }
