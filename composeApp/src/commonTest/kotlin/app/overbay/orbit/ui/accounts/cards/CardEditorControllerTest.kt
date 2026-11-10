@@ -96,16 +96,29 @@ class CardEditorControllerTest {
 
     @Test
     fun testBpsAprParsingAndFormatting() {
+        // Valid percentages
         assertEquals(2499, CardEditorDraft.parseBps("24.99"))
         assertEquals(2499, CardEditorDraft.parseBps("24.99%"))
         assertEquals(2490, CardEditorDraft.parseBps("24.9"))
+        assertEquals(2490, CardEditorDraft.parseBps("24.9%"))
         assertEquals(2400, CardEditorDraft.parseBps("24"))
         assertEquals(0, CardEditorDraft.parseBps("0"))
+        assertEquals(0, CardEditorDraft.parseBps("0%"))
         assertEquals(10000, CardEditorDraft.parseBps("100%"))
+        assertEquals(2499, CardEditorDraft.parseBps("24.999%"))
+
+        // Edge cases: >100%, negative, non-numeric, empty/blank
         assertNull(CardEditorDraft.parseBps("100.01"))
+        assertNull(CardEditorDraft.parseBps("100.01%"))
+        assertNull(CardEditorDraft.parseBps("200%"))
         assertNull(CardEditorDraft.parseBps("-1"))
+        assertNull(CardEditorDraft.parseBps("-5"))
+        assertNull(CardEditorDraft.parseBps("-24.99%"))
         assertNull(CardEditorDraft.parseBps("abc"))
+        assertNull(CardEditorDraft.parseBps("24.a%"))
         assertNull(CardEditorDraft.parseBps(""))
+        assertNull(CardEditorDraft.parseBps("   "))
+        assertNull(CardEditorDraft.parseBps("%"))
 
         assertEquals("24.99", CardEditorDraft.formatBpsForInput(2499))
         assertEquals("24.9", CardEditorDraft.formatBpsForInput(2490))
@@ -119,7 +132,7 @@ class CardEditorControllerTest {
         val account = Account(id = 102L, name = "Validation Card", type = AccountType.CREDIT)
         controller.open(account)
 
-        // Valid boundary days
+        // Valid boundary days: 1 and 31
         controller.updateDraft {
             it.copy(
                 statementCloseDayText = "1",
@@ -130,13 +143,37 @@ class CardEditorControllerTest {
         assertTrue(controller.draft.value!!.isValid)
         assertTrue(controller.draft.value!!.errors.isEmpty())
 
-        // Out of range closing day
+        // Out of range closing days: 0, 32, -5, "abc"
+        controller.updateDraft { it.copy(statementCloseDayText = "0") }
+        assertFalse(controller.draft.value!!.isValid)
+        assertTrue(controller.draft.value!!.errors.containsKey("statementCloseDay"))
+
         controller.updateDraft { it.copy(statementCloseDayText = "32") }
         assertFalse(controller.draft.value!!.isValid)
         assertTrue(controller.draft.value!!.errors.containsKey("statementCloseDay"))
 
-        // Out of range due day
+        controller.updateDraft { it.copy(statementCloseDayText = "-5") }
+        assertFalse(controller.draft.value!!.isValid)
+        assertTrue(controller.draft.value!!.errors.containsKey("statementCloseDay"))
+
+        controller.updateDraft { it.copy(statementCloseDayText = "abc") }
+        assertFalse(controller.draft.value!!.isValid)
+        assertTrue(controller.draft.value!!.errors.containsKey("statementCloseDay"))
+
+        // Out of range due days: 0, 32, -5, "abc"
         controller.updateDraft { it.copy(statementCloseDayText = "15", paymentDueDayText = "0") }
+        assertFalse(controller.draft.value!!.isValid)
+        assertTrue(controller.draft.value!!.errors.containsKey("paymentDueDay"))
+
+        controller.updateDraft { it.copy(paymentDueDayText = "32") }
+        assertFalse(controller.draft.value!!.isValid)
+        assertTrue(controller.draft.value!!.errors.containsKey("paymentDueDay"))
+
+        controller.updateDraft { it.copy(paymentDueDayText = "-5") }
+        assertFalse(controller.draft.value!!.isValid)
+        assertTrue(controller.draft.value!!.errors.containsKey("paymentDueDay"))
+
+        controller.updateDraft { it.copy(paymentDueDayText = "abc") }
         assertFalse(controller.draft.value!!.isValid)
         assertTrue(controller.draft.value!!.errors.containsKey("paymentDueDay"))
 
@@ -156,11 +193,20 @@ class CardEditorControllerTest {
 
     @Test
     fun testTemplateApplication() {
-        val account = Account(id = 103L, name = "Template Card", type = AccountType.CREDIT)
+        val account = Account(id = 103L, name = "Template Card", institution = "Orbit Bank", type = AccountType.CREDIT)
         controller.open(account)
 
         // Initial setup starts on PICK_TEMPLATE
         assertEquals(CardEditorStep.PICK_TEMPLATE, controller.draft.value!!.step)
+
+        // User enters billing info before template selection
+        controller.updateDraft {
+            it.copy(
+                statementCloseDayText = "18",
+                paymentDueDayText = "12",
+                aprText = "21.49"
+            )
+        }
 
         val template = CreditCardTemplates.ALL.first()
         controller.applyTemplate(template)
@@ -173,6 +219,13 @@ class CardEditorControllerTest {
         assertEquals(template.annualFeeCents, draft.annualFeeCents)
         assertEquals(template.benefits.size, draft.benefits.size)
         assertEquals(template.rewardCategories.size, draft.rewardCategories.size)
+
+        // Merging logic: user fields preserved
+        assertEquals("18", draft.statementCloseDayText)
+        assertEquals("12", draft.paymentDueDayText)
+        assertEquals("21.49", draft.aprText)
+        assertEquals("Template Card", draft.accountName)
+        assertEquals("Orbit Bank", draft.accountInstitution)
     }
 
     @Test
@@ -270,5 +323,25 @@ class CardEditorControllerTest {
         assertEquals(15, profile.statementClosingDay)
         assertEquals(10, profile.paymentDueDay)
         assertEquals(1850, profile.aprBps)
+    }
+
+    @Test
+    fun testSaveFailureRetainsDraft() = runTest(testDispatcher) {
+        val cardAcct = Account(id = 108L, name = "Save Failure Card", type = AccountType.CREDIT)
+        controller.open(cardAcct)
+
+        controller.updateDraft {
+            it.copy(
+                cardName = "Draft Should Be Retained",
+                statementCloseDayText = "99" // Validation error (day out of range 1..31)
+            )
+        }
+
+        val result = controller.save()
+        assertTrue(result.isFailure, "Save must fail when draft has validation errors")
+        assertNotNull(controller.draft.value, "Draft must not be cleared on save failure")
+        assertEquals("Draft Should Be Retained", controller.draft.value!!.cardName)
+        assertEquals("99", controller.draft.value!!.statementCloseDayText)
+        assertFalse(controller.draft.value!!.isSaving)
     }
 }
