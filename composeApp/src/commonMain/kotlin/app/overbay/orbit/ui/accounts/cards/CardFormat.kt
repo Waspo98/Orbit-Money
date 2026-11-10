@@ -39,16 +39,19 @@ object CardFormat {
 
     fun formatBps(bps: Int?, fallback: String = "—"): String {
         if (bps == null) return fallback
-        val whole = bps / 100
-        val frac = (bps % 100).absoluteValue
+        val isNegative = bps < 0
+        val absBps = bps.toLong().absoluteValue
+        val whole = absBps / 100
+        val frac = (absBps % 100).toInt()
+        val sign = if (isNegative) "-" else ""
         return if (frac == 0) {
-            "$whole%"
+            "$sign$whole%"
         } else {
             val fracStr = frac.toString().padStart(2, '0')
             if (fracStr.endsWith("0")) {
-                "$whole.${fracStr.first()}%"
+                "$sign$whole.${fracStr.first()}%"
             } else {
-                "$whole.$fracStr%"
+                "$sign$whole.$fracStr%"
             }
         }
     }

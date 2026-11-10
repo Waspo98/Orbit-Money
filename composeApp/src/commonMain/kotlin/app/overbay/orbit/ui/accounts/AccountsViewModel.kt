@@ -73,12 +73,12 @@ class AccountsViewModel(
     private val _selectedCardPlayer = MutableStateFlow(CreditCardStrategyEngine.ALL_PLAYERS)
     private val _perkUsageTarget = MutableStateFlow<PerkUsageTarget?>(null)
 
-    private val resolvedTodayFlow = todayFlow ?: flow {
+    private val resolvedTodayFlow = (todayFlow ?: flow {
         while (true) {
             emit(LocalDateUtils.todayLocalDate())
             delay(60_000)
         }
-    }.flowOn(Dispatchers.Default).distinctUntilChanged()
+    }).flowOn(computeDispatcher).distinctUntilChanged()
 
     private val cardPortfolioFlow = combine(
         repository.accounts,

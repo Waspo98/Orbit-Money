@@ -12,6 +12,7 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.util.PlatformStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -41,7 +42,11 @@ class AccountsViewModelTest {
         storage.clear()
         repository = OrbitRepository(storage)
         repository.initialize()
-        viewModel = AccountsViewModel(repository, testDispatcher)
+        viewModel = AccountsViewModel(
+            repository = repository,
+            computeDispatcher = testDispatcher,
+            todayFlow = flowOf(LocalDateUtils.todayLocalDate())
+        )
     }
 
     @AfterTest

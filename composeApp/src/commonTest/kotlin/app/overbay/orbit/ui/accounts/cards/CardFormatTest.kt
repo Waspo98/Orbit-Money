@@ -53,5 +53,11 @@ class CardFormatTest {
         assertEquals("0.5%", CardFormat.formatBps(50))
         assertEquals("0.05%", CardFormat.formatBps(5))
         assertEquals("100%", CardFormat.formatBps(10000))
+        assertEquals("-0.5%", CardFormat.formatBps(-50))
+        assertEquals("-0.01%", CardFormat.formatBps(-1))
+        assertEquals("-0.99%", CardFormat.formatBps(-99))
+        assertEquals("-1%", CardFormat.formatBps(-100))
+        assertEquals("-1.5%", CardFormat.formatBps(-150))
+        assertEquals("-24.99%", CardFormat.formatBps(-2499))
     }
 }
