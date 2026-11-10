@@ -76,12 +76,15 @@ data class Account(
 }
 
 @Serializable
-enum class BenefitCadence(val storageKey: String, val displayName: String, val periodsPerYear: Int) {
-    MONTHLY("monthly", "Monthly", 12),
-    QUARTERLY("quarterly", "Quarterly", 4),
-    SEMI_ANNUAL("semi_annual", "Semi-Annual", 2),
-    ANNUAL("annual", "Annual", 1),
-    EVERY_4_YEARS("every_4_years", "Every 4 Years", 1);
+enum class BenefitCadence(val storageKey: String, val displayName: String, val periodMonths: Int) {
+    MONTHLY("monthly", "Monthly", 1),
+    QUARTERLY("quarterly", "Quarterly", 3),
+    SEMI_ANNUAL("semi_annual", "Semi-Annual", 6),
+    ANNUAL("annual", "Annual", 12),
+    EVERY_4_YEARS("every_4_years", "Every 4 Years", 48);
+
+    @Deprecated("Use periodMonths for calculation", ReplaceWith("12 / periodMonths"))
+    val periodsPerYear: Int get() = if (periodMonths >= 12) 1 else 12 / periodMonths
 
     companion object {
         fun fromStorage(raw: String?): BenefitCadence {
@@ -92,6 +95,25 @@ enum class BenefitCadence(val storageKey: String, val displayName: String, val p
         }
     }
 }
+
+@Serializable
+enum class BenefitAnchor(val storageKey: String) {
+    CALENDAR("calendar"),
+    CARDMEMBER_YEAR("cardmember_year");
+
+    companion object {
+        fun fromStorage(raw: String?): BenefitAnchor =
+            entries.firstOrNull { it.storageKey.equals(raw, ignoreCase = true) || it.name.equals(raw, ignoreCase = true) }
+                ?: CALENDAR
+    }
+}
+
+@Serializable
+data class BenefitUsage(
+    val periodKey: String,
+    val amountCents: Cents,
+    val usedOn: String? = null
+)
 
 @Serializable
 data class RewardCategory(
@@ -107,13 +129,20 @@ data class RewardCategory(
 
 @Serializable
 data class CardBenefit(
+    val id: String = "",
     val title: String = "",
     val description: String? = null,
-    val annualCreditValueCents: Cents? = null,
-    val usedThisYear: Boolean = false,
+    val periodValueCents: Cents? = null,
+    val cadence: BenefitCadence = BenefitCadence.ANNUAL,
+    val anchor: BenefitAnchor = BenefitAnchor.CALENDAR,
+    val usage: List<BenefitUsage> = emptyList(),
     val category: String? = null,
     val valueText: String? = null,
-    val cadence: BenefitCadence = BenefitCadence.ANNUAL,
+    // LEGACY: read-only, upgraded by CreditCardBenefitEngine.upgradeLegacy
+    val annualCreditValueCents: Cents? = null,
+    // LEGACY: read-only, upgraded by CreditCardBenefitEngine.upgradeLegacy
+    val usedThisYear: Boolean = false,
+    // LEGACY: read-only, upgraded by CreditCardBenefitEngine.upgradeLegacy
     val usedPeriods: List<String> = emptyList()
 )
 

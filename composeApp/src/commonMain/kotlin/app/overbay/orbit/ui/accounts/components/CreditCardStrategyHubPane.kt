@@ -57,7 +57,7 @@ fun CreditCardStrategyHubPane(
     summary: CreditCardPortfolioSummary,
     onSelectPlayer: (String) -> Unit,
     onInspectAccount: (Long) -> Unit,
-    onToggleBenefit: (accountId: Long, benefitIndex: Int) -> Unit,
+    onToggleBenefit: (accountId: Long, benefitId: String) -> Unit,
     isWideScreen: Boolean = false,
     modifier: Modifier = Modifier
 ) {

@@ -30,8 +30,10 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.domain.ActivePerkItem
 import app.overbay.orbit.domain.CategoryBestCardPick
+import app.overbay.orbit.domain.CreditCardBenefitEngine
 import app.overbay.orbit.domain.CreditCardPortfolioSummary
 import app.overbay.orbit.domain.CreditCardStrategyEngine
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.SubProgressSummary
 import app.overbay.orbit.domain.SubTrackerStatus
@@ -143,11 +145,16 @@ fun SubTrackerMiniCard(sub: SubProgressSummary) {
 
 @Composable
 fun CardBenefitChecklistRow(benefit: CardBenefit, onToggle: () -> Unit) {
-    val isUsed = CreditCardStrategyEngine.isBenefitUsedInCurrentPeriod(benefit)
-    val periodLabel = CreditCardStrategyEngine.currentPeriodDisplayLabel(benefit.cadence)
-    val perPeriodCents = benefit.annualCreditValueCents?.let {
-        (it.toDouble() / benefit.cadence.periodsPerYear.toDouble()).roundToLong()
-    }
+    val period = CreditCardBenefitEngine.currentPeriod(benefit, null, LocalDateUtils.todayLocalDate())
+    val isUsed = CreditCardBenefitEngine.usedCents(benefit, period) > 0L ||
+        (benefit.usedPeriods.isNotEmpty() && period.key in benefit.usedPeriods) ||
+        (benefit.usedPeriods.isEmpty() && benefit.usedThisYear)
+    val periodLabel = period.label
+    val perPeriodCents = CreditCardBenefitEngine.periodValueCents(benefit).takeIf { it > 0 }
+        ?: benefit.annualCreditValueCents?.let {
+            val periodsInYear = (12 / benefit.cadence.periodMonths).coerceAtLeast(1)
+            it / periodsInYear
+        }
 
     Surface(
         shape = RoundedCornerShape(10.dp),
@@ -189,7 +196,7 @@ fun CardBenefitChecklistRow(benefit: CardBenefit, onToggle: () -> Unit) {
 @Composable
 fun PerksAndFeeRoiCard(
     summary: CreditCardPortfolioSummary,
-    onToggleBenefit: (accountId: Long, benefitIndex: Int) -> Unit,
+    onToggleBenefit: (accountId: Long, benefitId: String) -> Unit,
     onInspectAccount: (Long) -> Unit
 ) {
     Card(
@@ -237,7 +244,7 @@ fun PerksAndFeeRoiCard(
                     summary.currentPeriodPerks.forEach { item ->
                         HubPerkChecklistRow(
                             item = item,
-                            onToggle = { onToggleBenefit(item.accountId, item.benefitIndex) },
+                            onToggle = { onToggleBenefit(item.accountId, item.benefitId) },
                             onInspect = { onInspectAccount(item.accountId) }
                         )
                     }

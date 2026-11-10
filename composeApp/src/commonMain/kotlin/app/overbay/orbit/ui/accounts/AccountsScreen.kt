@@ -304,7 +304,7 @@ private fun AccountsMasterContent(
                 summary = state.cardPortfolioSummary,
                 onSelectPlayer = { viewModel.selectCardPlayer(it) },
                 onInspectAccount = { acctId -> viewModel.selectAccountForInspect(acctId) },
-                onToggleBenefit = { acctId, idx -> viewModel.toggleCardBenefit(acctId, idx) },
+                onToggleBenefit = { acctId, benefitId -> viewModel.toggleCardBenefit(acctId, benefitId) },
                 isWideScreen = isWideScreen,
                 modifier = Modifier.fillMaxSize()
             )

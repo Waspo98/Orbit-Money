@@ -1,5 +1,6 @@
 package app.overbay.orbit.domain
 
+import app.overbay.orbit.data.model.BenefitAnchor
 import app.overbay.orbit.data.model.BenefitCadence
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
@@ -19,23 +20,34 @@ data class CreditCardTemplate(
     val defaultSubTargetSpendCents: Cents? = null,
     val rewardCategories: List<RewardCategory> = emptyList(),
     val benefits: List<CardBenefit> = emptyList(),
-    val asOf: String = "2025-01"
+    val asOf: String = "2026-11"
 ) {
     fun applyToProfile(existing: CreditCardProfile): CreditCardProfile {
-        val existingBenefitsByTitle = existing.benefits.associateBy { it.title.trim().lowercase() }
+        val matchedExistingIds = mutableSetOf<String>()
+        val matchedExistingTitles = mutableSetOf<String>()
+
         val mergedBenefits = benefits.map { templateBenefit ->
-            val existingBenefit = existingBenefitsByTitle[templateBenefit.title.trim().lowercase()]
-            if (existingBenefit != null) {
+            val matched = existing.benefits.firstOrNull { existingBenefit ->
+                (existingBenefit.id.isNotBlank() && existingBenefit.id == templateBenefit.id) ||
+                existingBenefit.title.trim().equals(templateBenefit.title.trim(), ignoreCase = true)
+            }
+            if (matched != null) {
+                if (matched.id.isNotBlank()) matchedExistingIds.add(matched.id)
+                matchedExistingTitles.add(matched.title.trim().lowercase())
                 templateBenefit.copy(
-                    usedThisYear = existingBenefit.usedThisYear,
-                    usedPeriods = existingBenefit.usedPeriods
+                    usage = matched.usage,
+                    usedThisYear = matched.usedThisYear,
+                    usedPeriods = matched.usedPeriods
                 )
             } else {
                 templateBenefit
             }
-        } + existing.benefits.filter { existingBenefit ->
-            val key = existingBenefit.title.trim().lowercase()
-            benefits.none { it.title.trim().lowercase() == key }
+        }
+
+        val customBenefits = existing.benefits.filter { existingBenefit ->
+            val idMatch = existingBenefit.id.isNotBlank() && existingBenefit.id in matchedExistingIds
+            val titleMatch = existingBenefit.title.trim().lowercase() in matchedExistingTitles
+            !idMatch && !titleMatch
         }
 
         val templateCategoryLabels = rewardCategories.map { it.label.trim().lowercase() }.toSet()
@@ -50,7 +62,7 @@ data class CreditCardTemplate(
             imageUrl = imageUrl,
             annualFeeCents = annualFeeCents,
             rewardCategories = mergedRewardCategories,
-            benefits = mergedBenefits,
+            benefits = mergedBenefits + customBenefits,
             strategy = existing.strategy.copy(
                 isBusinessCard = existing.strategy.isBusinessCard || isBusinessCard,
                 subCooldownMonths = existing.strategy.subCooldownMonths ?: subCooldownMonths,
@@ -81,10 +93,38 @@ object CreditCardTemplates {
                 RewardCategory(category = "Everything Else", label = "Everything Else", multiplier = 1.0)
             ),
             benefits = listOf(
-                CardBenefit(title = "$300 Annual Travel Credit", annualCreditValueCents = 300_00L, cadence = BenefitCadence.ANNUAL),
-                CardBenefit(title = "DashPass & $5/mo DoorDash Promo", annualCreditValueCents = 60_00L, cadence = BenefitCadence.MONTHLY),
-                CardBenefit(title = "Global Entry / TSA PreCheck Credit", annualCreditValueCents = 120_00L, cadence = BenefitCadence.EVERY_4_YEARS),
-                CardBenefit(title = "Priority Pass Select Lounge Access", annualCreditValueCents = null, cadence = BenefitCadence.ANNUAL)
+                CardBenefit(
+                    id = "csr-travel-credit",
+                    title = "$300 Annual Travel Credit",
+                    periodValueCents = 300_00L,
+                    cadence = BenefitCadence.ANNUAL,
+                    anchor = BenefitAnchor.CARDMEMBER_YEAR,
+                    description = "$300 annual reimbursement for travel purchases each cardmember year"
+                ),
+                CardBenefit(
+                    id = "csr-doordash",
+                    title = "DashPass & $5/mo DoorDash Promo",
+                    periodValueCents = 5_00L,
+                    cadence = BenefitCadence.MONTHLY,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "Complimentary DashPass & $5 monthly DoorDash in-app credit"
+                ),
+                CardBenefit(
+                    id = "csr-global-entry",
+                    title = "Global Entry / TSA PreCheck Credit",
+                    periodValueCents = 120_00L,
+                    cadence = BenefitCadence.EVERY_4_YEARS,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "Up to $120 statement credit every 4 years for application fee"
+                ),
+                CardBenefit(
+                    id = "csr-priority-pass",
+                    title = "Priority Pass Select Lounge Access",
+                    periodValueCents = null,
+                    cadence = BenefitCadence.ANNUAL,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "Complimentary airport lounge access for cardmember and up to 2 guests"
+                )
             )
         ),
         CreditCardTemplate(
@@ -105,8 +145,22 @@ object CreditCardTemplates {
                 RewardCategory(category = "Travel & Flights", label = "Travel", multiplier = 2.0)
             ),
             benefits = listOf(
-                CardBenefit(title = "$50 Annual Chase Travel Hotel Credit", annualCreditValueCents = 50_00L, cadence = BenefitCadence.ANNUAL),
-                CardBenefit(title = "$10/mo DoorDash Non-Restaurant Credit", annualCreditValueCents = 120_00L, cadence = BenefitCadence.MONTHLY)
+                CardBenefit(
+                    id = "csp-hotel-credit",
+                    title = "$50 Annual Chase Travel Hotel Credit",
+                    periodValueCents = 50_00L,
+                    cadence = BenefitCadence.ANNUAL,
+                    anchor = BenefitAnchor.CARDMEMBER_YEAR,
+                    description = "$50 annual statement credit for hotels booked through Chase Travel"
+                ),
+                CardBenefit(
+                    id = "csp-doordash",
+                    title = "$10/mo DoorDash Non-Restaurant Credit",
+                    periodValueCents = 10_00L,
+                    cadence = BenefitCadence.MONTHLY,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "$10 monthly DoorDash credit for grocery/convenience orders"
+                )
             )
         ),
         CreditCardTemplate(
@@ -177,10 +231,38 @@ object CreditCardTemplates {
                 RewardCategory(category = "Travel & Flights", label = "Flights Booked Direct", multiplier = 3.0)
             ),
             benefits = listOf(
-                CardBenefit(title = "$10/mo Uber Cash ($120/yr)", annualCreditValueCents = 120_00L, cadence = BenefitCadence.MONTHLY),
-                CardBenefit(title = "$10/mo Dining Credit ($120/yr)", annualCreditValueCents = 120_00L, cadence = BenefitCadence.MONTHLY),
-                CardBenefit(title = "$50 Semi-Annual Resy Credit ($100/yr)", annualCreditValueCents = 100_00L, cadence = BenefitCadence.SEMI_ANNUAL),
-                CardBenefit(title = "$7/mo Dunkin' Credit ($84/yr)", annualCreditValueCents = 84_00L, cadence = BenefitCadence.MONTHLY)
+                CardBenefit(
+                    id = "amex-gold-uber-cash",
+                    title = "$10/mo Uber Cash ($120/yr)",
+                    periodValueCents = 10_00L,
+                    cadence = BenefitCadence.MONTHLY,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "$10 monthly Uber Cash for US rides and eats"
+                ),
+                CardBenefit(
+                    id = "amex-gold-dining-credit",
+                    title = "$10/mo Dining Credit ($120/yr)",
+                    periodValueCents = 10_00L,
+                    cadence = BenefitCadence.MONTHLY,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "$10 monthly dining credit at Grubhub, Cheesecake Factory, etc."
+                ),
+                CardBenefit(
+                    id = "amex-gold-resy-credit",
+                    title = "$50 Semi-Annual Resy Credit ($100/yr)",
+                    periodValueCents = 50_00L,
+                    cadence = BenefitCadence.SEMI_ANNUAL,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "Up to $50 semi-annually (Jan-Jun, Jul-Dec) for purchases at US Resy restaurants"
+                ),
+                CardBenefit(
+                    id = "amex-gold-dunkin-credit",
+                    title = "$7/mo Dunkin' Credit ($84/yr)",
+                    periodValueCents = 7_00L,
+                    cadence = BenefitCadence.MONTHLY,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "Up to $7 monthly statement credit at US Dunkin' locations"
+                )
             )
         ),
         CreditCardTemplate(
@@ -199,12 +281,54 @@ object CreditCardTemplates {
                 RewardCategory(category = "Everything Else", label = "Everything Else", multiplier = 1.0)
             ),
             benefits = listOf(
-                CardBenefit(title = "Uber Cash ($15/mo + $20 Dec)", annualCreditValueCents = 200_00L, cadence = BenefitCadence.MONTHLY),
-                CardBenefit(title = "$20/mo Digital Entertainment Credit", annualCreditValueCents = 240_00L, cadence = BenefitCadence.MONTHLY),
-                CardBenefit(title = "$200 Hotel Credit (FHR / THC)", annualCreditValueCents = 200_00L, cadence = BenefitCadence.ANNUAL),
-                CardBenefit(title = "$200 Airline Incidental Fee Credit", annualCreditValueCents = 200_00L, cadence = BenefitCadence.ANNUAL),
-                CardBenefit(title = "$50 Semi-Annual Saks Credit ($100/yr)", annualCreditValueCents = 100_00L, cadence = BenefitCadence.SEMI_ANNUAL),
-                CardBenefit(title = "$199 CLEAR Plus Credit", annualCreditValueCents = 199_00L, cadence = BenefitCadence.ANNUAL)
+                CardBenefit(
+                    id = "amex-plat-uber-cash",
+                    title = "Uber Cash ($15/mo + $20 Dec)",
+                    periodValueCents = 15_00L,
+                    cadence = BenefitCadence.MONTHLY,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "+$20 bonus in December ($200 total annual value)"
+                ),
+                CardBenefit(
+                    id = "amex-plat-digital-entertainment",
+                    title = "$20/mo Digital Entertainment Credit",
+                    periodValueCents = 20_00L,
+                    cadence = BenefitCadence.MONTHLY,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "Up to $20/mo statement credit for Disney+, Hulu, ESPN+, Peacock, NYT, WSJ"
+                ),
+                CardBenefit(
+                    id = "amex-plat-hotel-credit",
+                    title = "$200 Hotel Credit (FHR / THC)",
+                    periodValueCents = 200_00L,
+                    cadence = BenefitCadence.ANNUAL,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "$200 annual statement credit for prepaid Fine Hotels + Resorts or The Hotel Collection"
+                ),
+                CardBenefit(
+                    id = "amex-plat-airline-fee",
+                    title = "$200 Airline Incidental Fee Credit",
+                    periodValueCents = 200_00L,
+                    cadence = BenefitCadence.ANNUAL,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "$200 annual statement credit for incidental fees with one selected qualifying airline"
+                ),
+                CardBenefit(
+                    id = "amex-plat-saks-credit",
+                    title = "$50 Semi-Annual Saks Credit ($100/yr)",
+                    periodValueCents = 50_00L,
+                    cadence = BenefitCadence.SEMI_ANNUAL,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "Up to $50 statement credit semi-annually (Jan-Jun, Jul-Dec) at Saks Fifth Avenue"
+                ),
+                CardBenefit(
+                    id = "amex-plat-clear-plus",
+                    title = "$199 CLEAR Plus Credit",
+                    periodValueCents = 199_00L,
+                    cadence = BenefitCadence.ANNUAL,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "Up to $199 per calendar year statement credit for CLEAR Plus membership"
+                )
             )
         ),
         CreditCardTemplate(
@@ -223,9 +347,30 @@ object CreditCardTemplates {
                 RewardCategory(category = "Everything Else", label = "Everything Else (Catch-All)", multiplier = 2.0)
             ),
             benefits = listOf(
-                CardBenefit(title = "$300 Annual Capital One Travel Credit", annualCreditValueCents = 300_00L, cadence = BenefitCadence.ANNUAL),
-                CardBenefit(title = "10,000 Anniversary Bonus Miles ($100 val)", annualCreditValueCents = 100_00L, cadence = BenefitCadence.ANNUAL),
-                CardBenefit(title = "Global Entry / TSA PreCheck Credit", annualCreditValueCents = 120_00L, cadence = BenefitCadence.EVERY_4_YEARS)
+                CardBenefit(
+                    id = "venture-x-travel-credit",
+                    title = "$300 Annual Capital One Travel Credit",
+                    periodValueCents = 300_00L,
+                    cadence = BenefitCadence.ANNUAL,
+                    anchor = BenefitAnchor.CARDMEMBER_YEAR,
+                    description = "$300 annual credit for bookings through Capital One Travel each cardmember year"
+                ),
+                CardBenefit(
+                    id = "venture-x-anniversary-miles",
+                    title = "10,000 Anniversary Bonus Miles ($100 val)",
+                    periodValueCents = 100_00L,
+                    cadence = BenefitCadence.ANNUAL,
+                    anchor = BenefitAnchor.CARDMEMBER_YEAR,
+                    description = "10,000 bonus miles starting on first anniversary year (equal to $100 towards travel)"
+                ),
+                CardBenefit(
+                    id = "venture-x-global-entry",
+                    title = "Global Entry / TSA PreCheck Credit",
+                    periodValueCents = 120_00L,
+                    cadence = BenefitCadence.EVERY_4_YEARS,
+                    anchor = BenefitAnchor.CALENDAR,
+                    description = "Up to $120 statement credit for Global Entry or TSA PreCheck application fee every 4 years"
+                )
             )
         ),
         CreditCardTemplate(

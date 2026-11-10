@@ -3,6 +3,8 @@ package app.overbay.orbit.data.network
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.BalanceRecord
 import app.overbay.orbit.data.model.BalanceRecordSource
+import app.overbay.orbit.data.model.BenefitAnchor
+import app.overbay.orbit.data.model.BenefitUsage
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.GoalAllocation
 import app.overbay.orbit.data.model.GoalAllocationType
@@ -80,37 +82,86 @@ data class RewardCategoryWireDto(
 }
 
 @Serializable
+data class BenefitUsageWireDto(
+    @SerialName("period_key") val periodKey: String = "",
+    val amount: Double = 0.0,
+    @SerialName("used_on") val usedOn: String? = null
+) {
+    fun toDomain(): BenefitUsage = BenefitUsage(
+        periodKey = periodKey,
+        amountCents = MoneyUtils.dollarsToCents(amount),
+        usedOn = usedOn
+    )
+    companion object {
+        fun fromDomain(d: BenefitUsage): BenefitUsageWireDto = BenefitUsageWireDto(
+            periodKey = d.periodKey,
+            amount = MoneyUtils.centsToDollars(d.amountCents),
+            usedOn = d.usedOn
+        )
+    }
+}
+
+@Serializable
+data class BenefitUsageRequestDto(
+    @SerialName("period_key") val periodKey: String,
+    val amount: Double?,
+    @SerialName("used_on") val usedOn: String? = null
+)
+
+@Serializable
 data class CardBenefitWireDto(
+    val id: String = "",
     val name: String = "",
     val title: String = "",
     val value: JsonElement? = null,
+    @SerialName("period_value") val periodValue: Double? = null,
     val description: String? = null,
     val category: String? = null,
     val cadence: String? = "annual",
+    val anchor: String? = "calendar",
+    val usage: List<BenefitUsageWireDto> = emptyList(),
     @SerialName("used_this_year") @Serializable(with = FlexibleBooleanSerializer::class) val usedThisYear: Boolean = false,
     @SerialName("used_periods") val usedPeriods: List<String> = emptyList()
 ) {
     fun toDomain(): CardBenefit = CardBenefit(
+        id = id,
         title = title.ifBlank { name },
         description = description,
+        periodValueCents = periodValue?.let { MoneyUtils.dollarsToCents(it) },
         annualCreditValueCents = (value as? JsonPrimitive)?.content?.toDoubleOrNull()?.let { MoneyUtils.dollarsToCents(it) },
         usedThisYear = usedThisYear,
         category = category,
         valueText = (value as? JsonPrimitive)?.content,
         cadence = app.overbay.orbit.data.model.BenefitCadence.fromStorage(cadence),
+        anchor = BenefitAnchor.fromStorage(anchor),
+        usage = usage.map { it.toDomain() },
         usedPeriods = usedPeriods
     )
     companion object {
-        fun fromDomain(d: CardBenefit): CardBenefitWireDto = CardBenefitWireDto(
-            name = d.title,
-            title = d.title,
-            value = d.annualCreditValueCents?.let { JsonPrimitive(MoneyUtils.centsToDollars(it)) } ?: d.valueText?.let { JsonPrimitive(it) },
-            description = d.description,
-            category = d.category,
-            cadence = d.cadence.storageKey,
-            usedThisYear = d.usedThisYear,
-            usedPeriods = d.usedPeriods
-        )
+        fun fromDomain(d: CardBenefit): CardBenefitWireDto {
+            val annualizedDollars = when {
+                d.periodValueCents != null -> {
+                    val months = d.cadence.periodMonths.coerceAtLeast(1)
+                    MoneyUtils.centsToDollars(d.periodValueCents * 12 / months)
+                }
+                d.annualCreditValueCents != null -> MoneyUtils.centsToDollars(d.annualCreditValueCents)
+                else -> null
+            }
+            return CardBenefitWireDto(
+                id = d.id,
+                name = d.title,
+                title = d.title,
+                value = annualizedDollars?.let { JsonPrimitive(it) } ?: d.valueText?.let { JsonPrimitive(it) },
+                periodValue = d.periodValueCents?.let { MoneyUtils.centsToDollars(it) },
+                description = d.description,
+                category = d.category,
+                cadence = d.cadence.storageKey,
+                anchor = d.anchor.storageKey,
+                usage = d.usage.map { BenefitUsageWireDto.fromDomain(it) },
+                usedThisYear = d.usedThisYear,
+                usedPeriods = d.usedPeriods
+            )
+        }
     }
 }
 

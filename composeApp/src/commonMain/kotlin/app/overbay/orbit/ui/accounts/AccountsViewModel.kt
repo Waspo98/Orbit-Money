@@ -16,9 +16,11 @@ import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.reorderAccounts
 import app.overbay.orbit.data.saveCreditCardProfile
+import app.overbay.orbit.data.setCardBenefitUsage
 import app.overbay.orbit.data.setAccountArchived
 import app.overbay.orbit.data.unlinkSimpleFinAccount
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.CreditCardBenefitEngine
 import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.NetWorthEngine
@@ -355,21 +357,45 @@ class AccountsViewModel(
         }
     }
 
+    fun setCardBenefitUsage(accountId: Long, benefitId: String, amountCents: Cents?) {
+        val account = uiState.value.accounts.find { it.id == accountId } ?: return
+        val profile = account.creditCardProfile ?: return
+        val benefit = profile.benefits.find { it.id == benefitId } ?: return
+        val today = LocalDateUtils.todayLocalDate()
+        val opened = profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
+        val period = CreditCardBenefitEngine.currentPeriod(benefit, opened, today)
+        viewModelScope.launch {
+            repository.setCardBenefitUsage(
+                accountId = accountId,
+                benefitId = benefitId,
+                periodKey = period.key,
+                amountCents = amountCents,
+                usedOn = if (amountCents != null && amountCents > 0) LocalDateUtils.formatIsoDate(today) else null
+            ).onFailure { e ->
+                _syncErrorMessage.value = "Couldn't update perk: ${e.message ?: "unknown error"}"
+            }
+        }
+    }
+
+    fun toggleCardBenefit(accountId: Long, benefitId: String) {
+        val account = uiState.value.accounts.find { it.id == accountId } ?: return
+        val profile = account.creditCardProfile ?: return
+        val benefit = profile.benefits.find { it.id == benefitId } ?: return
+        val today = LocalDateUtils.todayLocalDate()
+        val opened = profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
+        val period = CreditCardBenefitEngine.currentPeriod(benefit, opened, today)
+        val used = CreditCardBenefitEngine.usedCents(benefit, period)
+        val periodValue = CreditCardBenefitEngine.periodValueCents(benefit)
+        val targetAmount = if (used > 0L) null else if (periodValue > 0L) periodValue else 1L
+        setCardBenefitUsage(accountId, benefitId, targetAmount)
+    }
+
+    @Deprecated("Use toggleCardBenefit with benefitId")
     fun toggleCardBenefit(accountId: Long, benefitIndex: Int) {
         val account = uiState.value.accounts.find { it.id == accountId } ?: return
         val profile = account.creditCardProfile ?: return
-        val currentBenefits = profile.benefits.toMutableList()
-        if (benefitIndex in currentBenefits.indices) {
-            val item = currentBenefits[benefitIndex]
-            currentBenefits[benefitIndex] = CreditCardStrategyEngine.toggleBenefitCurrentPeriod(item)
-            val updated = profile.copy(benefits = currentBenefits)
-            viewModelScope.launch {
-                repository.saveCreditCardProfile(accountId, updated)
-                    .onFailure { e ->
-                        _syncErrorMessage.value = "Couldn't update perk: ${e.message ?: "unknown error"}"
-                    }
-            }
-        }
+        val benefitId = profile.benefits.getOrNull(benefitIndex)?.id ?: return
+        toggleCardBenefit(accountId, benefitId)
     }
 
     fun openMergeDialog(sourceAccount: Account) {

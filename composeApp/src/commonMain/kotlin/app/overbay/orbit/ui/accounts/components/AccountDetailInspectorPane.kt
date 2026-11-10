@@ -178,7 +178,7 @@ fun AccountDetailInspectorPane(
                         onUnlinkSimpleFin = if (!inspecting.simplefinAccountId.isNullOrBlank()) {
                             { viewModel.unlinkSimpleFin(inspecting.id) }
                         } else null,
-                        onToggleBenefit = { index -> viewModel.toggleCardBenefit(inspecting.id, index) },
+                        onToggleBenefit = { benefitId -> viewModel.toggleCardBenefit(inspecting.id, benefitId) },
                         onSeeTransactions = { onNavigate(OrbitNavKey.Transactions(accountId = inspecting.id)) }
                     )
                 }
@@ -200,7 +200,7 @@ private fun AccountReadOnlyDetailContent(
     onToggleArchive: () -> Unit,
     onDelete: () -> Unit,
     onUnlinkSimpleFin: (() -> Unit)? = null,
-    onToggleBenefit: (Int) -> Unit = {},
+    onToggleBenefit: (String) -> Unit = {},
     onSeeTransactions: () -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current

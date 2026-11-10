@@ -123,6 +123,18 @@ suspend fun OrbitApiClient.saveCreditCardProfileRemote(
     res.body<CreditCardProfileMutationResponseDto>().profile?.toDomain()?.copy(accountId = accountId) ?: profile
 }
 
+suspend fun OrbitApiClient.saveBenefitUsageRemote(
+    accountId: Long, benefitId: String, periodKey: String, amountCents: Cents?, usedOn: String?
+): Result<CreditCardProfile> = runCatching {
+    val req = BenefitUsageRequestDto(periodKey, amountCents?.let { MoneyUtils.centsToDollars(it) }, usedOn)
+    val res = client.put(url("/api/accounts/$accountId/credit-card-profile/benefits/$benefitId/usage")) {
+        contentType(ContentType.Application.Json); auth(sessionCookie); setBody(req)
+    }
+    extractSessionCookie(res); ensureSuccess(res)
+    res.body<CreditCardProfileMutationResponseDto>().profile?.toDomain()?.copy(accountId = accountId)
+        ?: throw IllegalStateException("Missing profile in response")
+}
+
 // =============================================================================
 // Goals & Budgets Extensions
 // =============================================================================

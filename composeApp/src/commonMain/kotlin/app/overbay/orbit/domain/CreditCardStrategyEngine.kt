@@ -46,10 +46,23 @@ data class SubEligibilityInfo(
 )
 
 data class ActivePerkItem(
-    val accountId: Long, val cardTitle: String, val cardholder: String?, val benefitIndex: Int,
-    val benefit: CardBenefit, val periodKey: String, val periodLabel: String,
-    val periodValueCents: Cents, val isUsedInCurrentPeriod: Boolean
-)
+    val accountId: Long,
+    val cardTitle: String,
+    val cardholder: String?,
+    val benefitId: String,
+    val benefit: CardBenefit,
+    val period: BenefitPeriod,
+    val periodValueCents: Cents,
+    val usedCents: Cents,
+    val remainingCents: Cents,
+    val daysUntilReset: Int,
+    val isFullyUsed: Boolean,
+    val benefitIndex: Int = 0
+) {
+    val periodKey: String get() = period.key
+    val periodLabel: String get() = period.label
+    val isUsedInCurrentPeriod: Boolean get() = isFullyUsed
+}
 
 data class CategoryBestCardPick(
     val categoryName: String, val accountId: Long, val cardTitle: String, val cardholder: String?,
@@ -70,11 +83,14 @@ data class CreditCardPortfolioSummary(
     val activeSubs: List<SubProgressSummary> = emptyList(),
     val totalAnnualFeesCents: Cents = 0L,
     val totalAnnualCreditsPotentialCents: Cents = 0L,
-    val capturedCreditsYtdCents: Cents = 0L,
-    val netEffectiveAnnualFeeCents: Cents = 0L,
+    val capturedCreditsCardYearCents: Cents = 0L,
+    val feeAfterCreditsCents: Cents = 0L,
     val currentPeriodPerks: List<ActivePerkItem> = emptyList(),
     val bestCardsByCategory: List<CategoryBestCardPick> = emptyList()
-)
+) {
+    val capturedCreditsYtdCents: Cents get() = capturedCreditsCardYearCents
+    val netEffectiveAnnualFeeCents: Cents get() = feeAfterCreditsCents
+}
 
 const val UNASSIGNED_KEY = "~unassigned"
 const val LIFETIME_COOLDOWN_MONTHS = 999
@@ -156,47 +172,53 @@ object CreditCardStrategyEngine {
 
         var totalFees = 0L
         var totalPotentialCredits = 0L
-        var capturedYtd = 0L
+        var capturedCardYear = 0L
         val periodPerks = mutableListOf<ActivePerkItem>()
 
         for (account in activeCards) {
-            val profile = account.creditCardProfile ?: continue
+            val rawProfile = account.creditCardProfile ?: continue
+            val profile = CreditCardBenefitEngine.upgradeProfile(rawProfile, today)
             val cardTitle = profile.cardName?.takeIf { it.isNotBlank() } ?: account.name
             val holder = profile.strategy.cardholder?.takeIf { it.isNotBlank() }
             totalFees += (profile.annualFeeCents ?: 0L)
 
-            profile.benefits.forEachIndexed { idx, benefit ->
-                val annualVal = benefit.annualCreditValueCents ?: 0L
-                totalPotentialCredits += annualVal
-                capturedYtd += capturedBenefitValueYtdCents(benefit, today)
+            val ledger = CreditCardBenefitEngine.ledger(profile, today)
+            totalPotentialCredits += ledger.creditsAvailableCents
+            capturedCardYear += ledger.creditsCapturedCents
 
-                val pKey = currentPeriodKey(benefit.cadence, today)
-                val pLabel = currentPeriodDisplayLabel(benefit.cadence, today)
-                val perPeriodCents = if (annualVal > 0L) {
-                    (annualVal.toDouble() / benefit.cadence.periodsPerYear.toDouble()).roundToLong()
-                } else 0L
-                val isUsed = isBenefitUsedInCurrentPeriod(benefit, today)
+            val opened = profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
+
+            profile.benefits.forEachIndexed { idx, benefit ->
+                val period = CreditCardBenefitEngine.currentPeriod(benefit, opened, today)
+                val periodVal = CreditCardBenefitEngine.periodValueCents(benefit)
+                val used = CreditCardBenefitEngine.usedCents(benefit, period)
+                val remaining = CreditCardBenefitEngine.remainingCents(benefit, period)
+                val daysReset = CreditCardBenefitEngine.daysUntilReset(period, today)
+                val isFullyUsed = (used >= periodVal && periodVal > 0L) || (periodVal == 0L && used > 0L)
 
                 periodPerks.add(
                     ActivePerkItem(
                         accountId = account.id,
                         cardTitle = cardTitle,
                         cardholder = holder,
-                        benefitIndex = idx,
+                        benefitId = benefit.id,
                         benefit = benefit,
-                        periodKey = pKey,
-                        periodLabel = pLabel,
-                        periodValueCents = perPeriodCents,
-                        isUsedInCurrentPeriod = isUsed
+                        period = period,
+                        periodValueCents = periodVal,
+                        usedCents = used,
+                        remainingCents = remaining,
+                        daysUntilReset = daysReset,
+                        isFullyUsed = isFullyUsed,
+                        benefitIndex = idx
                     )
                 )
             }
         }
 
         val sortedPerks = periodPerks.sortedWith(
-            compareBy<ActivePerkItem> { it.isUsedInCurrentPeriod }
-                .thenByDescending { it.periodValueCents }
-                .thenBy { it.cardTitle }
+            compareBy<ActivePerkItem> { it.isFullyUsed }
+                .thenBy { it.daysUntilReset }
+                .thenByDescending { it.remainingCents }
         )
 
         val bestByCategory = computeBestCardsByCategory(activeCards)
@@ -209,8 +231,8 @@ object CreditCardStrategyEngine {
             activeSubs = activeSubs,
             totalAnnualFeesCents = totalFees,
             totalAnnualCreditsPotentialCents = totalPotentialCredits,
-            capturedCreditsYtdCents = capturedYtd,
-            netEffectiveAnnualFeeCents = totalFees - capturedYtd,
+            capturedCreditsCardYearCents = capturedCardYear,
+            feeAfterCreditsCents = totalFees - capturedCardYear,
             currentPeriodPerks = sortedPerks,
             bestCardsByCategory = bestByCategory
         )
@@ -406,98 +428,55 @@ object CreditCardStrategyEngine {
         }
     }
 
+    @Deprecated("Use CreditCardBenefitEngine.currentPeriod", ReplaceWith("CreditCardBenefitEngine.currentPeriod(CardBenefit(cadence = cadence), null, today).key"))
     fun currentPeriodKey(
         cadence: BenefitCadence,
         today: LocalDate = LocalDateUtils.todayLocalDate()
-    ): String {
-        val y = today.year
-        val m = today.monthNumber
-        return when (cadence) {
-            BenefitCadence.MONTHLY -> LocalDateUtils.formatYearMonth(y, m)
-            BenefitCadence.QUARTERLY -> "$y-Q${((m - 1) / 3) + 1}"
-            BenefitCadence.SEMI_ANNUAL -> "$y-H${if (m <= 6) 1 else 2}"
-            BenefitCadence.ANNUAL, BenefitCadence.EVERY_4_YEARS -> y.toString()
-        }
-    }
+    ): String = CreditCardBenefitEngine.currentPeriod(CardBenefit(cadence = cadence), null, today).key
 
+    @Deprecated("Use CreditCardBenefitEngine.currentPeriod", ReplaceWith("CreditCardBenefitEngine.currentPeriod(CardBenefit(cadence = cadence), null, today).label"))
     fun currentPeriodDisplayLabel(
         cadence: BenefitCadence,
         today: LocalDate = LocalDateUtils.todayLocalDate()
-    ): String {
-        val y = today.year
-        val m = today.monthNumber
-        return when (cadence) {
-            BenefitCadence.MONTHLY -> "${LocalDateUtils.monthShortName(m)} $y"
-            BenefitCadence.QUARTERLY -> "Q${((m - 1) / 3) + 1} $y"
-            BenefitCadence.SEMI_ANNUAL -> "${if (m <= 6) "Jan–Jun" else "Jul–Dec"} $y"
-            BenefitCadence.ANNUAL -> "$y Annual"
-            BenefitCadence.EVERY_4_YEARS -> "4-Yr Cycle"
-        }
-    }
+    ): String = CreditCardBenefitEngine.currentPeriod(CardBenefit(cadence = cadence), null, today).label
 
+    @Deprecated("Use CreditCardBenefitEngine", ReplaceWith("CreditCardBenefitEngine.usedCents(benefit, CreditCardBenefitEngine.currentPeriod(benefit, null, today)) > 0"))
     fun isBenefitUsedInCurrentPeriod(
         benefit: CardBenefit,
         today: LocalDate = LocalDateUtils.todayLocalDate()
     ): Boolean {
-        val key = currentPeriodKey(benefit.cadence, today)
-        if (key in benefit.usedPeriods) return true
-        if (benefit.cadence == BenefitCadence.EVERY_4_YEARS) {
-            val recentYears = (0..3).map { (today.year - it).toString() }
-            if (benefit.usedPeriods.any { it in recentYears }) return true
-        }
-        return benefit.usedPeriods.isEmpty() && benefit.usedThisYear
+        val period = CreditCardBenefitEngine.currentPeriod(benefit, null, today)
+        return CreditCardBenefitEngine.usedCents(benefit, period) > 0L ||
+            (benefit.usedPeriods.isNotEmpty() && period.key in benefit.usedPeriods) ||
+            (benefit.usedPeriods.isEmpty() && benefit.usedThisYear)
     }
 
+    @Deprecated("Use CreditCardBenefitEngine.setUsage", ReplaceWith("CreditCardBenefitEngine.setUsage(...)"))
     fun toggleBenefitCurrentPeriod(
         benefit: CardBenefit,
         today: LocalDate = LocalDateUtils.todayLocalDate()
     ): CardBenefit {
-        val key = currentPeriodKey(benefit.cadence, today)
-        val currentlyUsed = isBenefitUsedInCurrentPeriod(benefit, today)
-        val updatedPeriods = if (currentlyUsed) {
-            if (benefit.cadence == BenefitCadence.EVERY_4_YEARS) {
-                val recentYears = (0..3).map { (today.year - it).toString() }.toSet()
-                benefit.usedPeriods.filterNot { it in recentYears }
-            } else {
-                benefit.usedPeriods.filterNot { it == key }
-            }
-        } else {
-            (benefit.usedPeriods + key).distinct()
-        }
-        return benefit.copy(
-            usedThisYear = !currentlyUsed,
-            usedPeriods = updatedPeriods
-        )
+        val period = CreditCardBenefitEngine.currentPeriod(benefit, null, today)
+        val isUsed = isBenefitUsedInCurrentPeriod(benefit, today)
+        val periodVal = CreditCardBenefitEngine.periodValueCents(benefit)
+        val amount = if (isUsed) null else if (periodVal > 0L) periodVal else 1L
+        return CreditCardBenefitEngine.setUsage(benefit, period.key, amount, if (amount != null) LocalDateUtils.formatIsoDate(today) else null)
     }
 
+    @Deprecated("Use CreditCardBenefitEngine.ledger", ReplaceWith("CreditCardBenefitEngine.ledger(...)"))
     fun capturedBenefitValueYtdCents(
         benefit: CardBenefit,
         today: LocalDate = LocalDateUtils.todayLocalDate()
     ): Cents {
-        val annualVal = benefit.annualCreditValueCents ?: return 0L
-        if (annualVal <= 0L) return 0L
-        val yearPrefix = today.year.toString()
-        val usedCountThisYear = when (benefit.cadence) {
-            BenefitCadence.ANNUAL, BenefitCadence.EVERY_4_YEARS -> {
-                if (isBenefitUsedInCurrentPeriod(benefit, today)) 1 else 0
-            }
-            else -> {
-                val matched = benefit.usedPeriods.count { it.startsWith(yearPrefix) }
-                if (matched > 0) matched else if (benefit.usedThisYear) 1 else 0
-            }
-        }
-        val perPeriod = (annualVal.toDouble() / benefit.cadence.periodsPerYear.toDouble()).roundToLong()
-        return (perPeriod * usedCountThisYear).coerceAtMost(annualVal)
+        val period = CreditCardBenefitEngine.currentPeriod(benefit, null, today)
+        return CreditCardBenefitEngine.usedCents(benefit, period)
     }
 
+    @Deprecated("Use CreditCardBenefitEngine.ledger", ReplaceWith("CreditCardBenefitEngine.ledger(profile, today).feeAfterCreditsCents"))
     fun computeCardEffectiveAnnualFeeCents(
         profile: CreditCardProfile,
         today: LocalDate = LocalDateUtils.todayLocalDate()
-    ): Cents {
-        val fee = profile.annualFeeCents ?: 0L
-        val captured = profile.benefits.sumOf { capturedBenefitValueYtdCents(it, today) }
-        return fee - captured
-    }
+    ): Cents = CreditCardBenefitEngine.ledger(profile, today).feeAfterCreditsCents
 
     private val CATEGORY_SYNONYMS = listOf(
         "Dining & Restaurants" to setOf("dining", "restaurant", "restaurants"),

@@ -144,21 +144,7 @@ class CreditCardStrategyEngineTest {
     }
 
     @Test
-    fun cadenceAwareBenefitsTrackPeriodsAndCalculateNetEffectiveAnnualFee() {
-        val uberMonthly = CardBenefit(
-            title = "$10/mo Uber Cash",
-            annualCreditValueCents = 120_00L,
-            cadence = BenefitCadence.MONTHLY,
-            usedPeriods = listOf("2026-01", "2026-02", "2026-10") // 3 months used so far ($30)
-        )
-        assertFalse(CreditCardStrategyEngine.isBenefitUsedInCurrentPeriod(uberMonthly, refToday))
-
-        val toggledNov = CreditCardStrategyEngine.toggleBenefitCurrentPeriod(uberMonthly, refToday)
-        assertTrue(CreditCardStrategyEngine.isBenefitUsedInCurrentPeriod(toggledNov, refToday))
-        assertTrue("2026-11" in toggledNov.usedPeriods)
-        // 4 months used * $10 = $40 captured YTD
-        assertEquals(40_00L, CreditCardStrategyEngine.capturedBenefitValueYtdCents(toggledNov, refToday))
-
+    fun templateApplyToProfileAppliesDefaultFeeAndCategories() {
         val amexGoldTemplate = CreditCardTemplates.ALL.first { it.id == "amex_gold" }
         val applied = amexGoldTemplate.applyToProfile(CreditCardProfile(accountId = 99L))
         assertEquals(325_00L, applied.annualFeeCents)

@@ -27,6 +27,7 @@ import app.overbay.orbit.data.model.merchantLogoKey
 import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.data.network.*
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.CreditCardBenefitEngine
 import app.overbay.orbit.domain.RuleMatcherEngine
 import kotlinx.datetime.Clock
 
@@ -68,6 +69,31 @@ suspend fun OrbitRepository.saveCreditCardProfile(
     if (storageMode.value != StorageMode.SELF_HOSTED) return Result.success(profile)
     return createApiClient().saveCreditCardProfileRemote(accountId, accountName, accountInstitution, profile)
         .onSuccess { saved -> applyLocalCardProfile(accountId, saved, accountName, accountInstitution) }
+        .onFailure { revertLocalCardProfile(accountId, previousAccount, previousProfile) }
+}
+
+suspend fun OrbitRepository.setCardBenefitUsage(
+    accountId: Long,
+    benefitId: String,
+    periodKey: String,
+    amountCents: Cents?,
+    usedOn: String? = null
+): Result<CreditCardProfile> {
+    val previousAccount = accounts.value.find { it.id == accountId }
+    val previousProfile = snapshot.value.creditCardProfiles.find { it.accountId == accountId }
+        ?: previousAccount?.creditCardProfile
+        ?: return Result.failure(IllegalStateException("No credit card profile found for account $accountId"))
+
+    val updatedBenefits = previousProfile.benefits.map { b ->
+        if (b.id == benefitId) CreditCardBenefitEngine.setUsage(b, periodKey, amountCents, usedOn) else b
+    }
+    val localProfile = previousProfile.copy(benefits = updatedBenefits)
+    applyLocalCardProfile(accountId, localProfile, null, null)
+
+    if (storageMode.value != StorageMode.SELF_HOSTED) return Result.success(localProfile)
+
+    return createApiClient().saveBenefitUsageRemote(accountId, benefitId, periodKey, amountCents, usedOn)
+        .onSuccess { saved -> applyLocalCardProfile(accountId, saved, null, null) }
         .onFailure { revertLocalCardProfile(accountId, previousAccount, previousProfile) }
 }
 

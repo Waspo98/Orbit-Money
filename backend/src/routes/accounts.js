@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import express from 'express';
 import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
@@ -11,6 +12,7 @@ import { isValidDateOnly, parseDateParts } from '../lib/localDate.js';
 import { dollarsToCents, moneyFieldsToDollars } from '../lib/money.js';
 import { parseId, parseInteger, readIdParam } from '../lib/routeParams.js';
 import { mergeAccounts } from '../services/accountMerge.js';
+import { applyBenefitUsage } from '../services/creditCardBenefitUsage.js';
 
 const router = express.Router();
 
@@ -103,6 +105,38 @@ function normalizeOptionalMoney(value, fieldName) {
   return dollarsToCents(number);
 }
 
+function finiteNonNegOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+const BENEFIT_PERIOD_KEY_REGEX = /^(\d{4}(-\d{2}|-Q[1-4]|-H[12])?|CM-\d{4}-\d{2}-\d{2})$/;
+
+function normalizeBenefitUsage(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const key = String(item.period_key || item.periodKey || '').trim();
+      if (!key || key.length > 24 || !BENEFIT_PERIOD_KEY_REGEX.test(key)) return null;
+      const amt = Number(item.amount);
+      if (!Number.isFinite(amt) || amt < 0) return null;
+      let usedOn = null;
+      const rawDate = item.used_on ?? item.usedOn;
+      if (typeof rawDate === 'string' && isValidDateOnly(rawDate.trim())) {
+        usedOn = rawDate.trim();
+      }
+      return {
+        period_key: key,
+        amount: Math.round(amt * 100) / 100,
+        used_on: usedOn
+      };
+    })
+    .filter(Boolean)
+    .slice(-120);
+}
+
 function normalizeTextList(value, maxItems = 12, maxLength = 80, keep = 'first') {
   if (!Array.isArray(value)) return [];
   const items = value
@@ -151,7 +185,20 @@ function normalizeBenefits(value) {
     .map((item) => {
       if (typeof item === 'string') {
         const name = item.trim();
-        return name ? { name: name.slice(0, 120), title: name.slice(0, 120) } : null;
+        return name ? {
+          id: `b_${crypto.randomUUID().slice(0, 12)}`,
+          name: name.slice(0, 120),
+          title: name.slice(0, 120),
+          value: null,
+          period_value: null,
+          description: null,
+          category: null,
+          cadence: 'annual',
+          anchor: 'calendar',
+          usage: [],
+          used_this_year: false,
+          used_periods: []
+        } : null;
       }
       if (!item || typeof item !== 'object') return null;
       const name = String(item.name || item.title || item.label || '').trim();
@@ -168,12 +215,16 @@ function normalizeBenefits(value) {
         : normalizeOptionalTextLength(item.value_text || item.valueText, 120);
 
       const benefit = {
+        id: (typeof item.id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(item.id)) ? item.id : `b_${crypto.randomUUID().slice(0, 12)}`,
         name: trimmedName,
         title: trimmedName,
         value: numericValue,
+        period_value: finiteNonNegOrNull(item.period_value ?? item.periodValue),
         description: normalizeOptionalTextLength(item.description || item.notes, 300),
         category: normalizeOptionalTextLength(item.category, 80),
         cadence: normalizeOptionalTextLength(item.cadence, 32) || 'annual',
+        anchor: (item.anchor === 'cardmember_year') ? 'cardmember_year' : 'calendar',
+        usage: normalizeBenefitUsage(item.usage),
         used_this_year: Boolean(item.used_this_year ?? item.usedThisYear ?? false),
         used_periods: normalizeTextList(item.used_periods || item.usedPeriods, 120, 24, 'last')
       };
@@ -588,6 +639,64 @@ router.put('/:id/credit-card-profile', requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error('Save credit card profile failed:', err);
+    sendServerError(res, err);
+  }
+});
+
+router.put('/:id/credit-card-profile/benefits/:benefitId/usage', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  const id = readIdParam(req, res, 'id', 'account');
+  if (id === null) return;
+
+  const benefitId = typeof req.params.benefitId === 'string' ? req.params.benefitId.trim() : '';
+  if (!benefitId || benefitId.length > 64) {
+    return sendBadRequest(res, 'Invalid benefitId.');
+  }
+
+  const periodKey = typeof req.body?.period_key === 'string'
+    ? req.body.period_key.trim()
+    : (typeof req.body?.periodKey === 'string' ? req.body.periodKey.trim() : '');
+  if (!periodKey || !BENEFIT_PERIOD_KEY_REGEX.test(periodKey)) {
+    return sendBadRequest(res, 'period_key must match YYYY, YYYY-MM, YYYY-Qn, YYYY-Hn, or CM-YYYY-MM-DD.');
+  }
+
+  let amount = null;
+  const rawAmount = req.body?.amount;
+  if (rawAmount !== null && rawAmount !== undefined && rawAmount !== '') {
+    const num = Number(rawAmount);
+    if (!Number.isFinite(num) || num < 0) {
+      return sendBadRequest(res, 'amount must be a non-negative number or null.');
+    }
+    amount = Math.round(num * 100) / 100;
+  }
+
+  let usedOn = null;
+  const rawUsedOn = req.body?.used_on ?? req.body?.usedOn;
+  if (rawUsedOn !== null && rawUsedOn !== undefined && rawUsedOn !== '') {
+    if (typeof rawUsedOn !== 'string' || !isValidDateOnly(rawUsedOn.trim())) {
+      return sendBadRequest(res, 'used_on must be a valid YYYY-MM-DD date or null.');
+    }
+    usedOn = rawUsedOn.trim();
+  }
+
+  try {
+    const updated = applyBenefitUsage(db, {
+      householdId,
+      accountId: id,
+      benefitId,
+      periodKey,
+      amount,
+      usedOn
+    });
+    if (!updated) {
+      return sendNotFound(res, 'Credit card profile or benefit not found.');
+    }
+    sendOk(res, {
+      success: true,
+      profile: serializeCreditCardProfile(updated)
+    });
+  } catch (err) {
+    console.error('Update benefit usage failed:', err);
     sendServerError(res, err);
   }
 });

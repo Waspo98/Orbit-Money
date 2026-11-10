@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.CreditCardProfile
+import app.overbay.orbit.domain.CreditCardBenefitEngine
 import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
@@ -49,11 +50,11 @@ fun CreditCardPerksPanel(
     profile: CreditCardProfile,
     subProgress: SubProgressSummary? = null,
     onEditPerks: () -> Unit,
-    onToggleBenefit: ((benefitIndex: Int) -> Unit)? = null,
+    onToggleBenefit: ((benefitId: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val subEligibility = remember(profile) { CreditCardStrategyEngine.computeSubEligibility(profile) }
-    val netFeeCents = remember(profile) { CreditCardStrategyEngine.computeCardEffectiveAnnualFeeCents(profile) }
+    val netFeeCents = remember(profile) { CreditCardBenefitEngine.ledger(profile, LocalDateUtils.todayLocalDate()).feeAfterCreditsCents }
     val strategy = profile.strategy
 
     Card(
@@ -349,10 +350,10 @@ fun CreditCardPerksPanel(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    profile.benefits.forEachIndexed { index, benefit ->
+                    profile.benefits.forEach { benefit ->
                         CardBenefitChecklistRow(
                             benefit = benefit,
-                            onToggle = { onToggleBenefit?.invoke(index) }
+                            onToggle = { onToggleBenefit?.invoke(benefit.id) }
                         )
                     }
                 }
