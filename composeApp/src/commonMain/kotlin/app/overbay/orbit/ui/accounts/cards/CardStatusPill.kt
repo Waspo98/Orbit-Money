@@ -18,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.overbay.orbit.theme.OrbitTheme
 
 enum class CardStatusTone {
@@ -52,7 +51,6 @@ fun CardStatusPill(
             Text(
                 text = text,
                 style = MaterialTheme.typography.labelSmall,
-                fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = contentColor,
                 maxLines = 1

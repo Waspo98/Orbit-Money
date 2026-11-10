@@ -51,7 +51,7 @@ import app.overbay.orbit.ui.components.OrbitTextInputDialog
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 private val NETWORKS = listOf("Visa", "Mastercard", "Amex", "Discover")
-private val COOLDOWN_OPTIONS = listOf(null to "None", 24 to "24 Mo", 48 to "48 Mo", 999 to "Lifetime")
+private val COOLDOWN_OPTIONS = listOf(null to "None", 24 to "24 Months", 48 to "48 Months", 999 to "Once per Lifetime")
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -123,7 +123,7 @@ fun CardEditorFormSections(
                 FilterChip(
                     selected = draft.cardholderMemberId == null && !draft.cardholder.isNullOrBlank() && householdMembers.none { it.name.equals(draft.cardholder, ignoreCase = true) },
                     onClick = { showCustomHolderDialog = true },
-                    label = { Text(draft.cardholder?.takeIf { h -> householdMembers.none { it.name.equals(h, ignoreCase = true) } } ?: "Other...") }
+                    label = { Text(draft.cardholder?.takeIf { h -> householdMembers.none { it.name.equals(h, ignoreCase = true) } } ?: "Someone Else") }
                 )
             }
         }
@@ -173,7 +173,7 @@ fun CardEditorFormSections(
                         DateFieldButton(
                             date = draft.promoEndDate?.let { LocalDateUtils.parseIsoDate(it) } ?: LocalDateUtils.todayLocalDate(),
                             onDateSelected = { dt -> controller.updateDraft { it.copy(promoEndDate = LocalDateUtils.formatIsoDate(dt)) } },
-                            label = draft.promoEndDate?.let { "Promo Ends ($it)" } ?: "Select End Date"
+                            label = draft.promoEndDate?.let { "Promo Ends (${CardFormat.formatCardDate(it)})" } ?: "Select End Date"
                         )
                     }
                 }
@@ -194,7 +194,7 @@ fun CardEditorFormSections(
                             haptics.confirm()
                             controller.updateDraft { it.copy(annualFeeCents = feeCents ?: it.annualFeeCents, annualFeePostDate = feeDate) }
                         },
-                        label = { Text("Use detected fee: ${feeCents?.let { MoneyUtils.formatCents(it) } ?: ""} on $feeDate") }
+                        label = { Text("Use detected fee: ${feeCents?.let { MoneyUtils.formatCents(it) } ?: ""} on ${CardFormat.formatCardDate(feeDate)}") }
                     )
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -209,7 +209,7 @@ fun CardEditorFormSections(
                         DateFieldButton(
                             date = draft.annualFeePostDate?.let { LocalDateUtils.parseIsoDate(it) } ?: LocalDateUtils.todayLocalDate(),
                             onDateSelected = { dt -> controller.updateDraft { it.copy(annualFeePostDate = LocalDateUtils.formatIsoDate(dt)) } },
-                            label = draft.annualFeePostDate?.let { "Posts ($it)" } ?: "Select Fee Date"
+                            label = draft.annualFeePostDate?.let { "Posts (${CardFormat.formatCardDate(it)})" } ?: "Select Fee Date"
                         )
                     }
                 }
@@ -235,7 +235,7 @@ fun CardEditorFormSections(
                 )
             }
             TextButton(onClick = { controller.updateDraft { it.copy(editingPerkId = "") } }, modifier = Modifier.align(Alignment.End)) {
-                Text("+ Add Perk")
+                Text("Add Perk")
             }
         }
 
@@ -255,7 +255,7 @@ fun CardEditorFormSections(
                 )
             }
             TextButton(onClick = { controller.updateDraft { it.copy(editingRewardIndex = -1) } }, modifier = Modifier.align(Alignment.End)) {
-                Text("+ Add Multiplier")
+                Text("Add Multiplier")
             }
         }
 
@@ -265,13 +265,13 @@ fun CardEditorFormSections(
                 historySuggestions.suggestedOpenedDate?.let { opDate ->
                     AssistChip(
                         onClick = { controller.updateDraft { it.copy(openedDate = opDate) } },
-                        label = { Text("Earliest activity: $opDate. Use as open date?") }
+                        label = { Text("Earliest activity: ${CardFormat.formatCardDate(opDate)}. Use as Opened Date?") }
                     )
                 }
                 DateFieldButton(
                     date = draft.openedDate?.let { LocalDateUtils.parseIsoDate(it) } ?: LocalDateUtils.todayLocalDate(),
                     onDateSelected = { dt -> controller.updateDraft { it.copy(openedDate = LocalDateUtils.formatIsoDate(dt)) } },
-                    label = draft.openedDate?.let { "Card Opened ($it)" } ?: "Set Card Opened Date"
+                    label = draft.openedDate?.let { "Card Opened (${CardFormat.formatCardDate(it)})" } ?: "Set Opened Date"
                 )
                 OrbitSwitchRow(
                     title = "Business Card (5/24 Exempt)", subtitle = "Excludes this card from your personal Chase 5/24 count.",
@@ -304,7 +304,7 @@ fun CardEditorFormSections(
                             DateFieldButton(
                                 date = draft.targetDeadlineDate?.let { LocalDateUtils.parseIsoDate(it) } ?: LocalDateUtils.todayLocalDate(),
                                 onDateSelected = { dt -> controller.updateDraft { it.copy(targetDeadlineDate = LocalDateUtils.formatIsoDate(dt)) } },
-                                label = draft.targetDeadlineDate?.let { "Deadline ($it)" } ?: "Spend Deadline"
+                                label = draft.targetDeadlineDate?.let { "Deadline (${CardFormat.formatCardDate(it)})" } ?: "Spend Deadline"
                             )
                         }
                     }
@@ -312,7 +312,7 @@ fun CardEditorFormSections(
                     DateFieldButton(
                         date = draft.subReceivedDate?.let { LocalDateUtils.parseIsoDate(it) } ?: LocalDateUtils.todayLocalDate(),
                         onDateSelected = { dt -> controller.updateDraft { it.copy(subReceivedDate = LocalDateUtils.formatIsoDate(dt)) } },
-                        label = draft.subReceivedDate?.let { "Bonus Received ($it)" } ?: "Set Date Received"
+                        label = draft.subReceivedDate?.let { "Bonus Received (${CardFormat.formatCardDate(it)})" } ?: "Set Date Received"
                     )
                 }
 

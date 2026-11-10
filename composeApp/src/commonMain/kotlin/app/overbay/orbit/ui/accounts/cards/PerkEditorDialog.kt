@@ -76,10 +76,18 @@ fun PerkEditorDialog(
                     }
                 }
 
+                val cadenceLabel = when (cadence) {
+                    BenefitCadence.MONTHLY -> "$ per month"
+                    BenefitCadence.QUARTERLY -> "$ per quarter"
+                    BenefitCadence.SEMI_ANNUAL -> "$ per half-year"
+                    BenefitCadence.ANNUAL -> "$ per year"
+                    BenefitCadence.EVERY_4_YEARS -> "$ per 4 years"
+                }
+
                 CurrencyTextField(
                     cents = amountCents,
                     onCentsChange = { amountCents = it },
-                    label = "Amount per ${cadence.displayName.lowercase()}",
+                    label = cadenceLabel,
                     modifier = Modifier.fillMaxWidth()
                 )
 

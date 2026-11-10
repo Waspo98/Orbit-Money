@@ -9,7 +9,11 @@ object CardFormat {
     fun formatCardDate(iso: String?): String {
         if (iso.isNullOrBlank()) return "Not Set"
         val parsed = LocalDateUtils.parseIsoDate(iso) ?: return "Not Set"
-        return LocalDateUtils.formatShortDate(parsed)
+        return if (parsed.year != LocalDateUtils.todayLocalDate().year) {
+            LocalDateUtils.formatDisplayDate(parsed)
+        } else {
+            LocalDateUtils.formatShortDate(parsed)
+        }
     }
 
     fun formatDaysUntil(n: Int): String = when {

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.CreditCardTemplate
 import app.overbay.orbit.domain.CreditCardTemplates
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.OrbitTextField
 
@@ -113,7 +114,7 @@ fun CardTemplatePicker(
 
         // Footnote with D6 asOf stamp
         Text(
-            text = "Template perks and annual fees as of 2026-11. Verify current terms with your card issuer.",
+            text = "Template perks and annual fees as of ${LocalDateUtils.formatMonthLabel("2026-11")}. Verify current terms with your card issuer.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)

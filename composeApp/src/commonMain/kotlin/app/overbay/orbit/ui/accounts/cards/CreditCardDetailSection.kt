@@ -169,7 +169,7 @@ private fun CardDetailBillingDetails(profile: CreditCardProfile, cycle: CardCycl
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("BILLING & PAYMENT DETAILS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Billing & Payment Details", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
             rows.forEach { (label, value) ->
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
                     Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
@@ -189,7 +189,7 @@ private fun CardDetailPerksList(
     onOpenUsage: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("STATEMENT CREDITS & PERKS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Statement Credits & Perks", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
         benefits.forEach { b ->
             val period = remember(b, openedDate, today) { CreditCardBenefitEngine.currentPeriod(b, openedDate, today) }
             val used = remember(b, period) { CreditCardBenefitEngine.usedCents(b, period) }
@@ -218,7 +218,7 @@ private fun CardDetailLedgerSection(ledger: CardValueLedger, nextFeeDate: LocalD
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                Text("ANNUAL FEE & VALUE LEDGER", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = OrbitColorTokens.Purple)
+                Text("Annual Fee & Value Ledger", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = OrbitColorTokens.Purple)
                 if (nextFeeDate != null) {
                     val daysSuffix = daysUntilFee?.let { " (${CardFormat.formatDaysUntil(it)})" } ?: ""
                     Text("Renews ${CardFormat.formatCardDate(nextFeeDate.toString())}$daysSuffix", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
@@ -234,7 +234,7 @@ private fun CardDetailLedgerSection(ledger: CardValueLedger, nextFeeDate: LocalD
                     Text("${MoneyUtils.formatCents(ledger.creditsCapturedCents)} of ${MoneyUtils.formatCents(ledger.creditsAvailableCents)}", style = TabularNumStyle.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = OrbitColorTokens.Green))
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("Fee After Perks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                    Text("Fee After Credits (This Card-Year)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                     val feeColor = if (ledger.feeAfterCreditsCents <= 0L) OrbitColorTokens.Green else MaterialTheme.colorScheme.onSurface
                     Text(MoneyUtils.formatCents(ledger.feeAfterCreditsCents), style = TabularNumStyle.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold), color = feeColor)
                 }
@@ -253,7 +253,7 @@ private fun CardDetailStrategySection(
     today: LocalDate
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("REWARDS STRATEGY & MULTIPLIERS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Rewards Strategy & Multipliers", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (profile.rewardCategories.isNotEmpty()) {
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 profile.rewardCategories.forEach { cat ->
@@ -274,8 +274,8 @@ private fun CardDetailStrategySection(
                     Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                         Text("Welcome Bonus Tracker", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                         val (label, tone) = when (subProgress.status) {
-                            SubTrackerStatus.RECEIVED -> "Received" to CardStatusTone.POSITIVE
-                            SubTrackerStatus.SPEND_MET -> "Spend Met" to CardStatusTone.POSITIVE
+                            SubTrackerStatus.RECEIVED -> "Bonus Received" to CardStatusTone.POSITIVE
+                            SubTrackerStatus.SPEND_MET -> "Spend Met: Awaiting Bonus" to CardStatusTone.POSITIVE
                             SubTrackerStatus.EXPIRED -> "Expired" to CardStatusTone.NEUTRAL
                             SubTrackerStatus.AT_RISK -> "$pct% At Risk" to CardStatusTone.CRITICAL
                             SubTrackerStatus.ON_TRACK -> "$pct%" to CardStatusTone.POSITIVE

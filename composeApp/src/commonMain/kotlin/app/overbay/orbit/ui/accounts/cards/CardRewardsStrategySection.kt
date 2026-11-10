@@ -183,8 +183,8 @@ private fun WelcomeBonusesCard(subs: List<SubProgressSummary>, onInspectAccount:
 private fun WelcomeBonusRow(sub: SubProgressSummary, onClick: () -> Unit) {
     val pct = (sub.progressRatio * 100f).roundToInt()
     val (statusLabel, statusTone) = when (sub.status) {
-        SubTrackerStatus.RECEIVED -> "Received" to CardStatusTone.POSITIVE
-        SubTrackerStatus.SPEND_MET -> "Spend Met" to CardStatusTone.POSITIVE
+        SubTrackerStatus.RECEIVED -> "Bonus Received" to CardStatusTone.POSITIVE
+        SubTrackerStatus.SPEND_MET -> "Spend Met: Awaiting Bonus" to CardStatusTone.POSITIVE
         SubTrackerStatus.EXPIRED -> "Expired" to CardStatusTone.NEUTRAL
         SubTrackerStatus.AT_RISK -> "$pct% At Risk" to CardStatusTone.CRITICAL
         SubTrackerStatus.ON_TRACK -> "$pct%" to CardStatusTone.POSITIVE

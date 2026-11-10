@@ -428,7 +428,7 @@ object CreditCardStrategyEngine {
             LocalDateUtils.parseIsoDate(strategy.openedDate)?.let { LocalDateUtils.addMonthsClamped(it, 3) }
         } ?: return SubEligibilityInfo(
             isEligibleNow = true,
-            statusLabel = "${cooldown}-Mo Rule (Set SUB/Open Date)",
+            statusLabel = "${cooldown}-Mo Rule (Set Opened Date)",
             isEstimated = false
         )
 
@@ -440,7 +440,7 @@ object CreditCardStrategyEngine {
         return if (daysUntil <= 0) {
             SubEligibilityInfo(
                 isEligibleNow = true,
-                statusLabel = "${estPrefix}SUB Eligible Now (Passed $eligibleIso)",
+                statusLabel = "${estPrefix}SUB Eligible Now (Passed ${LocalDateUtils.formatShortDate(eligibleLocalDate)})",
                 eligibleDate = eligibleIso,
                 daysUntilEligible = 0,
                 isEstimated = isEstimated

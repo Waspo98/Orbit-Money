@@ -130,6 +130,7 @@ class CreditCardStrategyEngineTest {
         val elig2 = CreditCardStrategyEngine.computeSubEligibility(oldSapphire, refToday)
         assertNotNull(elig2)
         assertTrue(elig2.isEligibleNow)
+        assertEquals("SUB Eligible Now (Passed May 10)", elig2.statusLabel)
 
         val amexPlatinum = CreditCardProfile(
             accountId = 3L,
@@ -142,6 +143,14 @@ class CreditCardStrategyEngineTest {
         assertNotNull(elig3)
         assertFalse(elig3.isEligibleNow)
         assertEquals("Once per Lifetime", elig3.statusLabel)
+
+        val missingDatesProfile = CreditCardProfile(
+            accountId = 4L,
+            strategy = CreditCardStrategy(subCooldownMonths = 24)
+        )
+        val eligMissing = CreditCardStrategyEngine.computeSubEligibility(missingDatesProfile, refToday)
+        assertNotNull(eligMissing)
+        assertEquals("24-Mo Rule (Set Opened Date)", eligMissing.statusLabel)
     }
 
     @Test

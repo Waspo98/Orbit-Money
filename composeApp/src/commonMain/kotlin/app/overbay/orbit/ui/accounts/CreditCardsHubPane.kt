@@ -138,7 +138,7 @@ private fun CardHubSummaryStrip(uiState: AccountsUiState) {
                     } else "None due"
                     HubMetricCell(label = "Next Due", value = nextDueText)
                     HubMetricCell(label = "Annual Fees", value = "${MoneyUtils.formatCents(uiState.cardPortfolioSummary.totalAnnualFeesCents, showCents = false)}/yr")
-                    HubMetricCell(label = "Active SUBs", value = "${uiState.cardPortfolioSummary.activeSubs.size} active")
+                    HubMetricCell(label = "Welcome Bonuses", value = "${uiState.cardPortfolioSummary.activeSubs.size} active")
                 }
             }
         }
@@ -181,7 +181,7 @@ private fun PaymentsDueSection(uiState: AccountsUiState, actions: CreditCardsHub
                 }
                 if (firstMissing != null) {
                     TextButton(onClick = { actions.onOpenCardEditor(firstMissing) }, modifier = Modifier.align(Alignment.Start)) {
-                        Text("Add billing dates for ${uiState.missingBillingDatesCount} cards")
+                        Text("Add Billing Dates for ${uiState.missingBillingDatesCount} Cards")
                     }
                 }
             }

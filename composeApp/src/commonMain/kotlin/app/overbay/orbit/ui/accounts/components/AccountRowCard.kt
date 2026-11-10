@@ -312,7 +312,7 @@ fun AccountRowCard(
                     )
                     if (onPerks != null) {
                         DropdownMenuItem(
-                            text = { Text("Credit Card Perks") },
+                            text = { Text("Edit Card") },
                             onClick = { menuExpanded = false; onPerks() }
                         )
                     }
@@ -359,7 +359,7 @@ private fun AccountBadge(
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             softWrap = false,

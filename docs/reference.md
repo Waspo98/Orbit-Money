@@ -68,7 +68,7 @@ PWA asset cache strings are intentionally repeated in `frontend/index.html`,
 `frontend/src/brandAssets.js`. Keep those suffixes aligned when refreshing the
 app-shell cache; this is not an app version bump.
 
-### Database Schema (34 migrations)
+### Database Schema (36 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -106,6 +106,8 @@ app-shell cache; this is not an app version bump.
 | `032_account_balance_record_source.sql` | Adds source metadata to account balance snapshots and keeps balance record uniqueness household-scoped |
 | `033_credit_card_profiles.sql` | Adds local credit card profile metadata for tracked credit accounts |
 | `034_clean_credit_card_profiles.sql` | Removes external catalog-specific card columns and keeps the user-entered card name as local data |
+| `035_credit_card_strategy.sql` | Adds statement closing day, payment due day, and strategy_json to credit_card_profiles |
+| `036_credit_card_billing.sql` | Adds standard APR (apr_bps), promotional APR (promo_apr_bps), and promotional APR expiration date (promo_end_date) to credit_card_profiles |
 
 ### Key Data Model Notes
 
@@ -135,7 +137,20 @@ app-shell cache; this is not an app version bump.
 
 **Account balance records:** `account_balance_records` stores dated balance snapshots for accounts that need manual history outside SimpleFIN. Adding a record upserts by `(account_id, record_date)` and updates `accounts.current_balance` when that record is the newest snapshot for the account. Net Worth history uses the latest snapshot on or before each month when one exists, then falls back to transaction-derived balances. Push snapshot reminders can target selected accounts and deep-link to `/accounts?action=add-snapshot&accountId=...`.
 
-**Credit card profiles:** `credit_card_profiles` stores optional one-to-one profile details for credit accounts, including card name, issuer, network, credit limit, annual fee timing, authorized users, best-use reward categories, benefits, notes, and optional card imagery. Money fields are integer cents in SQLite and dollar values in API payloads.
+**Credit card profiles:** `credit_card_profiles` stores optional one-to-one profile details for accounts with `type = 'credit'`.
+- **Financial Units:** Money fields (`annual_fee`, `credit_limit`, benefit amounts, SUB targets and values) are stored as integer cents (`typealias Cents = Long`) in SQLite and domain models, and converted to decimal dollars in API JSON payloads.
+- **Basis Points (BPS):** Standard interest rate (`apr_bps`) and promotional interest rate (`promo_apr_bps`) are stored as non-negative integer basis points where 1 BPS = 0.01% (e.g., 24.99% is stored as `2499`, 0% promo is `0`). Valid range is `0` to `10000` (0.00% to 100.00%). Promotional expiration is stored as strict ISO date string `promo_end_date` (`YYYY-MM-DD`).
+- **Billing Cycle Days:** `statement_closing_day` and `payment_due_day` are stored as integers clamped to `1..31`. If a month has fewer days than the specified cycle day, calculation engines clamp to the month's last valid day.
+- **Benefits v2 Schema (`benefits_json`):** JSON array of up to 24 card benefit objects. Each benefit has a deterministic string `id` (`b_<alphanumeric>` or `legacy-<idx>-<hash>`), display `title` (max 120 chars), optional `description` (max 300 chars), `category` tag, `period_value` (integer cents in storage, decimal dollars in API), `cadence` (`monthly`, `quarterly`, `semi_annual`, `annual`, `every_4_years`), `anchor` (`calendar` vs `cardmember_year`), and a structured `usage` ledger array of `{ period_key, amount, used_on }` objects capped at 120 historical entries.
+- **Strategy & Lifecycle Schema (`strategy_json`):** JSON object tracking household player assignments and rewards strategy:
+  - `cardholder_member_id`: foreign key referencing `household_members.id` (primary cardholder).
+  - `authorized_user_member_ids`: array of up to 12 `household_members.id` references representing authorized users on the account.
+  - `cardholder`: free-text label used when the account is not linked to a household member profile.
+  - `opened_date` & `closed_date`: ISO `YYYY-MM-DD` lifecycle dates.
+  - `is_business_card`: boolean flag. Business cards do not count toward personal 5/24 limits unless overridden.
+  - `counts_toward_524_override`: nullable boolean allowing explicit manual override of 5/24 inclusion.
+  - `product_changed_from`: text tracking original product for upgraded/downgraded cards.
+  - Welcome bonus (SUB) tracker fields: `sub_reward_text`, `sub_estimated_value` (cents), `sub_target_spend` (cents), `sub_deadline_date` (ISO date), `sub_manual_spend_offset` (cents), `sub_completed` (boolean), `sub_received_date` (ISO date), and `sub_cooldown_months` (0..1200, with 999 representing lifetime).
 
 **Overlap strategy (SimpleFIN + Rocket Money):** cutover date approach — RM owns transactions before cutover, SimpleFIN owns after. Pre-cutover RM transactions are deleted during sync if SimpleFIN provides the same period.
 
@@ -213,7 +228,111 @@ All comparisons use COALESCE(edited, original) so filtering matches what's on sc
 - Three-dot dropdown menu per account (Add Record, Edit, Merge, Archive, Delete)
 - Add Record modal stores a dated account total snapshot with an app-dialog confirmation that summarizes the percentage change from the previous balance.
 - Edit modal: name, type, institution, plus estimated value for mortgage accounts. Balance and last-4 are intentionally not editable in the UI.
-- Credit card account rows open an Edit Card modal on tap/click. The modal stores the account name, institution, local card name, issuer, network, credit limit, annual fee timing, authorized users, best-use categories, benefits, notes, and optional card imagery. Card images can be found through the shared image finder using a DuckDuckGo Images helper or a direct image URL.
+- Credit card account rows open the unified Card Editor on tap/click (or via the "Edit Card Details & Perks" action menu). The editor binds directly to a configuration-proof `CardEditorDraft` in the ViewModel, preserving unsaved changes across screen rotation and device folding. Card visual styles use physical wallet-matched gradient presets (`CardArtPalette`) rather than fragile image scraping or external URLs.
+
+### Credit Card Tracking & Rewards Strategy
+
+Orbit provides an integrated, local-first credit card management and rewards strategy suite designed for multi-player households, travel rewards enthusiasts, and disciplined budgeters.
+
+#### 1. Billing & Cycle Engine (`CreditCardCycleEngine`)
+- **Clamped Date Math:** Statement close and due days (`1..31`) are dynamically clamped to each month's actual length via `LocalDateUtils.daysInMonth(year, month)`.
+- **Statement Close Date Derivation:**
+  - `lastClose(closingDay, today)`: Returns the closing date in the current month if on or before `today`; otherwise rolls back to the prior month (handling January to December year boundaries).
+  - `nextClose(closingDay, today)`: Returns the next closing date strictly after `today`, rolling forward into the subsequent month/year when this month's close date has elapsed.
+- **Payment Due Date Derivation:**
+  - `dueDateAfter(close, dueDay)`: Finds the first valid `dueDay` strictly after `close`. If `dueDay > close.dayOfMonth`, it falls in the same month; otherwise it rolls into the subsequent month (accounting for standard 21–25 day grace periods).
+  - When closing day is unconfigured, the due date is derived from the next upcoming occurrence of `dueDay`.
+- **Rolling Annual Fee Dates:**
+  - `nextAnnualFeeDate(postIso, today)`: Advances the card's original fee posting anniversary by whole years until it falls on or after `today`. Leap-day anniversaries (February 29) automatically clamp to February 28 during non-leap years.
+- **Statement Balance Estimation:**
+  - Orbit represents debt liabilities as negative current balances (`currentBalanceCents <= 0`).
+  - Transactions use negative cents for charges/expenses and positive cents for payments/refunds.
+  - The engine derives the balance at the last statement close by subtracting charges incurred after the close date:
+    $$\text{balanceAtClose} = \text{currentBalance} - \sum_{\text{date} > \text{lastClose}} \text{effectiveAmountCents}$$
+    $$\text{estimatedStatementBalance} = \max(0, -\text{balanceAtClose})$$
+  - If the card has a credit balance (`currentBalance > 0`) or closing day is unconfigured, estimated statement balance evaluates to `null`.
+- **Credit Utilization:**
+  - Portfolio utilization is calculated across all active, non-closed credit cards:
+    $$\text{utilizationBps} = \frac{\text{totalOwedCents} \times 10000}{\text{totalLimitCents}}$$
+  - Individual and portfolio utilization values are displayed with M3E color thresholds (green < 10%, amber 10–30%, red > 30%).
+- **Upcoming Payments Due:**
+  - Integrated into the Upcoming screen via `CardPaymentsDueCard`.
+  - Scans active credit cards with a derived `dueDate` within the next 35 days (`daysUntilDue in 0..35`).
+  - Displays due date, countdown pill, card title, cardholder label, estimated statement balance (or owed-now amount), and deep-links to transaction history or card settings.
+
+#### 2. Benefits v2 Model & Value Ledger (`CreditCardBenefitEngine`)
+- **Deterministic Benefit IDs:** Benefits carry immutable string identifiers (`b_<uuid>` or legacy upgrade slugs), ensuring usage records remain reliably linked across card template reapplications and title edits.
+- **Reset Cadences & Period Keys:**
+  - `MONTHLY`: Resets on the 1st of every month (`YYYY-MM`, e.g., `2026-11`).
+  - `QUARTERLY`: Resets on calendar quarter boundaries (`YYYY-Q1` through `YYYY-Q4`).
+  - `SEMI_ANNUAL`: Resets every six months (`YYYY-H1` for Jan–Jun, `YYYY-H2` for Jul–Dec).
+  - `ANNUAL` (Calendar): Resets on January 1 (`YYYY`, e.g., `2026`).
+  - `ANNUAL` (Cardmember Year): Resets on the card opening anniversary (`CM-YYYY-MM-DD`, where the date suffix is the window start date derived via `cardmemberYear(openedDate, today)`).
+  - `EVERY_4_YEARS`: 48-month window used for TSA PreCheck / Global Entry credits (`YYYY` representing the active 4-year block start).
+- **Value Ledger Calculation:**
+  - `CreditCardBenefitEngine.ledger(profile, today)` evaluates the card's active 12-month accounting window (cardmember year if `openedDate` is present; calendar year otherwise).
+  - **Captured Credits:** Sums usage amounts from `usage` entries whose period start falls within the active window.
+  - **Available Potential Credits:** Annualized sum of all configured card benefits:
+    $$\text{annualizedValue} = \text{periodValue} \times \frac{12}{\text{cadenceMonths}}$$
+  - **Fee After Credits (Net Effective Annual Fee):**
+    $$\text{feeAfterCredits} = \text{annualFee} - \text{creditsCaptured}$$
+    (A negative value indicates credits captured exceed the annual fee, yielding net positive financial return).
+- **Atomic Usage Mutation & Ledger History:**
+  - `PUT /api/accounts/:id/credit-card-profile/benefits/:benefitId/usage` updates benefit usage with optimistic rollback on the client.
+  - Usage histories are capped at 120 entries (`slice(-120)`) in SQLite to guarantee predictable document size in `benefits_json`.
+- **Card Template Merge Semantics:**
+  - Applying a template merges new catalog benefits and reward categories into the profile while preserving existing user usage history, manual custom benefits, and custom category rates. Templates are stamped with an `asOf` date (`2026-11`).
+
+#### 3. Household 5/24 & Strategy Tracking (`CreditCardStrategyEngine`)
+- **Chase 5/24 Rule:** Evaluates personal credit cards opened across any issuer within the sliding 24-month window (`today - 24 months`).
+- **Household Player Partitioning:**
+  - Card profiles map to household members via `cardholder_member_id` (`m:<id>`), falling back to string `cardholder` or `~unassigned`.
+  - The portfolio summary partitions 5/24 calculations by individual person (`Chase524PersonSummary`) and supports a global household filter (`ALL_PLAYERS`).
+- **Slot Drop-Off Calculation:**
+  - Each qualifying card occupies a 5/24 slot with drop-off date `openedDate + 24 months`.
+  - Slots are sorted chronologically by opening date.
+  - `nextSlotFreeDate`: The earliest drop-off date among active slots.
+  - `under524DropDate`: When at 5/5 or higher, the drop-off date of the $(N - 4)$-th card that will return the cardholder to 4/24.
+- **Authorized User Handling:**
+  - Cards where a player is listed in `authorized_user_member_ids` appear in that player's 5/24 list flagged with `isAuthorizedUser = true`.
+  - Because automated underwriting systems count authorized user cards until manual reconsideration, Orbit counts them toward the slot total while rendering a distinct AU visual badge.
+- **Missing Opened Date Safeguard:**
+  - If a card has `countsToward524 == true` but no `openedDate` is recorded, the engine cannot place it in the 24-month window.
+  - Rather than omitting the card or guessing, `missingOpenDateCount` is incremented and an attention banner is displayed in the UI prompting the user to supply the opening date.
+- **Business Cards & Manual Overrides:**
+  - Cards marked `isBusinessCard = true` are excluded from 5/24 by default (reflecting that small business cards from Chase, Amex, and Citi do not report to personal credit bureaus).
+  - Users can explicitly toggle `countsToward524Override` (`true` or `false`) to handle exceptions (such as Capital One business cards that report to personal bureaus).
+- **Account Deletion Warning:**
+  - Attempting to delete a credit card account opened within the last 24 months triggers a confirmation warning informing the user that deletion will remove the card from household 5/24 tracking.
+- **Welcome Bonus (SUB) Tracker:**
+  - Hardened spend calculation using `CardTransactionClassifier.bonusSpendDeltaCents(txn)`: strictly isolates true purchases, excluding balance transfers, payments, refunds, annual fees, interest charges, and cash advances.
+  - Supports manual spend offset (`subManualSpendOffsetCents`) to account for transactions that occurred prior to bank account linking.
+  - Status progression: `ON_TRACK`, `AT_RISK` (spend velocity behind pace or < 14 days remaining with < 85% spend met), `SPEND_MET`, `RECEIVED`, and `EXPIRED`.
+  - Conservative eligibility checks support once-per-lifetime rules (`subCooldownMonths >= 999`) and standard 24/48-month cooldowns with a 3-month anchor fallback when bonus receipt date is omitted.
+
+#### 4. UI Architecture & Responsive Layout Containment
+- **Unified Draft State in ViewModel:**
+  - Card editor state lives in `AccountsViewModel.cardEditor.draftState: StateFlow<CardEditorDraft?>`.
+  - Holds all editing properties (identity, billing days, APRs, dates, benefits, categories, welcome bonus mode, and discard confirmation state).
+  - Survives Android activity recreation, screen rotation, and foldable display unfolding without state loss.
+- **CardEditorController:**
+  - Encapsulates draft mutations: `startDraft`, `applyTemplate`, `skipTemplate`, `upsertBenefit`, `removeBenefit`, `undoRemoveBenefit`, `upsertReward`, `removeReward`, `setWelcomeBonusMode`, and atomic `save`.
+  - Validation engine provides synchronous per-field error mapping (`draft.errors`) for immediate input feedback.
+- **Zero `artworkUrl` & Preset Gradients (`CardArtPalette`):**
+  - External image URLs and DuckDuckGo image searches have been completely removed (Decision D4).
+  - Replaced with physical wallet-inspired gradient presets:
+    - `preset://sapphire-blue` (Chase Sapphire deep navy/cobalt)
+    - `preset://amex-gold` (American Express warm gold/brass)
+    - `preset://venture-silver` (Capital One slate / brushed titanium)
+    - `preset://apple-card` (Apple Card frosted pearl / light titanium)
+    - `preset://discover-plum` (Discover plum / royal purple)
+  - Selected via gradient chips with live animated `CardFace` preview.
+  - **Design System Carve-Out:** Card face composables are explicitly granted an architectural exception to the semantic color token rule to ensure instant physical wallet brand recognition.
+- **Dual Two-Pane / Sheet Rendering:**
+  - The single composable `CardEditorSheetContent` powers both form presentations:
+    - **Compact / Mobile (< 640dp):** Hosted in `CardEditorModalSheet` (wrapping `OrbitModalSheet`).
+    - **Expanded / Tablet / Desktop (≥ 640dp):** Rendered inline inside the right-hand inspector pane (`AccountDetailInspectorPane`) under submode `AccountInspectorSubMode.PERKS`.
+  - Built with a single root `LazyColumn` containing `item {}` sections, preventing nested scroll conflicts and fixed viewport height clamping.
 
 ### Budgets
 - **Monthly caps, global per category.** One amount per category that applies to every month. Editing `Groceries` updates the cap for every past and future month.
@@ -375,7 +494,10 @@ Sample households are seeded with two adult household members, MHA enabled, a ho
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/accounts?includeArchived=` | List, ordered by sort_order |
-| PUT | `/api/accounts/:id` | Update (name, type, institution) |
+| PUT | `/api/accounts/:id` | Update (name, type, institution, balance, estimated_value) |
+| PUT | `/api/accounts/:id/credit-card-profile` | Upsert credit card profile (account name, institution, card name, issuer, network, gradient preset key, annual fee & post date, credit limit, statement closing day, payment due day, standard APR BPS, promo APR BPS, promo end date, authorized users, reward categories, benefits v2, strategy JSON, notes). Validates BPS (0..10000) and cycle days (1..31). |
+| PUT | `/api/accounts/:id/credit-card-profile/benefits/:benefitId/usage` | Upsert or clear benefit usage for a period key (`{ period_key, amount, used_on? }`) in an atomic transaction. Enforces 120-item ledger cap. |
+| DELETE | `/api/accounts/:id/credit-card-profile` | Delete credit card profile metadata while keeping the underlying credit account row intact. |
 | POST | `/api/accounts/:id/archive` | Archive |
 | POST | `/api/accounts/:id/unarchive` | Unarchive |
 | POST | `/api/accounts/:id/records` | Add or update a dated manual balance snapshot |

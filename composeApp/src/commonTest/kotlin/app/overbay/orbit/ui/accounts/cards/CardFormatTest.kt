@@ -12,8 +12,10 @@ class CardFormatTest {
         assertEquals("Not Set", CardFormat.formatCardDate(""))
         assertEquals("Not Set", CardFormat.formatCardDate("   "))
         assertEquals("Not Set", CardFormat.formatCardDate("invalid-date"))
-        assertEquals("Nov 10", CardFormat.formatCardDate("2026-11-10"))
-        assertEquals("Jan 1", CardFormat.formatCardDate("2025-01-01"))
+        val currentYear = app.overbay.orbit.domain.LocalDateUtils.todayLocalDate().year
+        assertEquals("Nov 10", CardFormat.formatCardDate("$currentYear-11-10"))
+        assertEquals("Jan 1, 2025", CardFormat.formatCardDate("2025-01-01"))
+        assertEquals("Jun 30, 2027", CardFormat.formatCardDate("2027-06-30"))
     }
 
     @Test
