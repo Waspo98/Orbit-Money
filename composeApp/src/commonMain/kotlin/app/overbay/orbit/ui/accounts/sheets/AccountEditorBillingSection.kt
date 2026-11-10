@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.accounts.sheets
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,13 +20,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.CreditCardProfile
-import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.accounts.cards.CardEditorDraft
-import app.overbay.orbit.ui.accounts.cards.CardFormat
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitSwitchGroupCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.OrbitTextField
 
@@ -81,12 +82,13 @@ fun AccountEditorBillingSection(
     OrbitSectionCard(
         title = "Credit Card Billing & Terms",
         subtitle = "Statement cycle, credit limit, interest rate & annual fee",
+        showHeaderDivider = false,
         modifier = modifier.fillMaxWidth()
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Box(modifier = Modifier.weight(1f)) {
                     CurrencyTextField(
@@ -99,7 +101,9 @@ fun AccountEditorBillingSection(
                     OrbitTextField(
                         value = state.aprText,
                         onValueChange = { state.aprText = it },
-                        label = { Text("Purchase APR %") },
+                        label = { Text("Purchase APR") },
+                        placeholder = { Text("24.99") },
+                        suffixText = "%",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -109,12 +113,14 @@ fun AccountEditorBillingSection(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OrbitTextField(
                     value = state.statementCloseDayText,
                     onValueChange = { if (it.length <= 2) state.statementCloseDayText = it.filter(Char::isDigit) },
-                    label = { Text("Statement Close Day (1-31)") },
+                    label = { Text("Statement Closes") },
+                    placeholder = { Text("1–31") },
+                    suffixText = "Day",
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.weight(1f)
@@ -122,70 +128,91 @@ fun AccountEditorBillingSection(
                 OrbitTextField(
                     value = state.paymentDueDayText,
                     onValueChange = { if (it.length <= 2) state.paymentDueDayText = it.filter(Char::isDigit) },
-                    label = { Text("Payment Due Day (1-31)") },
+                    label = { Text("Payment Due") },
+                    placeholder = { Text("1–31") },
+                    suffixText = "Day",
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            OrbitSwitchRow(
-                title = "Promotional / Intro APR",
-                checked = state.hasPromo,
-                onCheckedChange = { state.hasPromo = it }
-            )
-            if (state.hasPromo) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OrbitTextField(
-                        value = state.promoAprText,
-                        onValueChange = { state.promoAprText = it },
-                        label = { Text("Promo APR (e.g. 0.0%)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Box(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
+            OrbitSwitchGroupCard {
+                OrbitSwitchRow(
+                    title = "Promotional / Intro APR",
+                    subtitle = "Temporary 0% or reduced purchase interest",
+                    checked = state.hasPromo,
+                    onCheckedChange = { state.hasPromo = it },
+                    showContainer = false
+                )
+
+                AnimatedVisibility(visible = state.hasPromo) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OrbitTextField(
+                            value = state.promoAprText,
+                            onValueChange = { state.promoAprText = it },
+                            label = { Text("Promo APR") },
+                            placeholder = { Text("0.0") },
+                            suffixText = "%",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
                         DateFieldButton(
-                            date = state.promoEndDate?.let { LocalDateUtils.parseIsoDate(it) } ?: LocalDateUtils.todayLocalDate(),
+                            date = state.promoEndDate?.let { LocalDateUtils.parseIsoDate(it) },
                             onDateSelected = { dt -> state.promoEndDate = LocalDateUtils.formatIsoDate(dt) },
-                            label = state.promoEndDate?.let { "Ends ${CardFormat.formatCardDate(it)}" } ?: "Promo End Date"
+                            label = "Promo Ends",
+                            placeholder = "Select Date",
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
-            }
 
-            OrbitSwitchRow(
-                title = "Has Annual Fee",
-                checked = state.hasAnnualFee,
-                onCheckedChange = { state.hasAnnualFee = it }
-            )
-            if (state.hasAnnualFee) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(modifier = Modifier.weight(1f)) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+                )
+
+                OrbitSwitchRow(
+                    title = "Annual Fee",
+                    subtitle = "Recurring cardmember renewal fee",
+                    checked = state.hasAnnualFee,
+                    onCheckedChange = { state.hasAnnualFee = it },
+                    showContainer = false
+                )
+
+                AnimatedVisibility(visible = state.hasAnnualFee) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         CurrencyTextField(
                             cents = state.annualFeeCents,
                             onCentsChange = { state.annualFeeCents = it },
-                            label = "Annual Fee"
+                            label = "Annual Fee",
+                            modifier = Modifier.weight(1f)
                         )
-                    }
-                    Box(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
                         DateFieldButton(
-                            date = state.annualFeePostDate?.let { LocalDateUtils.parseIsoDate(it) } ?: LocalDateUtils.todayLocalDate(),
+                            date = state.annualFeePostDate?.let { LocalDateUtils.parseIsoDate(it) },
                             onDateSelected = { dt -> state.annualFeePostDate = LocalDateUtils.formatIsoDate(dt) },
-                            label = state.annualFeePostDate?.let { "Posts ${CardFormat.formatCardDate(it)}" } ?: "Fee Post Date"
+                            onClear = { state.annualFeePostDate = null },
+                            label = "Fee Post Date",
+                            placeholder = "Not Set",
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
             }
 
             Text(
-                text = "Statement credits, reward multipliers & 5/24 strategy are managed in Credit Card Tracker.",
+                text = "Statement credits, reward multipliers & 5/24 strategy are managed via Edit Card.",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.outline

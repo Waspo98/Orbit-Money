@@ -1,32 +1,22 @@
 package app.overbay.orbit.ui.transactions.sheets
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
@@ -44,11 +33,13 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitAmountTypeCard
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitModalFooter
 import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.transactions.components.TransactionOptionsBlock
@@ -110,13 +101,7 @@ fun TransactionEditorContent(
     var isIgnored by remember(transaction) { mutableStateOf(transaction?.effectiveIsIgnored ?: false) }
     var mhaEligible by remember(transaction) { mutableStateOf(transaction?.effectiveMhaEligible ?: false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        // Title Header + Top-Right Quick Actions (Import CSV when new, Split & Delete when editing)
+    Column(modifier = modifier.fillMaxWidth()) {
         OrbitSheetHeader(
             title = if (isEditing) "Edit Transaction" else "New Transaction",
             onDismiss = onDismiss,
@@ -124,19 +109,13 @@ fun TransactionEditorContent(
                 if (!isEditing && onImportCsv != null) {
                     OrbitActionChip(
                         label = "Import CSV",
-                        onClick = {
-                            haptics.tick()
-                            onImportCsv()
-                        }
+                        onClick = { onImportCsv() }
                     )
                 } else if (transaction != null && transaction.id > 0L) {
                     OrbitActionChip(
                         label = "Split",
                         leadingIcon = Icons.Default.Share,
-                        onClick = {
-                            haptics.tick()
-                            onSplit(transaction.id)
-                        }
+                        onClick = { onSplit(transaction.id) }
                     )
                     OrbitActionChip(
                         label = "Delete",
@@ -148,161 +127,132 @@ fun TransactionEditorContent(
                         }
                     )
                 }
-            }
+            },
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
         )
 
-        // Compact Provenance Pill (if imported original values exist)
-        if (transaction != null && transaction.id > 0L) {
-            Spacer(modifier = Modifier.height(10.dp))
-            TransactionProvenanceCard(
-                transaction = transaction,
-                onResetToOriginal = onResetToOriginal
-            )
-        }
+        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Centerpiece Amount + Expense/Income Hero Card
-        OrbitAmountTypeCard(
-            cents = rawAmountCents,
-            onCentsChange = { rawAmountCents = it },
-            isExpense = isExpense,
-            onIsExpenseChange = { isExpense = it }
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Merchant Name Input
-        OrbitTextField(
-            value = merchant,
-            onValueChange = { merchant = it },
-            label = { Text("Merchant") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // 2-Column Bento Row: Date + Category
-        val selectedCategory = categories.find { it.id == selectedCategoryId }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            DateFieldButton(
-                date = selectedDate,
-                onDateSelected = { selectedDate = it },
-                label = "Date",
-                modifier = Modifier.weight(0.45f)
-            )
-
-            OrbitDropdownField(
-                label = "Category",
-                selectedText = selectedCategory?.labelWithEmoji ?: "❓ Uncategorized",
-                options = categories,
-                optionLabel = { it.labelWithEmoji },
-                onOptionSelected = { selectedCategoryId = it.id },
-                nullOptionLabel = "❓ Uncategorized",
-                onNullSelected = { selectedCategoryId = null },
-                leadingIcon = if (selectedCategory != null) {
-                    {
-                        val color = selectedCategory.color.toComposeColor(MaterialTheme.colorScheme.primary)
-                        Box(
-                            modifier = Modifier
-                                .size(12.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                        )
-                    }
-                } else null,
-                modifier = Modifier.weight(0.55f)
-            )
-        }
-
-        if (!isEditing && accounts.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(10.dp))
-            val selectedAccount = accounts.find { it.id == selectedAccountId } ?: accounts.first()
-            OrbitDropdownField(
-                label = "Account",
-                selectedText = selectedAccount.name,
-                options = accounts,
-                optionLabel = { it.name },
-                onOptionSelected = { selectedAccountId = it.id }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Notes Input
-        OrbitTextField(
-            value = notes,
-            onValueChange = { notes = it },
-            label = { Text("Notes (Optional)") },
-            modifier = Modifier.fillMaxWidth(),
-            maxLines = 2
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Grouped Tonal Options Card: Transfer, MHA & Quick Actions
-        TransactionOptionsBlock(
-            isTransfer = isTransfer,
-            onTransferChange = { isTransfer = it },
-            mhaEligible = mhaEligible,
-            onMhaEligibleChange = { mhaEligible = it },
-            isIgnored = isIgnored,
-            onIgnoredChange = { isIgnored = it },
-            onCreateRule = if (transaction != null && onCreateRule != null) ({ onCreateRule(transaction) }) else null,
-            onMarkRecurring = if (transaction != null && onMarkRecurring != null) ({ onMarkRecurring(transaction) }) else null,
-            showMhaOption = showMhaOption
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Primary Actions Row (Title Case)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-            ) {
-                Text("Cancel", fontWeight = FontWeight.SemiBold)
+            if (transaction != null && transaction.id > 0L) {
+                TransactionProvenanceCard(
+                    transaction = transaction,
+                    onResetToOriginal = onResetToOriginal
+                )
             }
 
-            Button(
-                onClick = {
-                    haptics.confirm()
-                    val signedAmount = if (isExpense) -rawAmountCents else rawAmountCents
-                    val isoDate = selectedDate.toString()
-                    onSave(
-                        transaction?.id ?: 0L,
-                        merchant,
-                        signedAmount,
-                        isoDate,
-                        selectedCategoryId,
-                        notes.ifBlank { null },
-                        isTransfer,
-                        isIgnored,
-                        mhaEligible,
-                        selectedAccountId
-                    )
-                },
-                enabled = merchant.isNotBlank() && rawAmountCents > 0L,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
+            OrbitAmountTypeCard(
+                cents = rawAmountCents,
+                onCentsChange = { rawAmountCents = it },
+                isExpense = isExpense,
+                onIsExpenseChange = { isExpense = it }
+            )
+
+            OrbitTextField(
+                value = merchant,
+                onValueChange = { merchant = it },
+                label = { Text("Merchant") },
+                placeholder = { Text("e.g. Trader Joe's, Electric Utility") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            val selectedCategory = categories.find { it.id == selectedCategoryId }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Save", fontWeight = FontWeight.Bold)
+                DateFieldButton(
+                    date = selectedDate,
+                    onDateSelected = { selectedDate = it },
+                    label = "Date",
+                    modifier = Modifier.weight(0.45f)
+                )
+
+                OrbitDropdownField(
+                    label = "Category",
+                    selectedText = selectedCategory?.labelWithEmoji ?: "❓ Uncategorized",
+                    options = categories,
+                    optionLabel = { it.labelWithEmoji },
+                    onOptionSelected = { selectedCategoryId = it.id },
+                    nullOptionLabel = "❓ Uncategorized",
+                    onNullSelected = { selectedCategoryId = null },
+                    leadingIcon = if (selectedCategory != null) {
+                        {
+                            val color = selectedCategory.color.toComposeColor(MaterialTheme.colorScheme.primary)
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                            )
+                        }
+                    } else null,
+                    modifier = Modifier.weight(0.55f)
+                )
             }
+
+            if (!isEditing && accounts.isNotEmpty()) {
+                val selectedAccount = accounts.find { it.id == selectedAccountId } ?: accounts.first()
+                OrbitDropdownField(
+                    label = "Account",
+                    selectedText = selectedAccount.name,
+                    options = accounts,
+                    optionLabel = { it.name },
+                    onOptionSelected = { selectedAccountId = it.id }
+                )
+            }
+
+            OrbitTextField(
+                value = notes,
+                onValueChange = { notes = it },
+                label = { Text("Notes (Optional)") },
+                placeholder = { Text("Add memo, tag, or receipt note…") },
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 2
+            )
+
+            TransactionOptionsBlock(
+                isTransfer = isTransfer,
+                onTransferChange = { isTransfer = it },
+                mhaEligible = mhaEligible,
+                onMhaEligibleChange = { mhaEligible = it },
+                isIgnored = isIgnored,
+                onIgnoredChange = { isIgnored = it },
+                onCreateRule = if (transaction != null && onCreateRule != null) ({ onCreateRule(transaction) }) else null,
+                onMarkRecurring = if (transaction != null && onMarkRecurring != null) ({ onMarkRecurring(transaction) }) else null,
+                showMhaOption = showMhaOption
+            )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        OrbitModalFooter(
+            confirmText = if (isEditing) "Save Transaction" else "Add Transaction",
+            confirmEnabled = merchant.isNotBlank() && rawAmountCents > 0L,
+            onDismiss = onDismiss,
+            onConfirm = {
+                val signedAmount = if (isExpense) -rawAmountCents else rawAmountCents
+                val isoDate = selectedDate.toString()
+                onSave(
+                    transaction?.id ?: 0L,
+                    merchant,
+                    signedAmount,
+                    isoDate,
+                    selectedCategoryId,
+                    notes.ifBlank { null },
+                    isTransfer,
+                    isIgnored,
+                    mhaEligible,
+                    selectedAccountId
+                )
+            }
+        )
     }
 }

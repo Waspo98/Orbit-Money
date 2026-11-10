@@ -439,4 +439,40 @@ class CardEditorControllerTest {
         assertEquals(listOf(10L), savedProfile.strategy.authorizedUserMemberIds)
         assertEquals(listOf("Jordan"), savedProfile.authorizedUsers)
     }
+
+    @Test
+    fun testTabNavigationAndCrossTabErrorRouting() {
+        val account = Account(
+            id = 111L,
+            name = "Tabbed Card",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(accountId = 111L, cardName = "Freedom Unlimited")
+        )
+        controller.open(account)
+
+        assertEquals(CardEditorTab.CARD, controller.draft.value!!.activeTab)
+        assertFalse(controller.draft.value!!.isDirty)
+
+        // Switching tabs is configuration-proof UI navigation and must NOT mark a clean draft dirty
+        controller.selectTab(CardEditorTab.REWARDS)
+        assertEquals(CardEditorTab.REWARDS, controller.draft.value!!.activeTab)
+        assertFalse(controller.draft.value!!.isDirty)
+
+        // Billing error routes to BILLING tab
+        controller.updateDraft { it.copy(statementCloseDayText = "40") }
+        assertTrue(controller.draft.value!!.tabHasErrors(CardEditorTab.BILLING))
+        assertFalse(controller.draft.value!!.tabHasErrors(CardEditorTab.CARD))
+        assertEquals(CardEditorTab.BILLING, controller.draft.value!!.firstErrorBanner?.first)
+
+        // Fix billing error, introduce Strategy date error -> routes to STRATEGY tab
+        controller.updateDraft {
+            it.copy(
+                statementCloseDayText = "15",
+                openedDate = "invalid-date"
+            )
+        }
+        assertFalse(controller.draft.value!!.tabHasErrors(CardEditorTab.BILLING))
+        assertTrue(controller.draft.value!!.tabHasErrors(CardEditorTab.STRATEGY))
+        assertEquals(CardEditorTab.STRATEGY, controller.draft.value!!.firstErrorBanner?.first)
+    }
 }
