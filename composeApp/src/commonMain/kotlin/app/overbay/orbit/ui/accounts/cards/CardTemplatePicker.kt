@@ -46,6 +46,7 @@ val TEMPLATE_FILTER_CHIPS = listOf(
     "Capital One",
     "Citi",
     "BofA",
+    "Barclays",
     "Wells Fargo / Bilt",
     "U.S. Bank",
     "Business",
@@ -66,6 +67,7 @@ fun filterCardTemplates(
             "Capital One" -> tpl.issuerName.contains("Capital One", ignoreCase = true)
             "Citi" -> tpl.issuerName.contains("Citi", ignoreCase = true)
             "BofA" -> tpl.issuerName.contains("Bank of America", ignoreCase = true)
+            "Barclays" -> tpl.issuerName.contains("Barclays", ignoreCase = true)
             "Wells Fargo / Bilt" -> tpl.issuerName.contains("Wells Fargo", ignoreCase = true) || tpl.issuerName.contains("Bilt", ignoreCase = true)
             "U.S. Bank" -> tpl.issuerName.contains("U.S. Bank", ignoreCase = true) || tpl.issuerName.contains("US Bank", ignoreCase = true)
             "Business" -> tpl.isBusinessCard
@@ -266,18 +268,13 @@ private fun TemplateItemRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(modifier = Modifier.size(width = 58.dp, height = 38.dp)) {
-                CardFace(
-                    name = template.shortLabel,
-                    issuer = template.issuerName,
-                    network = template.network,
-                    artKey = template.imageUrl,
-                    holderLabel = null,
-                    compact = true,
-                    artworkUrl = template.artworkUrl,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+            CardArtworkThumbnail(
+                name = template.shortLabel,
+                issuer = template.issuerName,
+                artKey = template.imageUrl,
+                artworkUrl = template.artworkUrl,
+                modifier = Modifier.size(width = 62.dp, height = 39.dp)
+            )
 
             Column(
                 modifier = Modifier.weight(1f),

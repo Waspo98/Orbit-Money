@@ -3,6 +3,7 @@ package app.overbay.orbit.data.network
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardTemplate
+import app.overbay.orbit.domain.CreditCardTemplates
 import app.overbay.orbit.domain.MoneyUtils
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
@@ -89,9 +90,11 @@ suspend fun OrbitApiClient.fetchCardCatalogRemote(): Result<List<CreditCardTempl
             issuerName = dto.issuerName,
             network = dto.network,
             imageUrl = dto.imageUrl,
-            artworkUrl = dto.artworkUrl?.takeIf { it.isNotBlank() }?.let { raw ->
-                if (raw.startsWith("http://") || raw.startsWith("https://")) raw else url(raw)
-            },
+            artworkUrl = dto.directArtworkUrl?.takeIf { it.isNotBlank() }
+                ?: CreditCardTemplates.findBundledById(dto.id)?.artworkUrl
+                ?: dto.artworkUrl?.takeIf { it.isNotBlank() }?.let { raw ->
+                    if (raw.startsWith("http://") || raw.startsWith("https://")) raw else url(raw)
+                },
             annualFeeCents = dto.annualFeeCents,
             isAnnualFeeWaived = dto.isAnnualFeeWaived,
             isBusinessCard = dto.isBusinessCard,

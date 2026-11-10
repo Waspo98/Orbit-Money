@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,8 +39,82 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.domain.CreditCardTemplates
 import app.overbay.orbit.theme.CardArtPalette
 import app.overbay.orbit.ui.transactions.components.MerchantLogoImageCache
+
+@Composable
+fun CardArtworkThumbnail(
+    name: String,
+    issuer: String?,
+    artKey: String?,
+    artworkUrl: String?,
+    modifier: Modifier = Modifier
+) {
+    val cleanArtworkUrl = remember(artworkUrl, name, issuer) {
+        CreditCardTemplates.resolveArtworkUrl(artworkUrl, name, issuer)
+    }
+    var artworkBitmap by remember(cleanArtworkUrl) {
+        mutableStateOf<ImageBitmap?>(MerchantLogoImageCache.getCached(cleanArtworkUrl))
+    }
+
+    LaunchedEffect(cleanArtworkUrl) {
+        if (cleanArtworkUrl == null) {
+            artworkBitmap = null
+        } else if (artworkBitmap == null && !MerchantLogoImageCache.isKnownFailed(cleanArtworkUrl)) {
+            artworkBitmap = MerchantLogoImageCache.fetchBitmap(cleanArtworkUrl)
+        }
+    }
+
+    val (startColor, endColor, textColor) = CardArtPalette.resolveColors(
+        key = artKey,
+        fallbackStart = MaterialTheme.colorScheme.primary,
+        fallbackEnd = MaterialTheme.colorScheme.tertiary,
+        fallbackText = MaterialTheme.colorScheme.onPrimary
+    )
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(6.dp),
+        shadowElevation = 2.dp,
+        border = BorderStroke(0.75.dp, textColor.copy(alpha = 0.22f))
+    ) {
+        val loadedBitmap = artworkBitmap
+        if (loadedBitmap != null) {
+            Image(
+                bitmap = loadedBitmap,
+                contentDescription = name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Brush.linearGradient(listOf(startColor, endColor)))
+                    .padding(5.dp),
+                contentAlignment = Alignment.BottomStart
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .size(width = 11.dp, height = 8.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(textColor.copy(alpha = 0.32f))
+                )
+                Text(
+                    text = name.take(12),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 7.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = textColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun CardFace(
@@ -51,7 +127,9 @@ fun CardFace(
     artworkUrl: String? = null,
     modifier: Modifier = Modifier
 ) {
-    val cleanArtworkUrl = artworkUrl?.trim()?.takeIf { it.isNotBlank() }
+    val cleanArtworkUrl = remember(artworkUrl, name, issuer) {
+        CreditCardTemplates.resolveArtworkUrl(artworkUrl, name, issuer)
+    }
     var artworkBitmap by remember(cleanArtworkUrl) {
         mutableStateOf<ImageBitmap?>(MerchantLogoImageCache.getCached(cleanArtworkUrl))
     }
@@ -90,30 +168,103 @@ fun CardFace(
     ) {
         val loadedBitmap = artworkBitmap
         if (loadedBitmap != null) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Image(
-                    bitmap = loadedBitmap,
-                    contentDescription = displayName,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                if (!holderLabel.isNullOrBlank()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Brush.linearGradient(listOf(startColor, endColor)))
+                    .padding(padding)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Surface(
-                        shape = CircleShape,
-                        color = Color.Black.copy(alpha = 0.65f),
-                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.25f)),
+                        shape = RoundedCornerShape(if (compact) 7.dp else 10.dp),
+                        shadowElevation = 4.dp,
+                        color = Color.Transparent,
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(if (compact) 6.dp else 10.dp)
+                            .fillMaxHeight()
+                            .aspectRatio(1.586f)
                     ) {
-                        Text(
-                            text = holderLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = if (compact) 8.5.sp else 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                        Image(
+                            bitmap = loadedBitmap,
+                            contentDescription = displayName,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
                         )
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = displayIssuer.uppercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = if (compact) 9.sp else 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.7.sp,
+                                color = textColor.copy(alpha = 0.85f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            if (!network.isNullOrBlank()) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = textColor.copy(alpha = 0.18f)
+                                ) {
+                                    Text(
+                                        text = network.uppercase(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = if (compact) 8.sp else 9.5.sp,
+                                        color = textColor,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = displayName,
+                            style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = textColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (!holderLabel.isNullOrBlank()) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color.Black.copy(alpha = 0.45f),
+                                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.25f))
+                                ) {
+                                    Text(
+                                        text = holderLabel,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = if (compact) 8.5.sp else 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

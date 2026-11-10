@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { CURATED_CARD_CATALOG } from './creditCardCatalogSeed.js';
+import { EXTENDED_CARD_CATALOG } from './creditCardCatalogExtendedSeed.js';
 
 const UPSTREAM_DATA_URL =
   'https://raw.githubusercontent.com/andenacitelli/credit-card-bonuses-api/main/exports/data.json';
@@ -217,8 +218,8 @@ export function ensureCreditCardCatalogSeeded(db) {
       @isBusinessCard, @countsToward524Override, @subCooldownMonths,
       @defaultSubRewardText, @defaultSubEstimatedValueCents,
       @defaultSubTargetSpendCents, @subSpendWindowDays,
-      0, @rewardCategoriesJson, @benefitsJson,
-      @sortRank, 1, '2026-11', datetime('now')
+      @isElevatedSubOffer, @rewardCategoriesJson, @benefitsJson,
+      @sortRank, @isCurated, '2026-11', datetime('now')
     )
     ON CONFLICT(id) DO UPDATE SET
       bonus_api_card_id = excluded.bonus_api_card_id,
@@ -234,12 +235,16 @@ export function ensureCreditCardCatalogSeeded(db) {
       reward_categories_json = excluded.reward_categories_json,
       benefits_json = excluded.benefits_json,
       sort_rank = excluded.sort_rank,
-      is_curated = 1,
+      is_curated = excluded.is_curated,
       updated_at = datetime('now')
   `);
 
   const trx = db.transaction(() => {
-    for (const item of CURATED_CARD_CATALOG) {
+    const seedList = [
+      ...CURATED_CARD_CATALOG.map((c) => ({ ...c, isCurated: 1 })),
+      ...EXTENDED_CARD_CATALOG.map((c) => ({ ...c, isCurated: 0 }))
+    ];
+    for (const item of seedList) {
       upsertStmt.run({
         id: item.id,
         bonusApiCardId: item.bonusApiCardId || null,
@@ -261,9 +266,11 @@ export function ensureCreditCardCatalogSeeded(db) {
         defaultSubEstimatedValueCents: item.defaultSubEstimatedValueCents ?? null,
         defaultSubTargetSpendCents: item.defaultSubTargetSpendCents ?? null,
         subSpendWindowDays: item.subSpendWindowDays ?? null,
+        isElevatedSubOffer: item.isElevatedSubOffer ? 1 : 0,
         rewardCategoriesJson: JSON.stringify(item.rewardCategories || []),
         benefitsJson: JSON.stringify(item.benefits || []),
-        sortRank: item.sortRank ?? 100
+        sortRank: item.sortRank ?? 100,
+        isCurated: item.isCurated
       });
     }
   });
@@ -304,6 +311,7 @@ export async function syncCreditCardCatalogFromUpstream(db, { fetchImpl = global
            last_synced_at = datetime('now'),
            updated_at = datetime('now')
      WHERE bonus_api_card_id = @bonusApiCardId
+       AND is_curated = 1
   `);
 
   const upsertUpstreamCardStmt = db.prepare(`
@@ -333,6 +341,8 @@ export async function syncCreditCardCatalogFromUpstream(db, { fetchImpl = global
       default_sub_target_spend_cents = COALESCE(excluded.default_sub_target_spend_cents, credit_card_catalog.default_sub_target_spend_cents),
       sub_spend_window_days = COALESCE(excluded.sub_spend_window_days, credit_card_catalog.sub_spend_window_days),
       is_elevated_sub_offer = excluded.is_elevated_sub_offer,
+      reward_categories_json = excluded.reward_categories_json,
+      benefits_json = excluded.benefits_json,
       as_of = excluded.as_of,
       last_synced_at = datetime('now'),
       updated_at = datetime('now')
@@ -506,6 +516,9 @@ export function serializeCatalogRow(row) {
     network: row.network,
     image_url: row.art_key,
     artwork_url: hasRasterArtwork ? `/api/card-catalog/${encodeURIComponent(row.id)}/artwork` : null,
+    direct_artwork_url: hasRasterArtwork
+      ? `${UPSTREAM_IMAGE_BASE_URL}${row.upstream_image_path.startsWith('/') ? '' : '/'}${row.upstream_image_path}`
+      : null,
     annual_fee_cents: Number(row.annual_fee_cents) || 0,
     is_annual_fee_waived: Boolean(row.is_annual_fee_waived),
     is_business_card: Boolean(row.is_business_card),

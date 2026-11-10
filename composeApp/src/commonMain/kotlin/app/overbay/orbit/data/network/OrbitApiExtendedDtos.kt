@@ -256,6 +256,7 @@ data class CardCatalogItemDto(
     val network: String = "Visa",
     @SerialName("image_url") val imageUrl: String = "preset://sapphire-blue",
     @SerialName("artwork_url") val artworkUrl: String? = null,
+    @SerialName("direct_artwork_url") val directArtworkUrl: String? = null,
     @SerialName("annual_fee_cents") val annualFeeCents: Long = 0L,
     @SerialName("is_annual_fee_waived") val isAnnualFeeWaived: Boolean = false,
     @SerialName("is_business_card") val isBusinessCard: Boolean = false,

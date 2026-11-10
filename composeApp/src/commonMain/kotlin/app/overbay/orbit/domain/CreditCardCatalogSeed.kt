@@ -2,554 +2,585 @@ package app.overbay.orbit.domain
 
 import app.overbay.orbit.data.model.BenefitAnchor
 import app.overbay.orbit.data.model.BenefitCadence
-import app.overbay.orbit.data.model.CardBenefit
-import app.overbay.orbit.data.model.RewardCategory
 
 internal object CreditCardCatalogSeed {
 
     val ADDITIONAL_CARDS: List<CreditCardTemplate> = listOf(
-        CreditCardTemplate(
-            id = "ink_unlimited",
-            shortLabel = "Ink Unlimited",
-            cardName = "Ink Business Unlimited",
-            issuerName = "Chase",
-            network = "Visa",
-            imageUrl = "hex://#1E293B:#334155:#FFFFFF",
-            annualFeeCents = 0L,
-            isBusinessCard = true,
-            subCooldownMonths = 24,
-            defaultSubRewardText = "75,000 Ultimate Rewards pts",
-            defaultSubEstimatedValueCents = 1125_00L,
-            defaultSubTargetSpendCents = 6000_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Everything Else", label = "Everything Else (Catch-All)", multiplier = 1.5)
-            )
+        card(
+            id = "amex_delta_reserve", shortLabel = "Delta Reserve", cardName = "Delta SkyMiles Reserve",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#2E1065:#581C87:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/delta-skymiles-reserve.webp", annualFeeCents = 65000L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "70,000 Delta SkyMiles", defaultSubEstimatedValueCents = 84000L,
+            defaultSubTargetSpendCents = 500000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Travel & Flights", "Delta Purchases", 3.0), r("Everything Else", "Everything Else", 1.0)),
+            benefits = listOf(b("delta-res-resy", "\$20/mo Resy Credit (\$240/yr)", 2000L, BenefitCadence.MONTHLY, BenefitAnchor.CALENDAR, "Up to \$20 monthly statement credit at U.S. Resy restaurants"), b("delta-res-rideshare", "\$10/mo Rideshare Credit (\$120/yr)", 1000L, BenefitCadence.MONTHLY, BenefitAnchor.CALENDAR, "Up to \$10 monthly credit with Uber, Lyft, Curb, Revel, and Alto"), b("delta-res-stays", "\$200 Annual Delta Stays Credit", 20000L, BenefitCadence.ANNUAL, BenefitAnchor.CALENDAR, "Up to \$200/yr statement credit on Delta Stays prepaid bookings"))
         ),
-        CreditCardTemplate(
-            id = "ink_preferred",
-            shortLabel = "Ink Preferred",
-            cardName = "Ink Business Preferred",
-            issuerName = "Chase",
-            network = "Visa",
-            imageUrl = "hex://#0B192C:#1E3E62:#FFFFFF",
-            annualFeeCents = 95_00L,
-            isBusinessCard = true,
-            subCooldownMonths = 24,
-            defaultSubRewardText = "90,000 Ultimate Rewards pts",
-            defaultSubEstimatedValueCents = 1350_00L,
-            defaultSubTargetSpendCents = 8000_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Travel & Flights", label = "Travel, Shipping, Internet & Ads", multiplier = 3.0),
-                RewardCategory(category = "Everything Else", label = "Everything Else", multiplier = 1.0)
-            )
+        card(
+            id = "venture_x", shortLabel = "Venture X", cardName = "Venture X",
+            issuerName = "Capital One", network = "Visa", imageUrl = "preset://venture-silver",
+            artworkUrl = "https://www.offeroptimist.com/images/capitalone/venture-x.webp", annualFeeCents = 39500L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "75,000 Capital One Miles", defaultSubEstimatedValueCents = 105000L,
+            defaultSubTargetSpendCents = 400000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Travel & Flights", "Portal Hotels & Rental Cars", 10.0), r("Everything Else", "Everything Else (Catch-All)", 2.0)),
+            benefits = listOf(b("venture-x-travel-credit", "\$300 Annual Capital One Travel Credit", 30000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "\$300 annual credit for bookings through Capital One Travel each cardmember year"), b("venture-x-anniversary-miles", "10,000 Anniversary Bonus Miles (\$100 val)", 10000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "10,000 bonus miles starting on first anniversary year (equal to \$100 towards travel)"), b("venture-x-global-entry", "Global Entry / TSA PreCheck Credit", 12000L, BenefitCadence.EVERY_4_YEARS, BenefitAnchor.CALENDAR, "Up to \$120 statement credit for Global Entry or TSA PreCheck application fee every 4 years"))
         ),
-        CreditCardTemplate(
-            id = "chase_amazon_prime",
-            shortLabel = "Prime Visa",
-            cardName = "Amazon Prime Visa",
-            issuerName = "Chase",
-            network = "Visa",
-            imageUrl = "hex://#1E293B:#0F172A:#FFFFFF",
-            annualFeeCents = 0L,
-            subCooldownMonths = 24,
-            defaultSubRewardText = "$200 Amazon Gift Card Instantly",
-            defaultSubEstimatedValueCents = 200_00L,
-            defaultSubTargetSpendCents = 0L,
-            subSpendWindowDays = 30,
-            rewardCategories = listOf(
-                RewardCategory(category = "Shopping", label = "Amazon.com, Whole Foods & Chase Travel", multiplier = 5.0),
-                RewardCategory(category = "Dining & Restaurants", label = "Restaurants & Gas Stations", multiplier = 2.0),
-                RewardCategory(category = "Everything Else", label = "Everything Else", multiplier = 1.0)
-            )
+        card(
+            id = "venture_rewards", shortLabel = "Venture Rewards", cardName = "Venture Rewards",
+            issuerName = "Capital One", network = "Visa", imageUrl = "hex://#1E3A8A:#2563EB:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/capitalone/venture-rewards.webp", annualFeeCents = 9500L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "75,000 Capital One Miles + \$250 Credit", defaultSubEstimatedValueCents = 130000L,
+            defaultSubTargetSpendCents = 400000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Travel & Flights", "Capital One Travel Hotels & Rental Cars", 5.0), r("Everything Else", "Everything Else (Catch-All)", 2.0)),
+            benefits = listOf(b("venture-global-entry", "Global Entry / TSA PreCheck Credit", 12000L, BenefitCadence.EVERY_4_YEARS, BenefitAnchor.CALENDAR, "Up to \$120 statement credit every 4 years"))
         ),
-        CreditCardTemplate(
-            id = "chase_hyatt",
-            shortLabel = "World of Hyatt",
-            cardName = "World of Hyatt",
-            issuerName = "Chase",
-            network = "Visa",
-            imageUrl = "hex://#111827:#1E3A8A:#FFFFFF",
-            annualFeeCents = 95_00L,
-            subCooldownMonths = 24,
-            defaultSubRewardText = "30,000 Hyatt Bonus Points",
-            defaultSubEstimatedValueCents = 540_00L,
-            defaultSubTargetSpendCents = 3000_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Travel & Flights", label = "Hyatt Hotels & Resorts", multiplier = 4.0),
-                RewardCategory(category = "Dining & Restaurants", label = "Dining, Flights & Gym", multiplier = 2.0)
-            ),
-            benefits = listOf(
-                CardBenefit(
-                    id = "hyatt-free-night",
-                    title = "Category 1-4 Free Night Award",
-                    periodValueCents = 180_00L,
-                    cadence = BenefitCadence.ANNUAL,
-                    anchor = BenefitAnchor.CARDMEMBER_YEAR,
-                    description = "1 free night at any Category 1-4 Hyatt hotel each anniversary year"
-                )
-            )
+        card(
+            id = "capital_one_savor", shortLabel = "Capital One Savor", cardName = "Capital One Savor",
+            issuerName = "Capital One", network = "Visa", imageUrl = "hex://#9A3412:#EA580C:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/capitalone/savor.webp", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "\$200 Cash Bonus", defaultSubEstimatedValueCents = 20000L,
+            defaultSubTargetSpendCents = 50000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Dining & Restaurants", "Dining", 3.0), r("Groceries", "Grocery Stores", 3.0), r("Streaming & Entertainment", "Entertainment & Popular Streaming", 3.0), r("Everything Else", "Everything Else", 1.0)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "chase_united_explorer",
-            shortLabel = "United Explorer",
-            cardName = "United Explorer",
-            issuerName = "Chase",
-            network = "Visa",
-            imageUrl = "hex://#0C2340:#1D4F91:#FFFFFF",
-            annualFeeCents = 150_00L,
-            isAnnualFeeWaived = true,
-            subCooldownMonths = 24,
-            defaultSubRewardText = "60,000 United MileagePlus Miles",
-            defaultSubEstimatedValueCents = 720_00L,
-            defaultSubTargetSpendCents = 3000_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Travel & Flights", label = "United Purchases, Dining & Hotels", multiplier = 2.0),
-                RewardCategory(category = "Everything Else", label = "Everything Else", multiplier = 1.0)
-            ),
-            benefits = listOf(
-                CardBenefit(
-                    id = "united-exp-global-entry",
-                    title = "Global Entry / TSA PreCheck Credit",
-                    periodValueCents = 120_00L,
-                    cadence = BenefitCadence.EVERY_4_YEARS,
-                    anchor = BenefitAnchor.CALENDAR,
-                    description = "Up to $120 credit for Global Entry, TSA PreCheck, or NEXUS"
-                ),
-                CardBenefit(
-                    id = "united-exp-club-passes",
-                    title = "2 United Club One-Time Passes",
-                    periodValueCents = 118_00L,
-                    cadence = BenefitCadence.ANNUAL,
-                    anchor = BenefitAnchor.CARDMEMBER_YEAR,
-                    description = "Two complimentary United Club one-time passes each anniversary year"
-                )
-            )
+        card(
+            id = "capital_one_quicksilver", shortLabel = "Quicksilver", cardName = "Capital One Quicksilver",
+            issuerName = "Capital One", network = "Visa", imageUrl = "hex://#334155:#64748B:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/capitalone/quicksilver.webp", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "\$200 Cash Bonus + \$100 Credit", defaultSubEstimatedValueCents = 30000L,
+            defaultSubTargetSpendCents = 50000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Catch-All)", 1.5)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "chase_marriott_boundless",
-            shortLabel = "Marriott Boundless",
-            cardName = "Marriott Bonvoy Boundless",
-            issuerName = "Chase",
-            network = "Visa",
-            imageUrl = "hex://#4A1525:#7F1D1D:#FFFFFF",
-            annualFeeCents = 95_00L,
-            subCooldownMonths = 24,
-            defaultSubRewardText = "3 Free Night Awards (up to 150k pts)",
-            defaultSubEstimatedValueCents = 600_00L,
-            defaultSubTargetSpendCents = 3000_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Travel & Flights", label = "Marriott Bonvoy Hotels", multiplier = 6.0),
-                RewardCategory(category = "Groceries", label = "Grocery, Gas & Dining ($6k cap)", multiplier = 3.0, capCents = 6000_00L),
-                RewardCategory(category = "Everything Else", label = "Everything Else", multiplier = 2.0)
-            ),
-            benefits = listOf(
-                CardBenefit(
-                    id = "boundless-free-night",
-                    title = "35,000-Pt Annual Free Night Award",
-                    periodValueCents = 175_00L,
-                    cadence = BenefitCadence.ANNUAL,
-                    anchor = BenefitAnchor.CARDMEMBER_YEAR,
-                    description = "Free Night Award worth up to 35,000 points every cardmember anniversary"
-                )
-            )
+        card(
+            id = "venture_x_biz", shortLabel = "Venture X Business", cardName = "Venture X Business",
+            issuerName = "Capital One", network = "Visa", imageUrl = "preset://venture-silver",
+            artworkUrl = "https://www.offeroptimist.com/images/capitalone/venture-x-business.png", annualFeeCents = 39500L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = false, subCooldownMonths = 48,
+            defaultSubRewardText = "150,000 Capital One Miles", defaultSubEstimatedValueCents = 210000L,
+            defaultSubTargetSpendCents = 3000000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Travel & Flights", "Capital One Travel Hotels & Rental Cars", 10.0), r("Everything Else", "Everything Else (Catch-All)", 2.0)),
+            benefits = listOf(b("vx-biz-travel-credit", "\$300 Annual Capital One Travel Credit", 30000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "\$300 annual credit for bookings in Capital One Business Travel"), b("vx-biz-anniv-miles", "10,000 Anniversary Bonus Miles (\$100 val)", 10000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "10,000 bonus miles every anniversary year"))
         ),
-        CreditCardTemplate(
-            id = "chase_ihg_premier",
-            shortLabel = "IHG One Premier",
-            cardName = "IHG One Rewards Premier",
-            issuerName = "Chase",
-            network = "Mastercard",
-            imageUrl = "hex://#1F2937:#0F766E:#FFFFFF",
-            annualFeeCents = 99_00L,
-            subCooldownMonths = 24,
-            defaultSubRewardText = "140,000 IHG One Rewards Points",
-            defaultSubEstimatedValueCents = 700_00L,
-            defaultSubTargetSpendCents = 3000_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Travel & Flights", label = "IHG Hotels & Resorts", multiplier = 10.0),
-                RewardCategory(category = "Dining & Restaurants", label = "Travel, Gas & Dining", multiplier = 5.0),
-                RewardCategory(category = "Everything Else", label = "Everything Else", multiplier = 3.0)
-            ),
-            benefits = listOf(
-                CardBenefit(
-                    id = "ihg-free-night",
-                    title = "40,000-Pt Anniversary Free Night",
-                    periodValueCents = 160_00L,
-                    cadence = BenefitCadence.ANNUAL,
-                    anchor = BenefitAnchor.CARDMEMBER_YEAR,
-                    description = "Anniversary Free Night valid up to 40,000 points"
-                ),
-                CardBenefit(
-                    id = "ihg-united-travelbank",
-                    title = "$50 Annual United TravelBank Cash",
-                    periodValueCents = 25_00L,
-                    cadence = BenefitCadence.SEMI_ANNUAL,
-                    anchor = BenefitAnchor.CALENDAR,
-                    description = "$25 United TravelBank Cash deposited every Jan and Jul ($50/yr)"
-                )
-            )
+        card(
+            id = "spark_cash_select", shortLabel = "Spark 1.5% Cash Select", cardName = "Spark 1.5% Cash Select",
+            issuerName = "Capital One", network = "Visa", imageUrl = "hex://#1F2937:#059669:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/capitalone/spark-cash.webp", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = true, subCooldownMonths = 48,
+            defaultSubRewardText = "\$750 Cash Bonus", defaultSubEstimatedValueCents = 75000L,
+            defaultSubTargetSpendCents = 600000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Every Business Purchase", 1.5)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "amex_green",
-            shortLabel = "Amex Green",
-            cardName = "American Express Green",
-            issuerName = "American Express",
-            network = "Amex",
-            imageUrl = "hex://#065F46:#10B981:#FFFFFF",
-            annualFeeCents = 150_00L,
-            subCooldownMonths = 999,
-            defaultSubRewardText = "40,000 Membership Rewards pts",
-            defaultSubEstimatedValueCents = 600_00L,
-            defaultSubTargetSpendCents = 3000_00L,
-            subSpendWindowDays = 180,
-            rewardCategories = listOf(
-                RewardCategory(category = "Travel & Flights", label = "Travel & Transit", multiplier = 3.0),
-                RewardCategory(category = "Dining & Restaurants", label = "Restaurants Worldwide", multiplier = 3.0)
-            ),
-            benefits = listOf(
-                CardBenefit(
-                    id = "amex-green-clear",
-                    title = "$199 CLEAR Plus Credit",
-                    periodValueCents = 199_00L,
-                    cadence = BenefitCadence.ANNUAL,
-                    anchor = BenefitAnchor.CALENDAR,
-                    description = "Up to $199 annual statement credit for CLEAR Plus membership"
-                )
-            )
+        card(
+            id = "citi_strata_premier", shortLabel = "Citi Strata Premier", cardName = "Citi Strata Premier",
+            issuerName = "Citi", network = "Mastercard", imageUrl = "hex://#0F172A:#0D9488:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/citi/strata-premier.png", annualFeeCents = 9500L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "60,000 ThankYou Points", defaultSubEstimatedValueCents = 84000L,
+            defaultSubTargetSpendCents = 400000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Travel & Flights", "CitiTravel.com Hotels & Car Rentals", 10.0), r("Dining & Restaurants", "Restaurants", 3.0), r("Groceries", "Supermarkets", 3.0), r("Gas & Transit", "Gas Stations & EV Charging", 3.0), r("Travel & Flights", "Air Travel & Other Hotels", 3.0)),
+            benefits = listOf(b("strata-hotel-credit", "\$100 Annual Hotel Benefit", 10000L, BenefitCadence.ANNUAL, BenefitAnchor.CALENDAR, "\$100 off a single hotel stay of \$500+ booked through CitiTravel.com each calendar year"))
         ),
-        CreditCardTemplate(
-            id = "amex_bcp",
-            shortLabel = "Blue Cash Preferred",
-            cardName = "Blue Cash Preferred",
-            issuerName = "American Express",
-            network = "Amex",
-            imageUrl = "hex://#0F4C81:#38BDF8:#FFFFFF",
-            annualFeeCents = 95_00L,
-            isAnnualFeeWaived = true,
-            subCooldownMonths = 999,
-            defaultSubRewardText = "$250 Statement Credit",
-            defaultSubEstimatedValueCents = 250_00L,
-            defaultSubTargetSpendCents = 3000_00L,
-            subSpendWindowDays = 180,
-            rewardCategories = listOf(
-                RewardCategory(category = "Groceries", label = "U.S. Supermarkets ($6k cap)", multiplier = 6.0, capCents = 6000_00L),
-                RewardCategory(category = "Streaming & Entertainment", label = "Select U.S. Streaming", multiplier = 6.0),
-                RewardCategory(category = "Gas & Transit", label = "U.S. Gas Stations & Transit", multiplier = 3.0)
-            ),
-            benefits = listOf(
-                CardBenefit(
-                    id = "amex-bcp-disney",
-                    title = "$7/mo Disney Bundle Credit ($84/yr)",
-                    periodValueCents = 7_00L,
-                    cadence = BenefitCadence.MONTHLY,
-                    anchor = BenefitAnchor.CALENDAR,
-                    description = "$7 monthly statement credit on eligible Disney Bundle subscriptions"
-                )
-            )
+        card(
+            id = "citi_double_cash", shortLabel = "Citi Double Cash", cardName = "Citi Double Cash",
+            issuerName = "Citi", network = "Mastercard", imageUrl = "hex://#0369A1:#0D9488:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/citi/double-cash.png", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "\$200 Cash Bonus", defaultSubEstimatedValueCents = 20000L,
+            defaultSubTargetSpendCents = 150000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (1% Buy + 1% Pay)", 2.0)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "amex_bce",
-            shortLabel = "Blue Cash Everyday",
-            cardName = "Blue Cash Everyday",
-            issuerName = "American Express",
-            network = "Amex",
-            imageUrl = "hex://#1E40AF:#60A5FA:#FFFFFF",
-            annualFeeCents = 0L,
-            subCooldownMonths = 999,
-            defaultSubRewardText = "$200 Statement Credit",
-            defaultSubEstimatedValueCents = 200_00L,
-            defaultSubTargetSpendCents = 2000_00L,
-            subSpendWindowDays = 180,
-            rewardCategories = listOf(
-                RewardCategory(category = "Groceries", label = "U.S. Supermarkets ($6k cap)", multiplier = 3.0, capCents = 6000_00L),
-                RewardCategory(category = "Shopping", label = "U.S. Online Retail ($6k cap)", multiplier = 3.0, capCents = 6000_00L),
-                RewardCategory(category = "Gas & Transit", label = "U.S. Gas Stations ($6k cap)", multiplier = 3.0, capCents = 6000_00L)
-            )
+        card(
+            id = "citi_custom_cash", shortLabel = "Citi Custom Cash", cardName = "Citi Custom Cash",
+            issuerName = "Citi", network = "Mastercard", imageUrl = "hex://#1E3A8A:#10B981:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/citi/custom-cash.png", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "\$200 Cash Bonus", defaultSubEstimatedValueCents = 20000L,
+            defaultSubTargetSpendCents = 150000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Groceries", "Top Eligible Spend Category (\$500/mo cap)", 5.0, capCents = 50000L), r("Everything Else", "Everything Else", 1.0)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "amex_bbp",
-            shortLabel = "Blue Business Plus",
-            cardName = "Blue Business Plus",
-            issuerName = "American Express",
-            network = "Amex",
-            imageUrl = "hex://#1E3A8A:#3B82F6:#FFFFFF",
-            annualFeeCents = 0L,
-            isBusinessCard = true,
-            subCooldownMonths = 999,
-            defaultSubRewardText = "15,000 Membership Rewards pts",
-            defaultSubEstimatedValueCents = 225_00L,
-            defaultSubTargetSpendCents = 3000_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Everything Else", label = "Every Purchase ($50k annual cap)", multiplier = 2.0, capCents = 50000_00L)
-            )
+        card(
+            id = "bilt", shortLabel = "Bilt Mastercard", cardName = "Bilt Mastercard",
+            issuerName = "Wells Fargo / Bilt", network = "Mastercard", imageUrl = "hex://#09090B:#27272A:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/wellsfargo/bilt.png", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = null,
+            defaultSubRewardText = null, defaultSubEstimatedValueCents = null,
+            defaultSubTargetSpendCents = null, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Dining & Restaurants", "Dining", 3.0), r("Travel & Flights", "Travel", 2.0), r("Rent", "Rent (No Transaction Fee)", 1.0)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "amex_hilton_aspire",
-            shortLabel = "Hilton Aspire",
-            cardName = "Hilton Honors Aspire",
-            issuerName = "American Express",
-            network = "Amex",
-            imageUrl = "hex://#0F172A:#1E3A8A:#FFFFFF",
-            annualFeeCents = 550_00L,
-            subCooldownMonths = 999,
-            defaultSubRewardText = "150,000 Hilton Honors Bonus Points",
-            defaultSubEstimatedValueCents = 750_00L,
-            defaultSubTargetSpendCents = 6000_00L,
-            subSpendWindowDays = 180,
-            rewardCategories = listOf(
-                RewardCategory(category = "Travel & Flights", label = "Hilton Hotels & Resorts", multiplier = 14.0),
-                RewardCategory(category = "Dining & Restaurants", label = "Flights, Car Rentals & U.S. Restaurants", multiplier = 7.0),
-                RewardCategory(category = "Everything Else", label = "Everything Else", multiplier = 3.0)
-            ),
-            benefits = listOf(
-                CardBenefit(
-                    id = "aspire-resort-credit",
-                    title = "$200 Semi-Annual Hilton Resort Credit ($400/yr)",
-                    periodValueCents = 200_00L,
-                    cadence = BenefitCadence.SEMI_ANNUAL,
-                    anchor = BenefitAnchor.CALENDAR,
-                    description = "Up to $200 Jan-Jun and $200 Jul-Dec at participating Hilton Resorts"
-                ),
-                CardBenefit(
-                    id = "aspire-flight-credit",
-                    title = "$50 Quarterly Flight Credit ($200/yr)",
-                    periodValueCents = 50_00L,
-                    cadence = BenefitCadence.QUARTERLY,
-                    anchor = BenefitAnchor.CALENDAR,
-                    description = "Up to $50 per quarter on flights booked direct or via Amex Travel"
-                )
-            )
+        card(
+            id = "wf_autograph", shortLabel = "Wells Fargo Autograph", cardName = "Wells Fargo Autograph",
+            issuerName = "Wells Fargo", network = "Visa", imageUrl = "hex://#7F1D1D:#B91C1C:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/wellsfargo/autograph.png", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "20,000 Wells_fargo pts", defaultSubEstimatedValueCents = 20000L,
+            defaultSubTargetSpendCents = 100000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Dining & Restaurants", "Restaurants", 3.0), r("Travel & Flights", "Travel & Transit", 3.0), r("Gas & Transit", "Gas Stations & EV Charging", 3.0), r("Streaming & Entertainment", "Popular Streaming & Phone Plans", 3.0)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "venture_rewards",
-            shortLabel = "Venture Rewards",
-            cardName = "Venture Rewards",
-            issuerName = "Capital One",
-            network = "Visa",
-            imageUrl = "hex://#1E3A8A:#2563EB:#FFFFFF",
-            annualFeeCents = 95_00L,
-            subCooldownMonths = 48,
-            defaultSubRewardText = "75,000 Capital One Miles",
-            defaultSubEstimatedValueCents = 1050_00L,
-            defaultSubTargetSpendCents = 4000_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Travel & Flights", label = "Capital One Travel Hotels & Rental Cars", multiplier = 5.0),
-                RewardCategory(category = "Everything Else", label = "Everything Else (Catch-All)", multiplier = 2.0)
-            )
+        card(
+            id = "wf_autograph_journey", shortLabel = "Autograph Journey", cardName = "Wells Fargo Autograph Journey",
+            issuerName = "Wells Fargo", network = "Visa", imageUrl = "hex://#450A0A:#991B1B:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/wellsfargo/autograph.png", annualFeeCents = 9500L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "60,000 Wells_fargo pts", defaultSubEstimatedValueCents = 60000L,
+            defaultSubTargetSpendCents = 400000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Travel & Flights", "Hotels (5x) & Airlines (4x)", 5.0), r("Dining & Restaurants", "Restaurants & Other Travel", 3.0)),
+            benefits = listOf(b("wf-journey-air", "\$50 Annual Airfare Statement Credit", 5000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "\$50 annual statement credit with \$50 minimum airline purchase"))
         ),
-        CreditCardTemplate(
-            id = "capital_one_savor",
-            shortLabel = "Capital One Savor",
-            cardName = "Capital One Savor",
-            issuerName = "Capital One",
-            network = "Visa",
-            imageUrl = "hex://#9A3412:#EA580C:#FFFFFF",
-            annualFeeCents = 0L,
-            subCooldownMonths = 48,
-            defaultSubRewardText = "$200 Cash Bonus",
-            defaultSubEstimatedValueCents = 200_00L,
-            defaultSubTargetSpendCents = 500_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Dining & Restaurants", label = "Dining", multiplier = 3.0),
-                RewardCategory(category = "Groceries", label = "Grocery Stores", multiplier = 3.0),
-                RewardCategory(category = "Streaming & Entertainment", label = "Entertainment & Popular Streaming", multiplier = 3.0)
-            )
+        card(
+            id = "wf_active_cash", shortLabel = "Wells Fargo Active Cash", cardName = "Wells Fargo Active Cash",
+            issuerName = "Wells Fargo", network = "Visa", imageUrl = "hex://#1E293B:#991B1B:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/wellsfargo/active-cash.png", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "\$200 Cash Bonus", defaultSubEstimatedValueCents = 20000L,
+            defaultSubTargetSpendCents = 50000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Catch-All)", 2.0)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "spark_cash_select",
-            shortLabel = "Spark 1.5% Cash Select",
-            cardName = "Spark 1.5% Cash Select",
-            issuerName = "Capital One",
-            network = "Visa",
-            imageUrl = "hex://#1F2937:#059669:#FFFFFF",
-            annualFeeCents = 0L,
-            isBusinessCard = true,
-            countsToward524Override = true,
-            subCooldownMonths = 48,
-            defaultSubRewardText = "$500 Cash Bonus",
-            defaultSubEstimatedValueCents = 500_00L,
-            defaultSubTargetSpendCents = 4500_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Everything Else", label = "Every Business Purchase", multiplier = 1.5)
-            )
+        card(
+            id = "bofa_customized_cash", shortLabel = "BofA Customized Cash", cardName = "Bank of America Customized Cash Rewards",
+            issuerName = "Bank of America", network = "Visa", imageUrl = "hex://#991B1B:#DC2626:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/bankofamerica/customized-cash-rewards.jpg", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 24,
+            defaultSubRewardText = "\$200 Cash Bonus", defaultSubEstimatedValueCents = 20000L,
+            defaultSubTargetSpendCents = 100000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Shopping", "3% Choice Category (\$2,500/qtr cap)", 3.0, capCents = 250000L), r("Groceries", "Grocery Stores & Wholesale Clubs", 2.0)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "citi_strata_premier",
-            shortLabel = "Citi Strata Premier",
-            cardName = "Citi Strata Premier",
-            issuerName = "Citi",
-            network = "Mastercard",
-            imageUrl = "hex://#0F172A:#0D9488:#FFFFFF",
-            annualFeeCents = 95_00L,
-            subCooldownMonths = 48,
-            defaultSubRewardText = "75,000 ThankYou Points",
-            defaultSubEstimatedValueCents = 1050_00L,
-            defaultSubTargetSpendCents = 4000_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Dining & Restaurants", label = "Restaurants", multiplier = 3.0),
-                RewardCategory(category = "Groceries", label = "Supermarkets", multiplier = 3.0),
-                RewardCategory(category = "Gas & Transit", label = "Gas Stations & EV Charging", multiplier = 3.0),
-                RewardCategory(category = "Travel & Flights", label = "Air Travel & Hotels", multiplier = 3.0)
-            ),
-            benefits = listOf(
-                CardBenefit(
-                    id = "strata-hotel-credit",
-                    title = "$100 Annual Hotel Benefit",
-                    periodValueCents = 100_00L,
-                    cadence = BenefitCadence.ANNUAL,
-                    anchor = BenefitAnchor.CALENDAR,
-                    description = "$100 off a single hotel stay of $500+ booked through CitiTravel.com"
-                )
-            )
+        card(
+            id = "bofa_premium_rewards", shortLabel = "BofA Premium Rewards", cardName = "Bank of America Premium Rewards",
+            issuerName = "Bank of America", network = "Visa", imageUrl = "hex://#18181B:#3F3F46:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/bankofamerica/premium-rewards.png", annualFeeCents = 9500L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 24,
+            defaultSubRewardText = "60,000 Bank_of_america pts", defaultSubEstimatedValueCents = 60000L,
+            defaultSubTargetSpendCents = 400000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Travel & Flights", "Travel & Dining", 2.0), r("Everything Else", "Everything Else", 1.5)),
+            benefits = listOf(b("bofa-pr-airline", "\$100 Annual Airline Incidental Credit", 10000L, BenefitCadence.ANNUAL, BenefitAnchor.CALENDAR, "Up to \$100 annual statement credit for qualifying airline incidental fees"), b("bofa-pr-ge", "Global Entry / TSA PreCheck Credit", 10000L, BenefitCadence.EVERY_4_YEARS, BenefitAnchor.CALENDAR, "Up to \$100 credit every 4 years for TSA PreCheck or Global Entry"))
         ),
-        CreditCardTemplate(
-            id = "citi_double_cash",
-            shortLabel = "Citi Double Cash",
-            cardName = "Citi Double Cash",
-            issuerName = "Citi",
-            network = "Mastercard",
-            imageUrl = "hex://#0369A1:#0D9488:#FFFFFF",
-            annualFeeCents = 0L,
-            subCooldownMonths = 48,
-            defaultSubRewardText = "$200 / 20,000 ThankYou Pts",
-            defaultSubEstimatedValueCents = 280_00L,
-            defaultSubTargetSpendCents = 1500_00L,
-            subSpendWindowDays = 180,
-            rewardCategories = listOf(
-                RewardCategory(category = "Everything Else", label = "Everything Else (1% Buy + 1% Pay)", multiplier = 2.0)
-            )
+        card(
+            id = "usbank_altitude_go", shortLabel = "U.S. Bank Altitude Go", cardName = "U.S. Bank Altitude Go",
+            issuerName = "U.S. Bank", network = "Visa", imageUrl = "hex://#1E3A8A:#B91C1C:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/usbank/altitude-go.jpg", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "20,000 Us_bank pts", defaultSubEstimatedValueCents = 20000L,
+            defaultSubTargetSpendCents = 100000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Dining & Restaurants", "Dining, Takeout & Restaurant Delivery", 4.0), r("Groceries", "Grocery Stores, Gas & Streaming", 2.0)),
+            benefits = listOf(b("altitude-go-streaming", "\$15 Annual Streaming Service Credit", 1500L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "\$15 statement credit after 11 consecutive months of eligible streaming purchases"))
         ),
-        CreditCardTemplate(
-            id = "citi_custom_cash",
-            shortLabel = "Citi Custom Cash",
-            cardName = "Citi Custom Cash",
-            issuerName = "Citi",
-            network = "Mastercard",
-            imageUrl = "hex://#1E3A8A:#10B981:#FFFFFF",
-            annualFeeCents = 0L,
-            subCooldownMonths = 48,
-            defaultSubRewardText = "$200 / 20,000 ThankYou Pts",
-            defaultSubEstimatedValueCents = 280_00L,
-            defaultSubTargetSpendCents = 1500_00L,
-            subSpendWindowDays = 180,
-            rewardCategories = listOf(
-                RewardCategory(category = "Groceries", label = "Top Eligible Spend Category ($500/mo cap)", multiplier = 5.0, capCents = 500_00L)
-            )
+        card(
+            id = "usbank_cash_plus", shortLabel = "U.S. Bank Cash+", cardName = "U.S. Bank Cash+ Visa Signature",
+            issuerName = "U.S. Bank", network = "Visa", imageUrl = "hex://#0F2B5B:#1D4ED8:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/usbank/cash-plus.jpg", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "\$200 Cash Bonus", defaultSubEstimatedValueCents = 20000L,
+            defaultSubTargetSpendCents = 100000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Utilities", "5% Two Chosen Categories (\$2,000/qtr cap)", 5.0, capCents = 200000L, isRotating = true), r("Groceries", "2% Everyday Category (Grocery, Gas, or Dining)", 2.0)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "wf_autograph",
-            shortLabel = "Wells Fargo Autograph",
-            cardName = "Wells Fargo Autograph",
-            issuerName = "Wells Fargo",
-            network = "Visa",
-            imageUrl = "hex://#7F1D1D:#B91C1C:#FFFFFF",
-            annualFeeCents = 0L,
-            subCooldownMonths = 48,
-            defaultSubRewardText = "20,000 Bonus Points ($200 val)",
-            defaultSubEstimatedValueCents = 200_00L,
-            defaultSubTargetSpendCents = 1000_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Dining & Restaurants", label = "Restaurants", multiplier = 3.0),
-                RewardCategory(category = "Travel & Flights", label = "Travel & Transit", multiplier = 3.0),
-                RewardCategory(category = "Gas & Transit", label = "Gas Stations & EV Charging", multiplier = 3.0)
-            )
+        card(
+            id = "discover_it", shortLabel = "Discover it Cash Back", cardName = "Discover it Cash Back",
+            issuerName = "Discover", network = "Discover", imageUrl = "preset://discover-plum",
+            artworkUrl = "https://www.offeroptimist.com/images/discover/it.webp", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 24,
+            defaultSubRewardText = "\$100 Cash Bonus", defaultSubEstimatedValueCents = 10000L,
+            defaultSubTargetSpendCents = 1L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Quarterly Bonus", "5% Rotating Quarterly Categories (\$1,500 cap)", 5.0, capCents = 150000L, isRotating = true), r("Everything Else", "Everything Else", 1.0)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "wf_active_cash",
-            shortLabel = "Wells Fargo Active Cash",
-            cardName = "Wells Fargo Active Cash",
-            issuerName = "Wells Fargo",
-            network = "Visa",
-            imageUrl = "hex://#1E293B:#991B1B:#FFFFFF",
-            annualFeeCents = 0L,
-            subCooldownMonths = 48,
-            defaultSubRewardText = "$200 Cash Rewards Bonus",
-            defaultSubEstimatedValueCents = 200_00L,
-            defaultSubTargetSpendCents = 500_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Everything Else", label = "Everything Else (Catch-All)", multiplier = 2.0)
-            )
+        card(
+            id = "apple_card", shortLabel = "Apple Card", cardName = "Apple Card",
+            issuerName = "Goldman Sachs / Apple", network = "Mastercard", imageUrl = "preset://apple-card",
+            artworkUrl = null, annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = null,
+            defaultSubRewardText = null, defaultSubEstimatedValueCents = null,
+            defaultSubTargetSpendCents = null, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Shopping", "Apple & Select Daily Cash Partners", 3.0), r("Everything Else", "Every Apple Pay Purchase", 2.0)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "bofa_customized_cash",
-            shortLabel = "BofA Customized Cash",
-            cardName = "Bank of America Customized Cash Rewards",
-            issuerName = "Bank of America",
-            network = "Visa",
-            imageUrl = "hex://#991B1B:#DC2626:#FFFFFF",
-            annualFeeCents = 0L,
-            subCooldownMonths = 24,
-            defaultSubRewardText = "$200 Online Cash Rewards Bonus",
-            defaultSubEstimatedValueCents = 200_00L,
-            defaultSubTargetSpendCents = 1000_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Shopping", label = "3% Choice Category ($2,500/qtr cap)", multiplier = 3.0, capCents = 2500_00L),
-                RewardCategory(category = "Groceries", label = "Grocery Stores & Wholesale Clubs", multiplier = 2.0)
-            )
+        card(
+            id = "american_express_delta_skymiles_blue", shortLabel = "Delta SkyMiles Blue", cardName = "Delta SkyMiles Blue",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#1E3A8A:#3B82F6:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/delta-skymiles-blue.jpg", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "10,000 Delta SkyMiles", defaultSubEstimatedValueCents = 12000L,
+            defaultSubTargetSpendCents = 100000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "usbank_altitude_go",
-            shortLabel = "U.S. Bank Altitude Go",
-            cardName = "U.S. Bank Altitude Go",
-            issuerName = "U.S. Bank",
-            network = "Visa",
-            imageUrl = "hex://#1E3A8A:#B91C1C:#FFFFFF",
-            annualFeeCents = 0L,
-            subCooldownMonths = 48,
-            defaultSubRewardText = "20,000 Bonus Points ($200 Value)",
-            defaultSubEstimatedValueCents = 200_00L,
-            defaultSubTargetSpendCents = 1000_00L,
-            subSpendWindowDays = 90,
-            rewardCategories = listOf(
-                RewardCategory(category = "Dining & Restaurants", label = "Dining, Takeout & Delivery", multiplier = 4.0),
-                RewardCategory(category = "Groceries", label = "Grocery Stores, Gas & Streaming", multiplier = 2.0)
-            )
+        card(
+            id = "american_express_delta_skymiles_gold_business", shortLabel = "Delta SkyMiles Gold Business", cardName = "Delta SkyMiles Gold Business",
+            issuerName = "American Express", network = "Amex", imageUrl = "preset://amex-gold",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/delta-skymiles-gold-business.webp", annualFeeCents = 15000L,
+            isAnnualFeeWaived = true, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "60,000 Delta SkyMiles", defaultSubEstimatedValueCents = 72000L,
+            defaultSubTargetSpendCents = 400000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
         ),
-        CreditCardTemplate(
-            id = "discover_it",
-            shortLabel = "Discover it Cash Back",
-            cardName = "Discover it Cash Back",
-            issuerName = "Discover",
-            network = "Discover",
-            imageUrl = "preset://discover-plum",
-            annualFeeCents = 0L,
-            subCooldownMonths = 24,
-            defaultSubRewardText = "Unlimited Cashback Match (First Year)",
-            defaultSubEstimatedValueCents = 150_00L,
-            defaultSubTargetSpendCents = null,
-            subSpendWindowDays = 365,
-            rewardCategories = listOf(
-                RewardCategory(category = "Quarterly Bonus", label = "5% Rotating Quarterly Categories ($1,500 cap)", multiplier = 5.0, isRotating = true, capCents = 1500_00L),
-                RewardCategory(category = "Everything Else", label = "Everything Else", multiplier = 1.0)
-            )
+        card(
+            id = "american_express_delta_skymiles_platinum", shortLabel = "Delta SkyMiles Platinum", cardName = "Delta SkyMiles Platinum",
+            issuerName = "American Express", network = "Amex", imageUrl = "preset://venture-silver",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/delta-skymiles-platinum.webp", annualFeeCents = 35000L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "60,000 Delta SkyMiles", defaultSubEstimatedValueCents = 72000L,
+            defaultSubTargetSpendCents = 300000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf(b("american_express_delta_skymiles_platinum-credit-1", "\$500 Companion Pass", 50000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Companion Pass"))
         ),
-        CreditCardTemplate(
-            id = "apple_card",
-            shortLabel = "Apple Card",
-            cardName = "Apple Card",
-            issuerName = "Goldman Sachs / Apple",
-            network = "Mastercard",
-            imageUrl = "preset://apple-card",
-            annualFeeCents = 0L,
-            subCooldownMonths = null,
-            rewardCategories = listOf(
-                RewardCategory(category = "Shopping", label = "Apple & Select Daily Cash Partners", multiplier = 3.0),
-                RewardCategory(category = "Everything Else", label = "Every Apple Pay Purchase", multiplier = 2.0)
-            )
+        card(
+            id = "american_express_delta_skymiles_platinum_business", shortLabel = "Delta SkyMiles Platinum Business", cardName = "Delta SkyMiles Platinum Business",
+            issuerName = "American Express", network = "Amex", imageUrl = "preset://venture-silver",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/delta-skymiles-platinum-business.webp", annualFeeCents = 35000L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "70,000 Delta SkyMiles", defaultSubEstimatedValueCents = 84000L,
+            defaultSubTargetSpendCents = 600000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf(b("american_express_delta_skymiles_platinum_business-credit-1", "\$100 PreCheck Credit", 10000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "PreCheck Credit"), b("american_express_delta_skymiles_platinum_business-credit-2", "\$500 Companion Pass", 50000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Companion Pass"), b("american_express_delta_skymiles_platinum_business-credit-3", "\$50 First checked bag free", 5000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "First checked bag free"))
+        ),
+        card(
+            id = "american_express_delta_skymiles_reserve_business", shortLabel = "Delta SkyMiles Reserve Business", cardName = "Delta SkyMiles Reserve Business",
+            issuerName = "American Express", network = "Amex", imageUrl = "preset://venture-silver",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/delta-skymiles-reserve-business.webp", annualFeeCents = 55000L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "80,000 Delta SkyMiles", defaultSubEstimatedValueCents = 96000L,
+            defaultSubTargetSpendCents = 1000000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
+        ),
+        card(
+            id = "american_express_blue_business_cash", shortLabel = "Blue Business Cash", cardName = "Blue Business Cash",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#065F46:#059669:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/blue-business-cash.webp", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "\$250 Cash Bonus", defaultSubEstimatedValueCents = 25000L,
+            defaultSubTargetSpendCents = 300000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 2.0)),
+            benefits = listOf()
+        ),
+        card(
+            id = "american_express_blue_cash_preferred_morgan_stanley", shortLabel = "Blue Cash Preferred (Morgan Stanley)", cardName = "Blue Cash Preferred (Morgan Stanley)",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#065F46:#059669:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/blue-cash-preferred-morgan-stanley.png", annualFeeCents = 9500L,
+            isAnnualFeeWaived = true, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "\$250 Cash Bonus", defaultSubEstimatedValueCents = 25000L,
+            defaultSubTargetSpendCents = 300000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 2.0)),
+            benefits = listOf(b("american_express_blue_cash_preferred_morgan_stanley-credit-1", "\$84 \$7/mo Disney Bundle Credit", 8400L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "\$7/mo Disney Bundle Credit"))
+        ),
+        card(
+            id = "american_express_business_green", shortLabel = "Business Green", cardName = "Business Green",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#065F46:#059669:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/business-green.webp", annualFeeCents = 9500L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "15,000 Membership Rewards pts", defaultSubEstimatedValueCents = 22500L,
+            defaultSubTargetSpendCents = 300000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
+        ),
+        card(
+            id = "american_express_cash_magnet", shortLabel = "Cash Magnet", cardName = "Cash Magnet",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#065F46:#059669:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/cash-magnet.webp", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = null, defaultSubEstimatedValueCents = null,
+            defaultSubTargetSpendCents = null, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.5)),
+            benefits = listOf()
+        ),
+        card(
+            id = "american_express_hilton_honors", shortLabel = "Hilton Honors", cardName = "Hilton Honors",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#1E3A8A:#3B82F6:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/hilton-honors.png", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "80,000 Hilton Honors pts", defaultSubEstimatedValueCents = 40000L,
+            defaultSubTargetSpendCents = 200000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
+        ),
+        card(
+            id = "american_express_hilton_honors_business", shortLabel = "Hilton Honors Business", cardName = "Hilton Honors Business",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#1E3A8A:#3B82F6:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/hilton-honors-business.png", annualFeeCents = 17500L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "130,000 Hilton Honors pts", defaultSubEstimatedValueCents = 65000L,
+            defaultSubTargetSpendCents = 600000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 5.0)),
+            benefits = listOf(b("american_express_hilton_honors_business-credit-1", "\$240 \$60 Hilton credit per quarter.", 24000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "\$60 Hilton credit per quarter."))
+        ),
+        card(
+            id = "american_express_hilton_honors_surpass", shortLabel = "Hilton Honors Surpass", cardName = "Hilton Honors Surpass",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#1E3A8A:#3B82F6:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/hilton-honors-surpass.jpg", annualFeeCents = 9500L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "130,000 Hilton Honors pts", defaultSubEstimatedValueCents = 65000L,
+            defaultSubTargetSpendCents = 300000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
+        ),
+        card(
+            id = "american_express_marriott_bonvoy_business", shortLabel = "Marriott Bonvoy Business", cardName = "Marriott Bonvoy Business",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#4A1525:#7F1D1D:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/marriott-bonvoy-business.webp", annualFeeCents = 12500L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "\$150000 Statement Credit", defaultSubEstimatedValueCents = 15000000L,
+            defaultSubTargetSpendCents = 300000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
+        ),
+        card(
+            id = "american_express_platinum_schwab", shortLabel = "Platinum (Schwab)", cardName = "Platinum (Schwab)",
+            issuerName = "American Express", network = "Amex", imageUrl = "preset://venture-silver",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/platinum-schwab.webp", annualFeeCents = 89500L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "80,000 Membership Rewards pts", defaultSubEstimatedValueCents = 120000L,
+            defaultSubTargetSpendCents = 800000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf(b("american_express_platinum_schwab-credit-1", "\$100 PreCheck Credit", 10000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "PreCheck Credit"), b("american_express_platinum_schwab-credit-2", "\$850 Lounge Access", 85000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Lounge Access"), b("american_express_platinum_schwab-credit-3", "\$600 Hotel Credit (2x/yr \$300)", 60000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Hotel Credit (2x/yr \$300)"), b("american_express_platinum_schwab-credit-4", "\$250 Misc. Hotel Perks", 25000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Misc. Hotel Perks"), b("american_express_platinum_schwab-credit-5", "\$200 Marriott/Hilton Gold Status", 20000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Marriott/Hilton Gold Status"), b("american_express_platinum_schwab-credit-6", "\$100 Avis/Hertz/National Gold Status", 10000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Avis/Hertz/National Gold Status"), b("american_express_platinum_schwab-credit-7", "\$200 \$15/mo Uber Cash", 20000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "\$15/mo Uber Cash"), b("american_express_platinum_schwab-credit-8", "\$120 Uber One Membership", 12000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Uber One Membership"), b("american_express_platinum_schwab-credit-9", "\$200 Airline Fee Credit", 20000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Airline Fee Credit"), b("american_express_platinum_schwab-credit-10", "\$400 Resy Credit (\$100/qtr)", 40000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Resy Credit (\$100/qtr)"), b("american_express_platinum_schwab-credit-11", "\$300 Digital Entertainment Credit (\$25/mo)", 30000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Digital Entertainment Credit (\$25/mo)"), b("american_express_platinum_schwab-credit-12", "\$300 Lululemon Credit", 30000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Lululemon Credit"), b("american_express_platinum_schwab-credit-13", "\$155 Walmart+ Credit", 15500L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Walmart+ Credit"), b("american_express_platinum_schwab-credit-14", "\$100 Saks Credit", 10000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Saks Credit"), b("american_express_platinum_schwab-credit-15", "\$200 Oura Ring Credit", 20000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Oura Ring Credit"), b("american_express_platinum_schwab-credit-16", "\$300 Equinox Credit", 30000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Equinox Credit"))
+        ),
+        card(
+            id = "american_express_platinum_morgan_stanley", shortLabel = "Platinum (Morgan Stanley)", cardName = "Platinum (Morgan Stanley)",
+            issuerName = "American Express", network = "Amex", imageUrl = "preset://venture-silver",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/platinum-morgan-stanley.webp", annualFeeCents = 89500L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "80,000 Membership Rewards pts", defaultSubEstimatedValueCents = 120000L,
+            defaultSubTargetSpendCents = 800000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf(b("american_express_platinum_morgan_stanley-credit-1", "\$100 PreCheck Credit", 10000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "PreCheck Credit"), b("american_express_platinum_morgan_stanley-credit-2", "\$850 Lounge Access", 85000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Lounge Access"), b("american_express_platinum_morgan_stanley-credit-3", "\$600 Hotel Credit (2x/yr \$300)", 60000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Hotel Credit (2x/yr \$300)"), b("american_express_platinum_morgan_stanley-credit-4", "\$250 Misc. Hotel Perks", 25000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Misc. Hotel Perks"), b("american_express_platinum_morgan_stanley-credit-5", "\$200 Marriott/Hilton Gold Status", 20000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Marriott/Hilton Gold Status"), b("american_express_platinum_morgan_stanley-credit-6", "\$100 Avis/Hertz/National Gold Status", 10000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Avis/Hertz/National Gold Status"), b("american_express_platinum_morgan_stanley-credit-7", "\$200 \$15/mo Uber Cash", 20000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "\$15/mo Uber Cash"), b("american_express_platinum_morgan_stanley-credit-8", "\$120 Uber One Membership", 12000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Uber One Membership"), b("american_express_platinum_morgan_stanley-credit-9", "\$200 Airline Fee Credit", 20000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Airline Fee Credit"), b("american_express_platinum_morgan_stanley-credit-10", "\$400 Resy Credit (\$100/qtr)", 40000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Resy Credit (\$100/qtr)"), b("american_express_platinum_morgan_stanley-credit-11", "\$300 Digital Entertainment Credit (\$25/mo)", 30000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Digital Entertainment Credit (\$25/mo)"), b("american_express_platinum_morgan_stanley-credit-12", "\$300 Lululemon Credit", 30000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Lululemon Credit"), b("american_express_platinum_morgan_stanley-credit-13", "\$155 Walmart+ Credit", 15500L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Walmart+ Credit"), b("american_express_platinum_morgan_stanley-credit-14", "\$100 Saks Credit", 10000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Saks Credit"), b("american_express_platinum_morgan_stanley-credit-15", "\$200 Oura Ring Credit", 20000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Oura Ring Credit"), b("american_express_platinum_morgan_stanley-credit-16", "\$300 Equinox Credit", 30000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Equinox Credit"))
+        ),
+        card(
+            id = "american_express_marriott_bonvoy_bevy", shortLabel = "Marriott Bonvoy Bevy", cardName = "Marriott Bonvoy Bevy",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#4A1525:#7F1D1D:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/marriott-bonvoy-bevy.png", annualFeeCents = 25000L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "175,000 Marriott Bonvoy pts", defaultSubEstimatedValueCents = 140000L,
+            defaultSubTargetSpendCents = 500000L, subSpendWindowDays = 180,
+            isElevatedSubOffer = true,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
+        ),
+        card(
+            id = "american_express_lowes", shortLabel = "Lowes", cardName = "Lowes",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#1E3A8A:#3B82F6:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/lowes-business.webp", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = null, defaultSubEstimatedValueCents = null,
+            defaultSubTargetSpendCents = null, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
+        ),
+        card(
+            id = "american_express_schwab_investor", shortLabel = "Schwab Investor", cardName = "Schwab Investor",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#1E3A8A:#3B82F6:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/schwab-investor.webp", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "\$200 Cash Bonus", defaultSubEstimatedValueCents = 20000L,
+            defaultSubTargetSpendCents = 100000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
+        ),
+        card(
+            id = "american_express_amazon_business", shortLabel = "Amazon Business", cardName = "Amazon Business",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#1E3A8A:#3B82F6:#FFFFFF",
+            artworkUrl = null, annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "\$100 Cash Bonus", defaultSubEstimatedValueCents = 10000L,
+            defaultSubTargetSpendCents = 1L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
+        ),
+        card(
+            id = "american_express_rakuten", shortLabel = "Rakuten", cardName = "Rakuten",
+            issuerName = "American Express", network = "Amex", imageUrl = "hex://#1E3A8A:#3B82F6:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/amex/rakuten.jpg", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 999,
+            defaultSubRewardText = "\$25 Cash Bonus", defaultSubEstimatedValueCents = 2500L,
+            defaultSubTargetSpendCents = 50000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
+        ),
+        card(
+            id = "bank_of_america_air_france_klm", shortLabel = "Air France KLM", cardName = "Air France KLM",
+            issuerName = "Bank of America", network = "Mastercard", imageUrl = "hex://#7F1D1D:#DC2626:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/bankofamerica/air-france-klm.webp", annualFeeCents = 8900L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "70,000 Flying_blue pts", defaultSubEstimatedValueCents = 70000L,
+            defaultSubTargetSpendCents = 300000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = true,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf()
+        ),
+        card(
+            id = "bank_of_america_premium_rewards_elite", shortLabel = "Premium Rewards Elite", cardName = "Premium Rewards Elite",
+            issuerName = "Bank of America", network = "Visa", imageUrl = "hex://#09090B:#27272A:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/bankofamerica/premium-rewards-elite.png", annualFeeCents = 55000L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "75,000 Bank_of_america pts", defaultSubEstimatedValueCents = 75000L,
+            defaultSubTargetSpendCents = 500000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.0)),
+            benefits = listOf(b("bank_of_america_premium_rewards_elite-credit-1", "\$100 PreCheck Credit", 10000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "PreCheck Credit"), b("bank_of_america_premium_rewards_elite-credit-2", "\$300 Incidental Airline Statement Credits", 30000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Incidental Airline Statement Credits"), b("bank_of_america_premium_rewards_elite-credit-3", "\$150 Annaul \$150 streaming, delivery, fitness, and transit credit", 15000L, BenefitCadence.ANNUAL, BenefitAnchor.CARDMEMBER_YEAR, "Annaul \$150 streaming, delivery, fitness, and transit credit"))
+        ),
+        card(
+            id = "bank_of_america_travel_rewards", shortLabel = "Travel Rewards", cardName = "Travel Rewards",
+            issuerName = "Bank of America", network = "Visa", imageUrl = "hex://#7F1D1D:#DC2626:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/bankofamerica/travel-rewards.png", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "25,000 Bank_of_america pts", defaultSubEstimatedValueCents = 25000L,
+            defaultSubTargetSpendCents = 100000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.5)),
+            benefits = listOf()
+        ),
+        card(
+            id = "bank_of_america_unlimited_cash_rewards", shortLabel = "Unlimited Cash Rewards", cardName = "Unlimited Cash Rewards",
+            issuerName = "Bank of America", network = "Visa", imageUrl = "hex://#065F46:#059669:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/bankofamerica/unlimited-cash-rewards.png", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = false,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "\$200 Cash Bonus", defaultSubEstimatedValueCents = 20000L,
+            defaultSubTargetSpendCents = 100000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.5)),
+            benefits = listOf()
+        ),
+        card(
+            id = "bank_of_america_business_advantage_customized_cash", shortLabel = "Business Advantage Customized Cash", cardName = "Business Advantage Customized Cash",
+            issuerName = "Bank of America", network = "Mastercard", imageUrl = "hex://#065F46:#059669:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/bankofamerica/business-advantage-customized-cash.jpg", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "\$500 Cash Bonus", defaultSubEstimatedValueCents = 50000L,
+            defaultSubTargetSpendCents = 500000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.5)),
+            benefits = listOf()
+        ),
+        card(
+            id = "bank_of_america_business_advantage_unlimited_cash", shortLabel = "Business Advantage Unlimited Cash", cardName = "Business Advantage Unlimited Cash",
+            issuerName = "Bank of America", network = "Mastercard", imageUrl = "hex://#065F46:#059669:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/bankofamerica/business-advantage-unlimited-cash.webp", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "\$500 Cash Bonus", defaultSubEstimatedValueCents = 50000L,
+            defaultSubTargetSpendCents = 500000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.5)),
+            benefits = listOf()
+        ),
+        card(
+            id = "bank_of_america_business_advantage_travel_rewards", shortLabel = "Business Advantage Travel Rewards", cardName = "Business Advantage Travel Rewards",
+            issuerName = "Bank of America", network = "Mastercard", imageUrl = "hex://#7F1D1D:#DC2626:#FFFFFF",
+            artworkUrl = "https://www.offeroptimist.com/images/bankofamerica/business-advantage-travel-rewards.webp", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "50,000 Bank_of_america pts", defaultSubEstimatedValueCents = 50000L,
+            defaultSubTargetSpendCents = 500000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.5)),
+            benefits = listOf()
+        ),
+        card(
+            id = "bank_of_america_platinum_plus", shortLabel = "Platinum Plus", cardName = "Platinum Plus",
+            issuerName = "Bank of America", network = "Mastercard", imageUrl = "preset://venture-silver",
+            artworkUrl = "https://www.offeroptimist.com/images/bankofamerica/platinum-plus.webp", annualFeeCents = 0L,
+            isAnnualFeeWaived = false, isBusinessCard = true,
+            countsToward524Override = null, subCooldownMonths = 48,
+            defaultSubRewardText = "\$300 Cash Bonus", defaultSubEstimatedValueCents = 30000L,
+            defaultSubTargetSpendCents = 300000L, subSpendWindowDays = 90,
+            isElevatedSubOffer = false,
+            rewardCategories = listOf(r("Everything Else", "Everything Else (Base Rate)", 1.5)),
+            benefits = listOf()
         )
     )
 }

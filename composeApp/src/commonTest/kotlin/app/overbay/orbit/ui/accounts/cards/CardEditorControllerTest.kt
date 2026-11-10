@@ -355,10 +355,11 @@ class CardEditorControllerTest {
 
         val draftAfterTemplate = controller.draft.value!!
         assertEquals("Capital One", draftAfterTemplate.accountInstitution)
-        assertEquals(500_00L, draftAfterTemplate.subEstimatedValueCents)
+        assertEquals(sparkTemplate.defaultSubEstimatedValueCents, draftAfterTemplate.subEstimatedValueCents)
         assertEquals(true, draftAfterTemplate.countsToward524Override)
         assertEquals(90, draftAfterTemplate.subSpendWindowDays)
         assertNull(draftAfterTemplate.targetDeadlineDate)
+        assertNotNull(draftAfterTemplate.artworkUrl)
 
         // Setting openedDate automatically populates targetDeadlineDate (+90 days)
         controller.setOpenedDate("2026-01-01")
@@ -367,8 +368,18 @@ class CardEditorControllerTest {
 
     @Test
     fun testFilterCardTemplatesAndHexPalette() {
+        assertTrue(CreditCardTemplates.BUNDLED.size >= 150, "Expected 150+ bundled cards, got ${CreditCardTemplates.BUNDLED.size}")
+        assertTrue(
+            CreditCardTemplates.BUNDLED.count { !it.artworkUrl.isNullOrBlank() } >= 150,
+            "Expected 150+ bundled cards with real artwork URLs"
+        )
+        assertEquals(
+            "https://www.offeroptimist.com/images/chase/sapphire-reserve.png",
+            CreditCardTemplates.resolveArtworkUrl(null, "Chase Sapphire Reserve", "Chase")
+        )
+
         val chaseCards = filterCardTemplates(CreditCardTemplates.BUNDLED, "", "Chase")
-        assertTrue(chaseCards.size >= 8)
+        assertTrue(chaseCards.size >= 25)
         assertTrue(chaseCards.all { it.issuerName == "Chase" })
 
         val bizCards = filterCardTemplates(CreditCardTemplates.BUNDLED, "", "Business")

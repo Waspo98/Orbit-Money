@@ -22,13 +22,14 @@ test('ensureCreditCardCatalogSeeded seeds curated cards with structured perks an
   ensureCreditCardCatalogSeeded(db);
 
   const items = listCatalogTemplates(db);
-  assert.ok(items.length >= 30, `Expected at least 30 curated cards, got ${items.length}`);
+  assert.ok(items.length >= 150, `Expected at least 150 cards in catalog seed, got ${items.length}`);
 
   const amexGold = items.find((c) => c.id === 'amex_gold');
   assert.ok(amexGold);
   assert.equal(amexGold.issuer_name, 'American Express');
   assert.equal(amexGold.annual_fee_cents, 32500);
   assert.equal(amexGold.artwork_url, '/api/card-catalog/amex_gold/artwork');
+  assert.equal(amexGold.direct_artwork_url, 'https://www.offeroptimist.com/images/amex/gold.webp');
   assert.equal(amexGold.benefits.length, 4);
   assert.equal(amexGold.reward_categories.length, 3);
 
