@@ -42,7 +42,8 @@ fun CardPerksInspectorPane(
     }
     val inspecting = activeAccount ?: cachedAccount
 
-    val mode = if (state.cardEditorDraft != null) {
+    val liveCardDraft = viewModel.cardEditor.currentDraft ?: state.cardEditorDraft
+    val mode = if (liveCardDraft != null) {
         CardPerksInspectorMode.EDIT_PERKS
     } else {
         CardPerksInspectorMode.DETAIL
@@ -62,7 +63,7 @@ fun CardPerksInspectorPane(
     ) { currentMode ->
         when (currentMode) {
             CardPerksInspectorMode.EDIT_PERKS -> {
-                val draft = state.cardEditorDraft
+                val draft = viewModel.cardEditor.currentDraft ?: state.cardEditorDraft
                 if (draft != null) {
                     CardEditorSheetContent(
                         draft = draft,

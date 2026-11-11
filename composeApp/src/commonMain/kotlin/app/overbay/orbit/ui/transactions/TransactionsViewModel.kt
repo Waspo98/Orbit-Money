@@ -1,5 +1,8 @@
 package app.overbay.orbit.ui.transactions
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.*
@@ -31,6 +34,8 @@ class TransactionsViewModel(
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
+    var searchQueryInput by mutableStateOf("")
+        private set
     private val _isSearchActive = MutableStateFlow(false)
     private val _quickFilter = MutableStateFlow(QuickFilter.ALL)
     private val _filterDraft = MutableStateFlow(TransactionFilterDraft())
@@ -194,10 +199,13 @@ class TransactionsViewModel(
             initialValue = TransactionsUiState(isLoading = true)
         )
 
-    fun setSearchQuery(query: String) { _searchQuery.value = query }
+    fun setSearchQuery(query: String) {
+        searchQueryInput = query
+        _searchQuery.value = query
+    }
     fun setSearchActive(active: Boolean) {
         _isSearchActive.value = active
-        if (!active) _searchQuery.value = ""
+        if (!active) setSearchQuery("")
     }
     fun setQuickFilter(filter: QuickFilter) { _quickFilter.value = filter }
     fun setSortOption(sort: TransactionSortOption) { _sortOption.value = sort }
@@ -228,7 +236,7 @@ class TransactionsViewModel(
     }
 
     fun clearFilters() {
-        _searchQuery.value = ""
+        setSearchQuery("")
         _quickFilter.value = QuickFilter.ALL
         _filterDraft.value = TransactionFilterDraft()
         _sortOption.value = TransactionSortOption.DATE_DESC
@@ -253,7 +261,7 @@ class TransactionsViewModel(
             sortOption != null || openAddSheet || openSearch || !includeTransfers || !includeIgnored
         if (!hasDeepLink) return
 
-        _searchQuery.value = ""
+        setSearchQuery("")
         _isSearchActive.value = openSearch
         _quickFilter.value = if (uncategorizedOnly) QuickFilter.UNCATEGORIZED else QuickFilter.ALL
 

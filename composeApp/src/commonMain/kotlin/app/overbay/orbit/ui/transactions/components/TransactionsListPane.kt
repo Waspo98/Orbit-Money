@@ -98,7 +98,7 @@ fun TransactionsListPane(
                         expandedTextBottomDp = expandedTextBottomDp,
                         searchActiveProgress = searchActiveProgress,
                         isSearchActive = state.isSearchActive,
-                        searchQuery = state.searchQuery,
+                        searchQuery = viewModel.searchQueryInput,
                         onSearchQueryChange = { viewModel.setSearchQuery(it) },
                         onSearchActiveChange = { viewModel.setSearchActive(it) },
                         expandedPlaceholder = "Search transactions",

@@ -1,5 +1,8 @@
 package app.overbay.orbit.ui.categories
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.*
@@ -31,6 +34,8 @@ class CategoriesViewModel(
     private val _ruleBlockedCategory = MutableStateFlow<CategorySummary?>(null)
     private val _isReorderMode = MutableStateFlow(false)
     private val _searchQuery = MutableStateFlow("")
+    var searchQueryInput by mutableStateOf("")
+        private set
     private val _isSearchActive = MutableStateFlow(false)
     private val _groupOrder = MutableStateFlow(
         listOf("Income", "Expenses", "Transfers")
@@ -173,11 +178,14 @@ class CategoriesViewModel(
         initialValue = CategoriesUiState(isLoading = true)
     )
 
-    fun setSearchQuery(query: String) { _searchQuery.value = query }
+    fun setSearchQuery(query: String) {
+        searchQueryInput = query
+        _searchQuery.value = query
+    }
 
     fun setSearchActive(active: Boolean) {
         _isSearchActive.value = active
-        if (!active) _searchQuery.value = ""
+        if (!active) setSearchQuery("")
     }
 
     fun selectCategoryForInspect(id: Long?) {

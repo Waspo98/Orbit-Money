@@ -104,7 +104,11 @@ class AccountsViewModel(
     ) { accts, txns, snap, prefs -> AccountsDataBundle(accts, txns, snap, prefs) }
 
     private val dialogFlow = combine(
-        _editingAccount, _showEditorSheet, cardEditor.draft
+        _editingAccount,
+        _showEditorSheet,
+        cardEditor.draft.distinctUntilChanged { old, new ->
+            (old == null) == (new == null) && old?.accountId == new?.accountId
+        }
     ) { editAcct, showEdit, draft ->
         AccountsSheetBundle(editAcct, showEdit, draft)
     }

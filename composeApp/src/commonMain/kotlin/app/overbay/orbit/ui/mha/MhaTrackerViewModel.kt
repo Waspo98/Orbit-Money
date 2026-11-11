@@ -1,5 +1,8 @@
 package app.overbay.orbit.ui.mha
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.*
@@ -30,6 +33,8 @@ class MhaTrackerViewModel(
     private val _selectedTabFilter = MutableStateFlow(MhaTransactionTabFilter.ELIGIBLE)
     private val _activeScreenTab = MutableStateFlow(MhaScreenTab.TRACKER)
     private val _searchQuery = MutableStateFlow("")
+    var searchQueryInput by mutableStateOf("")
+        private set
     private val _showConfigSheet = MutableStateFlow(false)
     private val _errorMessage = MutableStateFlow<String?>(null)
     private val _designatedCapCents = MutableStateFlow<Cents?>(repository.snapshot.value.mhaTaxProfile.designatedCapCents)
@@ -221,6 +226,7 @@ class MhaTrackerViewModel(
     }
 
     fun setSearchQuery(query: String) {
+        searchQueryInput = query
         _searchQuery.value = query
     }
 

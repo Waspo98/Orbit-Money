@@ -1,5 +1,9 @@
 package app.overbay.orbit.ui.login
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.OrbitRepository
@@ -17,7 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 
@@ -35,12 +39,19 @@ class LoginViewModel(
         LoginUiState(step = if (isWebPlatform) LoginStep.SERVER_AUTH else LoginStep.MODE_SELECT)
     )
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+    var currentUiState by mutableStateOf(_uiState.value)
+        private set
+
+    private inline fun modifyState(transform: (LoginUiState) -> LoginUiState) {
+        val next = _uiState.updateAndGet(transform)
+        Snapshot.withMutableSnapshot { currentUiState = next }
+    }
 
     init {
         val initialUrl = ServerUrlNormalizer.normalize(repository.preferences.value.selfHostedServerUrl)
         val hasKnownServer = isWebPlatform || initialUrl.isNotBlank()
         val initialStep = if (hasKnownServer) LoginStep.SERVER_AUTH else LoginStep.MODE_SELECT
-        _uiState.update {
+        modifyState {
             it.copy(
                 step = initialStep,
                 serverUrl = initialUrl,
@@ -58,7 +69,7 @@ class LoginViewModel(
                 repository.storageMode
             ) { authed, mode -> authed && mode == StorageMode.SELF_HOSTED }
                 .collect { isSelfHostedAuthed ->
-                    _uiState.update {
+                    modifyState {
                         it.copy(
                             isAuthenticated = isSelfHostedAuthed,
                             isSubmitting = if (isSelfHostedAuthed) false else it.isSubmitting,
@@ -73,7 +84,7 @@ class LoginViewModel(
                 OidcCallbackBridge.exchangeError
             ) { exchanging, err -> exchanging to err }
                 .collect { (exchanging, err) ->
-                    _uiState.update {
+                    modifyState {
                         it.copy(
                             isSubmitting = exchanging || it.isSubmitting,
                             errorMessage = err ?: it.errorMessage
@@ -84,7 +95,7 @@ class LoginViewModel(
     }
 
     fun resetToModeSelect() {
-        _uiState.update {
+        modifyState {
             it.copy(
                 step = LoginStep.MODE_SELECT,
                 customServerInput = it.serverUrl.ifBlank { LoginUiState.DEFAULT_SERVER_PREFIX },
@@ -96,14 +107,14 @@ class LoginViewModel(
 
     fun processIntent(intent: LoginIntent) {
         when (intent) {
-            LoginIntent.SelectLocalMode -> _uiState.update {
+            LoginIntent.SelectLocalMode -> modifyState {
                 it.copy(
                     step = LoginStep.LOCAL_SETUP,
                     errorMessage = null,
                     serverError = null
                 )
             }
-            LoginIntent.SelectSelfHostedMode -> _uiState.update {
+            LoginIntent.SelectSelfHostedMode -> modifyState {
                 val prefilled = it.serverUrl.ifBlank {
                     it.customServerInput.ifBlank { LoginUiState.DEFAULT_SERVER_PREFIX }
                 }
@@ -114,17 +125,17 @@ class LoginViewModel(
                     errorMessage = null
                 )
             }
-            LoginIntent.BackToModeSelect -> _uiState.update {
+            LoginIntent.BackToModeSelect -> modifyState {
                 it.copy(
                     step = LoginStep.MODE_SELECT,
                     serverError = null,
                     errorMessage = null
                 )
             }
-            is LoginIntent.SelectLocalSeed -> _uiState.update {
+            is LoginIntent.SelectLocalSeed -> modifyState {
                 it.copy(selectedLocalSeed = intent.choice, errorMessage = null)
             }
-            is LoginIntent.SetBackupFile -> _uiState.update {
+            is LoginIntent.SetBackupFile -> modifyState {
                 it.copy(
                     backupFileName = intent.fileName,
                     backupJsonContent = intent.jsonContent,
@@ -132,19 +143,19 @@ class LoginViewModel(
                 )
             }
             LoginIntent.ConfirmLocalSetup -> confirmLocalSetup()
-            is LoginIntent.UpdateUsername -> _uiState.update {
+            is LoginIntent.UpdateUsername -> modifyState {
                 it.copy(username = intent.username, errorMessage = null)
             }
-            is LoginIntent.UpdatePassword -> _uiState.update {
+            is LoginIntent.UpdatePassword -> modifyState {
                 it.copy(password = intent.password, errorMessage = null)
             }
-            LoginIntent.TogglePasswordVisibility -> _uiState.update {
+            LoginIntent.TogglePasswordVisibility -> modifyState {
                 it.copy(isPasswordVisible = !it.isPasswordVisible)
             }
             LoginIntent.SubmitPasswordLogin -> submitPasswordLogin()
             LoginIntent.PrepareOidcLogin -> prepareOidcLogin()
             LoginIntent.SubmitSampleDataLogin -> submitSampleDataLogin()
-            is LoginIntent.SetShowServerConfig -> _uiState.update {
+            is LoginIntent.SetShowServerConfig -> modifyState {
                 val targetStep = if (intent.show) {
                     LoginStep.SERVER_URL
                 } else if (it.serverUrl.isNotBlank() || isWebPlatform) {
@@ -162,7 +173,7 @@ class LoginViewModel(
                     serverError = null
                 )
             }
-            is LoginIntent.UpdateServerInput -> _uiState.update {
+            is LoginIntent.UpdateServerInput -> modifyState {
                 it.copy(
                     customServerInput = ServerUrlNormalizer.sanitizeInput(intent.url),
                     serverError = null
@@ -170,7 +181,7 @@ class LoginViewModel(
             }
             LoginIntent.ConnectAndSaveServer -> connectAndSaveServer()
             LoginIntent.UseOfflineLocalStorage -> switchToOfflineLocalMode()
-            LoginIntent.ClearNavigationFlags -> _uiState.update {
+            LoginIntent.ClearNavigationFlags -> modifyState {
                 it.copy(isAuthenticated = false, switchedToLocalMode = false)
             }
         }
@@ -178,7 +189,7 @@ class LoginViewModel(
 
     fun fetchAuthConfig(targetUrl: String = _uiState.value.serverUrl) {
         val normalized = ServerUrlNormalizer.normalize(targetUrl)
-        _uiState.update { it.copy(isLoadingConfig = true) }
+        modifyState { it.copy(isLoadingConfig = true) }
         scope.launch {
             val client = customApiClient ?: repository.createApiClient(normalized)
             val result = client.getAuthConfig()
@@ -186,7 +197,7 @@ class LoginViewModel(
                 val cfg = result.getOrThrow()
                 val localEnabled = cfg.localEnabled || (cfg.authProvider == "local" && !cfg.oidcEnabled)
                 val oidcEnabled = cfg.oidcEnabled || cfg.authProvider == "oidc" || cfg.authProvider == "both"
-                _uiState.update {
+                modifyState {
                     it.copy(
                         isLoadingConfig = false,
                         localEnabled = localEnabled,
@@ -197,7 +208,7 @@ class LoginViewModel(
                     )
                 }
             } else {
-                _uiState.update {
+                modifyState {
                     it.copy(
                         isLoadingConfig = false,
                         localEnabled = true,
@@ -213,10 +224,10 @@ class LoginViewModel(
         val rawInput = _uiState.value.customServerInput
         val normalized = ServerUrlNormalizer.normalize(rawInput)
         if (!isWebPlatform && normalized.isBlank()) {
-            _uiState.update { it.copy(serverError = "Please enter a server address") }
+            modifyState { it.copy(serverError = "Please enter a server address") }
             return
         }
-        _uiState.update {
+        modifyState {
             it.copy(
                 customServerInput = normalized.ifBlank { LoginUiState.DEFAULT_SERVER_PREFIX },
                 isTestingServer = true,
@@ -233,7 +244,7 @@ class LoginViewModel(
                 repository.updatePreferences(
                     repository.preferences.value.copy(selfHostedServerUrl = normalized)
                 )
-                _uiState.update {
+                modifyState {
                     it.copy(
                         step = LoginStep.SERVER_AUTH,
                         serverUrl = normalized,
@@ -254,7 +265,7 @@ class LoginViewModel(
                     repository.updatePreferences(
                         repository.preferences.value.copy(selfHostedServerUrl = normalized)
                     )
-                    _uiState.update {
+                    modifyState {
                         it.copy(
                             step = LoginStep.SERVER_AUTH,
                             serverUrl = normalized,
@@ -266,7 +277,7 @@ class LoginViewModel(
                     }
                 } else {
                     val targetLabel = normalized.ifBlank { "server" }
-                    _uiState.update {
+                    modifyState {
                         it.copy(
                             isTestingServer = false,
                             serverError = "Could not connect to $targetLabel. Check the address and ensure the server is online."
@@ -281,7 +292,7 @@ class LoginViewModel(
         val state = _uiState.value
         val normalizedUrl = ServerUrlNormalizer.normalize(state.serverUrl)
         if (!isWebPlatform && normalizedUrl.isBlank()) {
-            _uiState.update {
+            modifyState {
                 it.copy(
                     step = LoginStep.SERVER_URL,
                     errorMessage = "Please connect to your Orbit Money server first."
@@ -290,10 +301,10 @@ class LoginViewModel(
             return
         }
         if (state.username.isBlank() || state.password.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "Username and password are required.") }
+            modifyState { it.copy(errorMessage = "Username and password are required.") }
             return
         }
-        _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
+        modifyState { it.copy(isSubmitting = true, errorMessage = null) }
         scope.launch {
             val client = customApiClient ?: repository.createApiClient(normalizedUrl)
             val result = client.login(state.username.trim(), state.password)
@@ -301,10 +312,10 @@ class LoginViewModel(
                 val me = result.getOrThrow()
                 val userLabel = me.displayName ?: me.username ?: state.username.trim()
                 repository.markAuthenticated(normalizedUrl, userLabel)
-                _uiState.update { it.copy(isSubmitting = false, isAuthenticated = true) }
+                modifyState { it.copy(isSubmitting = false, isAuthenticated = true) }
             } else {
                 val msg = result.exceptionOrNull()?.message ?: "Invalid username or password"
-                _uiState.update { it.copy(isSubmitting = false, errorMessage = msg) }
+                modifyState { it.copy(isSubmitting = false, errorMessage = msg) }
             }
         }
     }
@@ -312,7 +323,7 @@ class LoginViewModel(
     private fun prepareOidcLogin() {
         val normalizedUrl = ServerUrlNormalizer.normalize(_uiState.value.serverUrl)
         if (!isWebPlatform && normalizedUrl.isBlank()) {
-            _uiState.update {
+            modifyState {
                 it.copy(
                     step = LoginStep.SERVER_URL,
                     errorMessage = "Please connect to your Orbit Money server first."
@@ -321,7 +332,7 @@ class LoginViewModel(
             return
         }
         storage.saveString(OidcCallbackBridge.PENDING_SERVER_URL_KEY, normalizedUrl.ifEmpty { "/" })
-        _uiState.update { it.copy(serverUrl = normalizedUrl, errorMessage = null) }
+        modifyState { it.copy(serverUrl = normalizedUrl, errorMessage = null) }
         scope.launch {
             repository.prepareForOidcLogin(normalizedUrl)
         }
@@ -329,7 +340,7 @@ class LoginViewModel(
 
     private fun submitSampleDataLogin() {
         val normalizedUrl = ServerUrlNormalizer.normalize(_uiState.value.serverUrl)
-        _uiState.update { it.copy(isSampleLoading = true, errorMessage = null) }
+        modifyState { it.copy(isSampleLoading = true, errorMessage = null) }
         scope.launch {
             val deviceId = getOrCreateSampleDeviceId()
             val client = customApiClient ?: repository.createApiClient(normalizedUrl)
@@ -338,9 +349,9 @@ class LoginViewModel(
                 val me = result.getOrThrow()
                 val userLabel = me.displayName ?: "Sample Data"
                 repository.markAuthenticated(normalizedUrl, userLabel)
-                _uiState.update { it.copy(isSampleLoading = false, isAuthenticated = true) }
+                modifyState { it.copy(isSampleLoading = false, isAuthenticated = true) }
             } else {
-                _uiState.update {
+                modifyState {
                     it.copy(
                         isSampleLoading = false,
                         errorMessage = result.exceptionOrNull()?.message ?: "Could not load sample data"
@@ -353,10 +364,10 @@ class LoginViewModel(
     private fun confirmLocalSetup() {
         val state = _uiState.value
         if (state.selectedLocalSeed == LocalSeedChoice.RESTORE_FILE && state.backupJsonContent.isNullOrBlank()) {
-            _uiState.update { it.copy(errorMessage = "Please select or paste a backup JSON file first.") }
+            modifyState { it.copy(errorMessage = "Please select or paste a backup JSON file first.") }
             return
         }
-        _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
+        modifyState { it.copy(isSubmitting = true, errorMessage = null) }
         scope.launch {
             repository.setStorageMode(StorageMode.LOCAL)
             when (state.selectedLocalSeed) {
@@ -367,7 +378,7 @@ class LoginViewModel(
                 LocalSeedChoice.RESTORE_FILE -> {
                     val restoreResult = repository.restoreBackupJson(state.backupJsonContent.orEmpty())
                     if (restoreResult.isFailure) {
-                        _uiState.update {
+                        modifyState {
                             it.copy(
                                 isSubmitting = false,
                                 errorMessage = restoreResult.exceptionOrNull()?.message ?: "Could not restore backup file."
@@ -386,7 +397,7 @@ class LoginViewModel(
                     onboardingCompleted = true
                 )
             )
-            _uiState.update { it.copy(isSubmitting = false, switchedToLocalMode = true) }
+            modifyState { it.copy(isSubmitting = false, switchedToLocalMode = true) }
         }
     }
 
@@ -399,7 +410,7 @@ class LoginViewModel(
                     onboardingCompleted = true
                 )
             )
-            _uiState.update { it.copy(switchedToLocalMode = true) }
+            modifyState { it.copy(switchedToLocalMode = true) }
         }
     }
 

@@ -82,9 +82,10 @@ fun AccountDetailInspectorPane(
     }
     val inspecting = activeAccount ?: cachedAccount
 
+    val liveCardDraft = viewModel.cardEditor.currentDraft ?: state.cardEditorDraft
     val subMode = when {
         state.showEditorSheet && state.editingAccount != null -> AccountInspectorSubMode.EDIT
-        state.cardEditorDraft != null -> AccountInspectorSubMode.PERKS
+        liveCardDraft != null -> AccountInspectorSubMode.PERKS
         state.showHistorySheet && state.historyAccount != null -> AccountInspectorSubMode.HISTORY
         else -> AccountInspectorSubMode.DETAIL
     }
@@ -125,7 +126,7 @@ fun AccountDetailInspectorPane(
                 }
             }
             AccountInspectorSubMode.PERKS -> {
-                val draft = state.cardEditorDraft
+                val draft = viewModel.cardEditor.currentDraft ?: state.cardEditorDraft
                 if (draft != null) {
                     CardEditorSheetContent(
                         draft = draft,

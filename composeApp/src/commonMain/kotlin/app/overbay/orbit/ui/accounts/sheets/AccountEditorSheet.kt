@@ -217,7 +217,7 @@ fun AccountEditorContent(
 
                         OrbitTextField(
                             value = accountNumberLast4,
-                            onValueChange = { if (it.length <= 4) accountNumberLast4 = it.filter(Char::isDigit) },
+                            onValueChange = { accountNumberLast4 = it.filter(Char::isDigit).take(4) },
                             label = { Text("Last 4 Digits") },
                             placeholder = { Text("1234") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

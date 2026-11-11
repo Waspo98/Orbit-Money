@@ -6,12 +6,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
@@ -137,13 +144,12 @@ fun MemberCompensationFields(
         )
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OrbitTextField(
-                value = if (employeeContribPercent > 0.0) employeeContribPercent.toString() else "",
-                onValueChange = { onEmployeeContribPercentChange(it.toDoubleOrNull() ?: 0.0) },
-                label = { Text("Employee %") },
-                placeholder = { Text("e.g. 6.0") },
-                modifier = Modifier.weight(1f),
-                singleLine = true
+            CompensationPercentField(
+                percent = employeeContribPercent,
+                onPercentChange = onEmployeeContribPercentChange,
+                label = "Employee %",
+                placeholder = "e.g. 6.0",
+                modifier = Modifier.weight(1f)
             )
             CurrencyTextField(
                 cents = employeeContribAnnualCents,
@@ -154,19 +160,17 @@ fun MemberCompensationFields(
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OrbitTextField(
-                value = if (employerMatchPercent > 0.0) employerMatchPercent.toString() else "",
-                onValueChange = { onEmployerMatchPercentChange(it.toDoubleOrNull() ?: 0.0) },
-                label = { Text("Match % (e.g. 100)") },
-                modifier = Modifier.weight(1f),
-                singleLine = true
+            CompensationPercentField(
+                percent = employerMatchPercent,
+                onPercentChange = onEmployerMatchPercentChange,
+                label = "Match % (e.g. 100)",
+                modifier = Modifier.weight(1f)
             )
-            OrbitTextField(
-                value = if (employerMatchLimitPercent > 0.0) employerMatchLimitPercent.toString() else "",
-                onValueChange = { onEmployerMatchLimitPercentChange(it.toDoubleOrNull() ?: 0.0) },
-                label = { Text("Match Limit % (e.g. 5)") },
-                modifier = Modifier.weight(1f),
-                singleLine = true
+            CompensationPercentField(
+                percent = employerMatchLimitPercent,
+                onPercentChange = onEmployerMatchLimitPercentChange,
+                label = "Match Limit % (e.g. 5)",
+                modifier = Modifier.weight(1f)
             )
         }
 
@@ -246,4 +250,43 @@ fun MemberCompensationFields(
             maxLines = 3
         )
     }
+}
+
+private fun formatInitialPercent(value: Double): String = when {
+    value <= 0.0 -> ""
+    value == value.toLong().toDouble() -> value.toLong().toString()
+    else -> value.toString()
+}
+
+@Composable
+private fun CompensationPercentField(
+    percent: Double,
+    onPercentChange: (Double) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null
+) {
+    var rawText by remember { mutableStateOf(formatInitialPercent(percent)) }
+    LaunchedEffect(percent) {
+        val currentParsed = rawText.toDoubleOrNull() ?: 0.0
+        if (currentParsed != percent) {
+            rawText = formatInitialPercent(percent)
+        }
+    }
+    OrbitTextField(
+        value = rawText,
+        onValueChange = { input ->
+            var hasDot = false
+            val sanitized = input.filter { ch ->
+                if (ch.isDigit()) true else if (ch == '.' && !hasDot) { hasDot = true; true } else false
+            }
+            rawText = sanitized
+            onPercentChange(sanitized.toDoubleOrNull() ?: 0.0)
+        },
+        label = { Text(label) },
+        placeholder = placeholder?.let { { Text(it) } },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        singleLine = true,
+        modifier = modifier
+    )
 }

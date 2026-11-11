@@ -117,7 +117,7 @@ fun AccountEditorBillingSection(
             ) {
                 OrbitTextField(
                     value = state.statementCloseDayText,
-                    onValueChange = { if (it.length <= 2) state.statementCloseDayText = it.filter(Char::isDigit) },
+                    onValueChange = { state.statementCloseDayText = it.filter(Char::isDigit).take(2) },
                     label = { Text("Statement Closes") },
                     placeholder = { Text("1–31") },
                     suffixText = "Day",
@@ -127,7 +127,7 @@ fun AccountEditorBillingSection(
                 )
                 OrbitTextField(
                     value = state.paymentDueDayText,
-                    onValueChange = { if (it.length <= 2) state.paymentDueDayText = it.filter(Char::isDigit) },
+                    onValueChange = { state.paymentDueDayText = it.filter(Char::isDigit).take(2) },
                     label = { Text("Payment Due") },
                     placeholder = { Text("1–31") },
                     suffixText = "Day",

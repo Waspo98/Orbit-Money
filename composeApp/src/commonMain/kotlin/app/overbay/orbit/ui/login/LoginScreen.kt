@@ -59,7 +59,15 @@ fun LoginScreen(
     onUseOfflineStorage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val flowState by viewModel.uiState.collectAsStateWithLifecycle()
+    val state = viewModel.currentUiState.let { snap ->
+        flowState.copy(
+            username = snap.username,
+            password = snap.password,
+            customServerInput = snap.customServerInput,
+            backupJsonContent = snap.backupJsonContent
+        )
+    }
 
     LoginScreen(
         state = state,

@@ -26,8 +26,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -55,6 +57,25 @@ fun TransactionsSearchBar(
     val haptics = LocalOrbitHaptics.current
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    var tfv by remember {
+        mutableStateOf(TextFieldValue(text = searchQuery, selection = TextRange(searchQuery.length)))
+    }
+    var lastExternalQuery by remember { mutableStateOf(searchQuery) }
+    val pendingEmissions = remember { ArrayDeque<String>() }
+
+    if (searchQuery != lastExternalQuery) {
+        val echoIdx = pendingEmissions.indexOf(searchQuery)
+        if (echoIdx >= 0) {
+            repeat(echoIdx + 1) { pendingEmissions.removeFirst() }
+        } else {
+            pendingEmissions.clear()
+            if (tfv.text != searchQuery) {
+                tfv = TextFieldValue(text = searchQuery, selection = TextRange(searchQuery.length))
+            }
+        }
+        lastExternalQuery = searchQuery
+    }
 
     LaunchedEffect(isSearchActive) {
         if (isSearchActive) {
@@ -154,8 +175,15 @@ fun TransactionsSearchBar(
                 ) { active ->
                     if (active) {
                         BasicTextField(
-                            value = searchQuery,
-                            onValueChange = onSearchQueryChange,
+                            value = tfv,
+                            onValueChange = { next ->
+                                val textChanged = next.text != tfv.text
+                                tfv = next
+                                if (textChanged) {
+                                    pendingEmissions.addLast(next.text)
+                                    onSearchQueryChange(next.text)
+                                }
+                            },
                             singleLine = true,
                             textStyle = MaterialTheme.typography.bodyLarge.copy(
                                 color = MaterialTheme.colorScheme.onSurface
@@ -171,7 +199,7 @@ fun TransactionsSearchBar(
                                     modifier = Modifier.fillMaxWidth(),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
-                                    if (searchQuery.isEmpty()) {
+                                    if (tfv.text.isEmpty()) {
                                         Text(
                                             text = placeholderText,
                                             style = MaterialTheme.typography.bodyMedium,
@@ -186,9 +214,9 @@ fun TransactionsSearchBar(
                         )
                     } else {
                         Text(
-                            text = if (searchQuery.isNotBlank()) searchQuery else placeholderText,
+                            text = if (tfv.text.isNotBlank()) tfv.text else placeholderText,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (searchQuery.isNotBlank()) {
+                            color = if (tfv.text.isNotBlank()) {
                                 MaterialTheme.colorScheme.onSurface
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
@@ -202,13 +230,15 @@ fun TransactionsSearchBar(
 
             // Trailing Action: Clear button
             AnimatedVisibility(
-                visible = searchQuery.isNotBlank(),
+                visible = tfv.text.isNotBlank(),
                 enter = fadeIn(OrbitSprings.effectsDefault()),
                 exit = fadeOut(OrbitSprings.effectsDefault())
             ) {
                 IconButton(
                     onClick = {
                         haptics.tick()
+                        pendingEmissions.clear()
+                        tfv = TextFieldValue(text = "", selection = TextRange(0))
                         onSearchQueryChange("")
                     },
                     modifier = Modifier.size(32.dp)

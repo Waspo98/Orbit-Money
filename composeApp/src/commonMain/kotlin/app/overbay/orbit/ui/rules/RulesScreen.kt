@@ -155,7 +155,7 @@ fun RulesScreen(
                     val masterList: @Composable () -> Unit = {
                         Column(modifier = Modifier.fillMaxSize()) {
                             OrbitTextField(
-                                value = state.searchQuery,
+                                value = viewModel.searchQueryInput,
                                 onValueChange = { viewModel.setSearchQuery(it) },
                                 placeholder = { Text("Search rules by name, merchant, or category...") },
                                 leadingIcon = {
@@ -165,7 +165,7 @@ fun RulesScreen(
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 },
-                                trailingIcon = if (state.searchQuery.isNotEmpty()) {
+                                trailingIcon = if (viewModel.searchQueryInput.isNotEmpty()) {
                                     {
                                         IconButton(onClick = { viewModel.setSearchQuery("") }) {
                                             Icon(

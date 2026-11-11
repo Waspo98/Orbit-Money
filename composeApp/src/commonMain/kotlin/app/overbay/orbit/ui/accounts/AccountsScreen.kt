@@ -85,7 +85,7 @@ fun AccountsScreen(
         val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
         val isInspectorActive = state.selectedAccount != null ||
             state.showEditorSheet ||
-            state.cardEditorDraft != null ||
+            viewModel.cardEditor.currentDraft != null ||
             state.showHistorySheet
         val isDetailOpen = isTwoPane && isInspectorActive
 

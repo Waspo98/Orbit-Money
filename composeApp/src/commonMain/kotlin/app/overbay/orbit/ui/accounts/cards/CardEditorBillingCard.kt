@@ -99,11 +99,9 @@ fun CardEditorBillingTab(
                     OrbitTextField(
                         value = draft.statementCloseDayText,
                         onValueChange = { txt ->
-                            if (txt.length <= 2) {
-                                val digits = txt.filter(Char::isDigit)
-                                controller.updateDraft {
-                                    it.copy(statementCloseDayText = digits, statementCloseDay = digits.toIntOrNull())
-                                }
+                            val digits = txt.filter(Char::isDigit).take(2)
+                            controller.updateDraft {
+                                it.copy(statementCloseDayText = digits, statementCloseDay = digits.toIntOrNull())
                             }
                         },
                         label = { Text("Statement Closes") },
@@ -117,11 +115,9 @@ fun CardEditorBillingTab(
                     OrbitTextField(
                         value = draft.paymentDueDayText,
                         onValueChange = { txt ->
-                            if (txt.length <= 2) {
-                                val digits = txt.filter(Char::isDigit)
-                                controller.updateDraft {
-                                    it.copy(paymentDueDayText = digits, paymentDueDay = digits.toIntOrNull())
-                                }
+                            val digits = txt.filter(Char::isDigit).take(2)
+                            controller.updateDraft {
+                                it.copy(paymentDueDayText = digits, paymentDueDay = digits.toIntOrNull())
                             }
                         },
                         label = { Text("Payment Due") },

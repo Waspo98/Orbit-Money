@@ -1,5 +1,9 @@
 package app.overbay.orbit.ui.accounts.cards
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
@@ -16,7 +20,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 
 class CardEditorController(
@@ -26,9 +30,21 @@ class CardEditorController(
     private val _draftState = MutableStateFlow<CardEditorDraft?>(null)
     val draftState: StateFlow<CardEditorDraft?> = _draftState.asStateFlow()
     val draft: StateFlow<CardEditorDraft?> get() = draftState
+    var currentDraft by mutableStateOf<CardEditorDraft?>(null)
+        private set
+
+    private fun setDraftValue(next: CardEditorDraft?) {
+        _draftState.value = next
+        Snapshot.withMutableSnapshot { currentDraft = next }
+    }
+
+    private inline fun modifyDraft(transform: (CardEditorDraft?) -> CardEditorDraft?) {
+        val next = _draftState.updateAndGet(transform)
+        Snapshot.withMutableSnapshot { currentDraft = next }
+    }
 
     fun startDraft(account: Account, profile: CreditCardProfile? = null) {
-        _draftState.value = CardEditorDraft.fromAccountAndProfile(account, profile ?: account.creditCardProfile)
+        setDraftValue(CardEditorDraft.fromAccountAndProfile(account, profile ?: account.creditCardProfile))
         catalogScope.launch {
             runCatching { repository.refreshCardCatalog() }
         }
@@ -39,7 +55,7 @@ class CardEditorController(
     }
 
     fun clearDraft() {
-        _draftState.value = null
+        setDraftValue(null)
     }
 
     fun confirmDiscard() {
@@ -49,31 +65,31 @@ class CardEditorController(
     fun requestClose() {
         val current = _draftState.value ?: return
         if (current.isDirty) {
-            _draftState.update { it?.copy(showDiscardConfirm = true) }
+            modifyDraft { it?.copy(showDiscardConfirm = true) }
         } else {
             clearDraft()
         }
     }
 
     fun dismissDiscardConfirm() {
-        _draftState.update { it?.copy(showDiscardConfirm = false) }
+        modifyDraft { it?.copy(showDiscardConfirm = false) }
     }
 
     fun skipTemplate() {
-        _draftState.update { it?.copy(step = CardEditorStep.FORM) }
+        modifyDraft { it?.copy(step = CardEditorStep.FORM) }
     }
 
     fun selectTab(tab: CardEditorTab) {
-        _draftState.update { it?.copy(activeTab = tab) }
+        modifyDraft { it?.copy(activeTab = tab) }
     }
 
     fun updateDraft(transform: (CardEditorDraft) -> CardEditorDraft) {
-        _draftState.update { current -> current?.let(transform) }
+        modifyDraft { current -> current?.let(transform) }
     }
 
     fun applyTemplate(template: CreditCardTemplate) {
-        _draftState.update { current ->
-            if (current == null) return@update null
+        modifyDraft { current ->
+            if (current == null) return@modifyDraft null
             val baseProfile = current.toProfile()
             val applied = template.applyToProfile(baseProfile)
             val resolvedInst = current.accountInstitution.takeIf { it.isNotBlank() } ?: template.issuerName
@@ -105,8 +121,8 @@ class CardEditorController(
     }
 
     fun setOpenedDate(isoDate: String?) {
-        _draftState.update { current ->
-            if (current == null) return@update null
+        modifyDraft { current ->
+            if (current == null) return@modifyDraft null
             val autoDeadline = if (current.targetDeadlineDate.isNullOrBlank() && !isoDate.isNullOrBlank()) {
                 LocalDateUtils.addDaysIso(isoDate, current.subSpendWindowDays ?: 90)
             } else {
@@ -118,8 +134,8 @@ class CardEditorController(
 
     fun selectPrimaryCardholder(memberId: Long?, name: String?) {
         val cleanName = name?.trim()?.ifBlank { null }
-        _draftState.update { current ->
-            if (current == null) return@update null
+        modifyDraft { current ->
+            if (current == null) return@modifyDraft null
             val filteredMemberIds = if (memberId != null) {
                 current.authorizedUserMemberIds.filterNot { it == memberId }
             } else current.authorizedUserMemberIds
@@ -136,8 +152,8 @@ class CardEditorController(
     }
 
     fun toggleAuthorizedMember(memberId: Long, memberName: String) {
-        _draftState.update { current ->
-            if (current == null || current.cardholderMemberId == memberId) return@update current
+        modifyDraft { current ->
+            if (current == null || current.cardholderMemberId == memberId) return@modifyDraft current
             val exists = current.authorizedUserMemberIds.contains(memberId)
             val updatedIds = if (exists) {
                 current.authorizedUserMemberIds - memberId
@@ -152,37 +168,37 @@ class CardEditorController(
     fun addCustomAuthorizedUser(name: String) {
         val clean = name.trim()
         if (clean.isEmpty()) return
-        _draftState.update { current ->
-            if (current == null) return@update null
-            if (current.cardholder?.equals(clean, ignoreCase = true) == true) return@update current
-            if (current.authorizedUsers.any { it.equals(clean, ignoreCase = true) }) return@update current
+        modifyDraft { current ->
+            if (current == null) return@modifyDraft null
+            if (current.cardholder?.equals(clean, ignoreCase = true) == true) return@modifyDraft current
+            if (current.authorizedUsers.any { it.equals(clean, ignoreCase = true) }) return@modifyDraft current
             current.copy(authorizedUsers = current.authorizedUsers + clean)
         }
     }
 
     fun removeCustomAuthorizedUser(name: String) {
-        _draftState.update { current ->
-            if (current == null) return@update null
+        modifyDraft { current ->
+            if (current == null) return@modifyDraft null
             current.copy(authorizedUsers = current.authorizedUsers.filterNot { it.equals(name, ignoreCase = true) })
         }
     }
 
     fun addBenefit(benefit: CardBenefit) {
         val resolved = if (benefit.id.isBlank()) benefit.copy(id = CreditCardBenefitEngine.newBenefitId()) else benefit
-        _draftState.update { it?.copy(benefits = it.benefits + resolved) }
+        modifyDraft { it?.copy(benefits = it.benefits + resolved) }
     }
 
     fun updateBenefit(benefit: CardBenefit) {
-        _draftState.update { current ->
-            if (current == null) return@update null
+        modifyDraft { current ->
+            if (current == null) return@modifyDraft null
             val updated = current.benefits.map { if (it.id == benefit.id) benefit else it }
             current.copy(benefits = updated)
         }
     }
 
     fun removeBenefit(benefitId: String) {
-        _draftState.update { current ->
-            if (current == null) return@update null
+        modifyDraft { current ->
+            if (current == null) return@modifyDraft null
             val target = current.benefits.find { it.id == benefitId }
             val remaining = current.benefits.filterNot { it.id == benefitId }
             current.copy(benefits = remaining, lastDeletedBenefit = target)
@@ -190,8 +206,8 @@ class CardEditorController(
     }
 
     fun undoRemoveBenefit() {
-        _draftState.update { current ->
-            val toRestore = current?.lastDeletedBenefit ?: return@update current
+        modifyDraft { current ->
+            val toRestore = current?.lastDeletedBenefit ?: return@modifyDraft current
             current.copy(benefits = current.benefits + toRestore, lastDeletedBenefit = null)
         }
     }
@@ -206,20 +222,20 @@ class CardEditorController(
     }
 
     fun addReward(reward: RewardCategory) {
-        _draftState.update { it?.copy(rewardCategories = it.rewardCategories + reward) }
+        modifyDraft { it?.copy(rewardCategories = it.rewardCategories + reward) }
     }
 
     fun updateReward(index: Int, reward: RewardCategory) {
-        _draftState.update { current ->
-            if (current == null || index !in current.rewardCategories.indices) return@update current
+        modifyDraft { current ->
+            if (current == null || index !in current.rewardCategories.indices) return@modifyDraft current
             val updated = current.rewardCategories.toMutableList().also { it[index] = reward }
             current.copy(rewardCategories = updated)
         }
     }
 
     fun removeReward(index: Int) {
-        _draftState.update { current ->
-            if (current == null || index !in current.rewardCategories.indices) return@update current
+        modifyDraft { current ->
+            if (current == null || index !in current.rewardCategories.indices) return@modifyDraft current
             val updated = current.rewardCategories.toMutableList().also { it.removeAt(index) }
             current.copy(rewardCategories = updated)
         }
@@ -234,8 +250,8 @@ class CardEditorController(
     }
 
     fun setWelcomeBonusMode(mode: WelcomeBonusMode) {
-        _draftState.update { current ->
-            if (current == null) return@update null
+        modifyDraft { current ->
+            if (current == null) return@modifyDraft null
             when (mode) {
                 WelcomeBonusMode.NONE -> current.copy(
                     subRewardText = null,
@@ -271,7 +287,7 @@ class CardEditorController(
             return Result.failure(IllegalArgumentException("Draft has validation errors: ${current.errors.values.joinToString(", ")}"))
         }
 
-        _draftState.update { it?.copy(isSaving = true) }
+        modifyDraft { it?.copy(isSaving = true) }
         val profile = current.toProfile()
         val acctName = accountNameOverride ?: current.accountName.takeIf { it.isNotBlank() }
         val acctInst = institutionOverride ?: current.accountInstitution.takeIf { it.isNotBlank() }
@@ -284,7 +300,7 @@ class CardEditorController(
         ).onSuccess {
             clearDraft()
         }.onFailure {
-            _draftState.update { it?.copy(isSaving = false) }
+            modifyDraft { it?.copy(isSaving = false) }
         }
     }
 }

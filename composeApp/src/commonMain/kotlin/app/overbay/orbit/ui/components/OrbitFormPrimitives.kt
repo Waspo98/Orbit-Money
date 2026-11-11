@@ -28,6 +28,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,13 +38,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlinx.coroutines.delay
 
 @Composable
 fun OrbitFieldLabel(
@@ -129,6 +133,36 @@ fun OrbitTextField(
         else -> null
     }
 
+    var tfv by remember {
+        mutableStateOf(TextFieldValue(text = value, selection = TextRange(value.length)))
+    }
+    var lastExternalValue by remember { mutableStateOf(value) }
+    val pendingEmissions = remember { ArrayDeque<String>() }
+
+    if (value != lastExternalValue) {
+        val echoIdx = pendingEmissions.indexOf(value)
+        if (echoIdx >= 0) {
+            repeat(echoIdx + 1) { pendingEmissions.removeFirst() }
+        } else {
+            pendingEmissions.clear()
+            if (tfv.text != value) {
+                tfv = TextFieldValue(text = value, selection = TextRange(value.length))
+            }
+        }
+        lastExternalValue = value
+    }
+
+    LaunchedEffect(tfv.text, value) {
+        if (tfv.text != value) {
+            delay(200)
+            if (tfv.text != value) {
+                pendingEmissions.clear()
+                val clamped = tfv.selection.end.coerceIn(0, value.length)
+                tfv = TextFieldValue(text = value, selection = TextRange(clamped))
+            }
+        }
+    }
+
     Column(modifier = modifier) {
         if (label != null) {
             ProvideTextStyle(
@@ -149,8 +183,15 @@ fun OrbitTextField(
             }
         }
         OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
+            value = tfv,
+            onValueChange = { next ->
+                val textChanged = next.text != tfv.text
+                tfv = next
+                if (textChanged) {
+                    pendingEmissions.addLast(next.text)
+                    onValueChange(next.text)
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
             readOnly = readOnly,

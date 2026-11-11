@@ -56,9 +56,15 @@ fun StorageSyncModeBlock(
     modifier: Modifier = Modifier
 ) {
     val oidcLauncher = LocalOidcAuthLauncher.current
-    var serverUrl by remember(preferences.selfHostedServerUrl) { mutableStateOf(preferences.selfHostedServerUrl) }
+    var serverUrl by remember { mutableStateOf(preferences.selfHostedServerUrl) }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+
+    androidx.compose.runtime.LaunchedEffect(preferences.selfHostedServerUrl) {
+        if (preferences.selfHostedServerUrl != serverUrl.trim()) {
+            serverUrl = preferences.selfHostedServerUrl
+        }
+    }
 
     OrbitSectionCard(
         title = "Data Storage & Sync Environment",

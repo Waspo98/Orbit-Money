@@ -13,6 +13,11 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -59,10 +64,7 @@ fun RecurringKindSelector(
                 val isSelected = selectedKind == kind
                 SegmentedButton(
                     selected = isSelected,
-                    onClick = {
-                        haptics.tick()
-                        onKindSelected(kind)
-                    },
+                    onClick = { haptics.tick(); onKindSelected(kind) },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = kinds.size),
                     icon = {},
                     label = {
@@ -102,16 +104,12 @@ fun RecurringAmountStrategySection(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(6.dp))
-
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             strategies.forEachIndexed { index, (strategy, label) ->
                 val isSelected = amountStrategy == strategy
                 SegmentedButton(
                     selected = isSelected,
-                    onClick = {
-                        haptics.tick()
-                        onStrategyChanged(strategy)
-                    },
+                    onClick = { haptics.tick(); onStrategyChanged(strategy) },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = strategies.size),
                     icon = {},
                     label = {
@@ -142,10 +140,7 @@ fun RecurringAmountStrategySection(
                         val isSel = lookbackMonths == months
                         SegmentedButton(
                             selected = isSel,
-                            onClick = {
-                                haptics.tick()
-                                onLookbackChanged(months)
-                            },
+                            onClick = { haptics.tick(); onLookbackChanged(months) },
                             shape = SegmentedButtonDefaults.itemShape(index = index, count = lookbackWindows.size),
                             icon = {},
                             label = {
@@ -200,10 +195,7 @@ fun RecurringScheduleModeSection(
                 val isSelected = scheduleMode == mode
                 SegmentedButton(
                     selected = isSelected,
-                    onClick = {
-                        haptics.tick()
-                        onScheduleModeChanged(mode)
-                    },
+                    onClick = { haptics.tick(); onScheduleModeChanged(mode) },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
                     icon = {},
                     label = {
@@ -304,7 +296,13 @@ fun RecurringCustomScheduleFields(
     modifier: Modifier = Modifier
 ) {
     if (frequency != RecurrenceFrequency.CUSTOM) return
-
+    var intervalText by remember { mutableStateOf(if (customInterval > 0) customInterval.toString() else "1") }
+    LaunchedEffect(customInterval) {
+        val parsed = intervalText.toIntOrNull()
+        if (parsed != null && parsed != customInterval && customInterval > 0) {
+            intervalText = customInterval.toString()
+        }
+    }
     Column(modifier = modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(8.dp))
         Row(
@@ -313,16 +311,16 @@ fun RecurringCustomScheduleFields(
             verticalAlignment = Alignment.CenterVertically
         ) {
             OrbitTextField(
-                value = if (customInterval > 0) customInterval.toString() else "",
+                value = intervalText,
                 onValueChange = { str ->
-                    val num = str.filter { it.isDigit() }.toIntOrNull() ?: 1
-                    onIntervalChanged(num)
+                    val digits = str.filter { it.isDigit() }.take(4)
+                    intervalText = digits
+                    digits.toIntOrNull()?.takeIf { it > 0 }?.let(onIntervalChanged)
                 },
                 label = { Text("Every (N)") },
                 singleLine = true,
                 modifier = Modifier.weight(0.45f)
             )
-
             OrbitDropdownField(
                 label = "Unit",
                 selectedText = customUnit.replaceFirstChar { it.uppercase() },
@@ -368,10 +366,7 @@ fun RecurringStatusAndNotesSection(
                     val isSelected = status == st
                     SegmentedButton(
                         selected = isSelected,
-                        onClick = {
-                            haptics.tick()
-                            onStatusChanged(st)
-                        },
+                        onClick = { haptics.tick(); onStatusChanged(st) },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = statuses.size),
                         icon = {},
                         label = {
@@ -385,9 +380,7 @@ fun RecurringStatusAndNotesSection(
                 }
             }
         }
-
         Spacer(modifier = Modifier.height(10.dp))
-
         OrbitTextField(
             value = notes,
             onValueChange = onNotesChanged,

@@ -96,7 +96,8 @@ fun CardPerksScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
-        val isInspectorActive = (state.selectedAccount?.type == AccountType.CREDIT) || state.cardEditorDraft != null
+        val liveCardDraft = viewModel.cardEditor.currentDraft ?: state.cardEditorDraft
+        val isInspectorActive = (state.selectedAccount?.type == AccountType.CREDIT) || liveCardDraft != null
         val isDetailOpen = isTwoPane && isInspectorActive
 
         Scaffold(

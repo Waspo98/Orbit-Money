@@ -1,5 +1,8 @@
 package app.overbay.orbit.ui.rules
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.*
@@ -32,6 +35,8 @@ class RulesViewModel(
     private val _isApplying = MutableStateFlow(false)
     private val _showWipeAllRulesDialog = MutableStateFlow(false)
     private val _searchQuery = MutableStateFlow("")
+    var searchQueryInput by mutableStateOf("")
+        private set
 
     private data class RulesDataSnapshot(
         val rules: List<TransactionRule>,
@@ -128,6 +133,7 @@ class RulesViewModel(
     )
 
     fun setSearchQuery(query: String) {
+        searchQueryInput = query
         _searchQuery.value = query
     }
 

@@ -30,29 +30,46 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.util.LocalOrbitHaptics
 
-private fun sanitizeCurrencyInput(input: String, allowNegative: Boolean): String = buildString {
+internal fun sanitizeCurrencyInputWithCursor(
+    input: String,
+    cursorEnd: Int,
+    allowNegative: Boolean
+): Pair<String, Int> {
+    val sb = StringBuilder(input.length)
     var hasDecimal = false
     var decimalPlaces = 0
+    var newCursor = 0
     input.forEachIndexed { index, c ->
-        if (c.isDigit()) {
-            if (!hasDecimal || decimalPlaces < 2) {
-                append(c)
-                if (hasDecimal) decimalPlaces++
-            }
-        } else if (c == '.' && !hasDecimal) {
-            append(c)
-            hasDecimal = true
-        } else if (c == '-' && index == 0 && allowNegative) {
-            append(c)
+        val keep = when {
+            c.isDigit() -> !hasDecimal || decimalPlaces < 2
+            c == '.' && !hasDecimal -> true
+            c == '-' && sb.isEmpty() && allowNegative -> true
+            else -> false
+        }
+        if (keep) {
+            sb.append(c)
+            if (c == '.') hasDecimal = true
+            else if (c.isDigit() && hasDecimal) decimalPlaces++
+            if (index < cursorEnd) newCursor++
         }
     }
+    return sb.toString() to newCursor.coerceIn(0, sb.length)
+}
+
+internal fun formatEditableCurrency(cents: Long): String = when {
+    cents == 0L -> ""
+    cents % 100L == 0L -> (cents / 100L).toString()
+    else -> MoneyUtils.centsToDollarString(cents)
 }
 
 /**
@@ -68,14 +85,22 @@ fun CurrencyTextField(
     isError: Boolean = false,
     errorMessage: String? = null
 ) {
-    var rawText by remember {
-        val initial = if (cents == 0L) "" else MoneyUtils.centsToDollarString(cents)
-        mutableStateOf(initial)
+    var tfv by remember {
+        val initial = formatEditableCurrency(cents)
+        mutableStateOf(TextFieldValue(text = initial, selection = TextRange(initial.length)))
     }
+    val pendingCents = remember { ArrayDeque<Long>() }
 
     LaunchedEffect(cents) {
-        if (MoneyUtils.dollarsToCents(rawText) != cents) {
-            rawText = if (cents == 0L) "" else MoneyUtils.centsToDollarString(cents)
+        val echoIdx = pendingCents.indexOf(cents)
+        if (echoIdx >= 0) {
+            repeat(echoIdx + 1) { pendingCents.removeFirst() }
+        } else {
+            pendingCents.clear()
+            if (MoneyUtils.dollarsToCents(tfv.text) != cents) {
+                val formatted = formatEditableCurrency(cents)
+                tfv = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
+            }
         }
     }
 
@@ -84,13 +109,31 @@ fun CurrencyTextField(
             OrbitFieldLabel(text = label)
         }
         OutlinedTextField(
-            value = rawText,
-            onValueChange = { input ->
-                val sanitized = sanitizeCurrencyInput(input, allowNegative)
-                rawText = sanitized
-                onCentsChange(MoneyUtils.dollarsToCents(sanitized))
+            value = tfv,
+            onValueChange = { next ->
+                val textChanged = next.text != tfv.text
+                if (!textChanged) {
+                    tfv = next
+                } else {
+                    val (sanitized, nextCursor) = sanitizeCurrencyInputWithCursor(
+                        input = next.text,
+                        cursorEnd = next.selection.end,
+                        allowNegative = allowNegative
+                    )
+                    val parsed = MoneyUtils.dollarsToCents(sanitized)
+                    tfv = TextFieldValue(text = sanitized, selection = TextRange(nextCursor))
+                    pendingCents.addLast(parsed)
+                    onCentsChange(parsed)
+                }
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { focusState ->
+                    if (!focusState.isFocused && MoneyUtils.dollarsToCents(tfv.text) != cents) {
+                        val formatted = formatEditableCurrency(cents)
+                        tfv = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
+                    }
+                },
             textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
             label = null,
             placeholder = { Text("0.00") },
@@ -137,14 +180,22 @@ fun OrbitAmountTypeCard(
     label: String = "Amount"
 ) {
     val haptics = LocalOrbitHaptics.current
-    var rawText by remember {
-        val initial = if (cents == 0L) "" else MoneyUtils.centsToDollarString(cents)
-        mutableStateOf(initial)
+    var tfv by remember {
+        val initial = formatEditableCurrency(cents)
+        mutableStateOf(TextFieldValue(text = initial, selection = TextRange(initial.length)))
     }
+    val pendingCents = remember { ArrayDeque<Long>() }
 
     LaunchedEffect(cents) {
-        if (MoneyUtils.dollarsToCents(rawText) != cents) {
-            rawText = if (cents == 0L) "" else MoneyUtils.centsToDollarString(cents)
+        val echoIdx = pendingCents.indexOf(cents)
+        if (echoIdx >= 0) {
+            repeat(echoIdx + 1) { pendingCents.removeFirst() }
+        } else {
+            pendingCents.clear()
+            if (MoneyUtils.dollarsToCents(tfv.text) != cents) {
+                val formatted = formatEditableCurrency(cents)
+                tfv = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
+            }
         }
     }
 
@@ -228,11 +279,22 @@ fun OrbitAmountTypeCard(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 BasicTextField(
-                    value = rawText,
-                    onValueChange = { input ->
-                        val sanitized = sanitizeCurrencyInput(input, allowNegative = false)
-                        rawText = sanitized
-                        onCentsChange(MoneyUtils.dollarsToCents(sanitized))
+                    value = tfv,
+                    onValueChange = { next ->
+                        val textChanged = next.text != tfv.text
+                        if (!textChanged) {
+                            tfv = next
+                        } else {
+                            val (sanitized, nextCursor) = sanitizeCurrencyInputWithCursor(
+                                input = next.text,
+                                cursorEnd = next.selection.end,
+                                allowNegative = false
+                            )
+                            val parsed = MoneyUtils.dollarsToCents(sanitized)
+                            tfv = TextFieldValue(text = sanitized, selection = TextRange(nextCursor))
+                            pendingCents.addLast(parsed)
+                            onCentsChange(parsed)
+                        }
                     },
                     textStyle = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
@@ -241,10 +303,17 @@ fun OrbitAmountTypeCard(
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { focusState ->
+                            if (!focusState.isFocused && MoneyUtils.dollarsToCents(tfv.text) != cents) {
+                                val formatted = formatEditableCurrency(cents)
+                                tfv = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
+                            }
+                        },
                     decorationBox = { innerTextField ->
                         Box(contentAlignment = Alignment.CenterStart) {
-                            if (rawText.isEmpty()) {
+                            if (tfv.text.isEmpty()) {
                                 Text(
                                     text = "0.00",
                                     style = MaterialTheme.typography.headlineMedium,

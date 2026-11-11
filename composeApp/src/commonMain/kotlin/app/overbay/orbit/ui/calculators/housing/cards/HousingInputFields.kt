@@ -28,15 +28,39 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.OrbitFieldLabel
 import app.overbay.orbit.ui.components.OrbitFormDefaults
-import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.components.formatEditableCurrency
+import app.overbay.orbit.ui.components.sanitizeCurrencyInputWithCursor
+
+private fun formatEditablePercent(valuePercent: Double?): String = when {
+    valuePercent == null -> ""
+    valuePercent == valuePercent.toLong().toDouble() -> valuePercent.toLong().toString()
+    else -> valuePercent.toString()
+}
+
+private fun sanitizeDecimalWithCursor(input: String, cursorEnd: Int): Pair<String, Int> {
+    val sb = StringBuilder(input.length)
+    var hasDot = false
+    var newCursor = 0
+    input.forEachIndexed { index, c ->
+        val keep = c.isDigit() || (c == '.' && !hasDot)
+        if (keep) {
+            sb.append(c)
+            if (c == '.') hasDot = true
+            if (index < cursorEnd) newCursor++
+        }
+    }
+    return sb.toString() to newCursor.coerceIn(0, sb.length)
+}
 
 @Composable
 fun HousingMoneyField(
@@ -46,29 +70,43 @@ fun HousingMoneyField(
     onValueChange: (Cents?) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var rawText by remember(valueCents) {
-        val initial = if (valueCents == null) "" else MoneyUtils.centsToDollarString(valueCents)
-        mutableStateOf(initial)
+    var tfv by remember {
+        val initial = if (valueCents == null) "" else formatEditableCurrency(valueCents)
+        mutableStateOf(TextFieldValue(text = initial, selection = TextRange(initial.length)))
     }
+    val pendingCents = remember { ArrayDeque<Cents?>() }
 
     LaunchedEffect(valueCents) {
-        val expected = if (valueCents == null) "" else MoneyUtils.centsToDollarString(valueCents)
-        if (rawText != expected && (rawText.isBlank() && valueCents != null || MoneyUtils.dollarsToCents(rawText) != (valueCents ?: 0L))) {
-            rawText = expected
+        val echoIdx = pendingCents.indexOf(valueCents)
+        if (echoIdx >= 0) {
+            repeat(echoIdx + 1) { pendingCents.removeFirst() }
+        } else {
+            pendingCents.clear()
+            val currentParsed = if (tfv.text.isBlank()) null else MoneyUtils.dollarsToCents(tfv.text)
+            if (currentParsed != valueCents) {
+                val expected = if (valueCents == null) "" else formatEditableCurrency(valueCents)
+                tfv = TextFieldValue(text = expected, selection = TextRange(expected.length))
+            }
         }
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
         OrbitFieldLabel(text = label)
         OutlinedTextField(
-            value = rawText,
-            onValueChange = { input ->
-                val digitsAndDots = input.filter { it.isDigit() || it == '.' }
-                rawText = digitsAndDots
-                if (digitsAndDots.isBlank()) {
-                    onValueChange(null)
+            value = tfv,
+            onValueChange = { next ->
+                if (next.text == tfv.text) {
+                    tfv = next
                 } else {
-                    onValueChange(MoneyUtils.dollarsToCents(digitsAndDots))
+                    val (sanitized, nextCursor) = sanitizeCurrencyInputWithCursor(
+                        input = next.text,
+                        cursorEnd = next.selection.end,
+                        allowNegative = false
+                    )
+                    val parsed = if (sanitized.isBlank()) null else MoneyUtils.dollarsToCents(sanitized)
+                    tfv = TextFieldValue(text = sanitized, selection = TextRange(nextCursor))
+                    pendingCents.addLast(parsed)
+                    onValueChange(parsed)
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -106,33 +144,39 @@ fun HousingPercentField(
     onValueChange: (Double?) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var rawText by remember(valuePercent) {
-        val initial = if (valuePercent == null) "" else {
-            if (valuePercent == valuePercent.toLong().toDouble()) valuePercent.toLong().toString() else valuePercent.toString()
-        }
-        mutableStateOf(initial)
+    var tfv by remember {
+        val initial = formatEditablePercent(valuePercent)
+        mutableStateOf(TextFieldValue(text = initial, selection = TextRange(initial.length)))
     }
+    val pendingValues = remember { ArrayDeque<Double?>() }
 
     LaunchedEffect(valuePercent) {
-        val expected = if (valuePercent == null) "" else {
-            if (valuePercent == valuePercent.toLong().toDouble()) valuePercent.toLong().toString() else valuePercent.toString()
-        }
-        if (rawText != expected && rawText.toDoubleOrNull() != valuePercent) {
-            rawText = expected
+        val echoIdx = pendingValues.indexOf(valuePercent)
+        if (echoIdx >= 0) {
+            repeat(echoIdx + 1) { pendingValues.removeFirst() }
+        } else {
+            pendingValues.clear()
+            val currentParsed = if (tfv.text.isBlank()) null else tfv.text.toDoubleOrNull()
+            if (currentParsed != valuePercent) {
+                val expected = formatEditablePercent(valuePercent)
+                tfv = TextFieldValue(text = expected, selection = TextRange(expected.length))
+            }
         }
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
         OrbitFieldLabel(text = label)
         OutlinedTextField(
-            value = rawText,
-            onValueChange = { input ->
-                val sanitized = input.filter { it.isDigit() || it == '.' }
-                rawText = sanitized
-                if (sanitized.isBlank()) {
-                    onValueChange(null)
+            value = tfv,
+            onValueChange = { next ->
+                if (next.text == tfv.text) {
+                    tfv = next
                 } else {
-                    onValueChange(sanitized.toDoubleOrNull())
+                    val (sanitized, nextCursor) = sanitizeDecimalWithCursor(next.text, next.selection.end)
+                    val parsed = if (sanitized.isBlank()) null else sanitized.toDoubleOrNull()
+                    tfv = TextFieldValue(text = sanitized, selection = TextRange(nextCursor))
+                    pendingValues.addLast(parsed)
+                    onValueChange(parsed)
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -163,9 +207,20 @@ fun HousingLoanTermControl(
     modifier: Modifier = Modifier
 ) {
     val isStandard = value == 30 || value == 15
-    var isCustom by remember(value) { mutableStateOf(!isStandard && value != null) }
-    var customText by remember(value) {
+    var isCustom by remember { mutableStateOf(!isStandard && value != null) }
+    var customText by remember {
         mutableStateOf(if (!isStandard && value != null) value.toString() else "")
+    }
+
+    LaunchedEffect(value) {
+        if (!isCustom) {
+            if (value != null && value != 30 && value != 15) {
+                isCustom = true
+                customText = value.toString()
+            } else if (value == null) {
+                customText = ""
+            }
+        }
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
