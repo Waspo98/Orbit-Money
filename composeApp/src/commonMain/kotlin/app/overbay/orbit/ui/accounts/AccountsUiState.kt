@@ -7,11 +7,14 @@ import app.overbay.orbit.data.model.DashboardWidgetConfig
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.domain.AccountClosureCandidate
 import app.overbay.orbit.domain.CardCycleStatus
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardPortfolioSummary
 import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.HouseholdCreditSummary
+import app.overbay.orbit.domain.RealEstatePropertyEngine
+import app.overbay.orbit.domain.RealEstatePropertyUnit
 import app.overbay.orbit.ui.accounts.cards.CardEditorDraft
 
 enum class AccountTypeCategory(val displayName: String) {
@@ -27,7 +30,8 @@ data class AccountGroupDisplay(
     val category: AccountTypeCategory,
     val title: String,
     val accounts: List<Account>,
-    val totalCents: Cents
+    val totalCents: Cents,
+    val propertyUnits: List<RealEstatePropertyUnit> = emptyList()
 )
 
 data class PerkUsageTarget(
@@ -85,10 +89,19 @@ data class AccountsUiState(
     val showWhichCardWhere: Boolean = false,
     val selectedRewardCategory: String? = null,
     val logoFinderAccount: Account? = null,
-    val cardPerksWidgets: List<DashboardWidgetConfig> = OrbitPreferences.defaultCardPerksWidgets()
+    val cardPerksWidgets: List<DashboardWidgetConfig> = OrbitPreferences.defaultCardPerksWidgets(),
+    val closureCandidates: List<AccountClosureCandidate> = emptyList(),
+    val activeClosurePrompt: AccountClosureCandidate? = null,
+    val isResolvingClosure: Boolean = false
 ) {
     val selectedAccount: Account?
         get() = accounts.find { it.id == selectedAccountId }
+
+    val availablePropertyAnchors: List<Account>
+        get() = accounts.filter { !it.isArchived && RealEstatePropertyEngine.isPropertyAnchor(it) }
+
+    val closureCandidateAccountIds: Set<Long>
+        get() = closureCandidates.map { it.account.id }.toSet()
 
     val showCardProfileSheet: Boolean
         get() = cardEditorDraft != null

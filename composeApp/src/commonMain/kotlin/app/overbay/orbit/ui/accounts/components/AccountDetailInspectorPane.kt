@@ -113,6 +113,7 @@ fun AccountDetailInspectorPane(
                 if (editTarget != null) {
                     AccountEditorContent(
                         account = editTarget,
+                        availablePropertyAnchors = state.availablePropertyAnchors,
                         onSave = { viewModel.saveAccount(it) },
                         onDelete = { viewModel.requestDeleteAccount(it) },
                         onUnlinkSimpleFin = if (!editTarget.simplefinAccountId.isNullOrBlank()) {
@@ -172,6 +173,8 @@ fun AccountDetailInspectorPane(
                         AccountReadOnlyDetailContent(
                             account = inspecting,
                             transactions = state.selectedAccountTransactions,
+                            hasClosureAlert = inspecting.id in state.closureCandidateAccountIds,
+                            onReviewClosure = { viewModel.closurePrompts.openForAccount(inspecting.id) },
                             onClose = onClosePane,
                             onEdit = { viewModel.openEditAccount(inspecting) },
                             onFindLogo = { viewModel.accountLogos.open(inspecting) },
@@ -198,6 +201,8 @@ fun AccountDetailInspectorPane(
 private fun AccountReadOnlyDetailContent(
     account: Account,
     transactions: List<Transaction>,
+    hasClosureAlert: Boolean = false,
+    onReviewClosure: (() -> Unit)? = null,
     onClose: () -> Unit,
     onEdit: () -> Unit,
     onFindLogo: () -> Unit,
@@ -214,9 +219,15 @@ private fun AccountReadOnlyDetailContent(
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
     val isLiability = account.type.isLiability
+    val headlineCents = if (account.isProperty) {
+        account.estimatedValueCents ?: account.currentBalanceCents
+    } else {
+        account.currentBalanceCents
+    }
     val balanceColor = when {
+        account.isProperty -> colors.income
         isLiability -> if (account.currentBalanceCents != 0L) colors.expense else MaterialTheme.colorScheme.onSurface
-        account.currentBalanceCents >= 0L -> colors.income
+        headlineCents >= 0L -> colors.income
         else -> colors.expense
     }
 
@@ -249,21 +260,22 @@ private fun AccountReadOnlyDetailContent(
                             modifier = Modifier.weight(1f, fill = false)
                         )
                         OrbitBadge(
-                            text = account.type.displayName,
+                            text = if (account.isProperty) "Property" else account.type.displayName,
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = MoneyUtils.formatCents(account.currentBalanceCents),
+                        text = MoneyUtils.formatCents(headlineCents),
                         style = TabularNumStyle.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold),
                         color = balanceColor
                     )
                     val metaParts = listOfNotNull(
                         account.institution?.takeIf { it.isNotBlank() },
                         account.accountNumberLast4?.takeIf { it.isNotBlank() }?.let { "•••• $it" },
-                        if (account.isManual) "Manual Account" else "Synced Account"
+                        if (account.isProperty) "Estimated Property Value"
+                        else if (account.isManual) "Manual Account" else "Synced Account"
                     )
                     if (metaParts.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(2.dp))
@@ -303,7 +315,9 @@ private fun AccountReadOnlyDetailContent(
                 onSeeTransactions = onSeeTransactions,
                 onToggleArchive = onToggleArchive,
                 onDelete = onDelete,
-                onUnlinkSimpleFin = onUnlinkSimpleFin
+                onUnlinkSimpleFin = onUnlinkSimpleFin,
+                hasClosureAlert = hasClosureAlert,
+                onReviewClosure = onReviewClosure
             )
         }
 

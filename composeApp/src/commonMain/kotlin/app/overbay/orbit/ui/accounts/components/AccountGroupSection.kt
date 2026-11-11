@@ -71,7 +71,9 @@ fun AccountGroupSection(
     group: AccountGroupDisplay,
     selectedAccountId: Long?,
     cardCycles: Map<Long, CardCycleStatus> = emptyMap(),
+    closureCandidateIds: Set<Long> = emptySet(),
     onInspectAccount: (Account) -> Unit = {},
+    onReviewClosure: (Account) -> Unit = {},
     onSeeTransactions: (Account) -> Unit,
     onEditAccount: (Account) -> Unit,
     onPerksClick: (Account) -> Unit,
@@ -148,8 +150,14 @@ fun AccountGroupSection(
                     )
                     Spacer(modifier = Modifier.height(3.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        val countLabel = if (group.category == AccountTypeCategory.REAL_ESTATE && group.propertyUnits.isNotEmpty()) {
+                            val n = group.propertyUnits.size
+                            "$n ${if (n == 1) "property" else "properties"}"
+                        } else {
+                            "${group.accounts.size} ${if (group.accounts.size == 1) "account" else "accounts"}"
+                        }
                         Text(
-                            text = "${group.accounts.size} ${if (group.accounts.size == 1) "account" else "accounts"}",
+                            text = countLabel,
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.outline,
@@ -245,7 +253,35 @@ fun AccountGroupSection(
                     itemSpacingDp = 1.dp
                 )
 
-                if (wideSpan == 2 && group.accounts.size >= 2 && !isReorderMode) {
+                if (group.category == AccountTypeCategory.REAL_ESTATE && group.propertyUnits.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+                        group.propertyUnits.forEach { unit ->
+                            key(unit.anchorAccount.id) {
+                                RealEstatePropertyCard(
+                                    unit = unit,
+                                    selectedAccountId = selectedAccountId,
+                                    closureCandidateIds = closureCandidateIds,
+                                    onInspectAccount = onInspectAccount,
+                                    onEditAccount = onEditAccount,
+                                    onReviewClosure = onReviewClosure,
+                                    onSeeTransactions = onSeeTransactions,
+                                    onFindLogo = onFindLogo,
+                                    onReportLogoStatus = onReportLogoStatus,
+                                    onHistoryClick = onHistoryClick,
+                                    onMergeClick = onMergeClick,
+                                    onToggleArchive = onToggleArchive,
+                                    onDeleteAccount = onDeleteAccount
+                                )
+                            }
+                        }
+                    }
+                } else if (wideSpan == 2 && group.accounts.size >= 2 && !isReorderMode) {
                     val pairs = group.accounts.chunked(2)
                     Column(modifier = Modifier.fillMaxWidth()) {
                         pairs.forEach { pairAccounts ->
@@ -257,6 +293,8 @@ fun AccountGroupSection(
                                         groupCategory = group.category,
                                         cycleStatus = cardCycles[account.id],
                                         isInspected = selectedAccountId == account.id,
+                                        hasClosureAlert = account.id in closureCandidateIds,
+                                        onReviewClosure = { onReviewClosure(account) },
                                         onInspect = { onInspectAccount(account) },
                                         onSeeTransactions = { onSeeTransactions(account) },
                                         onEdit = { onEditAccount(account) },
@@ -293,6 +331,8 @@ fun AccountGroupSection(
                                     groupCategory = group.category,
                                     cycleStatus = cardCycles[account.id],
                                     isInspected = selectedAccountId == account.id,
+                                    hasClosureAlert = account.id in closureCandidateIds,
+                                    onReviewClosure = { onReviewClosure(account) },
                                     onInspect = { onInspectAccount(account) },
                                     onSeeTransactions = { onSeeTransactions(account) },
                                     onEdit = { onEditAccount(account) },

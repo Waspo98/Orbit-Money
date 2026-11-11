@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -60,17 +61,72 @@ fun AccountInspectorActionsSection(
     onToggleArchive: () -> Unit,
     onDelete: () -> Unit,
     onUnlinkSimpleFin: (() -> Unit)? = null,
+    hasClosureAlert: Boolean = false,
+    onReviewClosure: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
     var showUnlinkConfirm by remember { mutableStateOf(false) }
+    val missingFromSync = !account.simplefinMissingSince.isNullOrBlank()
 
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // SimpleFIN link status banner if linked
-        if (!account.simplefinAccountId.isNullOrBlank()) {
+        if ((hasClosureAlert || missingFromSync) && onReviewClosure != null) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = if (missingFromSync) "No Longer Reported by SimpleFIN" else "Possible Payoff Detected",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                            Text(
+                                text = "Did you recently pay off or close this account?",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    OrbitActionChip(
+                        label = "Review",
+                        onClick = {
+                            haptics.tick()
+                            onReviewClosure()
+                        }
+                    )
+                }
+            }
+        }
+
+        // SimpleFIN link status banner if linked and actively reporting
+        if (!account.simplefinAccountId.isNullOrBlank() && !missingFromSync) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),

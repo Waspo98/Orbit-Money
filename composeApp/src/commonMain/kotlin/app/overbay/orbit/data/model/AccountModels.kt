@@ -43,6 +43,12 @@ data class Account(
     val accountNumberLast4: String? = null,
     val currentBalanceCents: Cents = 0L,
     val estimatedValueCents: Cents? = null,
+    val isProperty: Boolean = false,
+    val propertyName: String? = null,
+    val linkedPropertyAccountId: Long? = null,
+    val simplefinLastSeenAt: String? = null,
+    val simplefinMissingSince: String? = null,
+    val closurePromptDismissedAt: String? = null,
     val isManual: Boolean = true,
     val simplefinAccountId: String? = null,
     val isArchived: Boolean = false,
@@ -69,23 +75,27 @@ data class Account(
             return InstitutionLogoDefaults.fallbackUrlFor(institution)
         }
     /**
-     * Home equity calculated for mortgage accounts with an estimated property value.
+     * Home equity calculated for real estate properties and mortgages with an estimated property value.
      */
     val homeEquityCents: Cents?
-        get() = if (type == AccountType.MORTGAGE && estimatedValueCents != null) {
-            estimatedValueCents - abs(currentBalanceCents)
-        } else null
+        get() = when {
+            isProperty -> estimatedValueCents ?: currentBalanceCents.coerceAtLeast(0L)
+            type == AccountType.MORTGAGE && estimatedValueCents != null -> estimatedValueCents - abs(currentBalanceCents)
+            else -> null
+        }
 
     /**
      * Net worth contribution of this account.
+     * Standalone properties contribute their estimated property value.
      * Mortgages contribute (estimatedProperty - loanBalance).
      * Credit & loans contribute negative balance (liability).
      * Cash, savings, investments contribute positive balance (asset).
      */
     val netWorthContributionCents: Cents
-        get() = when (type) {
-            AccountType.MORTGAGE -> homeEquityCents ?: -abs(currentBalanceCents)
-            AccountType.CREDIT, AccountType.LOAN -> -abs(currentBalanceCents)
+        get() = when {
+            isProperty -> estimatedValueCents ?: currentBalanceCents.coerceAtLeast(0L)
+            type == AccountType.MORTGAGE -> homeEquityCents ?: -abs(currentBalanceCents)
+            type == AccountType.CREDIT || type == AccountType.LOAN -> -abs(currentBalanceCents)
             else -> currentBalanceCents
         }
 }

@@ -70,6 +70,8 @@ fun AccountRowCard(
     onToggleArchive: () -> Unit,
     onDelete: () -> Unit,
     isInspected: Boolean = false,
+    hasClosureAlert: Boolean = false,
+    onReviewClosure: (() -> Unit)? = null,
     dragHandle: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -139,7 +141,7 @@ fun AccountRowCard(
                         ?: account.creditCardProfile.strategy.cardholder?.takeIf { it.isNotBlank() }
                 } else null
 
-                if (institutionMeta.isNotEmpty() || showSubtypeBadge || resolvedHolder != null || account.isArchived) {
+                if (institutionMeta.isNotEmpty() || showSubtypeBadge || resolvedHolder != null || account.isArchived || hasClosureAlert) {
                     Spacer(modifier = Modifier.height(3.dp))
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -158,7 +160,7 @@ fun AccountRowCard(
 
                         if (showSubtypeBadge) {
                             AccountBadge(
-                                text = account.type.displayName,
+                                text = if (account.isProperty) "Property" else account.type.displayName,
                                 modifier = Modifier.align(Alignment.CenterVertically)
                             )
                         }
@@ -168,6 +170,25 @@ fun AccountRowCard(
                                 text = resolvedHolder,
                                 modifier = Modifier.align(Alignment.CenterVertically)
                             )
+                        }
+
+                        if (hasClosureAlert && onReviewClosure != null) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                modifier = Modifier
+                                    .align(Alignment.CenterVertically)
+                                    .clickable { haptics.tick(); onReviewClosure() }
+                            ) {
+                                Text(
+                                    text = "Closed / Paid Off?",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
                         }
 
                         if (account.isArchived) {
@@ -222,13 +243,15 @@ fun AccountRowCard(
 
             // Right Column: Bold Balance + Circular 3-dots button
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val displayAmount = if (isMortgage && account.homeEquityCents != null) {
+                val isEquityDisplay = (isMortgage || account.isProperty) && account.homeEquityCents != null
+                val displayAmount = if (isEquityDisplay) {
                     account.homeEquityCents!!
                 } else {
                     account.currentBalanceCents
                 }
 
                 val balanceColor = when {
+                    isEquityDisplay -> if (displayAmount >= 0L) colors.income else colors.expense
                     isCredit || isLiability -> {
                         if (account.currentBalanceCents != 0L) colors.expense else MaterialTheme.colorScheme.onSurface
                     }
@@ -320,7 +343,7 @@ fun AccountRowCard(
 }
 
 @Composable
-private fun AccountBadge(
+internal fun AccountBadge(
     text: String,
     isMuted: Boolean = false,
     modifier: Modifier = Modifier

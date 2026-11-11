@@ -19,6 +19,7 @@ import app.overbay.orbit.data.saveCreditCardProfile
 import app.overbay.orbit.data.setCardBenefitUsage
 import app.overbay.orbit.data.setAccountArchived
 import app.overbay.orbit.data.unlinkSimpleFinAccount
+import app.overbay.orbit.domain.AccountClosureDetector
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardBenefitEngine
 import app.overbay.orbit.domain.CreditCardStrategyEngine
@@ -49,6 +50,7 @@ class AccountsViewModel(
 
     val cardEditor = CardEditorController(repository)
     val accountLogos = AccountLogoController(repository, viewModelScope)
+    val closurePrompts = AccountClosureController(repository, viewModelScope)
 
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
     private val _editingAccount = MutableStateFlow<Account?>(null)
@@ -154,6 +156,11 @@ class AccountsViewModel(
             !strat?.openedDate.isNullOrBlank() || (strat?.subTargetSpendCents ?: 0L) > 0L
         }
         val resolvedRewardsToolsEnabled = data.preferences.cardRewardsToolsEnabled ?: hasRewardsData
+        val closureCandidates = AccountClosureDetector.detectCandidates(
+            accounts = data.accounts,
+            transactions = data.transactions,
+            todayIso = LocalDateUtils.todayIsoDate()
+        )
 
         AccountsUiState(
             accounts = sorted, accountGroups = groups, totalAssetsCents = snapshot.totalAssetsCents,
@@ -171,7 +178,8 @@ class AccountsViewModel(
             isSyncing = syncReorder.syncing, syncErrorMessage = syncReorder.err, isLoading = false,
             mhaEnabled = data.preferences.mhaTrackerEnabled,
             rewardsToolsEnabled = resolvedRewardsToolsEnabled,
-            cardPerksWidgets = data.preferences.cardPerksWidgets
+            cardPerksWidgets = data.preferences.cardPerksWidgets,
+            closureCandidates = closureCandidates
         )
     }.combine(_isPhoneViewingDetail) { state, phoneDetail -> state.copy(isPhoneViewingDetail = phoneDetail)
     }.combine(_perkUsageTarget) { state, target -> state.copy(perkUsageTarget = target)
@@ -202,6 +210,11 @@ class AccountsViewModel(
             }
             state.copy(accountGroups = updated)
         }
+    }.combine(closurePrompts.overlayFlow) { state, overlay ->
+        state.copy(
+            activeClosurePrompt = AccountClosureController.selectActivePrompt(state.closureCandidates, overlay),
+            isResolvingClosure = overlay.isResolving
+        )
     }.flowOn(computeDispatcher).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AccountsUiState(isLoading = true))
 
     fun selectAccount(accountId: Long?) { _selectedAccountId.value = accountId }
@@ -560,7 +573,7 @@ class AccountsViewModel(
             _syncErrorMessage.value = null
             when (val res = repository.sync(force = true)) {
                 is SyncResult.Error -> _syncErrorMessage.value = res.message
-                else -> {}
+                else -> closurePrompts.resetSnoozesAfterSync()
             }
             _isSyncing.value = false
         }

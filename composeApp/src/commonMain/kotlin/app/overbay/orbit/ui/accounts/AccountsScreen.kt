@@ -31,6 +31,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.accounts.cards.PerkUsageDialog
 import app.overbay.orbit.ui.accounts.components.AccountDetailInspectorPane
 import app.overbay.orbit.ui.accounts.components.AccountGroupSection
+import app.overbay.orbit.ui.accounts.sheets.AccountClosurePromptDialog
 import app.overbay.orbit.ui.accounts.sheets.AccountMergeDialog
 import app.overbay.orbit.ui.accounts.sheets.AddBalanceRecordDialog
 import app.overbay.orbit.ui.components.CanopyMenuAction
@@ -275,6 +276,20 @@ fun AccountsScreen(
             onDismiss = { viewModel.accountLogos.close() }
         )
     }
+
+    state.activeClosurePrompt?.let { promptCandidate ->
+        AccountClosurePromptDialog(
+            candidate = promptCandidate,
+            isResolving = state.isResolvingClosure,
+            onResolve = { resolution ->
+                viewModel.closurePrompts.resolve(
+                    accountId = promptCandidate.account.id,
+                    resolution = resolution
+                )
+            },
+            onSnooze = { viewModel.closurePrompts.snoozeCurrent(promptCandidate.account.id) }
+        )
+    }
 }
 
 @Composable
@@ -318,7 +333,9 @@ private fun AccountsMasterContent(
                     group = group,
                     selectedAccountId = state.selectedAccountId,
                     cardCycles = cardCyclesById,
+                    closureCandidateIds = state.closureCandidateAccountIds,
                     onInspectAccount = { acct -> onOpenDetail(acct) },
+                    onReviewClosure = { acct -> viewModel.closurePrompts.openForAccount(acct.id) },
                     onSeeTransactions = { acct ->
                         onNavigate(OrbitNavKey.Transactions(accountId = acct.id))
                     },

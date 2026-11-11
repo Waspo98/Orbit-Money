@@ -113,7 +113,9 @@ fun AccountInstitutionMark(
         Modifier.clip(shape)
     }
 
-    val (fallbackContainer, fallbackTint, fallbackIcon) = resolveAccountTypeStyle(account.type)
+    val (fallbackContainer, fallbackTint, fallbackIcon) = resolveAccountTypeStyle(
+        if (account.isProperty) AccountType.MORTGAGE else account.type
+    )
     val iconSize = (size.value * 0.5f).dp
 
     Box(modifier = modifier) {

@@ -29,9 +29,19 @@ class HousingViewModel(
     init {
         vmScope.launch {
             repository.accounts.collect { accounts ->
-                val mortgages = accounts.filter { !it.isArchived && it.type == AccountType.MORTGAGE }
+                val active = accounts.filter { !it.isArchived }
+                val units = app.overbay.orbit.domain.RealEstatePropertyEngine.buildPropertyUnits(active)
+                val unitAccountIds = app.overbay.orbit.domain.RealEstatePropertyEngine.realEstateMemberAccountIds(active)
+                val syntheticFromUnits = units.map { unit ->
+                    unit.anchorAccount.copy(
+                        name = unit.title,
+                        currentBalanceCents = -unit.totalDebtCents,
+                        estimatedValueCents = unit.estimatedValueCents
+                    )
+                }
+                val standaloneMortgages = active.filter { it.type == AccountType.MORTGAGE && it.id !in unitAccountIds }
                 _uiState.update { current ->
-                    current.copy(availableMortgageAccounts = mortgages)
+                    current.copy(availableMortgageAccounts = syntheticFromUnits + standaloneMortgages)
                 }
             }
         }

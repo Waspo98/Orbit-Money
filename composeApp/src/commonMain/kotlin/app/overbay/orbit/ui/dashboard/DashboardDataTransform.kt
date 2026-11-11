@@ -304,8 +304,16 @@ object DashboardDataTransform {
         var totalAssets: Cents = 0L
         var totalLiabilities: Cents = 0L
 
-        for (acct in snapshot.accounts) {
-            if (acct.isArchived) continue
+        val activeAccounts = snapshot.accounts.filter { !it.isArchived }
+        val propertyUnits = app.overbay.orbit.domain.RealEstatePropertyEngine.buildPropertyUnits(activeAccounts)
+        val realEstateMemberIds = app.overbay.orbit.domain.RealEstatePropertyEngine.realEstateMemberAccountIds(activeAccounts)
+        for (unit in propertyUnits) {
+            val eq = unit.netEquityCents
+            realEstateEquityCents += eq
+            if (eq >= 0L) totalAssets += eq else totalLiabilities += abs(eq)
+        }
+        for (acct in activeAccounts) {
+            if (acct.id in realEstateMemberIds) continue
             val bal = acct.currentBalanceCents
             when (acct.type) {
                 AccountType.CHECKING, AccountType.SAVINGS, AccountType.CASH -> {
@@ -320,19 +328,9 @@ object DashboardDataTransform {
                     creditOwedCents += abs(bal)
                     totalLiabilities += abs(bal)
                 }
-                AccountType.LOAN -> {
+                AccountType.LOAN, AccountType.MORTGAGE -> {
                     loansOwedCents += abs(bal)
                     totalLiabilities += abs(bal)
-                }
-                AccountType.MORTGAGE -> {
-                    if (acct.estimatedValueCents != null) {
-                        val eq = acct.homeEquityCents ?: 0L
-                        realEstateEquityCents += eq
-                        if (eq >= 0L) totalAssets += eq else totalLiabilities += abs(eq)
-                    } else {
-                        loansOwedCents += abs(bal)
-                        totalLiabilities += abs(bal)
-                    }
                 }
                 AccountType.OTHER -> {
                     otherCents += bal
@@ -387,13 +385,19 @@ object DashboardDataTransform {
         )
 
         // 13. Mortgage Snapshot
-        val mortgageAccount = snapshot.accounts.find { it.type == AccountType.MORTGAGE || it.name.contains("mortgage", ignoreCase = true) }
-        val mortgageBalance = mortgageAccount?.currentBalanceCents?.let { abs(it) } ?: loansOwedCents
-        val homeValue = mortgageAccount?.estimatedValueCents ?: (mortgageBalance + realEstateEquityCents)
+        val primaryPropertyUnit = propertyUnits.firstOrNull()
+        val mortgageAccount = primaryPropertyUnit?.anchorAccount
+            ?: activeAccounts.find { it.type == AccountType.MORTGAGE || it.name.contains("mortgage", ignoreCase = true) }
+        val mortgageBalance = primaryPropertyUnit?.totalDebtCents
+            ?: mortgageAccount?.currentBalanceCents?.let { abs(it) }
+            ?: loansOwedCents
+        val homeValue = primaryPropertyUnit?.estimatedValueCents
+            ?: mortgageAccount?.estimatedValueCents
+            ?: (mortgageBalance + realEstateEquityCents)
         val estimatedEquity = (homeValue - mortgageBalance).coerceAtLeast(0L)
         val equityPct = if (homeValue > 0L) (estimatedEquity.toDouble() / homeValue.toDouble()) * 100.0 else 0.0
         val mortgageState = MortgageSnapshotState(
-            hasMortgage = mortgageAccount != null || mortgageBalance > 0L,
+            hasMortgage = primaryPropertyUnit != null || mortgageAccount != null || mortgageBalance > 0L,
             mortgageAccountId = mortgageAccount?.id,
             estimatedHomeValueCents = homeValue,
             mortgageBalanceCents = mortgageBalance,

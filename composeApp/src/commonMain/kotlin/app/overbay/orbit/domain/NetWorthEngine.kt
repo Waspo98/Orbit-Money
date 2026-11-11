@@ -37,6 +37,9 @@ data class MonthlyNetWorthPoint(
 object NetWorthEngine {
 
     fun bucketForAccount(account: Account): NetWorthBucket {
+        if (account.isProperty || account.linkedPropertyAccountId != null) {
+            return NetWorthBucket.REAL_ESTATE
+        }
         return when (account.type) {
             AccountType.CHECKING, AccountType.SAVINGS, AccountType.CASH -> NetWorthBucket.CASH
             AccountType.INVESTMENT -> NetWorthBucket.INVESTMENTS
@@ -48,6 +51,12 @@ object NetWorthEngine {
     }
 
     fun accountContributionCents(account: Account, balanceCents: Cents): Cents {
+        if (account.isProperty) {
+            return account.estimatedValueCents ?: balanceCents.coerceAtLeast(0L)
+        }
+        if (account.linkedPropertyAccountId != null) {
+            return -abs(balanceCents)
+        }
         if (account.type == AccountType.MORTGAGE) {
             val estimatedValue = account.estimatedValueCents ?: 0L
             return estimatedValue - abs(balanceCents)
@@ -56,6 +65,10 @@ object NetWorthEngine {
     }
 
     fun computeCurrentSnapshot(accounts: List<Account>): NetWorthSnapshot {
+        val activeAccounts = accounts.filter { !it.isArchived }
+        val propertyUnits = RealEstatePropertyEngine.buildPropertyUnits(activeAccounts)
+        val realEstateMemberIds = RealEstatePropertyEngine.realEstateMemberAccountIds(activeAccounts)
+
         var cash: Cents = 0L
         var investments: Cents = 0L
         var realEstate: Cents = 0L
@@ -65,8 +78,18 @@ object NetWorthEngine {
         var assets: Cents = 0L
         var liabilities: Cents = 0L
 
-        for (acct in accounts) {
-            if (acct.isArchived) continue
+        for (unit in propertyUnits) {
+            val eq = unit.netEquityCents
+            realEstate += eq
+            if (eq > 0L) {
+                assets += eq
+            } else if (eq < 0L) {
+                liabilities += abs(eq)
+            }
+        }
+
+        for (acct in activeAccounts) {
+            if (acct.id in realEstateMemberIds) continue
             val contribution = accountContributionCents(acct, acct.currentBalanceCents)
             when (bucketForAccount(acct)) {
                 NetWorthBucket.CASH -> cash += contribution

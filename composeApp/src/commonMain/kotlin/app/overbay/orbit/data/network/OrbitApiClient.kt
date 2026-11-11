@@ -7,6 +7,7 @@ import app.overbay.orbit.util.PlatformStorageEpoch
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.timeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -572,8 +573,12 @@ class OrbitApiClient(
     // SimpleFIN Sync Trigger
     // -------------------------------------------------------------------------
     suspend fun triggerSimpleFinSync(): Result<SimpleFinSyncResultDto> = runCatching {
-        val response = client.post(url("/api/simplefin/sync")) {
+        val response = client.post(url("/api/simplefin/sync?wait=1")) {
             sessionCookie?.let { header("Cookie", it) }
+            timeout {
+                requestTimeoutMillis = 60_000L
+                socketTimeoutMillis = 60_000L
+            }
         }
         extractSessionCookie(response)
         response.body()

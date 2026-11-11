@@ -95,15 +95,18 @@ fun AccountContributionsCard(
                                 modifier = Modifier.weight(1f)
                             ) {
                                 // Account Type Badge
-                                val badgeLabel = when (acct.type) {
-                                    AccountType.CHECKING -> "Checking"
-                                    AccountType.SAVINGS -> "Savings"
-                                    AccountType.CASH -> "Cash"
-                                    AccountType.INVESTMENT -> "Investment"
-                                    AccountType.MORTGAGE -> if (acct.estimatedValueCents != null) "Real Estate" else "Mortgage"
-                                    AccountType.CREDIT -> "Credit"
-                                    AccountType.LOAN -> "Loan"
-                                    AccountType.OTHER -> "Other"
+                                val badgeLabel = when {
+                                    acct.isProperty -> "Property"
+                                    acct.linkedPropertyAccountId != null -> "Real Estate Loan"
+                                    acct.type == AccountType.CHECKING -> "Checking"
+                                    acct.type == AccountType.SAVINGS -> "Savings"
+                                    acct.type == AccountType.CASH -> "Cash"
+                                    acct.type == AccountType.INVESTMENT -> "Investment"
+                                    acct.type == AccountType.MORTGAGE -> if (acct.estimatedValueCents != null) "Real Estate" else "Mortgage"
+                                    acct.type == AccountType.CREDIT -> "Credit"
+                                    acct.type == AccountType.LOAN -> "Loan"
+                                    acct.type == AccountType.OTHER -> "Other"
+                                    else -> acct.type.displayName
                                 }
                                 OrbitBadge(
                                     text = badgeLabel,

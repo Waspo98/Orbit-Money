@@ -49,9 +49,29 @@ import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
 
+private enum class EditorAccountKind(val label: String, val accountType: AccountType, val isProperty: Boolean = false) {
+    CHECKING("Checking", AccountType.CHECKING),
+    SAVINGS("Savings", AccountType.SAVINGS),
+    CREDIT("Credit Card", AccountType.CREDIT),
+    INVESTMENT("Investment", AccountType.INVESTMENT),
+    PROPERTY("Real Estate Property", AccountType.OTHER, isProperty = true),
+    MORTGAGE("Mortgage", AccountType.MORTGAGE),
+    LOAN("Loan", AccountType.LOAN),
+    CASH("Cash", AccountType.CASH),
+    OTHER("Other Asset", AccountType.OTHER);
+
+    companion object {
+        fun fromAccount(account: Account): EditorAccountKind {
+            if (account.isProperty) return PROPERTY
+            return entries.firstOrNull { !it.isProperty && it.accountType == account.type } ?: OTHER
+        }
+    }
+}
+
 @Composable
 fun AccountEditorSheet(
     account: Account,
+    availablePropertyAnchors: List<Account> = emptyList(),
     onSave: (Account) -> Unit,
     onDelete: ((Long) -> Unit)? = null,
     onUnlinkSimpleFin: (() -> Unit)? = null,
@@ -65,6 +85,7 @@ fun AccountEditorSheet(
     ) {
         AccountEditorContent(
             account = account,
+            availablePropertyAnchors = availablePropertyAnchors,
             onSave = onSave,
             onDelete = onDelete,
             onUnlinkSimpleFin = onUnlinkSimpleFin,
@@ -78,6 +99,7 @@ fun AccountEditorSheet(
 @Composable
 fun AccountEditorContent(
     account: Account,
+    availablePropertyAnchors: List<Account> = emptyList(),
     onSave: (Account) -> Unit,
     onDelete: ((Long) -> Unit)? = null,
     onUnlinkSimpleFin: (() -> Unit)? = null,
@@ -90,12 +112,18 @@ fun AccountEditorContent(
 
     var name by remember(account) { mutableStateOf(account.name) }
     var institution by remember(account) { mutableStateOf(account.institution ?: "") }
-    var selectedType by remember(account) { mutableStateOf(account.type) }
+    var selectedKind by remember(account) { mutableStateOf(EditorAccountKind.fromAccount(account)) }
+    val selectedType = selectedKind.accountType
     var accountNumberLast4 by remember(account) { mutableStateOf(account.accountNumberLast4 ?: "") }
     var balanceCents by remember(account) { mutableStateOf(account.currentBalanceCents) }
     var estimatedValueCents by remember(account) { mutableStateOf(account.estimatedValueCents ?: 0L) }
+    var propertyName by remember(account) { mutableStateOf(account.propertyName ?: "") }
+    var linkedPropertyId by remember(account) { mutableStateOf(account.linkedPropertyAccountId) }
     var mhaEligible by remember(account) { mutableStateOf(account.mhaDefaultEligible) }
     val billingState = remember(account) { AccountBillingFieldsState(account.creditCardProfile, account.id) }
+    val eligibleProperties = remember(availablePropertyAnchors, account.id) {
+        availablePropertyAnchors.filter { it.id != 0L && it.id != account.id }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         OrbitSheetHeader(
@@ -193,14 +221,16 @@ fun AccountEditorContent(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    OrbitTextField(
-                        value = institution,
-                        onValueChange = { institution = it },
-                        label = { Text("Financial Institution") },
-                        placeholder = { Text("e.g. Chase, Vanguard, Fidelity") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (!selectedKind.isProperty) {
+                        OrbitTextField(
+                            value = institution,
+                            onValueChange = { institution = it },
+                            label = { Text("Financial Institution") },
+                            placeholder = { Text("e.g. Chase, Vanguard, Fidelity") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -208,37 +238,80 @@ fun AccountEditorContent(
                     ) {
                         OrbitDropdownField(
                             label = "Account Type",
-                            selectedText = selectedType.displayName,
-                            options = AccountType.entries,
-                            optionLabel = { it.displayName },
-                            onOptionSelected = { selectedType = it },
-                            modifier = Modifier.weight(0.58f)
+                            selectedText = selectedKind.label,
+                            options = EditorAccountKind.entries,
+                            optionLabel = { it.label },
+                            onOptionSelected = {
+                                selectedKind = it
+                                if (!it.isProperty && it.accountType !in setOf(AccountType.MORTGAGE, AccountType.LOAN)) {
+                                    linkedPropertyId = null
+                                }
+                            },
+                            modifier = if (selectedKind.isProperty) Modifier.fillMaxWidth() else Modifier.weight(0.58f)
                         )
 
-                        OrbitTextField(
-                            value = accountNumberLast4,
-                            onValueChange = { accountNumberLast4 = it.filter(Char::isDigit).take(4) },
-                            label = { Text("Last 4 Digits") },
-                            placeholder = { Text("1234") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            modifier = Modifier.weight(0.42f)
+                        if (!selectedKind.isProperty) {
+                            OrbitTextField(
+                                value = accountNumberLast4,
+                                onValueChange = { accountNumberLast4 = it.filter(Char::isDigit).take(4) },
+                                label = { Text("Last 4 Digits") },
+                                placeholder = { Text("1234") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier.weight(0.42f)
+                            )
+                        }
+                    }
+
+                    if (!selectedKind.isProperty) {
+                        CurrencyTextField(
+                            cents = balanceCents,
+                            onCentsChange = { balanceCents = it },
+                            label = "Current Balance",
+                            allowNegative = true,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
 
-                    CurrencyTextField(
-                        cents = balanceCents,
-                        onCentsChange = { balanceCents = it },
-                        label = "Current Balance",
-                        allowNegative = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if ((selectedType == AccountType.MORTGAGE || selectedType == AccountType.LOAN) && eligibleProperties.isNotEmpty()) {
+                        val linkOptions = listOf<Long?>(null) + eligibleProperties.map { it.id }
+                        val selectedProp = eligibleProperties.find { it.id == linkedPropertyId }
+                        OrbitDropdownField(
+                            label = "Linked Property (Optional)",
+                            selectedText = selectedProp?.let { it.propertyName?.takeIf(String::isNotBlank) ?: it.name }
+                                ?: "None (Standalone)",
+                            options = linkOptions,
+                            optionLabel = { id ->
+                                if (id == null) "None (Standalone)"
+                                else eligibleProperties.find { it.id == id }
+                                    ?.let { it.propertyName?.takeIf(String::isNotBlank) ?: it.name }
+                                    ?: "Property"
+                            },
+                            onOptionSelected = { linkedPropertyId = it },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
-                    if (selectedType == AccountType.MORTGAGE || selectedType == AccountType.OTHER) {
+                    if (selectedKind.isProperty || ((selectedType == AccountType.MORTGAGE || selectedType == AccountType.OTHER) && linkedPropertyId == null)) {
                         CurrencyTextField(
                             cents = estimatedValueCents,
                             onCentsChange = { estimatedValueCents = it },
-                            label = "Estimated Property / Asset Value",
+                            label = if (selectedKind.isProperty || selectedType == AccountType.MORTGAGE) {
+                                "Estimated Property Value"
+                            } else {
+                                "Estimated Property / Asset Value"
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    if (selectedType == AccountType.MORTGAGE && linkedPropertyId == null && estimatedValueCents > 0L) {
+                        OrbitTextField(
+                            value = propertyName,
+                            onValueChange = { propertyName = it },
+                            label = { Text("Property Display Name (Optional)") },
+                            placeholder = { Text(name.ifBlank { "e.g. 2104 Doubletree Lane" }) },
+                            singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -249,7 +322,7 @@ fun AccountEditorContent(
                 AccountEditorBillingSection(state = billingState)
             }
 
-            if (showMhaOption) {
+            if (showMhaOption && !selectedKind.isProperty) {
                 OrbitSwitchRow(
                     title = "MHA Expense Eligible",
                     subtitle = "Treat transactions from this account as household-eligible by default",
@@ -261,11 +334,14 @@ fun AccountEditorContent(
 
         OrbitModalFooter(
             confirmText = if (account.id == 0L) "Add Account" else "Save Account",
-            confirmEnabled = name.isNotBlank() && (selectedType != AccountType.CREDIT || billingState.isValid),
+            confirmEnabled = name.isNotBlank() && (!selectedKind.isProperty || estimatedValueCents > 0L) && (selectedType != AccountType.CREDIT || billingState.isValid),
             errorBannerText = if (selectedType == AccountType.CREDIT) billingState.firstErrorMessage else null,
             onDismiss = onDismiss,
             onConfirm = {
-                val estCents = if (estimatedValueCents > 0L) estimatedValueCents else null
+                val resolvedLinkId = if (selectedType in setOf(AccountType.MORTGAGE, AccountType.LOAN) && !selectedKind.isProperty) {
+                    linkedPropertyId
+                } else null
+                val estCents = if (resolvedLinkId == null && estimatedValueCents > 0L) estimatedValueCents else null
                 val updatedProfile = if (selectedType == AccountType.CREDIT) {
                     billingState.toUpdatedProfile(
                         existing = account.creditCardProfile,
@@ -276,12 +352,15 @@ fun AccountEditorContent(
 
                 val updated = account.copy(
                     name = name.trim(),
-                    institution = institution.trim().ifBlank { null },
+                    institution = if (selectedKind.isProperty) null else institution.trim().ifBlank { null },
                     type = selectedType,
-                    currentBalanceCents = balanceCents,
+                    currentBalanceCents = if (selectedKind.isProperty) 0L else balanceCents,
                     estimatedValueCents = estCents,
-                    accountNumberLast4 = accountNumberLast4.trim().ifBlank { null },
-                    mhaDefaultEligible = mhaEligible,
+                    isProperty = selectedKind.isProperty,
+                    propertyName = if (!selectedKind.isProperty && estCents != null) propertyName.trim().ifBlank { null } else null,
+                    linkedPropertyAccountId = resolvedLinkId,
+                    accountNumberLast4 = if (selectedKind.isProperty) null else accountNumberLast4.trim().ifBlank { null },
+                    mhaDefaultEligible = if (selectedKind.isProperty) false else mhaEligible,
                     creditCardProfile = updatedProfile
                 )
                 onSave(updated)
