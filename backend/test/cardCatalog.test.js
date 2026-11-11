@@ -17,12 +17,12 @@ function makeDb() {
   return db;
 }
 
-test('ensureCreditCardCatalogSeeded seeds curated cards with structured perks and 5/24 rules', () => {
+test('ensureCreditCardCatalogSeeded seeds all 178 audited cards with wire-compatible multipliers, perks, and 5/24 rules', () => {
   const db = makeDb();
   ensureCreditCardCatalogSeeded(db);
 
   const items = listCatalogTemplates(db);
-  assert.ok(items.length >= 150, `Expected at least 150 cards in catalog seed, got ${items.length}`);
+  assert.equal(items.length, 178, `Expected 178 cards in catalog seed, got ${items.length}`);
 
   const amexGold = items.find((c) => c.id === 'amex_gold');
   assert.ok(amexGold);
@@ -31,15 +31,40 @@ test('ensureCreditCardCatalogSeeded seeds curated cards with structured perks an
   assert.equal(amexGold.artwork_url, '/api/card-catalog/amex_gold/artwork');
   assert.equal(amexGold.direct_artwork_url, 'https://www.offeroptimist.com/images/amex/gold.webp');
   assert.equal(amexGold.benefits.length, 4);
-  assert.equal(amexGold.reward_categories.length, 3);
+  assert.ok(amexGold.reward_categories.length >= 4);
+  assert.equal(amexGold.reward_categories[0].rate, 4);
+  assert.equal(amexGold.reward_categories[0].multiplier, 4);
 
   const spark = items.find((c) => c.id === 'spark_cash_select');
   assert.ok(spark);
+  assert.equal(spark.network, 'Mastercard');
   assert.equal(spark.is_business_card, true);
   assert.equal(spark.counts_toward_524_override, true);
+
+  const savor = items.find((c) => c.id === 'capital_one_savor');
+  assert.equal(savor.network, 'Mastercard');
+  assert.equal(items.find((c) => c.id === 'chase_freedom_classic').network, 'Visa');
+  assert.equal(items.find((c) => c.id === 'cff').network, 'Mastercard');
+  assert.equal(items.find((c) => c.id === 'citi_costco_visa').network, 'Visa');
+
+  // Verify zero placeholder multipliers, snake_case SUBs, or corrupted perks across all 178 cards
+  for (const item of items) {
+    assert.ok(['Visa', 'Mastercard', 'Amex', 'Discover'].includes(item.network), `Bad network on ${item.id}`);
+    assert.ok(item.reward_categories.length >= 1, `Empty reward_categories on ${item.id}`);
+    for (const rc of item.reward_categories) {
+      assert.equal(typeof rc.rate, 'number', `Missing wire rate on ${item.id}`);
+      assert.ok(!rc.label.includes('Base Rate'), `Placeholder Base Rate on ${item.id}`);
+    }
+    if (item.default_sub_reward_text) {
+      assert.ok(!item.default_sub_reward_text.includes('_'), `Snake_case SUB on ${item.id}: ${item.default_sub_reward_text}`);
+    }
+    for (const ben of item.benefits) {
+      assert.ok(!/^\$[0-9]{4,}\b/.test(ben.title), `Points-as-dollars title on ${item.id}: ${ben.title}`);
+    }
+  }
 });
 
-test('syncCreditCardCatalogFromUpstream updates curated SUBs, detects elevated offers, and ingests long-tail cards', async () => {
+test('syncCreditCardCatalogFromUpstream updates curated SUBs, preserves extended multipliers/perks, and ingests long-tail cards', async () => {
   const db = makeDb();
   const mockPayload = [
     {
@@ -154,4 +179,52 @@ test('fetchAndCacheCardArtwork caches raster image bytes in SQLite and serves fr
   assert.ok(second);
   assert.equal(second.buffer.length, 8);
   assert.equal(fetchCalls, 1);
+});
+
+test('syncCreditCardCatalogFromUpstream preserves seeded extended multipliers and blocks bogus upstream credits', async () => {
+  const db = makeDb();
+  ensureCreditCardCatalogSeeded(db);
+  const marriottRow = db
+    .prepare('SELECT bonus_api_card_id FROM credit_card_catalog WHERE id = ?')
+    .get('american_express_marriott_bonvoy_business');
+  assert.ok(marriottRow?.bonus_api_card_id);
+
+  await syncCreditCardCatalogFromUpstream(db, {
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => [
+        {
+          cardId: marriottRow.bonus_api_card_id,
+          name: 'Marriott Bonvoy Business',
+          issuer: 'AMERICAN_EXPRESS',
+          network: 'AMERICAN_EXPRESS',
+          currency: 'MARRIOTT',
+          isBusiness: true,
+          annualFee: 125,
+          isAnnualFeeWaived: false,
+          universalCashbackPercent: 1,
+          imageUrl: '/images/amex/marriott-bonvoy-business.webp',
+          credits: [],
+          offers: [
+            {
+              spend: 8000,
+              amount: [{ amount: 0 }],
+              days: 180,
+              credits: [{ description: '3x 50k FNAs', value: 150000 }]
+            }
+          ],
+          historicalOffers: [],
+          discontinued: false
+        }
+      ]
+    })
+  });
+
+  const items = listCatalogTemplates(db);
+  const marriottBiz = items.find((c) => c.id === 'american_express_marriott_bonvoy_business');
+  assert.ok(marriottBiz);
+  assert.equal(marriottBiz.default_sub_reward_text, '3 Free Night Awards (50k pts each)');
+  assert.equal(marriottBiz.default_sub_estimated_value_cents, 60000);
+  assert.ok(marriottBiz.reward_categories.some((rc) => rc.rate === 6));
+  assert.equal(marriottBiz.benefits.length, 1);
 });

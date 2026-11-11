@@ -9,6 +9,7 @@ const UPSTREAM_DATA_URL =
   'https://raw.githubusercontent.com/andenacitelli/credit-card-bonuses-api/main/exports/data.json';
 const UPSTREAM_IMAGE_BASE_URL = 'https://www.offeroptimist.com';
 const RASTER_IMAGE_EXT_RE = /\.(png|jpe?g|webp)$/i;
+const CATALOG_SCHEMA_TAG = '2026-11-v2';
 
 const ISSUER_NAMES = {
   AMERICAN_EXPRESS: 'American Express',
@@ -20,7 +21,7 @@ const ISSUER_NAMES = {
   CITI: 'Citi',
   COMENITY: 'AAA / Comenity',
   DISCOVER: 'Discover',
-  FIRST: 'Cardless / First',
+  FIRST: 'Cardless',
   FNBO: 'FNBO',
   PENFED: 'PenFed',
   PNC: 'PNC',
@@ -49,6 +50,11 @@ const CURRENCY_LABELS = {
   CAPITAL_ONE: 'Capital One Miles',
   CITI: 'ThankYou Points',
   BILT: 'Bilt Points',
+  WELLS_FARGO: 'Wells Fargo Rewards pts',
+  BANK_OF_AMERICA: 'Preferred Rewards pts',
+  US_BANK: 'Altitude Rewards pts',
+  BARCLAYS: 'Bonus pts',
+  PENFED: 'PenFed Bonus pts',
   DELTA: 'Delta SkyMiles',
   UNITED: 'United Miles',
   SOUTHWEST: 'Rapid Rewards pts',
@@ -57,12 +63,24 @@ const CURRENCY_LABELS = {
   JETBLUE: 'TrueBlue pts',
   ALASKA: 'Atmos Rewards pts',
   ATMOS: 'Atmos Rewards pts',
+  FLYING_BLUE: 'Flying Blue Miles',
+  CATHAY_PACIFIC: 'Cathay Asia Miles',
+  ANA: 'ANA Mileage Club Miles',
+  KOREAN: 'Korean Air SKYPASS Miles',
+  VIRGIN: 'Virgin Points',
+  SPIRIT: 'Free Spirit pts',
+  LATAM: 'LATAM Pass Miles',
+  BREEZE: 'BreezePoints',
+  AMTRAK: 'Amtrak Guest Rewards pts',
+  CARNIVAL: 'Carnival FunPoints',
+  EXPEDIA: 'OneKeyCash',
   MARRIOTT: 'Marriott Bonvoy pts',
   HILTON: 'Hilton Honors pts',
   HYATT: 'World of Hyatt pts',
   IHG: 'IHG One Rewards pts',
   WYNDHAM: 'Wyndham Rewards pts',
   CHOICE: 'Choice Privileges pts',
+  BEST_WESTERN: 'Best Western Rewards pts',
   AVIANCA: 'LifeMiles',
   AEROPLAN: 'Aeroplan pts',
   AVIOS: 'Avios',
@@ -74,27 +92,39 @@ const CURRENCY_LABELS = {
 
 const CURRENCY_CPP = {
   USD: 100,
+  EXPEDIA: 100,
   CHASE: 1.5,
   AMERICAN_EXPRESS: 1.5,
   BILT: 1.6,
   HYATT: 1.8,
+  AMTRAK: 2.5,
   CAPITAL_ONE: 1.4,
   CITI: 1.4,
-  UNITED: 1.2,
-  DELTA: 1.2,
   SOUTHWEST: 1.3,
   AMERICAN: 1.3,
   AA: 1.3,
   ALASKA: 1.3,
   ATMOS: 1.3,
-  JETBLUE: 1.2,
   AEROPLAN: 1.3,
+  ANA: 1.3,
+  KOREAN: 1.3,
+  VIRGIN: 1.3,
+  UNITED: 1.2,
+  DELTA: 1.2,
+  JETBLUE: 1.2,
   AVIOS: 1.2,
-  MARRIOTT: 0.8,
-  IHG: 0.5,
-  HILTON: 0.5,
+  FLYING_BLUE: 1.2,
+  CATHAY_PACIFIC: 1.2,
+  WELLS_FARGO: 1.0,
+  BANK_OF_AMERICA: 1.0,
+  US_BANK: 1.0,
+  PENFED: 0.85,
   WYNDHAM: 0.9,
-  CHOICE: 0.6
+  MARRIOTT: 0.8,
+  CHOICE: 0.6,
+  BEST_WESTERN: 0.6,
+  IHG: 0.5,
+  HILTON: 0.5
 };
 
 function normalizeNetwork(raw) {
@@ -130,33 +160,39 @@ function inferArtKey(issuerName, cardName) {
   return ISSUER_PALETTES[issuerName] || 'preset://sapphire-blue';
 }
 
+function humanizeCurrencyUnit(currency) {
+  if (CURRENCY_LABELS[currency]) return CURRENCY_LABELS[currency];
+  const words = String(currency || 'Bonus')
+    .split('_')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  return `${words.join(' ')} pts`;
+}
+
 function parseUpstreamOffer(card) {
   const offers = Array.isArray(card.offers) ? card.offers : [];
   const primaryOffer = offers[0];
   if (!primaryOffer) {
-    return {
-      rewardText: null,
-      estimatedValueCents: null,
-      targetSpendCents: null,
-      spendWindowDays: null,
-      isElevated: false
-    };
+    return { rewardText: null, estimatedValueCents: null, targetSpendCents: null, spendWindowDays: null, isElevated: false };
   }
 
   const rawAmount = Number(primaryOffer.amount?.[0]?.amount || 0);
   const currency = String(card.currency || 'USD').toUpperCase();
   const offerCredits = Array.isArray(primaryOffer.credits) ? primaryOffer.credits : [];
-  const statementCreditDollars = offerCredits.reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+  const statementCreditDollars = offerCredits
+    .filter((c) => Number(c?.value) > 0 && Number(c?.value) <= 1000)
+    .reduce((sum, c) => sum + Number(c.value), 0);
 
   let rewardText = null;
   if (rawAmount > 0) {
     if (currency === 'USD') {
       rewardText = `$${rawAmount.toLocaleString('en-US')} Cash Bonus`;
+    } else if (currency === 'EXPEDIA') {
+      rewardText = `$${rawAmount.toLocaleString('en-US')} OneKeyCash`;
     } else if (rawAmount <= 10) {
       rewardText = `${rawAmount} Free Night Awards`;
     } else {
-      const unit = CURRENCY_LABELS[currency] || `${currency.charAt(0) + currency.slice(1).toLowerCase()} pts`;
-      rewardText = `${rawAmount.toLocaleString('en-US')} ${unit}`;
+      rewardText = `${rawAmount.toLocaleString('en-US')} ${humanizeCurrencyUnit(currency)}`;
     }
     if (statementCreditDollars > 0) {
       rewardText += ` + $${statementCreditDollars} Credit`;
@@ -168,7 +204,7 @@ function parseUpstreamOffer(card) {
   const cpp = CURRENCY_CPP[currency] ?? 1.0;
   let estimatedValueCents = null;
   if (rawAmount > 0) {
-    if (currency === 'USD') {
+    if (currency === 'USD' || currency === 'EXPEDIA') {
       estimatedValueCents = Math.round(rawAmount * 100);
     } else if (rawAmount <= 10) {
       estimatedValueCents = Math.round(rawAmount * 20000);
@@ -179,27 +215,24 @@ function parseUpstreamOffer(card) {
   if (statementCreditDollars > 0) {
     estimatedValueCents = (estimatedValueCents || 0) + Math.round(statementCreditDollars * 100);
   }
+  if (estimatedValueCents !== null && (estimatedValueCents < 1000 || estimatedValueCents > 500000)) {
+    estimatedValueCents = null;
+    rewardText = null;
+  }
 
   const spendDollars = Number(primaryOffer.spend || 0);
   const targetSpendCents = spendDollars > 0 ? Math.round(spendDollars * 100) : null;
   const days = Number(primaryOffer.days || 90);
   const spendWindowDays = days > 0 && days <= 730 ? days : 90;
 
-  const historical = Array.isArray(card.historicalOffers) ? card.historicalOffers : [];
-  const histAmounts = historical
+  const histAmounts = (Array.isArray(card.historicalOffers) ? card.historicalOffers : [])
     .map((h) => Number(h.amount?.[0]?.amount || 0))
     .filter((n) => n > 0);
   const maxHist = histAmounts.length > 0 ? Math.max(...histAmounts) : 0;
   const minHist = histAmounts.length > 0 ? Math.min(...histAmounts) : 0;
   const isElevated = rawAmount > 0 && histAmounts.length >= 2 && rawAmount >= maxHist && maxHist > minHist;
 
-  return {
-    rewardText,
-    estimatedValueCents,
-    targetSpendCents,
-    spendWindowDays,
-    isElevated
-  };
+  return { rewardText, estimatedValueCents, targetSpendCents, spendWindowDays, isElevated };
 }
 
 export function ensureCreditCardCatalogSeeded(db) {
@@ -219,7 +252,7 @@ export function ensureCreditCardCatalogSeeded(db) {
       @defaultSubRewardText, @defaultSubEstimatedValueCents,
       @defaultSubTargetSpendCents, @subSpendWindowDays,
       @isElevatedSubOffer, @rewardCategoriesJson, @benefitsJson,
-      @sortRank, @isCurated, '2026-11', datetime('now')
+      @sortRank, @isCurated, @asOf, datetime('now')
     )
     ON CONFLICT(id) DO UPDATE SET
       bonus_api_card_id = excluded.bonus_api_card_id,
@@ -229,13 +262,32 @@ export function ensureCreditCardCatalogSeeded(db) {
       network = excluded.network,
       art_key = excluded.art_key,
       upstream_image_path = COALESCE(excluded.upstream_image_path, credit_card_catalog.upstream_image_path),
+      annual_fee_cents = excluded.annual_fee_cents,
+      is_annual_fee_waived = excluded.is_annual_fee_waived,
       is_business_card = excluded.is_business_card,
       counts_toward_524_override = excluded.counts_toward_524_override,
       sub_cooldown_months = excluded.sub_cooldown_months,
+      default_sub_reward_text = CASE
+        WHEN credit_card_catalog.last_synced_at IS NULL
+          OR credit_card_catalog.default_sub_reward_text LIKE '%\\_%' ESCAPE '\\'
+          OR credit_card_catalog.default_sub_estimated_value_cents > 500000
+          OR credit_card_catalog.default_sub_estimated_value_cents < 1000
+        THEN excluded.default_sub_reward_text
+        ELSE COALESCE(credit_card_catalog.default_sub_reward_text, excluded.default_sub_reward_text)
+      END,
+      default_sub_estimated_value_cents = CASE
+        WHEN credit_card_catalog.last_synced_at IS NULL
+          OR credit_card_catalog.default_sub_reward_text LIKE '%\\_%' ESCAPE '\\'
+          OR credit_card_catalog.default_sub_estimated_value_cents > 500000
+          OR credit_card_catalog.default_sub_estimated_value_cents < 1000
+        THEN excluded.default_sub_estimated_value_cents
+        ELSE COALESCE(credit_card_catalog.default_sub_estimated_value_cents, excluded.default_sub_estimated_value_cents)
+      END,
       reward_categories_json = excluded.reward_categories_json,
       benefits_json = excluded.benefits_json,
       sort_rank = excluded.sort_rank,
       is_curated = excluded.is_curated,
+      as_of = CASE WHEN credit_card_catalog.as_of LIKE '%-v2' THEN credit_card_catalog.as_of ELSE excluded.as_of END,
       updated_at = datetime('now')
   `);
 
@@ -270,7 +322,8 @@ export function ensureCreditCardCatalogSeeded(db) {
         rewardCategoriesJson: JSON.stringify(item.rewardCategories || []),
         benefitsJson: JSON.stringify(item.benefits || []),
         sortRank: item.sortRank ?? 100,
-        isCurated: item.isCurated
+        isCurated: item.isCurated,
+        asOf: CATALOG_SCHEMA_TAG
       });
     }
   });
@@ -285,22 +338,16 @@ export async function syncCreditCardCatalogFromUpstream(db, { fetchImpl = global
   let rawCards;
   try {
     const res = await fetchImpl(UPSTREAM_DATA_URL, { signal: controller.signal });
-    if (!res.ok) {
-      throw new Error(`Upstream credit-card-bonuses-api HTTP ${res.status}`);
-    }
+    if (!res.ok) throw new Error(`Upstream credit-card-bonuses-api HTTP ${res.status}`);
     rawCards = await res.json();
   } finally {
     clearTimeout(timeout);
   }
-
-  if (!Array.isArray(rawCards)) {
-    throw new Error('Invalid upstream credit-card-bonuses-api payload');
-  }
+  if (!Array.isArray(rawCards)) throw new Error('Invalid upstream credit-card-bonuses-api payload');
 
   const updateCuratedStmt = db.prepare(`
     UPDATE credit_card_catalog
-       SET annual_fee_cents = @annualFeeCents,
-           is_annual_fee_waived = @isAnnualFeeWaived,
+       SET is_annual_fee_waived = @isAnnualFeeWaived,
            upstream_image_path = COALESCE(@upstreamImagePath, upstream_image_path),
            default_sub_reward_text = COALESCE(@rewardText, default_sub_reward_text),
            default_sub_estimated_value_cents = COALESCE(@estimatedValueCents, default_sub_estimated_value_cents),
@@ -312,6 +359,22 @@ export async function syncCreditCardCatalogFromUpstream(db, { fetchImpl = global
            updated_at = datetime('now')
      WHERE bonus_api_card_id = @bonusApiCardId
        AND is_curated = 1
+  `);
+
+  const updateSeededExtendedStmt = db.prepare(`
+    UPDATE credit_card_catalog
+       SET is_annual_fee_waived = @isAnnualFeeWaived,
+           upstream_image_path = COALESCE(@upstreamImagePath, upstream_image_path),
+           default_sub_reward_text = COALESCE(@rewardText, default_sub_reward_text),
+           default_sub_estimated_value_cents = COALESCE(@estimatedValueCents, default_sub_estimated_value_cents),
+           default_sub_target_spend_cents = COALESCE(@targetSpendCents, default_sub_target_spend_cents),
+           sub_spend_window_days = COALESCE(@spendWindowDays, sub_spend_window_days),
+           is_elevated_sub_offer = @isElevated,
+           as_of = @asOf,
+           last_synced_at = datetime('now'),
+           updated_at = datetime('now')
+     WHERE bonus_api_card_id = @bonusApiCardId
+       AND is_curated = 0
   `);
 
   const upsertUpstreamCardStmt = db.prepare(`
@@ -327,8 +390,7 @@ export async function syncCreditCardCatalogFromUpstream(db, { fetchImpl = global
       @id, @bonusApiCardId, @shortLabel, @cardName, @issuerName, @network,
       @artKey, @upstreamImagePath, @annualFeeCents, @isAnnualFeeWaived,
       @isBusinessCard, @countsToward524Override, @subCooldownMonths,
-      @rewardText, @estimatedValueCents,
-      @targetSpendCents, @spendWindowDays,
+      @rewardText, @estimatedValueCents, @targetSpendCents, @spendWindowDays,
       @isElevated, @rewardCategoriesJson, @benefitsJson,
       @sortRank, 0, @asOf, datetime('now'), datetime('now')
     )
@@ -350,7 +412,7 @@ export async function syncCreditCardCatalogFromUpstream(db, { fetchImpl = global
   `);
 
   const now = new Date();
-  const asOf = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const asOf = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-v2`;
   let updatedCurated = 0;
   let upsertedLongTail = 0;
 
@@ -359,15 +421,11 @@ export async function syncCreditCardCatalogFromUpstream(db, { fetchImpl = global
       if (!card || card.discontinued || !card.cardId || !card.name) continue;
       const offer = parseUpstreamOffer(card);
       const imagePath =
-        typeof card.imageUrl === 'string' && RASTER_IMAGE_EXT_RE.test(card.imageUrl)
-          ? card.imageUrl
-          : null;
+        typeof card.imageUrl === 'string' && RASTER_IMAGE_EXT_RE.test(card.imageUrl) ? card.imageUrl : null;
       const annualFeeCents = Math.max(0, Math.round((Number(card.annualFee) || 0) * 100));
       const isAnnualFeeWaived = card.isAnnualFeeWaived ? 1 : 0;
-
-      const res = updateCuratedStmt.run({
+      const syncParams = {
         bonusApiCardId: card.cardId,
-        annualFeeCents,
         isAnnualFeeWaived,
         upstreamImagePath: imagePath,
         rewardText: offer.rewardText,
@@ -376,10 +434,17 @@ export async function syncCreditCardCatalogFromUpstream(db, { fetchImpl = global
         spendWindowDays: offer.spendWindowDays,
         isElevated: offer.isElevated ? 1 : 0,
         asOf
-      });
+      };
 
-      if (res.changes > 0) {
-        updatedCurated += res.changes;
+      const curatedRes = updateCuratedStmt.run(syncParams);
+      if (curatedRes.changes > 0) {
+        updatedCurated += curatedRes.changes;
+        continue;
+      }
+
+      const extRes = updateSeededExtendedStmt.run(syncParams);
+      if (extRes.changes > 0) {
+        upsertedLongTail += extRes.changes;
         continue;
       }
 
@@ -388,30 +453,48 @@ export async function syncCreditCardCatalogFromUpstream(db, { fetchImpl = global
       const id = slugifyCardId(card.issuer, card.name);
       const isBusiness = Boolean(card.isBusiness);
       const isCapOneSpark =
-        isBusiness && issuerName === 'Capital One' && !String(card.name).toLowerCase().includes('venture x');
+        isBusiness && issuerName === 'Capital One' && !String(card.name).toLowerCase().includes('venture x') && !String(card.name).toLowerCase().includes('plus');
       const isDiscoverBiz = isBusiness && issuerName === 'Discover';
-      const countsToward524Override = isCapOneSpark || isDiscoverBiz ? 1 : null;
-      const subCooldownMonths =
-        issuerName === 'American Express' ? 999 : issuerName === 'Chase' ? 24 : 48;
+      const countsToward524Override = isCapOneSpark || isDiscoverBiz ? 1 : isBusiness ? 0 : null;
+      const subCooldownMonths = issuerName === 'American Express' ? 999 : issuerName === 'Chase' ? 24 : 48;
 
-      const baseRate = Number(card.universalCashbackPercent) || 1.0;
+      const baseRate = Math.max(1.0, Number(card.universalCashbackPercent) || 1.0);
       const rewardCategories = [
-        { category: 'Everything Else', label: 'Everything Else (Base Rate)', multiplier: baseRate }
+        {
+          category: 'Everything Else',
+          label: 'Every Purchase',
+          rate: baseRate,
+          multiplier: baseRate,
+          is_rotating: false,
+          isRotating: false,
+          cap: null,
+          capCents: null,
+          type: 'multiplier'
+        }
       ];
 
       const rawCredits = Array.isArray(card.credits) ? card.credits : [];
       const benefits = rawCredits
-        .filter((c) => c && c.description && Number(c.value) > 0)
+        .filter((c) => {
+          const val = Number(c?.value);
+          const desc = String(c?.description || '').trim();
+          return desc && val > 0 && val <= 1000 && !/\b(lounge|status|checked bag|pts|points|miles)\b/i.test(desc);
+        })
         .map((c, idx) => {
-          const valCents = Math.round(Number(c.value) * 100);
+          const valDollars = Number(c.value);
+          const valCents = Math.round(valDollars * 100);
+          const desc = String(c.description).trim();
+          const title = desc.startsWith('$') ? desc : `$${Math.round(valDollars)} ${desc}`;
           return {
             id: `${id}-credit-${idx + 1}`,
-            title: `$${Math.round(Number(c.value))} ${c.description}`,
-            period_value: Number(c.value),
+            name: title,
+            title,
+            value: valDollars,
+            period_value: valDollars,
             period_value_cents: valCents,
             cadence: 'ANNUAL',
             anchor: 'CARDMEMBER_YEAR',
-            description: String(c.description)
+            description: desc
           };
         });
 
@@ -419,7 +502,7 @@ export async function syncCreditCardCatalogFromUpstream(db, { fetchImpl = global
         id,
         bonusApiCardId: card.cardId,
         shortLabel: String(card.name).slice(0, 36),
-        cardName: `${issuerName.startsWith(card.name.split(' ')[0]) ? '' : ''}${card.name}`.trim(),
+        cardName: String(card.name).trim(),
         issuerName,
         network,
         artKey: inferArtKey(issuerName, card.name),
@@ -455,13 +538,9 @@ export async function fetchAndCacheCardArtwork(db, cardId, { fetchImpl = globalT
     return { contentType: cached.content_type, buffer: cached.image_blob };
   }
 
-  const row = db
-    .prepare('SELECT upstream_image_path FROM credit_card_catalog WHERE id = ?')
-    .get(cardId);
+  const row = db.prepare('SELECT upstream_image_path FROM credit_card_catalog WHERE id = ?').get(cardId);
   const imagePath = row?.upstream_image_path;
-  if (!imagePath || !RASTER_IMAGE_EXT_RE.test(imagePath)) {
-    return null;
-  }
+  if (!imagePath || !RASTER_IMAGE_EXT_RE.test(imagePath)) return null;
 
   const url = `${UPSTREAM_IMAGE_BASE_URL}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
   const controller = new AbortController();
@@ -470,13 +549,9 @@ export async function fetchAndCacheCardArtwork(db, cardId, { fetchImpl = globalT
     const res = await fetchImpl(url, { signal: controller.signal });
     if (!res.ok) return null;
     const contentType = String(res.headers.get('content-type') || 'image/png').split(';')[0].trim();
-    if (!contentType.startsWith('image/') || contentType.includes('svg') || contentType.includes('avif')) {
-      return null;
-    }
+    if (!contentType.startsWith('image/') || contentType.includes('svg') || contentType.includes('avif')) return null;
     const arrayBuf = await res.arrayBuffer();
-    if (!arrayBuf || arrayBuf.byteLength === 0 || arrayBuf.byteLength > 2 * 1024 * 1024) {
-      return null;
-    }
+    if (!arrayBuf || arrayBuf.byteLength === 0 || arrayBuf.byteLength > 2 * 1024 * 1024) return null;
     const buffer = Buffer.from(arrayBuf);
     db.prepare(`
       INSERT INTO credit_card_artwork_cache (card_id, content_type, image_blob, fetched_at)
@@ -486,7 +561,6 @@ export async function fetchAndCacheCardArtwork(db, cardId, { fetchImpl = globalT
         image_blob = excluded.image_blob,
         fetched_at = datetime('now')
     `).run(cardId, contentType, buffer);
-
     return { contentType, buffer };
   } catch {
     return null;
@@ -502,6 +576,39 @@ function safeJsonParse(raw, fallback) {
   } catch {
     return fallback;
   }
+}
+
+function normalizeWireRewardCategory(rc) {
+  const mult = Number(rc?.rate ?? rc?.multiplier ?? 1.0) || 1.0;
+  const rot = Boolean(rc?.is_rotating ?? rc?.isRotating ?? false);
+  const capCents = rc?.cap_cents ?? rc?.capCents ?? (rc?.cap != null ? Math.round(Number(rc.cap) * 100) : null);
+  return {
+    category: rc?.category || rc?.label || 'Everything Else',
+    label: rc?.label || rc?.category || 'Every Purchase',
+    rate: mult,
+    multiplier: mult,
+    is_rotating: rot,
+    isRotating: rot,
+    cap: rc?.cap != null ? Number(rc.cap) : capCents != null ? capCents / 100 : null,
+    capCents,
+    type: rc?.type || 'multiplier'
+  };
+}
+
+function normalizeWireBenefit(ben) {
+  const cents =
+    ben?.period_value_cents !== undefined
+      ? ben.period_value_cents
+      : ben?.period_value != null
+        ? Math.round(Number(ben.period_value) * 100)
+        : null;
+  return {
+    ...ben,
+    name: ben?.name || ben?.title || '',
+    title: ben?.title || ben?.name || '',
+    period_value: ben?.period_value !== undefined ? ben.period_value : cents != null ? cents / 100 : null,
+    period_value_cents: cents
+  };
 }
 
 export function serializeCatalogRow(row) {
@@ -527,27 +634,18 @@ export function serializeCatalogRow(row) {
         ? null
         : Boolean(row.counts_toward_524_override),
     sub_cooldown_months:
-      row.sub_cooldown_months === null || row.sub_cooldown_months === undefined
-        ? null
-        : Number(row.sub_cooldown_months),
+      row.sub_cooldown_months === null || row.sub_cooldown_months === undefined ? null : Number(row.sub_cooldown_months),
     default_sub_reward_text: row.default_sub_reward_text || null,
     default_sub_estimated_value_cents:
-      row.default_sub_estimated_value_cents === null || row.default_sub_estimated_value_cents === undefined
-        ? null
-        : Number(row.default_sub_estimated_value_cents),
+      row.default_sub_estimated_value_cents == null ? null : Number(row.default_sub_estimated_value_cents),
     default_sub_target_spend_cents:
-      row.default_sub_target_spend_cents === null || row.default_sub_target_spend_cents === undefined
-        ? null
-        : Number(row.default_sub_target_spend_cents),
-    sub_spend_window_days:
-      row.sub_spend_window_days === null || row.sub_spend_window_days === undefined
-        ? null
-        : Number(row.sub_spend_window_days),
+      row.default_sub_target_spend_cents == null ? null : Number(row.default_sub_target_spend_cents),
+    sub_spend_window_days: row.sub_spend_window_days == null ? null : Number(row.sub_spend_window_days),
     is_elevated_sub_offer: Boolean(row.is_elevated_sub_offer),
-    reward_categories: safeJsonParse(row.reward_categories_json, []),
-    benefits: safeJsonParse(row.benefits_json, []),
+    reward_categories: safeJsonParse(row.reward_categories_json, []).map(normalizeWireRewardCategory),
+    benefits: safeJsonParse(row.benefits_json, []).map(normalizeWireBenefit),
     is_curated: Boolean(row.is_curated),
-    as_of: row.as_of || '2026-11',
+    as_of: row.as_of || CATALOG_SCHEMA_TAG,
     last_synced_at: row.last_synced_at || null
   };
 }
@@ -558,12 +656,7 @@ export function listCatalogTemplates(db) {
     ensureCreditCardCatalogSeeded(db);
   }
   return db
-    .prepare(
-      `SELECT *
-         FROM credit_card_catalog
-        ORDER BY sort_rank ASC, issuer_name ASC, card_name ASC`
-    )
+    .prepare('SELECT * FROM credit_card_catalog ORDER BY sort_rank ASC, issuer_name ASC, card_name ASC')
     .all()
     .map(serializeCatalogRow);
 }
-
