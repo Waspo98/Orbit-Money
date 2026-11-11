@@ -174,6 +174,9 @@ fun AccountDetailInspectorPane(
                             transactions = state.selectedAccountTransactions,
                             onClose = onClosePane,
                             onEdit = { viewModel.openEditAccount(inspecting) },
+                            onFindLogo = { viewModel.accountLogos.open(inspecting) },
+                            onUseAccountIcon = { viewModel.accountLogos.resetToAccountIconAsync(inspecting.id) },
+                            onReportLogoStatus = { k, s -> viewModel.accountLogos.reportStatus(k, s) },
                             onHistory = { viewModel.openBalanceHistory(inspecting) },
                             onSnapshotReminder = { viewModel.requestSnapshotReminder(onNavigate) },
                             onMerge = { viewModel.openMergeDialog(inspecting) },
@@ -197,6 +200,9 @@ private fun AccountReadOnlyDetailContent(
     transactions: List<Transaction>,
     onClose: () -> Unit,
     onEdit: () -> Unit,
+    onFindLogo: () -> Unit,
+    onUseAccountIcon: () -> Unit,
+    onReportLogoStatus: (String, String) -> Unit,
     onHistory: () -> Unit,
     onSnapshotReminder: () -> Unit,
     onMerge: () -> Unit,
@@ -221,6 +227,16 @@ private fun AccountReadOnlyDetailContent(
     ) {
         item {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                AccountInstitutionMark(
+                    account = account,
+                    size = 48.dp,
+                    cornerRadius = 12.dp,
+                    logoPadding = 5.dp,
+                    onFindLogo = onFindLogo,
+                    onUseAccountIcon = onUseAccountIcon,
+                    onReportLogoStatus = onReportLogoStatus
+                )
+                Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(

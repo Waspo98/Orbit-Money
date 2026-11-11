@@ -2,6 +2,12 @@ package app.overbay.orbit.ui.accounts.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +49,7 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.domain.CardCycleStatus
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.accounts.AccountGroupDisplay
@@ -55,10 +62,9 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
  * Editorial accordion group section card.
- * Collapsed by default with 20dp corners, 1dp cardBorder, tracked uppercase header,
- * bold colored balance, circular 30dp bordered chevron button, left-side drag handle,
- * and support for 1-column vs 2-column wideSpan layout.
- *
+ * Collapsed by default with 16dp corners, 1dp cardBorder, tracked uppercase header,
+ * overlapping mini-stack visual preview, bold colored balance, circular 30dp chevron,
+ * left-side drag handle, and support for 1-column vs 2-column wideSpan layout.
  */
 @Composable
 fun AccountGroupSection(
@@ -69,6 +75,8 @@ fun AccountGroupSection(
     onSeeTransactions: (Account) -> Unit,
     onEditAccount: (Account) -> Unit,
     onPerksClick: (Account) -> Unit,
+    onFindLogo: (Account) -> Unit = {},
+    onReportLogoStatus: (String, String) -> Unit = { _, _ -> },
     onHistoryClick: (Account) -> Unit,
     onMergeClick: (Account) -> Unit,
     onToggleArchive: (Account) -> Unit,
@@ -97,7 +105,10 @@ fun AccountGroupSection(
         if (group.totalCents >= 0L) colors.income else colors.expense
     }
 
-    val chevronRotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f)
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = OrbitSprings.FloatSpatialDefault
+    )
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -123,7 +134,7 @@ fun AccountGroupSection(
                     Spacer(modifier = Modifier.width(8.dp))
                 }
 
-                // Left Column: Tracked uppercase title + account count
+                // Left Column: Tracked uppercase title + account count & collapsed mini-stack preview
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = group.title.uppercase(),
@@ -135,15 +146,29 @@ fun AccountGroupSection(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "${group.accounts.size} ${if (group.accounts.size == 1) "account" else "accounts"}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.outline,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "${group.accounts.size} ${if (group.accounts.size == 1) "account" else "accounts"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.outline,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        AnimatedVisibility(
+                            visible = !expanded,
+                            enter = fadeIn(OrbitSprings.effectsDefault()) + expandHorizontally(OrbitSprings.spatialDefault()),
+                            exit = fadeOut(OrbitSprings.effectsFast()) + shrinkHorizontally(OrbitSprings.spatialDefault())
+                        ) {
+                            AccountGroupPreviewStack(
+                                category = group.category,
+                                accounts = group.accounts,
+                                onReportLogoStatus = onReportLogoStatus,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -208,7 +233,11 @@ fun AccountGroupSection(
             }
 
             // Expanded Account Rows inside the same card
-            AnimatedVisibility(visible = expanded) {
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(OrbitSprings.spatialDefault()) + fadeIn(OrbitSprings.effectsDefault()),
+                exit = shrinkVertically(OrbitSprings.spatialDefault()) + fadeOut(OrbitSprings.effectsFast())
+            ) {
                 val accountReorderState = rememberDragReorderState(
                     items = group.accounts,
                     keySelector = { it.id },
@@ -219,12 +248,13 @@ fun AccountGroupSection(
                 if (wideSpan == 2 && group.accounts.size >= 2 && !isReorderMode) {
                     val pairs = group.accounts.chunked(2)
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        pairs.forEachIndexed { rowIndex, pairAccounts ->
+                        pairs.forEach { pairAccounts ->
                             HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
                             Row(modifier = Modifier.fillMaxWidth()) {
-                                pairAccounts.forEachIndexed { colIndex, account ->
+                                pairAccounts.forEach { account ->
                                     AccountRowCard(
                                         account = account,
+                                        groupCategory = group.category,
                                         cycleStatus = cardCycles[account.id],
                                         isInspected = selectedAccountId == account.id,
                                         onInspect = { onInspectAccount(account) },
@@ -233,6 +263,10 @@ fun AccountGroupSection(
                                         onPerks = if (account.type == AccountType.CREDIT) {
                                             { onPerksClick(account) }
                                         } else null,
+                                        onFindLogo = if (account.type != AccountType.CREDIT) {
+                                            { onFindLogo(account) }
+                                        } else null,
+                                        onReportLogoStatus = onReportLogoStatus,
                                         onHistory = { onHistoryClick(account) },
                                         onMerge = { onMergeClick(account) },
                                         onToggleArchive = { onToggleArchive(account) },
@@ -256,6 +290,7 @@ fun AccountGroupSection(
                                 )
                                 AccountRowCard(
                                     account = account,
+                                    groupCategory = group.category,
                                     cycleStatus = cardCycles[account.id],
                                     isInspected = selectedAccountId == account.id,
                                     onInspect = { onInspectAccount(account) },
@@ -264,6 +299,10 @@ fun AccountGroupSection(
                                     onPerks = if (account.type == AccountType.CREDIT) {
                                         { onPerksClick(account) }
                                     } else null,
+                                    onFindLogo = if (account.type != AccountType.CREDIT) {
+                                        { onFindLogo(account) }
+                                    } else null,
+                                    onReportLogoStatus = onReportLogoStatus,
                                     onHistory = { onHistoryClick(account) },
                                     onMerge = { onMergeClick(account) },
                                     onToggleArchive = { onToggleArchive(account) },

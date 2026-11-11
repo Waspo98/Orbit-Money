@@ -215,12 +215,13 @@ fun AccountGroupPreviewStack(
 ) {
     if (accounts.isEmpty()) return
 
-    val previewItems = remember(category, accounts) {
+    val maxVisible = if (accounts.size <= 4) 4 else 3
+    val previewItems = remember(category, accounts, maxVisible) {
         if (category == AccountTypeCategory.CREDIT_CARDS) {
-            accounts.take(4)
+            accounts.take(maxVisible)
         } else {
             val distinctFirst = accounts.distinctBy { it.effectiveInstitutionLogoUrl ?: "id-${it.id}" }
-            (distinctFirst + accounts).distinctBy { it.id }.take(4)
+            (distinctFirst + accounts).distinctBy { it.id }.take(maxVisible)
         }
     }
     val overflowCount = (accounts.size - previewItems.size).coerceAtLeast(0)

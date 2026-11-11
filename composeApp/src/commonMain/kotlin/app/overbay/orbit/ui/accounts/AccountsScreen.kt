@@ -48,6 +48,7 @@ import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.dragReorderItem
 import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.transactions.sheets.BrandLogoFinderDialog
 import app.overbay.orbit.util.LocalDevicePosture
 
 /**
@@ -257,6 +258,23 @@ fun AccountsScreen(
             onDismiss = { viewModel.closePerkUsage() }
         )
     }
+
+    state.logoFinderAccount?.let { logoAcct ->
+        val subject = logoAcct.institution?.takeIf { it.isNotBlank() } ?: logoAcct.name
+        BrandLogoFinderDialog(
+            targetKey = "acct:${logoAcct.id}:${logoAcct.institution.orEmpty()}",
+            subjectName = subject,
+            initialQuery = subject,
+            initialImageUrl = logoAcct.institutionLogo?.url,
+            searchFieldLabel = "Institution Search",
+            searchPlaceholder = "Bank or brokerage name",
+            fallbackButtonLabel = "Use Account Icon",
+            onSearchBrands = { q -> viewModel.accountLogos.search(logoAcct.id, q) },
+            onSaveLogoUrl = { url -> viewModel.accountLogos.saveLogoUrl(logoAcct.id, url) },
+            onUseFallbackIcon = { viewModel.accountLogos.useAccountIcon(logoAcct.id) },
+            onDismiss = { viewModel.accountLogos.close() }
+        )
+    }
 }
 
 @Composable
@@ -306,6 +324,8 @@ private fun AccountsMasterContent(
                     },
                     onEditAccount = { viewModel.openEditAccount(it) },
                     onPerksClick = { onNavigate(OrbitNavKey.CardPerks(accountId = it.id)) },
+                    onFindLogo = { viewModel.accountLogos.open(it) },
+                    onReportLogoStatus = { k, s -> viewModel.accountLogos.reportStatus(k, s) },
                     onHistoryClick = { viewModel.openBalanceHistory(it) },
                     onMergeClick = { viewModel.openMergeDialog(it) },
                     onToggleArchive = { viewModel.toggleArchiveAccount(it) },
