@@ -278,13 +278,25 @@ fun AccountsScreen(
     }
 
     state.activeClosurePrompt?.let { promptCandidate ->
+        val activeResolution = state.selectedClosureResolution ?: promptCandidate.defaultResolution()
         AccountClosurePromptDialog(
             candidate = promptCandidate,
+            selectedResolution = activeResolution,
             isResolving = state.isResolvingClosure,
-            onResolve = { resolution ->
+            errorMessage = state.closureErrorMessage,
+            onSelectResolution = { resolution ->
+                viewModel.closurePrompts.selectResolution(promptCandidate.account.id, resolution)
+            },
+            onConfirm = {
                 viewModel.closurePrompts.resolve(
                     accountId = promptCandidate.account.id,
-                    resolution = resolution
+                    resolution = activeResolution
+                )
+            },
+            onDismissPrompt = {
+                viewModel.closurePrompts.resolve(
+                    accountId = promptCandidate.account.id,
+                    resolution = app.overbay.orbit.domain.AccountClosureResolution.DISMISS
                 )
             },
             onSnooze = { viewModel.closurePrompts.snoozeCurrent(promptCandidate.account.id) }

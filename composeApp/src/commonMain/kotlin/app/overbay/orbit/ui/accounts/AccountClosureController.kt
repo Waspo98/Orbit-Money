@@ -13,9 +13,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 internal data class ClosureUiOverlay(
-    val manualAccountId: Long?,
-    val snoozedIds: Set<Long>,
-    val isResolving: Boolean
+    val manualAccountId: Long? = null,
+    val snoozedIds: Set<Long> = emptySet(),
+    val isResolving: Boolean = false,
+    val selectedResolutions: Map<Long, AccountClosureResolution> = emptyMap(),
+    val errorMessage: String? = null
 )
 
 /**
@@ -29,26 +31,42 @@ class AccountClosureController(
     private val _manualAccountId = MutableStateFlow<Long?>(null)
     private val _snoozedAccountIds = MutableStateFlow<Set<Long>>(emptySet())
     private val _isResolving = MutableStateFlow(false)
+    private val _selectedResolutions = MutableStateFlow<Map<Long, AccountClosureResolution>>(emptyMap())
+    private val _errorMessage = MutableStateFlow<String?>(null)
     val isResolving: StateFlow<Boolean> = _isResolving.asStateFlow()
 
     internal val overlayFlow: Flow<ClosureUiOverlay> = combine(
-        _manualAccountId,
-        _snoozedAccountIds,
-        _isResolving
-    ) { manualId, snoozed, resolving ->
-        ClosureUiOverlay(manualId, snoozed, resolving)
+        combine(_manualAccountId, _snoozedAccountIds, _isResolving) { m, s, r -> Triple(m, s, r) },
+        _selectedResolutions,
+        _errorMessage
+    ) { (manualId, snoozed, resolving), selections, error ->
+        ClosureUiOverlay(
+            manualAccountId = manualId,
+            snoozedIds = snoozed,
+            isResolving = resolving,
+            selectedResolutions = selections,
+            errorMessage = error
+        )
     }
 
     fun openForAccount(accountId: Long) {
+        _errorMessage.value = null
         _manualAccountId.value = accountId
     }
 
+    fun selectResolution(accountId: Long, resolution: AccountClosureResolution) {
+        _errorMessage.value = null
+        _selectedResolutions.value = _selectedResolutions.value + (accountId to resolution)
+    }
+
     fun snoozeCurrent(accountId: Long) {
+        _errorMessage.value = null
         _manualAccountId.value = null
         _snoozedAccountIds.value = _snoozedAccountIds.value + accountId
     }
 
     fun resetSnoozesAfterSync() {
+        _errorMessage.value = null
         _snoozedAccountIds.value = emptySet()
     }
 
@@ -60,15 +78,19 @@ class AccountClosureController(
     ) {
         if (_isResolving.value) return
         scope.launch {
+            _errorMessage.value = null
             _isResolving.value = true
             val res = repository.resolveAccountClosure(accountId, resolution)
             _isResolving.value = false
             if (res.isSuccess) {
                 _manualAccountId.value = null
                 _snoozedAccountIds.value = _snoozedAccountIds.value - accountId
+                _selectedResolutions.value = _selectedResolutions.value - accountId
                 onComplete()
             } else {
-                onError(res.exceptionOrNull()?.message ?: "Could not update account status")
+                val msg = res.exceptionOrNull()?.message ?: "Could not update account status"
+                _errorMessage.value = msg
+                onError(msg)
             }
         }
     }
@@ -82,6 +104,14 @@ class AccountClosureController(
                 return candidates.find { it.account.id == overlay.manualAccountId }
             }
             return candidates.firstOrNull { it.account.id !in overlay.snoozedIds }
+        }
+
+        internal fun selectActiveResolution(
+            candidate: AccountClosureCandidate?,
+            overlay: ClosureUiOverlay
+        ): AccountClosureResolution? {
+            val active = candidate ?: return null
+            return overlay.selectedResolutions[active.account.id] ?: active.defaultResolution()
         }
     }
 }

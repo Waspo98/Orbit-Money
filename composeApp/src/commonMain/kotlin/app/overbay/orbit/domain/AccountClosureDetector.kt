@@ -26,7 +26,21 @@ data class AccountClosureCandidate(
     val hasPropertyContext: Boolean = false,
     val propertyTitle: String? = null,
     val estimatedPropertyValueCents: Cents? = null
-)
+) {
+    fun defaultResolution(): AccountClosureResolution {
+        if (!hasPropertyContext) return AccountClosureResolution.SOLD_OR_CLOSED
+        val memo = buildString {
+            payoffTransaction?.effectiveMerchant?.let { append(it).append(' ') }
+            payoffTransaction?.originalDescription?.let { append(it) }
+        }.lowercase()
+        val mentionsSale = Regex("\\b(sale|sold)\\b").containsMatchIn(memo)
+        return if (mentionsSale) {
+            AccountClosureResolution.SOLD_PROPERTY
+        } else {
+            AccountClosureResolution.PAID_OFF_KEEP_PROPERTY
+        }
+    }
+}
 
 object AccountClosureDetector {
 
@@ -40,7 +54,8 @@ object AccountClosureDetector {
     fun detectCandidates(
         accounts: List<Account>,
         transactions: List<Transaction>,
-        todayIso: String
+        todayIso: String,
+        dismissedOverrides: Map<String, String> = emptyMap()
     ): List<AccountClosureCandidate> {
         val activeAccounts = accounts.filter { !it.isArchived }
         if (activeAccounts.isEmpty()) return emptyList()
@@ -54,7 +69,7 @@ object AccountClosureDetector {
 
         for (account in activeAccounts) {
             if (account.isProperty) continue
-            if (isDismissedForCurrentState(account)) continue
+            if (isDismissedForCurrentState(account, dismissedOverrides)) continue
 
             val parentProperty = account.linkedPropertyAccountId?.let { accountById[it] }
             val hasProp = ((account.estimatedValueCents ?: 0L) > 0L) || parentProperty != null
@@ -132,8 +147,13 @@ object AccountClosureDetector {
         return results
     }
 
-    private fun isDismissedForCurrentState(account: Account): Boolean {
-        val dismissedAt = account.closurePromptDismissedAt?.takeIf { it.isNotBlank() } ?: return false
+    private fun isDismissedForCurrentState(
+        account: Account,
+        dismissedOverrides: Map<String, String>
+    ): Boolean {
+        val serverDismissed = account.closurePromptDismissedAt?.takeIf { it.isNotBlank() }
+        val localDismissed = dismissedOverrides[account.id.toString()]?.takeIf { it.isNotBlank() }
+        val dismissedAt = listOfNotNull(serverDismissed, localDismissed).maxOrNull() ?: return false
         val missingSince = account.simplefinMissingSince?.takeIf { it.isNotBlank() }
         // Re-prompt only if SimpleFIN newly flagged the account missing after the user's prior dismissal
         if (missingSince != null && missingSince > dismissedAt) return false

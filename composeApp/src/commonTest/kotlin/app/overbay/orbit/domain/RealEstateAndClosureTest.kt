@@ -3,6 +3,8 @@ package app.overbay.orbit.domain
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.ui.accounts.AccountClosureController
+import app.overbay.orbit.ui.accounts.ClosureUiOverlay
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -124,5 +126,59 @@ class RealEstateAndClosureTest {
         val reflagged = AccountClosureDetector.detectCandidates(listOf(newlyMissing), listOf(payoffTxn), "2026-11-12")
         assertEquals(1, reflagged.size)
         assertEquals(ClosureReason.MISSING_FROM_SIMPLEFIN, reflagged.single().reason)
+    }
+
+    @Test
+    fun closureSelection_defaultsSmartlyAndSwitchesSelectedResolution() {
+        val parkRidge = Account(
+            id = 20L,
+            name = "2008 Park Ridge (8143)",
+            type = AccountType.MORTGAGE,
+            currentBalanceCents = -74_571_57L,
+            estimatedValueCents = 300_000_00L
+        )
+        val saleTxn = Transaction(
+            id = 501L,
+            accountId = 20L,
+            originalDate = "2026-10-20",
+            originalAmountCents = 74_255_42L,
+            originalMerchant = "Sale of Park Ridge"
+        )
+        val regularPayoffTxn = saleTxn.copy(originalMerchant = "Mortgage Principal Payoff")
+
+        val saleCandidate = AccountClosureDetector
+            .detectCandidates(listOf(parkRidge), listOf(saleTxn), "2026-11-11")
+            .single()
+        assertEquals(AccountClosureResolution.SOLD_PROPERTY, saleCandidate.defaultResolution())
+
+        val payoffCandidate = AccountClosureDetector
+            .detectCandidates(listOf(parkRidge), listOf(regularPayoffTxn), "2026-11-11")
+            .single()
+        assertEquals(AccountClosureResolution.PAID_OFF_KEEP_PROPERTY, payoffCandidate.defaultResolution())
+
+        // Selecting another card option updates active resolution cleanly
+        val initialOverlay = ClosureUiOverlay()
+        assertEquals(
+            AccountClosureResolution.SOLD_PROPERTY,
+            AccountClosureController.selectActiveResolution(saleCandidate, initialOverlay)
+        )
+
+        val switchedOverlay = ClosureUiOverlay(
+            selectedResolutions = mapOf(20L to AccountClosureResolution.REFINANCED_KEEP_PROPERTY)
+        )
+        assertEquals(
+            AccountClosureResolution.REFINANCED_KEEP_PROPERTY,
+            AccountClosureController.selectActiveResolution(saleCandidate, switchedOverlay)
+        )
+
+        // Local preference dismissal overrides suppress prompts even on pre-038 servers
+        assertTrue(
+            AccountClosureDetector.detectCandidates(
+                accounts = listOf(parkRidge),
+                transactions = listOf(saleTxn),
+                todayIso = "2026-11-11",
+                dismissedOverrides = mapOf("20" to "2026-11-11T23:59:59")
+            ).isEmpty()
+        )
     }
 }

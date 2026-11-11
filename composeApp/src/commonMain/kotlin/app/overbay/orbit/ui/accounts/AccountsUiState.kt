@@ -8,6 +8,7 @@ import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.AccountClosureCandidate
+import app.overbay.orbit.domain.AccountClosureResolution
 import app.overbay.orbit.domain.CardCycleStatus
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardPortfolioSummary
@@ -92,6 +93,8 @@ data class AccountsUiState(
     val cardPerksWidgets: List<DashboardWidgetConfig> = OrbitPreferences.defaultCardPerksWidgets(),
     val closureCandidates: List<AccountClosureCandidate> = emptyList(),
     val activeClosurePrompt: AccountClosureCandidate? = null,
+    val selectedClosureResolution: AccountClosureResolution? = null,
+    val closureErrorMessage: String? = null,
     val isResolvingClosure: Boolean = false
 ) {
     val selectedAccount: Account?

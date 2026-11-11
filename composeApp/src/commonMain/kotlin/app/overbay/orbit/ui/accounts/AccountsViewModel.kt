@@ -159,7 +159,8 @@ class AccountsViewModel(
         val closureCandidates = AccountClosureDetector.detectCandidates(
             accounts = data.accounts,
             transactions = data.transactions,
-            todayIso = LocalDateUtils.todayIsoDate()
+            todayIso = LocalDateUtils.todayIsoDate(),
+            dismissedOverrides = data.preferences.dismissedClosurePrompts
         )
 
         AccountsUiState(
@@ -211,8 +212,11 @@ class AccountsViewModel(
             state.copy(accountGroups = updated)
         }
     }.combine(closurePrompts.overlayFlow) { state, overlay ->
+        val activePrompt = AccountClosureController.selectActivePrompt(state.closureCandidates, overlay)
         state.copy(
-            activeClosurePrompt = AccountClosureController.selectActivePrompt(state.closureCandidates, overlay),
+            activeClosurePrompt = activePrompt,
+            selectedClosureResolution = AccountClosureController.selectActiveResolution(activePrompt, overlay),
+            closureErrorMessage = overlay.errorMessage,
             isResolvingClosure = overlay.isResolving
         )
     }.flowOn(computeDispatcher).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AccountsUiState(isLoading = true))

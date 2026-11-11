@@ -1,8 +1,13 @@
 package app.overbay.orbit.ui.accounts.sheets
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,13 +17,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,8 +34,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,6 +47,7 @@ import app.overbay.orbit.domain.AccountClosureResolution
 import app.overbay.orbit.domain.ClosureReason
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -47,8 +58,12 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 @Composable
 fun AccountClosurePromptDialog(
     candidate: AccountClosureCandidate,
+    selectedResolution: AccountClosureResolution,
     isResolving: Boolean,
-    onResolve: (AccountClosureResolution) -> Unit,
+    errorMessage: String?,
+    onSelectResolution: (AccountClosureResolution) -> Unit,
+    onConfirm: () -> Unit,
+    onDismissPrompt: () -> Unit,
     onSnooze: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -146,14 +161,14 @@ fun AccountClosurePromptDialog(
                 )
 
                 ClosureChoiceCard(
-                    icon = Icons.Default.CheckCircle,
+                    icon = OrbitIcons.NetWorth,
                     title = "Sold Property",
                     subtitle = "Archive property & loan so sold home equity is removed from Net Worth (all transactions are kept).",
                     enabled = !isResolving,
-                    isPrimary = true,
+                    selected = selectedResolution == AccountClosureResolution.SOLD_PROPERTY,
                     onClick = {
-                        haptics.confirm()
-                        onResolve(AccountClosureResolution.SOLD_PROPERTY)
+                        haptics.tick()
+                        onSelectResolution(AccountClosureResolution.SOLD_PROPERTY)
                     }
                 )
 
@@ -162,9 +177,10 @@ fun AccountClosurePromptDialog(
                     title = "Paid Off — Still Own Home",
                     subtitle = "Keep \"$propertyLabel\" active in Real Estate at full property value and archive this paid-off loan.",
                     enabled = !isResolving,
+                    selected = selectedResolution == AccountClosureResolution.PAID_OFF_KEEP_PROPERTY,
                     onClick = {
-                        haptics.confirm()
-                        onResolve(AccountClosureResolution.PAID_OFF_KEEP_PROPERTY)
+                        haptics.tick()
+                        onSelectResolution(AccountClosureResolution.PAID_OFF_KEEP_PROPERTY)
                     }
                 )
 
@@ -173,51 +189,94 @@ fun AccountClosurePromptDialog(
                     title = "Refinanced Loan",
                     subtitle = "Keep \"$propertyLabel\" active so you can link your new lender's mortgage, and archive this closed loan.",
                     enabled = !isResolving,
+                    selected = selectedResolution == AccountClosureResolution.REFINANCED_KEEP_PROPERTY,
                     onClick = {
-                        haptics.confirm()
-                        onResolve(AccountClosureResolution.REFINANCED_KEEP_PROPERTY)
+                        haptics.tick()
+                        onSelectResolution(AccountClosureResolution.REFINANCED_KEEP_PROPERTY)
                     }
                 )
             } else {
                 ClosureChoiceCard(
-                    icon = Icons.Default.CheckCircle,
+                    icon = OrbitIcons.Accounts,
                     title = "Yes — Closed or Paid Off",
                     subtitle = "Archive \"${account.name}\" so it leaves active balances while preserving all historical transactions.",
                     enabled = !isResolving,
-                    isPrimary = true,
+                    selected = selectedResolution == AccountClosureResolution.SOLD_OR_CLOSED,
                     onClick = {
-                        haptics.confirm()
-                        onResolve(AccountClosureResolution.SOLD_OR_CLOSED)
+                        haptics.tick()
+                        onSelectResolution(AccountClosureResolution.SOLD_OR_CLOSED)
                     }
                 )
             }
 
+            if (!errorMessage.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = errorMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
             HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+
+            Button(
+                onClick = { haptics.confirm(); onConfirm() },
+                enabled = !isResolving,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                if (isResolving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text("Confirm", fontWeight = FontWeight.Bold)
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedButton(
-                    onClick = {
-                        haptics.tick()
-                        onSnooze()
-                    },
+                    onClick = { haptics.tick(); onSnooze() },
                     enabled = !isResolving,
-                    modifier = Modifier.weight(1f)
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.weight(1f).height(44.dp)
                 ) {
-                    Text("Ask Later")
+                    Text("Ask Later", fontWeight = FontWeight.SemiBold)
                 }
 
                 OutlinedButton(
-                    onClick = {
-                        haptics.tick()
-                        onResolve(AccountClosureResolution.DISMISS)
-                    },
+                    onClick = { haptics.tick(); onDismissPrompt() },
                     enabled = !isResolving,
-                    modifier = Modifier.weight(1f)
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.weight(1f).height(44.dp)
                 ) {
-                    Text("Still Open")
+                    Text("Still Open", fontWeight = FontWeight.SemiBold)
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -231,38 +290,54 @@ private fun ClosureChoiceCard(
     title: String,
     subtitle: String,
     enabled: Boolean,
-    isPrimary: Boolean = false,
+    selected: Boolean,
     onClick: () -> Unit
 ) {
-    val container = if (isPrimary) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val border = if (isPrimary) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-    } else {
-        OrbitTheme.colors.cardBorder
-    }
+    val colorSpring = spring<androidx.compose.ui.graphics.Color>(
+        dampingRatio = Spring.DampingRatioLowBouncy,
+        stiffness = Spring.StiffnessLow
+    )
+    val container by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+        else MaterialTheme.colorScheme.surface,
+        animationSpec = colorSpring,
+        label = "closureCardContainer"
+    )
+    val border by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder,
+        animationSpec = colorSpring,
+        label = "closureCardBorder"
+    )
 
     Surface(
+        onClick = onClick,
+        enabled = enabled,
         shape = RoundedCornerShape(12.dp),
         color = container,
-        border = BorderStroke(1.dp, border),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
+        border = BorderStroke(if (selected) 1.5.dp else 1.dp, border),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(
+                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        else MaterialTheme.colorScheme.surfaceContainerHigh
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -278,6 +353,29 @@ private fun ClosureChoiceCard(
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .then(
+                        if (selected) {
+                            Modifier.background(MaterialTheme.colorScheme.primary)
+                        } else {
+                            Modifier.border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (selected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
             }
         }
     }
