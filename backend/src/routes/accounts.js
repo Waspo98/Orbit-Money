@@ -19,6 +19,7 @@ import {
   serializeCreditCardProfile,
   upsertCreditCardProfile
 } from '../services/creditCardProfileService.js';
+import { attachInstitutionLogo, attachInstitutionLogos } from '../services/institutionLogos.js';
 
 const router = express.Router();
 
@@ -26,7 +27,7 @@ const VALID_TYPES = ['checking', 'savings', 'credit', 'investment', 'loan', 'mor
 const ACCOUNT_MONEY_FIELDS = ['current_balance', 'estimated_value'];
 
 function serializeAccount(row) {
-  return moneyFieldsToDollars(row, ACCOUNT_MONEY_FIELDS);
+  return attachInstitutionLogo(db, moneyFieldsToDollars(row, ACCOUNT_MONEY_FIELDS));
 }
 
 function previousMonthEnd(value) {
@@ -68,9 +69,9 @@ router.get('/', requireAuth, (req, res) => {
       `
       )
       .all(householdId, householdId)
-      .map(serializeAccount);
+      .map((row) => moneyFieldsToDollars(row, ACCOUNT_MONEY_FIELDS));
 
-    sendOk(res, { items: attachCreditCardProfiles(db, householdId, items) });
+    sendOk(res, { items: attachInstitutionLogos(db, attachCreditCardProfiles(db, householdId, items)) });
   } catch (err) {
     console.error('List accounts failed:', err);
     sendServerError(res, err);

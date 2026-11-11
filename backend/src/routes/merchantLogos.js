@@ -2,6 +2,10 @@ import express from 'express';
 import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
 import {
+  ensureInstitutionLogoEntryForAccount,
+  searchInstitutionLogoBrands
+} from '../services/institutionLogos.js';
+import {
   ensureMerchantLogoEntryForTransaction,
   overrideMerchantLogo,
   reportMerchantLogoStatus,
@@ -77,12 +81,20 @@ router.post('/override', requireAuth, (req, res) => {
 
 router.post('/ensure', requireAuth, (req, res) => {
   const householdId = requireHouseholdId(req);
+  const accountId = parseId(req.body?.account_id);
   const transactionId = parseId(req.body?.transaction_id);
-  if (transactionId === null || transactionId <= 0) {
-    return sendBadRequest(res, 'transaction_id is required.');
+
+  if ((accountId === null || accountId <= 0) && (transactionId === null || transactionId <= 0)) {
+    return sendBadRequest(res, 'transaction_id or account_id is required.');
   }
 
   try {
+    if (accountId !== null && accountId > 0) {
+      const result = ensureInstitutionLogoEntryForAccount(db, accountId, householdId);
+      if (!result.found) return sendNotFound(res, 'Account not found.');
+      return sendOk(res, { success: true, merchant_logo: result.merchant_logo });
+    }
+
     const result = ensureMerchantLogoEntryForTransaction(db, transactionId, householdId);
     if (!result.found) {
       return sendNotFound(res, 'Transaction not found.');
@@ -99,19 +111,22 @@ router.post('/ensure', requireAuth, (req, res) => {
 
 router.post('/search', requireAuth, async (req, res) => {
   const householdId = requireHouseholdId(req);
+  const accountId = parseId(req.body?.account_id);
   const transactionId = parseId(req.body?.transaction_id);
   const query = String(req.body?.query || '').trim();
-  if (transactionId === null || transactionId <= 0) {
-    return sendBadRequest(res, 'transaction_id is required.');
+  if ((accountId === null || accountId <= 0) && (transactionId === null || transactionId <= 0)) {
+    return sendBadRequest(res, 'transaction_id or account_id is required.');
   }
   if (!query) {
     return sendBadRequest(res, 'query is required.');
   }
 
   try {
-    const result = await searchMerchantLogoBrands(db, { transactionId, query, householdId });
+    const result = accountId !== null && accountId > 0
+      ? await searchInstitutionLogoBrands(db, { accountId, query, householdId })
+      : await searchMerchantLogoBrands(db, { transactionId, query, householdId });
     if (!result.found) {
-      return sendNotFound(res, 'Transaction not found.');
+      return sendNotFound(res, accountId ? 'Account not found.' : 'Transaction not found.');
     }
     sendOk(res, {
       success: true,

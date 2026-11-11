@@ -60,7 +60,7 @@ export function merchantLogoKey(value) {
     .replace(/\s+/g, '-');
 }
 
-function extractDomain(value) {
+export function extractDomain(value) {
   const match = DOMAIN_RE.exec(String(value || '').toLowerCase());
   if (!match) return null;
   const domain = match[1].replace(/^www\./, '');
@@ -99,7 +99,7 @@ function isCuratedMerchantName(row, query) {
   );
 }
 
-function logoDevUrl(query, includeToken = false, lookup = 'name') {
+export function logoDevUrl(query, includeToken = false, lookup = 'name') {
   const params = new URLSearchParams({
     size: '96',
     retina: 'true',
@@ -113,7 +113,7 @@ function logoDevUrl(query, includeToken = false, lookup = 'name') {
   return `https://img.logo.dev/${path}?${params.toString()}`;
 }
 
-function publicLogoDevUrl(query, lookup = 'name') {
+export function publicLogoDevUrl(query, lookup = 'name') {
   if (!config.logoDevPublishableKey) return null;
   return logoDevUrl(query, true, lookup);
 }
@@ -156,7 +156,7 @@ function merchantIdentityForRow(row) {
   };
 }
 
-function formatCachedLogo(cached) {
+export function formatCachedLogo(cached) {
   if (!cached) return null;
   const hasLogo =
     cached.logo_url &&
@@ -180,7 +180,7 @@ function formatCachedLogo(cached) {
   };
 }
 
-function ensureCandidates(db, candidates) {
+export function ensureCandidates(db, candidates) {
   if (candidates.length === 0) return;
 
   const insert = db.prepare(`
