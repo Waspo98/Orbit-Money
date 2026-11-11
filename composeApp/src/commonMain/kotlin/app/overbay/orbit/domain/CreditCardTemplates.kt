@@ -449,39 +449,61 @@ object CreditCardTemplates {
         _catalogFlow.value = BUNDLED
     }
 
+    fun resolveTemplate(cardName: String?, issuerName: String? = null): CreditCardTemplate? {
+        val rawName = cardName?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val normInput = normalizeCardLookup(rawName, issuerName)
+        if (normInput.isBlank()) return null
+
+        val catalog = _catalogFlow.value
+        val exact = catalog.firstOrNull { tpl ->
+            tpl.id.equals(rawName, ignoreCase = true) ||
+                tpl.cardName.equals(rawName, ignoreCase = true) ||
+                tpl.shortLabel.equals(rawName, ignoreCase = true) ||
+                normalizeCardLookup(tpl.cardName, tpl.issuerName) == normInput ||
+                normalizeCardLookup(tpl.shortLabel, tpl.issuerName) == normInput
+        }
+        if (exact != null) return exact
+
+        val isChase = rawName.contains("chase", ignoreCase = true) ||
+            issuerName?.contains("chase", ignoreCase = true) == true
+        if (normInput == "freedom" && isChase) {
+            catalog.firstOrNull { it.id == "chase_freedom_classic" }?.let { return it }
+        }
+
+        val withArtworkMatch = catalog.firstOrNull { tpl ->
+            if (tpl.artworkUrl.isNullOrBlank()) return@firstOrNull false
+            val tplNorm = normalizeCardLookup(tpl.cardName, tpl.issuerName)
+            tplNorm.length >= 5 && normInput.length >= 5 && (normInput.contains(tplNorm) || tplNorm.contains(normInput))
+        }
+        if (withArtworkMatch != null) return withArtworkMatch
+
+        return catalog.firstOrNull { tpl ->
+            val tplNorm = normalizeCardLookup(tpl.cardName, tpl.issuerName)
+            tplNorm.length >= 5 && normInput.length >= 5 && (normInput.contains(tplNorm) || tplNorm.contains(normInput))
+        }
+    }
+
     fun resolveArtworkUrl(explicitUrl: String?, cardName: String?, issuerName: String? = null): String? {
         val cleanExplicit = explicitUrl?.trim()?.takeIf { it.isNotBlank() }
         if (cleanExplicit != null && !cleanExplicit.contains("/api/card-catalog/")) {
             return cleanExplicit
         }
-        val rawName = cardName?.trim()?.takeIf { it.isNotBlank() } ?: return cleanExplicit
-        val normInput = normalizeCardLookup(rawName, issuerName)
-        if (normInput.isBlank()) return cleanExplicit
-
-        val catalog = _catalogFlow.value
-        val exact = catalog.firstOrNull { tpl ->
-            !tpl.artworkUrl.isNullOrBlank() && (
-                tpl.id.equals(rawName, ignoreCase = true) ||
-                    tpl.cardName.equals(rawName, ignoreCase = true) ||
-                    tpl.shortLabel.equals(rawName, ignoreCase = true) ||
-                    normalizeCardLookup(tpl.cardName, tpl.issuerName) == normInput ||
-                    normalizeCardLookup(tpl.shortLabel, tpl.issuerName) == normInput
-                )
+        val matched = resolveTemplate(cardName, issuerName)
+        if (matched != null) {
+            return matched.artworkUrl?.takeIf { it.isNotBlank() } ?: cleanExplicit
         }
-        if (exact != null) return exact.artworkUrl
-
-        val containsMatch = catalog.firstOrNull { tpl ->
-            if (tpl.artworkUrl.isNullOrBlank()) return@firstOrNull false
-            val tplNorm = normalizeCardLookup(tpl.cardName, tpl.issuerName)
-            tplNorm.length >= 4 && (normInput.contains(tplNorm) || tplNorm.contains(normInput))
-        }
-        return containsMatch?.artworkUrl ?: cleanExplicit
+        return cleanExplicit
     }
 
     private fun normalizeCardLookup(name: String, issuer: String?): String {
         var s = name.lowercase().trim()
+        s = s.replace(Regex("\\([^)]*\\d{3,6}[^)]*\\)"), " ")
+            .replace(Regex("\\[[^\\]]*\\d{3,6}[^\\]]*]"), " ")
+            .replace(Regex("(?:ending in|[•*x·]{2,}|#|-\\s*)\\s*\\d{3,6}\\b"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
         val prefixes = listOf(
-            "american express ", "amex ", "chase ", "capital one ", "citi ", "citibank ",
+            "american express ", "amex ", "chase bank ", "chase ", "capital one ", "citibank ", "citi ",
             "bank of america ", "bofa ", "wells fargo ", "u.s. bank ", "us bank ", "barclays ", "discover "
         )
         for (p in prefixes) {
@@ -489,7 +511,7 @@ object CreditCardTemplates {
                 s = s.removePrefix(p).trim()
             }
         }
-        issuer?.lowercase()?.trim()?.takeIf { it.isNotBlank() }?.let { iss ->
+        issuer?.lowercase()?.trim()?.removeSuffix(" bank")?.trim()?.takeIf { it.isNotBlank() }?.let { iss ->
             if (s.startsWith("$iss ")) s = s.removePrefix("$iss ").trim()
         }
         s = s.removeSuffix(" credit card").removeSuffix(" card").trim()

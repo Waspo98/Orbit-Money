@@ -49,6 +49,7 @@ data class AccountDto(
     @SerialName("mha_default_eligible") @Serializable(with = FlexibleBooleanSerializer::class) val mhaDefaultEligible: Boolean = false,
     @SerialName("simplefin_account_id") val simplefinAccountId: String? = null,
     @SerialName("credit_card_profile") val creditCardProfile: CreditCardProfileDto? = null,
+    @SerialName("institution_logo") val institutionLogo: MerchantLogoDto? = null,
     @SerialName("transaction_count") val transactionCount: Int = 0
 ) {
     fun toDomain(): Account = Account(
@@ -65,6 +66,7 @@ data class AccountDto(
         mhaDefaultEligible = mhaDefaultEligible,
         simplefinAccountId = simplefinAccountId,
         creditCardProfile = creditCardProfile?.toDomain(),
+        institutionLogo = institutionLogo?.toDomain(),
         transactionCount = transactionCount
     )
 }

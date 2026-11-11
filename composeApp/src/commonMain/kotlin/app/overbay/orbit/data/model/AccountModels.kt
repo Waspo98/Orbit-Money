@@ -49,10 +49,25 @@ data class Account(
     val sortOrder: Int = 0,
     val mhaDefaultEligible: Boolean = false,
     val creditCardProfile: CreditCardProfile? = null,
+    val institutionLogo: MerchantLogo? = null,
     val transactionCount: Int = 0,
     val createdAt: String = "",
     val updatedAt: String = ""
 ) {
+    val resolvedInstitutionLogoKey: String
+        get() = institutionLogo?.merchantKey?.takeIf { it.isNotBlank() }
+            ?: institution?.let { merchantLogoKey(it) }?.takeIf { it.isNotBlank() }?.let { "inst:$it" }
+            ?: "inst:acct-$id"
+
+    val effectiveInstitutionLogoUrl: String?
+        get() {
+            val cached = institutionLogo
+            if (cached != null) {
+                if (cached.status == "hidden" || cached.status == "failed") return null
+                return cached.url?.takeIf { it.isNotBlank() }
+            }
+            return InstitutionLogoDefaults.fallbackUrlFor(institution)
+        }
     /**
      * Home equity calculated for mortgage accounts with an estimated property value.
      */
@@ -219,3 +234,85 @@ data class BalanceRecord(
     val createdAt: String = "",
     val updatedAt: String = ""
 )
+
+object InstitutionLogoDefaults {
+    private val DOMAIN_BY_NAME: Map<String, String> = mapOf(
+        "chase" to "chase.com",
+        "chase bank" to "chase.com",
+        "jpmorgan" to "chase.com",
+        "jpmorgan chase" to "chase.com",
+        "betterment" to "betterment.com",
+        "fidelity" to "fidelity.com",
+        "fidelity investments" to "fidelity.com",
+        "vanguard" to "vanguard.com",
+        "schwab" to "schwab.com",
+        "charles schwab" to "schwab.com",
+        "ally" to "ally.com",
+        "ally bank" to "ally.com",
+        "sofi" to "sofi.com",
+        "capital one" to "capitalone.com",
+        "american express" to "americanexpress.com",
+        "amex" to "americanexpress.com",
+        "bank of america" to "bankofamerica.com",
+        "bofa" to "bankofamerica.com",
+        "wells fargo" to "wellsfargo.com",
+        "citi" to "citi.com",
+        "citibank" to "citi.com",
+        "discover" to "discover.com",
+        "wealthfront" to "wealthfront.com",
+        "marcus" to "marcus.com",
+        "goldman sachs" to "marcus.com",
+        "usaa" to "usaa.com",
+        "navy federal" to "navyfederal.org",
+        "navy federal credit union" to "navyfederal.org",
+        "us bank" to "usbank.com",
+        "u s bank" to "usbank.com",
+        "pnc" to "pnc.com",
+        "pnc bank" to "pnc.com",
+        "td bank" to "td.com",
+        "truist" to "truist.com",
+        "fifth third" to "53.com",
+        "huntington" to "huntington.com",
+        "citizens" to "citizensbank.com",
+        "bmo" to "bmo.com",
+        "synchrony" to "synchrony.com",
+        "barclays" to "barclaysus.com",
+        "robinhood" to "robinhood.com",
+        "coinbase" to "coinbase.com",
+        "m1 finance" to "m1.com",
+        "etrade" to "etrade.com",
+        "e trade" to "etrade.com",
+        "merrill" to "ml.com",
+        "empower" to "empower.com",
+        "personal capital" to "empower.com",
+        "principal" to "principal.com",
+        "tiaa" to "tiaa.org",
+        "paypal" to "paypal.com",
+        "venmo" to "venmo.com",
+        "apple" to "apple.com",
+        "rocket mortgage" to "rocketmortgage.com",
+        "mr cooper" to "mrcooper.com",
+        "pennymac" to "pennymac.com",
+        "alliant" to "alliantcreditunion.org",
+        "becu" to "becu.org",
+        "penfed" to "penfed.org",
+        "chime" to "chime.com"
+    )
+
+    fun resolveDomain(institution: String?): String? {
+        val raw = institution?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val norm = raw.lowercase()
+            .replace("&", " and ")
+            .replace(Regex("[^a-z0-9]+"), " ")
+            .trim()
+        if (norm.isBlank()) return null
+        DOMAIN_BY_NAME[norm]?.let { return it }
+        val stripped = norm.replace(Regex("\\s+(bank|financial|investments|savings|mortgage)$"), "").trim()
+        return DOMAIN_BY_NAME[stripped]
+    }
+
+    fun fallbackUrlFor(institution: String?): String? {
+        val domain = resolveDomain(institution) ?: return null
+        return "https://www.google.com/s2/favicons?domain=$domain&sz=128"
+    }
+}

@@ -250,7 +250,24 @@ suspend fun OrbitApiClient.ensureMerchantLogo(transactionId: Long): Result<Merch
 
 suspend fun OrbitApiClient.searchMerchantLogos(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> = runCatching {
     val res = client.post(url("/api/merchant-logos/search")) {
-        contentType(ContentType.Application.Json); auth(sessionCookie); setBody(MerchantLogoSearchRequestDto(transactionId, query))
+        contentType(ContentType.Application.Json); auth(sessionCookie); setBody(MerchantLogoSearchRequestDto(transactionId = transactionId, query = query))
+    }
+    extractSessionCookie(res); ensureSuccess(res)
+    res.body<MerchantLogoSearchResponseDto>()
+}
+
+suspend fun OrbitApiClient.ensureAccountInstitutionLogo(accountId: Long): Result<MerchantLogoDto> = runCatching {
+    val res = client.post(url("/api/merchant-logos/ensure")) {
+        contentType(ContentType.Application.Json); auth(sessionCookie); setBody(MerchantLogoEnsureRequestDto(accountId = accountId))
+    }
+    extractSessionCookie(res); ensureSuccess(res)
+    res.body<MerchantLogoMutationResponseDto>().merchantLogo
+        ?: throw IllegalStateException("Could not initialize logo entry for this account.")
+}
+
+suspend fun OrbitApiClient.searchAccountInstitutionLogos(accountId: Long, query: String): Result<MerchantLogoSearchResponseDto> = runCatching {
+    val res = client.post(url("/api/merchant-logos/search")) {
+        contentType(ContentType.Application.Json); auth(sessionCookie); setBody(MerchantLogoSearchRequestDto(query = query, accountId = accountId))
     }
     extractSessionCookie(res); ensureSuccess(res)
     res.body<MerchantLogoSearchResponseDto>()

@@ -171,4 +171,29 @@ class CreditCardCatalogAuditTest {
         assertEquals("\$250 Cash Bonus", resolved.defaultSubRewardText)
         assertEquals(250_00L, resolved.defaultSubEstimatedValueCents)
     }
+
+    @Test
+    fun resolveTemplateStripsSimpleFinAccountMasksWithoutCrossCardCollision() {
+        val cfuArt = CreditCardTemplates.resolveArtworkUrl(
+            explicitUrl = null,
+            cardName = "Chase Freedom Unlimited (9876)",
+            issuerName = "Chase Bank"
+        )
+        assertEquals("https://www.offeroptimist.com/images/chase/freedom-unlimited.png", cfuArt)
+
+        val classicTpl = CreditCardTemplates.resolveTemplate(
+            cardName = "Chase Freedom (4085)",
+            issuerName = "Chase Bank"
+        )
+        assertNotNull(classicTpl)
+        assertEquals("chase_freedom_classic", classicTpl.id)
+        assertEquals("hex://#13315C:#1E40AF:#FFFFFF", classicTpl.imageUrl)
+
+        val classicArt = CreditCardTemplates.resolveArtworkUrl(
+            explicitUrl = null,
+            cardName = "Chase Freedom (4085)",
+            issuerName = "Chase Bank"
+        )
+        assertEquals(null, classicArt)
+    }
 }

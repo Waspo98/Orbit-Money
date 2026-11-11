@@ -424,8 +424,11 @@ class OrbitRepository(
         val updatedList = if (exists) current.map { if (it.id == account.id) savedLocal else it } else current + savedLocal
         commitSnapshot(_snapshot.value.copy(accounts = updatedList))
         val pushed = activeEngine.pushAccount(if (exists) account else account.copy(id = 0L)).getOrNull()
-        return if (pushed != null && pushed.id > 0L && pushed.id != localId) {
-            val synced = savedLocal.copy(id = pushed.id)
+        return if (pushed != null && ((pushed.id > 0L && pushed.id != localId) || pushed.institutionLogo != savedLocal.institutionLogo)) {
+            val synced = savedLocal.copy(
+                id = if (pushed.id > 0L) pushed.id else localId,
+                institutionLogo = pushed.institutionLogo ?: savedLocal.institutionLogo
+            )
             commitSnapshot(_snapshot.value.copy(accounts = _accounts.value.map { if (it.id == localId) synced else it }))
             synced
         } else savedLocal

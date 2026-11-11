@@ -460,7 +460,10 @@ data class MerchantLogoCandidateDto(val name: String = "", val domain: String = 
 data class MerchantLogoReportRequestDto(@SerialName("merchant_key") val merchantKey: String, val status: String)
 
 @Serializable
-data class MerchantLogoEnsureRequestDto(@SerialName("transaction_id") val transactionId: Long)
+data class MerchantLogoEnsureRequestDto(
+    @SerialName("transaction_id") val transactionId: Long? = null,
+    @SerialName("account_id") val accountId: Long? = null
+)
 
 @Serializable
 data class MerchantLogoOverrideRequestDto(
@@ -469,7 +472,11 @@ data class MerchantLogoOverrideRequestDto(
 )
 
 @Serializable
-data class MerchantLogoSearchRequestDto(@SerialName("transaction_id") val transactionId: Long, val query: String)
+data class MerchantLogoSearchRequestDto(
+    @SerialName("transaction_id") val transactionId: Long? = null,
+    val query: String,
+    @SerialName("account_id") val accountId: Long? = null
+)
 
 @Serializable
 data class MerchantLogoMutationResponseDto(val success: Boolean = true, @SerialName("merchant_logo") val merchantLogo: MerchantLogoDto? = null)
