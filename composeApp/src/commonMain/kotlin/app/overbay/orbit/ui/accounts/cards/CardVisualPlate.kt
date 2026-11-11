@@ -16,6 +16,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.domain.CreditCardTemplates
 import app.overbay.orbit.theme.CardArtPalette
 
 /**
@@ -41,8 +43,11 @@ fun CardVisualPlate(
     modifier: Modifier = Modifier
 ) {
     val artworkBitmap = rememberCardArtworkBitmap(artworkUrl, name, issuer)
+    val effectiveArtKey = remember(artKey, name, issuer) {
+        artKey?.takeIf { it.isNotBlank() } ?: CreditCardTemplates.resolveTemplate(name, issuer)?.imageUrl
+    }
     val (targetStart, targetEnd, targetText) = CardArtPalette.resolveColors(
-        key = artKey,
+        key = effectiveArtKey,
         fallbackStart = MaterialTheme.colorScheme.primary,
         fallbackEnd = MaterialTheme.colorScheme.tertiary,
         fallbackText = MaterialTheme.colorScheme.onPrimary

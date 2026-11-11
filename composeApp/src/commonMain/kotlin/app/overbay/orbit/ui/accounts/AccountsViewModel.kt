@@ -48,6 +48,7 @@ class AccountsViewModel(
 ) : ViewModel() {
 
     val cardEditor = CardEditorController(repository)
+    val accountLogos = AccountLogoController(repository, viewModelScope)
 
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
     private val _editingAccount = MutableStateFlow<Account?>(null)
@@ -174,6 +175,8 @@ class AccountsViewModel(
         )
     }.combine(_isPhoneViewingDetail) { state, phoneDetail -> state.copy(isPhoneViewingDetail = phoneDetail)
     }.combine(_perkUsageTarget) { state, target -> state.copy(perkUsageTarget = target)
+    }.combine(accountLogos.logoFinderAccount) { state, acct ->
+        state.copy(logoFinderAccount = acct?.let { target -> state.accounts.find { it.id == target.id } ?: target })
     }.combine(combine(hubUiControlFlow, creditCardsHubFlow) { ctrl, hub -> ctrl to hub }) { state, (ctrl, hub) ->
         state.copy(
             showUsedPerks = ctrl.showUsedPerks,

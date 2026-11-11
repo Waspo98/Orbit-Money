@@ -18,12 +18,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,11 +48,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Native Compose Multiplatform modal sheet for finding and overriding vendor/merchant logos.
- * Port of main's LogoFinderModal / ImageUrlFinderModal with Logo.dev brand search,
- * direct image URL input, live logo preview, DuckDuckGo image search, and category icon fallback.
- *
+ * Shared across Transactions (merchant brandmarks) and Accounts (institution brandmarks).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MerchantLogoFinderDialog(
     transaction: Transaction,
@@ -63,20 +58,50 @@ fun MerchantLogoFinderDialog(
     onUseCategoryIcon: suspend () -> Result<Unit>,
     onDismiss: () -> Unit
 ) {
+    val initialQuery = remember(transaction.id) {
+        transaction.effectiveMerchant.ifBlank { transaction.merchantLogo?.merchantName ?: "" }
+    }
+    BrandLogoFinderDialog(
+        targetKey = "txn:${transaction.id}",
+        subjectName = transaction.effectiveMerchant.ifBlank { "this merchant" },
+        initialQuery = initialQuery,
+        initialImageUrl = transaction.merchantLogo?.url,
+        searchFieldLabel = "Merchant Search",
+        searchPlaceholder = "Merchant name",
+        fallbackButtonLabel = "Use Category Icon",
+        onSearchBrands = onSearchBrands,
+        onSaveLogoUrl = onSaveLogoUrl,
+        onUseFallbackIcon = onUseCategoryIcon,
+        onDismiss = onDismiss
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BrandLogoFinderDialog(
+    targetKey: Any,
+    subjectName: String,
+    initialQuery: String,
+    initialImageUrl: String?,
+    searchFieldLabel: String = "Brand Search",
+    searchPlaceholder: String = "Brand or bank name",
+    fallbackButtonLabel: String = "Use Account Icon",
+    onSearchBrands: suspend (query: String) -> Result<MerchantLogoSearchResponseDto>,
+    onSaveLogoUrl: suspend (logoUrl: String) -> Result<Unit>,
+    onUseFallbackIcon: suspend () -> Result<Unit>,
+    onDismiss: () -> Unit
+) {
     val haptics = LocalOrbitHaptics.current
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
 
-    val initialQuery = remember(transaction.id) {
-        transaction.effectiveMerchant.ifBlank { transaction.merchantLogo?.merchantName ?: "" }
-    }
-    var query by remember(transaction.id) { mutableStateOf(initialQuery) }
-    var imageUrl by remember(transaction.id) { mutableStateOf(transaction.merchantLogo?.url ?: "") }
-    var candidates by remember(transaction.id) { mutableStateOf<List<MerchantLogoCandidateDto>>(emptyList()) }
-    var searching by remember(transaction.id) { mutableStateOf(false) }
-    var saving by remember(transaction.id) { mutableStateOf(false) }
-    var hasSearched by remember(transaction.id) { mutableStateOf(false) }
-    var errorMessage by remember(transaction.id) { mutableStateOf<String?>(null) }
+    var query by remember(targetKey) { mutableStateOf(initialQuery) }
+    var imageUrl by remember(targetKey) { mutableStateOf(initialImageUrl ?: "") }
+    var candidates by remember(targetKey) { mutableStateOf<List<MerchantLogoCandidateDto>>(emptyList()) }
+    var searching by remember(targetKey) { mutableStateOf(false) }
+    var saving by remember(targetKey) { mutableStateOf(false) }
+    var hasSearched by remember(targetKey) { mutableStateOf(false) }
+    var errorMessage by remember(targetKey) { mutableStateOf<String?>(null) }
 
     fun triggerSearch(searchQuery: String = query) {
         val trimmed = searchQuery.trim()
@@ -92,7 +117,7 @@ fun MerchantLogoFinderDialog(
             hasSearched = true
             res.onSuccess { dto ->
                 candidates = dto.candidates.filter { !it.logoUrl.isNullOrBlank() }
-                if (!dto.configured) {
+                if (!dto.configured && candidates.isEmpty()) {
                     errorMessage = "Logo search is not configured on this server yet. Paste a direct image URL below."
                 }
             }.onFailure { err ->
@@ -102,14 +127,14 @@ fun MerchantLogoFinderDialog(
         }
     }
 
-    LaunchedEffect(transaction.id) {
+    LaunchedEffect(targetKey) {
         if (initialQuery.isNotBlank()) {
             triggerSearch(initialQuery)
         }
     }
 
     fun openDuckDuckGoImages() {
-        val searchBase = query.trim().ifBlank { transaction.effectiveMerchant.ifBlank { "merchant" } }
+        val searchBase = query.trim().ifBlank { subjectName.ifBlank { "bank" } }
         val encoded = "$searchBase logo".encodeURLQueryComponent()
         runCatching {
             uriHandler.openUri("https://duckduckgo.com/?q=$encoded&iar=images&iax=images&ia=images")
@@ -135,14 +160,13 @@ fun MerchantLogoFinderDialog(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Search brand logos for ${transaction.effectiveMerchant}, or paste a direct image URL.",
+                text = "Search brand logos for $subjectName, or paste a direct image URL.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Search Input + Search Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -151,8 +175,8 @@ fun MerchantLogoFinderDialog(
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text("Merchant Search") },
-                    placeholder = { Text("Merchant name") },
+                    label = { Text(searchFieldLabel) },
+                    placeholder = { Text(searchPlaceholder) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { triggerSearch(query) }),
@@ -202,21 +226,22 @@ fun MerchantLogoFinderDialog(
 
             MerchantLogoPreviewAndToolsRow(
                 imageUrl = imageUrl,
-                merchantInitial = transaction.effectiveMerchant.take(1).uppercase().ifBlank { "$" },
+                merchantInitial = subjectName.take(1).uppercase().ifBlank { "$" },
                 saving = saving,
                 onOpenDuckDuckGoImages = ::openDuckDuckGoImages,
                 onUseCategoryIcon = {
                     scope.launch {
                         saving = true
                         errorMessage = null
-                        onUseCategoryIcon()
+                        onUseFallbackIcon()
                             .onSuccess { onDismiss() }
                             .onFailure { err ->
                                 saving = false
-                                errorMessage = err.message ?: "Could not switch to category icon."
+                                errorMessage = err.message ?: "Could not switch to fallback icon."
                             }
                     }
-                }
+                },
+                fallbackButtonLabel = fallbackButtonLabel
             )
 
             if (errorMessage != null) {

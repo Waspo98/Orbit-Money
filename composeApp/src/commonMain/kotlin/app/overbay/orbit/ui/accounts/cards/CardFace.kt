@@ -59,54 +59,91 @@ fun CardArtworkThumbnail(
     issuer: String?,
     artKey: String?,
     artworkUrl: String?,
+    last4: String? = null,
+    showLabels: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val artworkBitmap = rememberCardArtworkBitmap(artworkUrl, name, issuer)
+    val effectiveArtKey = remember(artKey, name, issuer) {
+        artKey?.takeIf { it.isNotBlank() } ?: CreditCardTemplates.resolveTemplate(name, issuer)?.imageUrl
+    }
 
     val (startColor, endColor, textColor) = CardArtPalette.resolveColors(
-        key = artKey,
+        key = effectiveArtKey,
         fallbackStart = MaterialTheme.colorScheme.primary,
         fallbackEnd = MaterialTheme.colorScheme.tertiary,
         fallbackText = MaterialTheme.colorScheme.onPrimary
     )
 
+    val cornerRadius = if (showLabels) 6.dp else 4.dp
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(6.dp),
-        shadowElevation = 2.dp,
+        shape = RoundedCornerShape(cornerRadius),
+        shadowElevation = if (showLabels) 2.dp else 0.dp,
         border = BorderStroke(0.75.dp, textColor.copy(alpha = 0.22f))
     ) {
         val loadedBitmap = artworkBitmap
         if (loadedBitmap != null) {
             Image(
                 bitmap = loadedBitmap,
-                contentDescription = name,
+                contentDescription = if (showLabels) name else null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
+        } else if (!showLabels) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Brush.linearGradient(listOf(startColor, endColor)))
+                    .padding(3.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .size(width = 6.dp, height = 4.5.dp)
+                        .clip(RoundedCornerShape(1.5.dp))
+                        .background(textColor.copy(alpha = 0.38f))
+                )
+            }
         } else {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Brush.linearGradient(listOf(startColor, endColor)))
-                    .padding(5.dp),
-                contentAlignment = Alignment.BottomStart
+                    .padding(horizontal = 5.dp, vertical = 4.dp)
             ) {
+                issuer?.takeIf { it.isNotBlank() }?.let { iss ->
+                    Text(
+                        text = iss.removeSuffix(" Bank").take(8).uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 6.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.4.sp,
+                        color = textColor.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
+                        .padding(top = 2.dp)
                         .size(width = 11.dp, height = 8.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(textColor.copy(alpha = 0.32f))
+                        .background(textColor.copy(alpha = 0.34f))
                 )
+                val bottomLabel = last4?.takeIf { it.isNotBlank() }?.let { "•• $it" }
+                    ?: name.take(12)
                 Text(
-                    text = name.take(12),
+                    text = bottomLabel,
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = 7.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = textColor,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.align(Alignment.BottomStart)
                 )
             }
         }

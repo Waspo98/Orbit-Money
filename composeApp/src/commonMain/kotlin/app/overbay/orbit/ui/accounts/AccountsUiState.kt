@@ -84,6 +84,7 @@ data class AccountsUiState(
     val showUsedPerks: Boolean = false,
     val showWhichCardWhere: Boolean = false,
     val selectedRewardCategory: String? = null,
+    val logoFinderAccount: Account? = null,
     val cardPerksWidgets: List<DashboardWidgetConfig> = OrbitPreferences.defaultCardPerksWidgets()
 ) {
     val selectedAccount: Account?

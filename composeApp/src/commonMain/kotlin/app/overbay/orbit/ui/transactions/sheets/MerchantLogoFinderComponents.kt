@@ -98,7 +98,8 @@ internal fun MerchantLogoPreviewAndToolsRow(
     merchantInitial: String,
     saving: Boolean,
     onOpenDuckDuckGoImages: () -> Unit,
-    onUseCategoryIcon: () -> Unit
+    onUseCategoryIcon: () -> Unit,
+    fallbackButtonLabel: String = "Use Category Icon"
 ) {
     val haptics = LocalOrbitHaptics.current
     Row(
@@ -157,7 +158,7 @@ internal fun MerchantLogoPreviewAndToolsRow(
                 shape = CircleShape,
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
             ) {
-                Text("Use Category Icon", fontSize = 12.sp)
+                Text(fallbackButtonLabel, fontSize = 12.sp)
             }
         }
     }
