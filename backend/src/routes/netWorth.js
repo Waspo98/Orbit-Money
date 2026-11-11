@@ -20,19 +20,41 @@ function addMonths(key, amount) {
   return addMonthsToLocalMonth(key, amount);
 }
 
-function contributionForAccount(account, balance) {
+function isPropertyAnchor(account) {
+  return (
+    account.is_property === 1 ||
+    (account.type === 'mortgage' && account.estimated_value != null && !account.linked_property_account_id)
+  );
+}
+
+function contributionForAccount(account, balance, activeAnchorIds = null) {
   const value = Number(balance) || 0;
+  if (account.is_property === 1) {
+    return Number(account.estimated_value) || value || 0;
+  }
+  if (account.linked_property_account_id && (!activeAnchorIds || activeAnchorIds.has(account.linked_property_account_id))) {
+    return -Math.abs(value);
+  }
   if (account.type === 'mortgage') {
     const estimatedValue = Number(account.estimated_value) || 0;
     return estimatedValue - Math.abs(value);
   }
+  if (CREDIT_TYPES.has(account.type) || LOAN_TYPES.has(account.type)) {
+    return -Math.abs(value);
+  }
   return value;
 }
 
-function categoryForAccount(account) {
+function categoryForAccount(account, activeAnchorIds = null) {
+  if (
+    account.is_property === 1 ||
+    account.type === 'mortgage' ||
+    (account.linked_property_account_id && (!activeAnchorIds || activeAnchorIds.has(account.linked_property_account_id)))
+  ) {
+    return 'realEstate';
+  }
   if (CASH_TYPES.has(account.type)) return 'cash';
   if (INVESTMENT_TYPES.has(account.type)) return 'investments';
-  if (account.type === 'mortgage') return 'realEstate';
   if (CREDIT_TYPES.has(account.type)) return 'credit';
   if (LOAN_TYPES.has(account.type)) return 'loans';
   return 'other';
@@ -52,37 +74,79 @@ function emptyTotals() {
   };
 }
 
-function addContribution(totals, account, contribution) {
-  const bucket = categoryForAccount(account);
-  totals[bucket] += contribution;
+function accumulateSnapshotTotals(accounts, getBalance) {
+  const totals = emptyTotals();
+  const anchors = accounts.filter(isPropertyAnchor);
+  const activeAnchorIds = new Set(anchors.map((a) => a.id));
+  const childrenByAnchor = new Map();
 
-  if (bucket === 'credit' || bucket === 'loans') {
-    totals.liabilities += Math.abs(Math.min(0, contribution));
-  } else if (contribution >= 0) {
-    totals.assets += contribution;
-  } else {
-    totals.liabilities += Math.abs(contribution);
+  for (const acct of accounts) {
+    if (acct.linked_property_account_id && activeAnchorIds.has(acct.linked_property_account_id)) {
+      if (!childrenByAnchor.has(acct.linked_property_account_id)) {
+        childrenByAnchor.set(acct.linked_property_account_id, []);
+      }
+      childrenByAnchor.get(acct.linked_property_account_id).push(acct);
+    }
   }
 
-  totals.netWorth += contribution;
+  for (const anchor of anchors) {
+    const anchorBal = Number(getBalance(anchor)) || 0;
+    const propVal = anchor.is_property === 1
+      ? (Number(anchor.estimated_value) || anchorBal || 0)
+      : (Number(anchor.estimated_value) || 0);
+    let debt = anchor.type === 'mortgage' ? Math.abs(anchorBal) : 0;
+    for (const child of childrenByAnchor.get(anchor.id) || []) {
+      debt += Math.abs(Number(getBalance(child)) || 0);
+    }
+    const equity = propVal - debt;
+    totals.realEstate += equity;
+    if (equity >= 0) {
+      totals.assets += equity;
+    } else {
+      totals.liabilities += Math.abs(equity);
+    }
+    totals.netWorth += equity;
+  }
+
+  for (const account of accounts) {
+    if (activeAnchorIds.has(account.id)) continue;
+    if (account.linked_property_account_id && activeAnchorIds.has(account.linked_property_account_id)) continue;
+
+    const contribution = contributionForAccount(account, getBalance(account), activeAnchorIds);
+    const bucket = categoryForAccount(account, activeAnchorIds);
+    totals[bucket] += contribution;
+
+    if (bucket === 'credit' || bucket === 'loans') {
+      totals.liabilities += Math.abs(Math.min(0, contribution));
+    } else if (contribution >= 0) {
+      totals.assets += contribution;
+    } else {
+      totals.liabilities += Math.abs(contribution);
+    }
+
+    totals.netWorth += contribution;
+  }
+
+  return { totals, activeAnchorIds };
 }
 
 function buildCurrentSummary(accounts) {
-  const totals = emptyTotals();
+  const { totals, activeAnchorIds } = accumulateSnapshotTotals(accounts, (a) => a.current_balance);
   const breakdown = [];
 
   for (const account of accounts) {
-    const contribution = contributionForAccount(account, account.current_balance);
-    addContribution(totals, account, contribution);
+    const contribution = contributionForAccount(account, account.current_balance, activeAnchorIds);
     breakdown.push({
       id: account.id,
       name: account.name,
       type: account.type,
       institution: account.institution,
+      is_property: account.is_property ?? 0,
+      linked_property_account_id: account.linked_property_account_id ?? null,
       current_balance: account.current_balance,
       estimated_value: account.estimated_value,
       contribution,
-      category: categoryForAccount(account)
+      category: categoryForAccount(account, activeAnchorIds)
     });
   }
 
@@ -129,13 +193,10 @@ function buildHistory(accounts, monthlyDeltas, balanceRecords, firstMonth, lates
   let cursor = latestMonth;
 
   while (cursor >= firstMonth) {
-    const totals = emptyTotals();
-
-    for (const account of accounts) {
+    const { totals } = accumulateSnapshotTotals(accounts, (account) => {
       const snapshotBalance = snapshotBalanceForMonth(account.id, cursor);
-      const balance = snapshotBalance ?? (balancesByAccount.get(account.id) || 0);
-      addContribution(totals, account, contributionForAccount(account, balance));
-    }
+      return snapshotBalance ?? (balancesByAccount.get(account.id) || 0);
+    });
 
     rows.push({
       month: cursor,
@@ -184,6 +245,7 @@ router.get('/', requireAuth, (req, res) => {
       .prepare(
         `
         SELECT id, name, type, institution,
+               is_property, linked_property_account_id,
                current_balance / 100.0 AS current_balance,
                estimated_value / 100.0 AS estimated_value
           FROM accounts

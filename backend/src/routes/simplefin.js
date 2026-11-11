@@ -112,6 +112,18 @@ router.post('/sync', requireAuth, async (req, res) => {
       }
     }
 
+    const waitForCompletion = req.query.wait === '1' || req.query.wait === 'true';
+    if (waitForCompletion) {
+      const result = await runSync({ trigger: 'manual', householdId });
+      return sendOk(res, {
+        success: true,
+        status: result.status,
+        transactions_inserted: result.inserted ?? 0,
+        accounts_unmatched: result.accountsUnmatched ?? 0,
+        accounts_flagged_missing: result.accountsFlaggedMissing ?? 0
+      });
+    }
+
     // Run sync in the background, catching errors so they don't cause unhandled promise rejections
     runSync({ trigger: 'manual', householdId }).catch((err) => {
       console.error('[simplefin] Background manual sync failed:', err.message || err);

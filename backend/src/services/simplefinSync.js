@@ -25,6 +25,7 @@
 
 import { db } from '../db/index.js';
 import { decrypt } from '../crypto.js';
+import { markMissingSimpleFinAccounts } from './accountRealEstateService.js';
 import { fetchAccounts } from './simplefinClient.js';
 import { loadRules, applyRulesToDraft } from './ruleMatcher.js';
 import { matchTransfers } from './transferMatcher.js';
@@ -236,7 +237,7 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
          AND institution IS ? AND account_number_last4 IS ?
     `);
     const findAccountBySfId = db.prepare(`
-      SELECT id FROM accounts WHERE household_id = ? AND simplefin_account_id = ?
+      SELECT id, institution FROM accounts WHERE household_id = ? AND simplefin_account_id = ?
     `);
     const linkSfId = db.prepare(`
       UPDATE accounts SET simplefin_account_id = ?, is_manual = 0, updated_at = datetime('now')
@@ -245,7 +246,10 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
     `);
     const updateBalance = db.prepare(`
       UPDATE accounts
-         SET current_balance = ?, updated_at = datetime('now')
+         SET current_balance = ?,
+             simplefin_last_seen_at = datetime('now'),
+             simplefin_missing_since = NULL,
+             updated_at = datetime('now')
        WHERE id = ?
          AND household_id = ?
     `);
@@ -260,8 +264,8 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
     `);
     const insertAccount = db.prepare(`
       INSERT INTO accounts (household_id, name, type, institution, account_number_last4,
-                            simplefin_account_id, current_balance, is_manual)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+                            simplefin_account_id, current_balance, is_manual, simplefin_last_seen_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, datetime('now'))
     `);
 
     let accountsCreated = 0;
@@ -279,19 +283,26 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
     // Map of SimpleFIN account id → our account id, so we can attribute
     // transactions correctly below.
     const sfToLocalId = new Map();
+    const seenAccountIds = new Set();
+    const syncedInstitutions = new Set();
 
     for (const sf of payload.accounts) {
+      const sfOrgName = sf.org?.name || null;
+      if (sfOrgName) syncedInstitutions.add(sfOrgName);
+
       // Already linked by simplefin_account_id?
       const linked = findAccountBySfId.get(householdId, sf.id);
       if (linked) {
         sfToLocalId.set(sf.id, linked.id);
+        seenAccountIds.add(linked.id);
+        if (linked.institution) syncedInstitutions.add(linked.institution);
         const balance = captureSimpleFinBalance(linked.id, sf);
         updateBalance.run(balance, linked.id, householdId);
         continue;
       }
 
       // Try to match by (institution, last4).
-      const institution = sf.org?.name || null;
+      const institution = sfOrgName;
       const last4 = extractLast4(sf);
 
       if (institution && last4) {
@@ -301,6 +312,7 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
           const balance = captureSimpleFinBalance(existing.id, sf);
           updateBalance.run(balance, existing.id, householdId);
           sfToLocalId.set(sf.id, existing.id);
+          seenAccountIds.add(existing.id);
           continue;
         }
       }
@@ -317,8 +329,10 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
         sf.id,
         balance
       );
-      sfToLocalId.set(sf.id, result.lastInsertRowid);
-      captureSimpleFinBalance(result.lastInsertRowid, sf);
+      const newId = Number(result.lastInsertRowid);
+      sfToLocalId.set(sf.id, newId);
+      seenAccountIds.add(newId);
+      captureSimpleFinBalance(newId, sf);
       accountsCreated++;
       accountsUnmatched++;
     }
@@ -476,6 +490,12 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
     // SimpleFIN may have returned per-institution errors. Surface them but
     // don't fail the overall sync — partial data is still useful.
     const sfErrors = Array.isArray(payload.errors) ? payload.errors : [];
+    const accountsFlaggedMissing = markMissingSimpleFinAccounts(db, {
+      householdId,
+      seenAccountIds,
+      syncedInstitutions,
+      sfErrors
+    });
     const errorMsg = sfErrors.length > 0
       ? `Partial sync — SimpleFIN reported: ${sfErrors.slice(0, 3).join('; ')}`
       : null;
@@ -524,6 +544,7 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
       rmDeleted,
       accountsCreated,
       accountsUnmatched,
+      accountsFlaggedMissing,
       transfersPaired,
       upcoming_reconciliation: upcomingReconciliation,
       balanceSnapshotsStored,

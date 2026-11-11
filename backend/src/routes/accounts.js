@@ -7,10 +7,15 @@ import {
   sendOk,
   sendServerError
 } from '../lib/http.js';
-import { isValidDateOnly, parseDateParts } from '../lib/localDate.js';
+import { isValidDateOnly } from '../lib/localDate.js';
 import { dollarsToCents, moneyFieldsToDollars } from '../lib/money.js';
 import { parseId, parseInteger, readIdParam } from '../lib/routeParams.js';
+import { recordManualAccountBalance } from '../services/accountBalanceRecordService.js';
 import { mergeAccounts } from '../services/accountMerge.js';
+import {
+  parseRealEstateAccountFields,
+  resolveAccountClosure
+} from '../services/accountRealEstateService.js';
 import { applyBenefitUsage } from '../services/creditCardBenefitUsage.js';
 import {
   BENEFIT_PERIOD_KEY_REGEX,
@@ -28,12 +33,6 @@ const ACCOUNT_MONEY_FIELDS = ['current_balance', 'estimated_value'];
 
 function serializeAccount(row) {
   return attachInstitutionLogo(db, moneyFieldsToDollars(row, ACCOUNT_MONEY_FIELDS));
-}
-
-function previousMonthEnd(value) {
-  const { year, month } = parseDateParts(value);
-  const date = new Date(Date.UTC(year, month - 1, 0));
-  return date.toISOString().slice(0, 10);
 }
 
 function normalizeOptionalText(value) {
@@ -57,6 +56,8 @@ router.get('/', requireAuth, (req, res) => {
         `
         SELECT a.id, a.name, a.type, a.institution, a.account_number_last4,
                a.current_balance, a.estimated_value,
+               a.is_property, a.property_name, a.linked_property_account_id,
+               a.simplefin_last_seen_at, a.simplefin_missing_since, a.closure_prompt_dismissed_at,
                a.is_manual, a.is_archived, a.sort_order, a.mha_default_eligible,
                a.simplefin_account_id, a.created_at, a.updated_at,
                COUNT(t.id) AS transaction_count
@@ -96,7 +97,7 @@ router.post('/', requireAuth, (req, res) => {
   }
 
   const balanceDollars = body.balance === undefined || body.balance === ''
-    ? 0
+    ? (body.current_balance === undefined || body.current_balance === '' ? 0 : Number(body.current_balance))
     : Number(body.balance);
   if (!Number.isFinite(balanceDollars)) {
     return sendBadRequest(res, 'balance must be a valid number.');
@@ -107,6 +108,13 @@ router.post('/', requireAuth, (req, res) => {
     return sendBadRequest(res, 'recordDate must be a valid YYYY-MM-DD date.');
   }
 
+  let realEstateFields;
+  try {
+    realEstateFields = parseRealEstateAccountFields(db, { householdId, effectiveType: type, body });
+  } catch (err) {
+    return sendBadRequest(res, err.message);
+  }
+
   const balance = dollarsToCents(balanceDollars);
 
   try {
@@ -115,9 +123,10 @@ router.post('/', requireAuth, (req, res) => {
         .prepare(
           `INSERT INTO accounts (
              household_id, name, type, institution, account_number_last4,
-             is_manual, current_balance, sort_order
+             is_manual, current_balance, estimated_value,
+             is_property, property_name, linked_property_account_id, sort_order
            ) VALUES (
-             ?, ?, ?, ?, ?, 1, ?,
+             ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?,
              COALESCE((SELECT MAX(sort_order) + 10 FROM accounts WHERE household_id = ?), 0)
            )`
         )
@@ -128,6 +137,10 @@ router.post('/', requireAuth, (req, res) => {
           normalizeOptionalText(body.institution),
           normalizeOptionalText(body.account_number_last4),
           balance,
+          realEstateFields.estimated_value ?? null,
+          realEstateFields.is_property ?? 0,
+          realEstateFields.property_name ?? null,
+          realEstateFields.linked_property_account_id ?? null,
           householdId
         );
 
@@ -204,7 +217,9 @@ router.put('/:id', requireAuth, (req, res) => {
   const id = readIdParam(req, res, 'id', 'account');
   if (id === null) return;
 
-  const existing = db.prepare('SELECT id FROM accounts WHERE id = ? AND household_id = ?').get(id, householdId);
+  const existing = db
+    .prepare('SELECT id, type FROM accounts WHERE id = ? AND household_id = ?')
+    .get(id, householdId);
   if (!existing) {
     return sendNotFound(res, 'Account not found.');
   }
@@ -219,6 +234,19 @@ router.put('/:id', requireAuth, (req, res) => {
     return sendBadRequest(res, 'name cannot be empty.');
   }
 
+  const effectiveType = body.type !== undefined ? body.type : existing.type;
+  let realEstateFields;
+  try {
+    realEstateFields = parseRealEstateAccountFields(db, {
+      householdId,
+      accountId: id,
+      effectiveType,
+      body
+    });
+  } catch (err) {
+    return sendBadRequest(res, err.message);
+  }
+
   const sets = [];
   const values = [];
 
@@ -228,8 +256,8 @@ router.put('/:id', requireAuth, (req, res) => {
     ['institution', 'institution'],
     ['account_number_last4', 'account_number_last4'],
     ['current_balance', 'current_balance'],
-    ['estimated_value', 'estimated_value'],
-    ['simplefin_account_id', 'simplefin_account_id']
+    ['simplefin_account_id', 'simplefin_account_id'],
+    ['mha_default_eligible', 'mha_default_eligible']
   ];
 
   for (const [key, col] of allowed) {
@@ -250,19 +278,16 @@ router.put('/:id', requireAuth, (req, res) => {
         }
         v = dollarsToCents(v);
       }
-      if (col === 'estimated_value') {
-        if (v === '' || v === null) {
-          v = null;
-        } else {
-          v = Number(v);
-          if (!Number.isFinite(v) || v < 0) {
-            return sendBadRequest(res, 'estimated_value must be a non-negative number.');
-          }
-          v = dollarsToCents(v);
-        }
+      if (col === 'mha_default_eligible') {
+        v = v === true || v === 1 || v === '1' ? 1 : 0;
       }
       values.push(v);
     }
+  }
+
+  for (const [col, val] of Object.entries(realEstateFields)) {
+    sets.push(`${col} = ?`);
+    values.push(val);
   }
 
   if (sets.length === 0) {
@@ -468,66 +493,13 @@ router.post('/:id/records', requireAuth, (req, res) => {
   }
 
   try {
-    const run = db.transaction(() => {
-      const insertRecord = db.prepare(
-        `
-        INSERT INTO account_balance_records (household_id, account_id, record_date, balance, source)
-        VALUES (?, ?, ?, ?, 'manual')
-        ON CONFLICT(household_id, account_id, record_date) DO UPDATE SET
-          balance = excluded.balance,
-          source = 'manual',
-          updated_at = datetime('now')
-      `
-      );
-
-      const priorRecords = db
-        .prepare(
-          `
-          SELECT COUNT(*) AS count
-            FROM account_balance_records
-           WHERE household_id = ? AND account_id = ? AND record_date < ?
-        `
-        )
-        .get(householdId, id, recordDate).count;
-
-      if (priorRecords === 0 && previousBalanceCents !== null && previousBalanceCents !== balance) {
-        const baselineDate = previousMonthEnd(recordDate);
-        db.prepare(
-          `
-          INSERT OR IGNORE INTO account_balance_records (household_id, account_id, record_date, balance)
-          VALUES (?, ?, ?, ?)
-        `
-        ).run(householdId, id, baselineDate, previousBalanceCents);
-      }
-
-      insertRecord.run(householdId, id, recordDate, balance);
-
-      const latestRecord = db
-        .prepare(
-          `
-          SELECT record_date, balance
-            FROM account_balance_records
-           WHERE household_id = ? AND account_id = ?
-           ORDER BY record_date DESC, id DESC
-           LIMIT 1
-        `
-        )
-        .get(householdId, id);
-
-      if (latestRecord?.record_date === recordDate) {
-        db.prepare(
-          `
-          UPDATE accounts
-             SET current_balance = ?, is_manual = 1, updated_at = datetime('now')
-           WHERE id = ? AND household_id = ?
-        `
-        ).run(balance, id, householdId);
-      }
-
-      return db.prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?').get(id, householdId);
+    const updated = recordManualAccountBalance(db, {
+      householdId,
+      accountId: id,
+      recordDate,
+      balanceCents: balance,
+      previousBalanceCents
     });
-
-    const updated = run();
     sendOk(res, {
       success: true,
       account: serializeAccount(updated),
@@ -539,6 +511,31 @@ router.post('/:id/records', requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error('Add account record failed:', err);
+    sendServerError(res, err);
+  }
+});
+
+router.post('/:id/resolve-closure', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  const id = readIdParam(req, res, 'id', 'account');
+  if (id === null) return;
+
+  const resolution = typeof req.body?.resolution === 'string' ? req.body.resolution.trim() : '';
+  try {
+    const { updatedAccount, createdProperty } = resolveAccountClosure(db, {
+      householdId,
+      accountId: id,
+      resolution
+    });
+    sendOk(res, {
+      success: true,
+      account: serializeAccount(updatedAccount),
+      created_property: createdProperty ? serializeAccount(createdProperty) : null
+    });
+  } catch (err) {
+    if (err.status === 404) return sendNotFound(res, err.message);
+    if (err.status === 400) return sendBadRequest(res, err.message);
+    console.error('Resolve closure failed:', err);
     sendServerError(res, err);
   }
 });
