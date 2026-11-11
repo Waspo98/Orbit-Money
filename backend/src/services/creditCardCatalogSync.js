@@ -68,6 +68,30 @@ export function ensureCreditCardCatalogSeeded(db) {
         THEN excluded.default_sub_estimated_value_cents
         ELSE COALESCE(credit_card_catalog.default_sub_estimated_value_cents, excluded.default_sub_estimated_value_cents)
       END,
+      default_sub_target_spend_cents = CASE
+        WHEN credit_card_catalog.last_synced_at IS NULL
+          OR credit_card_catalog.default_sub_reward_text LIKE '%\\_%' ESCAPE '\\'
+          OR credit_card_catalog.default_sub_estimated_value_cents > 500000
+          OR credit_card_catalog.default_sub_estimated_value_cents < 1000
+        THEN excluded.default_sub_target_spend_cents
+        ELSE COALESCE(credit_card_catalog.default_sub_target_spend_cents, excluded.default_sub_target_spend_cents)
+      END,
+      sub_spend_window_days = CASE
+        WHEN credit_card_catalog.last_synced_at IS NULL
+          OR credit_card_catalog.default_sub_reward_text LIKE '%\\_%' ESCAPE '\\'
+          OR credit_card_catalog.default_sub_estimated_value_cents > 500000
+          OR credit_card_catalog.default_sub_estimated_value_cents < 1000
+        THEN excluded.sub_spend_window_days
+        ELSE COALESCE(credit_card_catalog.sub_spend_window_days, excluded.sub_spend_window_days)
+      END,
+      is_elevated_sub_offer = CASE
+        WHEN credit_card_catalog.last_synced_at IS NULL
+          OR credit_card_catalog.default_sub_reward_text LIKE '%\\_%' ESCAPE '\\'
+          OR credit_card_catalog.default_sub_estimated_value_cents > 500000
+          OR credit_card_catalog.default_sub_estimated_value_cents < 1000
+        THEN excluded.is_elevated_sub_offer
+        ELSE credit_card_catalog.is_elevated_sub_offer
+      END,
       reward_categories_json = excluded.reward_categories_json,
       benefits_json = excluded.benefits_json,
       sort_rank = excluded.sort_rank,

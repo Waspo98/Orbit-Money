@@ -113,14 +113,6 @@ class SpendingTrendsViewModel(
         clearScrub()
     }
 
-    fun setChartMode(mode: TrendsChartMode) {
-        _chartMode.value = mode
-        if (mode == TrendsChartMode.CASH_FLOW) {
-            _selectedCategoryId.value = null
-        }
-        clearScrub()
-    }
-
     fun selectCategory(categoryId: Long?) {
         _selectedCategoryId.value = categoryId
         _chartMode.value = if (categoryId != null) TrendsChartMode.CATEGORY_TREND else TrendsChartMode.CASH_FLOW

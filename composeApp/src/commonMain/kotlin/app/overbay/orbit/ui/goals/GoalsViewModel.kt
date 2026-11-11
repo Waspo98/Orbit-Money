@@ -28,6 +28,7 @@ class GoalsViewModel(
     private val _inspectingGoalId = MutableStateFlow<Long?>(null)
     private val _editingGoal = MutableStateFlow<Goal?>(null)
     private val _showEditorSheet = MutableStateFlow(false)
+    private val _deleteConfirmGoalId = MutableStateFlow<Long?>(null)
     private val _isReorderMode = MutableStateFlow(false)
     private val _showAccountsOverview = MutableStateFlow(true)
     private val _goalSortOverrides = MutableStateFlow<Map<Long, Int>>(emptyMap())
@@ -43,9 +44,10 @@ class GoalsViewModel(
 
     private val dialogFlow = combine(
         _editingGoal,
-        _showEditorSheet
-    ) { editing, showSheet ->
-        GoalsDialogState(editing, showSheet)
+        _showEditorSheet,
+        _deleteConfirmGoalId
+    ) { editing, showSheet, deleteConfirmId ->
+        GoalsDialogState(editing, showSheet, deleteConfirmId)
     }
 
     private val controlFlow = combine(
@@ -107,6 +109,7 @@ class GoalsViewModel(
             inspectingGoalId = inspectingId,
             editingGoal = dialog.editing,
             showEditorSheet = dialog.showSheet,
+            deleteConfirmGoalId = dialog.deleteConfirmId,
             isReorderMode = isReorder,
             showAccountsOverview = showOverview,
             isLoading = false
@@ -184,22 +187,6 @@ class GoalsViewModel(
         }
     }
 
-    fun moveGoalUp(goalId: Long) {
-        val currentGoals = uiState.value.activeGoals
-        val index = currentGoals.indexOfFirst { it.id == goalId }
-        if (index > 0) {
-            moveGoal(completedGroup = false, fromIndex = index, toIndex = index - 1)
-        }
-    }
-
-    fun moveGoalDown(goalId: Long) {
-        val currentGoals = uiState.value.activeGoals
-        val index = currentGoals.indexOfFirst { it.id == goalId }
-        if (index in 0 until currentGoals.size - 1) {
-            moveGoal(completedGroup = false, fromIndex = index, toIndex = index + 1)
-        }
-    }
-
     fun saveGoalWithAllocations(goal: Goal, stealFromOthers: Boolean = false) {
         viewModelScope.launch {
             repository.saveGoalWithAllocations(goal, stealFromOthers)
@@ -211,9 +198,18 @@ class GoalsViewModel(
         saveGoalWithAllocations(goal, stealFromOthers = false)
     }
 
+    fun requestDeleteGoal(id: Long) {
+        _deleteConfirmGoalId.value = id
+    }
+
+    fun dismissDeleteGoal() {
+        _deleteConfirmGoalId.value = null
+    }
+
     fun deleteGoal(id: Long) {
         viewModelScope.launch {
             repository.deleteGoal(id)
+            _deleteConfirmGoalId.value = null
             if (_inspectingGoalId.value == id) {
                 _inspectingGoalId.value = null
             }
@@ -250,7 +246,8 @@ class GoalsViewModel(
 
     private data class GoalsDialogState(
         val editing: Goal?,
-        val showSheet: Boolean
+        val showSheet: Boolean,
+        val deleteConfirmId: Long?
     )
 
     private data class GoalsControlState(

@@ -84,7 +84,7 @@ class CardEditorController(
     }
 
     fun updateDraft(transform: (CardEditorDraft) -> CardEditorDraft) {
-        modifyDraft { current -> current?.let(transform) }
+        modifyDraft { current -> current?.copy(saveError = null)?.let(transform) }
     }
 
     fun applyTemplate(template: CreditCardTemplate) {
@@ -96,6 +96,7 @@ class CardEditorController(
 
             current.copy(
                 step = CardEditorStep.FORM,
+                saveError = null,
                 accountInstitution = resolvedInst,
                 cardName = applied.cardName.orEmpty(),
                 issuer = applied.issuerName.orEmpty(),
@@ -103,7 +104,6 @@ class CardEditorController(
                 artKey = applied.imageUrl,
                 artworkUrl = applied.artworkUrl,
                 annualFeeCents = applied.annualFeeCents,
-                annualFeeText = applied.annualFeeCents?.let { (it / 100).toString() }.orEmpty(),
                 hasAnnualFee = (applied.annualFeeCents ?: 0L) > 0L,
                 benefits = applied.benefits,
                 rewardCategories = applied.rewardCategories,
@@ -114,7 +114,6 @@ class CardEditorController(
                 subRewardText = applied.strategy.subRewardText,
                 subEstimatedValueCents = applied.strategy.subEstimatedValueCents,
                 targetSpendCents = applied.strategy.subTargetSpendCents,
-                targetSpendText = applied.strategy.subTargetSpendCents?.let { (it / 100).toString() }.orEmpty(),
                 targetDeadlineDate = applied.strategy.subDeadlineDate
             )
         }
@@ -257,7 +256,6 @@ class CardEditorController(
                     subRewardText = null,
                     subEstimatedValueCents = null,
                     targetSpendCents = null,
-                    targetSpendText = "",
                     targetDeadlineDate = null,
                     subCompleted = false,
                     subReceivedDate = null
@@ -278,6 +276,15 @@ class CardEditorController(
         return if (current.isValid) current.toProfile() else null
     }
 
+    fun submitSave(
+        accountNameOverride: String? = null,
+        institutionOverride: String? = null
+    ) {
+        catalogScope.launch {
+            save(accountNameOverride, institutionOverride)
+        }
+    }
+
     suspend fun save(
         accountNameOverride: String? = null,
         institutionOverride: String? = null
@@ -287,7 +294,7 @@ class CardEditorController(
             return Result.failure(IllegalArgumentException("Draft has validation errors: ${current.errors.values.joinToString(", ")}"))
         }
 
-        modifyDraft { it?.copy(isSaving = true) }
+        modifyDraft { it?.copy(isSaving = true, saveError = null) }
         val profile = current.toProfile()
         val acctName = accountNameOverride ?: current.accountName.takeIf { it.isNotBlank() }
         val acctInst = institutionOverride ?: current.accountInstitution.takeIf { it.isNotBlank() }
@@ -299,8 +306,8 @@ class CardEditorController(
             accountInstitution = acctInst
         ).onSuccess {
             clearDraft()
-        }.onFailure {
-            modifyDraft { it?.copy(isSaving = false) }
+        }.onFailure { err ->
+            modifyDraft { it?.copy(isSaving = false, saveError = err.message ?: "Failed to save card") }
         }
     }
 }

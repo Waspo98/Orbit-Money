@@ -35,7 +35,12 @@ object CreditCardHubStateCalculator {
         today: LocalDate,
         householdMembers: List<HouseholdMember>
     ): CreditCardHubBundle {
-        val (householdCredit, cardCycles) = CreditCardCycleEngine.summarize(accounts, transactions, today)
+        val (householdCredit, cardCycles) = CreditCardCycleEngine.summarize(
+            accounts = accounts,
+            txns = transactions,
+            today = today,
+            householdMembers = householdMembers
+        )
         val portfolio = CreditCardStrategyEngine.summarizePortfolio(
             accounts = accounts,
             transactions = transactions,

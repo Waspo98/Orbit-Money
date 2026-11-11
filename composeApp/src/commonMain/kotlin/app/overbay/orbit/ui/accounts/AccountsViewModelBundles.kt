@@ -41,7 +41,6 @@ internal data class SyncReorderBundle(
 )
 
 internal data class AccountsHubUiControl(
-    val mode: AccountsMasterMode,
     val showUsedPerks: Boolean,
     val showWhichCardWhere: Boolean,
     val selectedRewardCategory: String?

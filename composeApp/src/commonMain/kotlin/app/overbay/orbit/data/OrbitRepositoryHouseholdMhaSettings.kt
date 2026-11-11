@@ -30,7 +30,11 @@ import app.overbay.orbit.data.network.UpcomingItemDto
 import app.overbay.orbit.data.network.*
 import app.overbay.orbit.domain.MoneyUtils
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.intOrNull
 
 // =============================================================================
 // Tail Methods Preserved from OrbitRepository
@@ -38,7 +42,20 @@ import kotlinx.serialization.json.encodeToJsonElement
 
 internal fun OrbitRepository.exportBackupJsonImpl(): String = json.encodeToString(OrbitWorkspaceSnapshot.serializer(), snapshot.value)
 
+suspend fun OrbitRepository.exportBackupPayload(): String {
+    if (storageMode.value == StorageMode.SELF_HOSTED) {
+        val remote = createApiClient().exportOrbitBackupRemote().getOrNull()
+        if (!remote.isNullOrBlank()) return remote
+    }
+    return exportBackupJson()
+}
+
 internal suspend fun OrbitRepository.restoreBackupJsonImpl(jsonString: String): Result<Unit> = runCatching {
+    if (storageMode.value == StorageMode.SELF_HOSTED) {
+        createApiClient().restoreOrbitBackupRemote(jsonString).getOrThrow()
+        sync(force = true)
+        return@runCatching
+    }
     commitSnapshot(json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString), immediate = true)
 }
 
@@ -359,20 +376,41 @@ suspend fun OrbitRepository.updateNotificationPreferences(config: NotificationPr
 }
 
 fun OrbitRepository.previewBackupJson(jsonString: String): Result<BackupPreviewStats> = runCatching {
-    val snap = json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString)
-    BackupPreviewStats(
-        schemaVersion = snap.schemaVersion,
-        exportedAt = snap.exportedAt,
-        accountCount = snap.accounts.size,
-        transactionCount = snap.transactions.size,
-        categoryCount = snap.categories.size,
-        budgetCount = snap.budgets.size,
-        goalCount = snap.goals.size,
-        ruleCount = snap.rules.size,
-        upcomingCount = snap.upcomingItems.size,
-        memberCount = snap.members.size,
-        balanceRecordCount = snap.balanceRecords.size
-    )
+    val root = json.parseToJsonElement(jsonString) as? JsonObject
+        ?: throw IllegalArgumentException("Backup must be a JSON object")
+    val backupType = (root["type"] as? JsonPrimitive)?.content
+    if (backupType == "orbit_money_backup") {
+        val tables = root["tables"] as? JsonObject ?: JsonObject(emptyMap())
+        fun count(name: String): Int = (tables[name] as? JsonArray)?.size ?: 0
+        BackupPreviewStats(
+            schemaVersion = (root["version"] as? JsonPrimitive)?.intOrNull ?: 1,
+            exportedAt = (root["exported_at"] as? JsonPrimitive)?.content.orEmpty(),
+            accountCount = count("accounts"),
+            transactionCount = count("transactions"),
+            categoryCount = count("categories"),
+            budgetCount = count("budgets"),
+            goalCount = count("goals"),
+            ruleCount = count("rules"),
+            upcomingCount = count("upcoming_items"),
+            memberCount = count("household_members"),
+            balanceRecordCount = count("account_balance_records")
+        )
+    } else {
+        val snap = json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString)
+        BackupPreviewStats(
+            schemaVersion = snap.schemaVersion,
+            exportedAt = snap.exportedAt,
+            accountCount = snap.accounts.size,
+            transactionCount = snap.transactions.size,
+            categoryCount = snap.categories.size,
+            budgetCount = snap.budgets.size,
+            goalCount = snap.goals.size,
+            ruleCount = snap.rules.size,
+            upcomingCount = snap.upcomingItems.size,
+            memberCount = snap.householdMembers.size.coerceAtLeast(snap.members.size),
+            balanceRecordCount = snap.balanceRecords.size
+        )
+    }
 }
 
 suspend fun OrbitRepository.exportBudgetingCsv(): Result<String> = runCatching {
@@ -486,12 +524,42 @@ suspend fun OrbitRepository.undoImportBatch(batchId: Long): Result<Boolean> = ru
 
 suspend fun OrbitRepository.migrateLocalWorkspaceToSelfHosted(serverUrl: String): Result<String> = runCatching {
     val client = createApiClient(serverUrl)
-    val snap = snapshot.value
-    snap.categories.forEach { runCatching { client.createCategory(CategoryDto(id = 0L, name = it.name, color = it.color, icon = it.icon, isTransfer = it.isTransfer, isIncome = it.isIncome)) } }
-    snap.accounts.forEach { runCatching { client.createAccount(AccountDto(id = 0L, name = it.name, type = it.type.name.lowercase(), institution = it.institution, currentBalance = MoneyUtils.centsToDollars(it.currentBalanceCents))) } }
-    snap.rules.forEach { runCatching { client.createRule(RuleWireMapper.toDto(it.copy(id = 0L))) } }
-    snap.goals.forEach { runCatching { client.createGoal(GoalDto(id = 0L, name = it.name, targetAmount = MoneyUtils.centsToDollars(it.targetAmountCents))) } }
-    snap.upcomingItems.forEach { runCatching { client.createUpcoming(UpcomingItemDto(id = 0L, name = it.name, amount = MoneyUtils.centsToDollars(it.amountCents), direction = it.direction, frequencyType = it.frequencyType.name.lowercase(), nextDate = it.nextDate)) } }
+    val backupJson = exportBackupJson()
+    val restoredViaBackup = client.restoreOrbitBackupRemote(backupJson).isSuccess
+    if (!restoredViaBackup) {
+        val snap = snapshot.value
+        snap.categories.forEach { runCatching { client.createCategory(CategoryDto(id = 0L, name = it.name, color = it.color, icon = it.icon, isTransfer = it.isTransfer, isIncome = it.isIncome)) } }
+        snap.accounts.forEach { acct ->
+            runCatching {
+                val created = client.createAccount(AccountDto(id = 0L, name = acct.name, type = acct.type.name.lowercase(), institution = acct.institution, currentBalance = MoneyUtils.centsToDollars(acct.currentBalanceCents))).getOrNull()
+                if (created != null && created.id > 0L && acct.creditCardProfile != null) {
+                    client.saveCreditCardProfileRemote(created.id, acct.name, acct.institution, acct.creditCardProfile.copy(accountId = created.id))
+                }
+            }
+        }
+        snap.rules.forEach { runCatching { client.createRule(RuleWireMapper.toDto(it.copy(id = 0L))) } }
+        snap.goals.forEach { runCatching { client.createGoal(GoalDto(id = 0L, name = it.name, targetAmount = MoneyUtils.centsToDollars(it.targetAmountCents))) } }
+        snap.upcomingItems.forEach {
+            val isGiving = it.kind == app.overbay.orbit.data.model.UpcomingKind.GIVING
+            val isQuarterly = it.frequencyType == app.overbay.orbit.data.model.RecurrenceFrequency.QUARTERLY
+            runCatching {
+                client.createUpcoming(
+                    UpcomingItemDto(
+                        id = 0L,
+                        name = it.name,
+                        kind = if (isGiving) "giving" else it.kind.name.lowercase(),
+                        amount = MoneyUtils.centsToDollars(it.amountCents),
+                        direction = it.direction,
+                        frequencyType = if (isQuarterly) "quarterly" else it.frequencyType.name.lowercase(),
+                        frequencyInterval = if (isQuarterly) 3 else it.frequencyInterval,
+                        frequencyUnit = if (isQuarterly) "months" else it.frequencyUnit,
+                        recurrenceRule = it.recurrenceRule?.toWireJson(),
+                        nextDate = it.nextDate
+                    )
+                )
+            }
+        }
+    }
     setStorageMode(StorageMode.SELF_HOSTED, serverUrl)
     "Migration completed successfully"
 }

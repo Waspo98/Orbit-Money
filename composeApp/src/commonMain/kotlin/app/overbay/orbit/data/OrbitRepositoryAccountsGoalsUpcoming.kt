@@ -5,8 +5,9 @@ import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.data.network.*
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardBenefitEngine
+import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.RuleMatcherEngine
-import kotlinx.datetime.Clock
 
 // =============================================================================
 // Accounts Extension Methods
@@ -64,18 +65,19 @@ suspend fun OrbitRepository.setCardBenefitUsage(
     usedOn: String? = null
 ): Result<CreditCardProfile> {
     val previousAccount = accounts.value.find { it.id == accountId }
-    val previousProfile = snapshot.value.creditCardProfiles.find { it.accountId == accountId }
+    val rawPreviousProfile = snapshot.value.creditCardProfiles.find { it.accountId == accountId }
         ?: previousAccount?.creditCardProfile
         ?: return Result.failure(IllegalStateException("No credit card profile found for account $accountId"))
-    val updatedBenefits = previousProfile.benefits.map { b ->
+    val upgradedProfile = CreditCardBenefitEngine.upgradeProfile(rawPreviousProfile, LocalDateUtils.todayLocalDate())
+    val updatedBenefits = upgradedProfile.benefits.map { b ->
         if (b.id == benefitId) CreditCardBenefitEngine.setUsage(b, periodKey, amountCents, usedOn) else b
     }
-    val localProfile = previousProfile.copy(benefits = updatedBenefits)
+    val localProfile = upgradedProfile.copy(benefits = updatedBenefits)
     applyLocalCardProfile(accountId, localProfile, null, null)
     if (storageMode.value != StorageMode.SELF_HOSTED) return Result.success(localProfile)
     return createApiClient().saveBenefitUsageRemote(accountId, benefitId, periodKey, amountCents, usedOn)
         .onSuccess { saved -> applyLocalCardProfile(accountId, saved, null, null) }
-        .onFailure { revertLocalCardProfile(accountId, previousAccount, previousProfile) }
+        .onFailure { revertLocalCardProfile(accountId, previousAccount, rawPreviousProfile) }
 }
 
 private suspend fun OrbitRepository.applyLocalCardProfile(
@@ -157,6 +159,11 @@ suspend fun OrbitRepository.getActiveBudgetMonths(): List<String> {
     return (localMonths + remoteMonths).sortedDescending()
 }
 
+private fun GoalAllocation.resolvedAmountCents(accountBalanceCents: Cents): Cents =
+    if (allocationType == GoalAllocationType.PERCENT) {
+        MoneyUtils.multiplyPercent((accountBalanceCents - reserveAmountCents).coerceAtLeast(0L), allocationPercent)
+    } else allocationAmountCents
+
 suspend fun OrbitRepository.saveGoalWithAllocations(
     goal: Goal,
     stealFromOthers: Boolean = false
@@ -165,17 +172,8 @@ suspend fun OrbitRepository.saveGoalWithAllocations(
     val accountsMap = accounts.value.associateBy { it.id }
 
     val computedCurrentAmountCents = if (goal.allocations.isNotEmpty()) {
-        goal.allocations.sumOf { alloc ->
-            val acctBalance = accountsMap[alloc.accountId]?.currentBalanceCents ?: 0L
-            if (alloc.allocationType == GoalAllocationType.PERCENT) {
-                ((acctBalance - alloc.reserveAmountCents).coerceAtLeast(0L) * (alloc.allocationPercent / 100.0)).toLong()
-            } else {
-                alloc.allocationAmountCents
-            }
-        }
-    } else {
-        goal.currentAmountCents
-    }
+        goal.allocations.sumOf { alloc -> alloc.resolvedAmountCents(accountsMap[alloc.accountId]?.currentBalanceCents ?: 0L) }
+    } else goal.currentAmountCents
 
     val updatedGoal = goal.copy(currentAmountCents = computedCurrentAmountCents)
 
@@ -189,19 +187,10 @@ suspend fun OrbitRepository.saveGoalWithAllocations(
         for (newAlloc in savedGoal.allocations) {
             val acctId = newAlloc.accountId
             val acctBalance = (accountsMap[acctId]?.currentBalanceCents ?: 0L).coerceAtLeast(0L)
-            val newAllocCents = if (newAlloc.allocationType == GoalAllocationType.PERCENT) {
-                ((acctBalance - newAlloc.reserveAmountCents).coerceAtLeast(0L) * (newAlloc.allocationPercent / 100.0)).toLong()
-            } else {
-                newAlloc.allocationAmountCents
-            }
+            val newAllocCents = newAlloc.resolvedAmountCents(acctBalance)
             val otherRows = workingGoals.filter { it.id != savedGoal.id }.mapNotNull { g ->
                 val a = g.allocations.find { it.accountId == acctId } ?: return@mapNotNull null
-                val amt = if (a.allocationType == GoalAllocationType.PERCENT) {
-                    ((acctBalance - a.reserveAmountCents).coerceAtLeast(0L) * (a.allocationPercent / 100.0)).toLong()
-                } else {
-                    a.allocationAmountCents
-                }
-                Triple(g.id, a, amt)
+                Triple(g.id, a, a.resolvedAmountCents(acctBalance))
             }
             val otherTotal = otherRows.sumOf { it.third }
             val overflow = (newAllocCents + otherTotal) - acctBalance
@@ -209,11 +198,8 @@ suspend fun OrbitRepository.saveGoalWithAllocations(
                 var remainingReduction = overflow
                 val reductions = mutableMapOf<Long, Long>()
                 otherRows.forEachIndexed { idx, (gId, _, amt) ->
-                    val cut = if (idx == otherRows.lastIndex) {
-                        remainingReduction.coerceAtMost(amt)
-                    } else {
-                        ((overflow.toDouble() * (amt.toDouble() / otherTotal.toDouble())).toLong()).coerceAtMost(amt)
-                    }
+                    val cut = if (idx == otherRows.lastIndex) remainingReduction.coerceAtMost(amt)
+                    else ((overflow * amt) / otherTotal).coerceAtMost(amt)
                     reductions[gId] = cut
                     remainingReduction = (remainingReduction - cut).coerceAtLeast(0L)
                 }
@@ -223,32 +209,21 @@ suspend fun OrbitRepository.saveGoalWithAllocations(
                         if (a.accountId != acctId) a
                         else {
                             val basis = (acctBalance - a.reserveAmountCents).coerceAtLeast(0L)
-                            val curAmt = if (a.allocationType == GoalAllocationType.PERCENT) {
-                                (basis * (a.allocationPercent / 100.0)).toLong()
-                            } else a.allocationAmountCents
+                            val curAmt = a.resolvedAmountCents(acctBalance)
                             val nextAmt = (curAmt - cut).coerceAtLeast(0L)
                             if (nextAmt <= 0L) null
                             else if (a.allocationType == GoalAllocationType.PERCENT && basis > 0L) {
-                                a.copy(allocationPercent = (nextAmt.toDouble() / basis.toDouble()) * 100.0, allocationAmountCents = nextAmt)
-                            } else {
-                                a.copy(allocationAmountCents = nextAmt)
-                            }
+                                a.copy(allocationPercent = MoneyUtils.percentOf(nextAmt, basis), allocationAmountCents = nextAmt)
+                            } else a.copy(allocationAmountCents = nextAmt)
                         }
                     }
-                    val nextCurrent = nextAllocs.sumOf { a ->
-                        val b = accountsMap[a.accountId]?.currentBalanceCents ?: 0L
-                        if (a.allocationType == GoalAllocationType.PERCENT) {
-                            ((b - a.reserveAmountCents).coerceAtLeast(0L) * (a.allocationPercent / 100.0)).toLong()
-                        } else a.allocationAmountCents
-                    }
+                    val nextCurrent = nextAllocs.sumOf { a -> a.resolvedAmountCents(accountsMap[a.accountId]?.currentBalanceCents ?: 0L) }
                     g.copy(allocations = nextAllocs, currentAmountCents = nextCurrent)
                 }
             }
         }
         workingGoals
-    } else {
-        baseList
-    }
+    } else baseList
 
     commitSnapshot(snapshot.value.copy(goals = updatedGoalsList))
     if (storageMode.value == StorageMode.SELF_HOSTED) {
@@ -296,27 +271,6 @@ suspend fun OrbitRepository.createUpcomingFromTransaction(transactionId: Long): 
         )
         saveUpcoming(item)
         item
-    }
-}
-
-suspend fun OrbitRepository.acceptRecurringSuggestion(candidate: RecurringCandidate): Result<UpcomingItem> = runCatching {
-    val newItem = UpcomingItem(
-        name = candidate.merchant,
-        merchant = candidate.merchant,
-        amountCents = candidate.amountCents,
-        direction = UpcomingDirection.EXPENSE,
-        frequency = candidate.frequency,
-        nextDate = candidate.nextProjectedDate.ifBlank { Clock.System.now().toString().take(10) },
-        categoryId = candidate.suggestedCategoryId,
-        accountId = candidate.suggestedAccountId
-    ).copy(source = UpcomingSource.SUGGESTION)
-    saveUpcoming(newItem)
-    val remainingSuggestions = snapshot.value.upcomingSuggestions.filterNot { it.merchant == candidate.merchant }
-    commitSnapshot(snapshot.value.copy(upcomingSuggestions = remainingSuggestions))
-    if (storageMode.value == StorageMode.SELF_HOSTED) {
-        createApiClient().acceptUpcomingSuggestion(candidate).getOrElse { newItem }
-    } else {
-        newItem
     }
 }
 

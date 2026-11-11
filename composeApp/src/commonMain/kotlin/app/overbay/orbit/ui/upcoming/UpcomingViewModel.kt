@@ -171,9 +171,10 @@ class UpcomingViewModel(
     private val cardPaymentsFlow = combine(
         repository.accounts,
         repository.transactions,
-        resolvedTodayFlow
-    ) { accounts, transactions, today ->
-        CreditCardCycleEngine.summarize(accounts, transactions, today)
+        resolvedTodayFlow,
+        repository.snapshot
+    ) { accounts, transactions, today, snap ->
+        CreditCardCycleEngine.summarize(accounts, transactions, today, snap.householdMembers)
             .second
             .filter { it.daysUntilDue != null && it.daysUntilDue in 0..35 }
             .sortedBy { it.daysUntilDue }
@@ -448,12 +449,6 @@ class UpcomingViewModel(
         )
         _editingItem.value = draftItem
         _showEditorSheet.value = true
-    }
-
-    fun acceptCandidate(candidate: RecurringCandidate) {
-        viewModelScope.launch(computeDispatcher) {
-            repository.acceptRecurringSuggestion(candidate)
-        }
     }
 
     fun dismissCandidate(key: String) {

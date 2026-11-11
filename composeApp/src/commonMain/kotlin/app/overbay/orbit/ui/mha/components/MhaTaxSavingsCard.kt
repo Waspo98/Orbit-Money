@@ -160,19 +160,3 @@ fun MhaTaxSavingsCard(
         }
     }
 }
-
-@Composable
-fun MhaTaxSavingsCard(
-    taxResult: MhaTaxCalculationResult?,
-    projectedAnnualSavingsCents: Cents,
-    taxProfile: MhaTaxProfile,
-    modifier: Modifier = Modifier
-) = MhaTaxSavingsCard(
-    taxResult = taxResult,
-    eligibleExpensesCents = taxResult?.eligibleTotalCents ?: 0L,
-    eligibleTransactionCount = 0,
-    selectedYear = 2026,
-    taxProfile = taxProfile,
-    onEditSettings = {},
-    modifier = modifier
-)

@@ -453,10 +453,6 @@ class AccountsViewModelTest {
         testScheduler.advanceUntilIdle()
         assertEquals("Dining", viewModel.uiState.value.selectedRewardCategory)
 
-        viewModel.setMasterMode(AccountsMasterMode.CREDIT_CARDS)
-        testScheduler.advanceUntilIdle()
-        assertEquals(AccountsMasterMode.CREDIT_CARDS, viewModel.uiState.value.masterMode)
-
         collectJob.cancel()
     }
 }

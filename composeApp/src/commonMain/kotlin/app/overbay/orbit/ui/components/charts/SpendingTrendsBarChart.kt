@@ -199,7 +199,7 @@ fun SpendingTrendsBarChart(
                 drawLine(outlineColor, Offset(0f, h - 2f), Offset(w, h - 2f), strokeWidth = 2f)
 
                 // 3. Draw Budget Reference Line and Pill
-                val budgetCents = items.firstOrNull()?.budgetCents
+                val budgetCents = items.firstNotNullOfOrNull { it.budgetCents?.takeIf { b -> b > 0L } }
                 if (budgetCents != null && budgetCents > 0L) {
                     val budgetY = h - ((budgetCents.toDouble() / maxValue.toDouble()) * h).toFloat()
                     drawLine(

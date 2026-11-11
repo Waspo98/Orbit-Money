@@ -104,6 +104,16 @@ object CreditCardStrategyEngine {
 
     const val ALL_PLAYERS = "ALL"
 
+    internal fun resolveCardholderName(
+        strategy: CreditCardStrategy,
+        memberMap: Map<Long, HouseholdMember>
+    ): String? {
+        strategy.cardholderMemberId?.let { id ->
+            memberMap[id]?.name?.takeIf { it.isNotBlank() }?.let { return it }
+        }
+        return strategy.cardholder?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
     fun summarizePortfolio(
         accounts: List<Account>,
         transactions: List<Transaction>,
@@ -169,7 +179,7 @@ object CreditCardStrategyEngine {
                 }
                 else -> creditAccounts.filter { it.creditCardProfile?.let { p -> holderKey(p.strategy) } == hKey }
             }
-            val sum = computeChase524Status(acctsForPerson, today, forMemberId = mId)
+            val sum = computeChase524Status(acctsForPerson, today, forMemberId = mId, householdMembers = householdMembers)
             chase524List.add(Chase524PersonSummary(hKey, label, sum))
         }
         val chase524ByPerson = chase524List.sortedWith(
@@ -178,7 +188,7 @@ object CreditCardStrategyEngine {
 
         val cutoffReceivedDate = LocalDateUtils.addDays(today, -90)
         val activeSubs = playerFiltered.mapNotNull { account ->
-            computeSubProgress(account, transactions, today)
+            computeSubProgress(account, transactions, today, householdMembers)
         }.filter { sub ->
             if (sub.status != SubTrackerStatus.RECEIVED) true else {
                 val strat = playerFiltered.firstOrNull { it.id == sub.accountId }?.creditCardProfile?.strategy
@@ -206,7 +216,7 @@ object CreditCardStrategyEngine {
             val rawProfile = account.creditCardProfile ?: continue
             val profile = CreditCardBenefitEngine.upgradeProfile(rawProfile, today)
             val cardTitle = profile.cardName?.takeIf { it.isNotBlank() } ?: account.name
-            val holder = profile.strategy.cardholder?.takeIf { it.isNotBlank() }
+            val holder = resolveCardholderName(profile.strategy, memberMap)
             totalFees += (profile.annualFeeCents ?: 0L)
 
             val ledger = CreditCardBenefitEngine.ledger(profile, today)
@@ -248,7 +258,7 @@ object CreditCardStrategyEngine {
                 .thenByDescending { it.remainingCents }
         )
 
-        val bestByCategory = computeBestCardsByCategory(activeCards)
+        val bestByCategory = computeBestCardsByCategory(activeCards, householdMembers)
 
         return CreditCardPortfolioSummary(
             availablePlayers = players,
@@ -268,8 +278,10 @@ object CreditCardStrategyEngine {
     fun computeChase524Status(
         creditAccounts: List<Account>,
         today: LocalDate = LocalDateUtils.todayLocalDate(),
-        forMemberId: Long? = null
+        forMemberId: Long? = null,
+        householdMembers: List<HouseholdMember> = emptyList()
     ): Chase524Summary {
+        val memberMap = householdMembers.associateBy { it.id }
         val cutoffDate = LocalDateUtils.addMonthsClamped(today, -24)
         var excludedBiz = 0
         var missingOpenDates = 0
@@ -298,7 +310,7 @@ object CreditCardStrategyEngine {
                         accountId = account.id,
                         cardTitle = title,
                         issuerName = profile.issuerName ?: account.institution,
-                        cardholder = strategy.cardholder?.takeIf { it.isNotBlank() },
+                        cardholder = resolveCardholderName(strategy, memberMap),
                         openedDate = LocalDateUtils.formatIsoDate(opened),
                         dropOffDate = LocalDateUtils.formatIsoDate(dropOff),
                         daysUntilDropOff = daysLeft,
@@ -330,8 +342,10 @@ object CreditCardStrategyEngine {
     fun computeSubProgress(
         account: Account,
         transactions: List<Transaction>,
-        today: LocalDate = LocalDateUtils.todayLocalDate()
+        today: LocalDate = LocalDateUtils.todayLocalDate(),
+        householdMembers: List<HouseholdMember> = emptyList()
     ): SubProgressSummary? {
+        val memberMap = householdMembers.associateBy { it.id }
         val profile = account.creditCardProfile ?: return null
         val strategy = profile.strategy
         val targetCents = strategy.subTargetSpendCents ?: return null
@@ -390,7 +404,7 @@ object CreditCardStrategyEngine {
         return SubProgressSummary(
             accountId = account.id,
             cardTitle = title,
-            cardholder = strategy.cardholder?.takeIf { it.isNotBlank() },
+            cardholder = resolveCardholderName(strategy, memberMap),
             rewardText = strategy.subRewardText?.takeIf { it.isNotBlank() } ?: "Welcome Bonus",
             estimatedValueCents = strategy.subEstimatedValueCents,
             targetSpendCents = targetCents,
@@ -475,12 +489,16 @@ object CreditCardStrategyEngine {
         return CATEGORY_SYNONYMS.firstOrNull { (_, w) -> w.any(tokens::contains) }?.first ?: raw.trim()
     }
 
-    fun computeBestCardsByCategory(accounts: List<Account>): List<CategoryBestCardPick> {
+    fun computeBestCardsByCategory(
+        accounts: List<Account>,
+        householdMembers: List<HouseholdMember> = emptyList()
+    ): List<CategoryBestCardPick> {
+        val memberMap = householdMembers.associateBy { it.id }
         val bestByCat = mutableMapOf<String, CategoryBestCardPick>()
         for (account in accounts) {
             val profile = account.creditCardProfile ?: continue
             val cardTitle = profile.cardName?.takeIf { it.isNotBlank() } ?: account.name
-            val holder = profile.strategy.cardholder?.takeIf { it.isNotBlank() }
+            val holder = resolveCardholderName(profile.strategy, memberMap)
             for (reward in profile.rewardCategories) {
                 if (reward.isRotating) continue
                 val rawCat = reward.category.ifBlank { reward.label }.trim()

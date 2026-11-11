@@ -5,8 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -32,8 +29,6 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.CategoryBestCardPick
 import app.overbay.orbit.domain.Chase524PersonSummary
 import app.overbay.orbit.domain.Chase524SlotItem
-import app.overbay.orbit.domain.CreditCardPortfolioSummary
-import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.SubProgressSummary
 import app.overbay.orbit.domain.SubTrackerStatus
@@ -41,54 +36,6 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import kotlin.math.roundToInt
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun CardRewardsStrategySection(
-    summary: CreditCardPortfolioSummary,
-    showWhichCardWhere: Boolean,
-    onSelectPlayer: (String) -> Unit,
-    onInspectAccount: (Long) -> Unit,
-    onToggleWhichCardWhere: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (summary.availablePlayers.size > 1) {
-            FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val allSelected = summary.selectedPlayer == CreditCardStrategyEngine.ALL_PLAYERS
-                FilterChip(
-                    selected = allSelected,
-                    onClick = { onSelectPlayer(CreditCardStrategyEngine.ALL_PLAYERS) },
-                    label = { Text("All Household") }
-                )
-                summary.availablePlayers.forEach { (key, label) ->
-                    FilterChip(
-                        selected = summary.selectedPlayer == key,
-                        onClick = { onSelectPlayer(key) },
-                        label = { Text(label) }
-                    )
-                }
-            }
-        }
-
-        summary.chase524ByPerson.forEach { person ->
-            Chase524PersonCard(person = person, onInspectAccount = onInspectAccount)
-        }
-
-        if (summary.activeSubs.isNotEmpty()) {
-            WelcomeBonusesCard(subs = summary.activeSubs, onInspectAccount = onInspectAccount)
-        }
-
-        if (summary.bestCardsByCategory.isNotEmpty()) {
-            WhichCardWhereCard(
-                picks = summary.bestCardsByCategory,
-                isExpanded = showWhichCardWhere,
-                onToggleExpand = onToggleWhichCardWhere,
-                onInspectAccount = onInspectAccount
-            )
-        }
-    }
-}
 
 @Composable
 fun Chase524PersonCard(

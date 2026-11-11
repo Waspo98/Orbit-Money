@@ -44,6 +44,25 @@ class AccountBillingFieldsState(
     var annualFeeCents by mutableStateOf(initialProfile?.annualFeeCents ?: 0L)
     var annualFeePostDate by mutableStateOf(initialProfile?.annualFeePostDate)
 
+    val closeDayError: Boolean
+        get() = statementCloseDayText.trim().let { it.isNotEmpty() && it.toIntOrNull()?.let { d -> d in 1..31 } != true }
+    val dueDayError: Boolean
+        get() = paymentDueDayText.trim().let { it.isNotEmpty() && it.toIntOrNull()?.let { d -> d in 1..31 } != true }
+    val aprError: Boolean
+        get() = aprText.isNotBlank() && CardEditorDraft.parseBps(aprText) == null
+    val promoAprError: Boolean
+        get() = hasPromo && promoAprText.isNotBlank() && CardEditorDraft.parseBps(promoAprText) == null
+    val isValid: Boolean
+        get() = !closeDayError && !dueDayError && !aprError && !promoAprError
+    val firstErrorMessage: String?
+        get() = when {
+            aprError -> "Purchase APR must be between 0% and 100%"
+            closeDayError -> "Statement closing day must be between 1 and 31"
+            dueDayError -> "Payment due day must be between 1 and 31"
+            promoAprError -> "Promo APR must be between 0% and 100%"
+            else -> null
+        }
+
     fun toUpdatedProfile(
         existing: CreditCardProfile?,
         accountName: String,
@@ -104,6 +123,7 @@ fun AccountEditorBillingSection(
                         label = { Text("Purchase APR") },
                         placeholder = { Text("24.99") },
                         suffixText = "%",
+                        isError = state.aprError,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -121,6 +141,7 @@ fun AccountEditorBillingSection(
                     label = { Text("Statement Closes") },
                     placeholder = { Text("1–31") },
                     suffixText = "Day",
+                    isError = state.closeDayError,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.weight(1f)
@@ -131,6 +152,7 @@ fun AccountEditorBillingSection(
                     label = { Text("Payment Due") },
                     placeholder = { Text("1–31") },
                     suffixText = "Day",
+                    isError = state.dueDayError,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.weight(1f)
@@ -159,6 +181,7 @@ fun AccountEditorBillingSection(
                             label = { Text("Promo APR") },
                             placeholder = { Text("0.0") },
                             suffixText = "%",
+                            isError = state.promoAprError,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.weight(1f)

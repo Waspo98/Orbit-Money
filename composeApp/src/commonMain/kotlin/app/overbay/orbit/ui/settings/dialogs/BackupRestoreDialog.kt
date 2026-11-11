@@ -38,6 +38,8 @@ fun BackupRestoreDialog(
                     value = jsonText,
                     onValueChange = onTextChange,
                     placeholder = { Text("Paste backup data here...") },
+                    singleLine = false,
+                    maxLines = 10,
                     modifier = Modifier.fillMaxWidth().height(180.dp)
                 )
             }

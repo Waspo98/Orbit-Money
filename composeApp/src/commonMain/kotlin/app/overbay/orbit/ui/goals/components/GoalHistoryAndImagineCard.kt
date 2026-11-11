@@ -288,6 +288,8 @@ private fun GoalHistoryCanvasChart(
     val firstLabel = first?.let { LocalDateUtils.formatMonthShortLabel(it.month) } ?: ""
     val lastLabel = last?.let { LocalDateUtils.formatMonthShortLabel(it.month) } ?: ""
     val lastAmount = last?.let { MoneyUtils.formatCents(it.amountCents, showCents = false) } ?: ""
+    val path = remember { Path() }
+    val fillPath = remember { Path() }
 
     Column(modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -296,8 +298,8 @@ private fun GoalHistoryCanvasChart(
             val stepX = w / (points.size - 1).coerceAtLeast(1)
             val range = (maxVal - minVal).coerceAtLeast(1f)
 
-            val path = Path()
-            val fillPath = Path()
+            path.rewind()
+            fillPath.rewind()
 
             points.forEachIndexed { i, pt ->
                 val x = i * stepX

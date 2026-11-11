@@ -25,7 +25,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -49,7 +48,6 @@ import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
 import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalOrbitHaptics
-import kotlinx.coroutines.launch
 
 private enum class CardEditorSurfaceMode { FORM, TEMPLATE_PICKER, PERK_EDITOR, REWARD_EDITOR }
 
@@ -64,7 +62,6 @@ fun CardEditorSheetContent(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
-    val scope = rememberCoroutineScope()
     val catalog by CreditCardTemplates.catalogFlow.collectAsState()
 
     val surfaceMode = when {
@@ -268,7 +265,7 @@ fun CardEditorSheetContent(
                         onErrorClick = draft.firstErrorBanner?.first?.let { targetTab ->
                             { controller.selectTab(targetTab) }
                         },
-                        onConfirm = { scope.launch { controller.save() } },
+                        onConfirm = { controller.submitSave() },
                         onDismiss = handleCloseRequest
                     )
                 }

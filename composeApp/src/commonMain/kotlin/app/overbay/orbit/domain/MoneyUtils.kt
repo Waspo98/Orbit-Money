@@ -128,11 +128,20 @@ object MoneyUtils {
     fun percentOf(part: Cents, total: Cents): Double = ratio(part, total) * 100.0
 
     /**
-     * Multiplies cents by a percentage rate (e.g., 5.0 for 5%) and rounds to nearest integer cent.
+     * Multiplies cents by a percentage rate (e.g., 5.0 for 5%) using integer basis points
+     * to avoid binary floating-point rounding drift on large currency amounts.
      */
     fun multiplyPercent(cents: Cents, percent: Double): Cents {
-        if (cents == 0L || percent == 0.0) return 0L
-        return (cents.toDouble() * (percent / 100.0)).roundToLong()
+        if (cents == 0L || percent == 0.0 || percent.isNaN() || percent.isInfinite()) return 0L
+        val scaledHundredthsBps = (percent * 10_000.0).roundToLong() // 1% = 10,000 units (1_000_000 = 100%)
+        val sign = if ((cents < 0L) xor (scaledHundredthsBps < 0L)) -1L else 1L
+        val absCents = abs(cents)
+        val absRate = abs(scaledHundredthsBps)
+        return if (absCents <= Long.MAX_VALUE / (absRate.coerceAtLeast(1L) + 1L)) {
+            sign * ((absCents * absRate + 500_000L) / 1_000_000L)
+        } else {
+            (cents.toDouble() * (percent / 100.0)).roundToLong()
+        }
     }
 
     /**

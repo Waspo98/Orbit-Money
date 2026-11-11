@@ -1,6 +1,5 @@
 package app.overbay.orbit.ui.cardperks
 
-import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.DashboardWidgetConfig
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.ui.dashboard.dialogs.OrbitBentoCustomizeItem
@@ -84,7 +83,6 @@ data class CardPerksGridRow(
 
 data class CardPerksBentoActions(
     val onInspectAccount: (Long) -> Unit,
-    val onOpenCardEditor: (Account) -> Unit,
     val onToggleBenefit: (accountId: Long, benefitId: String) -> Unit,
     val onOpenPerkUsage: (accountId: Long, benefitId: String) -> Unit,
     val onToggleShowUsedPerks: () -> Unit

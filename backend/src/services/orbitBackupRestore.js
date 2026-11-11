@@ -26,6 +26,7 @@ const RESTORE_DELETE_ORDER = [
 
 const RESTORE_INSERT_ORDER = [
   'accounts',
+  'household_members',
   'credit_card_profiles',
   'categories',
   'rules',
@@ -34,7 +35,6 @@ const RESTORE_INSERT_ORDER = [
   'goals',
   'goal_account_allocations',
   'account_balance_records',
-  'household_members',
   'household_income_records',
   'household_retirement_accounts',
   'app_settings',
@@ -308,6 +308,29 @@ function transformRestoreRow(table, row, householdId, context) {
       const accountId = mapRequiredId(context, 'accounts', next.account_id);
       if (!accountId) return null;
       next.account_id = accountId;
+      if (hasOwn(next, 'strategy_json')) {
+        const strategy = safeJsonParse(next.strategy_json);
+        if (strategy && typeof strategy === 'object' && !Array.isArray(strategy)) {
+          const updatedStrategy = { ...strategy };
+          if (hasOwn(updatedStrategy, 'cardholder_member_id')) {
+            updatedStrategy.cardholder_member_id = mapOptionalId(
+              context,
+              'household_members',
+              updatedStrategy.cardholder_member_id
+            );
+          }
+          if (Array.isArray(updatedStrategy.authorized_user_member_ids)) {
+            updatedStrategy.authorized_user_member_ids = Array.from(
+              new Set(
+                updatedStrategy.authorized_user_member_ids
+                  .map((memberId) => mapOptionalId(context, 'household_members', memberId))
+                  .filter((memberId) => memberId !== null)
+              )
+            );
+          }
+          next.strategy_json = JSON.stringify(updatedStrategy);
+        }
+      }
       break;
     }
 

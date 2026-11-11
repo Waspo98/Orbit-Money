@@ -2,6 +2,7 @@ package app.overbay.orbit.domain
 
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.Transaction
 import kotlinx.datetime.LocalDate
 import kotlin.math.abs
@@ -28,7 +29,8 @@ data class CardCycleStatus(
     val daysUntilPromoEnd: Int?,
     val nextAnnualFeeDate: LocalDate?,
     val daysUntilAnnualFee: Int?,
-    val annualFeeCents: Cents
+    val annualFeeCents: Cents,
+    val authorizedUserNames: List<String> = emptyList()
 )
 
 /**
@@ -137,7 +139,12 @@ object CreditCardCycleEngine {
      * Computes the [CardCycleStatus] for an individual account.
      * Returns null if the account is not an active, non-archived credit account without a closed date.
      */
-    fun status(account: Account, txns: List<Transaction>, today: LocalDate): CardCycleStatus? {
+    fun status(
+        account: Account,
+        txns: List<Transaction>,
+        today: LocalDate,
+        householdMembers: List<HouseholdMember> = emptyList()
+    ): CardCycleStatus? {
         if (account.type != AccountType.CREDIT || account.isArchived) return null
         val profile = account.creditCardProfile
         if (!profile?.strategy?.closedDate.isNullOrBlank()) return null
@@ -192,8 +199,18 @@ object CreditCardCycleEngine {
         val nextFeeDate = nextAnnualFeeDate(profile?.annualFeePostDate, today)
         val daysUntilAnnualFee = nextFeeDate?.let { LocalDateUtils.daysBetween(today, it) }
 
+        val memberMap = householdMembers.associateBy { it.id }
         val cardTitle = profile?.cardName?.takeIf { it.isNotBlank() } ?: account.name
-        val holderLabel = profile?.strategy?.cardholder?.takeIf { it.isNotBlank() }
+        val holderLabel = profile?.strategy?.let { CreditCardStrategyEngine.resolveCardholderName(it, memberMap) }
+        val auNames = buildList {
+            profile?.strategy?.authorizedUserMemberIds?.forEach { auId ->
+                memberMap[auId]?.name?.takeIf { it.isNotBlank() }?.let { add(it) }
+            }
+            profile?.authorizedUsers?.forEach { raw ->
+                val trimmed = raw.trim()
+                if (trimmed.isNotEmpty() && none { it.equals(trimmed, ignoreCase = true) }) add(trimmed)
+            }
+        }
 
         return CardCycleStatus(
             accountId = account.id,
@@ -211,7 +228,8 @@ object CreditCardCycleEngine {
             daysUntilPromoEnd = daysUntilPromoEnd,
             nextAnnualFeeDate = nextFeeDate,
             daysUntilAnnualFee = daysUntilAnnualFee,
-            annualFeeCents = annualFeeCents
+            annualFeeCents = annualFeeCents,
+            authorizedUserNames = auNames
         )
     }
 
@@ -221,9 +239,10 @@ object CreditCardCycleEngine {
     fun summarize(
         accounts: List<Account>,
         txns: List<Transaction>,
-        today: LocalDate
+        today: LocalDate,
+        householdMembers: List<HouseholdMember> = emptyList()
     ): Pair<HouseholdCreditSummary, List<CardCycleStatus>> {
-        val statuses = accounts.mapNotNull { status(it, txns, today) }
+        val statuses = accounts.mapNotNull { status(it, txns, today, householdMembers) }
         val totalOwedCents = statuses.sumOf { it.owedNowCents }
         val totalLimitCents = statuses.mapNotNull { it.creditLimitCents }.sum()
         val utilizationBps = if (totalLimitCents > 0L) {

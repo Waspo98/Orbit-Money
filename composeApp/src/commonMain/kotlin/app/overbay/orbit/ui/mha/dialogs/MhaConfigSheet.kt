@@ -69,25 +69,6 @@ fun MhaConfigSheet(
     }
 }
 
-@Composable
-fun MhaConfigSheet(
-    taxProfile: MhaTaxProfile,
-    mhaEnabled: Boolean = true,
-    onToggleMhaEnabled: ((Boolean) -> Unit)? = null,
-    onDismiss: () -> Unit,
-    onSave: (MhaTaxProfile) -> Unit,
-    modifier: Modifier = Modifier
-) = MhaConfigSheet(
-    taxProfile = taxProfile,
-    designatedCapCents = null,
-    fairMarketRentalValueCents = null,
-    mhaEnabled = mhaEnabled,
-    onToggleMhaEnabled = onToggleMhaEnabled,
-    onDismiss = onDismiss,
-    onSave = { updated, _, _ -> onSave(updated) },
-    modifier = modifier
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MhaConfigContent(
@@ -101,8 +82,14 @@ fun MhaConfigContent(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
+    val initialCap = designatedCapCents ?: taxProfile.designatedCapCents
+    val initialFmrv = fairMarketRentalValueCents ?: taxProfile.fairMarketRentalValueCents
 
     var currentMhaEnabled by remember(mhaEnabled) { mutableStateOf(mhaEnabled) }
+    var enableDesignatedCap by remember(initialCap) { mutableStateOf(initialCap != null) }
+    var inputDesignatedCapCents by remember(initialCap) { mutableStateOf(initialCap ?: 0L) }
+    var enableFmrv by remember(initialFmrv) { mutableStateOf(initialFmrv != null) }
+    var inputFmrvCents by remember(initialFmrv) { mutableStateOf(initialFmrv ?: 0L) }
     var mode by remember(taxProfile) { mutableStateOf(taxProfile.mode) }
     var simpleFedRate by remember(taxProfile) { mutableStateOf(taxProfile.simpleFederalRatePercent.toString()) }
     var simpleStateRate by remember(taxProfile) { mutableStateOf(taxProfile.simpleStateRatePercent.toString()) }
@@ -134,7 +121,7 @@ fun MhaConfigContent(
     ) {
         OrbitSheetHeader(
             title = "MHA Tax Assumptions",
-            subtitle = "Configure federal and state tax rates or household estimate mode.",
+            subtitle = "Configure IRS Section 107 limits and federal/state tax rates.",
             onDismiss = onDismiss
         )
 
@@ -147,6 +134,36 @@ fun MhaConfigContent(
                 onToggleMhaEnabled?.invoke(it)
             }
         )
+
+        OrbitSwitchRow(
+            title = "Housing Allowance Designation Cap",
+            subtitle = if (enableDesignatedCap) "Capped by official church/employer designation" else "No annual designation cap configured",
+            checked = enableDesignatedCap,
+            onCheckedChange = { enableDesignatedCap = it }
+        )
+        if (enableDesignatedCap) {
+            CurrencyTextField(
+                cents = inputDesignatedCapCents,
+                onCentsChange = { inputDesignatedCapCents = it },
+                label = "Annual Designated Cap ($)",
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        OrbitSwitchRow(
+            title = "Fair Market Rental Value (FMRV)",
+            subtitle = if (enableFmrv) "Capped by furnished fair market rental value + utilities" else "No annual FMRV cap configured",
+            checked = enableFmrv,
+            onCheckedChange = { enableFmrv = it }
+        )
+        if (enableFmrv) {
+            CurrencyTextField(
+                cents = inputFmrvCents,
+                onCentsChange = { inputFmrvCents = it },
+                label = "Annual Fair Market Rental Value ($)",
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
         Text(
             text = "Tax Calculation Mode",
@@ -328,6 +345,8 @@ fun MhaConfigContent(
             Button(
                 onClick = {
                     haptics.tick()
+                    val resolvedCap = if (enableDesignatedCap) max(0L, inputDesignatedCapCents) else null
+                    val resolvedFmrv = if (enableFmrv) max(0L, inputFmrvCents) else null
                     val updated = taxProfile.copy(
                         mode = mode,
                         simpleFederalRatePercent = simpleFedRate.toDoubleOrNull() ?: 22.0,
@@ -337,9 +356,11 @@ fun MhaConfigContent(
                         deductionMode = deductionMode,
                         itemizedDeductionCents = itemizedDeductionCents,
                         taxableIncomeOverrideCents = if (enableTaxableIncomeOverride) max(0L, inputTaxableIncomeOverrideCents) else null,
-                        stateRateOverridePercent = if (enableStateRateOverride) inputStateRateOverride.toDoubleOrNull()?.coerceIn(0.0, 100.0) else null
+                        stateRateOverridePercent = if (enableStateRateOverride) inputStateRateOverride.toDoubleOrNull()?.coerceIn(0.0, 100.0) else null,
+                        designatedCapCents = resolvedCap,
+                        fairMarketRentalValueCents = resolvedFmrv
                     )
-                    onSave(updated, null, null)
+                    onSave(updated, resolvedCap, resolvedFmrv)
                 }
             ) {
                 Text("Save")

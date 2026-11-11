@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -71,6 +72,11 @@ fun RetirementHistoryTrajectoryCard(
     val startBalance = filteredPoints.firstOrNull()?.balanceCents ?: 0L
     val diffCents = latestBalance - startBalance
     val diffPercent = if (startBalance > 0L) (diffCents.toDouble() / startBalance.toDouble()) * 100.0 else 0.0
+    val palette = retirementAccountPalette()
+    val accountColorMap = remember(linkedAccounts, filteredPoints, palette) {
+        val allIds = linkedAccounts.map { it.accountId } + filteredPoints.flatMap { pt -> pt.accounts.map { it.accountId } }
+        retirementAccountColorMap(allIds, palette)
+    }
 
     OrbitSectionCard(
         title = "Retirement Portfolio History",
@@ -118,7 +124,7 @@ fun RetirementHistoryTrajectoryCard(
                     ) {
                         accountBalances.forEachIndexed { index, acct ->
                             val weight = max(0.02f, acct.balanceCents.toFloat() / totalAccountBal.toFloat())
-                            val color = RETIREMENT_ACCOUNT_MIX_COLORS[index % RETIREMENT_ACCOUNT_MIX_COLORS.size]
+                            val color = accountColorMap[acct.accountId] ?: palette[index % palette.size]
                             Box(modifier = Modifier.weight(weight).height(8.dp).background(color))
                         }
                     }
@@ -127,7 +133,7 @@ fun RetirementHistoryTrajectoryCard(
                 // Interactive Multi-Series Canvas Line Chart
                 InteractiveHistoryChart(
                     points = filteredPoints,
-                    linkedAccounts = linkedAccounts,
+                    accountColorMap = accountColorMap,
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -173,8 +179,8 @@ fun RetirementHistoryTrajectoryCard(
                         )
 
                         linkedAccounts.forEachIndexed { index, account ->
-                            val color = RETIREMENT_ACCOUNT_MIX_COLORS[index % RETIREMENT_ACCOUNT_MIX_COLORS.size]
-                            val startBal = firstPt.accounts.find { it.accountId == account.accountId }?.balanceCents ?: account.balanceCents
+                            val color = account.accountId?.let { accountColorMap[it] } ?: palette[index % palette.size]
+                            val startBal = firstPt.accounts.find { it.accountId == account.accountId }?.balanceCents ?: 0L
                             val endBal = lastPt.accounts.find { it.accountId == account.accountId }?.balanceCents ?: account.balanceCents
                             val changeCents = endBal - startBal
                             val changePct = if (startBal > 0L) (changeCents.toDouble() / startBal.toDouble()) * 100.0 else 0.0
@@ -213,7 +219,7 @@ fun RetirementHistoryTrajectoryCard(
 @Composable
 private fun InteractiveHistoryChart(
     points: List<RetirementHistoryPoint>,
-    linkedAccounts: List<LinkedRetirementAccountDetail>,
+    accountColorMap: Map<Long, Color>,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -244,6 +250,9 @@ private fun InteractiveHistoryChart(
     val seriesStroke = remember(density) {
         Stroke(width = with(density) { 1.5.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
     }
+    val acctPath = remember { Path() }
+    val totalPath = remember { Path() }
+    val allAccountIds = remember(points) { points.flatMap { it.accounts }.mapNotNull { it.accountId }.distinct() }
 
     Column(modifier = modifier) {
         // Scrubber Tooltip Row
@@ -296,10 +305,9 @@ private fun InteractiveHistoryChart(
                 fun balToY(bal: Cents): Float = h - ((bal.toDouble() / maxVal.toDouble()) * h).toFloat()
 
                 // 1. Draw individual colored lines for each linked account
-                val allAccountIds = points.flatMap { it.accounts }.map { it.accountId }.distinct()
-                allAccountIds.forEachIndexed { acctIdx, acctId ->
-                    val color = RETIREMENT_ACCOUNT_MIX_COLORS[acctIdx % RETIREMENT_ACCOUNT_MIX_COLORS.size]
-                    val acctPath = Path()
+                allAccountIds.forEach { acctId ->
+                    val color = accountColorMap[acctId] ?: primaryColor
+                    acctPath.rewind()
                     var started = false
 
                     points.forEachIndexed { idx, pt ->
@@ -316,7 +324,7 @@ private fun InteractiveHistoryChart(
                 }
 
                 // 2. Draw Total Savings line (solid primary)
-                val totalPath = Path()
+                totalPath.rewind()
                 points.forEachIndexed { idx, pt ->
                     val x = idxToX(idx)
                     val y = balToY(pt.balanceCents)

@@ -32,7 +32,6 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitFieldLabel
 import app.overbay.orbit.ui.components.OrbitModalFooter
-import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
 import app.overbay.orbit.ui.components.OrbitSheetHeader
@@ -50,24 +49,6 @@ private val COMMON_CATEGORIES = listOf(
     "Drugstores",
     "Everything Else"
 )
-
-@Composable
-fun RewardEditorDialog(
-    reward: RewardCategory,
-    isNew: Boolean,
-    onSave: (RewardCategory) -> Unit,
-    onDismiss: () -> Unit
-) {
-    OrbitModalSheet(onDismissRequest = onDismiss) {
-        RewardEditorSubform(
-            reward = reward,
-            isNew = isNew,
-            onSave = onSave,
-            onDismiss = onDismiss,
-            showBackButton = false
-        )
-    }
-}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

@@ -47,13 +47,26 @@ import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 
-private val GoalPalette = listOf(
-    Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFF8B5CF6),
-    Color(0xFFEC4899), Color(0xFF06B6D4), Color(0xFFF97316), Color(0xFF14B8A6)
-)
+@Composable
+private fun rememberGoalSlicePalette(): List<Color> {
+    val scheme = MaterialTheme.colorScheme
+    val orbit = OrbitTheme.colors
+    return remember(scheme, orbit) {
+        listOf(
+            scheme.primary,
+            orbit.income,
+            orbit.warning,
+            scheme.tertiary,
+            orbit.transfer,
+            scheme.secondary,
+            scheme.inversePrimary,
+            scheme.outline
+        )
+    }
+}
 
-private fun goalSliceColor(goalId: Long): Color =
-    GoalPalette[((goalId.hashCode().toLong() and 0x7FFFFFFF) % GoalPalette.size).toInt()]
+private fun goalSliceColor(goalId: Long, palette: List<Color>): Color =
+    palette[((goalId.hashCode().toLong() and 0x7FFFFFFF) % palette.size).toInt()]
 
 @Composable
 fun GoalAccountsOverviewCard(
@@ -143,18 +156,19 @@ private fun AccountSummaryRow(
 ) {
     val colors = OrbitTheme.colors
     val haptics = LocalOrbitHaptics.current
+    val palette = rememberGoalSlicePalette()
     val linkedGoals = remember(goals, summary.accountId) {
         goals.filter { g -> g.allocations.any { it.accountId == summary.accountId } }
     }
-    val goalAllocations = remember(linkedGoals, summary) {
+    val goalAllocations = remember(linkedGoals, summary, palette) {
         linkedGoals.mapNotNull { g ->
             val alloc = g.allocations.firstOrNull { it.accountId == summary.accountId } ?: return@mapNotNull null
             val amt = if (alloc.allocationType == GoalAllocationType.PERCENT) {
-                ((summary.allocatableAmountCents * alloc.allocationPercent) / 100.0).toLong()
+                MoneyUtils.multiplyPercent(summary.allocatableAmountCents, alloc.allocationPercent)
             } else {
                 alloc.allocationAmountCents
             }
-            Triple(g, amt, goalSliceColor(g.id))
+            Triple(g, amt, goalSliceColor(g.id, palette))
         }
     }
 
@@ -306,7 +320,7 @@ private fun AccountSummaryRow(
                             val alloc = goal.allocations.firstOrNull { it.accountId == summary.accountId }
                             val allocText = if (alloc != null) {
                                 if (alloc.allocationType == GoalAllocationType.PERCENT) {
-                                    "${alloc.allocationPercent.toInt()}% (${MoneyUtils.formatCents(((summary.allocatableAmountCents * alloc.allocationPercent) / 100.0).toLong())})"
+                                    "${alloc.allocationPercent.toInt()}% (${MoneyUtils.formatCents(MoneyUtils.multiplyPercent(summary.allocatableAmountCents, alloc.allocationPercent))})"
                                 } else {
                                     MoneyUtils.formatCents(alloc.allocationAmountCents)
                                 }

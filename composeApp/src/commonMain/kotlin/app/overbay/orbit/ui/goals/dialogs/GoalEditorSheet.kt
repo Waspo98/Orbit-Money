@@ -128,7 +128,7 @@ fun GoalEditorContent(
             if (acct != null) {
                 val allocatable = max(0L, acct.currentBalanceCents - alloc.reserveAmountCents)
                 if (alloc.allocationType == GoalAllocationType.PERCENT) {
-                    ((allocatable * alloc.allocationPercent) / 100.0).toLong()
+                    MoneyUtils.multiplyPercent(allocatable, alloc.allocationPercent)
                 } else {
                     min(allocatable, alloc.allocationAmountCents)
                 }

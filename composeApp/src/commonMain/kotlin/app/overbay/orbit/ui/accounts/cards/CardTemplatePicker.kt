@@ -24,9 +24,6 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -34,7 +31,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.CreditCardTemplate
-import app.overbay.orbit.domain.CreditCardTemplates
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.OrbitTextField
@@ -114,47 +110,6 @@ fun LazyListScope.cardTemplatePickerItems(
     }
 
     item(key = "template_picker_footer") {
-        CardTemplatePickerFooter(
-            asOf = catalog.firstOrNull()?.asOf ?: "2026-11",
-            onSkip = onSkip
-        )
-    }
-}
-
-@Composable
-fun CardTemplatePicker(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onSelectTemplate: (CreditCardTemplate) -> Unit,
-    onSkip: () -> Unit,
-    selectedFilter: String = "All",
-    onFilterChange: (String) -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    val catalog by CreditCardTemplates.catalogFlow.collectAsState()
-    val filtered = remember(catalog, query, selectedFilter) {
-        filterCardTemplates(catalog, query, selectedFilter)
-    }
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        CardTemplatePickerHeader(
-            query = query,
-            selectedFilter = selectedFilter,
-            totalMatching = filtered.size,
-            onQueryChange = onQueryChange,
-            onFilterChange = onFilterChange
-        )
-
-        filtered.forEach { tpl ->
-            TemplateItemRow(
-                template = tpl,
-                onClick = { onSelectTemplate(tpl) }
-            )
-        }
-
         CardTemplatePickerFooter(
             asOf = catalog.firstOrNull()?.asOf ?: "2026-11",
             onSkip = onSkip

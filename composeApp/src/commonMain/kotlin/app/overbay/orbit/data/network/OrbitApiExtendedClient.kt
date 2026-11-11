@@ -15,7 +15,6 @@ import app.overbay.orbit.data.model.MerchantLogo
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.OccurrenceStatus
 import app.overbay.orbit.data.model.PushNotificationConfigInfo
-import app.overbay.orbit.data.model.RecurringCandidate
 import app.overbay.orbit.data.model.RetirementHistoryPoint
 import app.overbay.orbit.data.model.RulePreviewResult
 import app.overbay.orbit.data.model.SimpleFinStatusInfo
@@ -159,22 +158,6 @@ suspend fun OrbitApiClient.getUpcomingFull(startDate: String? = null, endDate: S
 suspend fun OrbitApiClient.createUpcomingFromTransaction(transactionId: Long): Result<UpcomingItem> = runCatching {
     val res = client.post(url("/api/upcoming/from-transaction")) {
         contentType(ContentType.Application.Json); auth(sessionCookie); setBody(FromTransactionRequestDto(transactionId))
-    }
-    extractSessionCookie(res); ensureSuccess(res)
-    res.body<UpcomingItemDto>().toDomain()
-}
-
-suspend fun OrbitApiClient.acceptUpcomingSuggestion(candidate: RecurringCandidate): Result<UpcomingItem> = runCatching {
-    val req = AcceptSuggestionRequestDto(
-        key = candidate.key, name = candidate.name, merchant = candidate.merchant,
-        amount = MoneyUtils.centsToDollars(candidate.amountCents), direction = candidate.direction,
-        kind = candidate.kind.name.lowercase(), frequencyType = candidate.frequency.name.lowercase(),
-        frequencyInterval = candidate.frequencyInterval, frequencyUnit = candidate.frequencyUnit,
-        nextDate = candidate.nextProjectedDate, categoryId = candidate.suggestedCategoryId,
-        accountId = candidate.suggestedAccountId, sourceTransactionId = candidate.sourceTransactionId
-    )
-    val res = client.post(url("/api/upcoming/suggestions/accept")) {
-        contentType(ContentType.Application.Json); auth(sessionCookie); setBody(req)
     }
     extractSessionCookie(res); ensureSuccess(res)
     res.body<UpcomingItemDto>().toDomain()
@@ -536,6 +519,21 @@ suspend fun OrbitApiClient.exportBudgetingDataRemote(format: String): Result<Str
     }
     extractSessionCookie(res); ensureSuccess(res)
     res.bodyAsText()
+}
+
+suspend fun OrbitApiClient.exportOrbitBackupRemote(): Result<String> = runCatching {
+    val res = client.get(url("/api/data/orbit-backup")) { auth(sessionCookie) }
+    extractSessionCookie(res); ensureSuccess(res)
+    res.bodyAsText()
+}
+
+suspend fun OrbitApiClient.restoreOrbitBackupRemote(backupJson: String): Result<Boolean> = runCatching {
+    val res = client.post(url("/api/data/orbit-restore")) {
+        contentType(ContentType.Application.Json); auth(sessionCookie)
+        setBody(RestoreOrbitBackupRequestDto(backupJson = backupJson))
+    }
+    extractSessionCookie(res); ensureSuccess(res)
+    res.status.isSuccess()
 }
 
 suspend fun OrbitApiClient.uploadRocketMoneyCsvRemote(

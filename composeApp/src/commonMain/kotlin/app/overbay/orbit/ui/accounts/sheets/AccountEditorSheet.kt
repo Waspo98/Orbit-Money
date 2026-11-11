@@ -261,7 +261,8 @@ fun AccountEditorContent(
 
         OrbitModalFooter(
             confirmText = if (account.id == 0L) "Add Account" else "Save Account",
-            confirmEnabled = name.isNotBlank(),
+            confirmEnabled = name.isNotBlank() && (selectedType != AccountType.CREDIT || billingState.isValid),
+            errorBannerText = if (selectedType == AccountType.CREDIT) billingState.firstErrorMessage else null,
             onDismiss = onDismiss,
             onConfirm = {
                 val estCents = if (estimatedValueCents > 0L) estimatedValueCents else null

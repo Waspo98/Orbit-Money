@@ -51,10 +51,10 @@ fun HouseholdIncomeAssumptionsCard(
     modifier: Modifier = Modifier
 ) {
     val grossIncome = uiState.grossIncomeAnnualCents
-    val guide55 = if (grossIncome > 0L) (grossIncome.toDouble() * 0.55).roundToLong() else 45_000_00L
-    val guide80 = if (grossIncome > 0L) (grossIncome.toDouble() * 0.80).roundToLong() else 65_000_00L
-    val snapTolerance = if (grossIncome > 0L) (grossIncome.toDouble() * 0.04).roundToLong() else 3000_00L
-    val maxSpending = max(200_000_00L, if (grossIncome > 0L) (grossIncome.toDouble() * 1.5).roundToLong() else 150_000_00L)
+    val guide55 = if (grossIncome > 0L) MoneyUtils.multiplyPercent(grossIncome, 55.0) else 45_000_00L
+    val guide80 = if (grossIncome > 0L) MoneyUtils.multiplyPercent(grossIncome, 80.0) else 65_000_00L
+    val snapTolerance = if (grossIncome > 0L) MoneyUtils.multiplyPercent(grossIncome, 4.0) else 3000_00L
+    val maxSpending = max(200_000_00L, if (grossIncome > 0L) MoneyUtils.multiplyPercent(grossIncome, 150.0) else 150_000_00L)
 
     OrbitSectionCard(
         title = "Planning Assumptions & Ages",
@@ -134,11 +134,12 @@ fun HouseholdIncomeAssumptionsCard(
             )
         }
         val minRetireAge = (uiState.currentAge.toFloat() + 1f).coerceAtLeast(40f)
+        val maxRetireAge = max(85f, minRetireAge + 5f)
         Slider(
-            value = uiState.retirementAge.toFloat().coerceIn(minRetireAge, 85f),
+            value = uiState.retirementAge.toFloat().coerceIn(minRetireAge, maxRetireAge),
             onValueChange = { onRetirementAgeChange(it.toDouble()) },
-            valueRange = minRetireAge..85f,
-            steps = max(0, (85 - minRetireAge.toInt()) - 1),
+            valueRange = minRetireAge..maxRetireAge,
+            steps = max(0, (maxRetireAge.toInt() - minRetireAge.toInt()) - 1),
             modifier = Modifier.fillMaxWidth()
         )
 

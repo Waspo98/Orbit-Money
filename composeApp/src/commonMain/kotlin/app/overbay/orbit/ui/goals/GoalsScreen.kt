@@ -44,6 +44,7 @@ import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
@@ -90,20 +91,12 @@ fun GoalsScreen(
             }
         ) { paddingValues ->
             if (state.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             } else {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .nestedScroll(heroScrollState.nestedScrollConnection)
+                    modifier = Modifier.fillMaxSize().padding(paddingValues).nestedScroll(heroScrollState.nestedScrollConnection)
                 ) {
                     MorphingPageHero(
                         kicker = "SAVING TARGETS",
@@ -262,7 +255,7 @@ fun GoalsScreen(
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
                                                 OrbitActionChip(label = "Edit Goal", onClick = { viewModel.openEditGoal(selected) })
-                                                OrbitActionChip(label = "Delete", isDestructive = true, onClick = { viewModel.deleteGoal(selected.id) })
+                                                OrbitActionChip(label = "Delete", isDestructive = true, onClick = { viewModel.requestDeleteGoal(selected.id) })
                                             }
                                         }
                                     }
@@ -373,12 +366,24 @@ fun GoalsScreen(
                 accounts = state.accounts,
                 existingGoals = state.goals,
                 onSave = { goal, steal -> viewModel.saveGoalWithAllocations(goal, steal) },
-                onDelete = { viewModel.deleteGoal(it) },
+                onDelete = { viewModel.requestDeleteGoal(it) },
                 onDismiss = { viewModel.closeEditorSheet() },
                 onOpenLinkedAccount = { acctId ->
                     viewModel.closeEditorSheet()
                     onNavigate(OrbitNavKey.Accounts(accountId = acctId))
                 }
+            )
+        }
+
+        state.deleteConfirmGoalId?.let { targetId ->
+            val goalTitle = state.deleteConfirmGoal?.labelWithEmoji ?: "this goal"
+            OrbitConfirmationDialog(
+                title = "Delete Savings Goal?",
+                message = "Remove $goalTitle? Your connected accounts and balances will not be affected.",
+                confirmText = "Delete Goal",
+                isDestructive = true,
+                onConfirm = { viewModel.deleteGoal(targetId) },
+                onDismiss = { viewModel.dismissDeleteGoal() }
             )
         }
     }

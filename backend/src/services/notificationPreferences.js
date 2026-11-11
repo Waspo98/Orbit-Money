@@ -86,7 +86,9 @@ export function normalizeNotificationPreferences(value = {}) {
     },
     income: {
       enabled: income.enabled !== false,
-      timing: normalizeIncomeTiming(income.timing, defaults.income.timing),
+      timing: income.timing !== undefined
+        ? normalizeIncomeTiming(income.timing, defaults.income.timing)
+        : (TIME_RE.test(String(income.time || '')) ? 'scheduled' : defaults.income.timing),
       time: normalizeNotificationSectionTime(income, defaultTime, defaults.income.time)
     },
     syncIssues: {
@@ -98,7 +100,7 @@ export function normalizeNotificationPreferences(value = {}) {
       cadence: SNAPSHOT_CADENCES.has(snapshots.cadence)
         ? snapshots.cadence
         : defaults.accountSnapshots.cadence,
-      dayOfMonth: Math.max(1, Math.min(28, Math.trunc(Number(snapshots.dayOfMonth) || 1))),
+      dayOfMonth: Math.max(1, Math.min(28, Math.trunc(Number(snapshots.dayOfMonth ?? snapshots.dayOfWeek) || 1))),
       time: normalizeNotificationSectionTime(snapshots, defaultTime, defaults.accountSnapshots.time)
     }
   };

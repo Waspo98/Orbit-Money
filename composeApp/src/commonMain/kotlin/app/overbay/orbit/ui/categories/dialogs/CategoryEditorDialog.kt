@@ -25,10 +25,13 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSwitchGroupCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.OrbitTextField
@@ -66,11 +70,12 @@ fun CategoryEditorDialog(
     showMhaOption: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    app.overbay.orbit.ui.components.OrbitModalSheet(onDismissRequest = onDismiss, modifier = modifier) {
+    OrbitModalSheet(onDismissRequest = onDismiss, modifier = modifier) {
         CategoryEditorContent(category, onSave, onDelete, onViewTransactions, onDismiss, showMhaOption)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryEditorContent(
     category: Category?,
@@ -89,12 +94,16 @@ fun CategoryEditorContent(
         mutableStateOf(CategoryEmojiMapper.resolveEmoji(category?.icon) ?: PRESET_ICONS.first())
     }
     var mhaEligible by remember(category) { mutableStateOf(category?.mhaDefaultEligible ?: false) }
+    var categoryKind by remember(category) {
+        mutableStateOf(when {
+            category?.isIncome == true -> "income"
+            category?.isTransfer == true -> "transfer"
+            else -> "expense"
+        })
+    }
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState())
+        modifier = modifier.fillMaxWidth().padding(20.dp).verticalScroll(rememberScrollState())
     ) {
         Text(
             text = if (isEditing) "Edit Category" else "New Category",
@@ -104,7 +113,6 @@ fun CategoryEditorContent(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Live Composite Preview
         val previewComposeColor = remember(selectedColor) {
             selectedColor.toComposeColor(Color(0xFF2E7D32))
         }
@@ -119,18 +127,10 @@ fun CategoryEditorContent(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(previewComposeColor.copy(alpha = 0.18f)),
+                    modifier = Modifier.size(40.dp).clip(CircleShape).background(previewComposeColor.copy(alpha = 0.18f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = selectedIcon.ifBlank { "#" },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = previewComposeColor
-                    )
+                    Text(selectedIcon.ifBlank { "#" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = previewComposeColor)
                 }
                 Text(
                     text = name.ifBlank { "Category Name" },
@@ -140,7 +140,21 @@ fun CategoryEditorContent(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
+
+        if (!isEditing) {
+            val kinds = listOf("expense" to "Expense", "income" to "Income", "transfer" to "Transfer")
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                kinds.forEachIndexed { idx, (key, label) ->
+                    SegmentedButton(
+                        selected = categoryKind == key,
+                        onClick = { haptics.tick(); categoryKind = key },
+                        shape = SegmentedButtonDefaults.itemShape(index = idx, count = kinds.size)
+                    ) { Text(label) }
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+        }
 
         CategoryEditorFormFields(
             category = category,
@@ -155,17 +169,14 @@ fun CategoryEditorContent(
             showMhaOption = showMhaOption
         )
         Spacer(modifier = Modifier.height(20.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                Text("Cancel")
-            }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cancel") }
             Button(
                 onClick = {
                     haptics.confirm()
-                    onSave(category?.id ?: 0L, name.trim(), selectedColor, selectedIcon.trim().ifBlank { null }, category?.isTransfer ?: false, category?.isIncome ?: false, mhaEligible)
+                    val isTransfer = if (isEditing) category.isTransfer else categoryKind == "transfer"
+                    val isIncome = if (isEditing) category.isIncome else categoryKind == "income"
+                    onSave(category?.id ?: 0L, name.trim(), selectedColor, selectedIcon.trim().ifBlank { null }, isTransfer, isIncome, mhaEligible)
                 },
                 enabled = name.isNotBlank(),
                 modifier = Modifier.weight(1f)
@@ -324,22 +335,17 @@ private fun CategoryEditorFormFields(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
+                modifier = Modifier.size(40.dp).clip(CircleShape)
                     .background(parsedCustomColor ?: MaterialTheme.colorScheme.primaryContainer)
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                if (parsedCustomColor == null) {
-                    Text("?", style = MaterialTheme.typography.labelSmall)
-                }
+                if (parsedCustomColor == null) Text("?", style = MaterialTheme.typography.labelSmall)
             }
-            app.overbay.orbit.ui.components.OrbitTextField(
+            OrbitTextField(
                 value = selectedColor,
                 onValueChange = { input ->
-                    val formatted = if (input.startsWith("#")) input.take(7) else "#${input.take(6)}"
-                    onColorChange(formatted)
+                    onColorChange(if (input.startsWith("#")) input.take(7) else "#${input.take(6)}")
                 },
                 label = { Text("Custom Hex Color (#RRGGBB)") },
                 singleLine = true,
@@ -354,21 +360,14 @@ private fun CategoryEditorFormFields(
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
             ) {
                 Row(
                     modifier = Modifier.padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                     Text(
                         text = "Income and transfer behavior stays unchanged here. This editor only updates the name, emoji, color, and MHA default.",
                         style = MaterialTheme.typography.bodySmall,
@@ -380,13 +379,8 @@ private fun CategoryEditorFormFields(
 
         if (showMhaOption) {
             Spacer(modifier = Modifier.height(16.dp))
-            app.overbay.orbit.ui.components.OrbitSwitchGroupCard {
-                OrbitSwitchRow(
-                    title = "Default MHA Eligible",
-                    checked = mhaEligible,
-                    onCheckedChange = onMhaChange,
-                    showContainer = false
-                )
+            OrbitSwitchGroupCard {
+                OrbitSwitchRow("Default MHA Eligible", checked = mhaEligible, onCheckedChange = onMhaChange, showContainer = false)
             }
         }
     }

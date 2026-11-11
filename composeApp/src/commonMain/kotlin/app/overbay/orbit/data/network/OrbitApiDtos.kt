@@ -422,7 +422,11 @@ data class UpcomingItemDto(
             "bimonthly" -> RecurrenceFrequency.BIMONTHLY
             "quarterly" -> RecurrenceFrequency.QUARTERLY
             "yearly" -> RecurrenceFrequency.YEARLY
-            "custom" -> RecurrenceFrequency.CUSTOM
+            "custom" -> if (frequencyInterval == 3 && frequencyUnit.equals("months", ignoreCase = true)) {
+                RecurrenceFrequency.QUARTERLY
+            } else {
+                RecurrenceFrequency.CUSTOM
+            }
             else -> RecurrenceFrequency.MONTHLY
         }
         val k = when (kind.lowercase()) {

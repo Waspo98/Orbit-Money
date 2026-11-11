@@ -47,17 +47,25 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.ProjectionPoint
 import app.overbay.orbit.domain.RetirementScenarioModel
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-val SCENARIO_PRESET_COLORS = mapOf(
-    RetirementScenarioPreset.CONSERVATIVE to Color(0xFF2563EB), // Blue
-    RetirementScenarioPreset.BALANCED to Color(0xFF059669),     // Green
-    RetirementScenarioPreset.AGGRESSIVE to Color(0xFF7C3AED)   // Purple
-)
+@Composable
+private fun rememberScenarioPresetColors(): Map<RetirementScenarioPreset, Color> {
+    val conservative = OrbitTheme.colors.transfer
+    val balanced = MaterialTheme.colorScheme.primary
+    val aggressive = MaterialTheme.colorScheme.tertiary
+    return remember(conservative, balanced, aggressive) {
+        mapOf(
+            RetirementScenarioPreset.CONSERVATIVE to conservative,
+            RetirementScenarioPreset.BALANCED to balanced,
+            RetirementScenarioPreset.AGGRESSIVE to aggressive
+        )
+    }
+}
 
 @Composable
 fun RetirementProjectionChart(
@@ -107,7 +115,8 @@ fun RetirementProjectionChart(
         }
     }
 
-    val selectedColor = SCENARIO_PRESET_COLORS[selectedPreset] ?: Color(0xFF059669)
+    val presetColors = rememberScenarioPresetColors()
+    val selectedColor = presetColors[selectedPreset] ?: MaterialTheme.colorScheme.primary
     val areaBrush = remember(selectedColor) {
         Brush.verticalGradient(listOf(selectedColor.copy(alpha = 0.22f), selectedColor.copy(alpha = 0.01f)))
     }
@@ -126,8 +135,10 @@ fun RetirementProjectionChart(
     val actualStroke = remember(density) {
         Stroke(width = with(density) { 2.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
     }
+    val areaPath = remember { Path() }
+    val actualPath = remember { Path() }
+    val linePath = remember { Path() }
 
-    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
@@ -155,7 +166,7 @@ fun RetirementProjectionChart(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         RetirementScenarioPreset.entries.forEach { p ->
-                            val color = SCENARIO_PRESET_COLORS[p] ?: Color.Gray
+                            val color = presetColors[p] ?: onSurfaceVariant
                             val bal = interpolateBalanceAtAge(scenarios[p]?.accumulationPoints ?: emptyList(), age)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(modifier = Modifier.height(8.dp).width(8.dp).background(color, RoundedCornerShape(2.dp)))
@@ -244,46 +255,38 @@ fun RetirementProjectionChart(
                 val selectedModel = scenarios[selectedPreset]
                 if (selectedModel != null && selectedModel.accumulationPoints.size >= 2) {
                     val pts = selectedModel.accumulationPoints
-                    val path = Path()
-                    path.moveTo(ageToX(pts.first().age), balToY(pts.first().balanceCents))
+                    areaPath.rewind()
+                    areaPath.moveTo(ageToX(pts.first().age), balToY(pts.first().balanceCents))
                     for (i in 1 until pts.size) {
-                        path.lineTo(ageToX(pts[i].age), balToY(pts[i].balanceCents))
+                        areaPath.lineTo(ageToX(pts[i].age), balToY(pts[i].balanceCents))
                     }
-                    path.lineTo(ageToX(pts.last().age), h)
-                    path.lineTo(ageToX(pts.first().age), h)
-                    path.close()
-                    drawPath(path, brush = areaBrush)
+                    areaPath.lineTo(ageToX(pts.last().age), h)
+                    areaPath.lineTo(ageToX(pts.first().age), h)
+                    areaPath.close()
+                    drawPath(areaPath, brush = areaBrush)
                 }
 
                 // 5. Historical Actual Balances Line (up to currentAge)
                 if (actualHistoryPoints.size >= 2) {
-                    val actualPath = Path()
+                    actualPath.rewind()
                     actualPath.moveTo(ageToX(actualHistoryPoints.first().age), balToY(actualHistoryPoints.first().balanceCents))
                     for (i in 1 until actualHistoryPoints.size) {
                         val pt = actualHistoryPoints[i]
                         actualPath.lineTo(ageToX(pt.age), balToY(pt.balanceCents))
                     }
-                    drawPath(
-                        actualPath,
-                        color = onSurfaceVariant.copy(alpha = 0.65f),
-                        style = actualStroke
-                    )
+                    drawPath(actualPath, color = onSurfaceVariant.copy(alpha = 0.65f), style = actualStroke)
                 }
 
                 // 6. Dot at Today's Balance
-                drawCircle(
-                    color = onSurface,
-                    radius = with(density) { 4.5.dp.toPx() },
-                    center = Offset(todayX, balToY(currentBalanceCents))
-                )
+                drawCircle(color = onSurface, radius = with(density) { 4.5.dp.toPx() }, center = Offset(todayX, balToY(currentBalanceCents)))
 
                 // 7. Simultaneous 3 Accumulation Curves
                 RetirementScenarioPreset.entries.forEach { preset ->
                     val model = scenarios[preset]
                     if (model != null && model.accumulationPoints.size >= 2) {
-                        val color = SCENARIO_PRESET_COLORS[preset] ?: Color.Gray
+                        val color = presetColors[preset] ?: onSurfaceVariant
                         val isSelected = preset == selectedPreset
-                        val linePath = Path()
+                        linePath.rewind()
                         val pts = model.accumulationPoints
                         linePath.moveTo(ageToX(pts.first().age), balToY(pts.first().balanceCents))
                         for (i in 0 until pts.size - 1) {
@@ -291,25 +294,17 @@ fun RetirementProjectionChart(
                             val p1 = pts[i]
                             val p2 = pts[i + 1]
                             val p3 = if (i + 2 < pts.size) pts[i + 2] else p2
-                            val x1 = ageToX(p1.age)
-                            val y1 = balToY(p1.balanceCents)
-                            val x2 = ageToX(p2.age)
-                            val y2 = balToY(p2.balanceCents)
-                            val x0 = ageToX(p0.age)
-                            val y0 = balToY(p0.balanceCents)
-                            val x3 = ageToX(p3.age)
-                            val y3 = balToY(p3.balanceCents)
+                            val x1 = ageToX(p1.age); val y1 = balToY(p1.balanceCents)
+                            val x2 = ageToX(p2.age); val y2 = balToY(p2.balanceCents)
+                            val x0 = ageToX(p0.age); val y0 = balToY(p0.balanceCents)
+                            val x3 = ageToX(p3.age); val y3 = balToY(p3.balanceCents)
                             linePath.cubicTo(
                                 x1 + (x2 - x0) / 6f, (y1 + (y2 - y0) / 6f).coerceIn(0f, h),
                                 x2 - (x3 - x1) / 6f, (y2 - (y3 - y1) / 6f).coerceIn(0f, h),
                                 x2, y2
                             )
                         }
-                        drawPath(
-                            linePath,
-                            color = if (isSelected) color else color.copy(alpha = 0.7f),
-                            style = if (isSelected) thickCurveStroke else normalCurveStroke
-                        )
+                        drawPath(linePath, color = if (isSelected) color else color.copy(alpha = 0.7f), style = if (isSelected) thickCurveStroke else normalCurveStroke)
                     }
                 }
 
@@ -319,13 +314,7 @@ fun RetirementProjectionChart(
                     val sx = ageToX(activeAge)
                     val activeBal = interpolateBalanceAtAge(scenarios[selectedPreset]?.accumulationPoints ?: emptyList(), activeAge)
                     val sy = balToY(activeBal)
-
-                    drawLine(
-                        color = onSurface.copy(alpha = 0.8f),
-                        start = Offset(sx, 0f),
-                        end = Offset(sx, h),
-                        strokeWidth = markerStroke.width
-                    )
+                    drawLine(color = onSurface.copy(alpha = 0.8f), start = Offset(sx, 0f), end = Offset(sx, h), strokeWidth = markerStroke.width)
                     drawCircle(color = selectedColor.copy(alpha = 0.25f), radius = with(density) { 12.dp.toPx() }, center = Offset(sx, sy))
                     drawCircle(color = surfaceColor, radius = with(density) { 5.dp.toPx() }, center = Offset(sx, sy))
                     drawCircle(color = selectedColor, radius = with(density) { 5.dp.toPx() }, center = Offset(sx, sy), style = Stroke(width = with(density) { 2.5.dp.toPx() }))
@@ -337,10 +326,7 @@ fun RetirementProjectionChart(
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.9f),
-                    border = Stroke(1f).let { null },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
                 ) {
                     val statusText = if (hsaBridge.isBridgeCovered) "Non-HSA: Covered" else "Non-HSA: ${MoneyUtils.formatCompactCents(hsaBridge.shortfallCents)} Short"
                     val statusColor = if (hsaBridge.isBridgeCovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error

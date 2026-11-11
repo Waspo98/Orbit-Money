@@ -69,7 +69,6 @@ class AccountsViewModel(
     private val _accountSortOverrides = MutableStateFlow<Map<Long, Int>>(emptyMap())
     private val _isSyncing = MutableStateFlow(false)
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
-    private val _masterMode = MutableStateFlow(AccountsMasterMode.ALL_ACCOUNTS)
     private val _selectedCardPlayer = MutableStateFlow(CreditCardStrategyEngine.ALL_PLAYERS)
     private val _showUsedPerks = MutableStateFlow(false)
     private val _showWhichCardWhere = MutableStateFlow(false)
@@ -94,9 +93,9 @@ class AccountsViewModel(
     }.distinctUntilChanged().flowOn(computeDispatcher)
 
     private val hubUiControlFlow = combine(
-        _masterMode, _showUsedPerks, _showWhichCardWhere, _selectedRewardCategory
-    ) { mode, showUsed, showWhich, cat ->
-        AccountsHubUiControl(mode, showUsed, showWhich, cat)
+        _showUsedPerks, _showWhichCardWhere, _selectedRewardCategory
+    ) { showUsed, showWhich, cat ->
+        AccountsHubUiControl(showUsed, showWhich, cat)
     }
 
     private val dataFlow = combine(
@@ -177,7 +176,6 @@ class AccountsViewModel(
     }.combine(_perkUsageTarget) { state, target -> state.copy(perkUsageTarget = target)
     }.combine(combine(hubUiControlFlow, creditCardsHubFlow) { ctrl, hub -> ctrl to hub }) { state, (ctrl, hub) ->
         state.copy(
-            masterMode = ctrl.mode,
             showUsedPerks = ctrl.showUsedPerks,
             showWhichCardWhere = ctrl.showWhichCardWhere,
             selectedRewardCategory = ctrl.selectedRewardCategory,
@@ -205,7 +203,6 @@ class AccountsViewModel(
 
     fun selectAccount(accountId: Long?) { _selectedAccountId.value = accountId }
     fun setPhoneViewingDetail(viewing: Boolean) { _isPhoneViewingDetail.value = viewing }
-    fun setMasterMode(mode: AccountsMasterMode) { _masterMode.value = mode }
     fun selectCardPlayer(player: String) { _selectedCardPlayer.value = player }
     fun toggleShowUsedPerks() { _showUsedPerks.value = !_showUsedPerks.value }
     fun toggleShowWhichCardWhere() { _showWhichCardWhere.value = !_showWhichCardWhere.value }
@@ -304,17 +301,14 @@ class AccountsViewModel(
 
     fun saveAccount(account: Account) {
         viewModelScope.launch {
-            repository.saveAccount(account)
-            if (account.type == AccountType.CREDIT && account.creditCardProfile != null) {
-                val savedId = if (account.id != 0L) account.id else repository.accounts.value.lastOrNull()?.id ?: 0L
-                if (savedId != 0L) {
-                    repository.saveCreditCardProfile(
-                        accountId = savedId,
-                        profile = account.creditCardProfile.copy(accountId = savedId),
-                        accountName = account.name,
-                        accountInstitution = account.institution
-                    )
-                }
+            val saved = repository.saveAccount(account)
+            if (account.type == AccountType.CREDIT && account.creditCardProfile != null && saved.id != 0L) {
+                repository.saveCreditCardProfile(
+                    accountId = saved.id,
+                    profile = account.creditCardProfile.copy(accountId = saved.id),
+                    accountName = account.name,
+                    accountInstitution = account.institution
+                )
             }
             closeEditorSheet()
         }
@@ -427,9 +421,10 @@ class AccountsViewModel(
 
     fun setCardBenefitUsage(accountId: Long, benefitId: String, amountCents: Cents?) {
         val account = uiState.value.accounts.find { it.id == accountId } ?: return
-        val profile = account.creditCardProfile ?: return
-        val benefit = profile.benefits.find { it.id == benefitId } ?: return
+        val rawProfile = account.creditCardProfile ?: return
         val today = LocalDateUtils.todayLocalDate()
+        val profile = CreditCardBenefitEngine.upgradeProfile(rawProfile, today)
+        val benefit = profile.benefits.find { it.id == benefitId } ?: return
         val opened = profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
         val period = CreditCardBenefitEngine.currentPeriod(benefit, opened, today)
         viewModelScope.launch {
@@ -447,9 +442,10 @@ class AccountsViewModel(
 
     fun toggleCardBenefit(accountId: Long, benefitId: String) {
         val account = uiState.value.accounts.find { it.id == accountId } ?: return
-        val profile = account.creditCardProfile ?: return
-        val benefit = profile.benefits.find { it.id == benefitId } ?: return
+        val rawProfile = account.creditCardProfile ?: return
         val today = LocalDateUtils.todayLocalDate()
+        val profile = CreditCardBenefitEngine.upgradeProfile(rawProfile, today)
+        val benefit = profile.benefits.find { it.id == benefitId } ?: return
         val opened = profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
         val period = CreditCardBenefitEngine.currentPeriod(benefit, opened, today)
         val used = CreditCardBenefitEngine.usedCents(benefit, period)
@@ -461,17 +457,23 @@ class AccountsViewModel(
     @Deprecated("Use toggleCardBenefit with benefitId")
     fun toggleCardBenefit(accountId: Long, benefitIndex: Int) {
         val account = uiState.value.accounts.find { it.id == accountId } ?: return
-        val profile = account.creditCardProfile ?: return
+        val rawProfile = account.creditCardProfile ?: return
+        val profile = CreditCardBenefitEngine.upgradeProfile(rawProfile, LocalDateUtils.todayLocalDate())
         val benefitId = profile.benefits.getOrNull(benefitIndex)?.id ?: return
         toggleCardBenefit(accountId, benefitId)
     }
 
     fun openPerkUsage(accountId: Long, benefitId: String) {
         val account = uiState.value.accounts.find { it.id == accountId }
-        val profile = account?.creditCardProfile
+        val rawProfile = account?.creditCardProfile
+        val today = LocalDateUtils.todayLocalDate()
+        val profile = rawProfile?.let { CreditCardBenefitEngine.upgradeProfile(it, today) }
         val benefit = profile?.benefits?.find { it.id == benefitId }
-        val (periodLabel, used, value) = if (benefit != null) {
-            val today = LocalDateUtils.todayLocalDate()
+        if (benefit != null && CreditCardBenefitEngine.periodValueCents(benefit) <= 0L) {
+            toggleCardBenefit(accountId, benefitId)
+            return
+        }
+        val (periodLabel, used, value) = if (benefit != null && profile != null) {
             val opened = profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
             val p = CreditCardBenefitEngine.currentPeriod(benefit, opened, today)
             Triple(p.label, CreditCardBenefitEngine.usedCents(benefit, p), CreditCardBenefitEngine.periodValueCents(benefit))

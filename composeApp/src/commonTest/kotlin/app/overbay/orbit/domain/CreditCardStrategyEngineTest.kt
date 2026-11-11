@@ -387,4 +387,44 @@ class CreditCardStrategyEngineTest {
         assertTrue(csrSlot.isAuthorizedUser)
         assertFalse(amexSlot.isAuthorizedUser)
     }
+
+    @Test
+    fun summarizePortfolioResolvesMemberNamesAcrossPerksSubsAndBestCards() {
+        val member = HouseholdMember(id = 10L, name = "Alex Smith")
+        val account = Account(
+            id = 77L,
+            name = "Sapphire Preferred",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 77L,
+                cardName = "Sapphire Preferred",
+                annualFeeCents = 95_00L,
+                benefits = listOf(
+                    CardBenefit(id = "hotel", title = "$50 Hotel Credit", periodValueCents = 50_00L, cadence = BenefitCadence.ANNUAL)
+                ),
+                rewardCategories = listOf(
+                    RewardCategory(category = "Dining & Restaurants", multiplier = 3.0)
+                ),
+                strategy = CreditCardStrategy(
+                    cardholder = null,
+                    cardholderMemberId = 10L,
+                    openedDate = "2026-10-01",
+                    subTargetSpendCents = 4000_00L,
+                    subDeadlineDate = "2027-01-01"
+                )
+            )
+        )
+
+        val summary = CreditCardStrategyEngine.summarizePortfolio(
+            accounts = listOf(account),
+            transactions = emptyList(),
+            today = refToday,
+            householdMembers = listOf(member)
+        )
+
+        assertEquals("Alex Smith", summary.currentPeriodPerks.single().cardholder)
+        assertEquals("Alex Smith", summary.activeSubs.single().cardholder)
+        assertEquals("Alex Smith", summary.bestCardsByCategory.single().cardholder)
+        assertEquals("Alex Smith", summary.chase524ByPerson.single().summary.slots.single().cardholder)
+    }
 }

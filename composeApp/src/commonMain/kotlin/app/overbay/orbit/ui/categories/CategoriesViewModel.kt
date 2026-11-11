@@ -266,8 +266,8 @@ class CategoriesViewModel(
                 name = name,
                 color = color,
                 icon = icon,
-                isTransfer = existing?.isTransfer ?: false,
-                isIncome = existing?.isIncome ?: false,
+                isTransfer = existing?.isTransfer ?: isTransfer,
+                isIncome = existing?.isIncome ?: isIncome,
                 mhaDefaultEligible = mhaEligible,
                 mhaDefaultIgnored = if (mhaEligible) false else (existing?.mhaDefaultIgnored ?: false),
                 sortOrder = existing?.sortOrder ?: 0

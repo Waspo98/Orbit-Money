@@ -3,6 +3,7 @@ import test from 'node:test';
 import Database from 'better-sqlite3';
 
 import { restoreOrbitBackup } from '../src/services/orbitBackupRestore.js';
+import { convertWorkspaceSnapshotToOrbitBackup } from '../src/services/orbitBackupSnapshotBridge.js';
 
 function makeDb() {
   const db = new Database(':memory:');
@@ -115,6 +116,15 @@ function makeDb() {
       account_id INTEGER NOT NULL,
       record_date TEXT NOT NULL,
       balance INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE credit_card_profiles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      household_id INTEGER NOT NULL,
+      account_id INTEGER NOT NULL UNIQUE,
+      card_name TEXT NOT NULL,
+      issuer_name TEXT NOT NULL,
+      strategy_json TEXT NOT NULL DEFAULT '{}'
     );
 
     CREATE TABLE household_members (
@@ -334,6 +344,19 @@ function makeBackup() {
           balance: 12345
         }
       ],
+      credit_card_profiles: [
+        {
+          id: 75,
+          household_id: 5,
+          account_id: 10,
+          card_name: 'Sapphire Reserve',
+          issuer_name: 'Chase',
+          strategy_json: JSON.stringify({
+            cardholder_member_id: 80,
+            authorized_user_member_ids: [80, 9999]
+          })
+        }
+      ],
       household_members: [
         { id: 80, household_id: 5, name: 'Owner' }
       ],
@@ -446,6 +469,11 @@ test('restoreOrbitBackup allocates fresh ids and remaps dependent references', (
   assert.equal(onlyRow(db, 'household_income_records').member_id, onlyRow(db, 'household_members').id);
   assert.equal(onlyRow(db, 'household_retirement_accounts').account_id, account.id);
   assert.equal(onlyRow(db, 'household_retirement_accounts').member_id, onlyRow(db, 'household_members').id);
+  const restoredProfile = onlyRow(db, 'credit_card_profiles');
+  const restoredStrategy = JSON.parse(restoredProfile.strategy_json);
+  assert.equal(restoredProfile.account_id, account.id);
+  assert.equal(restoredStrategy.cardholder_member_id, onlyRow(db, 'household_members').id);
+  assert.deepEqual(restoredStrategy.authorized_user_member_ids, [onlyRow(db, 'household_members').id]);
 
   const upcomingItem = onlyRow(db, 'upcoming_items');
   assert.equal(upcomingItem.category_id, category.id);
@@ -481,4 +509,23 @@ test('restoreOrbitBackup allocates fresh ids and remaps dependent references', (
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM household_shares WHERE household_id = 1').get().count, 0);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM sync_log WHERE household_id = 1').get().count, 0);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM accounts WHERE household_id = 99 AND id = 10').get().count, 1);
+});
+
+test('convertWorkspaceSnapshotToOrbitBackup converts Kotlin workspace snapshot cleanly', () => {
+  const converted = convertWorkspaceSnapshotToOrbitBackup({
+    householdName: 'Snapshot Home',
+    accounts: [{ id: 1, name: 'Visa', type: 'CREDIT', balanceCents: -25000 }],
+    categories: [{ id: 2, name: 'Dining' }],
+    transactions: [
+      { id: 3, accountId: 1, date: '2026-05-01', amountCents: -1500, originalMerchant: 'Cafe', categoryId: 2 }
+    ],
+    creditCardProfiles: [
+      { accountId: 1, cardName: 'Sapphire', issuerName: 'Chase', annualFeeCents: 9500 }
+    ]
+  });
+  assert.ok(converted);
+  assert.equal(converted.type, 'orbit_money_backup');
+  assert.equal(converted.tables.accounts.length, 1);
+  assert.equal(converted.tables.credit_card_profiles.length, 1);
+  assert.equal(converted.tables.credit_card_profiles[0].annual_fee, 9500);
 });

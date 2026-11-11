@@ -59,19 +59,8 @@ fun RecurringItemEditorSheet(
     onViewHistory: ((UpcomingItem) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    OrbitModalSheet(
-        onDismissRequest = onDismiss,
-        modifier = modifier
-    ) {
-        RecurringItemEditorContent(
-            item = item,
-            categories = categories,
-            accounts = accounts,
-            onSave = onSave,
-            onDelete = onDelete,
-            onDismiss = onDismiss,
-            onViewHistory = onViewHistory
-        )
+    OrbitModalSheet(onDismissRequest = onDismiss, modifier = modifier) {
+        RecurringItemEditorContent(item, categories, accounts, onSave, onDelete, onDismiss, onViewHistory)
     }
 }
 
@@ -343,16 +332,11 @@ fun RecurringItemEditorContent(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(
                 onClick = onDismiss,
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
+                modifier = Modifier.weight(1f).height(48.dp)
             ) {
                 Text("Cancel", fontWeight = FontWeight.SemiBold)
             }

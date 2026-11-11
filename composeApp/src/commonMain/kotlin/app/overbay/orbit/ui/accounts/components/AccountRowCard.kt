@@ -148,19 +148,21 @@ fun AccountRowCard(
                 )
 
                 if (isCredit && account.creditCardProfile != null) {
-                    account.creditCardProfile.strategy.cardholder?.takeIf { it.isNotBlank() }?.let { holder ->
+                    val resolvedHolder = cycleStatus?.holderLabel
+                        ?: account.creditCardProfile.strategy.cardholder?.takeIf { it.isNotBlank() }
+                    resolvedHolder?.let { holder ->
                         AccountBadge(
                             text = holder,
                             modifier = Modifier.align(Alignment.CenterVertically)
                         )
                     }
-                    account.creditCardProfile.authorizedUsers.forEach { au ->
-                        if (au.isNotBlank()) {
-                            AccountBadge(
-                                text = "AU · $au",
-                                modifier = Modifier.align(Alignment.CenterVertically)
-                            )
-                        }
+                    val resolvedAus = cycleStatus?.authorizedUserNames?.takeIf { it.isNotEmpty() }
+                        ?: account.creditCardProfile.authorizedUsers.filter { it.isNotBlank() }
+                    resolvedAus.forEach { au ->
+                        AccountBadge(
+                            text = "AU · $au",
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        )
                     }
                 }
 

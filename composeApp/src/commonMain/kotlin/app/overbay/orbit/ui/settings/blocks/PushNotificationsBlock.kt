@@ -20,7 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,7 +49,7 @@ fun PushNotificationsBlock(
     modifier: Modifier = Modifier
 ) {
     val config = preferences.notificationPreferences
-    var activeScheduleType by remember { mutableStateOf<NotificationScheduleType?>(null) }
+    var activeScheduleType by rememberSaveable { mutableStateOf<NotificationScheduleType?>(null) }
 
     activeScheduleType?.let { type ->
         val currentSchedule = when (type) {
@@ -159,8 +159,9 @@ fun PushNotificationsBlock(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            val isIncomeScheduled = config.income.time != null && config.income.time != "after_sync"
-            val incomeScheduleLabel = if (isIncomeScheduled) "Scheduled at ${config.income.time}" else "After bank sync"
+            val isIncomeScheduled = config.income.timing == "scheduled" ||
+                (config.income.timing == null && !config.income.time.isNullOrBlank() && config.income.time != "after_sync")
+            val incomeScheduleLabel = if (isIncomeScheduled) "Scheduled at ${config.income.time ?: "09:00"}" else "After bank sync"
 
             NotificationPreferenceRow(
                 title = "Income & Paycheck Alerts",
@@ -188,10 +189,11 @@ fun PushNotificationsBlock(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            val snapshotDay = config.accountSnapshots.dayOfWeek ?: 1
+            val snapshotDay = config.accountSnapshots.dayOfMonth ?: config.accountSnapshots.dayOfWeek ?: 1
+            val snapshotCadence = if (config.accountSnapshots.cadence == "quarterly") "Quarterly" else "Monthly"
             val snapshotTime = config.accountSnapshots.time ?: "09:00"
             val snapshotCount = config.accountSnapshots.accountIds.size
-            val snapshotLabel = "Day $snapshotDay at $snapshotTime · $snapshotCount accts"
+            val snapshotLabel = "$snapshotCadence · Day $snapshotDay at $snapshotTime · $snapshotCount accts"
 
             NotificationPreferenceRow(
                 title = "Manual Balance Reminders",

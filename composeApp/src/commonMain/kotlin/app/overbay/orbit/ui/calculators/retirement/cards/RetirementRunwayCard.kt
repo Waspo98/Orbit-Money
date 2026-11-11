@@ -56,12 +56,12 @@ fun RetirementRunwayCard(
     val dashStroke = remember(density) {
         Stroke(width = with(density) { 1.2.dp.toPx() }, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
     }
+    val linePath = remember { Path() }
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val errorColor = MaterialTheme.colorScheme.error
     val outlineVariant = MaterialTheme.colorScheme.outlineVariant
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-    val surfaceColor = MaterialTheme.colorScheme.surface
 
     OrbitSectionCard(
         title = "Retirement Runway: Will It Last?",
@@ -96,7 +96,7 @@ fun RetirementRunwayCard(
                 )
 
                 if (drawdownPoints.size >= 2) {
-                    val linePath = Path()
+                    linePath.rewind()
                     val pFirst = drawdownPoints.first()
                     linePath.moveTo(ageToX(pFirst.age), balToY(pFirst.balanceCents))
 
@@ -191,11 +191,12 @@ fun RetirementRunwayCard(
             )
         }
         val minFinalAge = (retirementAge.toFloat() + 1f).coerceAtLeast(70f)
+        val maxFinalAge = max(110f, minFinalAge + 5f)
         Slider(
-            value = runwayEndAge.toFloat().coerceIn(minFinalAge, 110f),
+            value = runwayEndAge.toFloat().coerceIn(minFinalAge, maxFinalAge),
             onValueChange = { onRunwayEndAgeChange(it.toDouble()) },
-            valueRange = minFinalAge..110f,
-            steps = max(0, (110 - minFinalAge.toInt()) - 1),
+            valueRange = minFinalAge..maxFinalAge,
+            steps = max(0, (maxFinalAge.toInt() - minFinalAge.toInt()) - 1),
             modifier = Modifier.fillMaxWidth()
         )
 

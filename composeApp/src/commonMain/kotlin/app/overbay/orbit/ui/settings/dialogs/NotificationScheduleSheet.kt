@@ -83,14 +83,19 @@ fun NotificationScheduleSheet(
     }
 
     // Income Timing Mode
-    var isScheduledIncome by remember(schedule.time) {
-        mutableStateOf(schedule.time != null && schedule.time != "after_sync")
+    var isScheduledIncome by remember(schedule.timing, schedule.time) {
+        mutableStateOf(
+            schedule.timing == "scheduled" ||
+                (schedule.timing == null && !schedule.time.isNullOrBlank() && schedule.time != "after_sync")
+        )
     }
 
     // Account Snapshots Cadence & Day of Month
-    var cadence by remember { mutableStateOf("monthly") }
-    var dayOfMonthText by remember(schedule.dayOfWeek) {
-        mutableStateOf((schedule.dayOfWeek ?: 1).coerceIn(1, 28).toString())
+    var cadence by remember(schedule.cadence) {
+        mutableStateOf(if (schedule.cadence == "quarterly") "quarterly" else "monthly")
+    }
+    var dayOfMonthText by remember(schedule.dayOfMonth, schedule.dayOfWeek) {
+        mutableStateOf(((schedule.dayOfMonth ?: schedule.dayOfWeek ?: 1).coerceIn(1, 28)).toString())
     }
     var selectedAccountIds by remember(schedule.accountIds) {
         mutableStateOf(schedule.accountIds.toSet())
@@ -359,12 +364,15 @@ fun NotificationScheduleSheet(
                                 time = timeText.ifBlank { "08:00" }
                             )
                             NotificationScheduleType.INCOME -> schedule.copy(
-                                time = if (isScheduledIncome) timeText.ifBlank { "09:00" } else "after_sync"
+                                timing = if (isScheduledIncome) "scheduled" else "after_sync",
+                                time = if (isScheduledIncome) timeText.ifBlank { "09:00" } else null
                             )
                             NotificationScheduleType.SYNC_ISSUES -> schedule
                             NotificationScheduleType.ACCOUNT_SNAPSHOTS -> {
                                 val parsedDay = dayOfMonthText.toIntOrNull()?.coerceIn(1, 28) ?: 1
                                 schedule.copy(
+                                    cadence = cadence,
+                                    dayOfMonth = parsedDay,
                                     dayOfWeek = parsedDay,
                                     time = timeText.ifBlank { "09:00" },
                                     accountIds = selectedAccountIds.toList()

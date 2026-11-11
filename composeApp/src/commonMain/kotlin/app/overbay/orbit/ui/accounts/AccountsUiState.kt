@@ -14,16 +14,6 @@ import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.HouseholdCreditSummary
 import app.overbay.orbit.ui.accounts.cards.CardEditorDraft
 
-enum class AccountsMasterMode {
-    ALL_ACCOUNTS,
-    CREDIT_CARDS;
-
-    companion object {
-        @Deprecated("Renamed to CREDIT_CARDS", ReplaceWith("CREDIT_CARDS"))
-        val CARD_STRATEGY_HUB = CREDIT_CARDS
-    }
-}
-
 enum class AccountTypeCategory(val displayName: String) {
     CASH_AND_CHECKING("Cash & Checking"),
     CREDIT_CARDS("Credit Cards"),
@@ -85,7 +75,6 @@ data class AccountsUiState(
     val mhaEnabled: Boolean = false,
     val rewardsToolsEnabled: Boolean = false,
     val perkUsageTarget: PerkUsageTarget? = null,
-    val masterMode: AccountsMasterMode = AccountsMasterMode.ALL_ACCOUNTS,
     val selectedCardPlayer: String = CreditCardStrategyEngine.ALL_PLAYERS,
     val cardPortfolioSummary: CreditCardPortfolioSummary = CreditCardPortfolioSummary(),
     val householdCredit: HouseholdCreditSummary? = null,

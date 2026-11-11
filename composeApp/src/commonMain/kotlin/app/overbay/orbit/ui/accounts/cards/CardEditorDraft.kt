@@ -23,7 +23,7 @@ data class CardEditorDraft(
     val activeTab: CardEditorTab = CardEditorTab.CARD,
     val accountName: String = "",
     val accountInstitution: String = "",
-    // Appearance & Identity (CRITICAL D4: artKey preset only, NO artworkUrl)
+    // Appearance & Identity (hybrid artworkUrl + CardArtPalette fallback)
     val cardName: String = "",
     val issuer: String = "",
     val network: String = "Visa",
@@ -31,7 +31,6 @@ data class CardEditorDraft(
     val artworkUrl: String? = null,
     // Billing & Cycle
     val creditLimitCents: Cents? = null,
-    val creditLimitText: String = "",
     val statementCloseDay: Int? = null,
     val statementCloseDayText: String = "",
     val paymentDueDay: Int? = null,
@@ -45,7 +44,6 @@ data class CardEditorDraft(
     // Annual Fee
     val hasAnnualFee: Boolean = false,
     val annualFeeCents: Cents? = null,
-    val annualFeeText: String = "",
     val annualFeePostDate: String? = null,
     // Strategy & Household
     val cardholderMemberId: Long? = null,
@@ -58,7 +56,6 @@ data class CardEditorDraft(
     val subRewardText: String? = null,
     val subEstimatedValueCents: Cents? = null,
     val targetSpendCents: Cents? = null,
-    val targetSpendText: String = "",
     val targetDeadlineDate: String? = null,
     val subManualSpendOffsetCents: Cents = 0L,
     val subCompleted: Boolean = false,
@@ -77,6 +74,7 @@ data class CardEditorDraft(
     val editingPerkId: String? = null,
     val editingRewardIndex: Int? = null,
     val isSaving: Boolean = false,
+    val saveError: String? = null,
     val showDiscardConfirm: Boolean = false,
     val lastDeletedBenefit: CardBenefit? = null,
     val originalProfile: CreditCardProfile? = null,
@@ -134,8 +132,9 @@ data class CardEditorDraft(
 
     fun tabHasErrors(tab: CardEditorTab): Boolean = errors.keys.any { tabForErrorKey(it) == tab }
 
-    val firstErrorBanner: Pair<CardEditorTab, String>?
-        get() = errors.entries.firstOrNull()?.let { (key, msg) -> tabForErrorKey(key) to msg }
+    val firstErrorBanner: Pair<CardEditorTab?, String>?
+        get() = saveError?.takeIf { it.isNotBlank() }?.let { null to it }
+            ?: errors.entries.firstOrNull()?.let { (key, msg) -> tabForErrorKey(key) to msg }
 
     val isDirty: Boolean
         get() = toProfile() != (originalProfile ?: CreditCardProfile(accountId = accountId)) ||
@@ -202,20 +201,20 @@ data class CardEditorDraft(
                 network = p.network ?: "Visa",
                 artKey = p.imageUrl,
                 artworkUrl = p.artworkUrl,
-                creditLimitCents = p.creditLimitCents, creditLimitText = p.creditLimitCents?.let { (it / 100).toString() }.orEmpty(),
+                creditLimitCents = p.creditLimitCents,
                 statementCloseDay = p.statementClosingDay, statementCloseDayText = p.statementClosingDay?.toString().orEmpty(),
                 paymentDueDay = p.paymentDueDay, paymentDueDayText = p.paymentDueDay?.toString().orEmpty(),
                 aprBps = p.aprBps, aprText = formatBpsForInput(p.aprBps),
                 hasPromo = p.promoAprBps != null || !p.promoEndDate.isNullOrBlank(),
                 promoAprBps = p.promoAprBps, promoAprText = formatBpsForInput(p.promoAprBps), promoEndDate = p.promoEndDate,
                 hasAnnualFee = (p.annualFeeCents ?: 0L) > 0L || p.annualFeePostDate != null,
-                annualFeeCents = p.annualFeeCents, annualFeeText = p.annualFeeCents?.let { (it / 100).toString() }.orEmpty(),
+                annualFeeCents = p.annualFeeCents,
                 annualFeePostDate = p.annualFeePostDate,
                 cardholderMemberId = strat.cardholderMemberId, cardholder = strat.cardholder,
                 openedDate = strat.openedDate, closedDate = strat.closedDate,
                 isBusinessCard = strat.isBusinessCard, countsToward524Override = strat.countsToward524Override,
                 subRewardText = strat.subRewardText, subEstimatedValueCents = strat.subEstimatedValueCents,
-                targetSpendCents = strat.subTargetSpendCents, targetSpendText = strat.subTargetSpendCents?.let { (it / 100).toString() }.orEmpty(),
+                targetSpendCents = strat.subTargetSpendCents,
                 targetDeadlineDate = strat.subDeadlineDate, subManualSpendOffsetCents = strat.subManualSpendOffsetCents,
                 subCompleted = strat.subCompleted, subReceivedDate = strat.subReceivedDate, subCooldownMonths = strat.subCooldownMonths,
                 benefits = p.benefits,

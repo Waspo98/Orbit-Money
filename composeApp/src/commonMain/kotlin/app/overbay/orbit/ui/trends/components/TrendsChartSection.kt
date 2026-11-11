@@ -31,8 +31,6 @@ import app.overbay.orbit.ui.components.charts.DeltaTone
 import app.overbay.orbit.ui.components.charts.SpendingBarItem
 import app.overbay.orbit.ui.components.charts.SpendingTrendsBarChart
 import app.overbay.orbit.ui.trends.SpendingTrendsUiState
-import app.overbay.orbit.ui.trends.TrendsChartMode
-import app.overbay.orbit.ui.trends.TrendsPeriod
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -40,10 +38,7 @@ fun TrendsChartSection(
     state: SpendingTrendsUiState,
     onScrubBar: (Int?, SpendingBarItem?) -> Unit,
     modifier: Modifier = Modifier,
-    onInspectMonth: (String) -> Unit = {},
-    onSelectPeriod: ((TrendsPeriod) -> Unit)? = null,
-    onSelectChartMode: ((TrendsChartMode) -> Unit)? = null,
-    onSelectCategory: ((Long?) -> Unit)? = null
+    onInspectMonth: (String) -> Unit = {}
 ) {
     val haptics = LocalOrbitHaptics.current
     val scrubItem = state.flowScrubItem ?: state.scrubbedBarItem

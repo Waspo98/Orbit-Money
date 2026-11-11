@@ -47,8 +47,8 @@ fun CardPerkRow(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
-    val isFullyUsed = valueCents > 0L && usedCents >= valueCents
-    val isPartial = usedCents > 0L && usedCents < valueCents
+    val isFullyUsed = if (valueCents > 0L) usedCents >= valueCents else usedCents > 0L
+    val isPartial = valueCents > 0L && usedCents > 0L && usedCents < valueCents
 
     Surface(
         shape = RoundedCornerShape(12.dp),

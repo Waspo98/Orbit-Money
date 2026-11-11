@@ -249,7 +249,9 @@ class UpcomingViewModelTest {
             suggestedCategoryId = 4L,
             suggestedAccountId = 1L
         )
-        viewModel.acceptCandidate(candidate)
+        viewModel.reviewCandidate(candidate)
+        testScheduler.advanceUntilIdle()
+        viewModel.saveUpcoming(viewModel.uiState.value.editingItem!!)
         testScheduler.advanceUntilIdle()
 
         val savedItems = repository.upcomingItems.value

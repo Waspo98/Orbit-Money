@@ -84,6 +84,7 @@ data class CardBenefitWireDto(
     val name: String = "",
     val title: String = "",
     val value: JsonElement? = null,
+    @SerialName("value_text") val valueTextWire: String? = null,
     @SerialName("period_value") val periodValue: Double? = null,
     @SerialName("period_value_cents") val periodValueCentsWire: Long? = null,
     val description: String? = null,
@@ -94,20 +95,33 @@ data class CardBenefitWireDto(
     @SerialName("used_this_year") @Serializable(with = FlexibleBooleanSerializer::class) val usedThisYear: Boolean = false,
     @SerialName("used_periods") val usedPeriods: List<String> = emptyList()
 ) {
-    fun toDomain(): CardBenefit = CardBenefit(
-        id = id,
-        title = title.ifBlank { name },
-        description = description,
-        periodValueCents = periodValue?.let { MoneyUtils.dollarsToCents(it) } ?: periodValueCentsWire,
-        annualCreditValueCents = (value as? JsonPrimitive)?.content?.toDoubleOrNull()?.let { MoneyUtils.dollarsToCents(it) },
-        usedThisYear = usedThisYear,
-        category = category,
-        valueText = (value as? JsonPrimitive)?.content,
-        cadence = BenefitCadence.fromStorage(cadence),
-        anchor = BenefitAnchor.fromStorage(anchor),
-        usage = usage.map { it.toDomain() },
-        usedPeriods = usedPeriods
-    )
+    fun toDomain(): CardBenefit {
+        val primContent = (value as? JsonPrimitive)
+            ?.takeUnless { it is kotlinx.serialization.json.JsonNull }
+            ?.content
+        val resolvedPeriodValueCents = periodValue?.let { MoneyUtils.dollarsToCents(it) } ?: periodValueCentsWire
+        val legacyAnnualCents = if (resolvedPeriodValueCents == null) {
+            primContent?.toDoubleOrNull()?.let { MoneyUtils.dollarsToCents(it) }
+        } else {
+            null
+        }
+        val resolvedValueText = valueTextWire?.takeIf { it.isNotBlank() }
+            ?: primContent?.takeIf { it.isNotBlank() && it.toDoubleOrNull() == null }
+        return CardBenefit(
+            id = id,
+            title = title.ifBlank { name },
+            description = description,
+            periodValueCents = resolvedPeriodValueCents,
+            annualCreditValueCents = legacyAnnualCents,
+            usedThisYear = usedThisYear,
+            category = category,
+            valueText = resolvedValueText,
+            cadence = BenefitCadence.fromStorage(cadence),
+            anchor = BenefitAnchor.fromStorage(anchor),
+            usage = usage.map { it.toDomain() },
+            usedPeriods = usedPeriods
+        )
+    }
 
     companion object {
         fun fromDomain(d: CardBenefit): CardBenefitWireDto {
@@ -124,6 +138,7 @@ data class CardBenefitWireDto(
                 name = d.title,
                 title = d.title,
                 value = annualizedDollars?.let { JsonPrimitive(it) } ?: d.valueText?.let { JsonPrimitive(it) },
+                valueTextWire = d.valueText,
                 periodValue = d.periodValueCents?.let { MoneyUtils.centsToDollars(it) },
                 description = d.description,
                 category = d.category,

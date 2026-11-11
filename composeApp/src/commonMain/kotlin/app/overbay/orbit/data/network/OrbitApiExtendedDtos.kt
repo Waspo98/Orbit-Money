@@ -180,16 +180,6 @@ data class FromTransactionRequestDto(@SerialName("transaction_id") val transacti
 data class DismissSuggestionRequestDto(val key: String)
 
 @Serializable
-data class AcceptSuggestionRequestDto(
-    val key: String, val name: String, val merchant: String, val amount: Double,
-    val direction: String, val kind: String,
-    @SerialName("frequency_type") val frequencyType: String, @SerialName("frequency_interval") val frequencyInterval: Int,
-    @SerialName("frequency_unit") val frequencyUnit: String, @SerialName("next_date") val nextDate: String,
-    @SerialName("category_id") val categoryId: Long?, @SerialName("account_id") val accountId: Long?,
-    @SerialName("source_transaction_id") val sourceTransactionId: Long?
-)
-
-@Serializable
 data class UpcomingMutationResponseDto(val success: Boolean = true, val id: Long = 0L, val items: List<UpcomingItemDto> = emptyList())
 
 @Serializable
@@ -508,6 +498,9 @@ data class PutRemotePreferencesRequestDto(val preferences: Map<String, JsonEleme
 @Serializable
 data class PutRemotePreferenceKeyRequestDto(val value: JsonElement)
 
+@Serializable
+data class RestoreOrbitBackupRequestDto(@SerialName("backupJson") val backupJson: String)
+
 internal fun parseRecurrenceRuleJson(element: JsonElement?): RecurrenceRule? {
     if (element == null || element is JsonNull) return null
     val obj = element as? JsonObject ?: return null
@@ -524,4 +517,20 @@ internal fun parseRecurrenceRuleJson(element: JsonElement?): RecurrenceRule? {
         }
         else -> null
     }
+}
+
+internal fun RecurrenceRule.toWireJson(): JsonElement = when (this) {
+    is RecurrenceRule.MonthDays -> JsonObject(
+        mapOf(
+            "type" to JsonPrimitive("month_days"),
+            "days" to JsonArray(days.map { JsonPrimitive(it) })
+        )
+    )
+    is RecurrenceRule.MonthWeekdays -> JsonObject(
+        mapOf(
+            "type" to JsonPrimitive("month_weekdays"),
+            "ordinals" to JsonArray(ordinals.map { JsonPrimitive(it) }),
+            "weekdays" to JsonArray(weekdays.map { JsonPrimitive(it) })
+        )
+    )
 }

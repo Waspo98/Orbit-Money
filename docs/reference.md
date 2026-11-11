@@ -68,7 +68,7 @@ PWA asset cache strings are intentionally repeated in `frontend/index.html`,
 `frontend/src/brandAssets.js`. Keep those suffixes aligned when refreshing the
 app-shell cache; this is not an app version bump.
 
-### Database Schema (36 migrations)
+### Database Schema (37 migrations)
 
 | Migration | Purpose |
 |---|---|
@@ -108,6 +108,7 @@ app-shell cache; this is not an app version bump.
 | `034_clean_credit_card_profiles.sql` | Removes external catalog-specific card columns and keeps the user-entered card name as local data |
 | `035_credit_card_strategy.sql` | Adds statement closing day, payment due day, and strategy_json to credit_card_profiles |
 | `036_credit_card_billing.sql` | Adds standard APR (apr_bps), promotional APR (promo_apr_bps), and promotional APR expiration date (promo_end_date) to credit_card_profiles |
+| `037_credit_card_catalog.sql` | Adds household-scoped and shared credit card template catalog metadata (`credit_card_catalog`, elevated SUB offer fields) |
 
 ### Key Data Model Notes
 
@@ -318,16 +319,15 @@ Orbit provides an integrated, local-first credit card management and rewards str
 - **CardEditorController:**
   - Encapsulates draft mutations: `startDraft`, `applyTemplate`, `skipTemplate`, `upsertBenefit`, `removeBenefit`, `undoRemoveBenefit`, `upsertReward`, `removeReward`, `setWelcomeBonusMode`, and atomic `save`.
   - Validation engine provides synchronous per-field error mapping (`draft.errors`) for immediate input feedback.
-- **Zero `artworkUrl` & Preset Gradients (`CardArtPalette`):**
-  - External image URLs and DuckDuckGo image searches have been completely removed (Decision D4).
-  - Replaced with physical wallet-inspired gradient presets:
+- **Hybrid Card Artwork & Preset Gradients (`CardArtPalette`):**
+  - Card thumbnails resolve curated issuer card art via `CreditCardTemplates.resolveArtworkUrl` and `MerchantLogoImageCache` when `artworkUrl` is configured on a template or profile, falling back seamlessly to physical wallet-inspired gradient presets:
     - `preset://sapphire-blue` (Chase Sapphire deep navy/cobalt)
     - `preset://amex-gold` (American Express warm gold/brass)
     - `preset://venture-silver` (Capital One slate / brushed titanium)
     - `preset://apple-card` (Apple Card frosted pearl / light titanium)
     - `preset://discover-plum` (Discover plum / royal purple)
-  - Selected via gradient chips with live animated `CardFace` preview.
-  - **Design System Carve-Out:** Card face composables are explicitly granted an architectural exception to the semantic color token rule to ensure instant physical wallet brand recognition.
+  - Rendered via `CardArtworkThumbnail` and selected via gradient/artwork controls in the card editor.
+  - **Design System Carve-Out:** Card artwork composables are explicitly granted an architectural exception to the semantic color token rule to ensure instant physical wallet brand recognition.
 - **Dual Two-Pane / Sheet Rendering:**
   - The single composable `CardEditorSheetContent` powers both form presentations:
     - **Compact / Mobile (< 640dp):** Hosted in `CardEditorModalSheet` (wrapping `OrbitModalSheet`).
@@ -622,7 +622,7 @@ role and read/write access.
 - `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
 - `db/index.js`, `db/migrations.js`
 - `lib/`: http, localDate, money, routeParams, upcomingProjection, upcomingSchedule
-- `db/migrations/001` through `034`
+- `db/migrations/001` through `037`
 - `routes/`: accounts, auth, budgets, categories, goals, health, household, householdSharing, import, merchantLogos, mha, netWorth, rules, simplefin, spendingTrends, transactions, upcoming
 - `services/`: budgetOverview, csvImport, demoSeed, householdDefaults, merchantLogos, mhaSummary, mhaTaxEstimate, oidc, ruleMatcher, sampleHouseholds, sessionStore, simplefinClient, simplefinSync, spendingTrends, taxData2026, transferMatcher, upcomingReconciliation
 - `test/`: Node built-in test runner coverage for backend helpers and calculation services

@@ -33,7 +33,7 @@ fun PerkUsageDialog(
     onDismiss: () -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
-    var currentUsedCents by rememberSaveable { mutableStateOf(initialUsedCents) }
+    var currentUsedCents by rememberSaveable(title, periodLabel, initialUsedCents) { mutableStateOf(initialUsedCents) }
 
     AlertDialog(
         onDismissRequest = onDismiss,

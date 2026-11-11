@@ -171,7 +171,6 @@ fun CardPerksScreen(
                 val bentoActions = remember(viewModel) {
                     CardPerksBentoActions(
                         onInspectAccount = { viewModel.selectAccountForInspect(it) },
-                        onOpenCardEditor = { viewModel.openCreditCardProfile(it) },
                         onToggleBenefit = { aId, bId -> viewModel.toggleCardBenefit(aId, bId) },
                         onOpenPerkUsage = { aId, bId -> viewModel.openPerkUsage(aId, bId) },
                         onToggleShowUsedPerks = { viewModel.toggleShowUsedPerks() }

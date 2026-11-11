@@ -172,7 +172,7 @@ private fun SingleAllocationCard(
     val otherAllocatedCents = remember(otherGoalsOnAccount, allocatable) {
         otherGoalsOnAccount.sumOf { (_, alloc) ->
             if (alloc.allocationType == GoalAllocationType.PERCENT) {
-                ((allocatable * alloc.allocationPercent) / 100.0).toLong()
+                MoneyUtils.multiplyPercent(allocatable, alloc.allocationPercent)
             } else {
                 min(allocatable, alloc.allocationAmountCents)
             }

@@ -109,7 +109,7 @@ fun GoalDetailInspectorPane(
                     accounts = state.accounts,
                     existingGoals = state.goals,
                     onSave = { goal, steal -> viewModel.saveGoalWithAllocations(goal, steal) },
-                    onDelete = { viewModel.deleteGoal(it) },
+                    onDelete = { viewModel.requestDeleteGoal(it) },
                     onDismiss = {
                         if (state.inspectingGoalId != null) viewModel.closeEditorSheet() else onClosePane()
                     }
@@ -127,7 +127,7 @@ fun GoalDetailInspectorPane(
                         neededExtraMonthlyCents = neededExtra,
                         onClose = onClosePane,
                         onEdit = { viewModel.openEditGoal(inspecting) },
-                        onDelete = { viewModel.deleteGoal(inspecting.id) },
+                        onDelete = { viewModel.requestDeleteGoal(inspecting.id) },
                         onOpenLinkedAccount = if (acct != null) {
                             { onNavigate(OrbitNavKey.Accounts(accountId = acct.id)) }
                         } else null

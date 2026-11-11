@@ -283,6 +283,48 @@ class CreditCardBenefitEngineTest {
     }
 
     @Test
+    fun ledgerCountsUsedOnWithinCardmemberYearAndUpgradesLegacyProfiles() {
+        val quarterlyPerk = CardBenefit(
+            id = "q-dining",
+            title = "Quarterly Resy",
+            periodValueCents = 50_00L,
+            cadence = BenefitCadence.QUARTERLY,
+            usage = listOf(
+                // 2026-Q2 starts Apr 1 (before Apr 18 anniversary), but usedOn May 1 is inside cardmember year
+                BenefitUsage(periodKey = "2026-Q2", amountCents = 50_00L, usedOn = "2026-05-01"),
+                // 2026-Q1 used before anniversary -> outside current cardmember year
+                BenefitUsage(periodKey = "2026-Q1", amountCents = 50_00L, usedOn = "2026-03-10")
+            )
+        )
+        val profile = CreditCardProfile(
+            accountId = 21L,
+            annualFeeCents = 250_00L,
+            strategy = CreditCardStrategy(openedDate = "2025-04-18"),
+            benefits = listOf(quarterlyPerk)
+        )
+        val cmLedger = CreditCardBenefitEngine.ledger(profile, refToday)
+        assertEquals(50_00L, cmLedger.creditsCapturedCents)
+        assertEquals(200_00L, cmLedger.feeAfterCreditsCents)
+
+        val legacyProfile = CreditCardProfile(
+            accountId = 22L,
+            annualFeeCents = 95_00L,
+            benefits = listOf(
+                CardBenefit(
+                    title = "$50 Hotel Credit",
+                    annualCreditValueCents = 50_00L,
+                    cadence = BenefitCadence.ANNUAL,
+                    usedThisYear = true
+                )
+            )
+        )
+        val legacyLedger = CreditCardBenefitEngine.ledger(legacyProfile, refToday)
+        assertEquals(50_00L, legacyLedger.creditsAvailableCents)
+        assertEquals(50_00L, legacyLedger.creditsCapturedCents)
+        assertEquals(45_00L, legacyLedger.feeAfterCreditsCents)
+    }
+
+    @Test
     fun newBenefitIdGeneratesUniquePrefixedIdentifiers() {
         val id1 = CreditCardBenefitEngine.newBenefitId()
         val id2 = CreditCardBenefitEngine.newBenefitId()

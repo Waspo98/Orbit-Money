@@ -260,6 +260,8 @@ fun MhaTrackerScreen(
                                 ) {
                                     MhaConfigContent(
                                         taxProfile = state.taxProfile,
+                                        designatedCapCents = state.designatedCapCents,
+                                        fairMarketRentalValueCents = state.fairMarketRentalValueCents,
                                         mhaEnabled = state.mhaEnabled,
                                         onToggleMhaEnabled = { viewModel.setMhaEnabled(it) },
                                         onDismiss = { viewModel.closeConfigSheet() },
@@ -324,6 +326,8 @@ fun MhaTrackerScreen(
         if (!isTwoPane && state.showConfigSheet) {
             MhaConfigSheet(
                 taxProfile = state.taxProfile,
+                designatedCapCents = state.designatedCapCents,
+                fairMarketRentalValueCents = state.fairMarketRentalValueCents,
                 mhaEnabled = state.mhaEnabled,
                 onToggleMhaEnabled = { viewModel.setMhaEnabled(it) },
                 onDismiss = { viewModel.closeConfigSheet() },

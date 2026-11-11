@@ -144,9 +144,15 @@ fun OrbitTextField(
         if (echoIdx >= 0) {
             repeat(echoIdx + 1) { pendingEmissions.removeFirst() }
         } else {
+            val hadPendingUserEdit = pendingEmissions.isNotEmpty()
             pendingEmissions.clear()
             if (tfv.text != value) {
-                tfv = TextFieldValue(text = value, selection = TextRange(value.length))
+                val nextCursor = if (hadPendingUserEdit) {
+                    tfv.selection.end.coerceIn(0, value.length)
+                } else {
+                    value.length
+                }
+                tfv = TextFieldValue(text = value, selection = TextRange(nextCursor))
             }
         }
         lastExternalValue = value

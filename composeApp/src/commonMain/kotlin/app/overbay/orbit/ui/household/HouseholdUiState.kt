@@ -7,8 +7,8 @@ import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.HouseholdShare
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.MoneyUtils
 import kotlin.math.min
-import kotlin.math.roundToLong
 
 data class HouseholdUiState(
     val householdInfo: HouseholdInfo = HouseholdInfo(),
@@ -55,7 +55,7 @@ object HouseholdCalculations {
         val pct = m.employeeContributionPercent ?: 0.0
         val gross = m.grossIncomeAnnualCents
         return if (pct > 0.0 && gross > 0L) {
-            ((gross.toDouble() * pct) / 100.0).roundToLong()
+            MoneyUtils.multiplyPercent(gross, pct)
         } else 0L
     }
 
@@ -66,9 +66,8 @@ object HouseholdCalculations {
         val matchLimitPct = if (m.employerMatchLimitPercent > 0.0) m.employerMatchLimitPercent else empPct
         val matchCap = m.employerMatchAnnualCapCents
         val eligiblePct = min(empPct, matchLimitPct)
-        val matchRate = if (matchPct > 0.0) matchPct / 100.0 else 0.0
-        val uncapped = if (eligiblePct > 0.0 && gross > 0L) {
-            ((gross.toDouble() * eligiblePct / 100.0) * matchRate).roundToLong()
+        val uncapped = if (eligiblePct > 0.0 && matchPct > 0.0 && gross > 0L) {
+            MoneyUtils.multiplyPercent(gross, (eligiblePct * matchPct) / 100.0)
         } else 0L
         return if (matchCap > 0L) min(matchCap, uncapped) else uncapped
     }

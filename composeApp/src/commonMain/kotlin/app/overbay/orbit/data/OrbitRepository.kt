@@ -4,23 +4,7 @@ import app.overbay.orbit.data.engine.LocalSnapshotEngine
 import app.overbay.orbit.data.engine.OrbitStorageEngine
 import app.overbay.orbit.data.engine.SelfHostedApiEngine
 import app.overbay.orbit.data.engine.SyncResult
-import app.overbay.orbit.data.model.Account
-import app.overbay.orbit.data.model.Category
-import app.overbay.orbit.data.model.CategoryBudget
-import app.overbay.orbit.data.model.EditSource
-import app.overbay.orbit.data.model.Goal
-import app.overbay.orbit.data.model.HouseholdInfo
-import app.overbay.orbit.data.model.HouseholdMember
-import app.overbay.orbit.data.model.HouseholdShare
-import app.overbay.orbit.data.model.MerchantLogo
-import app.overbay.orbit.data.model.MhaTaxProfile
-import app.overbay.orbit.data.model.OrbitPreferences
-import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
-import app.overbay.orbit.data.model.SimpleFinStatusInfo
-import app.overbay.orbit.data.model.StorageMode
-import app.overbay.orbit.data.model.Transaction
-import app.overbay.orbit.data.model.TransactionRule
-import app.overbay.orbit.data.model.UpcomingItem
+import app.overbay.orbit.data.model.*
 import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.data.network.OrbitApiClient
 import app.overbay.orbit.data.network.ServerUrlNormalizer
@@ -432,20 +416,26 @@ class OrbitRepository(
     }
 
     // Accounts
-    suspend fun saveAccount(account: Account) {
+    suspend fun saveAccount(account: Account): Account {
         val current = _accounts.value
         val exists = current.any { it.id == account.id && account.id != 0L }
         val localId = if (exists) account.id else if (account.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else account.id
-        val updatedList = if (exists) current.map { if (it.id == account.id) account else it } else current + account.copy(id = localId)
+        val savedLocal = if (exists) account else account.copy(id = localId)
+        val updatedList = if (exists) current.map { if (it.id == account.id) savedLocal else it } else current + savedLocal
         commitSnapshot(_snapshot.value.copy(accounts = updatedList))
         val pushed = activeEngine.pushAccount(if (exists) account else account.copy(id = 0L)).getOrNull()
-        if (pushed != null && pushed.id > 0L && pushed.id != localId) {
-            commitSnapshot(_snapshot.value.copy(accounts = _accounts.value.map { if (it.id == localId) it.copy(id = pushed.id) else it }))
-        }
+        return if (pushed != null && pushed.id > 0L && pushed.id != localId) {
+            val synced = savedLocal.copy(id = pushed.id)
+            commitSnapshot(_snapshot.value.copy(accounts = _accounts.value.map { if (it.id == localId) synced else it }))
+            synced
+        } else savedLocal
     }
 
     suspend fun deleteAccount(id: Long) {
-        commitSnapshot(_snapshot.value.copy(accounts = _accounts.value.filterNot { it.id == id }))
+        commitSnapshot(_snapshot.value.copy(
+            accounts = _accounts.value.filterNot { it.id == id },
+            creditCardProfiles = _snapshot.value.creditCardProfiles.filterNot { it.accountId == id }
+        ))
         activeEngine.deleteAccount(id)
     }
     suspend fun mergeAccounts(sourceAccountId: Long, targetAccountId: Long, combineBalances: Boolean = false) {
@@ -455,9 +445,15 @@ class OrbitRepository(
         val updatedTxns = _transactions.value.map { txn ->
             if (txn.accountId == sourceAccountId) txn.copy(accountId = targetAccountId, accountName = target.name) else txn
         }
-        val updatedTarget = if (combineBalances) target.copy(currentBalanceCents = target.currentBalanceCents + source.currentBalanceCents) else target
+        val mergedCardProfile = target.creditCardProfile ?: source.creditCardProfile?.copy(accountId = targetAccountId)
+        val updatedTarget = target.copy(
+            currentBalanceCents = if (combineBalances) target.currentBalanceCents + source.currentBalanceCents else target.currentBalanceCents,
+            creditCardProfile = mergedCardProfile
+        )
         val remainingAccounts = currentAccounts.filterNot { it.id == sourceAccountId }.map { if (it.id == targetAccountId) updatedTarget else it }
-        commitSnapshot(_snapshot.value.copy(accounts = remainingAccounts, transactions = updatedTxns))
+        val cleanedProfiles = _snapshot.value.creditCardProfiles.filterNot { it.accountId == sourceAccountId || it.accountId == targetAccountId } +
+            listOfNotNull(mergedCardProfile)
+        commitSnapshot(_snapshot.value.copy(accounts = remainingAccounts, transactions = updatedTxns, creditCardProfiles = cleanedProfiles))
         activeEngine.mergeAccounts(sourceAccountId, targetAccountId)
         activeEngine.pushAccount(updatedTarget)
     }

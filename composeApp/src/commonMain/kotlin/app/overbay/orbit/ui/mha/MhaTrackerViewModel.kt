@@ -314,34 +314,6 @@ class MhaTrackerViewModel(
         }
     }
 
-    fun saveMhaConfig(updatedProfile: MhaTaxProfile) {
-        updateMhaConfig(
-            designationCapCents = _designatedCapCents.value,
-            fairMarketRentalValueCents = _fairMarketRentalValueCents.value,
-            profile = updatedProfile
-        )
-    }
-
-    fun reapplyCategoryDefaults(categoryId: Long) {
-        viewModelScope.launch {
-            val affected = repository.transactions.value.filter {
-                it.effectiveCategoryId == categoryId && it.editedMhaEligible != null
-            }
-            for (txn in affected) {
-                repository.resetTransactionFields(txn.id, listOf("mha_eligible"))
-            }
-        }
-    }
-
-    fun reapplyAllDefaults() {
-        viewModelScope.launch {
-            val overridden = repository.transactions.value.filter { it.editedMhaEligible != null }
-            for (txn in overridden) {
-                repository.resetTransactionFields(txn.id, listOf("mha_eligible"))
-            }
-        }
-    }
-
     fun clearError() {
         _errorMessage.value = null
     }

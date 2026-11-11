@@ -28,30 +28,11 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitFieldLabel
 import app.overbay.orbit.ui.components.OrbitModalFooter
-import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
 import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
-
-@Composable
-fun PerkEditorDialog(
-    benefit: CardBenefit,
-    isNew: Boolean,
-    onSave: (CardBenefit) -> Unit,
-    onDismiss: () -> Unit
-) {
-    OrbitModalSheet(onDismissRequest = onDismiss) {
-        PerkEditorSubform(
-            benefit = benefit,
-            isNew = isNew,
-            onSave = onSave,
-            onDismiss = onDismiss,
-            showBackButton = false
-        )
-    }
-}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -186,7 +167,7 @@ fun PerkEditorSubform(
                         cadence = cadence,
                         anchor = anchor,
                         periodValueCents = amountCents,
-                        annualCreditValueCents = amountCents,
+                        annualCreditValueCents = null,
                         description = description.trim().ifBlank { null }
                     )
                 )

@@ -219,17 +219,20 @@ object CreditCardBenefitEngine {
             Triple(LocalDate(today.year, 1, 1), LocalDate(today.year, 12, 31), false)
         }
 
+        val upgraded = upgradeProfile(p, today)
         var creditsCaptured = 0L
-        for (benefit in p.benefits) {
+        for (benefit in upgraded.benefits) {
             for (u in benefit.usage) {
-                val start = parsePeriodStart(u.periodKey) ?: continue
-                if (start in windowStart..windowEnd) {
+                val effectiveDate = u.usedOn?.let { LocalDateUtils.parseIsoDate(it) }
+                    ?: parsePeriodStart(u.periodKey)
+                    ?: continue
+                if (effectiveDate in windowStart..windowEnd) {
                     creditsCaptured += u.amountCents
                 }
             }
         }
 
-        val creditsAvailable = p.benefits.sumOf { annualizedValueCents(it) }
+        val creditsAvailable = upgraded.benefits.sumOf { annualizedValueCents(it) }
         val annualFee = p.annualFeeCents ?: 0L
 
         return CardValueLedger(

@@ -147,6 +147,7 @@ class SelfHostedApiEngine(
                 CategorySortOption.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
             } ?: currentPrefs.budgetSortOption,
             dashboardWidgets = remotePrefs?.prefOr("dashboardWidgets", currentPrefs.dashboardWidgets) ?: currentPrefs.dashboardWidgets,
+            cardPerksWidgets = remotePrefs?.prefOr("cardPerksWidgets", currentPrefs.cardPerksWidgets) ?: currentPrefs.cardPerksWidgets,
             dashboardHiddenBiggestIds = remotePrefs?.prefOr("dashboardHiddenBiggestIds", currentPrefs.dashboardHiddenBiggestIds) ?: currentPrefs.dashboardHiddenBiggestIds,
             dashboardFocusedGoalId = remotePrefs?.prefOr("dashboardFocusedGoalId", currentPrefs.dashboardFocusedGoalId),
             dashboardRetirementAge = remotePrefs?.prefOr("dashboardRetirementAge", currentPrefs.dashboardRetirementAge) ?: currentPrefs.dashboardRetirementAge,
@@ -354,23 +355,25 @@ class SelfHostedApiEngine(
         val kindStr = when (item.kind) {
             UpcomingKind.BILL -> "bill"
             UpcomingKind.SUBSCRIPTION -> "subscription"
+            UpcomingKind.GIVING -> "giving"
             UpcomingKind.INCOME -> "income"
-            else -> "bill"
         }
+        val isQuarterly = item.frequencyType == app.overbay.orbit.data.model.RecurrenceFrequency.QUARTERLY
         val dto = UpcomingItemDto(
             id = item.id,
             name = item.name,
             amount = MoneyUtils.centsToDollars(item.amountCents),
             direction = item.direction,
-            frequencyType = item.frequencyType.name.lowercase(),
+            frequencyType = if (isQuarterly) "quarterly" else item.frequencyType.name.lowercase(),
             nextDate = item.nextDate,
             categoryId = item.categoryId,
             accountId = item.accountId,
             status = item.status.name.lowercase(),
             merchant = item.merchant,
             kind = kindStr,
-            frequencyInterval = item.frequencyInterval,
-            frequencyUnit = item.frequencyUnit,
+            frequencyInterval = if (isQuarterly) 3 else item.frequencyInterval,
+            frequencyUnit = if (isQuarterly) "months" else item.frequencyUnit,
+            recurrenceRule = item.recurrenceRule?.toWireJson(),
             amountStrategy = item.amountStrategy.name.lowercase(),
             amountLookbackMonths = item.amountLookbackMonths,
             source = item.source.name.lowercase(),
@@ -403,6 +406,7 @@ class SelfHostedApiEngine(
             map["dismissedRecurringKeys"] = json.encodeToJsonElement(preferences.dismissedRecurringKeys)
             map["mutedSimpleFinAccounts"] = json.encodeToJsonElement(preferences.mutedSimpleFinAccounts)
             map["dashboardWidgets"] = json.encodeToJsonElement(preferences.dashboardWidgets)
+            map["cardPerksWidgets"] = json.encodeToJsonElement(preferences.cardPerksWidgets)
             map["notificationPreferences"] = json.encodeToJsonElement(preferences.notificationPreferences)
             map["accountGroupWideSpans"] = json.encodeToJsonElement(preferences.accountGroupWideSpans)
             apiClient.putRemotePreferences(map)

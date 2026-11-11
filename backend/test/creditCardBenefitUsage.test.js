@@ -193,3 +193,39 @@ test('applyBenefitUsage returns null for unknown benefit or account', () => {
   });
   assert.equal(missingAccount, null);
 });
+
+test('applyBenefitUsage upgrades legacy benefit without id using deterministic hash id', () => {
+  const db = makeDb();
+  const accountId = insertAccount(db);
+  insertProfile(db, accountId, [
+    {
+      title: 'Hotel Credit',
+      cadence: 'annual',
+      annual_credit_value: 300.0,
+      used_periods: ['2025']
+    }
+  ]);
+
+  // Compute deterministic Kotlin-compatible legacy id for index 0, 'hotel credit'
+  let h = 0;
+  for (const ch of 'hotel credit') h = (Math.imul(31, h) + ch.charCodeAt(0)) | 0;
+  const legacyId = `legacy-0-${(h >>> 0).toString(36)}`;
+
+  const updated = applyBenefitUsage(db, {
+    householdId: 1,
+    accountId,
+    benefitId: legacyId,
+    periodKey: '2026',
+    amount: 300.0,
+    usedOn: '2026-07-01'
+  });
+
+  assert.ok(updated);
+  const benefits = JSON.parse(updated.benefits_json);
+  assert.equal(benefits[0].id, legacyId);
+  assert.equal(benefits[0].usage.length, 2);
+  assert.deepEqual(
+    benefits[0].usage.map((u) => u.period_key).sort(),
+    ['2025', '2026']
+  );
+});

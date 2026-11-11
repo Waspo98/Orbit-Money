@@ -144,7 +144,7 @@ class SpendingTrendsViewModelTest {
         assertEquals(4000L, state.selectedCategoryTrend?.totalSpentCents)
 
         // Reset to Cash Flow
-        viewModel.setChartMode(TrendsChartMode.CASH_FLOW)
+        viewModel.clearCategorySelection()
         testScheduler.advanceUntilIdle()
         assertEquals(TrendsChartMode.CASH_FLOW, viewModel.uiState.value.chartMode)
         assertNull(viewModel.uiState.value.selectedCategoryId)

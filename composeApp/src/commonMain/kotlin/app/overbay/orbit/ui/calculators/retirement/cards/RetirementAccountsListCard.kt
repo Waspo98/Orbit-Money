@@ -16,6 +16,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.calculators.retirement.RetirementUiState
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitBadge
@@ -31,14 +33,18 @@ import app.overbay.orbit.ui.components.OrbitSectionCard
 import kotlin.math.max
 import kotlin.math.roundToLong
 
-val RETIREMENT_ACCOUNT_MIX_COLORS = listOf(
-    Color(0xFF10B981), // Emerald
-    Color(0xFF38BDF8), // Sky Blue
-    Color(0xFFA78BFA), // Lavender / Purple
-    Color(0xFFF59E0B), // Amber
-    Color(0xFFF472B6), // Pink
-    Color(0xFF22D3EE)  // Cyan
+@Composable
+fun retirementAccountPalette(): List<Color> = listOf(
+    MaterialTheme.colorScheme.primary,
+    OrbitTheme.colors.transfer,
+    MaterialTheme.colorScheme.tertiary,
+    OrbitTheme.colors.warning,
+    MaterialTheme.colorScheme.secondary,
+    OrbitTheme.colors.income
 )
+
+fun retirementAccountColorMap(accountIds: List<Long?>, palette: List<Color>): Map<Long, Color> =
+    accountIds.filterNotNull().distinct().mapIndexed { idx, id -> id to palette[idx % palette.size] }.toMap()
 
 @Composable
 fun RetirementAccountsListCard(
@@ -52,6 +58,10 @@ fun RetirementAccountsListCard(
     val scenario = uiState.scenario
     val linkedAccounts = uiState.linkedAccounts
     val totalLinkedBalance = linkedAccounts.sumOf { it.balanceCents }
+    val palette = retirementAccountPalette()
+    val accountColorMap = remember(linkedAccounts, palette) {
+        retirementAccountColorMap(linkedAccounts.map { it.accountId }, palette)
+    }
 
     OrbitSectionCard(
         title = "Portfolio Balance & Savings",
@@ -234,7 +244,7 @@ fun RetirementAccountsListCard(
                 ) {
                     linkedAccounts.forEachIndexed { index, account ->
                         val weight = max(0.02f, account.balanceCents.toFloat() / totalLinkedBalance.toFloat())
-                        val color = RETIREMENT_ACCOUNT_MIX_COLORS[index % RETIREMENT_ACCOUNT_MIX_COLORS.size]
+                        val color = account.accountId?.let { accountColorMap[it] } ?: palette[index % palette.size]
                         Box(
                             modifier = Modifier
                                 .weight(weight)
@@ -249,7 +259,7 @@ fun RetirementAccountsListCard(
             // Per-Account List Rows
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 linkedAccounts.forEachIndexed { index, account ->
-                    val color = RETIREMENT_ACCOUNT_MIX_COLORS[index % RETIREMENT_ACCOUNT_MIX_COLORS.size]
+                    val color = account.accountId?.let { accountColorMap[it] } ?: palette[index % palette.size]
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,

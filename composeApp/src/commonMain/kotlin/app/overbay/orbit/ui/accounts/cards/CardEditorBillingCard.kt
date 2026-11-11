@@ -67,12 +67,7 @@ fun CardEditorBillingTab(
                         CurrencyTextField(
                             cents = draft.creditLimitCents ?: 0L,
                             onCentsChange = { cents ->
-                                controller.updateDraft { d ->
-                                    d.copy(
-                                        creditLimitCents = cents.takeIf { it > 0L },
-                                        creditLimitText = if (cents > 0L) (cents / 100).toString() else ""
-                                    )
-                                }
+                                controller.updateDraft { d -> d.copy(creditLimitCents = cents.takeIf { it > 0L }) }
                             },
                             label = "Credit Limit"
                         )

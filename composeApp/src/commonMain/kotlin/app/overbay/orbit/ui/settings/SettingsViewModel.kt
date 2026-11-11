@@ -352,10 +352,11 @@ class SettingsViewModel(
         _uiState.update { it.copy(statusMessage = "Reapplying rules across all transactions...") }
         scope.launch {
             val initialTx = repository.transactions.value
+            val beforeById = initialTx.associateBy { it.id }
             val processed = initialTx.size
             repository.runRulesOnAllTransactions()
             val afterTx = repository.transactions.value
-            val updated = initialTx.zip(afterTx).count { (before, after) -> before != after }
+            val updated = afterTx.count { after -> beforeById[after.id] != after }
             _uiState.update { it.copy(statusMessage = "Reapplied rules to $processed transactions ($updated updated)") }
         }
     }
@@ -366,9 +367,16 @@ class SettingsViewModel(
     suspend fun exportBudgetingJson(): String = repository.exportBudgetingJson().getOrDefault("")
 
     fun exportBackup(): String {
-        val json = repository.exportBackupJson()
-        _uiState.update { it.copy(backupExportJson = json, showBackupExportDialog = true) }
-        return json
+        val fallbackJson = repository.exportBackupJson()
+        if (_uiState.value.storageMode == StorageMode.SELF_HOSTED) {
+            scope.launch {
+                val payload = repository.exportBackupPayload()
+                _uiState.update { it.copy(backupExportJson = payload, showBackupExportDialog = true) }
+            }
+        } else {
+            _uiState.update { it.copy(backupExportJson = fallbackJson, showBackupExportDialog = true) }
+        }
+        return fallbackJson
     }
 
     fun closeBackupExportDialog() {
@@ -475,8 +483,18 @@ class SettingsViewModel(
         scope.launch {
             val snap = repository.cloudSyncManager.restoreSnapshot()
             if (snap != null) {
-                repository.commitSnapshot(snap, immediate = true)
-                _uiState.update { it.copy(isSyncing = false, statusMessage = "Restored from Google Drive") }
+                if (_uiState.value.storageMode == StorageMode.SELF_HOSTED) {
+                    val snapshotJson = repository.json.encodeToString(OrbitWorkspaceSnapshot.serializer(), snap)
+                    val remoteResult = repository.restoreBackupJson(snapshotJson)
+                    if (remoteResult.isSuccess) {
+                        _uiState.update { it.copy(isSyncing = false, statusMessage = "Restored from Google Drive") }
+                    } else {
+                        _uiState.update { it.copy(isSyncing = false, statusMessage = "Restore failed: ${remoteResult.exceptionOrNull()?.message}") }
+                    }
+                } else {
+                    repository.commitSnapshot(snap, immediate = true)
+                    _uiState.update { it.copy(isSyncing = false, statusMessage = "Restored from Google Drive") }
+                }
             } else {
                 _uiState.update { it.copy(isSyncing = false, statusMessage = "Restore failed: No Google Drive backup found") }
             }

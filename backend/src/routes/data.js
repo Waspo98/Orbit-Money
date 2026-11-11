@@ -7,6 +7,10 @@ import { sendBadRequest, sendOk, sendRouteError } from '../lib/http.js';
 import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
 import { createMemoryUpload } from '../lib/uploads.js';
 import { restoreOrbitBackup } from '../services/orbitBackupRestore.js';
+import {
+  convertWorkspaceSnapshotToOrbitBackup,
+  isOrbitWorkspaceSnapshot
+} from '../services/orbitBackupSnapshotBridge.js';
 
 const router = express.Router();
 const EFFECTIVE_TRANSACTION_CATEGORY_ID_SQL = effectiveCategoryIdSql('t');
@@ -124,18 +128,35 @@ function buildOrbitBackup(householdId) {
   };
 }
 
-function parseBackupFile(file) {
-  if (!file) throw new Error('No backup file uploaded.');
-  let parsed;
-  try {
-    parsed = JSON.parse(file.buffer.toString('utf-8'));
-  } catch {
-    throw new Error('Backup file must be valid JSON.');
+function parseBackupInput(req) {
+  let parsed = null;
+  if (req.file) {
+    try {
+      parsed = JSON.parse(req.file.buffer.toString('utf-8'));
+    } catch {
+      throw new Error('Backup file must be valid JSON.');
+    }
+  } else if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+    if (typeof req.body.backupJson === 'string') {
+      try {
+        parsed = JSON.parse(req.body.backupJson);
+      } catch {
+        throw new Error('Backup file must be valid JSON.');
+      }
+    } else {
+      parsed = req.body.backup && typeof req.body.backup === 'object' ? req.body.backup : req.body;
+    }
+  } else {
+    throw new Error('No backup file uploaded.');
   }
-  if (parsed?.type !== 'orbit_money_backup' || parsed?.version !== 1 || !parsed.tables) {
-    throw new Error('This is not a supported Orbit Money backup file.');
+
+  if (parsed?.type === 'orbit_money_backup' && parsed?.version === 1 && parsed.tables) {
+    return parsed;
   }
-  return parsed;
+  if (isOrbitWorkspaceSnapshot(parsed)) {
+    return convertWorkspaceSnapshotToOrbitBackup(parsed);
+  }
+  throw new Error('This is not a supported Orbit Money backup file.');
 }
 
 function backupSummary(backup) {
@@ -226,19 +247,27 @@ router.get('/orbit-backup', requireAuth, requireHouseholdWrite, (req, res) => {
   }
 });
 
-router.post('/orbit-restore/preview', requireAuth, requireSessionHouseholdOwner, upload.single('file'), (req, res) => {
+function maybeUploadBackup(req, res, next) {
+  const ct = String(req.headers['content-type'] || '').toLowerCase();
+  if (ct.includes('multipart/form-data')) {
+    return upload.single('file')(req, res, next);
+  }
+  return next();
+}
+
+router.post('/orbit-restore/preview', requireAuth, requireSessionHouseholdOwner, maybeUploadBackup, (req, res) => {
   try {
-    const backup = parseBackupFile(req.file);
+    const backup = parseBackupInput(req);
     sendOk(res, { success: true, ...backupSummary(backup) });
   } catch (err) {
     sendBadRequest(res, err.message || 'Restore preview failed.');
   }
 });
 
-router.post('/orbit-restore', requireAuth, requireSessionHouseholdOwner, upload.single('file'), (req, res) => {
+router.post('/orbit-restore', requireAuth, requireSessionHouseholdOwner, maybeUploadBackup, (req, res) => {
   const householdId = requireHouseholdId(req);
   try {
-    const backup = parseBackupFile(req.file);
+    const backup = parseBackupInput(req);
     const result = restoreOrbitBackup(db, backup, householdId, req.user?.id || null);
     sendOk(res, {
       success: true,

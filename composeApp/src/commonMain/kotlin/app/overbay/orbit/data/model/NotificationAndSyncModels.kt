@@ -8,6 +8,9 @@ data class NotificationTypeSchedule(
     val enabled: Boolean = false,
     val time: String? = null,
     val dayOfWeek: Int? = null,
+    val dayOfMonth: Int? = null,
+    val cadence: String? = null,
+    val timing: String? = null,
     val minAmountCents: Cents? = null,
     val accountIds: List<Long> = emptyList()
 )
@@ -18,9 +21,15 @@ data class NotificationPreferencesConfig(
     val showAmounts: Boolean = true,
     val defaultTime: String = "09:00",
     val weeklySnapshot: NotificationTypeSchedule = NotificationTypeSchedule(enabled = true, dayOfWeek = 1, time = "09:00"),
-    val income: NotificationTypeSchedule = NotificationTypeSchedule(enabled = true, minAmountCents = 10_000L),
+    val income: NotificationTypeSchedule = NotificationTypeSchedule(enabled = true, timing = "after_sync", minAmountCents = 10_000L),
     val syncIssues: NotificationTypeSchedule = NotificationTypeSchedule(enabled = true),
-    val accountSnapshots: NotificationTypeSchedule = NotificationTypeSchedule(enabled = false, dayOfWeek = 1, time = "09:00")
+    val accountSnapshots: NotificationTypeSchedule = NotificationTypeSchedule(
+        enabled = false,
+        cadence = "monthly",
+        dayOfWeek = 1,
+        dayOfMonth = 1,
+        time = "09:00"
+    )
 )
 
 @Serializable
