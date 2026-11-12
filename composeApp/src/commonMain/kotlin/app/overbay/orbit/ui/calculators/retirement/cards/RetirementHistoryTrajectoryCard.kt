@@ -1,9 +1,12 @@
 package app.overbay.orbit.ui.calculators.retirement.cards
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,7 +36,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,9 +43,12 @@ import app.overbay.orbit.data.model.RetirementHistoryPoint
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.calculators.retirement.LinkedRetirementAccountDetail
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.charts.chartHorizontalScrub
+import app.overbay.orbit.ui.components.charts.rememberSmoothScrubPosition
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -239,8 +244,13 @@ private fun InteractiveHistoryChart(
 
     val maxVal = remember(points) {
         val peak = points.maxOfOrNull { it.balanceCents } ?: 100_000_00L
-        (peak.toDouble() * 1.1).toLong()
+        (peak.toDouble() * 1.1).toLong().coerceAtLeast(1L)
     }
+    val animatedMaxVal by animateFloatAsState(
+        targetValue = maxVal.toFloat(),
+        animationSpec = OrbitSprings.FloatSpatialDefault,
+        label = "historyChartMaxScale"
+    )
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -254,22 +264,55 @@ private fun InteractiveHistoryChart(
     val totalPath = remember { Path() }
     val allAccountIds = remember(points) { points.flatMap { it.accounts }.mapNotNull { it.accountId }.distinct() }
 
+    val activePt = scrubIndex?.let { points.getOrNull(it) }
+    val scrubNormTarget = scrubIndex?.takeIf { it in points.indices && points.size >= 2 }?.let { idx ->
+        val xNorm = idx.toFloat() / (points.size - 1).toFloat()
+        val yNorm = (1f - (points[idx].balanceCents.toFloat() / animatedMaxVal.coerceAtLeast(1f))).coerceIn(0f, 1f)
+        Offset(xNorm, yNorm)
+    }
+    val smoothScrubNorm = rememberSmoothScrubPosition(scrubNormTarget)
+
     Column(modifier = modifier) {
-        // Scrubber Tooltip Row
-        val activePt = scrubIndex?.let { points.getOrNull(it) }
-        if (activePt != null) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(activePt.month, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    Text("Total: ${MoneyUtils.formatCents(activePt.balanceCents, showCents = false)}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = primaryColor)
+        // Constant-height readout bar (zero vertical layout shift on touch)
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = if (activePt != null) 1f else 0.5f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 6.dp)
+                .height(30.dp)
+        ) {
+            AnimatedContent(
+                targetState = activePt,
+                contentKey = { it != null },
+                transitionSpec = {
+                    fadeIn(OrbitSprings.FloatEffectsFast) togetherWith
+                        fadeOut(OrbitSprings.FloatEffectsFast)
+                },
+                contentAlignment = Alignment.CenterStart,
+                label = "historyScrubReadout"
+            ) { pt ->
+                if (pt != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(pt.month, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Total: ${MoneyUtils.formatCents(pt.balanceCents, showCents = false)}",
+                            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                            fontWeight = FontWeight.Bold,
+                            color = primaryColor
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Drag horizontally to inspect monthly balances",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp)
+                    )
                 }
             }
         }
@@ -278,31 +321,25 @@ private fun InteractiveHistoryChart(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(180.dp)
-                .pointerInput(points.size) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            if (points.isNotEmpty()) {
-                                scrubIndex = ((offset.x / size.width) * (points.size - 1)).roundToInt().coerceIn(0, points.size - 1)
-                            }
-                        },
-                        onDragEnd = { scrubIndex = null },
-                        onDragCancel = { scrubIndex = null },
-                        onDrag = { change, _ ->
-                            if (points.isNotEmpty()) {
-                                scrubIndex = ((change.position.x / size.width) * (points.size - 1)).roundToInt().coerceIn(0, points.size - 1)
-                            }
-                        }
-                    )
-                }
+                .chartHorizontalScrub(
+                    key = points,
+                    clearOnRelease = true,
+                    onFractionChanged = { fraction ->
+                        scrubIndex = if (fraction != null && points.isNotEmpty()) {
+                            (fraction * (points.size - 1)).roundToInt().coerceIn(0, points.lastIndex)
+                        } else null
+                    }
+                )
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
                 val count = points.size
                 if (count < 2) return@Canvas
+                val denom = animatedMaxVal.toDouble().coerceAtLeast(1.0)
 
                 fun idxToX(idx: Int): Float = (idx.toFloat() / (count - 1).toFloat()) * w
-                fun balToY(bal: Cents): Float = h - ((bal.toDouble() / maxVal.toDouble()) * h).toFloat()
+                fun balToY(bal: Cents): Float = (h - ((bal.toDouble() / denom) * h).toFloat()).coerceIn(0f, h)
 
                 // 1. Draw individual colored lines for each linked account
                 allAccountIds.forEach { acctId ->
@@ -332,14 +369,12 @@ private fun InteractiveHistoryChart(
                 }
                 drawPath(totalPath, color = primaryColor, style = totalStroke)
 
-                // 3. Scrub line & circle
-                val sIdx = scrubIndex
-                if (sIdx != null && sIdx in 0 until count) {
-                    val sx = idxToX(sIdx)
-                    val pt = points[sIdx]
-                    val sy = balToY(pt.balanceCents)
+                // 3. Smoothly gliding scrub line & circle
+                if (smoothScrubNorm != null) {
+                    val sx = smoothScrubNorm.x * w
+                    val sy = smoothScrubNorm.y * h
                     drawLine(color = onSurfaceVariant.copy(alpha = 0.6f), start = Offset(sx, 0f), end = Offset(sx, h), strokeWidth = 1.5f)
-                    drawCircle(color = primaryColor, radius = with(density) { 5.dp.toPx() }, center = Offset(sx, sy))
+                    drawCircle(color = primaryColor, radius = 5.dp.toPx(), center = Offset(sx, sy))
                 }
             }
         }

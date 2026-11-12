@@ -1,9 +1,8 @@
 package app.overbay.orbit.ui.components.charts
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,7 +32,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -44,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 
@@ -56,7 +55,8 @@ data class SpendingBarItem(
 
 /**
  * Interactive monthly bar chart supporting grouped flow (Income vs Expenses) or category trends.
- * Features rounded bar caps, budget threshold reference line, and touch selection with haptics.
+ * Features spring-animated bar height morphing, smooth selection slot glide, horizontal scrub
+ * without vertical scroll hijacking, and rounded bar caps.
  */
 @Composable
 fun SpendingTrendsBarChart(
@@ -77,7 +77,6 @@ fun SpendingTrendsBarChart(
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var lastHapticIndex by remember { mutableStateOf<Int?>(null) }
 
-    // Pre-allocated drawing objects (Zero allocation in Canvas onDraw)
     val cornerRadius = remember { CornerRadius(10f, 10f) }
     val budgetStroke = remember(density) {
         Stroke(
@@ -108,7 +107,6 @@ fun SpendingTrendsBarChart(
         color = MaterialTheme.colorScheme.onTertiaryContainer
     )
 
-    // Calculate maximum scale
     val maxValue = remember(items) {
         var highest = 1L
         for (item in items) {
@@ -116,12 +114,32 @@ fun SpendingTrendsBarChart(
             if (item.incomeCents != null) highest = max(highest, item.incomeCents)
             if (item.budgetCents != null) highest = max(highest, item.budgetCents)
         }
-        (highest * 1.15).toLong() // 15% top headroom
+        (highest * 1.15).toLong().coerceAtLeast(1L)
     }
 
-    LaunchedEffect(selectedIndex) {
+    val expenseFractions = remember(items, maxValue) {
+        items.map { (it.expenseCents.toDouble() / maxValue.toDouble()).toFloat().coerceIn(0f, 1f) }
+    }
+    val incomeFractions = remember(items, maxValue) {
+        items.map { ((it.incomeCents ?: 0L).toDouble() / maxValue.toDouble()).toFloat().coerceIn(0f, 1f) }
+    }
+    val animatedExpense = rememberAnimatedFloatSeries(expenseFractions)
+    val animatedIncome = rememberAnimatedFloatSeries(incomeFractions)
+
+    val selectionAlpha by animateFloatAsState(
+        targetValue = if (selectedIndex != null) 1f else 0f,
+        animationSpec = OrbitSprings.FloatEffectsFast,
+        label = "barSelectionAlpha"
+    )
+    val animatedSlotIndex by animateFloatAsState(
+        targetValue = (selectedIndex ?: 0).toFloat(),
+        animationSpec = OrbitSprings.FloatSpatialFast,
+        label = "barSelectedSlotGlide"
+    )
+
+    LaunchedEffect(selectedIndex, items) {
         val idx = selectedIndex
-        if (idx != null && idx != lastHapticIndex) {
+        if (idx != null && idx in items.indices && idx != lastHapticIndex) {
             haptics.tick()
             lastHapticIndex = idx
             onItemSelected?.invoke(idx, items.getOrNull(idx))
@@ -136,38 +154,21 @@ fun SpendingTrendsBarChart(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(height)
-                .pointerInput(items) {
-                    detectTapGestures(
-                        onTap = { offset ->
-                            val n = items.size
-                            if (n > 0) {
-                                val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                                val idx = (fraction * n).toInt().coerceIn(0, n - 1)
-                                selectedIndex = if (selectedIndex == idx) null else idx
-                            }
+                .chartHorizontalScrub(
+                    key = items,
+                    clearOnRelease = false,
+                    onFractionChanged = { fraction ->
+                        if (fraction != null && items.isNotEmpty()) {
+                            selectedIndex = (fraction * items.size).toInt().coerceIn(0, items.lastIndex)
                         }
-                    )
-                }
-                .pointerInput(items) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            val n = items.size
-                            if (n > 0) {
-                                val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                                selectedIndex = (fraction * n).toInt().coerceIn(0, n - 1)
-                            }
-                        },
-                        onDragEnd = { /* keep selection so user can tap inspect month */ },
-                        onDragCancel = { /* keep selection */ },
-                        onDrag = { change, _ ->
-                            val n = items.size
-                            if (n > 0) {
-                                val fraction = (change.position.x / size.width).coerceIn(0f, 1f)
-                                selectedIndex = (fraction * n).toInt().coerceIn(0, n - 1)
-                            }
+                    },
+                    onTapFraction = { fraction ->
+                        if (items.isNotEmpty()) {
+                            val idx = (fraction * items.size).toInt().coerceIn(0, items.lastIndex)
+                            selectedIndex = if (selectedIndex == idx) null else idx
                         }
-                    )
-                }
+                    }
+                )
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
@@ -228,7 +229,18 @@ fun SpendingTrendsBarChart(
                     )
                 }
 
-                // 4. Draw Bar Clusters
+                // 4. Smoothly gliding selection highlight column
+                if (selectionAlpha > 0.01f) {
+                    val highlightLeft = animatedSlotIndex.coerceIn(0f, (n - 1).toFloat()) * slotWidth
+                    drawRoundRect(
+                        color = selectionBgColor.copy(alpha = selectionBgColor.alpha * selectionAlpha),
+                        topLeft = Offset(highlightLeft + 2f, 4f),
+                        size = Size((slotWidth - 4f).coerceAtLeast(0f), h - 4f),
+                        cornerRadius = cornerRadius
+                    )
+                }
+
+                // 5. Draw Spring-Animated Bar Clusters
                 for (i in 0 until n) {
                     val item = items[i]
                     val isSelected = selectedIndex == i
@@ -237,25 +249,11 @@ fun SpendingTrendsBarChart(
                     val slotLeft = i * slotWidth
                     val clusterWidth = slotWidth * 0.72f
                     val clusterOffset = slotLeft + (slotWidth - clusterWidth) / 2f
-
-                    // Selection highlight background behind cluster
-                    if (isSelected) {
-                        drawRoundRect(
-                            color = selectionBgColor,
-                            topLeft = Offset(slotLeft + 2f, 4f),
-                            size = Size(slotWidth - 4f, h - 4f),
-                            cornerRadius = cornerRadius
-                        )
-                    }
-
-                    val alpha = if (hasActiveSelection && !isSelected) 0.40f else 1.0f
+                    val alpha = if (hasActiveSelection && !isSelected) 0.42f else 1.0f
 
                     if (item.incomeCents != null) {
-                        // Dual Bar Mode (Income & Expense side-by-side)
                         val barWidth = (clusterWidth - 4f) / 2f
-
-                        // Income Bar (Left)
-                        val incomeH = ((item.incomeCents.toDouble() / maxValue.toDouble()) * h).toFloat().coerceAtLeast(4f)
+                        val incomeH = (animatedIncome.getOrElse(i) { 0f } * h).coerceAtLeast(4f)
                         drawRoundRect(
                             color = incomeColor.copy(alpha = alpha),
                             topLeft = Offset(clusterOffset, h - incomeH),
@@ -263,8 +261,7 @@ fun SpendingTrendsBarChart(
                             cornerRadius = cornerRadius
                         )
 
-                        // Expense Bar (Right)
-                        val expenseH = ((item.expenseCents.toDouble() / maxValue.toDouble()) * h).toFloat().coerceAtLeast(4f)
+                        val expenseH = (animatedExpense.getOrElse(i) { 0f } * h).coerceAtLeast(4f)
                         drawRoundRect(
                             color = expenseColor.copy(alpha = alpha),
                             topLeft = Offset(clusterOffset + barWidth + 4f, h - expenseH),
@@ -272,12 +269,11 @@ fun SpendingTrendsBarChart(
                             cornerRadius = cornerRadius
                         )
                     } else {
-                        // Single Bar Mode (Category Spending)
                         val baseBarColor = barColor ?: expenseColor
                         val isOverBudget = item.budgetCents != null && item.budgetCents > 0L && item.expenseCents > item.budgetCents
                         val colorToUse = if (isOverBudget) expenseColor else baseBarColor
 
-                        val barH = ((item.expenseCents.toDouble() / maxValue.toDouble()) * h).toFloat().coerceAtLeast(4f)
+                        val barH = (animatedExpense.getOrElse(i) { 0f } * h).coerceAtLeast(4f)
                         drawRoundRect(
                             color = colorToUse.copy(alpha = alpha),
                             topLeft = Offset(clusterOffset, h - barH),
@@ -289,7 +285,7 @@ fun SpendingTrendsBarChart(
             }
         }
 
-        // 5. X-Axis Month / Category Labels
+        // 6. X-Axis Month / Category Labels
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -300,6 +296,7 @@ fun SpendingTrendsBarChart(
                 Text(
                     text = items[i].label,
                     style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                     color = if (isSelected) MaterialTheme.colorScheme.primary else onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f)
@@ -307,7 +304,7 @@ fun SpendingTrendsBarChart(
             }
         }
 
-        // 6. Dual-Bar Legend (Income / Expenses)
+        // 7. Dual-Bar Legend (Income / Expenses)
         if (items.any { it.incomeCents != null }) {
             Row(
                 modifier = Modifier

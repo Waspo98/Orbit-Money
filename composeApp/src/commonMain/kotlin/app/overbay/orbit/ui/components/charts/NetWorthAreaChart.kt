@@ -1,8 +1,6 @@
 package app.overbay.orbit.ui.components.charts
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,19 +25,21 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MonthlyNetWorthPoint
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
  * Interactive Catmull-Rom cubic Bezier net worth area chart with gradient vertical fill.
- * Supports touch drag scrubbing with haptic ticks and zero-allocation 60fps rendering.
+ * Supports horizontal touch drag scrubbing with smooth spring rail glide, period morphing,
+ * haptic ticks, and zero vertical page-scroll hijacking.
  */
 @Composable
 fun NetWorthAreaChart(
@@ -57,11 +57,10 @@ fun NetWorthAreaChart(
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var lastHapticIndex by remember { mutableStateOf<Int?>(null) }
 
-    // Pre-allocated reusable paths (ZERO object allocation in Canvas onDraw)
+    // Pre-allocated reusable paths & strokes (ZERO object allocation in Canvas onDraw)
     val linePath = remember { Path() }
     val areaPath = remember { Path() }
 
-    // Pre-allocated strokes and brushes
     val lineStroke = remember(density) {
         Stroke(
             width = with(density) { 3.dp.toPx() },
@@ -97,22 +96,34 @@ fun NetWorthAreaChart(
     val surfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
-    // Calculate value range with proportional minimum span so minor ripples don't look like vertical cliffs
-    val rawValues = remember(points) { points.map { it.snapshot.netWorthCents } }
-    val minVal = rawValues.minOrNull() ?: 0L
-    val maxVal = rawValues.maxOrNull() ?: 1L
-    val rawSpan = max(1L, maxVal - minVal)
-    val minProportionalSpan = max(kotlin.math.abs(maxVal) / 8L, 100_00L)
-    val effectiveSpan = max(rawSpan, minProportionalSpan)
-    val midVal = (minVal + maxVal) / 2L
-    val paddedMin = midVal - (effectiveSpan * 0.62).toLong()
-    val paddedMax = midVal + (effectiveSpan * 0.62).toLong()
-    val totalSpan = max(1L, paddedMax - paddedMin).toDouble()
+    val normalizedTargets = remember(points) {
+        val rawValues = points.map { it.snapshot.netWorthCents }
+        val minVal = rawValues.minOrNull() ?: 0L
+        val maxVal = rawValues.maxOrNull() ?: 1L
+        val rawSpan = max(1L, maxVal - minVal)
+        val minProportionalSpan = max(abs(maxVal) / 8L, 100_00L)
+        val effectiveSpan = max(rawSpan, minProportionalSpan)
+        val midVal = (minVal + maxVal) / 2L
+        val paddedMin = midVal - (effectiveSpan * 0.62).toLong()
+        val paddedMax = midVal + (effectiveSpan * 0.62).toLong()
+        val totalSpan = max(1L, paddedMax - paddedMin).toDouble()
+        rawValues.map { value ->
+            ((value - paddedMin).toDouble() / totalSpan).toFloat().coerceIn(0f, 1f)
+        }
+    }
+    val animatedNormalized = rememberAnimatedFloatSeries(normalizedTargets)
 
-    // Trigger haptics when selected point changes
-    LaunchedEffect(selectedIndex) {
+    val scrubNormTarget = selectedIndex?.takeIf { it in points.indices }?.let { idx ->
+        val n = points.size
+        val xNorm = if (n == 1) 0.5f else idx.toFloat() / (n - 1).toFloat()
+        val yNorm = 1f - animatedNormalized.getOrElse(idx) { 0.5f }
+        Offset(xNorm, yNorm)
+    }
+    val smoothScrubNorm = rememberSmoothScrubPosition(scrubNormTarget)
+
+    LaunchedEffect(selectedIndex, points) {
         val idx = selectedIndex
-        if (idx != null && idx != lastHapticIndex) {
+        if (idx != null && idx in points.indices && idx != lastHapticIndex) {
             haptics.tick()
             lastHapticIndex = idx
             onPointSelected?.invoke(points.getOrNull(idx))
@@ -127,38 +138,21 @@ fun NetWorthAreaChart(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(height)
-                .pointerInput(points) {
-                    detectTapGestures(
-                        onPress = { offset ->
+                .chartHorizontalScrub(
+                    key = points,
+                    clearOnRelease = true,
+                    onFractionChanged = { fraction ->
+                        selectedIndex = fraction?.let { f ->
                             val n = points.size
-                            val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                            selectedIndex = (fraction * (n - 1)).roundToInt().coerceIn(0, n - 1)
-                            tryAwaitRelease()
-                            selectedIndex = null
+                            (f * (n - 1)).roundToInt().coerceIn(0, n - 1)
                         }
-                    )
-                }
-                .pointerInput(points) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            val n = points.size
-                            val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                            selectedIndex = (fraction * (n - 1)).roundToInt().coerceIn(0, n - 1)
-                        },
-                        onDragEnd = { selectedIndex = null },
-                        onDragCancel = { selectedIndex = null },
-                        onDrag = { change, _ ->
-                            val n = points.size
-                            val fraction = (change.position.x / size.width).coerceIn(0f, 1f)
-                            selectedIndex = (fraction * (n - 1)).roundToInt().coerceIn(0, n - 1)
-                        }
-                    )
-                }
+                    }
+                )
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
-                val n = points.size
+                val n = animatedNormalized.size
 
                 // 1. Draw 3 Horizontal Gridlines (Min, Mid, Max)
                 val yTop = h * 0.12f
@@ -168,13 +162,11 @@ fun NetWorthAreaChart(
                 drawLine(outlineColor, Offset(0f, yMid), Offset(w, yMid), strokeWidth = gridStroke.width, pathEffect = gridStroke.pathEffect)
                 drawLine(outlineColor, Offset(0f, yBottom), Offset(w, yBottom), strokeWidth = gridStroke.width, pathEffect = gridStroke.pathEffect)
 
-                // 2. Compute screen coordinates
+                // 2. Compute screen coordinates from animated normalized fractions
                 val pointCoords = ArrayList<Offset>(n)
                 for (i in 0 until n) {
                     val px = if (n == 1) w / 2f else (i.toFloat() / (n - 1).toFloat()) * w
-                    val value = points[i].snapshot.netWorthCents
-                    val normalized = ((value - paddedMin).toDouble() / totalSpan).toFloat().coerceIn(0f, 1f)
-                    val py = h - (normalized * h)
+                    val py = h - (animatedNormalized[i].coerceIn(0f, 1f) * h)
                     pointCoords.add(Offset(px, py))
                 }
 
@@ -198,23 +190,19 @@ fun NetWorthAreaChart(
                         linePath.cubicTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
                     }
 
-                    // Complete Area Path
                     areaPath.addPath(linePath)
                     areaPath.lineTo(w, h)
                     areaPath.lineTo(0f, h)
                     areaPath.close()
 
-                    // Draw Gradient Fill and Curve Stroke
                     drawPath(areaPath, brush = areaBrush)
                     drawPath(linePath, color = primaryColor, style = lineStroke)
                 }
 
-                // 4. Draw Active Scrubbing Rail and Indicator Thumb
-                val activeIdx = selectedIndex
-                if (activeIdx != null && activeIdx in pointCoords.indices) {
-                    val activePt = pointCoords[activeIdx]
+                // 4. Draw Smoothly Gliding Scrubbing Rail and Indicator Thumb
+                if (smoothScrubNorm != null) {
+                    val activePt = Offset(smoothScrubNorm.x * w, smoothScrubNorm.y * h)
 
-                    // Vertical dashed scrub rail
                     drawLine(
                         color = onSurfaceVariant.copy(alpha = 0.5f),
                         start = Offset(activePt.x, 0f),
@@ -222,15 +210,11 @@ fun NetWorthAreaChart(
                         strokeWidth = scrubRailStroke.width,
                         pathEffect = scrubRailStroke.pathEffect
                     )
-
-                    // Outer halo
                     drawCircle(
                         color = primaryColor.copy(alpha = 0.22f),
                         radius = haloRadiusPx,
                         center = activePt
                     )
-
-                    // Inner surface dot with solid primary border
                     drawCircle(
                         color = surfaceColor,
                         radius = dotRadiusPx,
@@ -274,7 +258,7 @@ fun NetWorthAreaChart(
                 style = MaterialTheme.typography.labelSmall,
                 color = onSurfaceVariant,
                 modifier = Modifier.weight(1f),
-                textAlign = androidx.compose.ui.text.style.TextAlign.End
+                textAlign = TextAlign.End
             )
         }
     }
