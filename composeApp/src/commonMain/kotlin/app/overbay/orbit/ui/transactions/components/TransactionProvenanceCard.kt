@@ -73,7 +73,7 @@ fun TransactionProvenanceCard(
         FieldProvenanceInfo(
             fieldKey = "category",
             label = "Category",
-            isEdited = transaction.editedCategoryId != null,
+            isEdited = transaction.editedCategoryIdSource != null || transaction.editedCategoryId != null,
             source = transaction.editedCategoryIdSource,
             originalText = null
         ),
@@ -108,7 +108,7 @@ fun TransactionProvenanceCard(
         FieldProvenanceInfo(
             fieldKey = "mha",
             label = "MHA",
-            isEdited = transaction.editedMhaEligible != null,
+            isEdited = transaction.editedMhaEligibleSource != null,
             source = transaction.editedMhaEligibleSource,
             originalText = "Default"
         )

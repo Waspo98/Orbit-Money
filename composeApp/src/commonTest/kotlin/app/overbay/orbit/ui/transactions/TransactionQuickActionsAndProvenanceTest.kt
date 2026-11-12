@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.transactions
 
 import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.engine.OrbitStorageEngine
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Category
@@ -8,6 +9,9 @@ import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionQuickAction
+import app.overbay.orbit.data.network.TransactionDto
+import app.overbay.orbit.data.resetTransactionFields
+import app.overbay.orbit.ui.components.TransactionFilterDraft
 import app.overbay.orbit.ui.transactions.components.FieldEditProvenance
 import app.overbay.orbit.ui.transactions.components.parseFieldProvenance
 import app.overbay.orbit.util.PlatformStorage
@@ -243,6 +247,132 @@ class TransactionQuickActionsAndProvenanceTest {
         val afterFullReset = viewModel.uiState.value.transactions.single { it.id == 5L }
         assertEquals("PORTILLOS #48", afterFullReset.effectiveMerchant)
         assertEquals(EditSource.NONE, afterFullReset.editSource)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testResetTransactionFields_normalizesShortKeysForSelfHostedBackend() = runTest(testDispatcher) {
+        val capturedCalls = mutableListOf<Pair<Long, List<String>>>()
+        val baseEngine = repository.localEngine
+        repository.activeEngine = object : OrbitStorageEngine by baseEngine {
+            override suspend fun resetTransaction(id: Long, fields: List<String>): Result<Transaction> {
+                capturedCalls.add(id to fields)
+                return baseEngine.resetTransaction(id, fields)
+            }
+        }
+
+        repository.saveAccount(Account(id = 1L, name = "Checking", type = AccountType.CHECKING))
+        repository.saveTransaction(
+            Transaction(
+                id = 9L,
+                accountId = 1L,
+                originalDate = "2026-11-10",
+                originalMerchant = "TRADER JOES",
+                originalAmountCents = -5420L,
+                editedCategoryId = 20L,
+                editedCategoryIdSource = "user",
+                editedIsTransfer = true,
+                editedIsTransferSource = "user",
+                editedIsIgnored = true,
+                editedIsIgnoredSource = "user",
+                editedMhaEligible = true,
+                editedMhaEligibleSource = "user",
+                editedDate = "2026-11-11",
+                editSource = EditSource.USER
+            )
+        )
+
+        repository.resetTransactionFields(9L, listOf("category", "transfer", "ignored", "mha"))
+        assertEquals(
+            listOf(9L to listOf("category_id", "is_transfer", "is_ignored", "mha_eligible")),
+            capturedCalls
+        )
+
+        // Local-only field ("date") resets locally without sending invalid empty/unsupported reset payload to server
+        capturedCalls.clear()
+        repository.resetTransactionFields(9L, listOf("date"))
+        assertTrue(capturedCalls.isEmpty())
+    }
+
+    @Test
+    fun testSelfHostedDtoProvenance_preservesUncategorizedOriginAndUneditedMhaDefault() {
+        // 1. Unedited bank transaction from backend has mha_eligible=false and edited_mha_eligible_source=null
+        val uneditedDomain = TransactionDto(
+            id = 100L,
+            accountId = 1L,
+            date = "2026-11-10",
+            amount = -25.00,
+            merchant = "COFFEE SHOP",
+            originalMerchant = "COFFEE SHOP",
+            categoryId = null,
+            originalCategoryId = null,
+            mhaEligible = false,
+            editedMhaEligible = null,
+            editedMhaEligibleSource = null
+        ).toDomain()
+
+        assertEquals(EditSource.NONE, uneditedDomain.editSource)
+        assertNull(uneditedDomain.editedMhaEligibleSource)
+        assertEquals(
+            FieldEditProvenance.None,
+            parseFieldProvenance(uneditedDomain.editedMhaEligibleSource != null, uneditedDomain.editedMhaEligibleSource)
+        )
+
+        val editedFiltered = TransactionsFilterHelper.filterTransactions(
+            transactions = listOf(uneditedDomain),
+            query = "",
+            quick = QuickFilter.ALL,
+            draft = TransactionFilterDraft(hasEditsFilter = "edited"),
+            categoryMap = emptyMap()
+        )
+        assertTrue(editedFiltered.isEmpty())
+
+        // 2. Imported uncategorized transaction categorized later must preserve originalCategoryId = null
+        val categorizedFromUncat = TransactionDto(
+            id = 101L,
+            accountId = 1L,
+            date = "2026-11-10",
+            amount = -42.50,
+            merchant = "ALDI",
+            originalMerchant = "ALDI",
+            categoryId = 20L,
+            originalCategoryId = null,
+            editedCategoryId = 20L,
+            editedCategoryIdSource = "user",
+            mhaEligible = false
+        ).toDomain()
+
+        assertNull(categorizedFromUncat.originalCategoryId)
+        assertEquals(20L, categorizedFromUncat.effectiveCategoryId)
+    }
+
+    @Test
+    fun testQuickSetCategory_noOpWhenUnchangedPreservesUneditedState() = runTest(testDispatcher) {
+        repository.saveAccount(Account(id = 1L, name = "Checking", type = AccountType.CHECKING))
+        repository.saveCategory(Category(id = 10L, name = "Dining", icon = "🍽️"))
+        repository.saveTransaction(
+            Transaction(
+                id = 7L,
+                accountId = 1L,
+                originalDate = "2026-11-10",
+                originalMerchant = "CAFE",
+                originalAmountCents = -1200L,
+                originalCategoryId = 10L
+            )
+        )
+
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
+        testScheduler.advanceUntilIdle()
+
+        // Saving the already-effective category on an unedited row must remain a no-op
+        viewModel.quickSetCategory(7L, 10L)
+        testScheduler.advanceUntilIdle()
+
+        val unchanged = viewModel.uiState.value.transactions.single { it.id == 7L }
+        assertNull(unchanged.editedCategoryId)
+        assertNull(unchanged.editedCategoryIdSource)
+        assertEquals(EditSource.NONE, unchanged.editSource)
 
         collectJob.cancel()
     }

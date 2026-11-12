@@ -384,6 +384,11 @@ class TransactionsViewModel(
         closeCategoryPicker()
         viewModelScope.launch(computeDispatcher) {
             val txn = uiState.value.transactions.find { it.id == transactionId } ?: return@launch
+            if (categoryId == txn.effectiveCategoryId &&
+                (txn.editedCategoryIdSource == null || txn.editedCategoryIdSource == "user")
+            ) {
+                return@launch
+            }
             val updated = txn.copy(
                 editedCategoryId = categoryId,
                 editedCategoryIdSource = "user",
@@ -426,8 +431,6 @@ class TransactionsViewModel(
         }
     }
 
-    fun resetMerchant(id: Long) = resetField(id, "merchant")
-    fun resetCategory(id: Long) = resetField(id, "category")
     fun resetField(id: Long, field: String) { viewModelScope.launch { repository.resetTransactionFields(id, listOf(field)) } }
     fun resetTransaction(id: Long) { viewModelScope.launch { repository.resetTransaction(id); closeTransactionEditor() } }
     fun requestOpenRuleEditor(ruleId: Long?) = repository.requestOpenRuleEditor(ruleId)

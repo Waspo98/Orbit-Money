@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -23,7 +22,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
-import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.data.model.labelWithEmoji
@@ -283,36 +281,26 @@ private fun TransactionReadOnlyDetailContent(
                     subtitle = if (transaction.editedMerchant != null && transaction.originalMerchant.isNotBlank()) {
                         "Originally: ${transaction.originalMerchant}"
                     } else null,
-                    onReset = if (transaction.editedMerchant != null || transaction.editSource == EditSource.USER) onResetMerchant else null
+                    onReset = if (transaction.editedMerchant != null && !transaction.editedMerchantSource.orEmpty().startsWith("rule:")) onResetMerchant else null
                 )
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val categoryEdited = transaction.editedCategoryIdSource != null || transaction.editedCategoryId != null
+                val categoryProv = parseFieldProvenance(categoryEdited, transaction.editedCategoryIdSource)
                 Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "CATEGORY",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (transaction.editedCategoryIdSource != null || transaction.editedCategoryId != null) {
-                            Text(
-                                text = "Reset",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = 8.dp).clickable { haptics.tick(); onResetCategory() }
-                            )
-                        }
-                    }
+                    FieldLabelWithProvenance(
+                        label = "CATEGORY",
+                        provenance = categoryProv,
+                        onReset = onResetCategory,
+                        onViewRule = onViewRule
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
                     TransactionCategoryChip(
                         categoryLabel = categoryName ?: if (transaction.effectiveIsTransfer) "🔄 Transfer" else "❓ Uncategorized",
                         categoryColor = catColor,
                         onClick = onOpenCategoryPicker
                     )
-                    if (transaction.editedCategoryIdSource != null || transaction.editedCategoryId != null) {
+                    if (categoryProv != FieldEditProvenance.None) {
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Originally: ${originalCategoryLabel ?: "Uncategorized"}",

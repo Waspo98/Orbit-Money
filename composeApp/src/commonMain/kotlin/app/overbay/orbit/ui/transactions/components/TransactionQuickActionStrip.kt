@@ -105,7 +105,7 @@ fun TransactionQuickActionStrip(
     fun menuLabelFor(action: TransactionQuickAction): String = when (action) {
         TransactionQuickAction.RECURRING -> "Mark as Recurring"
         TransactionQuickAction.TRANSFER -> if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Mark as Transfer"
-        TransactionQuickAction.MHA -> if (transaction.effectiveMhaEligible == true) "MHA Eligible" else "Mark as MHA"
+        TransactionQuickAction.MHA -> if (transaction.effectiveMhaEligible == true) "Remove MHA" else "Mark as MHA"
         TransactionQuickAction.IGNORE -> if (transaction.effectiveIsIgnored) "Unignore" else "Ignore"
         else -> action.label
     }
@@ -218,16 +218,6 @@ fun TransactionQuickActionStrip(
                                 modifier = Modifier.size(18.dp)
                             )
                         },
-                        trailingIcon = if (active) {
-                            {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "Active",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        } else null,
                         onClick = {
                             haptics.tick()
                             menuExpanded = false

@@ -805,7 +805,7 @@ router.patch('/:id', requireAuth, (req, res) => {
       });
     }
 
-    if (body.mha_eligible !== undefined) {
+    if (body.mha_eligible !== undefined && body.mha_eligible !== null) {
       const flag = body.mha_eligible ? 1 : 0;
       const defaultMhaEligible = existing.default_mha_eligible ? 1 : 0;
       if (flag === defaultMhaEligible) {

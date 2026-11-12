@@ -93,7 +93,7 @@ object TransactionsFilterHelper {
                             txn.editedDate != null ||
                             txn.editedIsTransfer != null ||
                             txn.editedIsIgnored != null ||
-                            txn.editedMhaEligible != null
+                            txn.editedMhaEligibleSource != null
                     if (!hasEdit) return@filter false
                 }
                 "original", "no" -> {
@@ -105,7 +105,7 @@ object TransactionsFilterHelper {
                             txn.editedDate != null ||
                             txn.editedIsTransfer != null ||
                             txn.editedIsIgnored != null ||
-                            txn.editedMhaEligible != null
+                            txn.editedMhaEligibleSource != null
                     if (hasEdit) return@filter false
                 }
             }

@@ -196,7 +196,7 @@ data class TransactionDto(
             originalMerchant = origMerchant,
             originalDescription = originalDescription,
             originalAmountCents = origAmountCents,
-            originalCategoryId = originalCategoryId ?: categoryId,
+            originalCategoryId = originalCategoryId ?: if (editedCategoryIdSource == null) categoryId else null,
             categoryName = categoryName,
             categoryColor = categoryColor,
             categoryIcon = categoryIcon,

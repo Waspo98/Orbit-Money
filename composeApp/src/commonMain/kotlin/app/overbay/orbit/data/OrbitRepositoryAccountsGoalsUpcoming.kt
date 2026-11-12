@@ -346,7 +346,19 @@ suspend fun OrbitRepository.resetTransactionFields(id: Long, fields: List<String
     val evaluated = RuleMatcherEngine.applyRules(listOf(unlockedForRuleEval), rules.value).firstOrNull() ?: unlockedForRuleEval
     val ruleEvaluated = if (hasRemainingUserLock) evaluated.copy(editSource = EditSource.USER) else evaluated
     commitSnapshot(snapshot.value.copy(transactions = current.map { if (it.id == id) ruleEvaluated else it }))
-    activeEngine.resetTransaction(id, fields)
+    val serverFields = fields.mapNotNull { f ->
+        when (f.lowercase()) {
+            "merchant" -> "merchant"
+            "category", "category_id" -> "category_id"
+            "transfer", "is_transfer" -> "is_transfer"
+            "ignored", "is_ignored" -> "is_ignored"
+            "mha", "mha_eligible" -> "mha_eligible"
+            else -> null
+        }
+    }.distinct()
+    if (serverFields.isNotEmpty()) {
+        activeEngine.resetTransaction(id, serverFields)
+    }
 }
 
 suspend fun OrbitRepository.setTransactionIgnored(id: Long, ignored: Boolean) {

@@ -260,6 +260,7 @@ class SelfHostedApiEngine(
             originalCategoryId = transaction.originalCategoryId,
             editedMerchant = transaction.editedMerchant,
             editedCategoryId = transaction.editedCategoryId,
+            mhaEligible = if (transaction.editedMhaEligibleSource != null) transaction.editedMhaEligible else null,
             notes = transaction.notes
         )
         return if (transaction.id == 0L) {
