@@ -43,6 +43,8 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitBarSegment
+import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitSectionCard
@@ -236,24 +238,17 @@ private fun SpendingMixPanel(
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            ) {
-                sorted.forEach { item ->
-                    val weight = (item.spentCents.toFloat() / totalSpent.toFloat()).coerceAtLeast(0.01f)
-                    val color = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
-                    Box(
-                        modifier = Modifier
-                            .weight(weight)
-                            .fillMaxHeight()
-                            .background(color)
+            OrbitStackedSegmentBar(
+                segments = sorted.map { item ->
+                    OrbitBarSegment(
+                        key = item.category.id,
+                        fraction = (item.spentCents.toFloat() / totalSpent.toFloat()).coerceAtLeast(0.01f),
+                        color = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
                     )
-                }
-            }
+                },
+                height = 10.dp,
+                normalizeToFullWidth = true
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 

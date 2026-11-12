@@ -19,56 +19,22 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Badge
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.util.LocalOrbitHaptics
-
-/**
- * Slim pill-shaped progress bar for budget pulse, goal funding, and category limits.
- */
-@Composable
-fun OrbitPillProgressBar(
-    percent: Float,
-    modifier: Modifier = Modifier,
-    overBudget: Boolean = false,
-    height: Dp = 10.dp,
-    customFillColor: Color? = null,
-    trackColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh
-) {
-    val clampedPercent = percent.coerceIn(0f, 1f)
-    val fillColor = customFillColor ?: when {
-        overBudget -> OrbitTheme.colors.expense
-        percent >= 0.85f -> OrbitTheme.colors.warning
-        else -> MaterialTheme.colorScheme.primary
-    }
-
-    LinearProgressIndicator(
-        progress = { clampedPercent },
-        modifier = modifier.fillMaxWidth().height(height).clip(CircleShape),
-        color = fillColor,
-        trackColor = trackColor,
-        strokeCap = StrokeCap.Round,
-        gapSize = 0.dp,
-        drawStopIndicator = {}
-    )
-}
 
 /**
  * Recreates `.dash-mini-stat-row` and `.dash-balance-row` with muted left label
@@ -151,6 +117,7 @@ fun OrbitCompactListRow(
             val rowModifier = if (onClick != null) {
                 Modifier
                     .fillMaxWidth()
+                    .orbitTactilePress()
                     .clickable { onClick() }
                     .padding(horizontal = if (containerColor != null) 12.dp else 0.dp, vertical = 10.dp)
             } else {
@@ -386,6 +353,6 @@ fun OrbitActionChip(
                 OrbitTheme.colors.cardBorder
             }
         ),
-        modifier = modifier
+        modifier = modifier.orbitTactilePress(enabled = enabled)
     )
 }

@@ -1,8 +1,6 @@
 package app.overbay.orbit.ui.categories
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -28,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.util.lerp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.categories.components.CategoryDetailInspectorPane
 import app.overbay.orbit.ui.categories.components.CategoryGroupCard
 import app.overbay.orbit.ui.categories.dialogs.CategoryEditorDialog
@@ -78,7 +77,7 @@ fun CategoriesScreen(
 
     val searchActiveProgress by animateFloatAsState(
         targetValue = if (state.isSearchActive) 1f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = OrbitSprings.FloatEffectsDefault,
         label = "categoriesSearchActiveProgress"
     )
 

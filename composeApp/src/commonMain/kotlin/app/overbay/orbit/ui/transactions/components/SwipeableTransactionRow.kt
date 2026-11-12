@@ -1,6 +1,11 @@
 package app.overbay.orbit.ui.transactions.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -44,9 +49,11 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -87,16 +94,24 @@ fun SwipeableTransactionRow(
     var menuExpanded by remember { mutableStateOf(false) }
 
     val catColor = category?.color.toComposeColor(MaterialTheme.colorScheme.primary)
-    val rowBgColor = when {
-        isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-        isInspected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
-        else -> MaterialTheme.colorScheme.surface
-    }
-    val rowBorderColor = if (isInspected || isSelected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
-    } else {
-        OrbitTheme.colors.cardBorder
-    }
+    val rowBgColor by animateColorAsState(
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+            isInspected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+            else -> MaterialTheme.colorScheme.surface
+        },
+        animationSpec = OrbitSprings.ColorEffectsDefault,
+        label = "txnRowBg"
+    )
+    val rowBorderColor by animateColorAsState(
+        targetValue = if (isInspected || isSelected) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+        } else {
+            OrbitTheme.colors.cardBorder
+        },
+        animationSpec = OrbitSprings.ColorEffectsDefault,
+        label = "txnRowBorder"
+    )
 
     Surface(
         modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)),
@@ -115,9 +130,15 @@ fun SwipeableTransactionRow(
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (isSelectionMode) {
-                    Checkbox(checked = isSelected, onCheckedChange = { onClick() }, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(10.dp))
+                AnimatedVisibility(
+                    visible = isSelectionMode,
+                    enter = expandHorizontally(OrbitSprings.spatialFast()) + fadeIn(OrbitSprings.FloatEffectsFast),
+                    exit = shrinkHorizontally(OrbitSprings.spatialFast()) + fadeOut(OrbitSprings.FloatEffectsFast)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = isSelected, onCheckedChange = { onClick() }, modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                    }
                 }
 
                 TransactionMerchantMark(
@@ -237,7 +258,7 @@ fun SwipeableTransactionRow(
                 }
             }
 
-            AnimatedVisibility(visible = isExpanded) {
+            OrbitAccordionVisibility(visible = isExpanded) {
                 Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
                         HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)

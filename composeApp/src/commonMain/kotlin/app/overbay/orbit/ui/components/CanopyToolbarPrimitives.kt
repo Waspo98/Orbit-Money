@@ -1,6 +1,8 @@
 package app.overbay.orbit.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -141,19 +143,37 @@ fun CanopyIconButton(
 ) {
     val haptics = LocalOrbitHaptics.current
     val iconSize = if (buttonSize < 42.dp) 18.dp else 20.dp
-    val borderColor = if (isActive) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-    }
+    val containerColor by animateColorAsState(
+        targetValue = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "canopyIconBg"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isActive) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+        } else {
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+        },
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "canopyIconBorder"
+    )
+    val iconTint by animateColorAsState(
+        targetValue = when {
+            !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+            isActive -> MaterialTheme.colorScheme.onPrimaryContainer
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "canopyIconTint"
+    )
 
     Surface(
         onClick = { haptics.tick(); onClick() },
         enabled = enabled,
         shape = CircleShape,
-        color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        color = containerColor,
         border = BorderStroke(1.dp, borderColor),
-        modifier = modifier.size(buttonSize)
+        modifier = modifier.size(buttonSize).orbitTactilePress(enabled = enabled)
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
             BadgedBox(
@@ -171,11 +191,7 @@ fun CanopyIconButton(
                 Icon(
                     imageVector = icon,
                     contentDescription = contentDescription,
-                    tint = when {
-                        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-                        isActive -> MaterialTheme.colorScheme.onPrimaryContainer
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                    tint = iconTint,
                     modifier = Modifier.size(iconSize)
                 )
             }
@@ -200,22 +216,36 @@ fun CanopyActionPillButton(
 ) {
     val haptics = LocalOrbitHaptics.current
     val iconSize = if (buttonSize < 42.dp) 16.dp else 18.dp
-    val borderColor = if (isActive) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-    }
+    val containerColor by animateColorAsState(
+        targetValue = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "canopyActionPillBg"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isActive) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+        } else {
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+        },
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "canopyActionPillBorder"
+    )
+    val horizontalPad by animateDpAsState(
+        targetValue = if (isCompact) 10.dp else 14.dp,
+        animationSpec = OrbitSprings.DpSpatialFast,
+        label = "canopyActionPillPad"
+    )
 
     Surface(
         onClick = { haptics.tick(); onClick() },
         enabled = enabled,
         shape = CircleShape,
-        color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        color = containerColor,
         border = BorderStroke(1.dp, borderColor),
-        modifier = modifier.height(buttonSize)
+        modifier = modifier.height(buttonSize).orbitTactilePress(enabled = enabled)
     ) {
         Row(
-            modifier = Modifier.fillMaxHeight().padding(horizontal = if (isCompact) 10.dp else 14.dp),
+            modifier = Modifier.fillMaxHeight().padding(horizontal = horizontalPad),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -232,72 +262,6 @@ fun CanopyActionPillButton(
                 color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1
             )
-        }
-    }
-}
-
-/**
- * Segmented capsule bar for period selection (Spending Trends, Net Worth) inside `canopyBar`.
- */
-@Composable
-fun <T> CanopySegmentedBar(
-    items: List<T>,
-    selectedItem: T,
-    labelProvider: (T) -> String,
-    onSelect: (T) -> Unit,
-    modifier: Modifier = Modifier,
-    isCompact: Boolean = false
-) {
-    val haptics = LocalOrbitHaptics.current
-
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-        ),
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            items.forEach { item ->
-                val selected = item == selectedItem
-                Surface(
-                    shape = CircleShape,
-                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(CircleShape)
-                        .clickable {
-                            haptics.tick()
-                            onSelect(item)
-                        }
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Text(
-                            text = labelProvider(item),
-                            fontSize = if (isCompact) 11.sp else 12.sp,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
         }
     }
 }

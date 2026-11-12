@@ -22,7 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.housing.HousingUiState
+import app.overbay.orbit.ui.components.OrbitBarSegment
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import app.overbay.orbit.ui.components.RollingTickerCents
 
 @Composable
@@ -85,17 +87,17 @@ fun MonthlyPaymentBreakdownCard(
                 }
 
                 // Visual Proportion Bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                ) {
-                    if (piRatio > 0f) Box(modifier = Modifier.weight(piRatio).height(8.dp).background(piColor))
-                    if (taxRatio > 0f) Box(modifier = Modifier.weight(taxRatio).height(8.dp).background(taxColor))
-                    if (insRatio > 0f) Box(modifier = Modifier.weight(insRatio).height(8.dp).background(insColor))
-                    if (hoaRatio > 0f) Box(modifier = Modifier.weight(hoaRatio).height(8.dp).background(hoaColor))
-                }
+                OrbitStackedSegmentBar(
+                    segments = listOf(
+                        OrbitBarSegment("pi", piRatio, piColor),
+                        OrbitBarSegment("tax", taxRatio, taxColor),
+                        OrbitBarSegment("ins", insRatio, insColor),
+                        OrbitBarSegment("hoa", hoaRatio, hoaColor)
+                    ),
+                    height = 8.dp,
+                    cornerRadius = 4.dp,
+                    normalizeToFullWidth = true
+                )
 
                 Spacer(modifier = Modifier.height(4.dp))
             }

@@ -7,15 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +35,8 @@ import app.overbay.orbit.data.model.RetirementHistoryPoint
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.OrbitBarSegment
+import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.calculators.retirement.LinkedRetirementAccountDetail
 import app.overbay.orbit.ui.components.EmptyStateCard
@@ -121,18 +115,18 @@ fun RetirementHistoryTrajectoryCard(
                 val totalAccountBal = accountBalances.sumOf { it.balanceCents }
 
                 if (totalAccountBal > 0L && accountBalances.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                    ) {
-                        accountBalances.forEachIndexed { index, acct ->
-                            val weight = max(0.02f, acct.balanceCents.toFloat() / totalAccountBal.toFloat())
-                            val color = accountColorMap[acct.accountId] ?: palette[index % palette.size]
-                            Box(modifier = Modifier.weight(weight).height(8.dp).background(color))
-                        }
-                    }
+                    OrbitStackedSegmentBar(
+                        segments = accountBalances.mapIndexed { index, acct ->
+                            OrbitBarSegment(
+                                key = acct.accountId,
+                                fraction = max(0.02f, acct.balanceCents.toFloat() / totalAccountBal.toFloat()),
+                                color = accountColorMap[acct.accountId] ?: palette[index % palette.size]
+                            )
+                        },
+                        height = 8.dp,
+                        cornerRadius = 4.dp,
+                        normalizeToFullWidth = true
+                    )
                 }
 
                 // Interactive Multi-Series Canvas Line Chart

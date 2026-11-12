@@ -1,6 +1,8 @@
 package app.overbay.orbit.ui.transactions.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.horizontalScroll
@@ -39,6 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.labelWithEmoji
+import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.components.RollingTickerText
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -62,8 +66,8 @@ fun TransactionBatchActionBar(
 
     AnimatedVisibility(
         visible = selectedCount > 0,
-        enter = slideInVertically(initialOffsetY = { it }),
-        exit = slideOutVertically(targetOffsetY = { it }),
+        enter = slideInVertically(OrbitSprings.IntOffsetSpatialDefault) { it } + fadeIn(OrbitSprings.FloatEffectsDefault),
+        exit = slideOutVertically(OrbitSprings.IntOffsetSpatialDefault) { it } + fadeOut(OrbitSprings.FloatEffectsFast),
         modifier = modifier
     ) {
         Surface(
@@ -98,15 +102,18 @@ fun TransactionBatchActionBar(
                             )
                         }
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
+                        RollingTickerText(
                             text = "$selectedCount Selected",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
-                    if (selectedCount < totalCount) {
+                    AnimatedVisibility(
+                        visible = selectedCount < totalCount,
+                        enter = fadeIn(OrbitSprings.FloatEffectsFast),
+                        exit = fadeOut(OrbitSprings.FloatEffectsFast)
+                    ) {
                         TextButton(onClick = {
                             haptics.tick()
                             onSelectAll()

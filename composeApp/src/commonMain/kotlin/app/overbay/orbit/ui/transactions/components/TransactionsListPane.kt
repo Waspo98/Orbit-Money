@@ -2,9 +2,7 @@ package app.overbay.orbit.ui.transactions.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -21,6 +19,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -70,7 +70,7 @@ fun TransactionsListPane(
 
     val searchActiveProgress by animateFloatAsState(
         targetValue = if (state.isSearchActive) 1f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = OrbitSprings.FloatEffectsDefault,
         label = "searchActiveProgress"
     )
 
@@ -155,10 +155,20 @@ fun TransactionsListPane(
                             }
                         }
                     } else {
+                        val pullRefreshState = rememberPullToRefreshState()
                         PullToRefreshBox(
+                            state = pullRefreshState,
                             isRefreshing = state.isSyncing,
                             onRefresh = { haptics.tick(); viewModel.syncSimpleFin() },
-                            indicator = {},
+                            indicator = {
+                                PullToRefreshDefaults.Indicator(
+                                    state = pullRefreshState,
+                                    isRefreshing = state.isSyncing,
+                                    modifier = Modifier.align(Alignment.TopCenter),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+                            },
                             modifier = Modifier.fillMaxSize()
                         ) {
                             when {

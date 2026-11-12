@@ -1,8 +1,6 @@
 package app.overbay.orbit.ui.dashboard.dialogs
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
 import app.overbay.orbit.ui.components.OrbitActionChip
@@ -291,10 +290,14 @@ private fun DashboardColumnWidthPicker(
 private fun DashboardWidthIcon(isWide: Boolean, isRightPlacement: Boolean, tint: Color) {
     val pillOffsetX by animateDpAsState(
         targetValue = if (!isWide && isRightPlacement) 16.dp else 3.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+        animationSpec = OrbitSprings.DpSpatialDefault,
         label = "dashboardWidthIconOffset"
     )
-    val pillWidth = if (isWide) 22.dp else 9.dp
+    val pillWidth by animateDpAsState(
+        targetValue = if (isWide) 22.dp else 9.dp,
+        animationSpec = OrbitSprings.DpSpatialDefault,
+        label = "dashboardWidthIconWidth"
+    )
 
     Box(
         modifier = Modifier

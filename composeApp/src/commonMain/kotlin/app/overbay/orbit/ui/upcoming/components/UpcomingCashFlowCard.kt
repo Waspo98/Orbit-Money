@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.upcoming.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -20,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,8 +34,8 @@ import app.overbay.orbit.domain.UpcomingCashFlowSummary
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.CanopySegmentedBar
 import app.overbay.orbit.ui.upcoming.UpcomingCashFlowPeriod
-import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
 fun UpcomingCashFlowCard(
@@ -42,7 +44,6 @@ fun UpcomingCashFlowCard(
     onPeriodChanged: (UpcomingCashFlowPeriod) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
 
     val income = if (selectedPeriod == UpcomingCashFlowPeriod.REST_OF_MONTH) {
@@ -79,8 +80,16 @@ fun UpcomingCashFlowCard(
     val remainingSubtitle = "$count transaction${if (count == 1) "" else "s"} remaining in the next $daysRemaining day${if (daysRemaining == 1) "" else "s"}"
 
     val maxFlow = maxOf(income, expense, 1L).toFloat()
-    val incomeProgress = (income.toFloat() / maxFlow).coerceIn(0.08f, 1f)
-    val expenseProgress = (expense.toFloat() / maxFlow).coerceIn(0.08f, 1f)
+    val incomeProgress by animateFloatAsState(
+        targetValue = (income.toFloat() / maxFlow).coerceIn(0.08f, 1f),
+        animationSpec = OrbitSprings.FloatSpatialDefault,
+        label = "upcomingIncomeBar"
+    )
+    val expenseProgress by animateFloatAsState(
+        targetValue = (expense.toFloat() / maxFlow).coerceIn(0.08f, 1f),
+        animationSpec = OrbitSprings.FloatSpatialDefault,
+        label = "upcomingExpenseBar"
+    )
 
     Surface(
         shape = RoundedCornerShape(20.dp),
@@ -118,53 +127,15 @@ fun UpcomingCashFlowCard(
                     )
                 }
 
-                // Toggle Pills
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val isRom = selectedPeriod == UpcomingCashFlowPeriod.REST_OF_MONTH
-                    Surface(
-                        onClick = {
-                            haptics.tick()
-                            onPeriodChanged(UpcomingCashFlowPeriod.REST_OF_MONTH)
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (isRom) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, if (isRom) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 10.dp)) {
-                            Text(
-                                text = "Month",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (isRom) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isRom) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    val isN30 = selectedPeriod == UpcomingCashFlowPeriod.NEXT_30_DAYS
-                    Surface(
-                        onClick = {
-                            haptics.tick()
-                            onPeriodChanged(UpcomingCashFlowPeriod.NEXT_30_DAYS)
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (isN30) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, if (isN30) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 10.dp)) {
-                            Text(
-                                text = "30 Days",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (isN30) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isN30) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
+                // Sliding Capsule Toggle
+                CanopySegmentedBar(
+                    items = UpcomingCashFlowPeriod.entries,
+                    selectedItem = selectedPeriod,
+                    labelProvider = { if (it == UpcomingCashFlowPeriod.REST_OF_MONTH) "Month" else "30 Days" },
+                    onSelect = onPeriodChanged,
+                    isCompact = true,
+                    modifier = Modifier.width(138.dp).height(30.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))

@@ -2,20 +2,9 @@ package app.overbay.orbit.ui.goals.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -30,8 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,6 +31,8 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitBarSegment
+import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 
@@ -223,9 +212,16 @@ private fun AccountSummaryRow(
             }
 
             // Multi-Segmented Allocation Bar
-            MultiSegmentedAllocationBar(
-                totalBalanceCents = summary.currentBalanceCents,
-                allocations = goalAllocations
+            val basis = max(1L, summary.currentBalanceCents).toFloat()
+            OrbitStackedSegmentBar(
+                segments = goalAllocations.map { (goal, amt, color) ->
+                    OrbitBarSegment(
+                        key = goal.id,
+                        fraction = (amt.toFloat() / basis).coerceAtLeast(0f),
+                        color = color
+                    )
+                },
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
             )
 
             // Colored Legend Chips Below Bar
@@ -352,41 +348,6 @@ private fun AccountSummaryRow(
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MultiSegmentedAllocationBar(
-    totalBalanceCents: Cents,
-    allocations: List<Triple<Goal, Cents, Color>>,
-    modifier: Modifier = Modifier
-) {
-    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-    val basis = max(1L, totalBalanceCents).toFloat()
-
-    Canvas(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(8.dp)
-            .clip(RoundedCornerShape(999.dp))
-    ) {
-        val w = size.width
-        val h = size.height
-
-        drawRect(color = trackColor, size = size)
-
-        var currentX = 0f
-        allocations.forEach { (_, amt, color) ->
-            val sliceWidth = ((amt.toFloat() / basis) * w).coerceAtLeast(0f)
-            if (sliceWidth > 0f) {
-                drawRect(
-                    color = color,
-                    topLeft = Offset(currentX, 0f),
-                    size = Size(sliceWidth.coerceAtMost(w - currentX), h)
-                )
-                currentX += sliceWidth
             }
         }
     }

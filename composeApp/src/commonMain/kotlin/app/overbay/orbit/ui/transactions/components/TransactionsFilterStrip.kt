@@ -124,8 +124,8 @@ fun TransactionsActiveFilterChipsBar(
 
     AnimatedVisibility(
         visible = !isSearchActive && activeChips.isNotEmpty(),
-        enter = expandVertically(OrbitSprings.spatialDefault()) + fadeIn(OrbitSprings.effectsDefault()),
-        exit = shrinkVertically(OrbitSprings.effectsDefault()) + fadeOut(OrbitSprings.effectsDefault()),
+        enter = expandVertically(OrbitSprings.IntSizeSpatialDefault) + fadeIn(OrbitSprings.FloatEffectsDefault),
+        exit = shrinkVertically(OrbitSprings.IntSizeSpatialDefault) + fadeOut(OrbitSprings.FloatEffectsFast),
         modifier = modifier.fillMaxWidth()
     ) {
         Row(

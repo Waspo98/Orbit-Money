@@ -1,8 +1,11 @@
 package app.overbay.orbit.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -22,6 +25,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,7 +55,12 @@ fun PeriodNavigatorPill(
     onClickLabel: (() -> Unit)? = null
 ) {
     val haptics = LocalOrbitHaptics.current
-    val buttonSize = if (isCompact) 34.dp else 38.dp
+    var stepDirection by remember { mutableIntStateOf(1) }
+    val buttonSize by animateDpAsState(
+        targetValue = if (isCompact) 34.dp else 38.dp,
+        animationSpec = OrbitSprings.DpSpatialFast,
+        label = "periodNavigatorButtonSize"
+    )
 
     Surface(
         modifier = modifier,
@@ -68,6 +80,7 @@ fun PeriodNavigatorPill(
         ) {
             IconButton(
                 onClick = {
+                    stepDirection = -1
                     haptics.tick()
                     onPrevious()
                 },
@@ -82,16 +95,24 @@ fun PeriodNavigatorPill(
             }
 
             AnimatedContent(
-                targetState = isCompact,
+                targetState = Triple(label, compactLabel, isCompact),
                 transitionSpec = {
-                    fadeIn(OrbitSprings.effectsDefault()) togetherWith
-                        fadeOut(OrbitSprings.effectsDefault())
+                    if (targetState.first != initialState.first) {
+                        val dir = stepDirection
+                        (slideInHorizontally(OrbitSprings.IntOffsetSpatialDefault) { dir * (it / 3) } +
+                            fadeIn(OrbitSprings.FloatEffectsDefault)) togetherWith
+                            (slideOutHorizontally(OrbitSprings.IntOffsetSpatialDefault) { -dir * (it / 3) } +
+                                fadeOut(OrbitSprings.FloatEffectsFast))
+                    } else {
+                        fadeIn(OrbitSprings.FloatEffectsDefault) togetherWith
+                            fadeOut(OrbitSprings.FloatEffectsDefault)
+                    }
                 },
                 contentAlignment = Alignment.Center,
                 label = "periodNavigatorLabelTransition"
-            ) { compact ->
+            ) { (fullLbl, shortLbl, compact) ->
                 Text(
-                    text = if (compact) compactLabel else label,
+                    text = if (compact) shortLbl else fullLbl,
                     style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Normal,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -114,6 +135,7 @@ fun PeriodNavigatorPill(
             IconButton(
                 onClick = {
                     if (canGoNext) {
+                        stepDirection = 1
                         haptics.tick()
                         onNext()
                     }
