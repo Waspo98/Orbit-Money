@@ -39,9 +39,19 @@ router.post('/report', requireAuth, (req, res) => {
 });
 
 router.post('/override', requireAuth, (req, res) => {
-  const merchantKey = String(req.body?.merchant_key || '').trim();
+  const householdId = requireHouseholdId(req);
+  const accountId = parseId(req.body?.account_id);
+  let merchantKey = String(req.body?.merchant_key || '').trim();
+  const merchantName = typeof req.body?.merchant_name === 'string' ? req.body.merchant_name.trim() : '';
   const useCategoryIcon = req.body?.use_category_icon === true;
   const rawLogoUrl = String(req.body?.logo_url || '').trim();
+
+  if (accountId !== null && accountId > 0) {
+    const ensured = ensureInstitutionLogoEntryForAccount(db, accountId, householdId);
+    if (ensured.found && ensured.merchant_logo?.merchant_key) {
+      merchantKey = ensured.merchant_logo.merchant_key;
+    }
+  }
 
   if (!merchantKey) {
     return sendBadRequest(res, 'merchant_key is required.');
@@ -66,6 +76,7 @@ router.post('/override', requireAuth, (req, res) => {
   try {
     const result = overrideMerchantLogo(db, {
       merchantKey,
+      merchantName: merchantName || null,
       logoUrl,
       hide: useCategoryIcon
     });

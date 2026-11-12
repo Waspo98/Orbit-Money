@@ -155,12 +155,26 @@ class SelfHostedApiEngine(
             accountGroupWideSpans = remotePrefs?.prefOr("accountGroupWideSpans", currentPrefs.accountGroupWideSpans) ?: currentPrefs.accountGroupWideSpans,
             dismissedRecurringKeys = remotePrefs?.prefOr("dismissedRecurringKeys", currentPrefs.dismissedRecurringKeys) ?: currentPrefs.dismissedRecurringKeys,
             mutedSimpleFinAccounts = remotePrefs?.prefOr("mutedSimpleFinAccounts", currentPrefs.mutedSimpleFinAccounts) ?: currentPrefs.mutedSimpleFinAccounts,
+            dismissedClosurePrompts = remotePrefs?.prefOr("dismissedClosurePrompts", currentPrefs.dismissedClosurePrompts) ?: currentPrefs.dismissedClosurePrompts,
+            accountInstitutionLogoOverrides = remotePrefs?.prefOr("accountInstitutionLogoOverrides", currentPrefs.accountInstitutionLogoOverrides) ?: currentPrefs.accountInstitutionLogoOverrides,
             includeHsaInRetirementRate = remotePrefs?.prefOr("includeHsaInRetirementRate", currentPrefs.includeHsaInRetirementRate) ?: currentPrefs.includeHsaInRetirementRate,
             notificationPreferences = remotePrefs?.prefOr("notificationPreferences", currentPrefs.notificationPreferences) ?: currentPrefs.notificationPreferences,
             isSharedNonOwnerSession = sharing != null && sharing.currentUserRole != "owner",
             isReadOnlySession = sharing != null && sharing.currentUserAccessLevel == "read",
             sharedSessionCachedAtEpochMs = Clock.System.now().toEpochMilliseconds()
         )
+
+        val logoOverrides = resolvedPrefs.accountInstitutionLogoOverrides
+        val mergedAccounts = if (logoOverrides.isEmpty()) accounts else accounts.map { acct ->
+            val currentLogo = acct.institutionLogo
+            if (currentLogo != null && (currentLogo.status == "manual" || currentLogo.status == "hidden")) {
+                acct
+            } else {
+                val override = logoOverrides[acct.resolvedInstitutionLogoKey]
+                    ?: logoOverrides["inst:acct-${acct.id}"]
+                if (override != null) acct.copy(institutionLogo = override) else acct
+            }
+        }
 
         OrbitWorkspaceSnapshot(
             schemaVersion = OrbitWorkspaceSnapshot.CURRENT_SCHEMA_VERSION,
@@ -171,7 +185,7 @@ class SelfHostedApiEngine(
             ),
             members = members,
             shares = sharing?.shares ?: emptyList(),
-            accounts = accounts,
+            accounts = mergedAccounts,
             creditCardProfiles = creditCardProfiles,
             balanceRecords = emptyList(),
             categories = categories,
@@ -409,6 +423,8 @@ class SelfHostedApiEngine(
             map["dashboardHiddenBiggestIds"] = json.encodeToJsonElement(preferences.dashboardHiddenBiggestIds)
             map["dismissedRecurringKeys"] = json.encodeToJsonElement(preferences.dismissedRecurringKeys)
             map["mutedSimpleFinAccounts"] = json.encodeToJsonElement(preferences.mutedSimpleFinAccounts)
+            map["dismissedClosurePrompts"] = json.encodeToJsonElement(preferences.dismissedClosurePrompts)
+            map["accountInstitutionLogoOverrides"] = json.encodeToJsonElement(preferences.accountInstitutionLogoOverrides)
             map["dashboardWidgets"] = json.encodeToJsonElement(preferences.dashboardWidgets)
             map["cardPerksWidgets"] = json.encodeToJsonElement(preferences.cardPerksWidgets)
             map["notificationPreferences"] = json.encodeToJsonElement(preferences.notificationPreferences)

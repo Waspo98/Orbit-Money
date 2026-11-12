@@ -234,7 +234,7 @@ fun AccountGroupPreviewStack(
     ) {
         if (category == AccountTypeCategory.CREDIT_CARDS) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy((-8).dp),
+                horizontalArrangement = Arrangement.spacedBy((-7).dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 previewItems.forEach { account ->
@@ -252,29 +252,29 @@ fun AccountGroupPreviewStack(
                             artworkUrl = profile?.artworkUrl,
                             showLabels = false,
                             modifier = Modifier
-                                .padding(1.25.dp)
-                                .size(width = 28.dp, height = 18.dp)
+                                .padding(1.dp)
+                                .size(width = 26.dp, height = 16.5.dp)
                         )
                     }
                 }
             }
         } else {
             Row(
-                horizontalArrangement = Arrangement.spacedBy((-6).dp),
+                horizontalArrangement = Arrangement.spacedBy((-5).dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 previewItems.forEach { account ->
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(7.dp),
                         color = MaterialTheme.colorScheme.surface
                     ) {
                         AccountInstitutionMark(
                             account = account,
-                            size = 24.dp,
-                            cornerRadius = 7.dp,
-                            logoPadding = 2.5.dp,
+                            size = 20.dp,
+                            cornerRadius = 6.dp,
+                            logoPadding = 2.dp,
                             onReportLogoStatus = onReportLogoStatus,
-                            modifier = Modifier.padding(1.25.dp)
+                            modifier = Modifier.padding(1.dp)
                         )
                     }
                 }
@@ -295,7 +295,7 @@ fun AccountGroupPreviewStack(
                         fontWeight = FontWeight.Bold
                     ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    modifier = Modifier.padding(horizontal = 5.5.dp, vertical = 1.dp)
                 )
             }
         }

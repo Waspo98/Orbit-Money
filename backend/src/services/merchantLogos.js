@@ -350,17 +350,49 @@ export async function searchMerchantLogoBrands(db, { transactionId, query, house
   };
 }
 
-export function overrideMerchantLogo(db, { merchantKey, logoUrl = null, hide = false }) {
+export function overrideMerchantLogo(db, { merchantKey, merchantName = null, logoUrl = null, hide = false }) {
   if (!merchantKey) return { updated: false };
-
-  const existing = db
-    .prepare('SELECT merchant_key, merchant_name, provider, provider_query FROM merchant_logo_cache WHERE merchant_key = ?')
-    .get(merchantKey);
-  if (!existing) return { updated: false };
 
   const status = hide ? 'hidden' : 'manual';
   const nextUrl = hide ? null : logoUrl;
   if (status === 'manual' && !nextUrl) return { updated: false };
+
+  let existing = db
+    .prepare('SELECT merchant_key, merchant_name, provider, provider_query FROM merchant_logo_cache WHERE merchant_key = ?')
+    .get(merchantKey);
+
+  if (!existing && (merchantKey.startsWith('inst:') || merchantName)) {
+    const inferredName = String(merchantName || merchantKey.replace(/^inst:/, '')).trim() || merchantKey;
+    db.prepare(`
+      INSERT INTO merchant_logo_cache
+        (merchant_key, merchant_name, provider, provider_query, logo_url, status, failure_count, last_checked_at)
+      VALUES (?, ?, 'logo_dev', ?, ?, ?, 0, datetime('now'))
+      ON CONFLICT(merchant_key) DO UPDATE SET
+        logo_url = excluded.logo_url,
+        status = excluded.status,
+        failure_count = 0,
+        last_checked_at = datetime('now'),
+        updated_at = datetime('now')
+    `).run(merchantKey, inferredName, inferredName, nextUrl, status);
+
+    existing = db
+      .prepare('SELECT merchant_key, merchant_name, provider, provider_query FROM merchant_logo_cache WHERE merchant_key = ?')
+      .get(merchantKey);
+    if (!existing) return { updated: false };
+    return {
+      updated: true,
+      merchant_logo: {
+        merchant_key: existing.merchant_key,
+        merchant_name: existing.merchant_name,
+        provider: existing.provider,
+        provider_query: existing.provider_query,
+        url: status === 'manual' ? nextUrl : null,
+        status
+      }
+    };
+  }
+
+  if (!existing) return { updated: false };
 
   const result = db
     .prepare(`

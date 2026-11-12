@@ -64,6 +64,7 @@ data class OrbitPreferences(
     val dismissedRecurringKeys: List<String> = emptyList(),
     val mutedSimpleFinAccounts: List<String> = emptyList(),
     val dismissedClosurePrompts: Map<String, String> = emptyMap(),
+    val accountInstitutionLogoOverrides: Map<String, MerchantLogo> = emptyMap(),
     val includeHsaInRetirementRate: Boolean = true,
     val notificationPreferences: NotificationPreferencesConfig = NotificationPreferencesConfig(),
     val sharedSessionCachedAtEpochMs: Long? = null,

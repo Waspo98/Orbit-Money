@@ -274,11 +274,23 @@ suspend fun OrbitApiClient.searchAccountInstitutionLogos(accountId: Long, query:
 }
 
 suspend fun OrbitApiClient.overrideMerchantLogo(
-    merchantKey: String, logoUrl: String? = null, useCategoryIcon: Boolean = false
+    merchantKey: String,
+    logoUrl: String? = null,
+    useCategoryIcon: Boolean = false,
+    accountId: Long? = null,
+    merchantName: String? = null
 ): Result<MerchantLogoDto> = runCatching {
     val res = client.post(url("/api/merchant-logos/override")) {
         contentType(ContentType.Application.Json); auth(sessionCookie)
-        setBody(MerchantLogoOverrideRequestDto(merchantKey, logoUrl?.takeIf { it.isNotBlank() }, useCategoryIcon))
+        setBody(
+            MerchantLogoOverrideRequestDto(
+                merchantKey = merchantKey,
+                logoUrl = logoUrl?.takeIf { it.isNotBlank() },
+                useCategoryIcon = useCategoryIcon,
+                accountId = accountId,
+                merchantName = merchantName
+            )
+        )
     }
     extractSessionCookie(res); ensureSuccess(res)
     res.body<MerchantLogoMutationResponseDto>().merchantLogo

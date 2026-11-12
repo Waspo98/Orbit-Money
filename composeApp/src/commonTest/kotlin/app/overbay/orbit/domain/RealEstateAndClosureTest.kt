@@ -2,6 +2,7 @@ package app.overbay.orbit.domain
 
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.data.model.InstitutionLogoDefaults
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.ui.accounts.AccountClosureController
 import app.overbay.orbit.ui.accounts.ClosureUiOverlay
@@ -180,5 +181,6 @@ class RealEstateAndClosureTest {
                 dismissedOverrides = mapOf("20" to "2026-11-11T23:59:59")
             ).isEmpty()
         )
+        assertEquals("newamericanfunding.com", InstitutionLogoDefaults.resolveDomain("New American Funding"))
     }
 }

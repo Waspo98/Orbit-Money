@@ -30,6 +30,7 @@ test('resolveInstitutionDomain maps common household banks and brokerages to can
   assert.equal(resolveInstitutionDomain('Charles Schwab'), 'schwab.com');
   assert.equal(resolveInstitutionDomain('Fidelity Investments'), 'fidelity.com');
   assert.equal(resolveInstitutionDomain('Navy Federal Credit Union'), 'navyfederal.org');
+  assert.equal(resolveInstitutionDomain('New American Funding'), 'newamericanfunding.com');
   assert.equal(resolveInstitutionDomain('https://www.localcu.org/login'), 'localcu.org');
 });
 
@@ -102,4 +103,19 @@ test('ensureInstitutionLogoEntryForAccount supports manual override and hide res
   ]);
   assert.equal(afterReset.institution_logo.status, 'hidden');
   assert.equal(afterReset.institution_logo.url, null);
+});
+
+test('overrideMerchantLogo upserts uncached inst: keys directly without returning 404', () => {
+  const db = makeDb();
+
+  const res = overrideMerchantLogo(db, {
+    merchantKey: 'inst:custom-credit-union',
+    merchantName: 'Custom Credit Union',
+    logoUrl: 'https://example.com/ccu-logo.png',
+    hide: false
+  });
+  assert.equal(res.updated, true);
+  assert.equal(res.merchant_logo.merchant_key, 'inst:custom-credit-union');
+  assert.equal(res.merchant_logo.status, 'manual');
+  assert.equal(res.merchant_logo.url, 'https://example.com/ccu-logo.png');
 });

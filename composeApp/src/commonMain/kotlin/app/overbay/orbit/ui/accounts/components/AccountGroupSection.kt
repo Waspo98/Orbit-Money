@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.accounts.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -111,6 +113,22 @@ fun AccountGroupSection(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = OrbitSprings.FloatSpatialDefault
     )
+    val hasPreview = group.accounts.isNotEmpty()
+    val collapsedSubtitleHeight = when {
+        !hasPreview -> 16.dp
+        group.category == AccountTypeCategory.CREDIT_CARDS -> 19.dp
+        else -> 22.dp
+    }
+    val subtitleRowHeight by animateDpAsState(
+        targetValue = if (expanded) 16.dp else collapsedSubtitleHeight,
+        animationSpec = OrbitSprings.DpSpatialDefault,
+        label = "groupSubtitleHeight"
+    )
+    val headerVerticalPadding by animateDpAsState(
+        targetValue = if (expanded || !hasPreview) 14.dp else 12.5.dp,
+        animationSpec = OrbitSprings.DpSpatialDefault,
+        label = "groupHeaderPad"
+    )
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -127,7 +145,7 @@ fun AccountGroupSection(
                         haptics.tick()
                         expanded = !expanded
                     }
-                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                    .padding(horizontal = 18.dp, vertical = headerVerticalPadding),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -149,7 +167,10 @@ fun AccountGroupSection(
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(3.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.height(subtitleRowHeight),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         val countLabel = if (group.category == AccountTypeCategory.REAL_ESTATE && group.propertyUnits.isNotEmpty()) {
                             val n = group.propertyUnits.size
                             "$n ${if (n == 1) "property" else "properties"}"
@@ -165,9 +186,10 @@ fun AccountGroupSection(
                             overflow = TextOverflow.Ellipsis
                         )
                         AnimatedVisibility(
-                            visible = !expanded,
+                            visible = !expanded && hasPreview,
                             enter = fadeIn(OrbitSprings.effectsDefault()) + expandHorizontally(OrbitSprings.spatialDefault()),
-                            exit = fadeOut(OrbitSprings.effectsFast()) + shrinkHorizontally(OrbitSprings.spatialDefault())
+                            exit = fadeOut(OrbitSprings.effectsFast()) + shrinkHorizontally(OrbitSprings.spatialDefault()),
+                            modifier = Modifier.wrapContentHeight(align = Alignment.CenterVertically, unbounded = true)
                         ) {
                             AccountGroupPreviewStack(
                                 category = group.category,

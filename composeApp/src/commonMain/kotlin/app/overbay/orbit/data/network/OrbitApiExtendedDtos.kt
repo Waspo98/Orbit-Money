@@ -467,8 +467,11 @@ data class MerchantLogoEnsureRequestDto(
 
 @Serializable
 data class MerchantLogoOverrideRequestDto(
-    @SerialName("merchant_key") val merchantKey: String, @SerialName("logo_url") val logoUrl: String? = null,
-    @SerialName("use_category_icon") val useCategoryIcon: Boolean = false
+    @SerialName("merchant_key") val merchantKey: String,
+    @SerialName("logo_url") val logoUrl: String? = null,
+    @SerialName("use_category_icon") val useCategoryIcon: Boolean = false,
+    @SerialName("account_id") val accountId: Long? = null,
+    @SerialName("merchant_name") val merchantName: String? = null
 )
 
 @Serializable
