@@ -1,5 +1,10 @@
 package app.overbay.orbit
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -26,6 +31,7 @@ import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.sync.BindPlatformGoogleDriveClient
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.BiometricLockOverlay
 import app.overbay.orbit.util.DevicePosture
@@ -45,6 +51,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 
+private enum class AppShellStage {
+    LOADING,
+    LOCKED,
+    READY
+}
+
 @Composable
 fun App(
     posture: DevicePosture = rememberDevicePosture(),
@@ -52,7 +64,8 @@ fun App(
     themeMode: OrbitThemeMode? = null,
     repository: OrbitRepository? = null,
     initialNavKey: OrbitNavKey? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onInitialized: (() -> Unit)? = null
 ) {
     val haptics = rememberOrbitHaptics()
     val biometricHelper = rememberBiometricAuthHelper()
@@ -70,6 +83,7 @@ fun App(
             // Ensure initialization error never hangs startup screen
         } finally {
             isInitialized = true
+            onInitialized?.invoke()
         }
     }
 
@@ -153,25 +167,46 @@ fun App(
                 modifier = modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                if (!isInitialized) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(36.dp)
-                        )
+                val appStage = when {
+                    !isInitialized -> AppShellStage.LOADING
+                    isBiometricLocked && preferences.biometricLockEnabled -> AppShellStage.LOCKED
+                    else -> AppShellStage.READY
+                }
+
+                AnimatedContent(
+                    targetState = appStage,
+                    transitionSpec = {
+                        (fadeIn(OrbitSprings.FloatEffectsDefault) +
+                            scaleIn(initialScale = 0.985f, animationSpec = OrbitSprings.FloatSpatialDefault)) togetherWith
+                            fadeOut(OrbitSprings.FloatEffectsFast)
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    label = "appShellStage"
+                ) { stage ->
+                    when (stage) {
+                        AppShellStage.LOADING -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                        }
+                        AppShellStage.LOCKED -> {
+                            BiometricLockOverlay(
+                                onUnlock = { isBiometricLocked = false }
+                            )
+                        }
+                        AppShellStage.READY -> {
+                            OrbitNavigation(
+                                repository = repo,
+                                initialKey = targetInitialNavKey
+                            )
+                        }
                     }
-                } else if (isBiometricLocked && preferences.biometricLockEnabled) {
-                    BiometricLockOverlay(
-                        onUnlock = { isBiometricLocked = false }
-                    )
-                } else {
-                    OrbitNavigation(
-                        repository = repo,
-                        initialKey = targetInitialNavKey
-                    )
                 }
             }
         }

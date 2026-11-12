@@ -3,31 +3,23 @@ package app.overbay.orbit
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
-import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.*
 import app.overbay.orbit.data.model.StorageMode
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.accounts.AccountsScreen
 import app.overbay.orbit.ui.accounts.AccountsViewModel
 import app.overbay.orbit.ui.cardperks.CardPerksScreen
@@ -133,28 +125,21 @@ fun OrbitNavigation(
         }
     }
 
-    if (currentKey == OrbitNavKey.Login || currentKey == OrbitNavKey.Onboarding) {
-        LaunchedEffect(currentKey) {
-            if (currentKey == OrbitNavKey.Onboarding) {
-                viewModels.loginViewModel.resetToModeSelect()
+    val isAuthRoute = currentKey == OrbitNavKey.Login || currentKey == OrbitNavKey.Onboarding
+    var lastShellKey by remember {
+        mutableStateOf(
+            if (initialKey == OrbitNavKey.Login || initialKey == OrbitNavKey.Onboarding) {
+                OrbitNavKey.Dashboard
+            } else {
+                initialKey
             }
-        }
-        LoginScreen(
-            viewModel = viewModels.loginViewModel,
-            onLoginSuccess = {
-                backStack.clear()
-                backStack.add(OrbitNavKey.Dashboard)
-            },
-            onUseOfflineStorage = {
-                backStack.clear()
-                backStack.add(OrbitNavKey.Dashboard)
-            },
-            modifier = modifier.fillMaxSize()
         )
-        return
+    }
+    if (!isAuthRoute) {
+        lastShellKey = currentKey
     }
 
-    BackHandler(enabled = backStack.size > 1) {
+    BackHandler(enabled = !isAuthRoute && backStack.size > 1) {
         if (backStack.size > 1) {
             backStack.removeAt(backStack.lastIndex)
         }
@@ -220,18 +205,50 @@ fun OrbitNavigation(
             }
         }
     }
-    val navTransition = updateTransition(targetState = currentKey, label = "OrbitNavigationTransition")
-    val canopyCoordinator = rememberCanopyTransitionCoordinator(navTransition.targetState.primaryTabIndex ?: navTransition.targetState)
+    AnimatedContent(
+        targetState = isAuthRoute,
+        transitionSpec = {
+            (fadeIn(OrbitSprings.FloatEffectsDefault) +
+                scaleIn(initialScale = 0.98f, animationSpec = OrbitSprings.FloatSpatialDefault)) togetherWith
+                fadeOut(OrbitSprings.FloatEffectsFast)
+        },
+        modifier = modifier.fillMaxSize(),
+        label = "authShellTransition"
+    ) { showAuth ->
+        if (showAuth) {
+            LaunchedEffect(currentKey) {
+                if (currentKey == OrbitNavKey.Onboarding) {
+                    viewModels.loginViewModel.resetToModeSelect()
+                }
+            }
+            LoginScreen(
+                viewModel = viewModels.loginViewModel,
+                onLoginSuccess = {
+                    backStack.clear()
+                    backStack.add(OrbitNavKey.Dashboard)
+                },
+                onUseOfflineStorage = {
+                    backStack.clear()
+                    backStack.add(OrbitNavKey.Dashboard)
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            val activeShellKey = if (!isAuthRoute) currentKey else lastShellKey
+            val navTransition = updateTransition(targetState = activeShellKey, label = "OrbitNavigationTransition")
+            val canopyCoordinator = rememberCanopyTransitionCoordinator(
+                navTransition.targetState.primaryTabIndex ?: navTransition.targetState
+            )
 
-    CompositionLocalProvider(LocalCanopyTransitionCoordinator provides canopyCoordinator) {
-        AdaptiveNavigationShell(
-            currentKey = currentKey,
-            onNavigate = navigateTo,
-            mhaEnabled = preferences.mhaTrackerEnabled,
-            hiddenRouteNames = preferences.hiddenRouteNames,
-            moreRouteOrder = preferences.moreRouteOrder,
-            modifier = modifier
-        ) {
+            CompositionLocalProvider(LocalCanopyTransitionCoordinator provides canopyCoordinator) {
+                AdaptiveNavigationShell(
+                    currentKey = activeShellKey,
+                    onNavigate = navigateTo,
+                    mhaEnabled = preferences.mhaTrackerEnabled,
+                    hiddenRouteNames = preferences.hiddenRouteNames,
+                    moreRouteOrder = preferences.moreRouteOrder,
+                    modifier = Modifier.fillMaxSize()
+                ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 GlobalStatusBanners(
                     repository = repo,
@@ -304,6 +321,8 @@ fun OrbitNavigation(
                         }
                     }
                 }
+            }
+        }
             }
         }
     }

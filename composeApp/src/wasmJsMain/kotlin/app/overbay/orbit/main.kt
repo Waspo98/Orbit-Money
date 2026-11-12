@@ -7,9 +7,8 @@ import kotlinx.browser.document
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     val body = document.body ?: return
-    hideLoadingScrim()
     ComposeViewport(body) {
-        App()
+        App(onInitialized = ::hideLoadingScrim)
     }
 }
 

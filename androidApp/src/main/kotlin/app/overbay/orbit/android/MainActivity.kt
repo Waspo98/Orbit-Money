@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.view.animation.DecelerateInterpolator
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,9 +22,27 @@ import app.overbay.orbit.util.PlatformStorage
 class MainActivity : FragmentActivity() {
 
     private var currentNavKey by mutableStateOf<OrbitNavKey?>(null)
+    @Volatile
+    private var isAppInitialized = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        val splashScreen = installSplashScreen()
+        splashScreen.setKeepOnScreenCondition { !isAppInitialized }
+        splashScreen.setOnExitAnimationListener { splashScreenView ->
+            val interpolator = DecelerateInterpolator()
+            runCatching { splashScreenView.iconView }.getOrNull()?.animate()
+                ?.scaleX(1.08f)
+                ?.scaleY(1.08f)
+                ?.setDuration(180L)
+                ?.setInterpolator(interpolator)
+                ?.start()
+            splashScreenView.view.animate()
+                .alpha(0f)
+                .setDuration(180L)
+                .setInterpolator(interpolator)
+                .withEndAction { splashScreenView.remove() }
+                .start()
+        }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
@@ -37,7 +56,10 @@ class MainActivity : FragmentActivity() {
         handleIncomingIntent(intent)
 
         setContent {
-            App(initialNavKey = currentNavKey)
+            App(
+                initialNavKey = currentNavKey,
+                onInitialized = { isAppInitialized = true }
+            )
         }
     }
 
