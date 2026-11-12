@@ -121,7 +121,7 @@ fun TransactionsScreen(
                 onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha, acctId ->
                     viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha, acctId)
                 },
-                onResetToOriginal = { id -> viewModel.resetTransaction(id) },
+                onResetToOriginal = { id -> viewModel.requestResetTransaction(id) },
                 onDelete = { id -> viewModel.setSingleDeleteConfirmId(id) },
                 onSplit = { id -> viewModel.openSplitSheet(id) },
                 onDismiss = { viewModel.closeTransactionEditor() },
@@ -275,6 +275,25 @@ fun TransactionsScreen(
                 viewModel.setSingleDeleteConfirmId(null)
             },
             onDismiss = { viewModel.setSingleDeleteConfirmId(null) }
+        )
+    }
+
+    val pendingReset = state.pendingResetConfirm
+    if (pendingReset != null) {
+        val fieldLabel = pendingReset.fieldLabel
+        OrbitConfirmationDialog(
+            title = if (fieldLabel != null) "Reset $fieldLabel?" else "Restore Original Transaction?",
+            message = if (fieldLabel != null) {
+                "Revert $fieldLabel back to its original value?"
+            } else {
+                "Revert all manual edits on this transaction back to the original imported values?"
+            },
+            confirmText = if (fieldLabel != null) "Reset" else "Restore All",
+            onConfirm = {
+                haptics.confirm()
+                viewModel.confirmPendingReset()
+            },
+            onDismiss = { viewModel.dismissPendingReset() }
         )
     }
 }

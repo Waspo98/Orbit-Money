@@ -99,7 +99,7 @@ fun TransactionDetailInspectorPane(
                     onSave = { id, merchant, amount, date, catId, notes, isTrans, isIgn, mha, acctId ->
                         viewModel.saveTransaction(id, merchant, amount, date, catId, notes, isTrans, isIgn, mha, acctId)
                     },
-                    onResetToOriginal = { id -> viewModel.resetTransaction(id) },
+                    onResetToOriginal = { id -> viewModel.requestResetTransaction(id) },
                     onDelete = { id -> onRequestDelete(id) },
                     onSplit = { id ->
                         viewModel.closeTransactionEditor()
@@ -150,10 +150,10 @@ fun TransactionDetailInspectorPane(
                         onToggleIgnore = { viewModel.toggleIgnore(inspecting.id) },
                         onDelete = { onRequestDelete(inspecting.id) },
                         onCustomizeActions = { viewModel.openCustomizeActionsSheet() },
-                        onResetMerchant = { viewModel.resetField(inspecting.id, "merchant") },
-                        onResetCategory = { viewModel.resetField(inspecting.id, "category") },
-                        onResetField = { field -> viewModel.resetField(inspecting.id, field) },
-                        onResetAll = { viewModel.resetTransaction(inspecting.id) },
+                        onResetMerchant = { viewModel.requestResetField(inspecting.id, "merchant") },
+                        onResetCategory = { viewModel.requestResetField(inspecting.id, "category") },
+                        onResetField = { field -> viewModel.requestResetField(inspecting.id, field) },
+                        onResetAll = { viewModel.requestResetTransaction(inspecting.id) },
                         onViewRule = { ruleId ->
                             viewModel.requestOpenRuleEditor(ruleId)
                             onNavigate(OrbitNavKey.Rules)

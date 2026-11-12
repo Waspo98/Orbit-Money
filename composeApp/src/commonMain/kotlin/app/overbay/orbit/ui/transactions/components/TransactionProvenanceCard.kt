@@ -157,7 +157,7 @@ fun TransactionProvenanceCard(
                         modifier = Modifier
                             .clip(CircleShape)
                             .clickable {
-                                haptics.confirm()
+                                haptics.tick()
                                 onResetToOriginal(transaction.id)
                             }
                     ) {

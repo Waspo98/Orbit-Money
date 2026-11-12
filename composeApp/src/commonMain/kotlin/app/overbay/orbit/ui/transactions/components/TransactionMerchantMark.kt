@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -31,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitDropdownMenu
 import app.overbay.orbit.util.LocalOrbitHaptics
 import app.overbay.orbit.util.PlatformRuntime
 import app.overbay.orbit.util.PlatformStorage
@@ -303,9 +303,9 @@ fun TransactionMerchantMark(
             }
         }
 
-        if (hasMenuActions && menuExpanded) {
-            DropdownMenu(
-                expanded = true,
+        if (hasMenuActions) {
+            OrbitDropdownMenu(
+                expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false }
             ) {
                 if (onFindLogo != null) {

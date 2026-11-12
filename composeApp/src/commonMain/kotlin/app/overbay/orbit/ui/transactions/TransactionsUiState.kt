@@ -34,6 +34,43 @@ data class MonthTransactionGroup(
     val transactions: List<Transaction>
 )
 
+data class PendingResetConfirm(
+    val transactionId: Long,
+    val fieldKey: String? = null
+) {
+    val fieldLabel: String?
+        get() = when (fieldKey) {
+            null -> null
+            "merchant" -> "Merchant"
+            "category" -> "Category"
+            "amount" -> "Amount"
+            "date" -> "Date"
+            "transfer" -> "Transfer"
+            "mha" -> "MHA"
+            "ignored" -> "Ignored"
+            else -> fieldKey.replaceFirstChar { it.uppercase() }
+        }
+}
+
+internal data class TransactionsOverlayState(
+    val isSearchActive: Boolean = false,
+    val selectedIds: Set<Long> = emptySet(),
+    val inspectingId: Long? = null,
+    val expandedId: Long? = null,
+    val showEditorSheet: Boolean = false,
+    val showSplitSheet: Boolean = false,
+    val showCsvImportSheet: Boolean = false,
+    val showFilterSheet: Boolean = false,
+    val showBatchDeleteConfirm: Boolean = false,
+    val singleDeleteConfirmId: Long? = null,
+    val pendingResetConfirm: PendingResetConfirm? = null,
+    val showCategoryBatchPicker: Boolean = false,
+    val logoFinderTransactionId: Long? = null,
+    val ruleDraftTransactionId: Long? = null,
+    val categoryPickerTransactionId: Long? = null,
+    val showCustomizeActionsSheet: Boolean = false
+)
+
 data class TransactionsUiState(
     val transactions: List<Transaction> = emptyList(),
     val filteredTransactions: List<Transaction> = emptyList(),
@@ -61,6 +98,7 @@ data class TransactionsUiState(
     val showFilterSheet: Boolean = false,
     val showBatchDeleteConfirm: Boolean = false,
     val singleDeleteConfirmId: Long? = null,
+    val pendingResetConfirm: PendingResetConfirm? = null,
     val showCategoryBatchPicker: Boolean = false,
     val logoFinderTransactionId: Long? = null,
     val ruleDraftTransactionId: Long? = null,

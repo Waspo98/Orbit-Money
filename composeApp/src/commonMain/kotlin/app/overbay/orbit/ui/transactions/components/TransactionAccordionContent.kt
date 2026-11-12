@@ -78,7 +78,7 @@ fun TransactionAccordionContent(
     ).any { it is FieldEditProvenance.Manual }
 
     val showTransferPill = transaction.effectiveIsTransfer || transferProv != FieldEditProvenance.None
-    val showMhaPill = mhaEnabled && (transaction.effectiveMhaEligible == true || mhaProv != FieldEditProvenance.None)
+    val showMhaPill = mhaEnabled && transaction.effectiveMhaEligible == true
     val showIgnorePill = transaction.effectiveIsIgnored || ignoreProv != FieldEditProvenance.None
     val showStatusStrip = amountProv != FieldEditProvenance.None ||
         showTransferPill || showMhaPill || showIgnorePill || hasManualEdits
@@ -184,7 +184,7 @@ fun TransactionAccordionContent(
                     }
                     if (showMhaPill) {
                         StatusProvenancePill(
-                            text = if (transaction.effectiveMhaEligible == true) "MHA Eligible" else "MHA Excluded",
+                            text = "MHA Eligible",
                             provenance = mhaProv,
                             onReset = { onResetField("mha") },
                             onViewRule = onViewRule
@@ -205,7 +205,7 @@ fun TransactionAccordionContent(
                             modifier = Modifier
                                 .clip(CircleShape)
                                 .clickable {
-                                    haptics.confirm()
+                                    haptics.tick()
                                     onResetAll()
                                 }
                         ) {

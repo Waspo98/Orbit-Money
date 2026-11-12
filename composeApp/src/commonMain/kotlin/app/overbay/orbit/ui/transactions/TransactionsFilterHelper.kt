@@ -201,4 +201,77 @@ object TransactionsFilterHelper {
         val sort: TransactionSortOption,
         val isCompactView: Boolean
     )
+
+    fun buildBaseUiState(
+        snapshot: RepoSnapshot,
+        filterParams: FilterParams,
+        pageSize: Int,
+        page: Int
+    ): TransactionsUiState {
+        val (txns, categories, accounts, nextPriority, preferences) = snapshot
+        val categoryMap = categories.associateBy { it.id }
+        val accountMap = accounts.associateBy { it.id }
+
+        val filteredRaw = filterTransactions(
+            transactions = txns,
+            query = filterParams.query,
+            quick = filterParams.quick,
+            draft = filterParams.draft,
+            categoryMap = categoryMap
+        )
+
+        val sorted = sortTransactions(filteredRaw, filterParams.sort)
+        val paginated = paginateTransactions(sorted, page, pageSize)
+
+        val currentMonthKey = LocalDateUtils.currentYearMonth()
+        val monthlyCount = txns.count { it.effectiveDate.take(7) == currentMonthKey && !it.effectiveIsIgnored }
+
+        var totalExpense = 0L
+        var totalIncome = 0L
+        for (txn in sorted) {
+            if (!txn.effectiveIsTransfer && !txn.effectiveIsIgnored) {
+                if (txn.effectiveAmountCents < 0) {
+                    totalExpense += txn.effectiveAmountCents
+                } else {
+                    totalIncome += txn.effectiveAmountCents
+                }
+            }
+        }
+
+        val displayList = if (pageSize <= 0) sorted else paginated
+        val grouped = displayList.groupBy { it.effectiveDate.take(7) }.map { (monthKey, items) ->
+            MonthTransactionGroup(
+                monthKey = monthKey,
+                monthLabel = LocalDateUtils.formatMonthLabel(monthKey),
+                count = items.size,
+                transactions = items
+            )
+        }
+
+        return TransactionsUiState(
+            transactions = txns,
+            filteredTransactions = sorted,
+            paginatedTransactions = paginated,
+            groupedTransactions = grouped,
+            categories = categories,
+            accounts = accounts,
+            categoryMap = categoryMap,
+            accountMap = accountMap,
+            searchQuery = filterParams.query,
+            quickFilter = filterParams.quick,
+            filterDraft = filterParams.draft,
+            sortOption = filterParams.sort,
+            isCompactView = filterParams.isCompactView,
+            pageSize = pageSize,
+            currentPage = page,
+            monthlyTransactionCount = monthlyCount,
+            nextRulePriority = nextPriority,
+            totalExpenseCents = totalExpense,
+            totalIncomeCents = totalIncome,
+            netCashflowCents = totalIncome + totalExpense,
+            mhaEnabled = preferences.mhaTrackerEnabled,
+            transactionPinnedActions = preferences.transactionPinnedActions,
+            transactionActionOrder = preferences.transactionActionOrder
+        )
+    }
 }

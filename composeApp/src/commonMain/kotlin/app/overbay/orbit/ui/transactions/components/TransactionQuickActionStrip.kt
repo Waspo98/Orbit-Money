@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,6 +40,7 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionQuickAction
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitDropdownMenu
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -189,7 +189,7 @@ fun TransactionQuickActionStrip(
                 }
             }
 
-            DropdownMenu(
+            OrbitDropdownMenu(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false }
             ) {

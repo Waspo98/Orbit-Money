@@ -320,8 +320,8 @@ private fun TransactionsGroupedLazyList(
                     onToggleIgnore = { viewModel.toggleIgnore(txn.id) },
                     onDelete = { viewModel.setSingleDeleteConfirmId(txn.id) },
                     onCustomizeActions = { viewModel.openCustomizeActionsSheet() },
-                    onResetField = { field -> viewModel.resetField(txn.id, field) },
-                    onResetAll = { viewModel.resetTransaction(txn.id) },
+                    onResetField = { field -> viewModel.requestResetField(txn.id, field) },
+                    onResetAll = { viewModel.requestResetTransaction(txn.id) },
                     onViewRule = { ruleId ->
                         viewModel.requestOpenRuleEditor(ruleId)
                         onNavigate(OrbitNavKey.Rules)

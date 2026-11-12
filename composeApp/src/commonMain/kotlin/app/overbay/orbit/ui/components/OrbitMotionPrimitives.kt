@@ -109,8 +109,8 @@ fun OrbitExpandableChevron(
 }
 
 /**
- * Standardized M3E vertical accordion container pairing bouncy spatial expansion
- * with critically-damped opacity fade.
+ * Standardized M3E vertical accordion container pairing snappy spatial expansion
+ * with critically-damped opacity fade (~200ms open/close).
  */
 @Composable
 fun OrbitAccordionVisibility(
@@ -120,9 +120,9 @@ fun OrbitAccordionVisibility(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = expandVertically(animationSpec = OrbitSprings.IntSizeSpatialDefault) +
-            fadeIn(animationSpec = OrbitSprings.FloatEffectsDefault),
-        exit = shrinkVertically(animationSpec = OrbitSprings.IntSizeSpatialDefault) +
+        enter = expandVertically(animationSpec = OrbitSprings.IntSizeAccordionFast) +
+            fadeIn(animationSpec = OrbitSprings.FloatEffectsFast),
+        exit = shrinkVertically(animationSpec = OrbitSprings.IntSizeAccordionFast) +
             fadeOut(animationSpec = OrbitSprings.FloatEffectsFast),
         modifier = modifier,
         content = content

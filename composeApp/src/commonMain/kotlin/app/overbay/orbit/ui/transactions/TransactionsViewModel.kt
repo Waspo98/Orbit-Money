@@ -13,7 +13,6 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.domain.Cents
-import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.RuleMatcherEngine
 import app.overbay.orbit.ui.components.TransactionFilterDraft
 import kotlinx.coroutines.CoroutineDispatcher
@@ -28,24 +27,6 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
-private data class TransactionsOverlayState(
-    val isSearchActive: Boolean = false,
-    val selectedIds: Set<Long> = emptySet(),
-    val inspectingId: Long? = null,
-    val expandedId: Long? = null,
-    val showEditorSheet: Boolean = false,
-    val showSplitSheet: Boolean = false,
-    val showCsvImportSheet: Boolean = false,
-    val showFilterSheet: Boolean = false,
-    val showBatchDeleteConfirm: Boolean = false,
-    val singleDeleteConfirmId: Long? = null,
-    val showCategoryBatchPicker: Boolean = false,
-    val logoFinderTransactionId: Long? = null,
-    val ruleDraftTransactionId: Long? = null,
-    val categoryPickerTransactionId: Long? = null,
-    val showCustomizeActionsSheet: Boolean = false
-)
 
 class TransactionsViewModel(
     private val repository: OrbitRepository,
@@ -97,72 +78,8 @@ class TransactionsViewModel(
         dataFlow,
         filterFlow,
         paginationFlow
-    ) { (txns, categories, accounts, nextPriority, preferences), filterParams, (pageSize, page) ->
-        val categoryMap = categories.associateBy { it.id }
-        val accountMap = accounts.associateBy { it.id }
-
-        val filteredRaw = TransactionsFilterHelper.filterTransactions(
-            transactions = txns,
-            query = filterParams.query,
-            quick = filterParams.quick,
-            draft = filterParams.draft,
-            categoryMap = categoryMap
-        )
-
-        val sorted = TransactionsFilterHelper.sortTransactions(filteredRaw, filterParams.sort)
-        val paginated = TransactionsFilterHelper.paginateTransactions(sorted, page, pageSize)
-
-        val currentMonthKey = LocalDateUtils.currentYearMonth()
-        val monthlyCount = txns.count { it.effectiveDate.take(7) == currentMonthKey && !it.effectiveIsIgnored }
-
-        var totalExpense = 0L
-        var totalIncome = 0L
-        for (txn in sorted) {
-            if (!txn.effectiveIsTransfer && !txn.effectiveIsIgnored) {
-                if (txn.effectiveAmountCents < 0) {
-                    totalExpense += txn.effectiveAmountCents
-                } else {
-                    totalIncome += txn.effectiveAmountCents
-                }
-            }
-        }
-
-        // Group active paginated transactions by month (or all sorted if page size is 0 / All)
-        val displayList = if (pageSize <= 0) sorted else paginated
-        val grouped = displayList.groupBy { it.effectiveDate.take(7) }.map { (monthKey, items) ->
-            MonthTransactionGroup(
-                monthKey = monthKey,
-                monthLabel = LocalDateUtils.formatMonthLabel(monthKey),
-                count = items.size,
-                transactions = items
-            )
-        }
-
-        TransactionsUiState(
-            transactions = txns,
-            filteredTransactions = sorted,
-            paginatedTransactions = paginated,
-            groupedTransactions = grouped,
-            categories = categories,
-            accounts = accounts,
-            categoryMap = categoryMap,
-            accountMap = accountMap,
-            searchQuery = filterParams.query,
-            quickFilter = filterParams.quick,
-            filterDraft = filterParams.draft,
-            sortOption = filterParams.sort,
-            isCompactView = filterParams.isCompactView,
-            pageSize = pageSize,
-            currentPage = page,
-            monthlyTransactionCount = monthlyCount,
-            nextRulePriority = nextPriority,
-            totalExpenseCents = totalExpense,
-            totalIncomeCents = totalIncome,
-            netCashflowCents = totalIncome + totalExpense,
-            mhaEnabled = preferences.mhaTrackerEnabled,
-            transactionPinnedActions = preferences.transactionPinnedActions,
-            transactionActionOrder = preferences.transactionActionOrder
-        )
+    ) { snapshot, filterParams, (pageSize, page) ->
+        TransactionsFilterHelper.buildBaseUiState(snapshot, filterParams, pageSize, page)
     }.flowOn(computeDispatcher)
 
     val uiState: StateFlow<TransactionsUiState> = combine(
@@ -182,6 +99,7 @@ class TransactionsViewModel(
             showFilterSheet = overlays.showFilterSheet,
             showBatchDeleteConfirm = overlays.showBatchDeleteConfirm,
             singleDeleteConfirmId = overlays.singleDeleteConfirmId,
+            pendingResetConfirm = overlays.pendingResetConfirm,
             showCategoryBatchPicker = overlays.showCategoryBatchPicker,
             logoFinderTransactionId = overlays.logoFinderTransactionId,
             ruleDraftTransactionId = overlays.ruleDraftTransactionId,
@@ -483,6 +401,28 @@ class TransactionsViewModel(
                 transactionActionOrder = orderIds
             )
             repository.updatePreferences(updated)
+        }
+    }
+
+    fun requestResetField(id: Long, field: String) {
+        _overlays.update { it.copy(pendingResetConfirm = PendingResetConfirm(id, field)) }
+    }
+
+    fun requestResetTransaction(id: Long) {
+        _overlays.update { it.copy(pendingResetConfirm = PendingResetConfirm(id, null)) }
+    }
+
+    fun dismissPendingReset() {
+        _overlays.update { it.copy(pendingResetConfirm = null) }
+    }
+
+    fun confirmPendingReset() {
+        val pending = _overlays.value.pendingResetConfirm ?: return
+        _overlays.update { it.copy(pendingResetConfirm = null) }
+        if (pending.fieldKey != null) {
+            resetField(pending.transactionId, pending.fieldKey)
+        } else {
+            resetTransaction(pending.transactionId)
         }
     }
 
