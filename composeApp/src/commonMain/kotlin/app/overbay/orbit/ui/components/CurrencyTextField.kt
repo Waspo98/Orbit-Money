@@ -38,6 +38,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 internal fun sanitizeCurrencyInputWithCursor(
@@ -81,6 +82,8 @@ fun CurrencyTextField(
     onCentsChange: (Long) -> Unit,
     modifier: Modifier = Modifier,
     label: String? = "Amount",
+    prefixSymbol: String = "$",
+    isPositiveAccent: Boolean = false,
     allowNegative: Boolean = false,
     isError: Boolean = false,
     errorMessage: String? = null
@@ -138,18 +141,29 @@ fun CurrencyTextField(
             label = null,
             placeholder = { Text("0.00") },
             leadingIcon = {
+                val badgeBg = when {
+                    isPositiveAccent -> OrbitTheme.colors.income.copy(alpha = 0.16f)
+                    prefixSymbol.startsWith("-") -> MaterialTheme.colorScheme.surfaceContainerHigh
+                    else -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)
+                }
+                val badgeText = when {
+                    isPositiveAccent -> OrbitTheme.colors.income
+                    prefixSymbol.startsWith("-") -> MaterialTheme.colorScheme.onSurface
+                    else -> MaterialTheme.colorScheme.primary
+                }
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
+                        .height(28.dp)
+                        .width(if (prefixSymbol.length > 1) 34.dp else 28.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)),
+                        .background(badgeBg),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "$",
-                        style = MaterialTheme.typography.titleSmall,
+                        text = prefixSymbol,
+                        style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = badgeText
                     )
                 }
             },

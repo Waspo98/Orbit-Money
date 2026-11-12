@@ -376,4 +376,60 @@ class TransactionQuickActionsAndProvenanceTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testSaveTransaction_diffsOnlyModifiedFieldsAndPreservesUneditedMhaAndRules() = runTest(testDispatcher) {
+        repository.saveAccount(Account(id = 1L, name = "Checking", type = AccountType.CHECKING))
+        repository.saveCategory(Category(id = 10L, name = "Hardware", icon = "🛠️"))
+        repository.saveCategory(Category(id = 20L, name = "Home Repairs", icon = "🏠"))
+        repository.saveTransaction(
+            Transaction(
+                id = 12L,
+                accountId = 1L,
+                originalDate = "2026-11-11",
+                originalMerchant = "ACE HARDWARE #102",
+                originalAmountCents = -764L,
+                originalCategoryId = 10L,
+                editedMerchant = "Ace Hardware",
+                editedMerchantSource = "rule:8",
+                source = "simplefin"
+            )
+        )
+
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
+        testScheduler.advanceUntilIdle()
+
+        // User opens editor and only changes Category + Notes; MHA remains untouched (null)
+        viewModel.saveTransaction(
+            id = 12L,
+            merchant = "Ace Hardware",
+            amountCents = -764L,
+            date = "2026-11-11",
+            categoryId = 20L,
+            notes = "Picture hooks",
+            isTransfer = false,
+            isIgnored = false,
+            mhaEligible = null,
+            accountId = 1L
+        )
+        testScheduler.advanceUntilIdle()
+
+        val saved = viewModel.uiState.value.transactions.single { it.id == 12L }
+        assertEquals(20L, saved.effectiveCategoryId)
+        assertEquals("user", saved.editedCategoryIdSource)
+        assertEquals("Picture hooks", saved.notes)
+        assertEquals(EditSource.USER, saved.editSource)
+
+        // Rule-derived merchant and untouched fields must NOT be stamped with "user"
+        assertEquals("Ace Hardware", saved.effectiveMerchant)
+        assertEquals("rule:8", saved.editedMerchantSource)
+        assertNull(saved.editedAmountCents)
+        assertNull(saved.editedDate)
+        assertNull(saved.editedIsTransfer)
+        assertNull(saved.editedIsIgnored)
+        assertNull(saved.editedMhaEligible)
+        assertNull(saved.editedMhaEligibleSource)
+
+        collectJob.cancel()
+    }
 }

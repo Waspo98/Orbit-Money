@@ -18,7 +18,6 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -51,7 +50,7 @@ fun transactionQuickActionIcon(
     if (isActiveToggle) return Icons.Default.Check
     return when (action) {
         TransactionQuickAction.EDIT -> Icons.Default.Edit
-        TransactionQuickAction.SPLIT -> Icons.Default.Share
+        TransactionQuickAction.SPLIT -> OrbitIcons.Split
         TransactionQuickAction.CREATE_RULE -> OrbitIcons.Rules
         TransactionQuickAction.IGNORE -> Icons.Default.Clear
         TransactionQuickAction.RECURRING -> OrbitIcons.Upcoming

@@ -1,8 +1,12 @@
 package app.overbay.orbit.ui.transactions.sheets
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,10 +17,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,25 +31,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Transaction
-import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
-import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitActionChip
-import app.overbay.orbit.ui.components.OrbitAmountTypeCard
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalFooter
+import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
 import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.transactions.components.TransactionOptionsBlock
-import app.overbay.orbit.ui.transactions.components.TransactionProvenanceCard
+import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.datetime.LocalDate
 import kotlin.math.abs
@@ -78,7 +85,9 @@ fun TransactionEditorContent(
 ) {
     val haptics = LocalOrbitHaptics.current
     val isEditing = transaction != null && transaction.id > 0L
+    val isManualOrNew = !isEditing || transaction.source.equals("manual", ignoreCase = true)
 
+    var isPickingCategory by remember(transaction?.id) { mutableStateOf(false) }
     var merchant by remember(transaction) { mutableStateOf(transaction?.effectiveMerchant ?: "") }
     var rawAmountCents by remember(transaction) {
         mutableStateOf(abs(transaction?.effectiveAmountCents ?: 0L))
@@ -99,160 +108,223 @@ fun TransactionEditorContent(
     var notes by remember(transaction) { mutableStateOf(transaction?.notes ?: "") }
     var isTransfer by remember(transaction) { mutableStateOf(transaction?.effectiveIsTransfer ?: false) }
     var isIgnored by remember(transaction) { mutableStateOf(transaction?.effectiveIsIgnored ?: false) }
-    var mhaEligible by remember(transaction) { mutableStateOf(transaction?.effectiveMhaEligible ?: false) }
+    var mhaEligible by remember(transaction) { mutableStateOf(transaction?.effectiveMhaEligible) }
+
+    BackHandler(enabled = isPickingCategory) {
+        haptics.tick()
+        isPickingCategory = false
+    }
+
+    val hasEdits = transaction != null && (
+        transaction.editSource == EditSource.USER ||
+            transaction.editedMerchant != null ||
+            transaction.editedAmountCents != null ||
+            transaction.editedDate != null ||
+            transaction.editedCategoryIdSource != null ||
+            transaction.editedCategoryId != null ||
+            transaction.editedIsTransfer != null ||
+            transaction.editedIsIgnored != null ||
+            transaction.editedMhaEligibleSource != null
+        )
+
+    val statementSubtitle = remember(transaction, accounts) {
+        if (transaction == null || transaction.id <= 0L) {
+            null
+        } else {
+            val friendlyDate = LocalDateUtils.parseIsoDate(transaction.originalDate)
+                ?.let { LocalDateUtils.formatDisplayDate(it) }
+                ?: transaction.originalDate
+            val acctName = accounts.find { it.id == transaction.accountId }?.name?.takeIf { it.isNotBlank() }
+                ?: transaction.accountName.takeIf { it.isNotBlank() }
+            val prefix = if (acctName != null) "$acctName • " else ""
+            "${prefix}Statement: ${transaction.originalMerchant} • $friendlyDate • ${
+                MoneyUtils.formatCents(transaction.originalAmountCents, signed = true)
+            }"
+        }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         OrbitSheetHeader(
-            title = if (isEditing) "Edit Transaction" else "New Transaction",
-            onDismiss = onDismiss,
-            trailingActions = {
-                if (!isEditing && onImportCsv != null) {
-                    OrbitActionChip(
-                        label = "Import CSV",
-                        onClick = { onImportCsv() }
-                    )
-                } else if (transaction != null && transaction.id > 0L) {
-                    OrbitActionChip(
-                        label = "Split",
-                        leadingIcon = Icons.Default.Share,
-                        onClick = { onSplit(transaction.id) }
-                    )
-                    OrbitActionChip(
-                        label = "Delete",
-                        leadingIcon = Icons.Default.Delete,
-                        isDestructive = true,
-                        onClick = {
-                            haptics.reject()
-                            onDelete(transaction.id)
-                        }
-                    )
-                }
+            title = when {
+                isPickingCategory -> "Select Category"
+                isEditing -> "Edit Transaction"
+                else -> "New Transaction"
             },
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+            subtitle = if (isPickingCategory) merchant.takeIf { it.isNotBlank() } else statementSubtitle,
+            onNavigateBack = if (isPickingCategory) ({ isPickingCategory = false }) else null,
+            onDismiss = onDismiss,
+            trailingActions = if (!isPickingCategory) {
+                {
+                    if (!isEditing && onImportCsv != null) {
+                        OrbitActionChip(
+                            label = "Import CSV",
+                            onClick = { onImportCsv() }
+                        )
+                    } else if (isEditing) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f)),
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    haptics.reject()
+                                    onDelete(transaction.id)
+                                },
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete Transaction",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else null,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
         )
 
         HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
 
-        Column(
-            modifier = Modifier
-                .weight(1f, fill = false)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if (transaction != null && transaction.id > 0L) {
-                TransactionProvenanceCard(
-                    transaction = transaction,
-                    onResetToOriginal = onResetToOriginal
+        AnimatedContent(
+            targetState = isPickingCategory,
+            transitionSpec = {
+                (fadeIn(OrbitSprings.FloatEffectsDefault) togetherWith fadeOut(OrbitSprings.FloatEffectsFast))
+                    .using(SizeTransform(clip = false) { _, _ -> OrbitSprings.IntSizeAccordionFast })
+            },
+            modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
+            label = "transactionEditorStageTransition"
+        ) { pickingCategory ->
+            if (pickingCategory) {
+                InlineCategoryPickerStage(
+                    categories = categories,
+                    selectedCategoryId = selectedCategoryId,
+                    currentSavedCategoryId = transaction?.effectiveCategoryId,
+                    onSelectCategory = { chosenId ->
+                        selectedCategoryId = chosenId
+                        isPickingCategory = false
+                    },
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
                 )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (isManualOrNew) {
+                        OrbitSegmentedTabRow(
+                            items = listOf(true, false),
+                            selected = isExpense,
+                            onSelect = { isExpense = it },
+                            label = { if (it) "Expense" else "Income" }
+                        )
+                    }
+
+                    if (!isEditing && accounts.isNotEmpty()) {
+                        val selectedAccount = accounts.find { it.id == selectedAccountId } ?: accounts.first()
+                        OrbitDropdownField(
+                            label = "Account",
+                            selectedText = selectedAccount.name,
+                            options = accounts,
+                            optionLabel = { it.name },
+                            onOptionSelected = { selectedAccountId = it.id }
+                        )
+                    }
+
+                    val selectedCategory = categories.find { it.id == selectedCategoryId }
+                    TransactionCategoryField(
+                        selectedCategory = selectedCategory,
+                        isTransfer = isTransfer,
+                        onClick = { isPickingCategory = true }
+                    )
+
+                    OrbitTextField(
+                        value = merchant,
+                        onValueChange = { merchant = it },
+                        label = { Text("Merchant") },
+                        placeholder = { Text("e.g. Trader Joe's, Electric Utility") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        DateFieldButton(
+                            date = selectedDate,
+                            onDateSelected = { selectedDate = it },
+                            label = "Date",
+                            modifier = Modifier.weight(0.5f)
+                        )
+
+                        CurrencyTextField(
+                            cents = rawAmountCents,
+                            onCentsChange = { rawAmountCents = it },
+                            label = "Amount",
+                            prefixSymbol = if (isExpense) "-$" else "+$",
+                            isPositiveAccent = !isExpense,
+                            modifier = Modifier.weight(0.5f)
+                        )
+                    }
+
+                    OrbitTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text("Notes (Optional)") },
+                        placeholder = { Text("Add memo, tag, or receipt note…") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 1,
+                        maxLines = 2
+                    )
+
+                    TransactionOptionsBlock(
+                        isTransfer = isTransfer,
+                        onTransferChange = { isTransfer = it },
+                        mhaEligible = mhaEligible,
+                        onMhaEligibleChange = { mhaEligible = it },
+                        isIgnored = isIgnored,
+                        onIgnoredChange = { isIgnored = it },
+                        onSplit = if (isEditing) ({ onSplit(transaction.id) }) else null,
+                        onCreateRule = if (isEditing && onCreateRule != null) ({ onCreateRule(transaction) }) else null,
+                        onMarkRecurring = if (isEditing && onMarkRecurring != null) ({ onMarkRecurring(transaction) }) else null,
+                        onRestoreOriginal = if (isEditing && hasEdits) ({ onResetToOriginal(transaction.id) }) else null,
+                        showMhaOption = showMhaOption
+                    )
+                }
             }
-
-            OrbitAmountTypeCard(
-                cents = rawAmountCents,
-                onCentsChange = { rawAmountCents = it },
-                isExpense = isExpense,
-                onIsExpenseChange = { isExpense = it }
-            )
-
-            OrbitTextField(
-                value = merchant,
-                onValueChange = { merchant = it },
-                label = { Text("Merchant") },
-                placeholder = { Text("e.g. Trader Joe's, Electric Utility") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            val selectedCategory = categories.find { it.id == selectedCategoryId }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                DateFieldButton(
-                    date = selectedDate,
-                    onDateSelected = { selectedDate = it },
-                    label = "Date",
-                    modifier = Modifier.weight(0.45f)
-                )
-
-                OrbitDropdownField(
-                    label = "Category",
-                    selectedText = selectedCategory?.labelWithEmoji ?: "❓ Uncategorized",
-                    options = categories,
-                    optionLabel = { it.labelWithEmoji },
-                    onOptionSelected = { selectedCategoryId = it.id },
-                    nullOptionLabel = "❓ Uncategorized",
-                    onNullSelected = { selectedCategoryId = null },
-                    leadingIcon = if (selectedCategory != null) {
-                        {
-                            val color = selectedCategory.color.toComposeColor(MaterialTheme.colorScheme.primary)
-                            Box(
-                                modifier = Modifier
-                                    .size(12.dp)
-                                    .clip(CircleShape)
-                                    .background(color)
-                            )
-                        }
-                    } else null,
-                    modifier = Modifier.weight(0.55f)
-                )
-            }
-
-            if (!isEditing && accounts.isNotEmpty()) {
-                val selectedAccount = accounts.find { it.id == selectedAccountId } ?: accounts.first()
-                OrbitDropdownField(
-                    label = "Account",
-                    selectedText = selectedAccount.name,
-                    options = accounts,
-                    optionLabel = { it.name },
-                    onOptionSelected = { selectedAccountId = it.id }
-                )
-            }
-
-            OrbitTextField(
-                value = notes,
-                onValueChange = { notes = it },
-                label = { Text("Notes (Optional)") },
-                placeholder = { Text("Add memo, tag, or receipt note…") },
-                modifier = Modifier.fillMaxWidth(),
-                maxLines = 2
-            )
-
-            TransactionOptionsBlock(
-                isTransfer = isTransfer,
-                onTransferChange = { isTransfer = it },
-                mhaEligible = mhaEligible,
-                onMhaEligibleChange = { mhaEligible = it },
-                isIgnored = isIgnored,
-                onIgnoredChange = { isIgnored = it },
-                onCreateRule = if (transaction != null && onCreateRule != null) ({ onCreateRule(transaction) }) else null,
-                onMarkRecurring = if (transaction != null && onMarkRecurring != null) ({ onMarkRecurring(transaction) }) else null,
-                showMhaOption = showMhaOption
-            )
         }
 
-        OrbitModalFooter(
-            confirmText = if (isEditing) "Save Transaction" else "Add Transaction",
-            confirmEnabled = merchant.isNotBlank() && rawAmountCents > 0L,
-            onDismiss = onDismiss,
-            onConfirm = {
-                val signedAmount = if (isExpense) -rawAmountCents else rawAmountCents
-                val isoDate = selectedDate.toString()
-                onSave(
-                    transaction?.id ?: 0L,
-                    merchant,
-                    signedAmount,
-                    isoDate,
-                    selectedCategoryId,
-                    notes.ifBlank { null },
-                    isTransfer,
-                    isIgnored,
-                    mhaEligible,
-                    selectedAccountId
-                )
-            }
-        )
+        if (!isPickingCategory) {
+            OrbitModalFooter(
+                confirmText = if (isEditing) "Save" else "Add Transaction",
+                confirmEnabled = merchant.isNotBlank() && rawAmountCents > 0L,
+                onDismiss = onDismiss,
+                onConfirm = {
+                    val signedAmount = if (isExpense) -rawAmountCents else rawAmountCents
+                    val isoDate = selectedDate.toString()
+                    onSave(
+                        transaction?.id ?: 0L,
+                        merchant,
+                        signedAmount,
+                        isoDate,
+                        selectedCategoryId,
+                        notes.ifBlank { null },
+                        isTransfer,
+                        isIgnored,
+                        mhaEligible,
+                        selectedAccountId
+                    )
+                }
+            )
+        }
     }
 }

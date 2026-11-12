@@ -107,6 +107,13 @@ object OrbitIcons {
         )
     }
 
+    val Split: ImageVector by lazy {
+        strokeIcon(
+            name = "Split",
+            pathData = "M12 20V13M12 13L6 7M6 7H10.2M6 7V11.2M12 13L18 7M18 7H13.8M18 7V11.2"
+        )
+    }
+
     val ViewSliders: ImageVector by lazy {
         strokeIcon(
             name = "ViewSliders",

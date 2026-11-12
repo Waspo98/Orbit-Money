@@ -309,21 +309,36 @@ class TransactionsViewModel(
         viewModelScope.launch(computeDispatcher) {
             val existing = uiState.value.transactions.find { it.id == id }
             if (existing != null) {
+                val merchantChanged = merchant != existing.effectiveMerchant
+                val amountChanged = amountCents != existing.effectiveAmountCents
+                val dateChanged = date != existing.effectiveDate
+                val categoryChanged = categoryId != existing.effectiveCategoryId
+                val transferChanged = isTransfer != existing.effectiveIsTransfer
+                val ignoredChanged = isIgnored != existing.effectiveIsIgnored
+                val mhaChanged = mhaEligible != existing.effectiveMhaEligible
+
+                val anyFieldEdited = merchantChanged || amountChanged || dateChanged ||
+                    categoryChanged || transferChanged || ignoredChanged || mhaChanged
+
                 val updated = existing.copy(
-                    editedMerchant = merchant,
-                    editedMerchantSource = "user",
-                    editedAmountCents = amountCents,
-                    editedDate = date,
-                    editedCategoryId = categoryId,
-                    editedCategoryIdSource = "user",
-                    editedIsTransfer = isTransfer,
-                    editedIsTransferSource = "user",
-                    editedIsIgnored = isIgnored,
-                    editedIsIgnoredSource = "user",
-                    editedMhaEligible = mhaEligible,
-                    editedMhaEligibleSource = "user",
+                    editedMerchant = if (merchantChanged) merchant else existing.editedMerchant,
+                    editedMerchantSource = if (merchantChanged) "user" else existing.editedMerchantSource,
+                    editedAmountCents = if (amountChanged) amountCents else existing.editedAmountCents,
+                    editedDate = if (dateChanged) date else existing.editedDate,
+                    editedCategoryId = if (categoryChanged) categoryId else existing.editedCategoryId,
+                    editedCategoryIdSource = if (categoryChanged) "user" else existing.editedCategoryIdSource,
+                    editedIsTransfer = if (transferChanged) isTransfer else existing.editedIsTransfer,
+                    editedIsTransferSource = if (transferChanged) "user" else existing.editedIsTransferSource,
+                    editedIsIgnored = if (ignoredChanged) isIgnored else existing.editedIsIgnored,
+                    editedIsIgnoredSource = if (ignoredChanged) "user" else existing.editedIsIgnoredSource,
+                    editedMhaEligible = if (mhaChanged) mhaEligible else existing.editedMhaEligible,
+                    editedMhaEligibleSource = if (mhaChanged) "user" else existing.editedMhaEligibleSource,
                     notes = notes,
-                    editSource = EditSource.USER
+                    editSource = if (anyFieldEdited || existing.editSource == EditSource.USER) {
+                        EditSource.USER
+                    } else {
+                        existing.editSource
+                    }
                 )
                 repository.saveTransaction(updated)
             } else {

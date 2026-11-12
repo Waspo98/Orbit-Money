@@ -123,9 +123,13 @@ fun TransactionsScreen(
                 },
                 onResetToOriginal = { id -> viewModel.requestResetTransaction(id) },
                 onDelete = { id -> viewModel.setSingleDeleteConfirmId(id) },
-                onSplit = { id -> viewModel.openSplitSheet(id) },
+                onSplit = { id ->
+                    viewModel.closeTransactionEditor()
+                    viewModel.openSplitSheet(id)
+                },
                 onDismiss = { viewModel.closeTransactionEditor() },
                 onCreateRule = { txn ->
+                    viewModel.closeTransactionEditor()
                     viewModel.openCreateRuleModal(txn.id)
                 },
                 onMarkRecurring = { txn ->
