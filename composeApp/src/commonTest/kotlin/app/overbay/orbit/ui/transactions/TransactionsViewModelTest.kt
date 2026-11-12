@@ -507,4 +507,70 @@ class TransactionsViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testGroupedTransactions_monthCountReflectsTotalForMonthAcrossPagesAndFilters() = runTest(testDispatcher) {
+        val checking = Account(id = 1L, name = "Checking", type = AccountType.CHECKING)
+        repository.saveAccount(checking)
+
+        val novTransactions = (1..62).map { index ->
+            val day = ((index - 1) % 28 + 1).toString().padStart(2, '0')
+            Transaction(
+                id = index.toLong(),
+                accountId = 1L,
+                originalDate = "2026-11-$day",
+                originalMerchant = if (index <= 55) "Coffee $index" else "Payroll $index",
+                originalAmountCents = if (index <= 55) -500L else 100_000L
+            )
+        }
+        val octTransactions = (1..5).map { index ->
+            val day = index.toString().padStart(2, '0')
+            Transaction(
+                id = 100L + index,
+                accountId = 1L,
+                originalDate = "2026-10-$day",
+                originalMerchant = "Oct Merchant $index",
+                originalAmountCents = -1200L
+            )
+        }
+        repository.importTransactions(novTransactions + octTransactions, emptyList())
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        // Default pageSize = 50: Page 1 shows 50 items for 2026-11, but month count is 62 total
+        val page1 = viewModel.uiState.value
+        assertEquals(50, page1.pageSize)
+        assertEquals(1, page1.groupedTransactions.size)
+        assertEquals("2026-11", page1.groupedTransactions[0].monthKey)
+        assertEquals(50, page1.groupedTransactions[0].transactions.size)
+        assertEquals(62, page1.groupedTransactions[0].count)
+
+        // Page 2 shows remaining 12 items for 2026-11 (still count=62) and 5 items for 2026-10 (count=5)
+        viewModel.nextPage()
+        testScheduler.advanceUntilIdle()
+        val page2 = viewModel.uiState.value
+        assertEquals(2, page2.currentPage)
+        assertEquals(2, page2.groupedTransactions.size)
+        assertEquals("2026-11", page2.groupedTransactions[0].monthKey)
+        assertEquals(12, page2.groupedTransactions[0].transactions.size)
+        assertEquals(62, page2.groupedTransactions[0].count)
+        assertEquals("2026-10", page2.groupedTransactions[1].monthKey)
+        assertEquals(5, page2.groupedTransactions[1].transactions.size)
+        assertEquals(5, page2.groupedTransactions[1].count)
+
+        // Applying a filter should scope the month count to the filtered total across pages
+        viewModel.setCurrentPage(1)
+        viewModel.setQuickFilter(QuickFilter.EXPENSES)
+        testScheduler.advanceUntilIdle()
+        val filteredPage1 = viewModel.uiState.value
+        assertEquals(1, filteredPage1.groupedTransactions.size)
+        assertEquals("2026-11", filteredPage1.groupedTransactions[0].monthKey)
+        assertEquals(50, filteredPage1.groupedTransactions[0].transactions.size)
+        assertEquals(55, filteredPage1.groupedTransactions[0].count)
+
+        collectJob.cancel()
+    }
 }

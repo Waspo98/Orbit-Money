@@ -239,11 +239,13 @@ object TransactionsFilterHelper {
         }
 
         val displayList = if (pageSize <= 0) sorted else paginated
+        // Count per month from `sorted` (full filtered set across all pages) so month headers reflect total matches, not just the current page slice.
+        val totalCountsByMonth = sorted.groupingBy { it.effectiveDate.take(7) }.eachCount()
         val grouped = displayList.groupBy { it.effectiveDate.take(7) }.map { (monthKey, items) ->
             MonthTransactionGroup(
                 monthKey = monthKey,
                 monthLabel = LocalDateUtils.formatMonthLabel(monthKey),
-                count = items.size,
+                count = totalCountsByMonth[monthKey] ?: items.size,
                 transactions = items
             )
         }
