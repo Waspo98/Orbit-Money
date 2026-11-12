@@ -31,6 +31,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.MorphingPageHero
@@ -211,11 +212,16 @@ fun DashboardScreen(
                                 items = gridRows,
                                 key = { row -> "${row.leftCard.name}_${row.rightCard?.name ?: "single"}" }
                             ) { row ->
+                                val itemMod = Modifier.animateItem(
+                                    fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                    placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                    fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                )
                                 if (row.isFullSpan) {
-                                    DashboardCardItem(row.leftCard, uiState, onAction, onNavigate)
+                                    DashboardCardItem(row.leftCard, uiState, onAction, onNavigate, modifier = itemMod)
                                 } else {
                                     Row(
-                                        modifier = Modifier
+                                        modifier = itemMod
                                             .fillMaxWidth()
                                             .height(IntrinsicSize.Max),
                                         horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -259,7 +265,17 @@ fun DashboardScreen(
                                 key = { config -> config.type.name },
                                 contentType = { config -> config.type }
                             ) { config ->
-                                DashboardCardItem(config.type, uiState, onAction, onNavigate)
+                                DashboardCardItem(
+                                    cardType = config.type,
+                                    uiState = uiState,
+                                    onAction = onAction,
+                                    onNavigate = onNavigate,
+                                    modifier = Modifier.animateItem(
+                                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                    )
+                                )
                             }
                         }
                     }

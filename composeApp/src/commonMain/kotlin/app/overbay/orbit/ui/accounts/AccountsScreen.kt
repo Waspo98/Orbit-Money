@@ -1,21 +1,9 @@
 package app.overbay.orbit.ui.accounts
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -28,27 +16,14 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.accounts.cards.PerkUsageDialog
 import app.overbay.orbit.ui.accounts.components.AccountDetailInspectorPane
 import app.overbay.orbit.ui.accounts.components.AccountGroupSection
 import app.overbay.orbit.ui.accounts.sheets.AccountClosurePromptDialog
 import app.overbay.orbit.ui.accounts.sheets.AccountMergeDialog
 import app.overbay.orbit.ui.accounts.sheets.AddBalanceRecordDialog
-import app.overbay.orbit.ui.components.CanopyMenuAction
-import app.overbay.orbit.ui.components.CanopyMoreMenuButton
-import app.overbay.orbit.ui.components.CanopySettingsButton
-import app.overbay.orbit.ui.components.CanopySurfacePill
-import app.overbay.orbit.ui.components.MorphingPageHero
-import app.overbay.orbit.ui.components.OrbitAlertDialog
-import app.overbay.orbit.ui.components.OrbitConfirmationDialog
-import app.overbay.orbit.ui.components.OrbitDragHandle
-import app.overbay.orbit.ui.components.OrbitFloatingActionButton
-import app.overbay.orbit.ui.components.OrbitIcons
-import app.overbay.orbit.ui.components.OrbitModalSheet
-import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
-import app.overbay.orbit.ui.components.dragReorderItem
-import app.overbay.orbit.ui.components.rememberDragReorderState
-import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.*
 import app.overbay.orbit.ui.transactions.sheets.BrandLogoFinderDialog
 import app.overbay.orbit.util.LocalDevicePosture
 
@@ -366,10 +341,16 @@ private fun AccountsMasterContent(
                         { OrbitDragHandle(state = groupReorderState, key = group.category) }
                     } else null,
                     onMoveAccount = { from, to -> viewModel.moveAccountInGroup(group.category, from, to) },
-                    modifier = Modifier.dragReorderItem(
-                        state = if (state.isReorderMode) groupReorderState else null,
-                        key = group.category
-                    )
+                    modifier = Modifier
+                        .animateItem(
+                            fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                            placementSpec = if (state.isReorderMode) null else OrbitSprings.IntOffsetSpatialDefault,
+                            fadeOutSpec = OrbitSprings.FloatEffectsFast
+                        )
+                        .dragReorderItem(
+                            state = if (state.isReorderMode) groupReorderState else null,
+                            key = group.category
+                        )
                 )
             }
         }

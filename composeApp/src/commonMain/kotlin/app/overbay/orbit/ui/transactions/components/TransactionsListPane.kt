@@ -316,7 +316,12 @@ private fun TransactionsGroupedLazyList(
                     onResetCategory = { viewModel.resetCategory(txn.id) },
                     onFindLogo = { viewModel.openLogoFinder(txn.id) },
                     onUseCategoryIcon = { viewModel.useCategoryIconForTransaction(txn.id) },
-                    onReportLogoStatus = { key, status -> viewModel.reportMerchantLogoStatus(key, status) }
+                    onReportLogoStatus = { key, status -> viewModel.reportMerchantLogoStatus(key, status) },
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                    )
                 )
             }
         }

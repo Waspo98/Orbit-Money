@@ -1,8 +1,6 @@
 package app.overbay.orbit.ui.accounts.sheets
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -46,9 +44,11 @@ import app.overbay.orbit.domain.AccountClosureCandidate
 import app.overbay.orbit.domain.AccountClosureResolution
 import app.overbay.orbit.domain.ClosureReason
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.orbitTactilePress
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -293,19 +293,15 @@ private fun ClosureChoiceCard(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val colorSpring = spring<androidx.compose.ui.graphics.Color>(
-        dampingRatio = Spring.DampingRatioLowBouncy,
-        stiffness = Spring.StiffnessLow
-    )
     val container by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
         else MaterialTheme.colorScheme.surface,
-        animationSpec = colorSpring,
+        animationSpec = OrbitSprings.ColorEffectsDefault,
         label = "closureCardContainer"
     )
     val border by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder,
-        animationSpec = colorSpring,
+        animationSpec = OrbitSprings.ColorEffectsDefault,
         label = "closureCardBorder"
     )
 
@@ -315,7 +311,9 @@ private fun ClosureChoiceCard(
         shape = RoundedCornerShape(12.dp),
         color = container,
         border = BorderStroke(if (selected) 1.5.dp else 1.dp, border),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .orbitTactilePress(enabled = enabled)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),

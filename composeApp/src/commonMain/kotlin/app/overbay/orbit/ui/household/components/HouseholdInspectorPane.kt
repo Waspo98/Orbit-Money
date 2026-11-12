@@ -1,8 +1,6 @@
 package app.overbay.orbit.ui.household.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -40,6 +38,7 @@ import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.HouseholdRole
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.household.HouseholdCalculations
@@ -77,8 +76,8 @@ fun HouseholdInspectorPane(
         AnimatedContent(
             targetState = activeMode,
             transitionSpec = {
-                fadeIn(spring(stiffness = Spring.StiffnessLow)) togetherWith
-                    fadeOut(spring(stiffness = Spring.StiffnessLow))
+                fadeIn(OrbitSprings.FloatEffectsDefault) togetherWith
+                    fadeOut(OrbitSprings.FloatEffectsFast)
             },
             label = "HouseholdInspectorModeTransition"
         ) { mode ->

@@ -1,8 +1,5 @@
 package app.overbay.orbit.ui.mha.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,11 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -35,6 +29,8 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitExpandableChevron
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSwitchGroupCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
@@ -102,18 +98,14 @@ private fun AutoIncludeAccountsCard(
                 haptics.tick()
                 isExpanded = !isExpanded
             }) {
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                OrbitExpandableChevron(
+                    expanded = isExpanded,
                     contentDescription = if (isExpanded) "Collapse" else "Expand"
                 )
             }
         }
     ) {
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = androidx.compose.animation.expandVertically(spring(stiffness = Spring.StiffnessLow)),
-            exit = androidx.compose.animation.shrinkVertically(spring(stiffness = Spring.StiffnessLow))
-        ) {
+        OrbitAccordionVisibility(visible = isExpanded) {
             Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -196,18 +188,14 @@ private fun CategoryDefaultsCard(
                 haptics.tick()
                 isExpanded = !isExpanded
             }) {
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                OrbitExpandableChevron(
+                    expanded = isExpanded,
                     contentDescription = if (isExpanded) "Collapse" else "Expand"
                 )
             }
         }
     ) {
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = androidx.compose.animation.expandVertically(spring(stiffness = Spring.StiffnessLow)),
-            exit = androidx.compose.animation.shrinkVertically(spring(stiffness = Spring.StiffnessLow))
-        ) {
+        OrbitAccordionVisibility(visible = isExpanded) {
             Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),

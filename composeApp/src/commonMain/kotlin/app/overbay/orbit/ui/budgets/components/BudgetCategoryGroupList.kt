@@ -1,29 +1,12 @@
 package app.overbay.orbit.ui.budgets.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -42,12 +25,15 @@ import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
-import app.overbay.orbit.ui.components.OrbitBarSegment
-import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitBarSegment
+import app.overbay.orbit.ui.components.OrbitExpandableChevron
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.roundToInt
 
@@ -100,7 +86,12 @@ fun LazyListScope.budgetCategoryGroupItems(
                 onEditBudget = { onEditBudget(item) },
                 onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
                 onViewTransactions = { onViewTransactions(item.category.id) },
-                modifier = if (index == budgeted.lastIndex) Modifier.padding(bottom = 8.dp) else Modifier
+                modifier = (if (index == budgeted.lastIndex) Modifier.padding(bottom = 8.dp) else Modifier)
+                    .animateItem(
+                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                    )
             )
         }
     }
@@ -128,7 +119,12 @@ fun LazyListScope.budgetCategoryGroupItems(
                 onEditBudget = { onEditBudget(item) },
                 onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
                 onViewTransactions = { onViewTransactions(item.category.id) },
-                modifier = if (index == unbudgeted.lastIndex) Modifier.padding(bottom = 8.dp) else Modifier
+                modifier = (if (index == unbudgeted.lastIndex) Modifier.padding(bottom = 8.dp) else Modifier)
+                    .animateItem(
+                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                    )
             )
         }
     }
@@ -188,16 +184,11 @@ private fun InactiveBudgetCategoriesSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Icon(
-                    imageVector = if (showInactive) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
+                OrbitExpandableChevron(expanded = showInactive)
             }
         }
 
-        AnimatedVisibility(visible = showInactive) {
+        OrbitAccordionVisibility(visible = showInactive) {
             Column(
                 modifier = Modifier.padding(top = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)

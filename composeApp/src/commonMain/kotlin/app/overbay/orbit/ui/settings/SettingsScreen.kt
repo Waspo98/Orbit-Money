@@ -1,33 +1,21 @@
 package app.overbay.orbit.ui.settings
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,23 +28,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.StorageMode
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
-import app.overbay.orbit.ui.components.CanopyActionPillButton
-import app.overbay.orbit.ui.components.CanopyIconButton
-import app.overbay.orbit.ui.components.CanopySettingsButton
-import app.overbay.orbit.ui.components.CanopySurfacePill
-import app.overbay.orbit.ui.components.MorphingPageHero
-import app.overbay.orbit.ui.components.OrbitAlertDialog
-import app.overbay.orbit.ui.components.OrbitConfirmationDialog
-import app.overbay.orbit.ui.components.OrbitIcons
-import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.*
 import app.overbay.orbit.ui.settings.blocks.AboutSettingsBlock
-import app.overbay.orbit.ui.settings.dialogs.BackupExportDialog
-import app.overbay.orbit.ui.settings.dialogs.BackupRestoreDialog
-import app.overbay.orbit.ui.settings.dialogs.GoogleDriveClientIdDialog
-import app.overbay.orbit.ui.settings.dialogs.MigrateWorkspaceDialog
-import app.overbay.orbit.ui.settings.dialogs.PartnerInviteDialog
-import app.overbay.orbit.ui.settings.dialogs.RestorePreviewDialog
+import app.overbay.orbit.ui.settings.dialogs.*
 import app.overbay.orbit.ui.settings.subpages.DataManagementSubpageContent
 import app.overbay.orbit.ui.settings.subpages.PreferencesSubpageContent
 import app.overbay.orbit.util.BackHandler
@@ -171,63 +147,77 @@ fun SettingsScreen(
                 }
             )
 
-            LazyColumn(
+            AnimatedContent(
+                targetState = uiState.activeSubpage,
+                transitionSpec = {
+                    val entering = targetState != null && initialState == null
+                    val dir = if (entering) 1 else -1
+                    (slideInHorizontally(OrbitSprings.IntOffsetSpatialDefault) { dir * it / 4 } +
+                        fadeIn(OrbitSprings.FloatEffectsDefault)) togetherWith
+                        (slideOutHorizontally(OrbitSprings.IntOffsetSpatialDefault) { -dir * it / 4 } +
+                            fadeOut(OrbitSprings.FloatEffectsFast))
+                },
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                if (isHub) {
-                    // Settings Hub: Two Rich Subpage Cards + About Block
-                    item {
-                        SettingsHubCard(
-                            title = "Preferences",
-                            subtitle = "Theme & AMOLED pure black, push notifications, navigation customization, and biometric security",
-                            icon = OrbitIcons.Categories,
-                            onClick = { viewModel.setSubpage("preferences") }
-                        )
+                label = "settingsSubpageTransition"
+            ) { subpage ->
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (subpage == null) {
+                        // Settings Hub: Two Rich Subpage Cards + About Block
+                        item(key = "hub_preferences") {
+                            SettingsHubCard(
+                                title = "Preferences",
+                                subtitle = "Theme & AMOLED pure black, push notifications, navigation customization, and biometric security",
+                                icon = OrbitIcons.Categories,
+                                onClick = { viewModel.setSubpage("preferences") }
+                            )
+                        }
+
+                        item(key = "hub_data") {
+                            SettingsHubCard(
+                                title = "Data Management",
+                                subtitle = "Storage mode & server sync, SimpleFIN bank feeds, partner sharing, rules maintenance, and cloud backups",
+                                icon = OrbitIcons.Upcoming,
+                                onClick = { viewModel.setSubpage("data") }
+                            )
+                        }
+
+                        item(key = "hub_about") {
+                            AboutSettingsBlock(
+                                preferences = uiState.preferences,
+                                onReplayWalkthrough = {
+                                    viewModel.replayWalkthrough { onNavigate(OrbitNavKey.Onboarding) }
+                                },
+                                onDonateClick = { viewModel.setShowDonateDialog(true) },
+                                onSignOut = {
+                                    viewModel.logout()
+                                    onNavigate(OrbitNavKey.Login)
+                                }
+                            )
+                        }
+                    } else if (subpage == "preferences") {
+                        item(key = "subpage_preferences") {
+                            PreferencesSubpageContent(
+                                uiState = uiState,
+                                viewModel = viewModel
+                            )
+                        }
+                    } else if (subpage == "data") {
+                        item(key = "subpage_data") {
+                            DataManagementSubpageContent(
+                                uiState = uiState,
+                                viewModel = viewModel,
+                                onNavigate = onNavigate
+                            )
+                        }
                     }
 
-                    item {
-                        SettingsHubCard(
-                            title = "Data Management",
-                            subtitle = "Storage mode & server sync, SimpleFIN bank feeds, partner sharing, rules maintenance, and cloud backups",
-                            icon = OrbitIcons.Upcoming,
-                            onClick = { viewModel.setSubpage("data") }
-                        )
+                    item(key = "bottom_spacer") {
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
-
-                    item {
-                        AboutSettingsBlock(
-                            preferences = uiState.preferences,
-                            onReplayWalkthrough = {
-                                viewModel.replayWalkthrough { onNavigate(OrbitNavKey.Onboarding) }
-                            },
-                            onDonateClick = { viewModel.setShowDonateDialog(true) },
-                            onSignOut = {
-                                viewModel.logout()
-                                onNavigate(OrbitNavKey.Login)
-                            }
-                        )
-                    }
-                } else if (uiState.activeSubpage == "preferences") {
-                    item {
-                        PreferencesSubpageContent(
-                            uiState = uiState,
-                            viewModel = viewModel
-                        )
-                    }
-                } else if (uiState.activeSubpage == "data") {
-                    item {
-                        DataManagementSubpageContent(
-                            uiState = uiState,
-                            viewModel = viewModel,
-                            onNavigate = onNavigate
-                        )
-                    }
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }
@@ -320,7 +310,9 @@ private fun SettingsHubCard(
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .orbitTactilePress()
     ) {
         Row(
             modifier = Modifier

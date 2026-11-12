@@ -1,8 +1,6 @@
 package app.overbay.orbit.ui.rules.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -47,6 +45,7 @@ import app.overbay.orbit.data.model.RuleCondition
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.labelWithEmoji
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.rules.RulesUiState
 import app.overbay.orbit.ui.rules.sheets.RuleEditorContent
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -82,8 +81,8 @@ fun RuleDetailInspectorPane(
         AnimatedContent(
             targetState = activeMode,
             transitionSpec = {
-                fadeIn(spring(stiffness = Spring.StiffnessLow)) togetherWith
-                    fadeOut(spring(stiffness = Spring.StiffnessLow))
+                fadeIn(OrbitSprings.FloatEffectsDefault) togetherWith
+                    fadeOut(OrbitSprings.FloatEffectsFast)
             },
             label = "RuleInspectorModeTransition"
         ) { mode ->

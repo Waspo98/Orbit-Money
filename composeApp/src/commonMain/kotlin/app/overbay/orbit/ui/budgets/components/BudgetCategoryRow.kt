@@ -1,6 +1,6 @@
 package app.overbay.orbit.ui.budgets.components
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,9 +35,11 @@ import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -71,16 +74,24 @@ fun BudgetCategoryRow(
         else -> colors.income
     }
 
-    val rowBgColor = if (isInspected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val rowBorderColor = if (isInspected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
-    } else {
-        OrbitTheme.colors.cardBorder
-    }
+    val rowBgColor by animateColorAsState(
+        targetValue = if (isInspected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        animationSpec = OrbitSprings.ColorEffectsDefault,
+        label = "budgetRowBgColor"
+    )
+    val rowBorderColor by animateColorAsState(
+        targetValue = if (isInspected) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+        } else {
+            OrbitTheme.colors.cardBorder
+        },
+        animationSpec = OrbitSprings.ColorEffectsDefault,
+        label = "budgetRowBorderColor"
+    )
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -212,7 +223,7 @@ fun BudgetCategoryRow(
             }
 
             // Inline Expandable Detail Preview
-            AnimatedVisibility(visible = isExpanded) {
+            OrbitAccordionVisibility(visible = isExpanded) {
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                     modifier = Modifier.fillMaxWidth()

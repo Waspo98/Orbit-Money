@@ -1,31 +1,13 @@
 package app.overbay.orbit.ui.goals
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,26 +19,9 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.ui.components.CanopyMenuAction
-import app.overbay.orbit.ui.components.CanopyMoreMenuButton
-import app.overbay.orbit.ui.components.CanopySettingsButton
-import app.overbay.orbit.ui.components.CanopySurfacePill
-import app.overbay.orbit.ui.components.EmptyStateCard
-import app.overbay.orbit.ui.components.MorphingPageHero
-import app.overbay.orbit.ui.components.OrbitActionChip
-import app.overbay.orbit.ui.components.OrbitConfirmationDialog
-import app.overbay.orbit.ui.components.OrbitDragHandle
-import app.overbay.orbit.ui.components.OrbitFloatingActionButton
-import app.overbay.orbit.ui.components.OrbitIcons
-import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
-import app.overbay.orbit.ui.components.dragReorderItem
-import app.overbay.orbit.ui.components.rememberDragReorderState
-import app.overbay.orbit.ui.components.rememberHeroScrollState
-import app.overbay.orbit.ui.goals.components.GoalAccountsOverviewCard
-import app.overbay.orbit.ui.goals.components.GoalDetailInspectorPane
-import app.overbay.orbit.ui.goals.components.GoalHistoryAndImagineCard
-import app.overbay.orbit.ui.goals.components.GoalProgressCard
-import app.overbay.orbit.ui.goals.components.GoalTotalSavedBanner
+import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.components.*
+import app.overbay.orbit.ui.goals.components.*
 import app.overbay.orbit.ui.goals.dialogs.GoalEditorSheet
 import app.overbay.orbit.util.LocalDevicePosture
 import kotlin.math.roundToInt
@@ -285,16 +250,22 @@ fun GoalsScreen(
                                         dragHandle = if (state.isReorderMode) {
                                             { OrbitDragHandle(state = activeReorderState, key = goal.id) }
                                         } else null,
-                                        modifier = Modifier.dragReorderItem(
-                                            state = if (state.isReorderMode) activeReorderState else null,
-                                            key = goal.id
-                                        )
+                                        modifier = Modifier
+                                            .animateItem(
+                                                fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                                placementSpec = if (state.isReorderMode) null else OrbitSprings.IntOffsetSpatialDefault,
+                                                fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                            )
+                                            .dragReorderItem(
+                                                state = if (state.isReorderMode) activeReorderState else null,
+                                                key = goal.id
+                                            )
                                     )
                                 }
                             }
 
                             if (state.completedGoals.isNotEmpty()) {
-                                item {
+                                item(key = "completed_goals_header") {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = "Completed Goals (${state.completedGoals.size})",
@@ -316,10 +287,16 @@ fun GoalsScreen(
                                         dragHandle = if (state.isReorderMode) {
                                             { OrbitDragHandle(state = completedReorderState, key = goal.id) }
                                         } else null,
-                                        modifier = Modifier.dragReorderItem(
-                                            state = if (state.isReorderMode) completedReorderState else null,
-                                            key = goal.id
-                                        )
+                                        modifier = Modifier
+                                            .animateItem(
+                                                fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                                placementSpec = if (state.isReorderMode) null else OrbitSprings.IntOffsetSpatialDefault,
+                                                fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                            )
+                                            .dragReorderItem(
+                                                state = if (state.isReorderMode) completedReorderState else null,
+                                                key = goal.id
+                                            )
                                     )
                                 }
                             }

@@ -1,6 +1,5 @@
 package app.overbay.orbit.ui.accounts.sheets
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +23,7 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.accounts.cards.CardEditorDraft
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSwitchGroupCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
@@ -168,7 +168,7 @@ fun AccountEditorBillingSection(
                     showContainer = false
                 )
 
-                AnimatedVisibility(visible = state.hasPromo) {
+                OrbitAccordionVisibility(visible = state.hasPromo) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -209,7 +209,7 @@ fun AccountEditorBillingSection(
                     showContainer = false
                 )
 
-                AnimatedVisibility(visible = state.hasAnnualFee) {
+                OrbitAccordionVisibility(visible = state.hasAnnualFee) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

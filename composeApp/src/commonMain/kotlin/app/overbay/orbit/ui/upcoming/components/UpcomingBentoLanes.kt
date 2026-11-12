@@ -63,7 +63,8 @@ fun UpcomingLaneCard(
     inspectingItemId: Long?,
     onItemClick: (UpcomingItem) -> Unit,
     onMarkPaid: (UpcomingItem) -> Unit,
-    onAddClick: (UpcomingKind) -> Unit
+    onAddClick: (UpcomingKind) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val colors = OrbitTheme.colors
     val totalCents = items.sumOf { projectedAmounts[it.id]?.amountCents ?: it.amountCents }
@@ -83,7 +84,7 @@ fun UpcomingLaneCard(
                 color = laneColor
             )
         },
-        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+        modifier = modifier.fillMaxWidth().padding(bottom = 6.dp)
     ) {
         if (items.isEmpty()) {
             Row(
@@ -129,7 +130,8 @@ fun UpcomingCandidateRow(
     category: Category?,
     accountName: String?,
     onReview: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
     val relDue = LocalDateUtils.formatRelativeDueLabel(candidate.nextProjectedDate)
@@ -138,7 +140,7 @@ fun UpcomingCandidateRow(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
             Row(

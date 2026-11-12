@@ -17,10 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -42,7 +38,9 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitCompactListRow
+import app.overbay.orbit.ui.components.OrbitExpandableChevron
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.dashboard.DashboardRecentTransactionItem
@@ -301,11 +299,9 @@ fun RecentTransactionsCard(
                                 },
                                 modifier = Modifier.size(28.dp)
                             ) {
-                                Icon(
-                                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Quick actions",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
+                                OrbitExpandableChevron(
+                                    expanded = isExpanded,
+                                    contentDescription = "Quick actions"
                                 )
                             }
                         },
@@ -315,7 +311,7 @@ fun RecentTransactionsCard(
                         }
                     )
 
-                    if (isExpanded) {
+                    OrbitAccordionVisibility(visible = isExpanded) {
                         RecentTransactionQuickActionsRow(
                             transaction = txn,
                             mhaEnabled = mhaEnabled,

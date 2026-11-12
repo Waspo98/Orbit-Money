@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.upcoming.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +26,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +44,7 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.ProjectedAmountResult
 import app.overbay.orbit.domain.UpcomingScheduleHelper
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
@@ -87,7 +90,12 @@ fun LazyListScope.upcomingTimelineItems(
                     category = candidate.suggestedCategoryId?.let { categoryMap[it] },
                     accountName = candidate.suggestedAccountId?.let { accountMap[it]?.name },
                     onReview = { onReviewCandidate(candidate) },
-                    onDismiss = { onDismissCandidate(candidate.merchant) }
+                    onDismiss = { onDismissCandidate(candidate.merchant) },
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                    )
                 )
             }
         }
@@ -119,7 +127,12 @@ fun LazyListScope.upcomingTimelineItems(
                     inspectingItemId = inspectingItemId,
                     onItemClick = onItemClick,
                     onMarkPaid = onMarkPaid,
-                    onAddClick = onAddClick
+                    onAddClick = onAddClick,
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                    )
                 )
             }
         }
@@ -148,7 +161,12 @@ fun LazyListScope.upcomingTimelineItems(
                 projected = projectedAmounts[item.id],
                 isInspected = item.id == inspectingItemId,
                 onClick = { onItemClick(item) },
-                onMarkPaid = { onMarkPaid(item) }
+                onMarkPaid = { onMarkPaid(item) },
+                modifier = Modifier.animateItem(
+                    fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                    placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                    fadeOutSpec = OrbitSprings.FloatEffectsFast
+                )
             )
         }
     }
@@ -162,7 +180,8 @@ fun UpcomingItemRow(
     projected: ProjectedAmountResult?,
     onClick: () -> Unit,
     onMarkPaid: () -> Unit,
-    isInspected: Boolean = false
+    isInspected: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
     val isExpense = item.direction.lowercase() != "income"
@@ -171,23 +190,31 @@ fun UpcomingItemRow(
     val catColor = category?.color.toComposeColor(MaterialTheme.colorScheme.primary)
     val relDue = LocalDateUtils.formatRelativeDueLabel(item.nextDate)
 
-    val rowBgColor = if (isInspected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val rowBorderColor = if (isInspected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-    }
+    val rowBgColor by animateColorAsState(
+        targetValue = if (isInspected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        animationSpec = OrbitSprings.ColorEffectsDefault,
+        label = "upcomingRowBgColor"
+    )
+    val rowBorderColor by animateColorAsState(
+        targetValue = if (isInspected) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+        } else {
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+        },
+        animationSpec = OrbitSprings.ColorEffectsDefault,
+        label = "upcomingRowBorderColor"
+    )
 
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = rowBgColor,
         border = BorderStroke(if (isInspected) 1.5.dp else 1.dp, rowBorderColor),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier

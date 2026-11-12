@@ -1,6 +1,5 @@
 package app.overbay.orbit.ui.accounts.cards
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -30,6 +29,7 @@ import app.overbay.orbit.data.model.RewardCategory
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitFieldLabel
 import app.overbay.orbit.ui.components.OrbitModalFooter
 import app.overbay.orbit.ui.components.OrbitSectionCard
@@ -192,7 +192,7 @@ fun RewardEditorSubform(
                     showContainer = false
                 )
 
-                AnimatedVisibility(visible = hasCap) {
+                OrbitAccordionVisibility(visible = hasCap) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()

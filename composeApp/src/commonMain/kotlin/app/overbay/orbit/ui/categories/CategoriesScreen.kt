@@ -229,10 +229,16 @@ fun CategoriesScreen(
                                         } else null,
                                         onMoveCategory = { from, to -> viewModel.moveCategoryInGroup(group.title, from, to) },
                                         showMhaBadge = state.mhaEnabled,
-                                        modifier = Modifier.dragReorderItem(
-                                            state = if (state.isReorderMode) groupReorderState else null,
-                                            key = group.title
-                                        )
+                                        modifier = Modifier
+                                            .animateItem(
+                                                fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                                placementSpec = if (state.isReorderMode) null else OrbitSprings.IntOffsetSpatialDefault,
+                                                fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                            )
+                                            .dragReorderItem(
+                                                state = if (state.isReorderMode) groupReorderState else null,
+                                                key = group.title
+                                            )
                                     )
                                 }
                             }

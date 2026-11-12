@@ -1,8 +1,6 @@
 package app.overbay.orbit.ui.accounts.cards
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -28,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.CreditCardTemplates
 import app.overbay.orbit.theme.CardArtPalette
+import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.components.orbitTactilePress
 
 /**
  * Fixed-aspect-ratio (1.586f) credit card visual plate used in Card Wallet rows and
@@ -52,12 +52,12 @@ fun CardVisualPlate(
         fallbackEnd = MaterialTheme.colorScheme.tertiary,
         fallbackText = MaterialTheme.colorScheme.onPrimary
     )
-    val startColor by animateColorAsState(targetStart, spring(stiffness = Spring.StiffnessLow), label = "plateStart")
-    val endColor by animateColorAsState(targetEnd, spring(stiffness = Spring.StiffnessLow), label = "plateEnd")
-    val textColor by animateColorAsState(targetText, spring(stiffness = Spring.StiffnessLow), label = "plateText")
+    val startColor by animateColorAsState(targetStart, OrbitSprings.ColorEffectsDefault, label = "plateStart")
+    val endColor by animateColorAsState(targetEnd, OrbitSprings.ColorEffectsDefault, label = "plateEnd")
+    val textColor by animateColorAsState(targetText, OrbitSprings.ColorEffectsDefault, label = "plateText")
 
     Surface(
-        modifier = modifier,
+        modifier = modifier.orbitTactilePress(),
         shape = RoundedCornerShape(10.dp),
         shadowElevation = 3.dp,
         border = BorderStroke(1.dp, textColor.copy(alpha = 0.2f))

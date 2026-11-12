@@ -1,45 +1,18 @@
 package app.overbay.orbit.ui.mha
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -47,12 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.LocalDateUtils
-import app.overbay.orbit.ui.components.CanopyIconButton
-import app.overbay.orbit.ui.components.CanopySettingsButton
-import app.overbay.orbit.ui.components.MorphingPageHero
-import app.overbay.orbit.ui.components.OrbitIcons
-import app.overbay.orbit.ui.components.PeriodNavigatorPill
-import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.components.*
 import app.overbay.orbit.ui.mha.components.MhaAutoDefaultsSection
 import app.overbay.orbit.ui.mha.components.MhaTaxSavingsCard
 import app.overbay.orbit.ui.mha.components.MhaTransactionsTab
@@ -165,24 +134,15 @@ fun MhaTrackerScreen(
                     }
                 )
 
-                SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
-                ) {
-                    SegmentedButton(
-                        selected = state.activeScreenTab == MhaScreenTab.TRACKER,
-                        onClick = { viewModel.setActiveScreenTab(MhaScreenTab.TRACKER) },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) {
-                        Text("Tracker & Expenses")
-                    }
-                    SegmentedButton(
-                        selected = state.activeScreenTab == MhaScreenTab.DEFAULTS,
-                        onClick = { viewModel.setActiveScreenTab(MhaScreenTab.DEFAULTS) },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) {
-                        Text("Auto-Defaults")
-                    }
-                }
+                OrbitSegmentedTabRow(
+                    items = MhaScreenTab.entries,
+                    selected = state.activeScreenTab,
+                    onSelect = { viewModel.setActiveScreenTab(it) },
+                    label = { tab ->
+                        if (tab == MhaScreenTab.TRACKER) "Tracker & Expenses" else "Auto-Defaults"
+                    },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                )
 
                 val summaryCards: LazyListScope.() -> Unit = {
                     item {
@@ -199,37 +159,24 @@ fun MhaTrackerScreen(
                     }
                 }
 
-                if (state.activeScreenTab == MhaScreenTab.DEFAULTS) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        item {
-                            MhaAutoDefaultsSection(
-                                accounts = state.accounts,
-                                categories = state.categories,
-                                onToggleAccountDefault = viewModel::setMhaAccountDefault,
-                                onToggleCategoryDefault = viewModel::setMhaCategoryDefault,
-                                onToggleCategoryIgnoreDefault = viewModel::setMhaCategoryIgnoreDefault
-                            )
-                        }
-                    }
-                } else if (isTwoPane) {
-                    // Foldable / Tablet / Wide Two-Pane Split
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        // Left Pane: Summary Card + Auto Defaults
+                AnimatedContent(
+                    targetState = state.activeScreenTab,
+                    transitionSpec = {
+                        val dir = if (targetState.ordinal >= initialState.ordinal) 1 else -1
+                        (slideInHorizontally(OrbitSprings.IntOffsetSpatialDefault) { dir * it / 4 } +
+                            fadeIn(OrbitSprings.FloatEffectsDefault)) togetherWith
+                            (slideOutHorizontally(OrbitSprings.IntOffsetSpatialDefault) { -dir * it / 4 } +
+                                fadeOut(OrbitSprings.FloatEffectsFast))
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    label = "MhaScreenTabTransition"
+                ) { activeTab ->
+                    if (activeTab == MhaScreenTab.DEFAULTS) {
                         LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(bottom = 32.dp),
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            summaryCards()
                             item {
                                 MhaAutoDefaultsSection(
                                     accounts = state.accounts,
@@ -240,83 +187,109 @@ fun MhaTrackerScreen(
                                 )
                             }
                         }
-
-                        // Right Pane: Morphs between Transaction Review Queue and MHA Settings Content
-                        AnimatedContent(
-                            targetState = state.showConfigSheet,
-                            transitionSpec = {
-                                fadeIn(spring(stiffness = Spring.StiffnessLow)) togetherWith
-                                    fadeOut(spring(stiffness = Spring.StiffnessLow))
-                            },
-                            modifier = Modifier.weight(1.2f).fillMaxSize(),
-                            label = "MhaRightPaneMorph"
-                        ) { showConfig ->
-                            if (showConfig) {
-                                Surface(
-                                    shape = RoundedCornerShape(24.dp),
-                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    MhaConfigContent(
-                                        taxProfile = state.taxProfile,
-                                        designatedCapCents = state.designatedCapCents,
-                                        fairMarketRentalValueCents = state.fairMarketRentalValueCents,
-                                        mhaEnabled = state.mhaEnabled,
-                                        onToggleMhaEnabled = { viewModel.setMhaEnabled(it) },
-                                        onDismiss = { viewModel.closeConfigSheet() },
-                                        onSave = { updatedProfile, cap, fmrv ->
-                                            viewModel.updateMhaConfig(cap, fmrv, updatedProfile)
-                                        }
-                                    )
-                                }
-                            } else {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    MhaTransactionsTab(
-                                        transactions = state.visibleTransactions,
-                                        selectedTab = state.selectedTabFilter,
-                                        eligibleCount = state.eligibleTransactions.size,
-                                        reviewQueueCount = state.reviewQueueTransactions.size,
-                                        allCount = state.allYearOutflows.size,
-                                        searchQuery = viewModel.searchQueryInput,
-                                        onTabChange = { viewModel.setTabFilter(it) },
-                                        onSearchChange = { viewModel.setSearchQuery(it) },
-                                        onToggleEligible = { id, current -> viewModel.toggleTransactionEligibility(id, current) },
-                                        onResetEligible = { id -> viewModel.resetTransactionMhaOverride(id) },
-                                        onIgnoreFromBudget = { id, ignored -> viewModel.setTransactionIgnored(id, ignored) },
-                                        onInspectTransaction = { id -> onNavigate(OrbitNavKey.Transactions(transactionId = id)) }
+                    } else if (isTwoPane) {
+                        // Foldable / Tablet / Wide Two-Pane Split
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            // Left Pane: Summary Card + Auto Defaults
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(bottom = 32.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                summaryCards()
+                                item {
+                                    MhaAutoDefaultsSection(
+                                        accounts = state.accounts,
+                                        categories = state.categories,
+                                        onToggleAccountDefault = viewModel::setMhaAccountDefault,
+                                        onToggleCategoryDefault = viewModel::setMhaCategoryDefault,
+                                        onToggleCategoryIgnoreDefault = viewModel::setMhaCategoryIgnoreDefault
                                     )
                                 }
                             }
-                        }
-                    }
-                } else {
-                    // Compact Mobile Single-Column Scroll
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        summaryCards()
 
-                        item {
-                            MhaTransactionsTab(
-                                transactions = state.visibleTransactions,
-                                selectedTab = state.selectedTabFilter,
-                                eligibleCount = state.eligibleTransactions.size,
-                                reviewQueueCount = state.reviewQueueTransactions.size,
-                                allCount = state.allYearOutflows.size,
-                                searchQuery = viewModel.searchQueryInput,
-                                onTabChange = { viewModel.setTabFilter(it) },
-                                onSearchChange = { viewModel.setSearchQuery(it) },
-                                onToggleEligible = { id, current -> viewModel.toggleTransactionEligibility(id, current) },
-                                onResetEligible = { id -> viewModel.resetTransactionMhaOverride(id) },
-                                onIgnoreFromBudget = { id, ignored -> viewModel.setTransactionIgnored(id, ignored) },
-                                onInspectTransaction = { id -> onNavigate(OrbitNavKey.Transactions(transactionId = id)) }
-                            )
+                            // Right Pane: Morphs between Transaction Review Queue and MHA Settings Content
+                            AnimatedContent(
+                                targetState = state.showConfigSheet,
+                                transitionSpec = {
+                                    fadeIn(OrbitSprings.FloatEffectsDefault) togetherWith
+                                        fadeOut(OrbitSprings.FloatEffectsFast)
+                                },
+                                modifier = Modifier.weight(1.2f).fillMaxSize(),
+                                label = "MhaRightPaneMorph"
+                            ) { showConfig ->
+                                if (showConfig) {
+                                    Surface(
+                                        shape = RoundedCornerShape(24.dp),
+                                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        MhaConfigContent(
+                                            taxProfile = state.taxProfile,
+                                            designatedCapCents = state.designatedCapCents,
+                                            fairMarketRentalValueCents = state.fairMarketRentalValueCents,
+                                            mhaEnabled = state.mhaEnabled,
+                                            onToggleMhaEnabled = { viewModel.setMhaEnabled(it) },
+                                            onDismiss = { viewModel.closeConfigSheet() },
+                                            onSave = { updatedProfile, cap, fmrv ->
+                                                viewModel.updateMhaConfig(cap, fmrv, updatedProfile)
+                                            }
+                                        )
+                                    }
+                                } else {
+                                    Column(
+                                        modifier = Modifier.fillMaxSize(),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        MhaTransactionsTab(
+                                            transactions = state.visibleTransactions,
+                                            selectedTab = state.selectedTabFilter,
+                                            eligibleCount = state.eligibleTransactions.size,
+                                            reviewQueueCount = state.reviewQueueTransactions.size,
+                                            allCount = state.allYearOutflows.size,
+                                            searchQuery = viewModel.searchQueryInput,
+                                            onTabChange = { viewModel.setTabFilter(it) },
+                                            onSearchChange = { viewModel.setSearchQuery(it) },
+                                            onToggleEligible = { id, current -> viewModel.toggleTransactionEligibility(id, current) },
+                                            onResetEligible = { id -> viewModel.resetTransactionMhaOverride(id) },
+                                            onIgnoreFromBudget = { id, ignored -> viewModel.setTransactionIgnored(id, ignored) },
+                                            onInspectTransaction = { id -> onNavigate(OrbitNavKey.Transactions(transactionId = id)) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Compact Mobile Single-Column Scroll
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            summaryCards()
+
+                            item {
+                                MhaTransactionsTab(
+                                    transactions = state.visibleTransactions,
+                                    selectedTab = state.selectedTabFilter,
+                                    eligibleCount = state.eligibleTransactions.size,
+                                    reviewQueueCount = state.reviewQueueTransactions.size,
+                                    allCount = state.allYearOutflows.size,
+                                    searchQuery = viewModel.searchQueryInput,
+                                    onTabChange = { viewModel.setTabFilter(it) },
+                                    onSearchChange = { viewModel.setSearchQuery(it) },
+                                    onToggleEligible = { id, current -> viewModel.toggleTransactionEligibility(id, current) },
+                                    onResetEligible = { id -> viewModel.resetTransactionMhaOverride(id) },
+                                    onIgnoreFromBudget = { id, ignored -> viewModel.setTransactionIgnored(id, ignored) },
+                                    onInspectTransaction = { id -> onNavigate(OrbitNavKey.Transactions(transactionId = id)) }
+                                )
+                            }
                         }
                     }
                 }

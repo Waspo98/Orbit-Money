@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.components.CanopyActionPillButton
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
@@ -229,7 +230,12 @@ fun RulesScreen(
                                             },
                                             onToggleEnabled = { enabled -> viewModel.toggleRuleEnabled(rule.id, enabled) },
                                             onEdit = { viewModel.openEditRule(rule) },
-                                            onDelete = { viewModel.requestDeleteRule(rule.id) }
+                                            onDelete = { viewModel.requestDeleteRule(rule.id) },
+                                            modifier = Modifier.animateItem(
+                                                fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                                placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                                fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                            )
                                         )
                                     }
 

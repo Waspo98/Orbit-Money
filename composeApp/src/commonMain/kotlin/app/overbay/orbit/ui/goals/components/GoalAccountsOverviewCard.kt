@@ -1,6 +1,5 @@
 package app.overbay.orbit.ui.goals.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,7 +30,9 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitBarSegment
+import app.overbay.orbit.ui.components.OrbitExpandableChevron
 import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
@@ -117,13 +118,23 @@ fun GoalAccountsOverviewCard(
                         }
                     }
                     Surface(shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                        Text(
-                            text = if (isExpanded) "Hide Details ▲" else "View Details ▼",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = if (isExpanded) "Hide Details" else "View Details",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            OrbitExpandableChevron(
+                                expanded = isExpanded,
+                                size = 14.dp,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
@@ -279,7 +290,7 @@ private fun AccountSummaryRow(
             }
 
             // Detailed Goals Breakdown
-            AnimatedVisibility(visible = isDetailsVisible) {
+            OrbitAccordionVisibility(visible = isDetailsVisible) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
