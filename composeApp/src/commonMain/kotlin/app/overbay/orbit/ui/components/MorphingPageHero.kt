@@ -18,7 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -29,6 +31,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -40,10 +43,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private class CoordinatesHolder {
     var value: LayoutCoordinates? = null
+    var rootX by mutableFloatStateOf(0f)
 }
 
 private class HeroMetricsHolder(
@@ -266,8 +271,20 @@ fun MorphingPageHero(
             elevationPxProvider = { (scrollState?.collapseFraction ?: 0f) * maxElevationPx },
             coordinator = canopyCoordinator,
             screenKeyId = canopyScreenKeyId,
-            getHeroCoordinates = { heroCoordinates.value },
-            setHeroCoordinates = { heroCoordinates.value = it }
+            getHeroCoordinates = {
+                // Subscribe the Draw phase to rootX so late slide settlement invalidates draw
+                // without triggering recomposition.
+                @Suppress("UNUSED_VARIABLE")
+                val trackedRootX = heroCoordinates.rootX
+                heroCoordinates.value
+            },
+            setHeroCoordinates = { coords ->
+                heroCoordinates.value = coords
+                val rootX = coords.positionInRoot().x
+                if (abs(rootX - heroCoordinates.rootX) > 0.01f) {
+                    heroCoordinates.rootX = rootX
+                }
+            }
         )
     ) {
         Layout(

@@ -1,6 +1,8 @@
 package app.overbay.orbit
 
 import app.overbay.orbit.ui.components.CanopyTransitionCoordinator
+import app.overbay.orbit.ui.components.canopyBackdropFillSize
+import app.overbay.orbit.ui.components.canopyBackdropFillTopLeft
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -160,5 +162,29 @@ class NavigationTransitionTest {
         assertEquals(520, coordinator.resolveDisplayHeightPx(screenKeyId = 0, naturalHeightPx = 180))
         assertEquals(520, coordinator.resolveDisplayHeightPx(screenKeyId = 1, naturalHeightPx = 520))
         assertTrue(!coordinator.isTransitioning)
+    }
+
+    @Test
+    fun `canopy backdrop fill bounds cover full local width for negative zero and positive slide offsets`() {
+        val width = 1080f
+        val height = 420f
+        val offsets = listOf(-1080f, -10.5f, -0.5f, 0f, 0.5f, 10.5f, 1080f)
+
+        offsets.forEach { slideOffsetX ->
+            val topLeft = canopyBackdropFillTopLeft(slideOffsetX)
+            val fillSize = canopyBackdropFillSize(width, height)
+            val localLeft = -slideOffsetX + topLeft.x
+            val localRight = localLeft + fillSize.width
+
+            assertTrue(localLeft <= 0f, "Left edge gap for slideOffsetX=$slideOffsetX: localLeft=$localLeft")
+            assertTrue(localRight >= width, "Right edge gap for slideOffsetX=$slideOffsetX: localRight=$localRight")
+            assertEquals(0f, topLeft.y)
+            assertEquals(height, fillSize.height)
+        }
+    }
+
+    @Test
+    fun `canopy transition threshold stays sub-pixel relative to IntOffset slide settling`() {
+        assertTrue(CanopyTransitionCoordinator.CANOPY_TRANSITION_THRESHOLD < 1f / 1080f)
     }
 }

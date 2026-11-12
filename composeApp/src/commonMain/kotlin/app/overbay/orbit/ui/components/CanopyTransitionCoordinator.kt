@@ -43,8 +43,14 @@ import androidx.compose.ui.util.lerp
 @Stable
 class CanopyTransitionCoordinator(initialKeyId: Any) {
     private val knownNaturalHeights = HashMap<Any, Int>()
-    private val transitionAnimatable = Animatable(1f)
+    // Use a sub-pixel visibility threshold (~0.5px on a 1000px screen) so the canopy
+    // coordinator doesn't terminate ~100ms ahead of AnimatedContent's 1px IntOffset slide.
+    private val transitionAnimatable = Animatable(1f, visibilityThreshold = CANOPY_TRANSITION_THRESHOLD)
     private var interruptedHeightVelocityPxPerSec: Float = 0f
+
+    companion object {
+        internal const val CANOPY_TRANSITION_THRESHOLD = 0.0005f
+    }
 
     var activeKeyId: Any = initialKeyId
         private set
@@ -109,7 +115,8 @@ class CanopyTransitionCoordinator(initialKeyId: Any) {
                 initialVelocity = normalizedVelocity,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = 650f
+                    stiffness = 650f,
+                    visibilityThreshold = CANOPY_TRANSITION_THRESHOLD
                 )
             ) {
                 updateTransitionFraction(value)
@@ -153,6 +160,17 @@ fun rememberCanopyTransitionCoordinator(currentKeyId: Any): CanopyTransitionCoor
     }
     return coordinator
 }
+
+/**
+ * Computes the `topLeft` offset inside a canvas translated by `(-slideOffsetX, 0)` so the drawn
+ * backdrop covers local `[0, width]` with 1px horizontal bleed inside `clipRect`.
+ */
+internal fun canopyBackdropFillTopLeft(slideOffsetX: Float): Offset = Offset(slideOffsetX - 1f, 0f)
+
+/**
+ * Computes the fill size paired with [canopyBackdropFillTopLeft] inside `clipRect`.
+ */
+internal fun canopyBackdropFillSize(width: Float, height: Float): Size = Size(width + 2f, height)
 
 fun Modifier.stationaryCanopyBackdrop(
     canopyStart: Color,
@@ -208,11 +226,15 @@ fun Modifier.stationaryCanopyBackdrop(
                     radius = (totalW * 0.7f).coerceAtLeast(100f)
                 )
             }
-            val backdropSize = Size(totalW.coerceAtLeast(size.width), size.height)
+            // Keep the fill anchored to local [0..size.width] (with 1px bleed inside clipRect)
+            // inside the translated canvas so only the gradient shader offsets horizontally and
+            // neither edge can ever be left unpainted for any slideOffsetX.
+            val fillTopLeft = canopyBackdropFillTopLeft(slideOffsetX)
+            val fillSize = canopyBackdropFillSize(size.width, size.height)
             clipRect {
                 withTransform({ translate(left = -slideOffsetX, top = 0f) }) {
-                    drawRect(brush = cachedLinearBrush!!, topLeft = Offset.Zero, size = backdropSize)
-                    drawRect(brush = cachedRadialBrush!!, topLeft = Offset.Zero, size = backdropSize)
+                    drawRect(brush = cachedLinearBrush!!, topLeft = fillTopLeft, size = fillSize)
+                    drawRect(brush = cachedRadialBrush!!, topLeft = fillTopLeft, size = fillSize)
                 }
             }
             val h = size.height
