@@ -1,118 +1,62 @@
 package app.overbay.orbit.ui.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.layout.*
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.*
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import kotlin.math.abs
 import kotlin.math.roundToInt
-
-/**
- * Scroll state for [MorphingPageHero] implementing ExitUntilCollapsed physics,
- * smooth spring snapping to collapsed or expanded state, and scroll-direction FAB visibility.
- */
-class HeroScrollState(
-    initialMaxHeightPx: Float,
-    val minHeightPx: Float,
-    private val coroutineScope: CoroutineScope
-) {
-    var maxHeightPx: Float = initialMaxHeightPx
-    var scrollOffsetPx by mutableFloatStateOf(0f)
-    var isFabVisible by mutableStateOf(true)
-    var scrollEnabled by mutableStateOf(true)
-
-    val maxCollapsePx: Float get() = (maxHeightPx - minHeightPx).coerceAtLeast(0f)
-    val collapseFraction: Float get() = if (maxCollapsePx > 0f) (scrollOffsetPx / maxCollapsePx).coerceIn(0f, 1f) else 0f
-
-    val nestedScrollConnection = object : NestedScrollConnection {
-        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            if (!scrollEnabled) return Offset.Zero
-            if (available.y < -2f) isFabVisible = false else if (available.y > 2f) isFabVisible = true
-            if (available.y < 0f && scrollOffsetPx < maxCollapsePx) {
-                val newOffset = (scrollOffsetPx - available.y).coerceIn(0f, maxCollapsePx)
-                val consumedY = scrollOffsetPx - newOffset
-                scrollOffsetPx = newOffset
-                return Offset(0f, consumedY)
-            }
-            return Offset.Zero
-        }
-
-        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-            if (!scrollEnabled) return Offset.Zero
-            if (available.y > 0f && scrollOffsetPx > 0f) {
-                val newOffset = (scrollOffsetPx - available.y).coerceIn(0f, maxCollapsePx)
-                val consumedY = scrollOffsetPx - newOffset
-                scrollOffsetPx = newOffset
-                if (scrollOffsetPx <= 1f) isFabVisible = true
-                return Offset(0f, consumedY)
-            }
-            return Offset.Zero
-        }
-
-        override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-            if (scrollEnabled && collapseFraction in 0.01f..0.99f) {
-                val target = if (collapseFraction < 0.5f) 0f else maxCollapsePx
-                coroutineScope.launch { animateTo(target) }
-            }
-            return super.onPostFling(consumed, available)
-        }
-    }
-
-    suspend fun animateTo(target: Float) {
-        Animatable(scrollOffsetPx).animateTo(
-            targetValue = target,
-            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)
-        ) { scrollOffsetPx = value }
-    }
-
-    suspend fun expand() { isFabVisible = true; animateTo(0f) }
-    suspend fun collapse() = animateTo(maxCollapsePx)
-
-    fun updateMaxHeight(newMaxPx: Float) {
-        val coerced = newMaxPx.coerceAtLeast(minHeightPx)
-        if (abs(coerced - maxHeightPx) > 1f) {
-            maxHeightPx = coerced
-            scrollOffsetPx = scrollOffsetPx.coerceIn(0f, maxCollapsePx)
-        }
-    }
-}
-
-@Composable
-fun rememberHeroScrollState(maxHeight: Dp = 112.dp, minHeight: Dp = 56.dp): HeroScrollState {
-    val density = LocalDensity.current
-    val maxPx = with(density) { maxHeight.toPx() }
-    val minPx = with(density) { minHeight.toPx() }
-    val scope = rememberCoroutineScope()
-    return remember(minPx) { HeroScrollState(maxPx, minPx, scope) }
-}
 
 private class CoordinatesHolder {
     var value: LayoutCoordinates? = null
 }
 
+private class HeroMetricsHolder(
+    var textBlockHeightPx: Float,
+    var titleTopInColumnPx: Float,
+    var titleHeightPx: Float,
+    var rawTitleWidthPx: Float
+)
+
 /**
  * Edge-to-edge flat emerald canopy header that draws seamlessly behind the system status bar.
- * Features a single continuous morphing title (30sp expanded -> 17.5–21sp left-anchored collapsed)
- * that scales and glides into the 56dp compact bar on GPU graphicsLayer, plus 2-axis morphing toolbars.
+ * Isolates scroll-driven morphing strictly to Compose's Layout and Draw/graphicsLayer phases
+ * (zero per-frame Composition reads) and resolves exact header geometry on Frame 0.
  */
 @Composable
 fun MorphingPageHero(
@@ -125,23 +69,21 @@ fun MorphingPageHero(
     activeHeightOverrideDp: Dp? = null,
     actions: @Composable RowScope.() -> Unit = {},
     canopyBar: (@Composable RowScope.(collapseFraction: Float, isCompact: Boolean, barHeight: Dp) -> Unit)? = null,
-    morphingContent: (@Composable BoxWithConstraintsScope.(collapseFraction: Float, collapsedTitleRightDp: Dp, expandedTextBottomDp: Dp) -> Unit)? = null,
+    morphingContent: (@Composable BoxWithConstraintsScope.(
+        collapseFractionProvider: () -> Float,
+        collapsedTitleRightDp: Dp,
+        expandedTextBottomPxProvider: () -> Float
+    ) -> Unit)? = null,
     persistentBottomBar: (@Composable ColumnScope.() -> Unit)? = null,
     heroContent: (@Composable () -> Unit)? = null
 ) {
     val density = LocalDensity.current
     val canopyColors = OrbitTheme.colors
+    val textMeasurer = rememberTextMeasurer()
 
     val minBarHeightPx = scrollState?.minHeightPx ?: with(density) { 56.dp.toPx() }
-    val minBarHeightDp = with(density) { minBarHeightPx.toDp() }
     val hasCanopyBar = canopyBar != null && morphingContent == null
     val hasMorphingSlot = morphingContent != null
-
-    var textBlockHeightPx by remember { mutableFloatStateOf(with(density) { 104.dp.toPx() }) }
-    var titleTopInColumnPx by remember { mutableFloatStateOf(with(density) { if (kicker != null) 16.dp.toPx() else 0.dp.toPx() }) }
-    var titleHeightPx by remember { mutableFloatStateOf(with(density) { 38.dp.toPx() }) }
-    var rawTitleWidthPx by remember { mutableFloatStateOf(with(density) { 180.dp.toPx() }) }
-    var containerWidthPx by remember { mutableIntStateOf(with(density) { 400.dp.roundToPx() }) }
 
     val expandedFontSize = if (title.length > 17) 26.sp else 30.sp
     val collapsedTargetSp = when {
@@ -151,13 +93,49 @@ fun MorphingPageHero(
     }
     val collapsedTitleScale = collapsedTargetSp / expandedFontSize.value
 
-    val extraMorphSlotPx = when {
-        hasMorphingSlot || hasCanopyBar -> with(density) { 58.dp.toPx() }
-        else -> 0f
-    }
-    val expandedMorphHeightPx = (textBlockHeightPx + extraMorphSlotPx).coerceAtLeast(minBarHeightPx)
-    scrollState?.updateMaxHeight(expandedMorphHeightPx)
+    val titleStyle = MaterialTheme.typography.displayMedium.copy(
+        fontSize = expandedFontSize,
+        lineHeight = (expandedFontSize.value + 6f).sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.sp
+    )
+    val kickerStyle = MaterialTheme.typography.labelSmall.copy(
+        fontSize = 10.5.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 1.4.sp
+    )
 
+    val measuredTitleSize = remember(title, expandedFontSize, density) {
+        textMeasurer.measure(text = title, style = titleStyle, maxLines = 1).size
+    }
+    val initialTitleTopPx = remember(kicker, density) {
+        if (kicker != null) {
+            val kh = textMeasurer.measure(text = kicker.uppercase(), style = kickerStyle, maxLines = 1).size.height
+            kh + with(density) { 3.dp.toPx() }
+        } else {
+            0f
+        }
+    }
+
+    val metrics = remember(title, kicker, expandedFontSize) {
+        HeroMetricsHolder(
+            textBlockHeightPx = initialTitleTopPx + measuredTitleSize.height + with(density) { 28.dp.toPx() },
+            titleTopInColumnPx = initialTitleTopPx,
+            titleHeightPx = measuredTitleSize.height.toFloat(),
+            rawTitleWidthPx = measuredTitleSize.width.toFloat()
+        )
+    }
+
+    val isCompact by remember(scrollState) {
+        derivedStateOf { (scrollState?.collapseFraction ?: 0f) > 0.45f }
+    }
+    val animatedBarButtonHeight by animateDpAsState(
+        targetValue = if (isCompact) 38.dp else 46.dp,
+        animationSpec = OrbitSprings.DpSpatialFast,
+        label = "canopyBarButtonHeight"
+    )
+
+    val extraMorphSlotPx = if (hasMorphingSlot || hasCanopyBar) with(density) { 58.dp.toPx() } else 0f
     val canopyCoordinator = LocalCanopyTransitionCoordinator.current
     val canopyScreenKeyId = LocalCanopyScreenKeyId.current
     val heroCoordinates = remember { CoordinatesHolder() }
@@ -167,30 +145,15 @@ fun MorphingPageHero(
     val topPadPx = with(density) { topPadDp.toPx() }
     val bottomPadDp = if (hasMorphingSlot || hasCanopyBar || persistentBottomBar != null) 10.dp else 18.dp
     val backShiftBasePx = with(density) { (-6).dp.toPx() }
-
-    val collapsedTitleWidthPx = rawTitleWidthPx * collapsedTitleScale
-    val expandedTextBottomDp = with(density) { textBlockHeightPx.toDp() }
+    val collapsedTitleWidthDp = with(density) { (metrics.rawTitleWidthPx * collapsedTitleScale).toDp() }
+    val iconTopOffsetDp = with(density) {
+        (initialTitleTopPx + (measuredTitleSize.height - 36.dp.toPx()).coerceAtLeast(0f) / 2f).toDp()
+    }
 
     val headerTextRow: @Composable () -> Unit = {
-        val expandedTitleCenterY = topPadPx + titleTopInColumnPx + (titleHeightPx / 2f)
-        val maxTitleShiftY = (minBarHeightPx / 2f) - expandedTitleCenterY
-        val iconTopOffsetDp = with(density) {
-            (titleTopInColumnPx + (titleHeightPx - 36.dp.toPx()).coerceAtLeast(0f) / 2f).toDp()
-        }
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .layout { measurable, constraints ->
-                    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
-                    val h = placeable.height.toFloat()
-                    if (abs(h - textBlockHeightPx) > 0.5f) {
-                        textBlockHeightPx = h
-                    }
-                    layout(placeable.width, placeable.height.coerceAtMost(constraints.maxHeight)) {
-                        placeable.placeRelative(0, 0)
-                    }
-                }
                 .padding(start = 20.dp, end = 20.dp, top = topPadDp, bottom = bottomPadDp),
             verticalAlignment = Alignment.Top
         ) {
@@ -199,10 +162,7 @@ fun MorphingPageHero(
                     val kickerTint = lerp(canopyColors.onCanopy, canopyColors.heroStatGood, 0.32f).copy(alpha = 0.84f)
                     Text(
                         text = kicker.uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.4.sp,
+                        style = kickerStyle,
                         color = kickerTint,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -217,46 +177,47 @@ fun MorphingPageHero(
 
                 if (heroContent != null) {
                     Box(
-                        modifier = Modifier.graphicsLayer {
-                            val f = scrollState?.collapseFraction ?: 0f
-                            val scale = lerp(1f, collapsedTitleScale, f)
-                            alpha = contentAlpha
-                            scaleX = scale
-                            scaleY = scale
-                            transformOrigin = TransformOrigin(0f, 0.5f)
-                            translationX = backShiftBasePx * f
-                            translationY = maxTitleShiftY * f
-                        }
-                    ) { heroContent() }
-                } else {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.displayMedium,
-                        fontSize = expandedFontSize,
-                        lineHeight = (expandedFontSize.value + 6f).sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.sp,
-                        color = canopyColors.onCanopy,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
-                            .onPlaced { coordinates ->
-                                val newTop = coordinates.positionInParent().y
-                                val newH = coordinates.size.height.toFloat()
-                                val newW = coordinates.size.width.toFloat()
-                                if (abs(newTop - titleTopInColumnPx) > 0.5f) titleTopInColumnPx = newTop
-                                if (abs(newH - titleHeightPx) > 0.5f) titleHeightPx = newH
-                                if (abs(newW - rawTitleWidthPx) > 0.5f) rawTitleWidthPx = newW
+                            .onPlaced { coords ->
+                                metrics.titleTopInColumnPx = coords.positionInParent().y
+                                metrics.titleHeightPx = coords.size.height.toFloat()
+                                metrics.rawTitleWidthPx = coords.size.width.toFloat()
                             }
                             .graphicsLayer {
                                 val f = scrollState?.collapseFraction ?: 0f
+                                val maxShiftY = (minBarHeightPx / 2f) - (topPadPx + metrics.titleTopInColumnPx + metrics.titleHeightPx / 2f)
                                 val scale = lerp(1f, collapsedTitleScale, f)
                                 alpha = contentAlpha
                                 scaleX = scale
                                 scaleY = scale
                                 transformOrigin = TransformOrigin(0f, 0.5f)
                                 translationX = backShiftBasePx * f
-                                translationY = maxTitleShiftY * f
+                                translationY = maxShiftY * f
+                            }
+                    ) { heroContent() }
+                } else {
+                    Text(
+                        text = title,
+                        style = titleStyle,
+                        color = canopyColors.onCanopy,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .onPlaced { coords ->
+                                metrics.titleTopInColumnPx = coords.positionInParent().y
+                                metrics.titleHeightPx = coords.size.height.toFloat()
+                                metrics.rawTitleWidthPx = coords.size.width.toFloat()
+                            }
+                            .graphicsLayer {
+                                val f = scrollState?.collapseFraction ?: 0f
+                                val maxShiftY = (minBarHeightPx / 2f) - (topPadPx + metrics.titleTopInColumnPx + metrics.titleHeightPx / 2f)
+                                val scale = lerp(1f, collapsedTitleScale, f)
+                                alpha = contentAlpha
+                                scaleX = scale
+                                scaleY = scale
+                                transformOrigin = TransformOrigin(0f, 0.5f)
+                                translationX = backShiftBasePx * f
+                                translationY = maxShiftY * f
                             }
                     )
                 }
@@ -286,33 +247,15 @@ fun MorphingPageHero(
                     .padding(top = iconTopOffsetDp)
                     .graphicsLayer {
                         val f = scrollState?.collapseFraction ?: 0f
+                        val maxShiftY = (minBarHeightPx / 2f) - (topPadPx + metrics.titleTopInColumnPx + metrics.titleHeightPx / 2f)
                         alpha = contentAlpha
-                        translationY = maxTitleShiftY * f
+                        translationY = maxShiftY * f
                     },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End
             ) { actions() }
         }
     }
-
-    val zoneLayoutModifier = Modifier
-        .fillMaxWidth()
-        .onSizeChanged { size ->
-            if (size.width > 0 && size.width != containerWidthPx) {
-                containerWidthPx = size.width
-            }
-        }
-        .layout { measurable, constraints ->
-            val f = scrollState?.collapseFraction ?: 0f
-            val restingPx = lerp(expandedMorphHeightPx, minBarHeightPx, f)
-            val targetHeightPx = activeHeightOverrideDp?.roundToPx() ?: restingPx.roundToInt()
-            val coercedHeight = targetHeightPx.coerceAtLeast(0)
-            val placeable = measurable.measure(constraints.copy(minHeight = coercedHeight, maxHeight = coercedHeight))
-            layout(placeable.width, coercedHeight) {
-                placeable.placeRelative(0, 0)
-            }
-        }
-        .clipToBounds()
 
     Column(
         modifier = modifier.stationaryCanopyBackdrop(
@@ -327,49 +270,77 @@ fun MorphingPageHero(
             setHeroCoordinates = { heroCoordinates.value = it }
         )
     ) {
-        if (morphingContent != null) {
-            BoxWithConstraints(modifier = zoneLayoutModifier) {
-                val fraction = scrollState?.collapseFraction ?: 0f
-                val maxCollapsedTitleWidthDp = (maxWidth * 0.46f).coerceAtLeast(100.dp)
-                val collapsedTitleWidthDp = with(density) { collapsedTitleWidthPx.toDp() }
-                    .coerceIn(52.dp, maxCollapsedTitleWidthDp)
-                val collapsedTitleRightDp = 20.dp + collapsedTitleWidthDp
-
-                headerTextRow()
-                morphingContent(fraction, collapsedTitleRightDp, expandedTextBottomDp)
-            }
-        } else {
-            Box(modifier = zoneLayoutModifier) {
+        Layout(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clipToBounds(),
+            content = {
                 headerTextRow()
 
-                if (canopyBar != null) {
-                    val fraction = scrollState?.collapseFraction ?: 0f
-                    val totalWidth = with(density) { containerWidthPx.toDp() }
-                    val maxCollapsedTitleWidthDp = (totalWidth * 0.36f).coerceAtLeast(84.dp)
-                    val collapsedTitleWidthDp = with(density) { collapsedTitleWidthPx.toDp() }
-                        .coerceIn(52.dp, maxCollapsedTitleWidthDp)
-                    val collapsedTitleRightDp = 20.dp + collapsedTitleWidthDp
-
-                    val barHeight = lerp(46.dp, 38.dp, fraction)
-                    val collapsedRowLeft = collapsedTitleRightDp + 10.dp
-                    val barLeft = lerp(20.dp, collapsedRowLeft, fraction)
-                    val barTop = lerp(expandedTextBottomDp, (minBarHeightDp - barHeight) / 2, fraction)
-                    val barRightMargin = lerp(20.dp, 16.dp, fraction)
-                    val barWidth = (totalWidth - barRightMargin - barLeft).coerceAtLeast(120.dp)
-                    val isCompact = fraction > 0.45f
-
+                if (morphingContent != null) {
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val maxCollapsedTitleWidthDp = (maxWidth * 0.46f).coerceAtLeast(100.dp)
+                        val clampedTitleW = collapsedTitleWidthDp.coerceIn(52.dp, maxCollapsedTitleWidthDp)
+                        morphingContent(
+                            { scrollState?.collapseFraction ?: 0f },
+                            20.dp + clampedTitleW,
+                            { metrics.textBlockHeightPx }
+                        )
+                    }
+                } else if (canopyBar != null) {
                     Row(
-                        modifier = Modifier
-                            .offset { IntOffset(barLeft.roundToPx(), barTop.roundToPx()) }
-                            .width(barWidth)
-                            .height(barHeight)
-                            .graphicsLayer { alpha = contentAlpha },
+                        modifier = Modifier.graphicsLayer { alpha = contentAlpha },
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        canopyBar(fraction, isCompact, barHeight)
+                        canopyBar(if (isCompact) 1f else 0f, isCompact, animatedBarButtonHeight)
                     }
                 }
+            }
+        ) { measurables, constraints ->
+            val headerPlaceable = measurables[0].measure(
+                constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
+            )
+            val textBlockH = headerPlaceable.height.toFloat()
+            metrics.textBlockHeightPx = textBlockH
+
+            val expandedMorphHeightPx = (textBlockH + extraMorphSlotPx).coerceAtLeast(minBarHeightPx)
+            scrollState?.updateMaxHeight(expandedMorphHeightPx)
+
+            val f = scrollState?.collapseFraction ?: 0f
+            val restingPx = lerp(expandedMorphHeightPx, minBarHeightPx, f)
+            val zoneHeightPx = (activeHeightOverrideDp?.roundToPx() ?: restingPx.roundToInt()).coerceAtLeast(0)
+            val totalWidthPx = constraints.maxWidth.toFloat()
+
+            var secondPlaceableX = 0
+            var secondPlaceableY = 0
+            val secondPlaceable = if (measurables.size > 1) {
+                if (hasMorphingSlot) {
+                    measurables[1].measure(Constraints.fixed(constraints.maxWidth, zoneHeightPx))
+                } else {
+                    val maxCollapsedTitleW = (totalWidthPx * 0.36f).coerceAtLeast(84.dp.toPx())
+                    val clampedTitleW = (metrics.rawTitleWidthPx * collapsedTitleScale)
+                        .coerceIn(52.dp.toPx(), maxCollapsedTitleW)
+                    val collapsedRowLeftPx = 20.dp.toPx() + clampedTitleW + 10.dp.toPx()
+                    val barHeightPx = lerp(46.dp.toPx(), 38.dp.toPx(), f)
+                    val barLeftPx = lerp(20.dp.toPx(), collapsedRowLeftPx, f)
+                    val barTopPx = lerp(textBlockH, (minBarHeightPx - barHeightPx) / 2f, f)
+                    val barRightMarginPx = lerp(20.dp.toPx(), 16.dp.toPx(), f)
+                    val barWidthPx = (totalWidthPx - barRightMarginPx - barLeftPx)
+                        .coerceAtLeast(120.dp.toPx())
+                        .roundToInt()
+
+                    secondPlaceableX = barLeftPx.roundToInt()
+                    secondPlaceableY = barTopPx.roundToInt()
+                    measurables[1].measure(
+                        Constraints.fixed(barWidthPx, barHeightPx.roundToInt().coerceAtLeast(1))
+                    )
+                }
+            } else null
+
+            layout(constraints.maxWidth, zoneHeightPx) {
+                headerPlaceable.placeRelative(0, 0)
+                secondPlaceable?.placeRelative(secondPlaceableX, secondPlaceableY)
             }
         }
 

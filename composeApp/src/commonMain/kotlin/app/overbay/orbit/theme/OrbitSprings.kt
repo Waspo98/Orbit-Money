@@ -2,10 +2,12 @@ package app.overbay.orbit.theme
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 
 /**
  * Material 3 Expressive spring physics tokens matching Orbit Money's kinetic design system.
@@ -64,14 +66,6 @@ object OrbitSprings {
     )
 
     /**
-     * Tabular numeric reel spring used by RollingTickerText odometer character reels.
-     */
-    val TickerSpring: SpringSpec<Float> = spring(
-        dampingRatio = 0.72f,
-        stiffness = 600f
-    )
-
-    /**
      * IntOffset animation spec for vertical odometer reel slides.
      */
     val TickerOffsetSpring: SpringSpec<IntOffset> = spring(
@@ -90,8 +84,12 @@ object OrbitSprings {
     // Pre-allocated static specs to eliminate allocation thrashing during high-frequency animations
     val FloatSpatialFast: SpringSpec<Float> = spatialFast()
     val FloatSpatialDefault: SpringSpec<Float> = spatialDefault()
+    val DpSpatialFast: SpringSpec<Dp> = spatialFast()
     val DpSpatialDefault: SpringSpec<Dp> = spatialDefault()
-    val IntOffsetSpatialDefault: SpringSpec<IntOffset> = spatialDefault()
+    val IntOffsetSpatialDefault: SpringSpec<IntOffset> = spatialDefault(IntOffset.VisibilityThreshold)
+    val IntSizeSpatialDefault: SpringSpec<IntSize> = spatialDefault(IntSize.VisibilityThreshold)
     val FloatEffectsFast: SpringSpec<Float> = effectsFast()
+    val FloatEffectsDefault: SpringSpec<Float> = effectsDefault()
     val ColorEffectsFast: SpringSpec<Color> = effectsFast()
+    val ColorEffectsDefault: SpringSpec<Color> = effectsDefault()
 }

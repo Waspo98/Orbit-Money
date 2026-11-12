@@ -14,13 +14,17 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
@@ -33,11 +37,14 @@ import androidx.compose.ui.util.lerp
 /**
  * Coordinates a stationary screen-space canopy gradient and synchronized smooth vertical
  * height glide across [MorphingPageHero] instances during horizontal page transitions.
+ * Preserves vertical velocity on rapid mid-flight tab switches and caches GPU gradient brushes
+ * once per container width (zero per-frame Shader allocations).
  */
 @Stable
 class CanopyTransitionCoordinator(initialKeyId: Any) {
     private val knownNaturalHeights = HashMap<Any, Int>()
     private val transitionAnimatable = Animatable(1f)
+    private var interruptedHeightVelocityPxPerSec: Float = 0f
 
     var activeKeyId: Any = initialKeyId
         private set
@@ -64,6 +71,8 @@ class CanopyTransitionCoordinator(initialKeyId: Any) {
 
     fun onTargetKeyChanged(newKeyId: Any) {
         if (newKeyId != activeKeyId) {
+            val prevDelta = (targetHeightPx - startHeightPx).toFloat()
+            interruptedHeightVelocityPxPerSec = prevDelta * transitionAnimatable.velocity
             val currentDisplayed = sharedDisplayHeightPx
             if (currentDisplayed > 0) {
                 startHeightPx = currentDisplayed
@@ -81,14 +90,23 @@ class CanopyTransitionCoordinator(initialKeyId: Any) {
         transitionFraction = clamped
         if (clamped >= 1f) {
             startHeightPx = targetHeightPx
+            interruptedHeightVelocityPxPerSec = 0f
         }
     }
 
     suspend fun animateToTarget() {
         if (transitionFraction < 1f) {
+            val delta = (targetHeightPx - startHeightPx).toFloat()
+            val normalizedVelocity = if (kotlin.math.abs(delta) > 1f) {
+                (interruptedHeightVelocityPxPerSec / delta).coerceIn(-8f, 8f)
+            } else {
+                0f
+            }
+            interruptedHeightVelocityPxPerSec = 0f
             transitionAnimatable.snapTo(0f)
             transitionAnimatable.animateTo(
                 targetValue = 1f,
+                initialVelocity = normalizedVelocity,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
                     stiffness = 650f
@@ -127,7 +145,9 @@ val LocalCanopyScreenKeyId = compositionLocalOf<Any?> { null }
 @Composable
 fun rememberCanopyTransitionCoordinator(currentKeyId: Any): CanopyTransitionCoordinator {
     val coordinator = remember { CanopyTransitionCoordinator(currentKeyId) }
-    coordinator.onTargetKeyChanged(currentKeyId)
+    Snapshot.withoutReadObservation {
+        coordinator.onTargetKeyChanged(currentKeyId)
+    }
     LaunchedEffect(currentKeyId) {
         coordinator.animateToTarget()
     }
@@ -159,7 +179,6 @@ fun Modifier.stationaryCanopyBackdrop(
         val linearColors = listOf(canopyStart, canopyMid, canopyEnd)
         val radialColors = listOf(canopyGlow, Color.Transparent)
         var cachedTotalW = Float.NaN
-        var cachedSlideX = Float.NaN
         var cachedLinearBrush: Brush? = null
         var cachedRadialBrush: Brush? = null
 
@@ -176,22 +195,26 @@ fun Modifier.stationaryCanopyBackdrop(
             } else {
                 size.width
             }
-            if (cachedLinearBrush == null || cachedTotalW != totalW || cachedSlideX != slideOffsetX) {
+            if (cachedLinearBrush == null || cachedTotalW != totalW) {
                 cachedTotalW = totalW
-                cachedSlideX = slideOffsetX
                 cachedLinearBrush = Brush.linearGradient(
                     colors = linearColors,
-                    start = Offset(-slideOffsetX, 0f),
-                    end = Offset(totalW - slideOffsetX, gradientHeightPx)
+                    start = Offset.Zero,
+                    end = Offset(totalW, gradientHeightPx)
                 )
                 cachedRadialBrush = Brush.radialGradient(
                     colors = radialColors,
-                    center = Offset(totalW * 0.92f - slideOffsetX, 0f),
+                    center = Offset(totalW * 0.92f, 0f),
                     radius = (totalW * 0.7f).coerceAtLeast(100f)
                 )
             }
-            drawRect(brush = cachedLinearBrush!!)
-            drawRect(brush = cachedRadialBrush!!)
+            val backdropSize = Size(totalW.coerceAtLeast(size.width), size.height)
+            clipRect {
+                withTransform({ translate(left = -slideOffsetX, top = 0f) }) {
+                    drawRect(brush = cachedLinearBrush!!, topLeft = Offset.Zero, size = backdropSize)
+                    drawRect(brush = cachedRadialBrush!!, topLeft = Offset.Zero, size = backdropSize)
+                }
+            }
             val h = size.height
             drawLine(
                 color = borderColor,

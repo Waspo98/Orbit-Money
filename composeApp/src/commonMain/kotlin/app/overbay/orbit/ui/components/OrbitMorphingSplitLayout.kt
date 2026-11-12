@@ -1,8 +1,6 @@
 package app.overbay.orbit.ui.components
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,23 +13,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.BackHandler
+import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
  * Reusable morphing master-detail split layout template for unfolded phones, tablets, and desktops.
  *
- * - When [isDetailOpen] is false, [masterContent] spans 100% of the container width (with a 20dp right gutter).
- * - When [isDetailOpen] is true, [masterContent] smoothly morphs to the left column ([masterWeightWhenOpen])
- *   while [detailContent] glides into the right column as a floating bordered card.
- * - Both opening (0f -> 1f) and closing (1f -> 0f) preserve full spring overshoot and rebound.
+ * - Uses [OrbitSprings.FloatSpatialDefault] (`DampingRatioLowBouncy = 0.85f, StiffnessLow = 200f`)
+ *   without horizontal text distortion or out-of-bounds width overshoot on the master column.
+ * - Preserves expressive GPU spring glide and uniform subtle scale on the floating detail card.
  */
 @Composable
 fun OrbitMorphingSplitLayout(
@@ -44,7 +42,7 @@ fun OrbitMorphingSplitLayout(
     masterContent: @Composable () -> Unit,
     detailContent: @Composable () -> Unit
 ) {
-    val haptics = app.overbay.orbit.util.LocalOrbitHaptics.current
+    val haptics = LocalOrbitHaptics.current
 
     BackHandler(enabled = isDetailOpen) {
         haptics.tick()
@@ -53,10 +51,7 @@ fun OrbitMorphingSplitLayout(
 
     val splitProgress by animateFloatAsState(
         targetValue = if (isDetailOpen) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = 0.48f,
-            stiffness = Spring.StiffnessLow
-        ),
+        animationSpec = OrbitSprings.FloatSpatialDefault,
         label = "orbitMorphingSplitProgress"
     )
 
@@ -71,15 +66,7 @@ fun OrbitMorphingSplitLayout(
                 .widthIn(max = maxContainerWidth)
                 .fillMaxSize(),
             content = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            val closeOvershoot = (-splitProgress).coerceAtLeast(0f)
-                            transformOrigin = TransformOrigin(0f, 0.5f)
-                            scaleX = 1f + (closeOvershoot * 0.08f)
-                        }
-                ) {
+                Box(modifier = Modifier.fillMaxSize()) {
                     masterContent()
                 }
 
@@ -91,7 +78,10 @@ fun OrbitMorphingSplitLayout(
                             .graphicsLayer {
                                 val progress = splitProgress
                                 alpha = progress.coerceIn(0f, 1f)
-                                translationX = (1f - progress) * size.width * 0.35f
+                                val uniformScale = lerp(0.96f, 1f, progress.coerceIn(0f, 1.05f))
+                                scaleX = uniformScale
+                                scaleY = uniformScale
+                                translationX = (1f - progress) * (size.width * 0.35f)
                             }
                     ) {
                         Surface(
@@ -112,20 +102,14 @@ fun OrbitMorphingSplitLayout(
             val minPanePx = 320.dp.roundToPx()
             val gutterPx = 20.dp.roundToPx()
             val spacingPx = paneSpacing.roundToPx()
-            val progress = splitProgress
+            val clampedProgress = splitProgress.coerceIn(0f, 1f)
 
             val restingClosedMasterPx = (totalWidthPx - gutterPx).coerceAtLeast(minPanePx).coerceAtMost(totalWidthPx)
             val effectiveOpenPx = (totalWidthPx - spacingPx - gutterPx).coerceAtLeast(minPanePx)
             val openMasterPx = (effectiveOpenPx * masterWeightWhenOpen).toInt().coerceIn(1, totalWidthPx)
             val openDetailPx = (effectiveOpenPx - openMasterPx).coerceAtLeast(1)
 
-            val closeOvershoot = (-progress).coerceAtLeast(0f)
-            val gutterOvershootFraction = (closeOvershoot / 0.22f).coerceIn(0f, 1f)
-            val currentMasterPx = if (progress >= 0f) {
-                lerp(restingClosedMasterPx, openMasterPx, progress)
-            } else {
-                lerp(restingClosedMasterPx, (totalWidthPx - 2.dp.roundToPx()).coerceAtLeast(1), gutterOvershootFraction)
-            }.coerceIn(1, totalWidthPx)
+            val currentMasterPx = lerp(restingClosedMasterPx, openMasterPx, clampedProgress).coerceIn(1, totalWidthPx)
 
             val masterPlaceable = measurables[0].measure(
                 Constraints.fixed(currentMasterPx, totalHeightPx)
@@ -136,7 +120,7 @@ fun OrbitMorphingSplitLayout(
                 )
             } else null
 
-            val detailOffsetX = currentMasterPx + (spacingPx * progress.coerceAtLeast(0f)).toInt()
+            val detailOffsetX = currentMasterPx + (spacingPx * clampedProgress).toInt()
 
             layout(totalWidthPx, totalHeightPx) {
                 masterPlaceable.placeRelative(0, 0)

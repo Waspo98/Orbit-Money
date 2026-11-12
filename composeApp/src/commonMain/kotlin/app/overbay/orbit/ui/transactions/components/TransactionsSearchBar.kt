@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
@@ -32,9 +31,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.lerp
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.coroutines.delay
@@ -308,79 +305,5 @@ fun TransactionsSearchPromptOrEmpty(
                 )
             }
         }
-    }
-}
-
-/**
- * Shared 2-axis morphing canopy search bar and trailing controls layout used inside [MorphingPageHero].
- */
-@Composable
-fun BoxWithConstraintsScope.CanopyMorphingSearchContent(
-    collapseFraction: Float,
-    collapsedTitleRightDp: Dp,
-    expandedTextBottomDp: Dp,
-    searchActiveProgress: Float,
-    isSearchActive: Boolean,
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
-    onSearchActiveChange: (Boolean) -> Unit,
-    expandedPlaceholder: String,
-    compactPlaceholder: String = "Search...",
-    trailingControls: @Composable (buttonSize: Dp) -> Unit
-) {
-    val restingHeight = lerp(46.dp, 38.dp, collapseFraction)
-    val controlsWidth = restingHeight * 2 + 8.dp
-    val gapToControls = 8.dp
-    val totalTrailingReserve = controlsWidth + gapToControls
-
-    val collapsedRowLeft = collapsedTitleRightDp + 10.dp
-    val restingLeft = lerp(20.dp, collapsedRowLeft, collapseFraction)
-    val restingTop = lerp(expandedTextBottomDp, 9.dp, collapseFraction)
-    val restingRowRightMargin = lerp(20.dp, 16.dp, collapseFraction)
-    val restingTotalRowWidth = (maxWidth - restingRowRightMargin - restingLeft).coerceAtLeast(160.dp)
-    val restingSearchWidth = (restingTotalRowWidth - totalTrailingReserve).coerceAtLeast(72.dp)
-
-    val currentLeft = lerp(restingLeft, 12.dp, searchActiveProgress)
-    val currentTop = lerp(restingTop, 6.dp, searchActiveProgress)
-    val currentSearchWidth = lerp(restingSearchWidth, (maxWidth - 24.dp).coerceAtLeast(100.dp), searchActiveProgress)
-    val currentHeight = lerp(restingHeight, 48.dp, searchActiveProgress)
-
-    val controlsLeft = restingLeft + restingSearchWidth + gapToControls
-    val controlsAlpha = (1f - searchActiveProgress * 2.2f).coerceIn(0f, 1f)
-
-    val isCompact = !isSearchActive && (collapseFraction > 0.45f)
-    val placeholder = if (isSearchActive || collapseFraction <= 0.45f) {
-        expandedPlaceholder
-    } else {
-        compactPlaceholder
-    }
-
-    if (controlsAlpha > 0.01f) {
-        Box(
-            modifier = Modifier
-                .offset(x = controlsLeft, y = restingTop)
-                .height(restingHeight)
-                .graphicsLayer { alpha = controlsAlpha },
-            contentAlignment = Alignment.CenterEnd
-        ) {
-            trailingControls(restingHeight)
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .offset(x = currentLeft, y = currentTop)
-            .width(currentSearchWidth)
-            .height(currentHeight)
-    ) {
-        TransactionsSearchBar(
-            searchQuery = searchQuery,
-            onSearchQueryChange = onSearchQueryChange,
-            isSearchActive = isSearchActive,
-            onSearchActiveChange = onSearchActiveChange,
-            isCompact = isCompact,
-            placeholderText = placeholder,
-            modifier = Modifier.fillMaxSize()
-        )
     }
 }

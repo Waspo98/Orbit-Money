@@ -1,6 +1,8 @@
 package app.overbay.orbit
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -87,6 +89,7 @@ private class OrbitViewModelHolder(repo: OrbitRepository) {
     val settingsViewModel by lazy { SettingsViewModel(repo) }
 }
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun OrbitNavigation(
     repository: OrbitRepository? = null,
@@ -217,7 +220,8 @@ fun OrbitNavigation(
             }
         }
     }
-    val canopyCoordinator = rememberCanopyTransitionCoordinator(currentKey.primaryTabIndex ?: currentKey)
+    val navTransition = updateTransition(targetState = currentKey, label = "OrbitNavigationTransition")
+    val canopyCoordinator = rememberCanopyTransitionCoordinator(navTransition.targetState.primaryTabIndex ?: navTransition.targetState)
 
     CompositionLocalProvider(LocalCanopyTransitionCoordinator provides canopyCoordinator) {
         AdaptiveNavigationShell(
@@ -233,8 +237,7 @@ fun OrbitNavigation(
                     repository = repo,
                     onNavigate = navigateTo
                 )
-                AnimatedContent(
-                    targetState = currentKey,
+                navTransition.AnimatedContent(
                     transitionSpec = { orbitNavigationTransitionSpec() },
                     contentKey = { key -> key.primaryTabIndex ?: key },
                     modifier = Modifier
@@ -246,8 +249,7 @@ fun OrbitNavigation(
                             if (kotlin.math.abs(rx - canopyCoordinator.containerRootX) > 0.5f) canopyCoordinator.containerRootX = rx
                             if (kotlin.math.abs(rw - canopyCoordinator.containerWidthPx) > 0.5f) canopyCoordinator.containerWidthPx = rw
 
-                        },
-                    label = "OrbitNavigationTransition"
+                        }
                 ) { key ->
                     CompositionLocalProvider(LocalCanopyScreenKeyId provides (key.primaryTabIndex ?: key)) {
                         when (key) {

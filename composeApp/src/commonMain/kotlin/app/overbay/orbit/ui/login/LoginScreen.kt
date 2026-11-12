@@ -2,9 +2,10 @@ package app.overbay.orbit.ui.login
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -164,7 +165,6 @@ fun LoginScreen(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp, vertical = 28.dp)
-                    .animateContentSize(animationSpec = OrbitSprings.spatialDefault())
             ) {
                 LoginBrandLockup(
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -173,12 +173,17 @@ fun LoginScreen(
                 AnimatedContent(
                     targetState = state.step,
                     transitionSpec = {
-                        fadeIn(OrbitSprings.effectsDefault())
-                            .togetherWith(fadeOut(OrbitSprings.effectsFast()))
+                        val dir = if (targetState.ordinal >= initialState.ordinal) 1 else -1
+                        (slideInHorizontally(OrbitSprings.IntOffsetSpatialDefault) { dir * it / 8 } +
+                            fadeIn(OrbitSprings.FloatEffectsDefault))
+                            .togetherWith(
+                                slideOutHorizontally(OrbitSprings.IntOffsetSpatialDefault) { -dir * it / 8 } +
+                                    fadeOut(OrbitSprings.FloatEffectsFast)
+                            )
                             .using(
                                 SizeTransform(
                                     clip = false,
-                                    sizeAnimationSpec = { _, _ -> OrbitSprings.spatialDefault() }
+                                    sizeAnimationSpec = { _, _ -> OrbitSprings.IntSizeSpatialDefault }
                                 )
                             )
                     },

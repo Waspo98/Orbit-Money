@@ -130,11 +130,11 @@ fun CategoriesScreen(
                         scrollState = heroScrollState,
                         contentAlpha = contentAlpha,
                         activeHeightOverrideDp = activeHeightOverrideDp,
-                        morphingContent = { collapseFraction, collapsedTitleRightDp, expandedTextBottomDp ->
+                        morphingContent = { collapseFractionProvider, collapsedTitleRightDp, expandedTextBottomPxProvider ->
                             CanopyMorphingSearchContent(
-                                collapseFraction = collapseFraction,
+                                collapseFractionProvider = collapseFractionProvider,
                                 collapsedTitleRightDp = collapsedTitleRightDp,
-                                expandedTextBottomDp = expandedTextBottomDp,
+                                expandedTextBottomPxProvider = expandedTextBottomPxProvider,
                                 searchActiveProgress = searchActiveProgress,
                                 isSearchActive = state.isSearchActive,
                                 searchQuery = viewModel.searchQueryInput,
