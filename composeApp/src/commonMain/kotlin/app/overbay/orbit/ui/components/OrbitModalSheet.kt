@@ -37,6 +37,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +50,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlinx.coroutines.launch
+
+/**
+ * Provided inside [OrbitModalSheet] so header close buttons, footer cancel buttons, and custom
+ * sheet action buttons can play `sheetState.hide()` smoothly before mutating ViewModel state.
+ * Remains `null` when components such as [OrbitModalFooter] render inside two-pane inspectors.
+ */
+val LocalOrbitSheetDismiss = compositionLocalOf<((afterHide: () -> Unit) -> Unit)?> { null }
 
 /**
  * Standard Orbit bottom-up modal sheet that slides in from the bottom of the screen,
@@ -61,6 +73,18 @@ fun OrbitModalSheet(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    val animateAndDismiss: ((() -> Unit) -> Unit) = remember(sheetState, scope) {
+        { afterHide ->
+            scope.launch {
+                try {
+                    sheetState.hide()
+                } finally {
+                    afterHide()
+                }
+            }
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -70,13 +94,15 @@ fun OrbitModalSheet(
         dragHandle = { OrbitSheetDragHandle() },
         modifier = modifier.statusBarsPadding()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .imePadding(),
-            content = content
-        )
+        CompositionLocalProvider(LocalOrbitSheetDismiss provides animateAndDismiss) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding(),
+                content = content
+            )
+        }
     }
 }
 
@@ -94,6 +120,7 @@ fun OrbitSheetHeader(
     trailingActions: (@Composable RowScope.() -> Unit)? = null
 ) {
     val haptics = LocalOrbitHaptics.current
+    val sheetDismiss = LocalOrbitSheetDismiss.current
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -170,7 +197,7 @@ fun OrbitSheetHeader(
                         IconButton(
                             onClick = {
                                 haptics.tick()
-                                onDismiss()
+                                sheetDismiss?.invoke(onDismiss) ?: onDismiss()
                             },
                             modifier = Modifier.size(34.dp)
                         ) {
@@ -206,6 +233,7 @@ fun OrbitModalFooter(
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow
 ) {
     val haptics = LocalOrbitHaptics.current
+    val sheetDismiss = LocalOrbitSheetDismiss.current
 
     Surface(
         color = containerColor,
@@ -276,7 +304,7 @@ fun OrbitModalFooter(
                 OutlinedButton(
                     onClick = {
                         haptics.tick()
-                        onDismiss()
+                        sheetDismiss?.invoke(onDismiss) ?: onDismiss()
                     },
                     enabled = !isSaving,
                     shape = RoundedCornerShape(14.dp),

@@ -32,6 +32,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitDragReorderState
@@ -129,6 +130,7 @@ fun <K : Any> OrbitBentoCustomizeSheet(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
+        val sheetDismiss = LocalOrbitSheetDismiss.current
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
             OrbitSheetHeader(
                 title = title,
@@ -172,7 +174,7 @@ fun <K : Any> OrbitBentoCustomizeSheet(
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 Button(
-                    onClick = { haptics.confirm(); onDismiss() },
+                    onClick = { haptics.confirm(); sheetDismiss?.invoke(onDismiss) ?: onDismiss() },
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.height(42.dp)
                 ) {

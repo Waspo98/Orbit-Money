@@ -75,7 +75,8 @@ fun RetirementProjectionHeroCard(
                         RollingTickerCents(
                             cents = uiState.scrubbedBalanceCents ?: scenario.projectedBalanceCents,
                             style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
+                            animate = uiState.scrubbedBalanceCents == null
                         )
                     }
 

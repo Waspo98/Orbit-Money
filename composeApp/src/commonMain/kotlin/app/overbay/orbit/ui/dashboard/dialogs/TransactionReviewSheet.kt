@@ -1,46 +1,41 @@
 package app.overbay.orbit.ui.dashboard.dialogs
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.RuleCondition
 import app.overbay.orbit.domain.ReviewQueueCandidate
 import app.overbay.orbit.domain.RuleMatcherEngine
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSheetHeader
@@ -48,6 +43,14 @@ import app.overbay.orbit.ui.dashboard.CategorizeReviewState
 import app.overbay.orbit.ui.dashboard.DashboardAction
 import app.overbay.orbit.ui.rules.sheets.RuleEditorSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlinx.coroutines.launch
+
+private enum class ReviewSheetStage {
+    ALL_DONE,
+    BATCH_COMPLETE,
+    CATEGORY_PICKER,
+    SWIPE_STAGE
+}
 
 /**
  * Interactive "Categorize Recent Transactions" modal dialog matching `TransactionReviewModal` on `main`.
@@ -71,6 +74,12 @@ fun TransactionReviewSheet(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
+        val sheetDismiss = LocalOrbitSheetDismiss.current
+        val closeSheet: () -> Unit = {
+            val dismissAction = { onAction(DashboardAction.CloseCategorizeReview) }
+            sheetDismiss?.invoke(dismissAction) ?: dismissAction()
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -86,41 +95,65 @@ fun TransactionReviewSheet(
             HorizontalDivider(color = colors.cardBorder)
             Spacer(modifier = Modifier.height(14.dp))
 
-            when {
-                state.allDone -> ReviewEmptyStateContent(
-                    badgeText = "!",
-                    title = "PHEW all transactions are categorized for now.",
-                    subtitle = "Want to go through more transactions just for fun, ya sicko?",
-                    primaryButtonText = "Yes I Need The Dopamine",
-                    secondaryButtonText = "No Thanks, I Have Self-Control",
-                    onPrimaryClick = { onAction(DashboardAction.StartFunReviewMode) },
-                    onSecondaryClick = { onAction(DashboardAction.CloseCategorizeReview) }
-                )
+            val reviewStage = when {
+                state.allDone -> ReviewSheetStage.ALL_DONE
+                state.isBatchComplete -> ReviewSheetStage.BATCH_COMPLETE
+                currentTxn != null && state.isCategoryPickerOpen -> ReviewSheetStage.CATEGORY_PICKER
+                else -> ReviewSheetStage.SWIPE_STAGE
+            }
 
-                state.isBatchComplete -> ReviewEmptyStateContent(
-                    badgeText = "10",
-                    title = "Ten down.",
-                    subtitle = "Want another stack, or are we calling that a responsible little victory?",
-                    primaryButtonText = "View More Transactions",
-                    secondaryButtonText = "Done For Now",
-                    onPrimaryClick = { onAction(DashboardAction.LoadMoreReviewTransactions) },
-                    onSecondaryClick = { onAction(DashboardAction.CloseCategorizeReview) }
-                )
+            AnimatedContent(
+                targetState = reviewStage,
+                transitionSpec = {
+                    (fadeIn(OrbitSprings.FloatEffectsDefault) togetherWith
+                        fadeOut(OrbitSprings.FloatEffectsFast)).using(
+                        SizeTransform(clip = false) { _, _ -> OrbitSprings.IntSizeSpatialDefault }
+                    )
+                },
+                label = "ReviewSheetStageTransition"
+            ) { stage ->
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    when (stage) {
+                        ReviewSheetStage.ALL_DONE -> ReviewEmptyStateContent(
+                            badgeText = "!",
+                            title = "PHEW all transactions are categorized for now.",
+                            subtitle = "Want to go through more transactions just for fun, ya sicko?",
+                            primaryButtonText = "Yes I Need The Dopamine",
+                            secondaryButtonText = "No Thanks, I Have Self-Control",
+                            onPrimaryClick = { onAction(DashboardAction.StartFunReviewMode) },
+                            onSecondaryClick = closeSheet
+                        )
 
-                currentTxn != null && state.isCategoryPickerOpen -> CategoryReviewPickerContent(
-                    txn = currentTxn,
-                    categories = state.categories,
-                    onChooseCategory = { catId -> onAction(DashboardAction.RequestConfirmReviewCategory(catId)) },
-                    onBack = { onAction(DashboardAction.CloseReviewCategoryPicker) }
-                )
+                        ReviewSheetStage.BATCH_COMPLETE -> ReviewEmptyStateContent(
+                            badgeText = "10",
+                            title = "Ten down.",
+                            subtitle = "Want another stack, or are we calling that a responsible little victory?",
+                            primaryButtonText = "View More Transactions",
+                            secondaryButtonText = "Done For Now",
+                            onPrimaryClick = { onAction(DashboardAction.LoadMoreReviewTransactions) },
+                            onSecondaryClick = closeSheet
+                        )
 
-                currentTxn != null -> ReviewSwipeStage(
-                    currentTxn = currentTxn,
-                    currentIndex = state.currentIndex,
-                    batchReviewed = state.batchReviewed,
-                    category = currentTxn.categoryId?.let { categoryById[it] },
-                    onAction = onAction
-                )
+                        ReviewSheetStage.CATEGORY_PICKER -> if (currentTxn != null) {
+                            CategoryReviewPickerContent(
+                                txn = currentTxn,
+                                categories = state.categories,
+                                onChooseCategory = { catId -> onAction(DashboardAction.RequestConfirmReviewCategory(catId)) },
+                                onBack = { onAction(DashboardAction.CloseReviewCategoryPicker) }
+                            )
+                        }
+
+                        ReviewSheetStage.SWIPE_STAGE -> if (currentTxn != null) {
+                            ReviewSwipeStage(
+                                currentTxn = currentTxn,
+                                currentIndex = state.currentIndex,
+                                batchReviewed = state.batchReviewed,
+                                category = currentTxn.categoryId?.let { categoryById[it] },
+                                onAction = onAction
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -155,7 +188,6 @@ fun TransactionReviewSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReviewSwipeStage(
     currentTxn: ReviewQueueCandidate,
@@ -166,7 +198,33 @@ private fun ReviewSwipeStage(
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
     val canGoBack = currentIndex > 0
+    val thresholdPx = with(density) { 108.dp.toPx() }
+    val exitPx = with(density) { 420.dp.toPx() }
+    val offsetX = remember(currentTxn.id, currentIndex) { Animatable(0f) }
+    var isExiting by remember(currentTxn.id, currentIndex) { mutableStateOf(false) }
+
+    fun triggerApprove() {
+        if (isExiting) return
+        isExiting = true
+        haptics.confirm()
+        scope.launch {
+            offsetX.animateTo(exitPx, OrbitSprings.FloatSpatialFast)
+            onAction(DashboardAction.ApproveReviewTransaction)
+        }
+    }
+
+    fun triggerReject() {
+        if (isExiting) return
+        isExiting = true
+        haptics.tick()
+        scope.launch {
+            offsetX.animateTo(-exitPx, OrbitSprings.FloatSpatialFast)
+            onAction(DashboardAction.RejectReviewTransaction)
+        }
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -199,44 +257,83 @@ private fun ReviewSwipeStage(
     Spacer(modifier = Modifier.height(14.dp))
 
     key(currentTxn.id, currentIndex) {
-        val dismissState = rememberSwipeToDismissBoxState(
-            confirmValueChange = { value ->
-                when (value) {
-                    SwipeToDismissBoxValue.StartToEnd -> {
-                        haptics.confirm()
-                        onAction(DashboardAction.ApproveReviewTransaction)
-                        false
-                    }
-                    SwipeToDismissBoxValue.EndToStart -> {
-                        haptics.tick()
-                        onAction(DashboardAction.RejectReviewTransaction)
-                        false
-                    }
-                    SwipeToDismissBoxValue.Settled -> false
-                }
-            }
-        )
-        val cardTone = when (dismissState.targetValue) {
-            SwipeToDismissBoxValue.StartToEnd -> "yes"
-            SwipeToDismissBoxValue.EndToStart -> "no"
-            SwipeToDismissBoxValue.Settled -> ""
+        val cardTone = when {
+            offsetX.value > 24f -> "yes"
+            offsetX.value < -24f -> "no"
+            else -> ""
         }
 
-        SwipeToDismissBox(
-            state = dismissState,
+        Box(
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            backgroundContent = {
-                Row(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Change", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                    Text("Confirm", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                }
-            }
+            contentAlignment = Alignment.Center
         ) {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Row(
+                modifier = Modifier.matchParentSize().padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val confirmProgress = (offsetX.value / thresholdPx).coerceIn(0f, 1f)
+                Text(
+                    text = "Confirm ✓",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.graphicsLayer {
+                        alpha = 0.2f + 0.8f * confirmProgress
+                        val s = 0.9f + 0.14f * confirmProgress
+                        scaleX = s
+                        scaleY = s
+                    }
+                )
+                val rejectProgress = (-offsetX.value / thresholdPx).coerceIn(0f, 1f)
+                Text(
+                    text = "✗ Change",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.expense,
+                    modifier = Modifier.graphicsLayer {
+                        alpha = 0.2f + 0.8f * rejectProgress
+                        val s = 0.9f + 0.14f * rejectProgress
+                        scaleX = s
+                        scaleY = s
+                    }
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(currentTxn.id, currentIndex) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                if (isExiting) return@detectHorizontalDragGestures
+                                when {
+                                    offsetX.value >= thresholdPx -> triggerApprove()
+                                    offsetX.value <= -thresholdPx -> triggerReject()
+                                    else -> scope.launch {
+                                        offsetX.animateTo(0f, OrbitSprings.FloatSpatialDefault)
+                                    }
+                                }
+                            },
+                            onDragCancel = {
+                                if (!isExiting) {
+                                    scope.launch { offsetX.animateTo(0f, OrbitSprings.FloatSpatialDefault) }
+                                }
+                            },
+                            onHorizontalDrag = { change, dragAmount ->
+                                if (!isExiting) {
+                                    change.consume()
+                                    scope.launch { offsetX.snapTo(offsetX.value + dragAmount) }
+                                }
+                            }
+                        )
+                    }
+                    .graphicsLayer {
+                        translationX = offsetX.value
+                        rotationZ = (offsetX.value / 48f).coerceIn(-7f, 7f)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
                 ReviewTransactionCardContent(
                     txn = currentTxn,
                     category = category,
@@ -261,7 +358,7 @@ private fun ReviewSwipeStage(
             color = colors.expense,
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
-                .clickable { haptics.tick(); onAction(DashboardAction.RejectReviewTransaction) }
+                .clickable { triggerReject() }
                 .padding(vertical = 4.dp, horizontal = 6.dp)
         )
         Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerLow, border = BorderStroke(1.dp, colors.cardBorder)) {
@@ -274,7 +371,7 @@ private fun ReviewSwipeStage(
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
-                .clickable { haptics.confirm(); onAction(DashboardAction.ApproveReviewTransaction) }
+                .clickable { triggerApprove() }
                 .padding(vertical = 4.dp, horizontal = 6.dp)
         )
     }

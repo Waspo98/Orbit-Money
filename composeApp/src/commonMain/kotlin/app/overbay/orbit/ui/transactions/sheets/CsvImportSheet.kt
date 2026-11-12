@@ -58,6 +58,7 @@ import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.domain.CandidateImportRule
 import app.overbay.orbit.domain.CsvImportEngine
 import app.overbay.orbit.domain.CsvImportPreview
+import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalFileImportExportHelper
@@ -320,12 +321,13 @@ fun CsvImportSheet(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 // Action Buttons
+                val sheetDismiss = LocalOrbitSheetDismiss.current
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedButton(
-                        onClick = onDismiss,
+                        onClick = { haptics.tick(); sheetDismiss?.invoke(onDismiss) ?: onDismiss() },
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Cancel")

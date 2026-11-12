@@ -155,6 +155,7 @@ private fun DestinationSection(
     onDismiss: () -> Unit,
     onTick: () -> Unit
 ) {
+    val sheetDismiss = LocalOrbitSheetDismiss.current
     Text(
         text = sectionTitle,
         style = MaterialTheme.typography.labelMedium,
@@ -223,8 +224,11 @@ private fun DestinationSection(
                         .clip(RoundedCornerShape(16.dp))
                         .clickable {
                             onTick()
-                            onNavigate(item.key)
-                            onDismiss()
+                            val finish = {
+                                onNavigate(item.key)
+                                onDismiss()
+                            }
+                            sheetDismiss?.invoke(finish) ?: finish()
                         }
                 )
             }

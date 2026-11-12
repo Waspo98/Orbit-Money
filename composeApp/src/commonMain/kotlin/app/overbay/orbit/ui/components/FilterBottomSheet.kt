@@ -66,6 +66,7 @@ fun FilterBottomSheet(
         onDismissRequest = onDismiss,
         modifier = modifier
     ) {
+        val sheetDismiss = LocalOrbitSheetDismiss.current
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -191,9 +192,12 @@ fun FilterBottomSheet(
                 Button(
                     onClick = {
                         haptics.confirm()
-                        onApply(draft)
-                        onApplySort(sortDraft)
-                        onDismiss()
+                        val applyAndClose = {
+                            onApply(draft)
+                            onApplySort(sortDraft)
+                            onDismiss()
+                        }
+                        sheetDismiss?.invoke(applyAndClose) ?: applyAndClose()
                     },
                     modifier = Modifier.weight(1f)
                 ) {
