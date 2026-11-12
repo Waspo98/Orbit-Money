@@ -93,6 +93,7 @@ function createRestoreContext() {
   return {
     columnCache: new Map(),
     idMaps: new Map(),
+    deferredAccountPropertyLinks: [],
     deferredTransactionPairs: []
   };
 }
@@ -249,6 +250,18 @@ function transformRestoreRow(table, row, householdId, context) {
   const next = { ...row };
 
   switch (table) {
+    case 'accounts':
+      if (hasOwn(next, 'linked_property_account_id')) {
+        if (next.linked_property_account_id !== null && next.linked_property_account_id !== undefined) {
+          context.deferredAccountPropertyLinks.push({
+            oldId: next.id,
+            oldLinkedId: next.linked_property_account_id
+          });
+        }
+        next.linked_property_account_id = null;
+      }
+      break;
+
     case 'rules':
       if (hasOwn(next, 'conditions')) next.conditions = remapRuleConditions(next.conditions, context);
       if (hasOwn(next, 'actions')) next.actions = remapRuleActions(next.actions, context);
@@ -426,6 +439,19 @@ function insertRestoreRows(db, table, rows, householdId, context) {
   return inserted;
 }
 
+function applyDeferredAccountPropertyLinks(db, householdId, context) {
+  if (context.deferredAccountPropertyLinks.length === 0) return;
+  const update = db.prepare(
+    `UPDATE accounts SET linked_property_account_id = ? WHERE id = ? AND household_id = ?`
+  );
+  for (const link of context.deferredAccountPropertyLinks) {
+    const newId = mappedId(context, 'accounts', link.oldId);
+    const newLinkedId = mapOptionalId(context, 'accounts', link.oldLinkedId);
+    if (!newId || !newLinkedId || newId === newLinkedId) continue;
+    update.run(newLinkedId, newId, householdId);
+  }
+}
+
 function applyDeferredTransactionPairs(db, householdId, context) {
   if (context.deferredTransactionPairs.length === 0) return;
   const update = db.prepare(
@@ -552,6 +578,7 @@ export function restoreOrbitBackup(db, backup, householdId, currentUserId) {
     for (const table of RESTORE_INSERT_ORDER) {
       inserted[table] = insertRestoreRows(db, table, backup.tables?.[table] || [], householdId, context);
     }
+    applyDeferredAccountPropertyLinks(db, householdId, context);
     applyDeferredTransactionPairs(db, householdId, context);
 
     const { restored: membershipsRestored, userIdMap } = restoreMemberships(

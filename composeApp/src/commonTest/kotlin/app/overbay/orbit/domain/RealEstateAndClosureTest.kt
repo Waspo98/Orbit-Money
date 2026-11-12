@@ -183,4 +183,22 @@ class RealEstateAndClosureTest {
         )
         assertEquals("newamericanfunding.com", InstitutionLogoDefaults.resolveDomain("New American Funding"))
     }
+
+    @Test
+    fun linkedMortgage_suppressesStaleInlineHomeEquityAndContributesDebtOnly() {
+        val linkedMortgageWithStaleEst = Account(
+            id = 30L,
+            name = "Refinanced Mortgage",
+            type = AccountType.MORTGAGE,
+            currentBalanceCents = -380_000_00L,
+            estimatedValueCents = 450_000_00L,
+            linkedPropertyAccountId = 2L
+        )
+        assertEquals(null, linkedMortgageWithStaleEst.homeEquityCents)
+        assertEquals(-380_000_00L, linkedMortgageWithStaleEst.netWorthContributionCents)
+        assertEquals(
+            linkedMortgageWithStaleEst.netWorthContributionCents,
+            NetWorthEngine.accountContributionCents(linkedMortgageWithStaleEst, linkedMortgageWithStaleEst.currentBalanceCents)
+        )
+    }
 }

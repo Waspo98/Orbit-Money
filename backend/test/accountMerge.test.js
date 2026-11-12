@@ -17,15 +17,19 @@ function insertAccount(db, values) {
     .prepare(
       `INSERT INTO accounts (
          household_id, name, type, current_balance, estimated_value,
+         is_property, property_name, linked_property_account_id,
          simplefin_account_id, is_manual, sort_order
        )
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       values.name,
       values.type || 'checking',
       values.current_balance || 0,
       values.estimated_value ?? null,
+      values.is_property ?? 0,
+      values.property_name ?? null,
+      values.linked_property_account_id ?? null,
       values.simplefin_account_id ?? null,
       values.is_manual ?? 1,
       values.sort_order || 0
@@ -261,6 +265,58 @@ test('mergeAccounts preserves account-owned records before deleting the source a
       sub_target_spend: 4000,
       cardholder: 'Alex'
     });
+  } finally {
+    db.close();
+  }
+});
+
+test('mergeAccounts preserves linked real estate property references and loan links', () => {
+  const db = makeDb();
+  try {
+    // 1. Merging duplicate standalone properties re-points linked loans to target property
+    const targetPropId = insertAccount(db, {
+      name: '2104 Doubletree',
+      type: 'other',
+      is_property: 0
+    });
+    const sourcePropId = insertAccount(db, {
+      name: 'Doubletree Old',
+      type: 'other',
+      estimated_value: 45000000,
+      is_property: 1,
+      property_name: '2104 Doubletree Lane'
+    });
+    const mortgageId = insertAccount(db, {
+      name: 'Primary Mortgage',
+      type: 'mortgage',
+      current_balance: -39000000,
+      linked_property_account_id: sourcePropId
+    });
+
+    const propMerge = mergeAccounts(db, { householdId: 1, sourceId: sourcePropId, targetId: targetPropId });
+    assert.equal(propMerge.linkedPropertyLoansMoved, 1);
+
+    const targetProp = db.prepare('SELECT * FROM accounts WHERE id = ?').get(targetPropId);
+    assert.equal(targetProp.is_property, 1);
+    assert.equal(targetProp.estimated_value, 45000000);
+    assert.equal(targetProp.property_name, '2104 Doubletree Lane');
+
+    const movedMortgage = db.prepare('SELECT * FROM accounts WHERE id = ?').get(mortgageId);
+    assert.equal(movedMortgage.linked_property_account_id, targetPropId);
+
+    // 2. Merging old manual/refinanced mortgage into new SimpleFIN mortgage inherits property link
+    const refinancedSimpleFinId = insertAccount(db, {
+      name: 'New Servicer Mortgage',
+      type: 'mortgage',
+      current_balance: -38500000,
+      is_manual: 0,
+      simplefin_account_id: 'sf-new-mtg'
+    });
+    mergeAccounts(db, { householdId: 1, sourceId: mortgageId, targetId: refinancedSimpleFinId });
+
+    const mergedLoan = db.prepare('SELECT * FROM accounts WHERE id = ?').get(refinancedSimpleFinId);
+    assert.equal(mergedLoan.linked_property_account_id, targetPropId);
+    assert.equal(mergedLoan.is_property, 0);
   } finally {
     db.close();
   }

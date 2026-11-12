@@ -76,10 +76,12 @@ data class Account(
         }
     /**
      * Home equity calculated for real estate properties and mortgages with an estimated property value.
+     * Loans linked to a separate property anchor do not report standalone inline equity.
      */
     val homeEquityCents: Cents?
         get() = when {
             isProperty -> estimatedValueCents ?: currentBalanceCents.coerceAtLeast(0L)
+            linkedPropertyAccountId != null -> null
             type == AccountType.MORTGAGE && estimatedValueCents != null -> estimatedValueCents - abs(currentBalanceCents)
             else -> null
         }
@@ -87,13 +89,15 @@ data class Account(
     /**
      * Net worth contribution of this account.
      * Standalone properties contribute their estimated property value.
-     * Mortgages contribute (estimatedProperty - loanBalance).
+     * Linked property loans contribute negative balance (liability against their anchor property).
+     * Combined mortgages contribute (estimatedProperty - loanBalance).
      * Credit & loans contribute negative balance (liability).
      * Cash, savings, investments contribute positive balance (asset).
      */
     val netWorthContributionCents: Cents
         get() = when {
             isProperty -> estimatedValueCents ?: currentBalanceCents.coerceAtLeast(0L)
+            linkedPropertyAccountId != null -> -abs(currentBalanceCents)
             type == AccountType.MORTGAGE -> homeEquityCents ?: -abs(currentBalanceCents)
             type == AccountType.CREDIT || type == AccountType.LOAN -> -abs(currentBalanceCents)
             else -> currentBalanceCents

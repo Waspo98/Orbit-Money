@@ -419,6 +419,10 @@ export function mergeAccounts(db, { householdId, sourceId, targetId }) {
   }
 
   const run = db.transaction(() => {
+    const canTargetActAsPropertyAnchor =
+      ['other', 'mortgage'].includes(target.type) &&
+      (!target.linked_property_account_id || target.linked_property_account_id === sourceId);
+
     const summary = {
       transactionsMoved: db
         .prepare(
@@ -446,7 +450,19 @@ export function mergeAccounts(db, { householdId, sourceId, targetId }) {
             WHERE account_id = ?
               AND household_id = ?`
         )
-        .run(targetId, sourceId, householdId).changes
+        .run(targetId, sourceId, householdId).changes,
+      linkedPropertyLoansMoved: canTargetActAsPropertyAnchor
+        ? db
+            .prepare(
+              `UPDATE accounts
+                  SET linked_property_account_id = ?,
+                      updated_at = datetime('now')
+                WHERE linked_property_account_id = ?
+                  AND household_id = ?
+                  AND id != ?`
+            )
+            .run(targetId, sourceId, householdId, targetId).changes
+        : 0
     };
 
     Object.assign(summary, mergeBalanceRecords(db, { householdId, sourceId, targetId }));
@@ -465,9 +481,48 @@ export function mergeAccounts(db, { householdId, sourceId, targetId }) {
 
     db.prepare('DELETE FROM accounts WHERE id = ? AND household_id = ?').run(sourceId, householdId);
 
+    const targetWasLinkedToSource = target.linked_property_account_id === sourceId;
+    let effectiveLinkedPropertyId = targetWasLinkedToSource
+      ? null
+      : target.linked_property_account_id || null;
+
+    const existingTargetChildLoans = db
+      .prepare(
+        'SELECT COUNT(*) AS count FROM accounts WHERE household_id = ? AND linked_property_account_id = ?'
+      )
+      .get(householdId, targetId).count;
+
     const accountUpdates = [];
     const accountValues = [];
-    if (source.estimated_value != null && target.estimated_value == null) {
+
+    if (
+      !effectiveLinkedPropertyId &&
+      source.linked_property_account_id &&
+      source.linked_property_account_id !== targetId &&
+      ['loan', 'mortgage'].includes(target.type) &&
+      target.is_property !== 1 &&
+      existingTargetChildLoans === 0
+    ) {
+      effectiveLinkedPropertyId = source.linked_property_account_id;
+      accountUpdates.push('linked_property_account_id = ?');
+      accountValues.push(effectiveLinkedPropertyId);
+    }
+
+    if (
+      source.is_property === 1 &&
+      target.is_property !== 1 &&
+      target.type === 'other' &&
+      !effectiveLinkedPropertyId
+    ) {
+      accountUpdates.push('is_property = 1');
+    }
+
+    if (source.property_name && !target.property_name) {
+      accountUpdates.push('property_name = ?');
+      accountValues.push(source.property_name);
+    }
+
+    if (source.estimated_value != null && target.estimated_value == null && !effectiveLinkedPropertyId) {
       accountUpdates.push('estimated_value = ?');
       accountValues.push(source.estimated_value);
     }

@@ -7,6 +7,7 @@ import { convertWorkspaceSnapshotToOrbitBackup } from '../src/services/orbitBack
 
 function makeDb() {
   const db = new Database(':memory:');
+  db.pragma('foreign_keys = ON');
   db.exec(`
     CREATE TABLE users (
       id INTEGER PRIMARY KEY,
@@ -52,6 +53,11 @@ function makeDb() {
       name TEXT NOT NULL,
       type TEXT NOT NULL,
       current_balance INTEGER NOT NULL DEFAULT 0,
+      estimated_value INTEGER,
+      is_property INTEGER NOT NULL DEFAULT 0,
+      property_name TEXT,
+      linked_property_account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+      closure_prompt_dismissed_at TEXT,
       is_manual INTEGER NOT NULL DEFAULT 1
     );
 
@@ -528,4 +534,53 @@ test('convertWorkspaceSnapshotToOrbitBackup converts Kotlin workspace snapshot c
   assert.equal(converted.tables.accounts.length, 1);
   assert.equal(converted.tables.credit_card_profiles.length, 1);
   assert.equal(converted.tables.credit_card_profiles[0].annual_fee, 9500);
+});
+
+test('restoreOrbitBackup and snapshot bridge remap linked_property_account_id with foreign_keys = ON', () => {
+  const db = makeDb();
+  const converted = convertWorkspaceSnapshotToOrbitBackup({
+    schemaVersion: 1,
+    household: { name: 'Real Estate Home' },
+    accounts: [
+      // Mortgage appears BEFORE its linked property and references old id 500
+      {
+        id: 501,
+        name: 'Primary Mortgage',
+        type: 'MORTGAGE',
+        currentBalanceCents: -39000000,
+        linkedPropertyAccountId: 500,
+        closurePromptDismissedAt: '2026-11-11T12:00:00Z'
+      },
+      {
+        id: 500,
+        name: '2104 Doubletree Lane',
+        type: 'OTHER',
+        estimatedValueCents: 45000000,
+        isProperty: true,
+        propertyName: '2104 Doubletree Lane'
+      },
+      // Loan referencing non-existent / other-household id 10 must safely null out
+      {
+        id: 502,
+        name: 'Orphan Loan',
+        type: 'LOAN',
+        currentBalanceCents: -500000,
+        linkedPropertyAccountId: 10
+      }
+    ]
+  });
+
+  const result = restoreOrbitBackup(db, converted, 1, 7);
+  assert.equal(result.inserted.accounts, 3);
+
+  const prop = db.prepare("SELECT * FROM accounts WHERE household_id = 1 AND name = '2104 Doubletree Lane'").get();
+  const mtg = db.prepare("SELECT * FROM accounts WHERE household_id = 1 AND name = 'Primary Mortgage'").get();
+  const orphan = db.prepare("SELECT * FROM accounts WHERE household_id = 1 AND name = 'Orphan Loan'").get();
+
+  assert.equal(prop.is_property, 1);
+  assert.equal(prop.estimated_value, 45000000);
+  assert.equal(prop.property_name, '2104 Doubletree Lane');
+  assert.equal(mtg.linked_property_account_id, prop.id);
+  assert.equal(mtg.closure_prompt_dismissed_at, '2026-11-11T12:00:00Z');
+  assert.equal(orphan.linked_property_account_id, null);
 });
