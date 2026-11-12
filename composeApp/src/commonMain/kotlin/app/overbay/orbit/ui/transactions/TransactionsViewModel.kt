@@ -26,7 +26,26 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+private data class TransactionsOverlayState(
+    val isSearchActive: Boolean = false,
+    val selectedIds: Set<Long> = emptySet(),
+    val inspectingId: Long? = null,
+    val expandedId: Long? = null,
+    val showEditorSheet: Boolean = false,
+    val showSplitSheet: Boolean = false,
+    val showCsvImportSheet: Boolean = false,
+    val showFilterSheet: Boolean = false,
+    val showBatchDeleteConfirm: Boolean = false,
+    val singleDeleteConfirmId: Long? = null,
+    val showCategoryBatchPicker: Boolean = false,
+    val logoFinderTransactionId: Long? = null,
+    val ruleDraftTransactionId: Long? = null,
+    val categoryPickerTransactionId: Long? = null,
+    val showCustomizeActionsSheet: Boolean = false
+)
 
 class TransactionsViewModel(
     private val repository: OrbitRepository,
@@ -36,25 +55,13 @@ class TransactionsViewModel(
     private val _searchQuery = MutableStateFlow("")
     var searchQueryInput by mutableStateOf("")
         private set
-    private val _isSearchActive = MutableStateFlow(false)
     private val _quickFilter = MutableStateFlow(QuickFilter.ALL)
     private val _filterDraft = MutableStateFlow(TransactionFilterDraft())
     private val _sortOption = MutableStateFlow(TransactionSortOption.DATE_DESC)
     private val _isCompactView = MutableStateFlow(false)
     private val _pageSize = MutableStateFlow(50)
     private val _currentPage = MutableStateFlow(1)
-    private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
-    private val _inspectingId = MutableStateFlow<Long?>(null)
-    private val _expandedId = MutableStateFlow<Long?>(null)
-    private val _showEditorSheet = MutableStateFlow(false)
-    private val _showSplitSheet = MutableStateFlow(false)
-    private val _showCsvImportSheet = MutableStateFlow(false)
-    private val _showFilterSheet = MutableStateFlow(false)
-    private val _showBatchDeleteConfirm = MutableStateFlow(false)
-    private val _singleDeleteConfirmId = MutableStateFlow<Long?>(null)
-    private val _showCategoryBatchPicker = MutableStateFlow(false)
-    private val _logoFinderTransactionId = MutableStateFlow<Long?>(null)
-    private val _ruleDraftTransactionId = MutableStateFlow<Long?>(null)
+    private val _overlays = MutableStateFlow(TransactionsOverlayState())
     private val _isSyncing = MutableStateFlow(false)
     private val _syncToastMessage = MutableStateFlow<String?>(null)
 
@@ -62,10 +69,11 @@ class TransactionsViewModel(
         repository.transactions,
         repository.categories,
         repository.accounts,
-        repository.rules
-    ) { txns, categories, accounts, rules ->
+        repository.rules,
+        repository.preferences
+    ) { txns, categories, accounts, rules, preferences ->
         val nextPriority = (rules.maxOfOrNull { it.priority } ?: 0) + 10
-        TransactionsFilterHelper.RepoSnapshot(txns, categories, accounts, nextPriority)
+        TransactionsFilterHelper.RepoSnapshot(txns, categories, accounts, nextPriority, preferences)
     }.distinctUntilChanged()
 
     private val filterFlow = combine(
@@ -89,7 +97,7 @@ class TransactionsViewModel(
         dataFlow,
         filterFlow,
         paginationFlow
-    ) { (txns, categories, accounts, nextPriority), filterParams, (pageSize, page) ->
+    ) { (txns, categories, accounts, nextPriority, preferences), filterParams, (pageSize, page) ->
         val categoryMap = categories.associateBy { it.id }
         val accountMap = accounts.associateBy { it.id }
 
@@ -151,46 +159,36 @@ class TransactionsViewModel(
             totalExpenseCents = totalExpense,
             totalIncomeCents = totalIncome,
             netCashflowCents = totalIncome + totalExpense,
-            mhaEnabled = repository.preferences.value.mhaTrackerEnabled
+            mhaEnabled = preferences.mhaTrackerEnabled,
+            transactionPinnedActions = preferences.transactionPinnedActions,
+            transactionActionOrder = preferences.transactionActionOrder
         )
     }.flowOn(computeDispatcher)
 
-    @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<TransactionsUiState> = combine(
         baseStateFlow,
-        _isSearchActive,
-        _selectedIds,
-        _inspectingId,
-        _expandedId,
-        _showEditorSheet,
-        _showSplitSheet,
-        _showCsvImportSheet,
-        _showFilterSheet,
-        _showBatchDeleteConfirm,
-        _singleDeleteConfirmId,
-        _showCategoryBatchPicker,
-        _logoFinderTransactionId,
-        _ruleDraftTransactionId,
+        _overlays,
         _isSyncing,
         _syncToastMessage
-    ) { args ->
-        val base = args[0] as TransactionsUiState
+    ) { base, overlays, isSyncing, syncToast ->
         base.copy(
-            isSearchActive = args[1] as Boolean,
-            selectedTransactionIds = args[2] as Set<Long>,
-            inspectingTransactionId = args[3] as Long?,
-            expandedTransactionId = args[4] as Long?,
-            showEditorSheet = args[5] as Boolean,
-            showSplitSheet = args[6] as Boolean,
-            showCsvImportSheet = args[7] as Boolean,
-            showFilterSheet = args[8] as Boolean,
-            showBatchDeleteConfirm = args[9] as Boolean,
-            singleDeleteConfirmId = args[10] as Long?,
-            showCategoryBatchPicker = args[11] as Boolean,
-            logoFinderTransactionId = args[12] as Long?,
-            ruleDraftTransactionId = args[13] as Long?,
-            isSyncing = args[14] as Boolean,
-            syncToastMessage = args[15] as String?
+            isSearchActive = overlays.isSearchActive,
+            selectedTransactionIds = overlays.selectedIds,
+            inspectingTransactionId = overlays.inspectingId,
+            expandedTransactionId = overlays.expandedId,
+            showEditorSheet = overlays.showEditorSheet,
+            showSplitSheet = overlays.showSplitSheet,
+            showCsvImportSheet = overlays.showCsvImportSheet,
+            showFilterSheet = overlays.showFilterSheet,
+            showBatchDeleteConfirm = overlays.showBatchDeleteConfirm,
+            singleDeleteConfirmId = overlays.singleDeleteConfirmId,
+            showCategoryBatchPicker = overlays.showCategoryBatchPicker,
+            logoFinderTransactionId = overlays.logoFinderTransactionId,
+            ruleDraftTransactionId = overlays.ruleDraftTransactionId,
+            categoryPickerTransactionId = overlays.categoryPickerTransactionId,
+            showCustomizeActionsSheet = overlays.showCustomizeActionsSheet,
+            isSyncing = isSyncing,
+            syncToastMessage = syncToast
         )
     }.flowOn(computeDispatcher)
         .stateIn(
@@ -204,16 +202,16 @@ class TransactionsViewModel(
         _searchQuery.value = query
     }
     fun setSearchActive(active: Boolean) {
-        _isSearchActive.value = active
+        _overlays.update { it.copy(isSearchActive = active) }
         if (!active) setSearchQuery("")
     }
     fun setQuickFilter(filter: QuickFilter) { _quickFilter.value = filter }
     fun setSortOption(sort: TransactionSortOption) { _sortOption.value = sort }
     fun toggleCompactView() { _isCompactView.value = !_isCompactView.value }
     fun applyFilterDraft(draft: TransactionFilterDraft) { _filterDraft.value = draft }
-    fun setShowBatchDeleteConfirm(show: Boolean) { _showBatchDeleteConfirm.value = show }
-    fun setSingleDeleteConfirmId(id: Long?) { _singleDeleteConfirmId.value = id }
-    fun setShowCategoryBatchPicker(show: Boolean) { _showCategoryBatchPicker.value = show }
+    fun setShowBatchDeleteConfirm(show: Boolean) { _overlays.update { it.copy(showBatchDeleteConfirm = show) } }
+    fun setSingleDeleteConfirmId(id: Long?) { _overlays.update { it.copy(singleDeleteConfirmId = id) } }
+    fun setShowCategoryBatchPicker(show: Boolean) { _overlays.update { it.copy(showCategoryBatchPicker = show) } }
 
     fun setPageSize(size: Int) {
         _pageSize.value = size
@@ -262,7 +260,6 @@ class TransactionsViewModel(
         if (!hasDeepLink) return
 
         setSearchQuery("")
-        _isSearchActive.value = openSearch
         _quickFilter.value = if (uncategorizedOnly) QuickFilter.UNCATEGORIZED else QuickFilter.ALL
 
         val resolvedSort = sortOption?.let { TransactionsFilterHelper.parseSortOption(it) }
@@ -281,62 +278,69 @@ class TransactionsViewModel(
             includeIgnored = includeIgnored
         )
 
-        _inspectingId.value = transactionId
-        _expandedId.value = transactionId
-        _showEditorSheet.value = openAddSheet
-        _showSplitSheet.value = false
+        _overlays.update {
+            it.copy(
+                isSearchActive = openSearch,
+                inspectingId = transactionId,
+                expandedId = transactionId,
+                showEditorSheet = openAddSheet,
+                showSplitSheet = false
+            )
+        }
         _currentPage.value = 1
     }
 
     fun toggleTransactionSelection(id: Long) {
-        val current = _selectedIds.value
-        _selectedIds.value = if (current.contains(id)) current - id else current + id
+        _overlays.update { state ->
+            val current = state.selectedIds
+            state.copy(selectedIds = if (current.contains(id)) current - id else current + id)
+        }
     }
 
     fun selectAll() {
         val visibleIds = uiState.value.filteredTransactions.map { it.id }.toSet()
-        _selectedIds.value = visibleIds
+        _overlays.update { it.copy(selectedIds = visibleIds) }
     }
 
-    fun clearSelection() { _selectedIds.value = emptySet() }
+    fun clearSelection() { _overlays.update { it.copy(selectedIds = emptySet()) } }
 
     fun toggleExpandTransaction(id: Long) {
-        _expandedId.value = if (_expandedId.value == id) null else id
+        _overlays.update { it.copy(expandedId = if (it.expandedId == id) null else id) }
     }
 
     fun selectTransactionForInspect(id: Long?) {
-        if (id != null && _inspectingId.value == id && !_showEditorSheet.value && !_showSplitSheet.value) {
-            _inspectingId.value = null
-        } else {
-            _inspectingId.value = id
-            _showEditorSheet.value = false
-            _showSplitSheet.value = false
+        _overlays.update { state ->
+            if (id != null && state.inspectingId == id && !state.showEditorSheet && !state.showSplitSheet) {
+                state.copy(inspectingId = null)
+            } else {
+                state.copy(inspectingId = id, showEditorSheet = false, showSplitSheet = false)
+            }
         }
     }
 
     fun dismissInspectorPane() {
-        _inspectingId.value = null
-        _showEditorSheet.value = false
-        _showSplitSheet.value = false
+        _overlays.update { it.copy(inspectingId = null, showEditorSheet = false, showSplitSheet = false) }
     }
 
     fun openTransactionEditor(id: Long? = null) {
-        _inspectingId.value = id
-        _showEditorSheet.value = true
+        _overlays.update { it.copy(inspectingId = id, showEditorSheet = true) }
     }
 
-    fun closeTransactionEditor() { _showEditorSheet.value = false }
+    fun closeTransactionEditor() { _overlays.update { it.copy(showEditorSheet = false) } }
     fun openSplitSheet(id: Long) {
-        _inspectingId.value = id
-        _showSplitSheet.value = true
+        _overlays.update { it.copy(inspectingId = id, showSplitSheet = true) }
     }
-    fun closeSplitSheet() { _showSplitSheet.value = false }
-    fun openCsvImportSheet() { _showCsvImportSheet.value = true }
-    fun closeCsvImportSheet() { _showCsvImportSheet.value = false }
-    fun openFilterSheet() { _showFilterSheet.value = true }
-    fun closeFilterSheet() { _showFilterSheet.value = false }
-    fun openLogoFinder(transactionId: Long) { _logoFinderTransactionId.value = transactionId }
-    fun closeLogoFinder() { _logoFinderTransactionId.value = null }
+    fun closeSplitSheet() { _overlays.update { it.copy(showSplitSheet = false) } }
+    fun openCsvImportSheet() { _overlays.update { it.copy(showCsvImportSheet = true) } }
+    fun closeCsvImportSheet() { _overlays.update { it.copy(showCsvImportSheet = false) } }
+    fun openFilterSheet() { _overlays.update { it.copy(showFilterSheet = true) } }
+    fun closeFilterSheet() { _overlays.update { it.copy(showFilterSheet = false) } }
+    fun openLogoFinder(transactionId: Long) { _overlays.update { it.copy(logoFinderTransactionId = transactionId) } }
+    fun closeLogoFinder() { _overlays.update { it.copy(logoFinderTransactionId = null) } }
+    fun openCategoryPicker(transactionId: Long) { _overlays.update { it.copy(categoryPickerTransactionId = transactionId) } }
+    fun closeCategoryPicker() { _overlays.update { it.copy(categoryPickerTransactionId = null) } }
+    fun openCustomizeActionsSheet() { _overlays.update { it.copy(showCustomizeActionsSheet = true) } }
+    fun closeCustomizeActionsSheet() { _overlays.update { it.copy(showCustomizeActionsSheet = false) } }
 
     fun reportMerchantLogoStatus(merchantKey: String, status: String) {
         viewModelScope.launch(computeDispatcher) { repository.reportMerchantLogoStatus(merchantKey, status) }
@@ -458,6 +462,30 @@ class TransactionsViewModel(
         }
     }
 
+    fun quickSetCategory(transactionId: Long, categoryId: Long?) {
+        closeCategoryPicker()
+        viewModelScope.launch(computeDispatcher) {
+            val txn = uiState.value.transactions.find { it.id == transactionId } ?: return@launch
+            val updated = txn.copy(
+                editedCategoryId = categoryId,
+                editedCategoryIdSource = "user",
+                editSource = EditSource.USER
+            )
+            repository.saveTransaction(updated)
+        }
+    }
+
+    fun saveTransactionQuickActions(pinnedIds: List<String>, orderIds: List<String>) {
+        closeCustomizeActionsSheet()
+        viewModelScope.launch(computeDispatcher) {
+            val updated = repository.preferences.value.copy(
+                transactionPinnedActions = pinnedIds,
+                transactionActionOrder = orderIds
+            )
+            repository.updatePreferences(updated)
+        }
+    }
+
     fun resetMerchant(id: Long) = resetField(id, "merchant")
     fun resetCategory(id: Long) = resetField(id, "category")
     fun resetField(id: Long, field: String) { viewModelScope.launch { repository.resetTransactionFields(id, listOf(field)) } }
@@ -468,10 +496,14 @@ class TransactionsViewModel(
     fun deleteTransaction(id: Long) {
         viewModelScope.launch(computeDispatcher) {
             repository.deleteTransaction(id)
-            if (_inspectingId.value == id) _inspectingId.value = null
-            if (_expandedId.value == id) _expandedId.value = null
-            closeTransactionEditor()
-            closeSplitSheet()
+            _overlays.update { state ->
+                state.copy(
+                    inspectingId = if (state.inspectingId == id) null else state.inspectingId,
+                    expandedId = if (state.expandedId == id) null else state.expandedId,
+                    showEditorSheet = false,
+                    showSplitSheet = false
+                )
+            }
         }
     }
 
@@ -521,7 +553,7 @@ class TransactionsViewModel(
     }
 
     fun batchCategorize(categoryId: Long) {
-        val selected = _selectedIds.value
+        val selected = _overlays.value.selectedIds
         if (selected.isEmpty()) return
         viewModelScope.launch(computeDispatcher) {
             repository.batchEditCategory(selected, categoryId)
@@ -530,7 +562,7 @@ class TransactionsViewModel(
     }
 
     fun batchMarkTransfer(isTransfer: Boolean) {
-        val selected = _selectedIds.value
+        val selected = _overlays.value.selectedIds
         if (selected.isEmpty()) return
         viewModelScope.launch(computeDispatcher) {
             repository.batchMarkTransfer(selected, isTransfer)
@@ -539,7 +571,7 @@ class TransactionsViewModel(
     }
 
     fun batchToggleMha() {
-        val selected = _selectedIds.value
+        val selected = _overlays.value.selectedIds
         if (selected.isEmpty()) return
         viewModelScope.launch(computeDispatcher) {
             val txns = uiState.value.transactions.filter { it.id in selected }
@@ -550,7 +582,7 @@ class TransactionsViewModel(
     }
 
     fun batchMarkIgnored(isIgnored: Boolean) {
-        val selected = _selectedIds.value
+        val selected = _overlays.value.selectedIds
         if (selected.isEmpty()) return
         viewModelScope.launch(computeDispatcher) {
             repository.batchSetIgnored(selected, isIgnored)
@@ -559,7 +591,7 @@ class TransactionsViewModel(
     }
 
     fun batchDelete() {
-        val selected = _selectedIds.value
+        val selected = _overlays.value.selectedIds
         if (selected.isEmpty()) return
         viewModelScope.launch(computeDispatcher) {
             repository.batchDeleteTransactions(selected)
@@ -568,14 +600,13 @@ class TransactionsViewModel(
     }
 
     fun openCreateRuleModal(transactionId: Long) {
-        _showEditorSheet.value = false
-        _ruleDraftTransactionId.value = transactionId
+        _overlays.update { it.copy(showEditorSheet = false, ruleDraftTransactionId = transactionId) }
     }
 
-    fun closeCreateRuleModal() { _ruleDraftTransactionId.value = null }
+    fun closeCreateRuleModal() { _overlays.update { it.copy(ruleDraftTransactionId = null) } }
 
     fun saveRuleFromTransaction(rule: TransactionRule) {
-        _ruleDraftTransactionId.value = null
+        _overlays.update { it.copy(ruleDraftTransactionId = null) }
         viewModelScope.launch(computeDispatcher) { repository.saveRule(rule) }
     }
 

@@ -2,6 +2,7 @@ package app.overbay.orbit.ui.transactions
 
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.EditSource
+import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.TransactionFilterDraft
@@ -87,6 +88,7 @@ object TransactionsFilterHelper {
                     val hasEdit = txn.editSource != EditSource.NONE ||
                             txn.editedMerchant != null ||
                             txn.editedCategoryId != null ||
+                            txn.editedCategoryIdSource != null ||
                             txn.editedAmountCents != null ||
                             txn.editedDate != null ||
                             txn.editedIsTransfer != null ||
@@ -98,6 +100,7 @@ object TransactionsFilterHelper {
                     val hasEdit = txn.editSource != EditSource.NONE ||
                             txn.editedMerchant != null ||
                             txn.editedCategoryId != null ||
+                            txn.editedCategoryIdSource != null ||
                             txn.editedAmountCents != null ||
                             txn.editedDate != null ||
                             txn.editedIsTransfer != null ||
@@ -187,7 +190,8 @@ object TransactionsFilterHelper {
         val transactions: List<Transaction>,
         val categories: List<Category>,
         val accounts: List<app.overbay.orbit.data.model.Account>,
-        val nextRulePriority: Int
+        val nextRulePriority: Int,
+        val preferences: OrbitPreferences = OrbitPreferences()
     )
 
     data class FilterParams(

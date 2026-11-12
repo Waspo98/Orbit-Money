@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.util.lerp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
@@ -285,14 +286,19 @@ private fun TransactionsGroupedLazyList(
             }
 
             items(items = group.transactions, key = { it.id }, contentType = { "transaction_row" }) { txn ->
+                val origCatLabel = txn.originalCategoryId?.let { state.categoryMap[it]?.labelWithEmoji }
                 SwipeableTransactionRow(
                     transaction = txn,
                     category = state.categoryMap[txn.effectiveCategoryId],
+                    originalCategoryLabel = origCatLabel,
                     accountName = state.accountMap[txn.accountId]?.name ?: txn.accountName,
                     isSelected = state.selectedTransactionIds.contains(txn.id),
                     isSelectionMode = state.isSelectionMode,
                     isExpanded = !isWideScreen && state.expandedTransactionId == txn.id,
                     isInspected = isWideScreen && state.inspectingTransactionId == txn.id,
+                    mhaEnabled = state.mhaEnabled,
+                    pinnedActions = state.transactionPinnedActions,
+                    actionOrder = state.transactionActionOrder,
                     onClick = {
                         onInteraction()
                         if (state.isSelectionMode) {
@@ -304,6 +310,7 @@ private fun TransactionsGroupedLazyList(
                         }
                     },
                     onLongClick = { onInteraction(); viewModel.toggleTransactionSelection(txn.id) },
+                    onOpenCategoryPicker = { viewModel.openCategoryPicker(txn.id) },
                     onEdit = { viewModel.openTransactionEditor(txn.id) },
                     onSplit = { viewModel.openSplitSheet(txn.id) },
                     onCreateRule = { viewModel.openCreateRuleModal(txn.id) },
@@ -312,8 +319,13 @@ private fun TransactionsGroupedLazyList(
                     onToggleMha = { viewModel.toggleMha(txn.id) },
                     onToggleIgnore = { viewModel.toggleIgnore(txn.id) },
                     onDelete = { viewModel.setSingleDeleteConfirmId(txn.id) },
-                    onResetMerchant = { viewModel.resetMerchant(txn.id) },
-                    onResetCategory = { viewModel.resetCategory(txn.id) },
+                    onCustomizeActions = { viewModel.openCustomizeActionsSheet() },
+                    onResetField = { field -> viewModel.resetField(txn.id, field) },
+                    onResetAll = { viewModel.resetTransaction(txn.id) },
+                    onViewRule = { ruleId ->
+                        viewModel.requestOpenRuleEditor(ruleId)
+                        onNavigate(OrbitNavKey.Rules)
+                    },
                     onFindLogo = { viewModel.openLogoFinder(txn.id) },
                     onUseCategoryIcon = { viewModel.useCategoryIconForTransaction(txn.id) },
                     onReportLogoStatus = { key, status -> viewModel.reportMerchantLogoStatus(key, status) },

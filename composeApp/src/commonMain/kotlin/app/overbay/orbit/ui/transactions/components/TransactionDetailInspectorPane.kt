@@ -133,7 +133,11 @@ fun TransactionDetailInspectorPane(
                         categoryColorHex = cat?.color,
                         originalCategoryLabel = origCat?.labelWithEmoji,
                         accountName = state.accountMap[inspecting.accountId]?.name ?: inspecting.accountName,
+                        mhaEnabled = state.mhaEnabled,
+                        pinnedActions = state.transactionPinnedActions,
+                        actionOrder = state.transactionActionOrder,
                         onClose = onClosePane,
+                        onOpenCategoryPicker = { viewModel.openCategoryPicker(inspecting.id) },
                         onEdit = { viewModel.openTransactionEditor(inspecting.id) },
                         onSplit = { viewModel.openSplitSheet(inspecting.id) },
                         onCreateRule = { viewModel.openCreateRuleModal(inspecting.id) },
@@ -145,6 +149,7 @@ fun TransactionDetailInspectorPane(
                         onToggleMha = { viewModel.toggleMha(inspecting.id) },
                         onToggleIgnore = { viewModel.toggleIgnore(inspecting.id) },
                         onDelete = { onRequestDelete(inspecting.id) },
+                        onCustomizeActions = { viewModel.openCustomizeActionsSheet() },
                         onResetMerchant = { viewModel.resetField(inspecting.id, "merchant") },
                         onResetCategory = { viewModel.resetField(inspecting.id, "category") },
                         onResetField = { field -> viewModel.resetField(inspecting.id, field) },
@@ -167,7 +172,6 @@ fun TransactionDetailInspectorPane(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TransactionReadOnlyDetailContent(
     transaction: Transaction,
@@ -176,7 +180,11 @@ private fun TransactionReadOnlyDetailContent(
     categoryColorHex: String?,
     originalCategoryLabel: String? = null,
     accountName: String,
+    mhaEnabled: Boolean,
+    pinnedActions: List<String>,
+    actionOrder: List<String>,
     onClose: () -> Unit,
+    onOpenCategoryPicker: () -> Unit,
     onEdit: () -> Unit,
     onSplit: () -> Unit,
     onCreateRule: () -> Unit,
@@ -185,6 +193,7 @@ private fun TransactionReadOnlyDetailContent(
     onToggleMha: () -> Unit,
     onToggleIgnore: () -> Unit,
     onDelete: () -> Unit,
+    onCustomizeActions: () -> Unit,
     onResetMerchant: () -> Unit,
     onResetCategory: () -> Unit,
     onResetField: (String) -> Unit,
@@ -278,15 +287,41 @@ private fun TransactionReadOnlyDetailContent(
                 )
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                InspectorMetaItem(
-                    label = "CATEGORY",
-                    value = categoryName ?: if (transaction.effectiveIsTransfer) "🔄 Transfer" else "❓ Uncategorized",
-                    valueColor = catColor,
-                    subtitle = if (transaction.editedCategoryId != null && originalCategoryLabel != null) {
-                        "Originally: $originalCategoryLabel"
-                    } else null,
-                    onReset = if (transaction.editedCategoryId != null) onResetCategory else null
-                )
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "CATEGORY",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (transaction.editedCategoryIdSource != null || transaction.editedCategoryId != null) {
+                            Text(
+                                text = "Reset",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(start = 8.dp).clickable { haptics.tick(); onResetCategory() }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    TransactionCategoryChip(
+                        categoryLabel = categoryName ?: if (transaction.effectiveIsTransfer) "🔄 Transfer" else "❓ Uncategorized",
+                        categoryColor = catColor,
+                        onClick = onOpenCategoryPicker
+                    )
+                    if (transaction.editedCategoryIdSource != null || transaction.editedCategoryId != null) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Originally: ${originalCategoryLabel ?: "Uncategorized"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 InspectorMetaItem(
                     label = "ORIGINAL DESCRIPTION",
                     value = transaction.originalDescription ?: transaction.originalMerchant,
@@ -300,19 +335,20 @@ private fun TransactionReadOnlyDetailContent(
         HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
         Spacer(modifier = Modifier.height(16.dp))
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            InspectorPillAction(label = "Edit", onClick = onEdit)
-            InspectorPillAction(label = "Split", onClick = onSplit)
-            InspectorPillAction(label = "Create Rule", onClick = onCreateRule)
-            InspectorPillAction(label = "Recurring", onClick = onMarkRecurring)
-            InspectorPillAction(label = if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Transfer", onClick = onToggleTransfer)
-            InspectorPillAction(label = if (transaction.effectiveMhaEligible == true) "Remove MHA" else "MHA Eligible", onClick = onToggleMha)
-            InspectorPillAction(label = if (transaction.effectiveIsIgnored) "Unignore" else "Ignore", onClick = onToggleIgnore)
-            InspectorPillAction(label = "Delete", isDestructive = true, onClick = onDelete)
-        }
+        TransactionQuickActionStrip(
+            transaction = transaction,
+            pinnedIds = pinnedActions,
+            orderIds = actionOrder,
+            mhaEnabled = mhaEnabled,
+            onEdit = onEdit,
+            onSplit = onSplit,
+            onCreateRule = onCreateRule,
+            onMarkRecurring = onMarkRecurring,
+            onToggleTransfer = onToggleTransfer,
+            onToggleMha = onToggleMha,
+            onToggleIgnore = onToggleIgnore,
+            onDelete = onDelete,
+            onCustomizeActions = onCustomizeActions
+        )
     }
 }

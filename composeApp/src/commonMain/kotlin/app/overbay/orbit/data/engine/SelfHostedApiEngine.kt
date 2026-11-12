@@ -159,6 +159,8 @@ class SelfHostedApiEngine(
             accountInstitutionLogoOverrides = remotePrefs?.prefOr("accountInstitutionLogoOverrides", currentPrefs.accountInstitutionLogoOverrides) ?: currentPrefs.accountInstitutionLogoOverrides,
             includeHsaInRetirementRate = remotePrefs?.prefOr("includeHsaInRetirementRate", currentPrefs.includeHsaInRetirementRate) ?: currentPrefs.includeHsaInRetirementRate,
             notificationPreferences = remotePrefs?.prefOr("notificationPreferences", currentPrefs.notificationPreferences) ?: currentPrefs.notificationPreferences,
+            transactionPinnedActions = remotePrefs?.prefOr("transactionPinnedActions", currentPrefs.transactionPinnedActions) ?: currentPrefs.transactionPinnedActions,
+            transactionActionOrder = remotePrefs?.prefOr("transactionActionOrder", currentPrefs.transactionActionOrder) ?: currentPrefs.transactionActionOrder,
             isSharedNonOwnerSession = sharing != null && sharing.currentUserRole != "owner",
             isReadOnlySession = sharing != null && sharing.currentUserAccessLevel == "read",
             sharedSessionCachedAtEpochMs = Clock.System.now().toEpochMilliseconds()
@@ -428,6 +430,8 @@ class SelfHostedApiEngine(
             map["dashboardWidgets"] = json.encodeToJsonElement(preferences.dashboardWidgets)
             map["cardPerksWidgets"] = json.encodeToJsonElement(preferences.cardPerksWidgets)
             map["notificationPreferences"] = json.encodeToJsonElement(preferences.notificationPreferences)
+            map["transactionPinnedActions"] = json.encodeToJsonElement(preferences.transactionPinnedActions)
+            map["transactionActionOrder"] = json.encodeToJsonElement(preferences.transactionActionOrder)
             map["accountGroupWideSpans"] = json.encodeToJsonElement(preferences.accountGroupWideSpans)
             apiClient.putRemotePreferences(map)
         }

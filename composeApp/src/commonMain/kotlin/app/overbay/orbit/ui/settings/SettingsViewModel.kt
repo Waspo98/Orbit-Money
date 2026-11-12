@@ -211,6 +211,23 @@ class SettingsViewModel(
         scope.launch { repository.updatePreferences(updated) }
     }
 
+    fun openTransactionActionsSheet() {
+        _uiState.update { it.copy(showTransactionActionsSheet = true) }
+    }
+
+    fun closeTransactionActionsSheet() {
+        _uiState.update { it.copy(showTransactionActionsSheet = false) }
+    }
+
+    fun saveTransactionQuickActions(pinnedIds: List<String>, orderIds: List<String>) {
+        val updated = _uiState.value.preferences.copy(
+            transactionPinnedActions = pinnedIds,
+            transactionActionOrder = orderIds
+        )
+        _uiState.update { it.copy(preferences = updated, showTransactionActionsSheet = false) }
+        scope.launch { repository.updatePreferences(updated) }
+    }
+
     // Push Notifications
     fun loadPushConfig() {
         scope.launch {

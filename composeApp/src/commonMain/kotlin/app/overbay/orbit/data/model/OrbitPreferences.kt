@@ -21,6 +21,38 @@ enum class OrbitThemeMode(val displayName: String, val emoji: String) {
 }
 
 @Serializable
+enum class TransactionQuickAction(val id: String, val label: String) {
+    EDIT("edit", "Edit"),
+    SPLIT("split", "Split"),
+    CREATE_RULE("create_rule", "Create Rule"),
+    IGNORE("ignore", "Ignore"),
+    RECURRING("recurring", "Recurring"),
+    TRANSFER("transfer", "Transfer"),
+    MHA("mha", "MHA"),
+    DELETE("delete", "Delete");
+
+    companion object {
+        fun fromId(id: String): TransactionQuickAction? =
+            entries.firstOrNull { it.id.equals(id, ignoreCase = true) }
+
+        fun resolveActions(
+            pinnedIds: List<String>,
+            orderIds: List<String>,
+            mhaEnabled: Boolean
+        ): Pair<List<TransactionQuickAction>, List<TransactionQuickAction>> {
+            val orderIndex = orderIds.withIndex().associate { it.value.lowercase() to it.index }
+            val orderedAll = entries.sortedWith(
+                compareBy<TransactionQuickAction> { orderIndex[it.id] ?: (1000 + it.ordinal) }
+                    .thenBy { it.ordinal }
+            )
+            val visible = if (mhaEnabled) orderedAll else orderedAll.filter { it != MHA }
+            val pinnedSet = pinnedIds.map { it.lowercase() }.toSet()
+            return visible.partition { it.id in pinnedSet }
+        }
+    }
+}
+
+@Serializable
 data class DashboardWidgetConfig(
     val widgetId: String,
     val title: String,
@@ -67,11 +99,19 @@ data class OrbitPreferences(
     val accountInstitutionLogoOverrides: Map<String, MerchantLogo> = emptyMap(),
     val includeHsaInRetirementRate: Boolean = true,
     val notificationPreferences: NotificationPreferencesConfig = NotificationPreferencesConfig(),
+    val transactionPinnedActions: List<String> = defaultTransactionPinnedActions(),
+    val transactionActionOrder: List<String> = defaultTransactionActionOrder(),
     val sharedSessionCachedAtEpochMs: Long? = null,
     val isSharedNonOwnerSession: Boolean = false,
     val isReadOnlySession: Boolean = false
 ) {
     companion object {
+        fun defaultTransactionPinnedActions(): List<String> =
+            listOf("edit", "split", "create_rule")
+
+        fun defaultTransactionActionOrder(): List<String> =
+            TransactionQuickAction.entries.map { it.id }
+
         fun defaultDashboardWidgets(): List<DashboardWidgetConfig> = listOf(
             DashboardWidgetConfig("accounts", "Accounts", isVisible = true, sortOrder = 0),
             DashboardWidgetConfig("budget_pulse", "Budget Pulse", isVisible = true, sortOrder = 1),

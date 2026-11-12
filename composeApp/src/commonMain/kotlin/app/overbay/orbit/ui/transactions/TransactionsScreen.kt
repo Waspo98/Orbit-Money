@@ -20,9 +20,11 @@ import app.overbay.orbit.ui.rules.sheets.RuleEditorSheet
 import app.overbay.orbit.ui.transactions.components.TransactionBatchActionBar
 import app.overbay.orbit.ui.transactions.components.TransactionDetailInspectorPane
 import app.overbay.orbit.ui.transactions.components.TransactionsListPane
+import app.overbay.orbit.ui.transactions.sheets.CategoryPickerSheet
 import app.overbay.orbit.ui.transactions.sheets.CsvImportSheet
 import app.overbay.orbit.ui.transactions.sheets.MerchantLogoFinderDialog
 import app.overbay.orbit.ui.transactions.sheets.SplitTransactionSheet
+import app.overbay.orbit.ui.transactions.sheets.TransactionActionsCustomizeSheet
 import app.overbay.orbit.ui.transactions.sheets.TransactionEditorSheet
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalDevicePosture
@@ -193,6 +195,26 @@ fun TransactionsScreen(
             onApplySort = { sort -> viewModel.setSortOption(sort) },
             accountNames = state.accounts.associate { it.id to it.name },
             categoryNames = state.categories.associate { it.id to it.labelWithEmoji }
+        )
+    }
+
+    val categoryPickerTxn = state.categoryPickerTransaction
+    if (categoryPickerTxn != null) {
+        CategoryPickerSheet(
+            transaction = categoryPickerTxn,
+            categories = state.categories,
+            onSaveCategory = { categoryId -> viewModel.quickSetCategory(categoryPickerTxn.id, categoryId) },
+            onDismiss = { viewModel.closeCategoryPicker() }
+        )
+    }
+
+    if (state.showCustomizeActionsSheet) {
+        TransactionActionsCustomizeSheet(
+            pinnedIds = state.transactionPinnedActions,
+            orderIds = state.transactionActionOrder,
+            mhaEnabled = state.mhaEnabled,
+            onSave = { pinned, ordered -> viewModel.saveTransactionQuickActions(pinned, ordered) },
+            onDismiss = { viewModel.closeCustomizeActionsSheet() }
         )
     }
 

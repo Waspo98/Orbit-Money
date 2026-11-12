@@ -8,10 +8,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,31 +18,23 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.data.model.labelWithEmoji
@@ -54,13 +44,11 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
-import app.overbay.orbit.ui.components.OrbitActionChip
-import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * 3-line transaction row featuring 40dp avatar, metadata summary,
- * circular 3-dots action menu, and inline detail drawer.
+ * Clean 3-line transaction row featuring 40dp avatar, metadata summary,
+ * vertically centered tabular amount, and expandable inline provenance/actions drawer.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -73,6 +61,7 @@ fun SwipeableTransactionRow(
     isExpanded: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onOpenCategoryPicker: () -> Unit,
     onEdit: () -> Unit,
     onSplit: () -> Unit,
     onCreateRule: () -> Unit,
@@ -81,9 +70,15 @@ fun SwipeableTransactionRow(
     onToggleMha: () -> Unit,
     onToggleIgnore: () -> Unit,
     onDelete: () -> Unit,
-    onResetMerchant: () -> Unit,
-    onResetCategory: () -> Unit,
+    onCustomizeActions: () -> Unit,
+    onResetField: (String) -> Unit,
+    onResetAll: () -> Unit,
+    onViewRule: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    originalCategoryLabel: String? = null,
+    mhaEnabled: Boolean = false,
+    pinnedActions: List<String> = OrbitPreferences.defaultTransactionPinnedActions(),
+    actionOrder: List<String> = OrbitPreferences.defaultTransactionActionOrder(),
     isInspected: Boolean = false,
     onFindLogo: (() -> Unit)? = null,
     onUseCategoryIcon: (() -> Unit)? = null,
@@ -91,7 +86,6 @@ fun SwipeableTransactionRow(
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
-    var menuExpanded by remember { mutableStateOf(false) }
 
     val catColor = category?.color.toComposeColor(MaterialTheme.colorScheme.primary)
     val rowBgColor by animateColorAsState(
@@ -201,129 +195,43 @@ fun SwipeableTransactionRow(
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                Column(horizontalAlignment = Alignment.End) {
-                    val amountColor = when {
-                        transaction.effectiveIsTransfer -> MaterialTheme.colorScheme.secondary
-                        transaction.isIncome -> colors.income
-                        else -> MaterialTheme.colorScheme.onSurface
-                    }
-                    Text(
-                        text = MoneyUtils.formatCents(transaction.effectiveAmountCents, signed = true),
-                        style = TabularNumStyle.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold),
-                        color = amountColor
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Box {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                            modifier = Modifier.size(28.dp).clickable { haptics.tick(); menuExpanded = true }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = OrbitIcons.MoreHoriz,
-                                    contentDescription = "Actions",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-
-                        if (menuExpanded) {
-                            DropdownMenu(expanded = true, onDismissRequest = { menuExpanded = false }) {
-                                DropdownMenuItem(text = { Text("Edit") }, onClick = { menuExpanded = false; onEdit() })
-                                DropdownMenuItem(text = { Text("Split") }, onClick = { menuExpanded = false; onSplit() })
-                                DropdownMenuItem(text = { Text("Create Rule") }, onClick = { menuExpanded = false; onCreateRule() })
-                                DropdownMenuItem(text = { Text("Mark as Recurring") }, onClick = { menuExpanded = false; onMarkRecurring() })
-                                DropdownMenuItem(
-                                    text = { Text(if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Mark as Transfer") },
-                                    onClick = { menuExpanded = false; onToggleTransfer() }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(if (transaction.effectiveMhaEligible == true) "Remove MHA" else "MHA Eligible") },
-                                    onClick = { menuExpanded = false; onToggleMha() }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(if (transaction.effectiveIsIgnored) "Unignore" else "Ignore") },
-                                    onClick = { menuExpanded = false; onToggleIgnore() }
-                                )
-                                HorizontalDivider()
-                                DropdownMenuItem(text = { Text("Delete", color = colors.danger) }, onClick = { menuExpanded = false; onDelete() })
-                            }
-                        }
-                    }
+                val amountColor = when {
+                    transaction.effectiveIsTransfer -> MaterialTheme.colorScheme.secondary
+                    transaction.isIncome -> colors.income
+                    else -> MaterialTheme.colorScheme.onSurface
                 }
+                Text(
+                    text = MoneyUtils.formatCents(transaction.effectiveAmountCents, signed = true),
+                    style = TabularNumStyle.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                    color = amountColor
+                )
             }
 
             OrbitAccordionVisibility(visible = isExpanded) {
-                Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-                        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                MetaItem(label = "Date", value = transaction.effectiveDate)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                MetaItem(label = "Account", value = accountName ?: transaction.accountName)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    MetaItem(label = "Merchant", value = transaction.effectiveMerchant)
-                                    if (transaction.editedMerchant != null) {
-                                        Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetMerchant() }.padding(start = 6.dp))
-                                    }
-                                }
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    MetaItem(label = "Category", value = category?.labelWithEmoji ?: "❓ Uncategorized")
-                                    if (transaction.editedCategoryId != null) {
-                                        Text("Reset", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onResetCategory() }.padding(start = 6.dp))
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                MetaItem(label = "Bank Statement", value = transaction.originalDescription ?: transaction.originalMerchant, isMono = true)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                MetaItem(label = "Notes", value = transaction.notes ?: "None")
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OrbitActionChip(label = "Edit Transaction", onClick = { haptics.tick(); onEdit() })
-                            OrbitActionChip(label = "Split", onClick = { haptics.tick(); onSplit() })
-                            OrbitActionChip(label = "Create Rule", onClick = { haptics.tick(); onCreateRule() })
-                        }
-                    }
-                }
+                TransactionAccordionContent(
+                    transaction = transaction,
+                    category = category,
+                    categoryColor = catColor,
+                    originalCategoryLabel = originalCategoryLabel,
+                    accountName = accountName,
+                    mhaEnabled = mhaEnabled,
+                    pinnedIds = pinnedActions,
+                    orderIds = actionOrder,
+                    onOpenCategoryPicker = onOpenCategoryPicker,
+                    onEdit = onEdit,
+                    onSplit = onSplit,
+                    onCreateRule = onCreateRule,
+                    onMarkRecurring = onMarkRecurring,
+                    onToggleTransfer = onToggleTransfer,
+                    onToggleMha = onToggleMha,
+                    onToggleIgnore = onToggleIgnore,
+                    onDelete = onDelete,
+                    onCustomizeActions = onCustomizeActions,
+                    onResetField = onResetField,
+                    onResetAll = onResetAll,
+                    onViewRule = onViewRule
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun MetaItem(label: String, value: String, isMono: Boolean = false) {
-    Column {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = if (isMono) MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace) else MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
     }
 }

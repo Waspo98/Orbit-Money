@@ -52,5 +52,6 @@ data class SettingsUiState(
 
     // System Confirmations
     val showResetConfirmation: Boolean = false,
-    val showDonateDialog: Boolean = false
+    val showDonateDialog: Boolean = false,
+    val showTransactionActionsSheet: Boolean = false
 )

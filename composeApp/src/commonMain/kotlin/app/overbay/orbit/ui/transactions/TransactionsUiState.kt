@@ -2,6 +2,7 @@ package app.overbay.orbit.ui.transactions
 
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.ui.components.TransactionFilterDraft
@@ -63,6 +64,8 @@ data class TransactionsUiState(
     val showCategoryBatchPicker: Boolean = false,
     val logoFinderTransactionId: Long? = null,
     val ruleDraftTransactionId: Long? = null,
+    val categoryPickerTransactionId: Long? = null,
+    val showCustomizeActionsSheet: Boolean = false,
     val nextRulePriority: Int = 10,
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
@@ -70,7 +73,9 @@ data class TransactionsUiState(
     val totalExpenseCents: Cents = 0L,
     val totalIncomeCents: Cents = 0L,
     val netCashflowCents: Cents = 0L,
-    val mhaEnabled: Boolean = false
+    val mhaEnabled: Boolean = false,
+    val transactionPinnedActions: List<String> = OrbitPreferences.defaultTransactionPinnedActions(),
+    val transactionActionOrder: List<String> = OrbitPreferences.defaultTransactionActionOrder()
 ) {
     val isSelectionMode: Boolean get() = selectedTransactionIds.isNotEmpty()
     val selectedCount: Int get() = selectedTransactionIds.size
@@ -83,6 +88,9 @@ data class TransactionsUiState(
 
     val ruleDraftTransaction: Transaction?
         get() = transactions.find { it.id == ruleDraftTransactionId }
+
+    val categoryPickerTransaction: Transaction?
+        get() = transactions.find { it.id == categoryPickerTransactionId }
 
     val totalPages: Int
         get() = if (pageSize <= 0) 1 else ((filteredTransactions.size + pageSize - 1) / pageSize).coerceAtLeast(1)
