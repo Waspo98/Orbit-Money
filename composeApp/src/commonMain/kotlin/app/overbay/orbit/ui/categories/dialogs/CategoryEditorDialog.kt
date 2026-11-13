@@ -114,7 +114,6 @@ fun CategoryEditorContent(
         onDismiss = onDismiss,
         confirmText = "Save Category",
         onConfirm = {
-            haptics.confirm()
             val isTransfer = category?.isTransfer ?: (categoryKind == "transfer")
             val isIncome = category?.isIncome ?: (categoryKind == "income")
             onSave(category?.id ?: 0L, name.trim(), selectedColor, selectedIcon.trim().ifBlank { null }, isTransfer, isIncome, mhaEligible)

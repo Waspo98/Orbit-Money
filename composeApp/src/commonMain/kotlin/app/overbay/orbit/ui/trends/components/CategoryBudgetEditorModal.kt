@@ -46,7 +46,6 @@ fun CategoryBudgetEditorModal(
         onDismissRequest = onDismiss,
         confirmText = "Save",
         onConfirm = {
-            haptics.confirm()
             onSave(amountCents, rollover)
         },
         modifier = modifier,

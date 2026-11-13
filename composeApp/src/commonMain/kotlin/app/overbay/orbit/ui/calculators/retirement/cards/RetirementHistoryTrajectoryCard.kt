@@ -68,10 +68,6 @@ fun RetirementHistoryTrajectoryCard(
         else -> historyPoints
     }
 
-    val latestBalance = filteredPoints.lastOrNull()?.balanceCents ?: 0L
-    val startBalance = filteredPoints.firstOrNull()?.balanceCents ?: 0L
-    val diffCents = latestBalance - startBalance
-    val diffPercent = if (startBalance > 0L) (diffCents.toDouble() / startBalance.toDouble()) * 100.0 else 0.0
     val palette = retirementAccountPalette()
     val accountColorMap = remember(linkedAccounts, filteredPoints, palette) {
         val allIds = linkedAccounts.map { it.accountId } + filteredPoints.flatMap { pt -> pt.accounts.map { it.accountId } }
@@ -146,6 +142,10 @@ fun RetirementHistoryTrajectoryCard(
                         )
 
                         // Growth Summary Banner
+                        val latestBalance = latestPoint.balanceCents
+                        val startBalance = activePoints.first().balanceCents
+                        val diffCents = latestBalance - startBalance
+                        val diffPercent = if (startBalance > 0L) (diffCents.toDouble() / startBalance.toDouble()) * 100.0 else 0.0
                         Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
                             Row(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Column {

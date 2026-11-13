@@ -92,7 +92,6 @@ fun BudgetAmountEditorContent(
         onDismiss = onDismiss,
         confirmText = "Save",
         onConfirm = {
-            haptics.confirm()
             onSave(item.category.id, amountCents, rollover)
         },
         modifier = modifier,

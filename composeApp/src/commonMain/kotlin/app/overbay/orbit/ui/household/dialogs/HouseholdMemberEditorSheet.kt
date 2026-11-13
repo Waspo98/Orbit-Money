@@ -126,7 +126,6 @@ fun HouseholdMemberEditorContent(
         confirmText = "Save Member",
         onConfirm = {
             if (name.isNotBlank()) {
-                haptics.tick()
                 val periods = HouseholdCalculations.periodsPerYear(payFrequency).toDouble()
                 val healthPremiumMonthly = if (periods > 0) ((healthPerPaycheckCents.toDouble() * periods) / 12.0).roundToLong() else 0L
                 val hsaAnnual = (hsaPerPaycheckCents.toDouble() * periods).roundToLong()

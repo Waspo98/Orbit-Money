@@ -216,7 +216,6 @@ private fun AddIncomeSnapshotSheet(
         onDismissRequest = onDismiss,
         confirmText = "Save Snapshot",
         onConfirm = {
-            haptics.tick()
             val record = HouseholdIncomeRecord(
                 householdId = selectedMember.householdId,
                 memberId = selectedMember.id,

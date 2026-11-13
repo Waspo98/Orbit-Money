@@ -30,6 +30,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -129,8 +131,12 @@ fun RuleMatchPreviewWindow(
             )
 
             // Conflict Warning Banners (Priority Conflicts)
+            val lastConflicts = remember { mutableStateOf(previewResult?.conflicts.orEmpty()) }
+            if (!previewResult?.conflicts.isNullOrEmpty()) {
+                lastConflicts.value = previewResult!!.conflicts
+            }
             OrbitAccordionVisibility(visible = previewResult != null && previewResult.conflicts.isNotEmpty()) {
-                val conflicts = previewResult?.conflicts.orEmpty()
+                val conflicts = lastConflicts.value
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -178,9 +184,15 @@ fun RuleMatchPreviewWindow(
             }
 
             // Mutation Diffs Chips (Will Change X)
+            val lastDiffs = remember { mutableStateOf(previewResult?.diffs.orEmpty()) }
+            val lastWillChangeCount = remember { mutableIntStateOf(previewResult?.willChangeCount ?: 0) }
+            if (!previewResult?.diffs.isNullOrEmpty()) {
+                lastDiffs.value = previewResult!!.diffs
+                lastWillChangeCount.intValue = previewResult.willChangeCount
+            }
             OrbitAccordionVisibility(visible = previewResult != null && previewResult.diffs.isNotEmpty()) {
-                val currentDiffs = previewResult?.diffs.orEmpty()
-                val willChangeCount = previewResult?.willChangeCount ?: 0
+                val currentDiffs = lastDiffs.value
+                val willChangeCount = lastWillChangeCount.intValue
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
                         Text("Will Change ($willChangeCount)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)

@@ -88,7 +88,6 @@ fun CsvImportSheet(
                     if (preview == null) {
                         parseCsv()
                     } else {
-                        haptics.confirm()
                         val accountName = accounts.find { it.id == selectedAccountId }?.name ?: ""
                         val assignedTxns = preview.transactions.map {
                             it.copy(accountId = selectedAccountId, accountName = accountName)

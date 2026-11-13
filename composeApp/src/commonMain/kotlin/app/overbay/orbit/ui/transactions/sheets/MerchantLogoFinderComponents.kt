@@ -70,10 +70,7 @@ internal fun MerchantLogoCandidatesSection(
         when (mode) {
             0 -> Column {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 240.dp)
-                        .verticalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     lastCandidates.value.forEach { candidate ->

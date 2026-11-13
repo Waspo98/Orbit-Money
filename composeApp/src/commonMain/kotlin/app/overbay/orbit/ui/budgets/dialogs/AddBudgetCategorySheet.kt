@@ -87,7 +87,6 @@ fun AddBudgetCategorySheet(
             onConfirm = {
                 val cat = selectedCategory
                 if (cat != null && amountCents > 0L) {
-                    haptics.confirm()
                     onSave(cat.id, amountCents, rollover)
                 }
             },

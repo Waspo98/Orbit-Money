@@ -76,7 +76,6 @@ fun TargetSettingsContent(
         onDismiss = onDismiss,
         confirmText = "Save Target Settings",
         onConfirm = {
-            haptics.tick()
             onSave(selectedMode, if (selectedMode == RetirementTargetMode.CUSTOM) customTarget else null, legacyTarget, endAge)
         },
         modifier = modifier,

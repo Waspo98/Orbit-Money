@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -141,11 +143,12 @@ fun OrbitCompactTextField(
     val (tfv, handleValueChange) = rememberSyncedTextField(value = value, onValueChange = onValueChange)
     var isFocused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(12.dp)
-    val border = if (isFocused) {
-        BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
-    } else {
-        BorderStroke(1.dp, OrbitTheme.colors.cardBorder)
-    }
+    val borderColor by animateColorAsState(
+        targetValue = if (isFocused) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "compactTextFieldBorderColor"
+    )
+    val border = BorderStroke(if (isFocused) 1.5.dp else 1.dp, borderColor)
 
     Surface(
         shape = shape,
@@ -239,11 +242,12 @@ fun OrbitCompactCurrencyField(
     }
 
     val shape = RoundedCornerShape(12.dp)
-    val border = if (isFocused) {
-        BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
-    } else {
-        BorderStroke(1.dp, OrbitTheme.colors.cardBorder)
-    }
+    val borderColor by animateColorAsState(
+        targetValue = if (isFocused) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "compactTextFieldBorderColor"
+    )
+    val border = BorderStroke(if (isFocused) 1.5.dp else 1.dp, borderColor)
 
     Surface(
         shape = shape,

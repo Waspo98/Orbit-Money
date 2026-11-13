@@ -59,7 +59,6 @@ fun AccountMergeDialog(
         onDismissRequest = onDismiss,
         confirmText = "Merge Accounts",
         onConfirm = {
-            haptics.confirm()
             selectedTarget?.let { target ->
                 onMerge(sourceAccount.id, target.id, combineBalances)
             }

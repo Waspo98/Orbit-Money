@@ -135,17 +135,14 @@ fun BrandLogoFinderDialog(
         }
     }
 
+    val hasValidLogoUrl = imageUrl.trim().let { it.startsWith("http://") || it.startsWith("https://") }
+
     OrbitModalSheet(
         onDismissRequest = { if (!saving) onDismiss() },
         confirmText = if (saving) "Saving..." else "Save",
         onConfirm = {
             val trimmed = imageUrl.trim()
-            if (trimmed.isEmpty()) {
-                errorMessage = "Choose a result or paste a direct image URL."
-            } else if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-                errorMessage = "Logo URL must start with http:// or https://."
-            } else {
-                haptics.confirm()
+            if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
                 MerchantLogoImageCache.clearFailed(trimmed)
                 scope.launch {
                     saving = true
@@ -161,8 +158,9 @@ fun BrandLogoFinderDialog(
         },
         title = "Find Logo",
         subtitle = "Search brand logos for $subjectName, or paste a direct image URL.",
-        confirmEnabled = !saving,
+        confirmEnabled = !saving && hasValidLogoUrl,
         isSaving = saving,
+        errorBannerText = errorMessage,
         containerColor = MaterialTheme.colorScheme.surface,
         bodySpacing = 0.dp
     ) {
@@ -243,18 +241,5 @@ fun BrandLogoFinderDialog(
                 },
                 fallbackButtonLabel = fallbackButtonLabel
             )
-
-            val lastError = remember { mutableStateOf("") }
-            if (!errorMessage.isNullOrBlank()) lastError.value = errorMessage!!
-            OrbitAccordionVisibility(visible = errorMessage != null) {
-                Column {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = lastError.value,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OrbitTheme.colors.expense
-                    )
-                }
-            }
     }
 }

@@ -68,7 +68,6 @@ fun AddBalanceRecordDialog(
         onDismissRequest = onDismiss,
         confirmText = "Save Balance",
         onConfirm = {
-            haptics.confirm()
             onAddRecord(LocalDateUtils.formatIsoDate(date), balanceCents)
         },
         modifier = modifier,

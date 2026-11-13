@@ -71,7 +71,6 @@ fun FilterBottomSheet(
             onDismiss = { sheetDismiss?.invoke(onDismiss) ?: onDismiss() },
             confirmText = "Apply Filters",
             onConfirm = {
-                haptics.confirm()
                 val applyAndClose = {
                     onApply(draft)
                     onApplySort(sortDraft)
@@ -82,7 +81,6 @@ fun FilterBottomSheet(
             title = "Filter & Sort Transactions",
             dismissText = "Reset All",
             onSecondaryAction = {
-                haptics.tick()
                 draft = TransactionFilterDraft()
                 sortDraft = TransactionSortOption.DATE_DESC
             },

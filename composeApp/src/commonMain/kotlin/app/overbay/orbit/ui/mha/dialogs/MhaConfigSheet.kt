@@ -114,7 +114,6 @@ fun MhaConfigContent(
         onDismiss = onDismiss,
         confirmText = "Save",
         onConfirm = {
-            haptics.tick()
             val resolvedCap = if (enableDesignatedCap) max(0L, inputDesignatedCapCents) else null
             val resolvedFmrv = if (enableFmrv) max(0L, inputFmrvCents) else null
             val updated = taxProfile.copy(
