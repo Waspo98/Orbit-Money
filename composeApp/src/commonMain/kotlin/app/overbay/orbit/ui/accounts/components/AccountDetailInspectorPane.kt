@@ -4,67 +4,45 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.data.model.BalanceRecord
+import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.Transaction
-import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
-import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.accounts.AccountDetailTab
 import app.overbay.orbit.ui.accounts.AccountsUiState
 import app.overbay.orbit.ui.accounts.AccountsViewModel
-import app.overbay.orbit.ui.accounts.sheets.AccountBalanceHistoryContent
-import app.overbay.orbit.ui.accounts.sheets.AccountEditorContent
 import app.overbay.orbit.ui.accounts.cards.CardEditorSheetContent
 import app.overbay.orbit.ui.accounts.cards.CreditCardInspectorDetailContent
-import app.overbay.orbit.ui.components.OrbitBadge
-import app.overbay.orbit.ui.components.OrbitCompactListRow
+import app.overbay.orbit.ui.accounts.sheets.AccountBalanceHistoryContent
+import app.overbay.orbit.ui.accounts.sheets.AccountEditorContent
+import app.overbay.orbit.ui.accounts.sheets.AccountInlineBalanceHistorySection
+import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 private enum class AccountInspectorSubMode { DETAIL, EDIT, PERKS, HISTORY }
 
 /**
- * Right-hand morphing inspector pane for Accounts on unfolded phones, tablets, and desktops.
- * Shows the read-only Account Detail view by default when an account row is tapped, and morphs
- * smoothly into the Edit, Credit Card Perks, or Balance History views when triggered.
- *
+ * Right-hand morphing inspector pane (and compact phone OrbitModalSheet content) for Accounts.
+ * Shows the modernized Account Detail view by default when an account row is tapped, and morphs
+ * smoothly into the Edit, Credit Card Perks, or Credit Card Balance History views when triggered.
  */
 @Composable
 fun AccountDetailInspectorPane(
@@ -126,6 +104,7 @@ fun AccountDetailInspectorPane(
                     )
                 }
             }
+
             AccountInspectorSubMode.PERKS -> {
                 val draft = viewModel.cardEditor.currentDraft ?: state.cardEditorDraft
                 if (draft != null) {
@@ -141,6 +120,7 @@ fun AccountDetailInspectorPane(
                     )
                 }
             }
+
             AccountInspectorSubMode.HISTORY -> {
                 val histAcct = state.historyAccount ?: inspecting
                 if (histAcct != null) {
@@ -149,45 +129,66 @@ fun AccountDetailInspectorPane(
                         transactions = state.selectedAccountTransactions,
                         balanceRecords = state.historyBalanceRecords,
                         onAddRecord = { viewModel.openAddBalanceRecord(histAcct) },
+                        onNavigateBack = if (state.selectedAccount != null) {
+                            { viewModel.closeBalanceHistory() }
+                        } else null,
                         onDismiss = {
                             if (state.selectedAccount != null) viewModel.closeBalanceHistory() else onClosePane()
                         }
                     )
                 }
             }
+
             AccountInspectorSubMode.DETAIL -> {
                 if (inspecting != null) {
+                    val unlinkAction: (() -> Unit)? = if (!inspecting.simplefinAccountId.isNullOrBlank()) {
+                        { viewModel.unlinkSimpleFin(inspecting.id) }
+                    } else null
+                    val hasClosureAlert = inspecting.id in state.closureCandidateAccountIds
+
                     if (inspecting.type == AccountType.CREDIT) {
                         CreditCardInspectorDetailContent(
                             account = inspecting,
                             transactions = state.selectedAccountTransactions,
                             householdMembers = state.householdMembers,
                             rewardsToolsEnabled = state.rewardsToolsEnabled,
+                            categoryMap = state.categoryMap,
+                            hasClosureAlert = hasClosureAlert,
+                            onReviewClosure = { viewModel.closurePrompts.openForAccount(inspecting.id) },
                             onEditCard = { viewModel.openCreditCardProfile(inspecting) },
                             onToggleBenefit = { bId -> viewModel.toggleCardBenefit(inspecting.id, bId) },
                             onOpenPerkUsage = { bId -> viewModel.openPerkUsage(inspecting.id, bId) },
                             onSeeFullTransactions = { onNavigate(OrbitNavKey.Transactions(accountId = inspecting.id)) },
+                            onHistory = { viewModel.openBalanceHistory(inspecting) },
+                            onAddBalanceRecord = { viewModel.openAddBalanceRecord(inspecting) },
+                            onSnapshotReminder = { viewModel.requestSnapshotReminder(onNavigate) },
+                            onMerge = { viewModel.openMergeDialog(inspecting) },
+                            onUnlinkSimpleFin = unlinkAction,
+                            onToggleArchive = { viewModel.toggleArchiveAccount(inspecting) },
+                            onDelete = { viewModel.requestDeleteAccount(inspecting.id) },
                             onClosePane = onClosePane
                         )
                     } else {
                         AccountReadOnlyDetailContent(
                             account = inspecting,
                             transactions = state.selectedAccountTransactions,
-                            hasClosureAlert = inspecting.id in state.closureCandidateAccountIds,
+                            balanceRecords = state.historyBalanceRecords,
+                            categoryMap = state.categoryMap,
+                            activeTab = state.activeDetailTab,
+                            onSelectTab = { viewModel.selectDetailTab(it) },
+                            hasClosureAlert = hasClosureAlert,
                             onReviewClosure = { viewModel.closurePrompts.openForAccount(inspecting.id) },
                             onClose = onClosePane,
                             onEdit = { viewModel.openEditAccount(inspecting) },
                             onFindLogo = { viewModel.accountLogos.open(inspecting) },
                             onUseAccountIcon = { viewModel.accountLogos.resetToAccountIconAsync(inspecting.id) },
                             onReportLogoStatus = { k, s -> viewModel.accountLogos.reportStatus(k, s) },
-                            onHistory = { viewModel.openBalanceHistory(inspecting) },
+                            onAddBalanceRecord = { viewModel.openAddBalanceRecord(inspecting) },
                             onSnapshotReminder = { viewModel.requestSnapshotReminder(onNavigate) },
                             onMerge = { viewModel.openMergeDialog(inspecting) },
                             onToggleArchive = { viewModel.toggleArchiveAccount(inspecting) },
                             onDelete = { viewModel.requestDeleteAccount(inspecting.id) },
-                            onUnlinkSimpleFin = if (!inspecting.simplefinAccountId.isNullOrBlank()) {
-                                { viewModel.unlinkSimpleFin(inspecting.id) }
-                            } else null,
+                            onUnlinkSimpleFin = unlinkAction,
                             onSeeTransactions = { onNavigate(OrbitNavKey.Transactions(accountId = inspecting.id)) }
                         )
                     }
@@ -201,6 +202,10 @@ fun AccountDetailInspectorPane(
 private fun AccountReadOnlyDetailContent(
     account: Account,
     transactions: List<Transaction>,
+    balanceRecords: List<BalanceRecord>,
+    categoryMap: Map<Long, Category>,
+    activeTab: AccountDetailTab,
+    onSelectTab: (AccountDetailTab) -> Unit,
     hasClosureAlert: Boolean = false,
     onReviewClosure: (() -> Unit)? = null,
     onClose: () -> Unit,
@@ -208,7 +213,7 @@ private fun AccountReadOnlyDetailContent(
     onFindLogo: () -> Unit,
     onUseAccountIcon: () -> Unit,
     onReportLogoStatus: (String, String) -> Unit,
-    onHistory: () -> Unit,
+    onAddBalanceRecord: () -> Unit,
     onSnapshotReminder: () -> Unit,
     onMerge: () -> Unit,
     onToggleArchive: () -> Unit,
@@ -216,147 +221,106 @@ private fun AccountReadOnlyDetailContent(
     onUnlinkSimpleFin: (() -> Unit)? = null,
     onSeeTransactions: () -> Unit
 ) {
-    val haptics = LocalOrbitHaptics.current
-    val colors = OrbitTheme.colors
-    val isLiability = account.type.isLiability
-    val headlineCents = if (account.isProperty) {
-        account.estimatedValueCents ?: account.currentBalanceCents
-    } else {
-        account.currentBalanceCents
+    val subtitle = remember(account) {
+        listOfNotNull(
+            account.institution?.takeIf { it.isNotBlank() },
+            account.accountNumberLast4?.takeIf { it.isNotBlank() }?.let { "•••• $it" }
+        ).joinToString(" • ").ifBlank {
+            if (account.isProperty) "Real Estate Property" else account.type.displayName
+        }
     }
-    val balanceColor = when {
-        account.isProperty -> colors.income
-        isLiability -> if (account.currentBalanceCents != 0L) colors.expense else MaterialTheme.colorScheme.onSurface
-        headlineCents >= 0L -> colors.income
-        else -> colors.expense
-    }
+    val showClosureBanner = (hasClosureAlert || !account.simplefinMissingSince.isNullOrBlank()) && onReviewClosure != null
 
-    LazyColumn(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        AccountInspectorHeader(
+            accountName = account.name,
+            title = account.name,
+            subtitle = subtitle,
+            editLabel = "Edit",
+            isArchived = account.isArchived,
+            leadingContent = {
                 AccountInstitutionMark(
                     account = account,
-                    size = 48.dp,
-                    cornerRadius = 12.dp,
-                    logoPadding = 5.dp,
+                    size = 40.dp,
+                    cornerRadius = 10.dp,
+                    logoPadding = 4.dp,
                     onFindLogo = onFindLogo,
                     onUseAccountIcon = onUseAccountIcon,
                     onReportLogoStatus = onReportLogoStatus
                 )
-                Spacer(modifier = Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = account.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        OrbitBadge(
-                            text = if (account.isProperty) "Property" else account.type.displayName,
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = MoneyUtils.formatCents(headlineCents),
-                        style = TabularNumStyle.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold),
-                        color = balanceColor
+            },
+            onEdit = onEdit,
+            onClose = onClose,
+            onAddBalanceRecord = if (!account.isProperty) onAddBalanceRecord else null,
+            onSnapshotReminder = onSnapshotReminder,
+            onMerge = onMerge,
+            onUnlinkSimpleFin = onUnlinkSimpleFin,
+            onToggleArchive = onToggleArchive,
+            onDelete = onDelete
+        )
+
+        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (showClosureBanner) {
+                item(key = "acct_closure_alert") {
+                    AccountClosureAlertBanner(
+                        account = account,
+                        hasClosureAlert = hasClosureAlert,
+                        onReviewClosure = onReviewClosure!!
                     )
-                    val metaParts = listOfNotNull(
-                        account.institution?.takeIf { it.isNotBlank() },
-                        account.accountNumberLast4?.takeIf { it.isNotBlank() }?.let { "•••• $it" },
-                        if (account.isProperty) "Estimated Property Value"
-                        else if (account.isManual) "Manual Account" else "Synced Account"
-                    )
-                    if (metaParts.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = metaParts.joinToString(" • "),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                IconButton(onClick = { haptics.tick(); onClose() }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "Close Details", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-        }
 
-        if (account.type == AccountType.MORTGAGE && account.homeEquityCents != null) {
-            item {
-                Text(
-                    text = "Home Equity: ${MoneyUtils.formatCents(account.homeEquityCents!!)} (Est. Property ${MoneyUtils.formatCents(account.estimatedValueCents ?: 0L)})",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.income,
-                    fontWeight = FontWeight.SemiBold
+            item(key = "acct_balance_hero") {
+                AccountBalanceHeroCard(
+                    account = account,
+                    onAddBalanceRecord = if (account.isManual && !account.isProperty) onAddBalanceRecord else null
                 )
             }
-        }
 
-        item {
-            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-            Spacer(modifier = Modifier.height(10.dp))
-            AccountInspectorActionsSection(
-                account = account,
-                onEdit = onEdit,
-                onHistory = onHistory,
-                onSnapshotReminder = onSnapshotReminder,
-                onMerge = onMerge,
-                onSeeTransactions = onSeeTransactions,
-                onToggleArchive = onToggleArchive,
-                onDelete = onDelete,
-                onUnlinkSimpleFin = onUnlinkSimpleFin,
-                hasClosureAlert = hasClosureAlert,
-                onReviewClosure = onReviewClosure
-            )
-        }
-
-        item {
-            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "RECENT TRANSACTIONS (${transactions.size})",
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        if (transactions.isEmpty()) {
-            item {
-                Text(
-                    text = "No transactions recorded for this account.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
+            item(key = "acct_detail_tabs") {
+                OrbitSegmentedTabRow(
+                    items = AccountDetailTab.entries,
+                    selected = activeTab,
+                    onSelect = onSelectTab,
+                    label = { it.label },
+                    badgeCount = { tab ->
+                        when (tab) {
+                            AccountDetailTab.TRANSACTIONS -> transactions.size
+                            AccountDetailTab.BALANCE_HISTORY -> balanceRecords.size
+                        }
+                    }
                 )
             }
-        } else {
-            items(transactions.take(15), key = { it.id }) { txn ->
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OrbitCompactListRow(
-                        title = txn.effectiveMerchant,
-                        subtitle = txn.effectiveDate,
-                        amount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
-                        amountColor = if (txn.effectiveAmountCents > 0L) colors.income else MaterialTheme.colorScheme.onSurface,
-                        showTopDivider = false,
-                        modifier = Modifier.padding(horizontal = 12.dp)
-                    )
+
+            item(key = "acct_detail_tab_body") {
+                AnimatedContent(
+                    targetState = activeTab,
+                    transitionSpec = { fadeIn(OrbitSprings.FloatEffectsFast) togetherWith fadeOut(OrbitSprings.FloatEffectsFast) },
+                    label = "accountDetailTabTransition"
+                ) { tab ->
+                    when (tab) {
+                        AccountDetailTab.TRANSACTIONS -> {
+                            AccountRecentTransactionsSection(
+                                transactions = transactions,
+                                categoryMap = categoryMap,
+                                onSeeTransactions = onSeeTransactions
+                            )
+                        }
+                        AccountDetailTab.BALANCE_HISTORY -> {
+                            AccountInlineBalanceHistorySection(
+                                balanceRecords = balanceRecords,
+                                onAddRecord = onAddBalanceRecord
+                            )
+                        }
+                    }
                 }
             }
         }

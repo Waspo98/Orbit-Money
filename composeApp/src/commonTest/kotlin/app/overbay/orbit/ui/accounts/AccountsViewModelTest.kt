@@ -455,5 +455,51 @@ class AccountsViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testDetailTabAndBalanceHistoryRouting_inlineForStandardAndSheetForCredit() = runTest(testDispatcher) {
+        val checking = Account(id = 401L, name = "Checking", type = AccountType.CHECKING, currentBalanceCents = 10000L)
+        val savings = Account(id = 402L, name = "Savings", type = AccountType.SAVINGS, currentBalanceCents = 50000L)
+        val credit = Account(id = 403L, name = "Sapphire", type = AccountType.CREDIT, currentBalanceCents = -2500L)
+        repository.saveAccount(checking)
+        repository.saveAccount(savings)
+        repository.saveAccount(credit)
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(AccountDetailTab.TRANSACTIONS, viewModel.uiState.value.activeDetailTab)
+
+        viewModel.selectAccountForInspect(401L)
+        testScheduler.advanceUntilIdle()
+        assertEquals(AccountDetailTab.TRANSACTIONS, viewModel.uiState.value.activeDetailTab)
+
+        viewModel.selectDetailTab(AccountDetailTab.BALANCE_HISTORY)
+        testScheduler.advanceUntilIdle()
+        assertEquals(AccountDetailTab.BALANCE_HISTORY, viewModel.uiState.value.activeDetailTab)
+
+        // Selecting a different account resets tab back to Transactions
+        viewModel.selectAccountForInspect(402L)
+        testScheduler.advanceUntilIdle()
+        assertEquals(AccountDetailTab.TRANSACTIONS, viewModel.uiState.value.activeDetailTab)
+
+        // openBalanceHistory on a standard account opens inline BALANCE_HISTORY tab without showHistorySheet
+        viewModel.openBalanceHistory(checking)
+        testScheduler.advanceUntilIdle()
+        assertEquals(401L, viewModel.uiState.value.selectedAccountId)
+        assertEquals(AccountDetailTab.BALANCE_HISTORY, viewModel.uiState.value.activeDetailTab)
+        assertFalse(viewModel.uiState.value.showHistorySheet)
+
+        // openBalanceHistory on a credit card opens the dedicated history sub-mode
+        viewModel.openBalanceHistory(credit)
+        testScheduler.advanceUntilIdle()
+        assertEquals(403L, viewModel.uiState.value.selectedAccountId)
+        assertTrue(viewModel.uiState.value.showHistorySheet)
+        assertEquals(403L, viewModel.uiState.value.historyAccount?.id)
+
+        collectJob.cancel()
+    }
 }
 

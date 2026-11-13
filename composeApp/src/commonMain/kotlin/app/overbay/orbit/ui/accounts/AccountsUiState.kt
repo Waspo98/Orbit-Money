@@ -2,6 +2,7 @@ package app.overbay.orbit.ui.accounts
 
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.BalanceRecord
+import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.DashboardWidgetConfig
 import app.overbay.orbit.data.model.HouseholdMember
@@ -35,6 +36,11 @@ data class AccountGroupDisplay(
     val propertyUnits: List<RealEstatePropertyUnit> = emptyList()
 )
 
+enum class AccountDetailTab(val label: String) {
+    TRANSACTIONS("Transactions"),
+    BALANCE_HISTORY("Balance History")
+}
+
 data class PerkUsageTarget(
     val accountId: Long,
     val benefitId: String,
@@ -57,6 +63,8 @@ data class AccountsUiState(
     val isReorderMode: Boolean = false,
     val selectedAccountId: Long? = null,
     val selectedAccountTransactions: List<Transaction> = emptyList(),
+    val activeDetailTab: AccountDetailTab = AccountDetailTab.TRANSACTIONS,
+    val categoryMap: Map<Long, Category> = emptyMap(),
     val editingAccount: Account? = null,
     val showEditorSheet: Boolean = false,
     val cardEditorDraft: CardEditorDraft? = null,

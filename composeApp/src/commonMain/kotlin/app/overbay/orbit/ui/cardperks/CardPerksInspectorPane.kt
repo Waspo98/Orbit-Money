@@ -84,6 +84,7 @@ fun CardPerksInspectorPane(
                         transactions = state.selectedAccountTransactions,
                         householdMembers = state.householdMembers,
                         rewardsToolsEnabled = state.rewardsToolsEnabled,
+                        categoryMap = state.categoryMap,
                         onEditCard = { viewModel.openCreditCardProfile(inspecting) },
                         onToggleBenefit = { bId -> viewModel.toggleCardBenefit(inspecting.id, bId) },
                         onOpenPerkUsage = { bId -> viewModel.openPerkUsage(inspecting.id, bId) },

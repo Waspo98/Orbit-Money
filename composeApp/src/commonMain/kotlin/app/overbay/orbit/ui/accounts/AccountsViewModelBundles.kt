@@ -29,7 +29,8 @@ internal data class AccountsActionBundle(
 
 internal data class AddRecordBundle(
     val showAddRecordDialog: Boolean,
-    val addRecordAccount: Account?
+    val addRecordAccount: Account?,
+    val activeDetailTab: AccountDetailTab = AccountDetailTab.TRANSACTIONS
 )
 
 internal data class SyncReorderBundle(

@@ -61,6 +61,7 @@ class AccountsViewModel(
     private val _showHistorySheet = MutableStateFlow(false)
     private val _showAddRecordDialog = MutableStateFlow(false)
     private val _addRecordAccount = MutableStateFlow<Account?>(null)
+    private val _activeDetailTab = MutableStateFlow(AccountDetailTab.TRANSACTIONS)
     private val _isPhoneViewingDetail = MutableStateFlow(false)
     private val _deleteConfirmAccountId = MutableStateFlow<Long?>(null)
     private val _deleteWarning524Date = MutableStateFlow<String?>(null)
@@ -121,8 +122,8 @@ class AccountsViewModel(
         AccountsActionBundle(selId, mergeAcct, showMerge, histAcct, showHist)
     }
 
-    private val addRecordFlow = combine(_showAddRecordDialog, _addRecordAccount) { showAdd, acct ->
-        AddRecordBundle(showAdd, acct)
+    private val addRecordFlow = combine(_showAddRecordDialog, _addRecordAccount, _activeDetailTab) { showAdd, acct, tab ->
+        AddRecordBundle(showAdd, acct, tab)
     }
 
     private val syncFlow = combine(
@@ -169,7 +170,9 @@ class AccountsViewModel(
             cashCents = snapshot.cashCents, creditCardCents = snapshot.creditDebtCents,
             investmentsCents = snapshot.investmentsCents, showArchived = syncReorder.showArchived,
             isReorderMode = syncReorder.isReorderMode, selectedAccountId = selId,
-            selectedAccountTransactions = selectedTxns, editingAccount = dialog.editingAccount,
+            selectedAccountTransactions = selectedTxns, activeDetailTab = addRecord.activeDetailTab,
+            categoryMap = data.workspaceSnapshot.categories.associateBy { it.id },
+            editingAccount = dialog.editingAccount,
             showEditorSheet = dialog.showEditorSheet, cardEditorDraft = dialog.cardEditorDraft,
             householdMembers = data.workspaceSnapshot.householdMembers,
             mergingAccount = action.mergingAccount, showMergeDialog = action.showMergeDialog,
@@ -222,6 +225,7 @@ class AccountsViewModel(
     }.flowOn(computeDispatcher).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AccountsUiState(isLoading = true))
 
     fun selectAccount(accountId: Long?) { _selectedAccountId.value = accountId }
+    fun selectDetailTab(tab: AccountDetailTab) { _activeDetailTab.value = tab }
     fun setPhoneViewingDetail(viewing: Boolean) { _isPhoneViewingDetail.value = viewing }
     fun selectCardPlayer(player: String) { _selectedCardPlayer.value = player }
     fun toggleShowUsedPerks() { _showUsedPerks.value = !_showUsedPerks.value }
@@ -263,6 +267,7 @@ class AccountsViewModel(
 
     fun openAccountDeepLink(accountId: Long) {
         _selectedAccountId.value = accountId
+        _activeDetailTab.value = AccountDetailTab.TRANSACTIONS
         _showEditorSheet.value = false
         _editingAccount.value = null
         cardEditor.clearDraft()
@@ -278,6 +283,7 @@ class AccountsViewModel(
             _selectedAccountId.value = null
         } else {
             _selectedAccountId.value = accountId
+            _activeDetailTab.value = AccountDetailTab.TRANSACTIONS
             _showEditorSheet.value = false
             _editingAccount.value = null
             cardEditor.clearDraft()
@@ -289,6 +295,7 @@ class AccountsViewModel(
 
     fun dismissInspectorPane() {
         _selectedAccountId.value = null
+        _activeDetailTab.value = AccountDetailTab.TRANSACTIONS
         _showEditorSheet.value = false
         _editingAccount.value = null
         cardEditor.clearDraft()
@@ -474,15 +481,6 @@ class AccountsViewModel(
         setCardBenefitUsage(accountId, benefitId, targetAmount)
     }
 
-    @Deprecated("Use toggleCardBenefit with benefitId")
-    fun toggleCardBenefit(accountId: Long, benefitIndex: Int) {
-        val account = uiState.value.accounts.find { it.id == accountId } ?: return
-        val rawProfile = account.creditCardProfile ?: return
-        val profile = CreditCardBenefitEngine.upgradeProfile(rawProfile, LocalDateUtils.todayLocalDate())
-        val benefitId = profile.benefits.getOrNull(benefitIndex)?.id ?: return
-        toggleCardBenefit(accountId, benefitId)
-    }
-
     fun openPerkUsage(accountId: Long, benefitId: String) {
         val account = uiState.value.accounts.find { it.id == accountId }
         val rawProfile = account?.creditCardProfile
@@ -541,8 +539,14 @@ class AccountsViewModel(
         _selectedAccountId.value = account.id
         _showEditorSheet.value = false
         cardEditor.clearDraft()
-        _historyAccount.value = account
-        _showHistorySheet.value = true
+        if (account.type == AccountType.CREDIT) {
+            _historyAccount.value = account
+            _showHistorySheet.value = true
+        } else {
+            _activeDetailTab.value = AccountDetailTab.BALANCE_HISTORY
+            _showHistorySheet.value = false
+            _historyAccount.value = null
+        }
     }
 
     fun closeBalanceHistory() {

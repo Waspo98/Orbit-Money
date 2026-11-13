@@ -1,11 +1,10 @@
 package app.overbay.orbit.ui.accounts.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,17 +13,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,194 +34,258 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import app.overbay.orbit.data.model.Account
-import app.overbay.orbit.theme.OrbitColorTokens
-import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
+import app.overbay.orbit.ui.components.OrbitDropdownMenu
+import app.overbay.orbit.ui.components.OrbitIcons
+import app.overbay.orbit.ui.components.orbitTactilePress
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * Editorial actions section for Account Detail view.
- * Encapsulates action pills (Edit, Perks, Balance History, Snapshot Reminder,
- * Merge, Transactions, Archive, Delete) and SimpleFIN sync link status.
- *
+ * Sticky top header for Account and Credit Card detail inspectors/modals.
+ * Pairs an optional leading brandmark + title/subtitle with 34dp-aligned Edit,
+ * spring-animated overflow menu (`•••`), and Close (`✕`) controls.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun AccountInspectorActionsSection(
-    account: Account,
+fun AccountInspectorHeader(
+    accountName: String,
+    title: String,
+    editLabel: String,
     onEdit: () -> Unit,
-    onHistory: () -> Unit,
-    onSnapshotReminder: () -> Unit,
-    onMerge: () -> Unit,
-    onSeeTransactions: () -> Unit,
-    onToggleArchive: () -> Unit,
-    onDelete: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    isArchived: Boolean = false,
+    leadingContent: (@Composable () -> Unit)? = null,
+    onHistory: (() -> Unit)? = null,
+    onAddBalanceRecord: (() -> Unit)? = null,
+    onSnapshotReminder: (() -> Unit)? = null,
+    onMerge: (() -> Unit)? = null,
     onUnlinkSimpleFin: (() -> Unit)? = null,
-    hasClosureAlert: Boolean = false,
-    onReviewClosure: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    onToggleArchive: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null
 ) {
     val haptics = LocalOrbitHaptics.current
+    val colors = OrbitTheme.colors
+    val sheetDismiss = LocalOrbitSheetDismiss.current
+    var menuExpanded by remember { mutableStateOf(false) }
     var showUnlinkConfirm by remember { mutableStateOf(false) }
-    val missingFromSync = !account.simplefinMissingSince.isNullOrBlank()
 
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+    val hasOverflowMenu = onHistory != null ||
+        onAddBalanceRecord != null ||
+        onSnapshotReminder != null ||
+        onMerge != null ||
+        onUnlinkSimpleFin != null ||
+        onToggleArchive != null ||
+        onDelete != null
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        if ((hasClosureAlert || missingFromSync) && onReviewClosure != null) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = if (missingFromSync) "No Longer Reported by SimpleFIN" else "Possible Payoff Detected",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                            Text(
-                                text = "Did you recently pay off or close this account?",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    OrbitActionChip(
-                        label = "Review",
-                        onClick = {
-                            haptics.tick()
-                            onReviewClosure()
-                        }
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (leadingContent != null) {
+                leadingContent()
+                Spacer(modifier = Modifier.width(12.dp))
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!subtitle.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
         }
 
-        // SimpleFIN link status banner if linked and actively reporting
-        if (!account.simplefinAccountId.isNullOrBlank() && !missingFromSync) {
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
-                modifier = Modifier.fillMaxWidth()
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                border = BorderStroke(1.dp, colors.cardBorder),
+                modifier = Modifier
+                    .height(34.dp)
+                    .orbitTactilePress()
+                    .clip(CircleShape)
+                    .clickable {
+                        haptics.tick()
+                        onEdit()
+                    }
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Text(
+                        text = editLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            if (hasOverflowMenu) {
+                Box {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f),
+                        border = BorderStroke(1.dp, colors.cardBorder),
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .clickable {
+                                haptics.tick()
+                                menuExpanded = true
+                            }
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = OrbitColorTokens.Green,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "Linked to SimpleFIN",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Text(
-                                text = "Automatically syncing balances & activity",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = OrbitIcons.MoreHoriz,
+                                contentDescription = "More Account Actions",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
 
-                    if (onUnlinkSimpleFin != null) {
-                        OrbitActionChip(
-                            label = "Unlink",
-                            onClick = {
-                                haptics.tick()
+                    OrbitDropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        onHistory?.let { action ->
+                            OverflowActionItem("Balance History", OrbitIcons.SpendingTrends) {
+                                menuExpanded = false
+                                action()
+                            }
+                        }
+                        onAddBalanceRecord?.let { action ->
+                            OverflowActionItem("Log Balance", Icons.Default.Add) {
+                                menuExpanded = false
+                                action()
+                            }
+                        }
+                        onSnapshotReminder?.let { action ->
+                            OverflowActionItem("Balance Reminder", Icons.Default.Notifications) {
+                                menuExpanded = false
+                                sheetDismiss?.invoke(action) ?: action()
+                            }
+                        }
+                        onMerge?.let { action ->
+                            OverflowActionItem("Merge Account", OrbitIcons.Split) {
+                                menuExpanded = false
+                                action()
+                            }
+                        }
+                        if (onUnlinkSimpleFin != null) {
+                            OverflowActionItem("Unlink SimpleFIN", Icons.Default.Clear) {
+                                menuExpanded = false
                                 showUnlinkConfirm = true
                             }
-                        )
+                        }
+                        onToggleArchive?.let { action ->
+                            OverflowActionItem(
+                                label = if (isArchived) "Unarchive Account" else "Archive Account",
+                                icon = OrbitIcons.Accounts
+                            ) {
+                                menuExpanded = false
+                                action()
+                            }
+                        }
+                        onDelete?.let { action ->
+                            HorizontalDivider(color = colors.cardBorder)
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = "Delete Account",
+                                        color = colors.danger,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = colors.danger,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    haptics.reject()
+                                    menuExpanded = false
+                                    action()
+                                }
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // Action pills row
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OrbitActionChip(
-                label = "Edit Account",
-                onClick = { haptics.tick(); onEdit() }
-            )
-            OrbitActionChip(
-                label = "Balance History",
-                onClick = { haptics.tick(); onHistory() }
-            )
-            OrbitActionChip(
-                label = "Balance Reminder",
-                onClick = { haptics.tick(); onSnapshotReminder() }
-            )
-            OrbitActionChip(
-                label = "Merge",
-                onClick = { haptics.tick(); onMerge() }
-            )
-            OrbitActionChip(
-                label = "See Transactions",
-                onClick = { haptics.tick(); onSeeTransactions() }
-            )
-            OrbitActionChip(
-                label = if (account.isArchived) "Unarchive" else "Archive",
-                onClick = { haptics.tick(); onToggleArchive() }
-            )
-            OrbitActionChip(
-                label = "Delete",
-                isDestructive = true,
-                onClick = { haptics.tick(); onDelete() }
-            )
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f),
+                border = BorderStroke(1.dp, colors.cardBorder),
+                modifier = Modifier.size(34.dp)
+            ) {
+                IconButton(
+                    onClick = {
+                        haptics.tick()
+                        sheetDismiss?.invoke(onClose) ?: onClose()
+                    },
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close Details",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
         }
     }
 
     if (showUnlinkConfirm && onUnlinkSimpleFin != null) {
         OrbitConfirmationDialog(
             title = "Unlink SimpleFIN?",
-            message = "Unlinking \"${account.name}\" from SimpleFIN will convert it to a manual account. Existing transactions and balance history will be preserved.",
+            message = "Unlinking \"$accountName\" from SimpleFIN will convert it to a manual account. Existing transactions and balance history will be preserved.",
             confirmText = "Unlink",
             isDestructive = false,
             onConfirm = {
@@ -231,4 +295,28 @@ fun AccountInspectorActionsSection(
             onDismiss = { showUnlinkConfirm = false }
         )
     }
+}
+
+@Composable
+private fun OverflowActionItem(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    val haptics = LocalOrbitHaptics.current
+    DropdownMenuItem(
+        text = { Text(label) },
+        leadingIcon = {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        },
+        onClick = {
+            haptics.tick()
+            onClick()
+        }
+    )
 }
