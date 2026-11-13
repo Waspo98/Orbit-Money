@@ -25,6 +25,7 @@
 
 import { db } from '../db/index.js';
 import { decrypt } from '../crypto.js';
+import { upsertAutoAccountBalance } from './accountBalanceRecordService.js';
 import { markMissingSimpleFinAccounts } from './accountRealEstateService.js';
 import { fetchAccounts } from './simplefinClient.js';
 import { loadRules, applyRulesToDraft } from './ruleMatcher.js';
@@ -253,15 +254,6 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
        WHERE id = ?
          AND household_id = ?
     `);
-    const upsertSimpleFinBalanceRecord = db.prepare(`
-      INSERT INTO account_balance_records (household_id, account_id, record_date, balance, source)
-      VALUES (?, ?, ?, ?, 'simplefin')
-      ON CONFLICT(household_id, account_id, record_date) DO UPDATE SET
-        balance = excluded.balance,
-        source = 'simplefin',
-        updated_at = datetime('now')
-      WHERE account_balance_records.source = 'simplefin'
-    `);
     const insertAccount = db.prepare(`
       INSERT INTO accounts (household_id, name, type, institution, account_number_last4,
                             simplefin_account_id, current_balance, is_manual, simplefin_last_seen_at)
@@ -275,8 +267,14 @@ export async function runSync({ trigger = 'manual', householdId = 1 } = {}) {
     function captureSimpleFinBalance(accountId, sfAccount) {
       const balance = simpleFinBalanceToCents(sfAccount);
       const recordDate = simpleFinBalanceDate(sfAccount, todayDate);
-      const result = upsertSimpleFinBalanceRecord.run(householdId, accountId, recordDate, balance);
-      if (result.changes > 0) balanceSnapshotsStored++;
+      const result = upsertAutoAccountBalance(db, {
+        householdId,
+        accountId,
+        recordDate,
+        balanceCents: balance,
+        source: 'simplefin'
+      });
+      if (result.recorded) balanceSnapshotsStored++;
       return balance;
     }
 

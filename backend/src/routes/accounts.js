@@ -7,10 +7,16 @@ import {
   sendOk,
   sendServerError
 } from '../lib/http.js';
-import { isValidDateOnly } from '../lib/localDate.js';
+import { formatLocalDate, isValidDateOnly } from '../lib/localDate.js';
 import { dollarsToCents, moneyFieldsToDollars } from '../lib/money.js';
 import { parseId, parseInteger, readIdParam } from '../lib/routeParams.js';
-import { recordManualAccountBalance } from '../services/accountBalanceRecordService.js';
+import {
+  deleteAccountBalanceRecord,
+  listAccountBalanceRecords,
+  listHouseholdBalanceRecords,
+  recordManualAccountBalance,
+  upsertAutoAccountBalance
+} from '../services/accountBalanceRecordService.js';
 import { mergeAccounts } from '../services/accountMerge.js';
 import {
   parseRealEstateAccountFields,
@@ -40,13 +46,7 @@ function normalizeOptionalText(value) {
   return text || null;
 }
 
-/**
- * GET /api/accounts?includeArchived=1
- *
- * Returns accounts ordered by sort_order (user-controlled via drag-and-drop).
- * Archived accounts go to the bottom (is_archived ASC first). Within the same
- * archived-state, sort_order controls the order.
- */
+/** GET /api/accounts?includeArchived=1 */
 router.get('/', requireAuth, (req, res) => {
   const includeArchived = req.query.includeArchived === '1';
   const householdId = requireHouseholdId(req);
@@ -75,6 +75,16 @@ router.get('/', requireAuth, (req, res) => {
     sendOk(res, { items: attachInstitutionLogos(db, attachCreditCardProfiles(db, householdId, items)) });
   } catch (err) {
     console.error('List accounts failed:', err);
+    sendServerError(res, err);
+  }
+});
+
+router.get('/records', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  try {
+    sendOk(res, listHouseholdBalanceRecords(db, householdId));
+  } catch (err) {
+    console.error('List household balance records failed:', err);
     sendServerError(res, err);
   }
 });
@@ -149,6 +159,14 @@ router.post('/', requireAuth, (req, res) => {
           `INSERT INTO account_balance_records (household_id, account_id, record_date, balance, source)
            VALUES (?, ?, ?, ?, 'manual')`
         ).run(householdId, result.lastInsertRowid, recordDate, balance);
+      } else {
+        upsertAutoAccountBalance(db, {
+          householdId,
+          accountId: Number(result.lastInsertRowid),
+          recordDate: formatLocalDate(),
+          balanceCents: balance,
+          source: 'manual'
+        });
       }
 
       return db
@@ -164,17 +182,7 @@ router.post('/', requireAuth, (req, res) => {
   }
 });
 
-/**
- * POST /api/accounts/reorder
- * Body: { orderedIds: [1, 5, 3, 8, ...] }
- *
- * Assigns new sort_order values in multiples of 10 so future insertions have
- * room. Only updates accounts present in the array; missing accounts keep
- * their existing order.
- *
- * Wrapped in a transaction so a partial failure doesn't leave the order half
- * written.
- */
+/** POST /api/accounts/reorder — assigns sort_order in multiples of 10. */
 router.post('/reorder', requireAuth, (req, res) => {
   const householdId = requireHouseholdId(req);
   const orderedIds = Array.isArray(req.body?.orderedIds) ? req.body.orderedIds : null;
@@ -218,7 +226,11 @@ router.put('/:id', requireAuth, (req, res) => {
   if (id === null) return;
 
   const existing = db
-    .prepare('SELECT id, type FROM accounts WHERE id = ? AND household_id = ?')
+    .prepare(
+      `SELECT id, type, current_balance, COALESCE(is_property, 0) AS is_property
+         FROM accounts
+        WHERE id = ? AND household_id = ?`
+    )
     .get(id, householdId);
   if (!existing) {
     return sendNotFound(res, 'Account not found.');
@@ -300,6 +312,15 @@ router.put('/:id', requireAuth, (req, res) => {
   try {
     db.prepare(`UPDATE accounts SET ${sets.join(', ')} WHERE id = ? AND household_id = ?`).run(...values);
     const updated = db.prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?').get(id, householdId);
+    if (body.current_balance !== undefined && updated.current_balance !== existing.current_balance && !updated.is_property) {
+      upsertAutoAccountBalance(db, {
+        householdId,
+        accountId: id,
+        recordDate: formatLocalDate(),
+        balanceCents: updated.current_balance,
+        source: 'manual'
+      });
+    }
     sendOk(res, { success: true, account: serializeAccount(updated) });
   } catch (err) {
     console.error('Update account failed:', err);
@@ -409,13 +430,8 @@ router.delete('/:id/credit-card-profile', requireAuth, (req, res) => {
   const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'account');
   if (id === null) return;
-
   try {
-    db.prepare(
-      `DELETE FROM credit_card_profiles
-        WHERE account_id = ?
-          AND household_id = ?`
-    ).run(id, householdId);
+    db.prepare('DELETE FROM credit_card_profiles WHERE account_id = ? AND household_id = ?').run(id, householdId);
     sendOk(res, { success: true });
   } catch (err) {
     console.error('Delete credit card profile failed:', err);
@@ -423,44 +439,35 @@ router.delete('/:id/credit-card-profile', requireAuth, (req, res) => {
   }
 });
 
-router.post('/:id/archive', requireAuth, (req, res) => {
+function setAccountArchivedState(req, res, archived) {
   const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'account');
   if (id === null) return;
   try {
     const result = db
-      .prepare(
-        `UPDATE accounts SET is_archived = 1, updated_at = datetime('now')
-          WHERE id = ? AND household_id = ?`
-      )
-      .run(id, householdId);
-    if (result.changes === 0) {
-      return sendNotFound(res, 'Account not found.');
-    }
+      .prepare(`UPDATE accounts SET is_archived = ?, updated_at = datetime('now') WHERE id = ? AND household_id = ?`)
+      .run(archived ? 1 : 0, id, householdId);
+    if (result.changes === 0) return sendNotFound(res, 'Account not found.');
     sendOk(res, { success: true });
   } catch (err) {
-    console.error('Archive failed:', err);
+    console.error(archived ? 'Archive failed:' : 'Unarchive failed:', err);
     sendServerError(res, err);
   }
-});
+}
 
-router.post('/:id/unarchive', requireAuth, (req, res) => {
+router.post('/:id/archive', requireAuth, (req, res) => setAccountArchivedState(req, res, true));
+router.post('/:id/unarchive', requireAuth, (req, res) => setAccountArchivedState(req, res, false));
+
+router.get('/:id/records', requireAuth, (req, res) => {
   const householdId = requireHouseholdId(req);
   const id = readIdParam(req, res, 'id', 'account');
   if (id === null) return;
   try {
-    const result = db
-      .prepare(
-        `UPDATE accounts SET is_archived = 0, updated_at = datetime('now')
-          WHERE id = ? AND household_id = ?`
-      )
-      .run(id, householdId);
-    if (result.changes === 0) {
-      return sendNotFound(res, 'Account not found.');
-    }
-    sendOk(res, { success: true });
+    const items = listAccountBalanceRecords(db, { householdId, accountId: id });
+    if (items === null) return sendNotFound(res, 'Account not found.');
+    sendOk(res, items);
   } catch (err) {
-    console.error('Unarchive failed:', err);
+    console.error('Get account records failed:', err);
     sendServerError(res, err);
   }
 });
@@ -471,46 +478,50 @@ router.post('/:id/records', requireAuth, (req, res) => {
   if (id === null) return;
 
   const recordDate = String(req.body?.date || '').trim();
-  if (!isValidDateOnly(recordDate)) {
-    return sendBadRequest(res, 'date must be a valid YYYY-MM-DD date.');
-  }
-
+  if (!isValidDateOnly(recordDate)) return sendBadRequest(res, 'date must be a valid YYYY-MM-DD date.');
   const balanceDollars = Number(req.body?.balance);
-  if (!Number.isFinite(balanceDollars)) {
-    return sendBadRequest(res, 'balance must be a valid number.');
-  }
-  const balance = dollarsToCents(balanceDollars);
-  const previousBalance =
-    req.body?.previousBalance === undefined ? null : Number(req.body.previousBalance);
+  if (!Number.isFinite(balanceDollars)) return sendBadRequest(res, 'balance must be a valid number.');
+  const previousBalance = req.body?.previousBalance === undefined ? null : Number(req.body.previousBalance);
   if (previousBalance !== null && !Number.isFinite(previousBalance)) {
     return sendBadRequest(res, 'previousBalance must be a valid number.');
   }
-  const previousBalanceCents = previousBalance === null ? null : dollarsToCents(previousBalance);
 
   const account = db.prepare('SELECT * FROM accounts WHERE id = ? AND household_id = ?').get(id, householdId);
-  if (!account) {
-    return sendNotFound(res, 'Account not found.');
-  }
+  if (!account) return sendNotFound(res, 'Account not found.');
 
   try {
     const updated = recordManualAccountBalance(db, {
       householdId,
       accountId: id,
       recordDate,
-      balanceCents: balance,
-      previousBalanceCents
+      balanceCents: dollarsToCents(balanceDollars),
+      previousBalanceCents: previousBalance === null ? null : dollarsToCents(previousBalance)
     });
+    const savedRow = listAccountBalanceRecords(db, { householdId, accountId: id })?.find((r) => r.record_date === recordDate);
     sendOk(res, {
       success: true,
       account: serializeAccount(updated),
-      record: {
-        account_id: id,
-        date: recordDate,
-        balance: balanceDollars
-      }
+      record: savedRow || { account_id: id, date: recordDate, record_date: recordDate, balance: balanceDollars, source: 'manual' }
     });
   } catch (err) {
     console.error('Add account record failed:', err);
+    sendServerError(res, err);
+  }
+});
+
+router.delete('/:id/records/:recordId', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  const id = readIdParam(req, res, 'id', 'account');
+  if (id === null) return;
+  const recordId = readIdParam(req, res, 'recordId', 'record');
+  if (recordId === null) return;
+  try {
+    if (!deleteAccountBalanceRecord(db, { householdId, accountId: id, recordId })) {
+      return sendNotFound(res, 'Balance record not found.');
+    }
+    sendOk(res, { success: true });
+  } catch (err) {
+    console.error('Delete account record failed:', err);
     sendServerError(res, err);
   }
 });
@@ -545,19 +556,11 @@ router.post('/:id/merge', requireAuth, (req, res) => {
   const sourceId = readIdParam(req, res, 'id', 'account');
   if (sourceId === null) return;
   const targetId = parseId(req.body?.targetId);
-
-  if (targetId === null) {
-    return sendBadRequest(res, 'Invalid account ids.');
-  }
-  if (sourceId === targetId) {
-    return sendBadRequest(res, "Can't merge an account into itself.");
-  }
+  if (targetId === null) return sendBadRequest(res, 'Invalid account ids.');
+  if (sourceId === targetId) return sendBadRequest(res, "Can't merge an account into itself.");
 
   try {
-    sendOk(res, {
-      success: true,
-      ...mergeAccounts(db, { householdId, sourceId, targetId })
-    });
+    sendOk(res, { success: true, ...mergeAccounts(db, { householdId, sourceId, targetId }) });
   } catch (err) {
     if (err.status === 404) return sendNotFound(res, err.message);
     console.error('Merge failed:', err);
@@ -574,18 +577,11 @@ router.delete('/:id', requireAuth, (req, res) => {
     const txnCount = db
       .prepare('SELECT COUNT(*) AS c FROM transactions WHERE account_id = ? AND household_id = ?')
       .get(id, householdId).c;
-
     if (txnCount > 0) {
-      return sendBadRequest(
-        res,
-        `Can't delete an account with ${txnCount} transactions. Merge or archive instead.`
-      );
+      return sendBadRequest(res, `Can't delete an account with ${txnCount} transactions. Merge or archive instead.`);
     }
-
     const result = db.prepare('DELETE FROM accounts WHERE id = ? AND household_id = ?').run(id, householdId);
-    if (result.changes === 0) {
-      return sendNotFound(res, 'Account not found.');
-    }
+    if (result.changes === 0) return sendNotFound(res, 'Account not found.');
     sendOk(res, { success: true });
   } catch (err) {
     console.error('Delete failed:', err);

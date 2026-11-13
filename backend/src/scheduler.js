@@ -16,6 +16,7 @@
 // =============================================================================
 
 import { db } from './db/index.js';
+import { captureAllHouseholdsDailyCheckpoints } from './services/accountBalanceRecordService.js';
 import { cleanupExpiredSampleHouseholds } from './services/sampleHouseholds.js';
 import { runSync } from './services/simplefinSync.js';
 import { reconcileUpcomingTransactions } from './services/upcomingReconciliation.js';
@@ -51,6 +52,15 @@ async function tick() {
     }
   } catch (err) {
     console.error('[scheduler] Upcoming reconciliation failed:', err.message || err);
+  }
+
+  try {
+    const result = captureAllHouseholdsDailyCheckpoints(db, localTodayIsoDate());
+    if (result.recorded > 0) {
+      console.log('[scheduler] Balance checkpoints captured:', result);
+    }
+  } catch (err) {
+    console.error('[scheduler] Balance checkpoint capture failed:', err.message || err);
   }
 
   try {
