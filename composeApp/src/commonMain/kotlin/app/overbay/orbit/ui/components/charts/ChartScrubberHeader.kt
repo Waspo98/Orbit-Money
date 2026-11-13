@@ -33,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.RollingTickerText
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 
 enum class DeltaTone {
     POSITIVE, // Gain, Under budget, Income (Emerald)
@@ -133,9 +135,10 @@ fun ChartScrubberHeader(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // 2. Primary Hero Metric (Tabular Numerals)
-        Text(
+        // 2. Primary Hero Metric (Odometer rolls on period changes, lockstep 60fps during scrubs)
+        RollingTickerText(
             text = formattedValue,
+            animate = !isScrubbing,
             style = MaterialTheme.typography.headlineLarge.copy(
                 fontWeight = FontWeight.Bold,
                 fontFeatureSettings = "tnum"
@@ -143,55 +146,67 @@ fun ChartScrubberHeader(
             color = MaterialTheme.colorScheme.onSurface
         )
 
-        // 3. Bottom Row: Delta pill & subtitle detail
-        if (deltaText != null || subtitle != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (deltaText != null) {
-                    val (targetBg, targetText) = when (deltaTone) {
-                        DeltaTone.POSITIVE -> themeColors.income.copy(alpha = 0.15f) to themeColors.income
-                        DeltaTone.NEGATIVE -> themeColors.expense.copy(alpha = 0.15f) to themeColors.expense
-                        DeltaTone.NEUTRAL -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                    val pillBg by animateColorAsState(
-                        targetValue = targetBg,
-                        animationSpec = OrbitSprings.ColorEffectsDefault,
-                        label = "deltaPillBg"
-                    )
-                    val pillText by animateColorAsState(
-                        targetValue = targetText,
-                        animationSpec = OrbitSprings.ColorEffectsDefault,
-                        label = "deltaPillText"
-                    )
+        // 3. Bottom Row: Delta pill & subtitle detail (fixed minHeight prevents vertical jump)
+        val (targetBg, targetText) = when (deltaTone) {
+            DeltaTone.POSITIVE -> themeColors.income.copy(alpha = 0.15f) to themeColors.income
+            DeltaTone.NEGATIVE -> themeColors.expense.copy(alpha = 0.15f) to themeColors.expense
+            DeltaTone.NEUTRAL -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+        }
+        val pillBg by animateColorAsState(
+            targetValue = targetBg,
+            animationSpec = OrbitSprings.ColorEffectsDefault,
+            label = "deltaPillBg"
+        )
+        val pillText by animateColorAsState(
+            targetValue = targetText,
+            animationSpec = OrbitSprings.ColorEffectsDefault,
+            label = "deltaPillText"
+        )
 
-                    Surface(
-                        shape = RoundedCornerShape(999.dp),
-                        color = pillBg
-                    ) {
+        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 28.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            AnimatedContent(
+                targetState = Triple(deltaText, deltaTone, subtitle),
+                contentKey = { (delta, tone, sub) ->
+                    if (isScrubbing) Triple(delta != null, tone, sub != null) else Triple(delta, tone, sub)
+                },
+                transitionSpec = { orbitFadeContentTransform() },
+                label = "scrubberDeltaAndSubtitle"
+            ) { (activeDelta, _, activeSubtitle) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (activeDelta != null) {
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = pillBg
+                        ) {
+                            Text(
+                                text = activeDelta,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFeatureSettings = "tnum"
+                                ),
+                                color = pillText,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    if (activeSubtitle != null) {
                         Text(
-                            text = deltaText,
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontFeatureSettings = "tnum"
-                            ),
-                            color = pillText,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                            text = activeSubtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
-
-                if (subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
         }

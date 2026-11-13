@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 
@@ -305,7 +306,7 @@ fun SpendingTrendsBarChart(
         }
 
         // 7. Dual-Bar Legend (Income / Expenses)
-        if (items.any { it.incomeCents != null }) {
+        OrbitAccordionVisibility(visible = items.any { it.incomeCents != null }) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

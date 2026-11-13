@@ -19,7 +19,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -30,6 +33,7 @@ import app.overbay.orbit.domain.UNCATEGORIZED_CATEGORY_ID
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.ui.components.charts.ChartScrubberHeader
 import app.overbay.orbit.ui.components.charts.DeltaTone
 import app.overbay.orbit.ui.components.charts.SpendingBarItem
@@ -158,20 +162,28 @@ fun CategoryHistoryCard(
                 val scrubbedMonth = scrubbedIndex?.let { idx ->
                     selectedTrend.monthlySeries.getOrNull(idx)?.month
                 }
+                var lastInspectMonth by remember { mutableStateOf("") }
+                if (scrubbedMonth != null) lastInspectMonth = scrubbedMonth
 
-                if (scrubbedMonth != null) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(28.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    OrbitScaleBadgeVisibility(visible = scrubbedMonth != null) {
+                        val monthToInspect = scrubbedMonth ?: lastInspectMonth
                         Surface(
                             shape = RoundedCornerShape(999.dp),
                             color = MaterialTheme.colorScheme.primaryContainer,
                             modifier = Modifier.clickable {
                                 haptics.tick()
-                                onInspectMonth(scrubbedMonth)
+                                if (monthToInspect.isNotEmpty()) onInspectMonth(monthToInspect)
                             }
                         ) {
                             Text(
-                                text = "Inspect Month ($scrubbedMonth)",
+                                text = "Inspect Month ($monthToInspect)",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -181,7 +193,7 @@ fun CategoryHistoryCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // Single-Bar Category Chart Canvas
                 if (barItems.isNotEmpty()) {

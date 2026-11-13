@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.budgets.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -20,11 +22,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.MonthlyBudgetOverview
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitStatTile
+import app.overbay.orbit.ui.components.RollingTickerCents
+import app.overbay.orbit.ui.components.RollingTickerText
 import kotlin.math.roundToInt
 
 /**
@@ -67,8 +72,8 @@ fun BudgetSummaryHeroCard(
                 verticalAlignment = Alignment.Bottom
             ) {
                 Column {
-                    Text(
-                        text = MoneyUtils.formatCents(totalSpent),
+                    RollingTickerCents(
+                        cents = totalSpent,
                         style = MaterialTheme.typography.displayMedium.copy(
                             fontSize = 34.sp,
                             lineHeight = 40.sp,
@@ -89,13 +94,18 @@ fun BudgetSummaryHeroCard(
                 } else {
                     "${MoneyUtils.formatCents(totalBudgeted - totalSpent)} remaining"
                 }
-                Text(
+                val remainingColor by animateColorAsState(
+                    targetValue = if (isOverBudget) colors.danger else colors.income,
+                    animationSpec = OrbitSprings.ColorEffectsFast,
+                    label = "budgetRemainingColor"
+                )
+                RollingTickerText(
                     text = remainingText,
                     style = TabularNumStyle.copy(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     ),
-                    color = if (isOverBudget) colors.danger else colors.income
+                    color = remainingColor
                 )
             }
 

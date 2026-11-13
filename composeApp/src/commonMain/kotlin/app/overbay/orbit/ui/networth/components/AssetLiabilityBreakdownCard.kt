@@ -32,8 +32,10 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.NetWorthSnapshot
 import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.ui.components.OrbitBarSegment
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import kotlin.math.abs
 
 @Composable
@@ -147,32 +149,21 @@ fun AllocationBar(
         Spacer(modifier = Modifier.height(6.dp))
 
         // Horizontal Segmented Bar (6 Buckets)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(10.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-        ) {
-            if (cashFraction > 0.005f) {
-                Box(modifier = Modifier.weight(cashFraction).fillMaxHeight().background(cashColor))
-            }
-            if (invFraction > 0.005f) {
-                Box(modifier = Modifier.weight(invFraction).fillMaxHeight().background(invColor))
-            }
-            if (reFraction > 0.005f) {
-                Box(modifier = Modifier.weight(reFraction).fillMaxHeight().background(reColor))
-            }
-            if (creditFraction > 0.005f) {
-                Box(modifier = Modifier.weight(creditFraction).fillMaxHeight().background(creditColor))
-            }
-            if (loansFraction > 0.005f) {
-                Box(modifier = Modifier.weight(loansFraction).fillMaxHeight().background(loanColor))
-            }
-            if (otherFraction > 0.005f) {
-                Box(modifier = Modifier.weight(otherFraction).fillMaxHeight().background(otherColor))
-            }
-        }
+        val barSegments = listOf(
+            OrbitBarSegment("cash", cashFraction, cashColor),
+            OrbitBarSegment("inv", invFraction, invColor),
+            OrbitBarSegment("re", reFraction, reColor),
+            OrbitBarSegment("credit", creditFraction, creditColor),
+            OrbitBarSegment("loans", loansFraction, loanColor),
+            OrbitBarSegment("other", otherFraction, otherColor)
+        )
+        OrbitStackedSegmentBar(
+            segments = barSegments,
+            height = 10.dp,
+            cornerRadius = 5.dp,
+            normalizeToFullWidth = true,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+        )
 
         Spacer(modifier = Modifier.height(8.dp))
 

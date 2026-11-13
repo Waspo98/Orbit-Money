@@ -97,6 +97,12 @@ fun RetirementProjectionChart(
         animationSpec = OrbitSprings.FloatSpatialDefault,
         label = "retirementMaxBalanceScale"
     )
+    val animatedScenarioBalances = RetirementScenarioPreset.entries.associateWith { preset ->
+        val targets = remember(scenarios[preset]) {
+            scenarios[preset]?.accumulationPoints?.map { it.balanceCents.toFloat().coerceAtLeast(0f) } ?: emptyList()
+        }
+        rememberAnimatedFloatSeries(targets = targets)
+    }
 
     LaunchedEffect(scrubbedAge, selectedPreset) {
         val age = scrubbedAge
@@ -185,6 +191,7 @@ fun RetirementProjectionChart(
 
                 fun ageToX(age: Double): Float = (((age - minAge) / ageSpan) * w).toFloat()
                 fun balToY(bal: Cents): Float = (h - ((bal.toDouble() / denom) * h).toFloat()).coerceIn(0f, h)
+                fun balFloatToY(bal: Float): Float = (h - ((bal.toDouble() / denom) * h).toFloat()).coerceIn(0f, h)
 
                 // 1. Target Nest Egg Horizontal Line
                 val targetY = balToY(targetNestEggCents)
@@ -220,10 +227,14 @@ fun RetirementProjectionChart(
                 val selectedModel = scenarios[selectedPreset]
                 if (selectedModel != null && selectedModel.accumulationPoints.size >= 2) {
                     val pts = selectedModel.accumulationPoints
+                    val animPts = animatedScenarioBalances[selectedPreset]
+                    fun ptY(i: Int): Float = balFloatToY(
+                        animPts?.getOrElse(i) { pts[i].balanceCents.toFloat() } ?: pts[i].balanceCents.toFloat()
+                    )
                     areaPath.rewind()
-                    areaPath.moveTo(ageToX(pts.first().age), balToY(pts.first().balanceCents))
+                    areaPath.moveTo(ageToX(pts.first().age), ptY(0))
                     for (i in 1 until pts.size) {
-                        areaPath.lineTo(ageToX(pts[i].age), balToY(pts[i].balanceCents))
+                        areaPath.lineTo(ageToX(pts[i].age), ptY(i))
                     }
                     areaPath.lineTo(ageToX(pts.last().age), h)
                     areaPath.lineTo(ageToX(pts.first().age), h)
@@ -253,16 +264,20 @@ fun RetirementProjectionChart(
                         val isSelected = preset == selectedPreset
                         linePath.rewind()
                         val pts = model.accumulationPoints
-                        linePath.moveTo(ageToX(pts.first().age), balToY(pts.first().balanceCents))
+                        val animPts = animatedScenarioBalances[preset]
+                        fun ptY(i: Int): Float = balFloatToY(
+                            animPts?.getOrElse(i) { pts[i].balanceCents.toFloat() } ?: pts[i].balanceCents.toFloat()
+                        )
+                        linePath.moveTo(ageToX(pts.first().age), ptY(0))
                         for (i in 0 until pts.size - 1) {
-                            val p0 = if (i > 0) pts[i - 1] else pts[i]
-                            val p1 = pts[i]
-                            val p2 = pts[i + 1]
-                            val p3 = if (i + 2 < pts.size) pts[i + 2] else p2
-                            val x1 = ageToX(p1.age); val y1 = balToY(p1.balanceCents)
-                            val x2 = ageToX(p2.age); val y2 = balToY(p2.balanceCents)
-                            val x0 = ageToX(p0.age); val y0 = balToY(p0.balanceCents)
-                            val x3 = ageToX(p3.age); val y3 = balToY(p3.balanceCents)
+                            val i0 = (i - 1).coerceAtLeast(0)
+                            val i1 = i
+                            val i2 = i + 1
+                            val i3 = (i + 2).coerceAtMost(pts.lastIndex)
+                            val x1 = ageToX(pts[i1].age); val y1 = ptY(i1)
+                            val x2 = ageToX(pts[i2].age); val y2 = ptY(i2)
+                            val x0 = ageToX(pts[i0].age); val y0 = ptY(i0)
+                            val x3 = ageToX(pts[i3].age); val y3 = ptY(i3)
                             linePath.cubicTo(
                                 x1 + (x2 - x0) / 6f, (y1 + (y2 - y0) / 6f).coerceIn(0f, h),
                                 x2 - (x3 - x1) / 6f, (y2 - (y3 - y1) / 6f).coerceIn(0f, h),

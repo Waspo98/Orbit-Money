@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.components.charts
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -18,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,10 +47,15 @@ internal fun RetirementChartReadoutBar(
     modifier: Modifier = Modifier
 ) {
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val containerAlpha by animateFloatAsState(
+        targetValue = if (scrubbedAge != null) 1f else 0.55f,
+        animationSpec = OrbitSprings.FloatEffectsFast,
+        label = "retirementReadoutAlpha"
+    )
 
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = if (scrubbedAge != null) 1f else 0.55f),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = containerAlpha),
         modifier = modifier
             .fillMaxWidth()
             .padding(bottom = 6.dp)

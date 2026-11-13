@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.networth.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,10 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -29,6 +34,9 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.MonthlyNetWorthPoint
 import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
+import app.overbay.orbit.ui.components.RollingTickerCents
 import app.overbay.orbit.ui.components.charts.NetWorthAreaChart
 import app.overbay.orbit.ui.networth.NetWorthPeriod
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -73,30 +81,48 @@ fun NetWorthChartCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     val amount = activePoint?.snapshot?.netWorthCents ?: 0L
-                    Text(
-                        text = MoneyUtils.formatCents(amount),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (amount >= 0L) OrbitColorTokens.Green else OrbitColorTokens.Red
+                    val amountColor by animateColorAsState(
+                        targetValue = if (amount >= 0L) OrbitColorTokens.Green else OrbitColorTokens.Red,
+                        animationSpec = OrbitSprings.ColorEffectsFast,
+                        label = "netWorthAmountColor"
+                    )
+                    RollingTickerCents(
+                        cents = amount,
+                        animate = scrubbedPoint == null,
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                        color = amountColor
                     )
                 }
 
-                activePoint?.let { pt ->
-                    if (pt.deltaFromPreviousCents != 0L) {
-                        val isPositive = pt.deltaFromPreviousCents > 0L
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isPositive) OrbitColorTokens.Green.copy(alpha = 0.15f)
-                            else OrbitColorTokens.Red.copy(alpha = 0.15f)
-                        ) {
-                            Text(
-                                text = (if (isPositive) "+" else "") + MoneyUtils.formatCents(pt.deltaFromPreviousCents),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isPositive) OrbitColorTokens.Green else OrbitColorTokens.Red,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
+                val currentDelta = activePoint?.deltaFromPreviousCents ?: 0L
+                var lastNonZeroDelta by remember { mutableLongStateOf(0L) }
+                if (currentDelta != 0L) lastNonZeroDelta = currentDelta
+                val displayDelta = if (currentDelta != 0L) currentDelta else lastNonZeroDelta
+                val isPositive = displayDelta > 0L
+                val deltaBg by animateColorAsState(
+                    targetValue = if (isPositive) OrbitColorTokens.Green.copy(alpha = 0.15f)
+                    else OrbitColorTokens.Red.copy(alpha = 0.15f),
+                    animationSpec = OrbitSprings.ColorEffectsFast,
+                    label = "netWorthDeltaBg"
+                )
+                val deltaTextColor by animateColorAsState(
+                    targetValue = if (isPositive) OrbitColorTokens.Green else OrbitColorTokens.Red,
+                    animationSpec = OrbitSprings.ColorEffectsFast,
+                    label = "netWorthDeltaText"
+                )
+                OrbitScaleBadgeVisibility(visible = currentDelta != 0L) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = deltaBg
+                    ) {
+                        RollingTickerCents(
+                            cents = displayDelta,
+                            showSign = true,
+                            animate = scrubbedPoint == null,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = deltaTextColor,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
                     }
                 }
             }

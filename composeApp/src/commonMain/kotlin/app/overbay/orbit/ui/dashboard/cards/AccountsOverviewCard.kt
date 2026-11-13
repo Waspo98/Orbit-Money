@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.dashboard.cards
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -8,16 +9,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.RollingTickerCents
 import app.overbay.orbit.ui.dashboard.AccountsOverviewState
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -55,14 +59,19 @@ fun AccountsOverviewCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = MoneyUtils.formatCents(accounts.totalNetWorthCents, showCents = true),
+            val netWorthColor by animateColorAsState(
+                targetValue = if (accounts.totalNetWorthCents >= 0L) colors.income else colors.expense,
+                animationSpec = OrbitSprings.ColorEffectsFast,
+                label = "accountsOverviewNetWorthColor"
+            )
+            RollingTickerCents(
+                cents = accounts.totalNetWorthCents,
                 style = TabularNumStyle.copy(
                     fontSize = 27.sp,
                     lineHeight = 32.sp,
                     fontWeight = FontWeight.Bold
                 ),
-                color = if (accounts.totalNetWorthCents >= 0L) colors.income else colors.expense
+                color = netWorthColor
             )
             Text(
                 text = "Across ${accounts.accountCount} ${if (accounts.accountCount == 1) "account" else "accounts"}",

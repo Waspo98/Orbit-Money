@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.dashboard.cards
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,10 +22,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.RollingTickerCents
 import app.overbay.orbit.ui.dashboard.CashflowHeroState
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -52,6 +56,11 @@ fun NetCashflowHeroCard(
                 onClick()
             }
     ) {
+        val netColor by animateColorAsState(
+            targetValue = if (cashflow.isNetPositive) colors.income else colors.danger,
+            animationSpec = OrbitSprings.ColorEffectsFast,
+            label = "cashflowNetColor"
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -59,20 +68,21 @@ fun NetCashflowHeroCard(
         ) {
             MonthStatColumn(
                 label = "Income",
-                amount = MoneyUtils.formatCents(cashflow.incomeCents),
+                cents = cashflow.incomeCents,
                 color = colors.income,
                 modifier = Modifier.weight(1f)
             )
             MonthStatColumn(
                 label = "Expenses",
-                amount = MoneyUtils.formatCents(cashflow.expenseCents),
+                cents = cashflow.expenseCents,
                 color = colors.danger,
                 modifier = Modifier.weight(1f)
             )
             MonthStatColumn(
                 label = "Net",
-                amount = MoneyUtils.formatCents(cashflow.netCents, signed = true),
-                color = if (cashflow.isNetPositive) colors.income else colors.danger,
+                cents = cashflow.netCents,
+                showSign = true,
+                color = netColor,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -82,9 +92,10 @@ fun NetCashflowHeroCard(
 @Composable
 private fun MonthStatColumn(
     label: String,
-    amount: String,
+    cents: Cents,
     color: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showSign: Boolean = false
 ) {
     Column(
         modifier = modifier
@@ -104,15 +115,14 @@ private fun MonthStatColumn(
             overflow = TextOverflow.Ellipsis
         )
         Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = amount,
+        RollingTickerCents(
+            cents = cents,
+            showSign = showSign,
             style = TabularNumStyle.copy(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             ),
-            color = color,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            color = color
         )
     }
 }

@@ -1,5 +1,7 @@
 package app.overbay.orbit.ui.accounts.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -45,9 +47,11 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.RealEstatePropertyEngine
 import app.overbay.orbit.domain.RealEstatePropertyUnit
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitIcons
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.roundToInt
 
@@ -122,6 +126,11 @@ fun RealEstatePropertyCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(4.dp))
+                    val animatedEquityFraction by animateFloatAsState(
+                        targetValue = unit.equityFraction.coerceIn(0f, 1f),
+                        animationSpec = OrbitSprings.FloatSpatialDefault,
+                        label = "propertyEquityFraction"
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
@@ -132,7 +141,7 @@ fun RealEstatePropertyCard(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth(unit.equityFraction.coerceIn(0f, 1f))
+                                    .fillMaxWidth(animatedEquityFraction)
                                     .fillMaxHeight()
                                     .clip(CircleShape)
                                     .background(equityColor)
@@ -271,8 +280,13 @@ private fun LinkedPropertyLoanSubRow(
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
     var menuExpanded by remember { mutableStateOf(false) }
-    val rowBg = if (isInspected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+    val targetRowBg = if (isInspected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
     else MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)
+    val rowBg by animateColorAsState(
+        targetValue = targetRowBg,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "linkedLoanRowBg"
+    )
 
     Surface(color = rowBg, modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -308,24 +322,20 @@ private fun LinkedPropertyLoanSubRow(
                             modifier = Modifier.align(Alignment.CenterVertically)
                         )
                     }
-                    if (hasClosureAlert) {
+                    OrbitScaleBadgeVisibility(
+                        visible = hasClosureAlert,
+                        modifier = Modifier.align(Alignment.CenterVertically)
+                    ) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = MaterialTheme.colorScheme.tertiaryContainer,
-                            modifier = Modifier
-                                .align(Alignment.CenterVertically)
-                                .clickable { haptics.tick(); onReviewClosure() }
+                            modifier = Modifier.clickable { haptics.tick(); onReviewClosure() }
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                    modifier = Modifier.size(11.dp)
-                                )
+                                Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(11.dp))
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = "Paid Off / Closed?",
@@ -359,12 +369,7 @@ private fun LinkedPropertyLoanSubRow(
                         .clickable { haptics.tick(); menuExpanded = true }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = OrbitIcons.MoreHoriz,
-                            contentDescription = "Loan Options",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Icon(OrbitIcons.MoreHoriz, "Loan Options", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                     }
                 }
 
@@ -378,14 +383,8 @@ private fun LinkedPropertyLoanSubRow(
                     DropdownMenuItem(text = { Text("Find Bank Logo") }, onClick = { menuExpanded = false; onFindLogo() })
                     DropdownMenuItem(text = { Text("Balance History") }, onClick = { menuExpanded = false; onHistory() })
                     DropdownMenuItem(text = { Text("Merge Account") }, onClick = { menuExpanded = false; onMerge() })
-                    DropdownMenuItem(
-                        text = { Text(if (loan.isArchived) "Unarchive" else "Archive") },
-                        onClick = { menuExpanded = false; onToggleArchive() }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Delete", color = colors.danger) },
-                        onClick = { menuExpanded = false; onDelete() }
-                    )
+                    DropdownMenuItem(text = { Text(if (loan.isArchived) "Unarchive" else "Archive") }, onClick = { menuExpanded = false; onToggleArchive() })
+                    DropdownMenuItem(text = { Text("Delete", color = colors.danger) }, onClick = { menuExpanded = false; onDelete() })
                 }
             }
         }

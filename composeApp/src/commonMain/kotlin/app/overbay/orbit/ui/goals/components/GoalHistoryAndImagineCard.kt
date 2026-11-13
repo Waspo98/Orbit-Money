@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.goals.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +50,8 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.charts.rememberAnimatedFloatSeries
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 
@@ -141,25 +144,31 @@ fun GoalHistoryAndImagineCard(
             }
 
             // Canvas Line & Area Chart
-            if (history.size >= 2) {
-                GoalHistoryCanvasChart(
-                    points = history,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(135.dp)
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(80.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Historical balances will chart here as account syncs accumulate.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
+            AnimatedContent(
+                targetState = history.size >= 2,
+                transitionSpec = { orbitMorphContentTransform(clip = false) },
+                label = "goalHistoryChartMode"
+            ) { hasChart ->
+                if (hasChart) {
+                    GoalHistoryCanvasChart(
+                        points = history,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(135.dp)
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Historical balances will chart here as account syncs accumulate.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
                 }
             }
 
@@ -282,6 +291,11 @@ private fun GoalHistoryCanvasChart(
     val values = remember(points) { points.map { it.amountCents.toFloat() } }
     val maxVal = remember(values) { max(1f, values.maxOrNull() ?: 1f) }
     val minVal = remember(values) { values.minOrNull() ?: 0f }
+    val range = remember(maxVal, minVal) { (maxVal - minVal).coerceAtLeast(1f) }
+    val normalizedTargets = remember(values, minVal, range) {
+        values.map { ((it - minVal) / range).coerceIn(0f, 1f) }
+    }
+    val animatedNorms = rememberAnimatedFloatSeries(targets = normalizedTargets)
 
     val first = points.firstOrNull()
     val last = points.lastOrNull()
@@ -296,14 +310,13 @@ private fun GoalHistoryCanvasChart(
             val w = size.width
             val h = size.height
             val stepX = w / (points.size - 1).coerceAtLeast(1)
-            val range = (maxVal - minVal).coerceAtLeast(1f)
 
             path.rewind()
             fillPath.rewind()
 
-            points.forEachIndexed { i, pt ->
+            points.forEachIndexed { i, _ ->
                 val x = i * stepX
-                val norm = (pt.amountCents - minVal) / range
+                val norm = animatedNorms.getOrElse(i) { normalizedTargets.getOrElse(i) { 0f } }
                 val y = h - (norm * (h - 18f)) - 8f
 
                 if (i == 0) {
@@ -340,7 +353,7 @@ private fun GoalHistoryCanvasChart(
 
             // Draw dot at latest point
             val lastX = (points.size - 1) * stepX
-            val lastNorm = (points.last().amountCents - minVal) / range
+            val lastNorm = animatedNorms.lastOrNull() ?: normalizedTargets.lastOrNull() ?: 0f
             val lastY = h - (lastNorm * (h - 18f)) - 8f
             drawCircle(color = primaryColor, radius = 5.dp.toPx(), center = Offset(lastX, lastY))
         }
