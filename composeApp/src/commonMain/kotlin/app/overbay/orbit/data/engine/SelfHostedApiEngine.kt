@@ -82,6 +82,7 @@ class SelfHostedApiEngine(
         preFetchedMe: AuthMeResponseDto? = null
     ): OrbitWorkspaceSnapshot = coroutineScope {
         val accountsDeferred = async { apiClient.getAccounts().getOrThrow() }
+        val balanceRecordsDeferred = async { apiClient.getAllAccountBalanceRecords().getOrNull() ?: emptyList() }
         val transactionsDeferred = async { apiClient.getAllTransactions().getOrThrow() }
         val categoriesDeferred = async { apiClient.getCategories().getOrThrow() }
         val budgetsDeferred = async { apiClient.getBudgets("").getOrNull() }
@@ -189,7 +190,7 @@ class SelfHostedApiEngine(
             shares = sharing?.shares ?: emptyList(),
             accounts = mergedAccounts,
             creditCardProfiles = creditCardProfiles,
-            balanceRecords = emptyList(),
+            balanceRecords = balanceRecordsDeferred.await(),
             categories = categories,
             transactions = transactions,
             budgets = budgetsDto?.toDomainList() ?: emptyList(),

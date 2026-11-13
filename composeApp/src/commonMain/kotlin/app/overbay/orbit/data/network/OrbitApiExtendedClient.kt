@@ -73,6 +73,12 @@ suspend fun OrbitApiClient.unarchiveAccount(id: Long): Result<Boolean> = runCatc
     res.status.isSuccess()
 }
 
+suspend fun OrbitApiClient.getAllAccountBalanceRecords(): Result<List<BalanceRecord>> = runCatching {
+    val res = client.get(url("/api/accounts/records")) { auth(sessionCookie) }
+    extractSessionCookie(res); ensureSuccess(res)
+    res.body<List<BalanceRecordWireDto>>().map { it.toDomain() }
+}
+
 suspend fun OrbitApiClient.getAccountBalanceHistory(accountId: Long): Result<List<BalanceRecord>> = runCatching {
     val res = client.get(url("/api/accounts/$accountId/records")) { auth(sessionCookie) }
     extractSessionCookie(res); ensureSuccess(res)

@@ -317,7 +317,7 @@ class Wave2ParityEngineAndRepoTest {
         assertEquals(1, preview.accountCount)
         assertEquals(2, preview.transactionCount)
         assertEquals(1, preview.goalCount)
-        assertEquals(1, preview.balanceRecordCount)
+        assertEquals(2, preview.balanceRecordCount)
 
         // Undo batch -> removes both imported transactions cleanly
         val undone = repository.undoImportBatch(importedBatch.id).getOrThrow()

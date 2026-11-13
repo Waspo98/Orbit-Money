@@ -10,7 +10,9 @@ import app.overbay.orbit.data.network.OrbitApiClient
 import app.overbay.orbit.data.network.ServerUrlNormalizer
 import app.overbay.orbit.data.network.SimpleFinDirectClient
 import app.overbay.orbit.data.sync.CloudSyncManager
+import app.overbay.orbit.domain.BalanceHistoryEngine
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.RuleMatcherEngine
 import app.overbay.orbit.domain.TransferMatcherEngine
 import app.overbay.orbit.util.OidcCallbackBridge
@@ -136,7 +138,10 @@ class OrbitRepository(
         } else {
             _isAuthenticated.value = true
             activeEngine = localEngine
-            updateMemoryState((localSnap ?: localEngine.loadSnapshot()).copy(preferences = pref))
+            val rawLocal = (localSnap ?: localEngine.loadSnapshot()).copy(preferences = pref)
+            val hydratedLocal = BalanceHistoryEngine.ensureDailySnapshotCheckpoints(rawLocal, LocalDateUtils.todayIsoDate())
+            updateMemoryState(hydratedLocal)
+            if (hydratedLocal.balanceRecords !== rawLocal.balanceRecords) localEngine.saveSnapshot(hydratedLocal)
         }
     }
 
@@ -265,15 +270,10 @@ class OrbitRepository(
 
     // Transactions (with Strict Provenance Preservation)
     private suspend fun commitTransactionsWithManualBalanceSync(oldTxns: List<Transaction>, newTxns: List<Transaction>) {
-        val deltas = mutableMapOf<Long, Cents>()
-        for (t in oldTxns) if (!t.effectiveIsIgnored && t.accountId > 0L) deltas[t.accountId] = (deltas[t.accountId] ?: 0L) - t.effectiveAmountCents
-        for (t in newTxns) if (!t.effectiveIsIgnored && t.accountId > 0L) deltas[t.accountId] = (deltas[t.accountId] ?: 0L) + t.effectiveAmountCents
-        val modifiedManualAccounts = mutableListOf<Account>()
-        val updatedAccounts = _accounts.value.map { acct ->
-            val delta = deltas[acct.id] ?: 0L
-            if (acct.isManual && delta != 0L) acct.copy(currentBalanceCents = acct.currentBalanceCents + delta).also { modifiedManualAccounts.add(it) } else acct
-        }
-        commitSnapshot(_snapshot.value.copy(transactions = newTxns, accounts = updatedAccounts))
+        val (updatedSnapshot, modifiedManualAccounts) = BalanceHistoryEngine.applyTransactionBalanceDeltas(
+            _snapshot.value, oldTxns, newTxns, LocalDateUtils.todayIsoDate()
+        )
+        commitSnapshot(updatedSnapshot)
         modifiedManualAccounts.forEach { activeEngine.pushAccount(it) }
     }
 
@@ -422,14 +422,15 @@ class OrbitRepository(
         val localId = if (exists) account.id else if (account.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else account.id
         val savedLocal = if (exists) account else account.copy(id = localId)
         val updatedList = if (exists) current.map { if (it.id == account.id) savedLocal else it } else current + savedLocal
-        commitSnapshot(_snapshot.value.copy(accounts = updatedList))
+        commitSnapshot(BalanceHistoryEngine.applySavedAccount(_snapshot.value, savedLocal, updatedList, LocalDateUtils.todayIsoDate()))
         val pushed = activeEngine.pushAccount(if (exists) account else account.copy(id = 0L)).getOrNull()
         return if (pushed != null && ((pushed.id > 0L && pushed.id != localId) || pushed.institutionLogo != savedLocal.institutionLogo)) {
-            val synced = savedLocal.copy(
-                id = if (pushed.id > 0L) pushed.id else localId,
-                institutionLogo = pushed.institutionLogo ?: savedLocal.institutionLogo
-            )
-            commitSnapshot(_snapshot.value.copy(accounts = _accounts.value.map { if (it.id == localId) synced else it }))
+            val resolvedId = if (pushed.id > 0L) pushed.id else localId
+            val synced = savedLocal.copy(id = resolvedId, institutionLogo = pushed.institutionLogo ?: savedLocal.institutionLogo)
+            commitSnapshot(_snapshot.value.copy(
+                accounts = _accounts.value.map { if (it.id == localId) synced else it },
+                balanceRecords = BalanceHistoryEngine.remapAccountId(_snapshot.value.balanceRecords, localId, resolvedId)
+            ))
             synced
         } else savedLocal
     }
@@ -437,7 +438,8 @@ class OrbitRepository(
     suspend fun deleteAccount(id: Long) {
         commitSnapshot(_snapshot.value.copy(
             accounts = _accounts.value.filterNot { it.id == id },
-            creditCardProfiles = _snapshot.value.creditCardProfiles.filterNot { it.accountId == id }
+            creditCardProfiles = _snapshot.value.creditCardProfiles.filterNot { it.accountId == id },
+            balanceRecords = _snapshot.value.balanceRecords.filterNot { it.accountId == id }
         ))
         activeEngine.deleteAccount(id)
     }
@@ -456,7 +458,8 @@ class OrbitRepository(
         val remainingAccounts = currentAccounts.filterNot { it.id == sourceAccountId }.map { if (it.id == targetAccountId) updatedTarget else it }
         val cleanedProfiles = _snapshot.value.creditCardProfiles.filterNot { it.accountId == sourceAccountId || it.accountId == targetAccountId } +
             listOfNotNull(mergedCardProfile)
-        commitSnapshot(_snapshot.value.copy(accounts = remainingAccounts, transactions = updatedTxns, creditCardProfiles = cleanedProfiles))
+        val mergedRecords = BalanceHistoryEngine.mergeAccountRecords(_snapshot.value.balanceRecords, updatedTarget, sourceAccountId, LocalDateUtils.todayIsoDate())
+        commitSnapshot(_snapshot.value.copy(accounts = remainingAccounts, transactions = updatedTxns, creditCardProfiles = cleanedProfiles, balanceRecords = mergedRecords))
         activeEngine.mergeAccounts(sourceAccountId, targetAccountId)
         activeEngine.pushAccount(updatedTarget)
     }

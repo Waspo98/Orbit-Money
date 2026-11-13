@@ -157,7 +157,7 @@ fun AccountInlineBalanceHistorySection(
             if (balanceRecords.isEmpty()) {
                 EmptyStateCard(
                     title = "No Balance History Yet",
-                    description = "Tap \"Add Record\" above to record your first balance snapshot for this account."
+                    description = "Snapshots are captured automatically as balances change, or tap \"Add Record\" above to log a past date."
                 )
             } else {
                 Column(modifier = Modifier.fillMaxWidth()) {

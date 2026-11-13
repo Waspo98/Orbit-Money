@@ -1,8 +1,11 @@
 package app.overbay.orbit.data.network
 
 import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.BalanceRecordSource
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.domain.BalanceHistoryEngine
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -115,12 +118,28 @@ class SimpleFinDirectClient(
         val bridgeData = fetchBridgeData(accessUrl).getOrThrow()
         val existingTxIds = snapshot.transactions.mapNotNull { it.externalId }.toSet()
         val accountBySimpleFinId = snapshot.accounts.associateBy { it.simplefinAccountId }
+        val todayIso = LocalDateUtils.todayIsoDate()
 
         val newTransactions = mutableListOf<Transaction>()
+        val updatedBalancesByAccountId = mutableMapOf<Long, Long>()
+        var updatedRecords = snapshot.balanceRecords
         var nextId = (snapshot.transactions.maxOfOrNull { it.id } ?: 0L) + 1L
 
         for (sfAccount in bridgeData.accounts) {
             val localAccount = accountBySimpleFinId[sfAccount.id] ?: continue
+            val parsedBalance = sfAccount.balance.toDoubleOrNull()
+            if (parsedBalance != null) {
+                val balanceCents = MoneyUtils.dollarsToCents(parsedBalance)
+                val recordDate = if (sfAccount.balanceDate > 0L) formatEpochDate(sfAccount.balanceDate) else todayIso
+                updatedBalancesByAccountId[localAccount.id] = balanceCents
+                updatedRecords = BalanceHistoryEngine.upsertAutoCheckpoint(
+                    records = updatedRecords,
+                    account = localAccount.copy(currentBalanceCents = balanceCents),
+                    recordDate = recordDate,
+                    balanceCents = balanceCents,
+                    source = BalanceRecordSource.SIMPLEFIN
+                )
+            }
             for (sfTx in sfAccount.transactions) {
                 if (existingTxIds.contains(sfTx.id)) continue
 
@@ -145,7 +164,18 @@ class SimpleFinDirectClient(
             }
         }
 
+        val updatedAccounts = if (updatedBalancesByAccountId.isEmpty()) {
+            snapshot.accounts
+        } else {
+            snapshot.accounts.map { acct ->
+                val syncedBal = updatedBalancesByAccountId[acct.id]
+                if (syncedBal != null) acct.copy(currentBalanceCents = syncedBal) else acct
+            }
+        }
+
         val merged = snapshot.copy(
+            accounts = updatedAccounts,
+            balanceRecords = updatedRecords,
             transactions = snapshot.transactions + newTransactions
         )
         return DirectSyncOutcome(merged, newTransactions.size)
