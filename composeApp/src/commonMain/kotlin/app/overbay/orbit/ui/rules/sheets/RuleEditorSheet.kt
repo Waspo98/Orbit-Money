@@ -33,6 +33,7 @@ import app.overbay.orbit.ui.components.OrbitCompactTextField
 import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.rules.RuleDraftDefaults
+import app.overbay.orbit.ui.rules.components.RuleEditorEntry
 import app.overbay.orbit.ui.rules.components.RuleLogicCard
 import app.overbay.orbit.ui.rules.components.RuleMatchPreviewWindow
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -88,29 +89,47 @@ fun RuleEditorContent(
     val isEditingExisting = rule != null && rule.id > 0L
     val sortedCategories = remember(categories) { categories.sortedBy { it.name.lowercase() } }
 
-    val conditions = remember(rule, sourceTransaction?.id) {
-        mutableStateListOf<RuleCondition>().apply {
-            if (rule != null && rule.conditions.isNotEmpty()) {
-                addAll(rule.conditions)
+    val entryKeyCounter = remember(rule, sourceTransaction?.id) { longArrayOf(1L) }
+
+    val conditionEntries = remember(rule, sourceTransaction?.id) {
+        mutableStateListOf<RuleEditorEntry<RuleCondition>>().apply {
+            val initialConditions = if (rule != null && rule.conditions.isNotEmpty()) {
+                rule.conditions
             } else {
-                add(RuleDraftDefaults.conditionFromTransaction(RuleConditionField.MERCHANT, RuleOperator.CONTAINS, sourceTransaction, accounts, sortedCategories))
+                listOf(
+                    RuleDraftDefaults.conditionFromTransaction(
+                        RuleConditionField.MERCHANT,
+                        RuleOperator.CONTAINS,
+                        sourceTransaction,
+                        accounts,
+                        sortedCategories
+                    )
+                )
+            }
+            initialConditions.forEach { condition ->
+                add(RuleEditorEntry(key = entryKeyCounter[0]++, value = condition, animateEnter = false))
             }
         }
     }
 
-    val actions = remember(rule, sourceTransaction?.id) {
-        mutableStateListOf<RuleAction>().apply {
-            if (rule != null && rule.actions.isNotEmpty()) {
-                addAll(rule.actions)
+    val actionEntries = remember(rule, sourceTransaction?.id) {
+        mutableStateListOf<RuleEditorEntry<RuleAction>>().apply {
+            val initialActions = if (rule != null && rule.actions.isNotEmpty()) {
+                rule.actions
             } else {
                 val defaultType = if (sourceTransaction != null) RuleActionType.RENAME else RuleActionType.CATEGORIZE
-                add(RuleDraftDefaults.actionForType(defaultType, sourceTransaction, sortedCategories))
+                listOf(RuleDraftDefaults.actionForType(defaultType, sourceTransaction, sortedCategories))
+            }
+            initialActions.forEach { action ->
+                add(RuleEditorEntry(key = entryKeyCounter[0]++, value = action, animateEnter = false))
             }
         }
     }
 
-    val currentConditions = conditions.toList()
-    val currentActions = actions.toList()
+    val currentConditionEntries = conditionEntries.toList()
+    val currentActionEntries = actionEntries.toList()
+    val currentConditions = currentConditionEntries.filterNot { it.isRemoving }.map { it.value }
+    val currentActions = currentActionEntries.filterNot { it.isRemoving }.map { it.value }
     val computedDefaultName = remember(currentConditions, currentActions, sourceTransaction) {
         RuleDraftDefaults.defaultRuleName(currentConditions, currentActions, sourceTransaction)
     }
@@ -240,42 +259,76 @@ fun RuleEditorContent(
         )
 
         RuleLogicCard(
-            conditions = currentConditions,
-            actions = currentActions,
+            conditions = currentConditionEntries,
+            actions = currentActionEntries,
             accounts = accounts,
             categories = sortedCategories,
             onAddCondition = {
-                conditions.add(
+                conditionEntries.add(
+                    RuleEditorEntry(
+                        key = entryKeyCounter[0]++,
+                        value = RuleDraftDefaults.conditionFromTransaction(
+                            RuleConditionField.MERCHANT,
+                            RuleOperator.CONTAINS,
+                            sourceTransaction,
+                            accounts,
+                            sortedCategories
+                        ),
+                        animateEnter = true
+                    )
+                )
+            },
+            onConditionFieldChanged = { key, nextField ->
+                conditionEntries.updateActiveEntry(key) { current ->
                     RuleDraftDefaults.conditionFromTransaction(
-                        RuleConditionField.MERCHANT,
-                        RuleOperator.CONTAINS,
+                        nextField,
+                        current.operator,
                         sourceTransaction,
                         accounts,
                         sortedCategories
                     )
-                )
+                }
             },
-            onConditionFieldChanged = { index, nextField ->
-                conditions[index] = RuleDraftDefaults.conditionFromTransaction(
-                    nextField,
-                    conditions[index].operator,
-                    sourceTransaction,
-                    accounts,
-                    sortedCategories
-                )
+            onConditionChanged = { key, updated ->
+                conditionEntries.updateActiveEntry(key) { updated }
             },
-            onConditionChanged = { index, updated -> conditions[index] = updated },
-            onDeleteCondition = { index -> conditions.removeAt(index) },
+            onDeleteCondition = { key ->
+                conditionEntries.markEntryRemoving(key)
+            },
+            onRemoveConditionFinished = { key ->
+                conditionEntries.removeAll { it.key == key }
+            },
             onAddAction = {
-                val hasRename = actions.any { RuleDraftDefaults.canonicalActionType(it.type) == RuleActionType.RENAME }
-                val nextType = if (hasRename && sortedCategories.isNotEmpty()) RuleActionType.CATEGORIZE else RuleActionType.RENAME
-                actions.add(RuleDraftDefaults.actionForType(nextType, sourceTransaction, sortedCategories))
+                val hasRename = currentActions.any {
+                    RuleDraftDefaults.canonicalActionType(it.type) == RuleActionType.RENAME
+                }
+                val nextType = if (hasRename && sortedCategories.isNotEmpty()) {
+                    RuleActionType.CATEGORIZE
+                } else {
+                    RuleActionType.RENAME
+                }
+                actionEntries.add(
+                    RuleEditorEntry(
+                        key = entryKeyCounter[0]++,
+                        value = RuleDraftDefaults.actionForType(nextType, sourceTransaction, sortedCategories),
+                        animateEnter = true
+                    )
+                )
             },
-            onActionTypeChanged = { index, nextType ->
-                actions[index] = RuleDraftDefaults.actionForType(nextType, sourceTransaction, sortedCategories)
+            onActionTypeChanged = { key, nextType ->
+                actionEntries.updateActiveEntry(key) {
+                    RuleDraftDefaults.actionForType(nextType, sourceTransaction, sortedCategories)
+                }
             },
-            onActionChanged = { index, updated -> actions[index] = updated },
-            onDeleteAction = { index -> actions.removeAt(index) }
+            onActionChanged = { key, updated ->
+                actionEntries.updateActiveEntry(key) { updated }
+            },
+            onDeleteAction = { key ->
+                actionEntries.markEntryRemoving(key)
+            },
+            onRemoveActionFinished = { key ->
+                actionEntries.removeAll { it.key == key }
+            }
         )
 
         RuleMatchPreviewWindow(
@@ -288,5 +341,24 @@ fun RuleEditorContent(
             previewResult = previewResult,
             onOpenRule = onOpenRule
         )
+    }
+}
+
+private fun <T> MutableList<RuleEditorEntry<T>>.updateActiveEntry(
+    key: Long,
+    transform: (T) -> T
+) {
+    val index = indexOfFirst { it.key == key && !it.isRemoving }
+    if (index >= 0) {
+        val current = this[index]
+        this[index] = current.copy(value = transform(current.value))
+    }
+}
+
+private fun <T> MutableList<RuleEditorEntry<T>>.markEntryRemoving(key: Long) {
+    if (count { !it.isRemoving } <= 1) return
+    val index = indexOfFirst { it.key == key && !it.isRemoving }
+    if (index >= 0) {
+        this[index] = this[index].copy(isRemoving = true)
     }
 }
