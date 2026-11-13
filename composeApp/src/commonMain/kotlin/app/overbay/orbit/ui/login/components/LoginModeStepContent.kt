@@ -1,10 +1,5 @@
 package app.overbay.orbit.ui.login.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,12 +22,15 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitHorizontalReveal
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.components.SelectableListRow
@@ -153,10 +151,8 @@ fun LoginLocalSetupStep(
             onClick = { onIntent(LoginIntent.SelectLocalSeed(LocalSeedChoice.RESTORE_FILE)) }
         )
 
-        AnimatedVisibility(
-            visible = state.selectedLocalSeed == LocalSeedChoice.RESTORE_FILE,
-            enter = expandVertically(OrbitSprings.spatialDefault()) + fadeIn(OrbitSprings.effectsDefault()),
-            exit = shrinkVertically(OrbitSprings.spatialDefault()) + fadeOut(OrbitSprings.effectsFast())
+        OrbitAccordionVisibility(
+            visible = state.selectedLocalSeed == LocalSeedChoice.RESTORE_FILE
         ) {
             Column(
                 modifier = Modifier
@@ -177,7 +173,11 @@ fun LoginLocalSetupStep(
                     Text("Choose Backup File")
                 }
 
+                val lastBackupFileName = remember { mutableStateOf("") }
                 if (state.backupFileName != null) {
+                    lastBackupFileName.value = state.backupFileName
+                }
+                OrbitAccordionVisibility(visible = state.backupFileName != null) {
                     Surface(
                         shape = RoundedCornerShape(999.dp),
                         color = colors.incomeContainer
@@ -194,7 +194,7 @@ fun LoginLocalSetupStep(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = state.backupFileName,
+                                text = lastBackupFileName.value,
                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                                 color = colors.onIncomeContainer
                             )
@@ -244,13 +244,15 @@ fun LoginLocalSetupStep(
                     .weight(1f)
                     .height(48.dp)
             ) {
-                if (state.isSubmitting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                OrbitHorizontalReveal(visible = state.isSubmitting, expandFrom = Alignment.Start) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
                 }
                 Text(
                     text = if (state.isSubmitting) "Starting..." else "Continue",

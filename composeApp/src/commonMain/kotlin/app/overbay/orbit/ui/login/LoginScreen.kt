@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.components.OrbitHorizontalReveal
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.login.components.ConfirmedServerPill
 import app.overbay.orbit.ui.login.components.LoginBrandLockup
@@ -281,13 +282,15 @@ private fun LoginServerAuthStep(
                     .fillMaxWidth()
                     .height(48.dp)
             ) {
-                if (state.isSubmitting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                OrbitHorizontalReveal(visible = state.isSubmitting, expandFrom = Alignment.Start) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
                 }
                 Text(
                     text = if (state.isSubmitting) "Signing In..." else "Sign In",

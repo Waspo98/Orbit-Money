@@ -160,31 +160,33 @@ fun FilterDateRangeSection(
         }
     }
 
-    if (datePreset == "custom") {
-        Spacer(modifier = Modifier.height(10.dp))
-        val today = remember { LocalDateUtils.todayLocalDate() }
-        val parsedStart = remember(startDate) {
-            startDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: today
-        }
-        val parsedEnd = remember(endDate) {
-            endDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: today
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            DateFieldButton(
-                date = parsedStart,
-                onDateSelected = { onStartDateChange(it.toString()) },
-                label = "Start Date",
-                modifier = Modifier.weight(1f)
-            )
-            DateFieldButton(
-                date = parsedEnd,
-                onDateSelected = { onEndDateChange(it.toString()) },
-                label = "End Date",
-                modifier = Modifier.weight(1f)
-            )
+    OrbitAccordionVisibility(visible = datePreset == "custom") {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            val today = remember { LocalDateUtils.todayLocalDate() }
+            val parsedStart = remember(startDate) {
+                startDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: today
+            }
+            val parsedEnd = remember(endDate) {
+                endDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: today
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                DateFieldButton(
+                    date = parsedStart,
+                    onDateSelected = { onStartDateChange(it.toString()) },
+                    label = "Start Date",
+                    modifier = Modifier.weight(1f)
+                )
+                DateFieldButton(
+                    date = parsedEnd,
+                    onDateSelected = { onEndDateChange(it.toString()) },
+                    label = "End Date",
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }

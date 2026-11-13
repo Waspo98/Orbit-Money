@@ -141,38 +141,42 @@ fun <T> OrbitSegmentedTabRow(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            if (itemCount > 0) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (isSelected) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceContainerHighest
-                                    }
-                                ) {
-                                    Text(
-                                        text = itemCount.toString(),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
+                            OrbitHorizontalReveal(visible = itemCount > 0) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Surface(
+                                        shape = CircleShape,
                                         color = if (isSelected) {
-                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                            MaterialTheme.colorScheme.primaryContainer
                                         } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                    )
+                                            MaterialTheme.colorScheme.surfaceContainerHighest
+                                        }
+                                    ) {
+                                        Text(
+                                            text = itemCount.toString(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) {
+                                                MaterialTheme.colorScheme.onPrimaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                        )
+                                    }
                                 }
                             }
-                            if (showError) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.error)
-                                )
+                            OrbitHorizontalReveal(visible = showError) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.error)
+                                    )
+                                }
                             }
                         }
                     }

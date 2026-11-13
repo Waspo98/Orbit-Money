@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -351,16 +353,22 @@ private fun TypeSegmentPill(
     isIncomePill: Boolean,
     onClick: () -> Unit
 ) {
-    val containerColor = when {
-        selected && isIncomePill -> MaterialTheme.colorScheme.primaryContainer
-        selected && !isIncomePill -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerLow
-    }
-    val contentColor = when {
-        selected && isIncomePill -> MaterialTheme.colorScheme.onPrimaryContainer
-        selected && !isIncomePill -> MaterialTheme.colorScheme.onSecondaryContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            selected && isIncomePill -> MaterialTheme.colorScheme.primaryContainer
+            selected && !isIncomePill -> MaterialTheme.colorScheme.secondaryContainer
+            else -> MaterialTheme.colorScheme.surfaceContainerLow
+        },
+        animationSpec = OrbitSprings.ColorEffectsFast
+    )
+    val contentColor by animateColorAsState(
+        targetValue = when {
+            selected && isIncomePill -> MaterialTheme.colorScheme.onPrimaryContainer
+            selected && !isIncomePill -> MaterialTheme.colorScheme.onSecondaryContainer
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = OrbitSprings.ColorEffectsFast
+    )
 
     Surface(
         shape = RoundedCornerShape(999.dp),

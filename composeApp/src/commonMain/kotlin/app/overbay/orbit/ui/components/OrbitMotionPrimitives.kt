@@ -1,12 +1,20 @@
 package app.overbay.orbit.ui.components
 
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -22,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
@@ -128,3 +137,78 @@ fun OrbitAccordionVisibility(
         content = content
     )
 }
+
+/**
+ * Standardized horizontal M3E reveal pairing snappy spatial expand/shrink with fast fade.
+ */
+@Composable
+fun OrbitHorizontalReveal(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    expandFrom: Alignment.Horizontal = Alignment.End,
+    content: @Composable AnimatedVisibilityScope.() -> Unit
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = expandHorizontally(
+            animationSpec = OrbitSprings.IntSizeSpatialFast,
+            expandFrom = expandFrom
+        ) + fadeIn(animationSpec = OrbitSprings.FloatEffectsFast),
+        exit = shrinkHorizontally(
+            animationSpec = OrbitSprings.IntSizeSpatialFast,
+            shrinkTowards = expandFrom
+        ) + fadeOut(animationSpec = OrbitSprings.FloatEffectsFast),
+        modifier = modifier,
+        content = content
+    )
+}
+
+/**
+ * Standardized bouncy badge/stamp/icon reveal pairing [OrbitSprings.FloatSpatialFast] scale with
+ * critically damped fade.
+ */
+@Composable
+fun OrbitScaleBadgeVisibility(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    initialScale: Float = 0.8f,
+    content: @Composable AnimatedVisibilityScope.() -> Unit
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = scaleIn(
+            animationSpec = OrbitSprings.FloatSpatialFast,
+            initialScale = initialScale
+        ) + fadeIn(animationSpec = OrbitSprings.FloatEffectsFast),
+        exit = scaleOut(
+            animationSpec = OrbitSprings.FloatSpatialFast,
+            targetScale = initialScale
+        ) + fadeOut(animationSpec = OrbitSprings.FloatEffectsFast),
+        modifier = modifier,
+        content = content
+    )
+}
+
+/**
+ * M3E [ContentTransform] for form/card mode switches that change height while swapping content.
+ */
+fun AnimatedContentTransitionScope<*>.orbitMorphContentTransform(
+    clip: Boolean = true
+): ContentTransform =
+    ((fadeIn(animationSpec = OrbitSprings.FloatEffectsFast) +
+        expandVertically(
+            animationSpec = OrbitSprings.IntSizeAccordionFast,
+            expandFrom = Alignment.Top
+        )) togetherWith
+        (fadeOut(animationSpec = OrbitSprings.FloatEffectsFast) +
+            shrinkVertically(
+                animationSpec = OrbitSprings.IntSizeAccordionFast,
+                shrinkTowards = Alignment.Top
+            ))).using(SizeTransform(clip = clip) { _, _ -> OrbitSprings.IntSizeSpatialDefault })
+
+/**
+ * M3E critically-damped crossfade [ContentTransform] for loading, empty-state, and tab swaps.
+ */
+fun AnimatedContentTransitionScope<*>.orbitFadeContentTransform(): ContentTransform =
+    fadeIn(animationSpec = OrbitSprings.FloatEffectsDefault) togetherWith
+        fadeOut(animationSpec = OrbitSprings.FloatEffectsFast)

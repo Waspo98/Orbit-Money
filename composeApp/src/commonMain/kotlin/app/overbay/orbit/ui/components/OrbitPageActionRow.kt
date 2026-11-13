@@ -1,8 +1,6 @@
 package app.overbay.orbit.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -18,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -35,13 +34,10 @@ fun OrbitFloatingActionButton(
     AnimatedVisibility(
         visible = visible,
         modifier = modifier,
-        enter = scaleIn(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioLowBouncy,
-                stiffness = Spring.StiffnessLow
-            )
-        ) + fadeIn(),
-        exit = scaleOut() + fadeOut()
+        enter = scaleIn(animationSpec = OrbitSprings.FloatSpatialDefault) +
+            fadeIn(animationSpec = OrbitSprings.FloatEffectsFast),
+        exit = scaleOut(animationSpec = OrbitSprings.FloatSpatialFast) +
+            fadeOut(animationSpec = OrbitSprings.FloatEffectsFast)
     ) {
         FloatingActionButton(
             onClick = {

@@ -87,6 +87,7 @@ object OrbitSprings {
     val DpSpatialFast: SpringSpec<Dp> = spatialFast()
     val DpSpatialDefault: SpringSpec<Dp> = spatialDefault()
     val IntOffsetSpatialDefault: SpringSpec<IntOffset> = spatialDefault(IntOffset.VisibilityThreshold)
+    val IntSizeSpatialFast: SpringSpec<IntSize> = spatialFast(IntSize.VisibilityThreshold)
     val IntSizeSpatialDefault: SpringSpec<IntSize> = spatialDefault(IntSize.VisibilityThreshold)
     /**
      * Snappy vertical accordion spring (~200ms settle, 2x faster than [IntSizeSpatialDefault]).

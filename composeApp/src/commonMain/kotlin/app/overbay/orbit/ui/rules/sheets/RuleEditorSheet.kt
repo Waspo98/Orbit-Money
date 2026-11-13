@@ -28,12 +28,15 @@ import app.overbay.orbit.data.model.RuleOperator
 import app.overbay.orbit.data.model.RulePreviewResult
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
+import app.overbay.orbit.ui.components.OrbitAnimatedEntry
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitCompactTextField
+import app.overbay.orbit.ui.components.OrbitEntryKeyGenerator
 import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.markEntryRemoving
+import app.overbay.orbit.ui.components.updateActiveEntry
 import app.overbay.orbit.ui.rules.RuleDraftDefaults
-import app.overbay.orbit.ui.rules.components.RuleEditorEntry
 import app.overbay.orbit.ui.rules.components.RuleLogicCard
 import app.overbay.orbit.ui.rules.components.RuleMatchPreviewWindow
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -89,10 +92,10 @@ fun RuleEditorContent(
     val isEditingExisting = rule != null && rule.id > 0L
     val sortedCategories = remember(categories) { categories.sortedBy { it.name.lowercase() } }
 
-    val entryKeyCounter = remember(rule, sourceTransaction?.id) { longArrayOf(1L) }
+    val entryKeyCounter = remember(rule, sourceTransaction?.id) { OrbitEntryKeyGenerator() }
 
     val conditionEntries = remember(rule, sourceTransaction?.id) {
-        mutableStateListOf<RuleEditorEntry<RuleCondition>>().apply {
+        mutableStateListOf<OrbitAnimatedEntry<RuleCondition>>().apply {
             val initialConditions = if (rule != null && rule.conditions.isNotEmpty()) {
                 rule.conditions
             } else {
@@ -107,13 +110,13 @@ fun RuleEditorContent(
                 )
             }
             initialConditions.forEach { condition ->
-                add(RuleEditorEntry(key = entryKeyCounter[0]++, value = condition, animateEnter = false))
+                add(OrbitAnimatedEntry(key = entryKeyCounter.nextKey(), value = condition, animateEnter = false))
             }
         }
     }
 
     val actionEntries = remember(rule, sourceTransaction?.id) {
-        mutableStateListOf<RuleEditorEntry<RuleAction>>().apply {
+        mutableStateListOf<OrbitAnimatedEntry<RuleAction>>().apply {
             val initialActions = if (rule != null && rule.actions.isNotEmpty()) {
                 rule.actions
             } else {
@@ -121,7 +124,7 @@ fun RuleEditorContent(
                 listOf(RuleDraftDefaults.actionForType(defaultType, sourceTransaction, sortedCategories))
             }
             initialActions.forEach { action ->
-                add(RuleEditorEntry(key = entryKeyCounter[0]++, value = action, animateEnter = false))
+                add(OrbitAnimatedEntry(key = entryKeyCounter.nextKey(), value = action, animateEnter = false))
             }
         }
     }
@@ -265,8 +268,8 @@ fun RuleEditorContent(
             categories = sortedCategories,
             onAddCondition = {
                 conditionEntries.add(
-                    RuleEditorEntry(
-                        key = entryKeyCounter[0]++,
+                    OrbitAnimatedEntry(
+                        key = entryKeyCounter.nextKey(),
                         value = RuleDraftDefaults.conditionFromTransaction(
                             RuleConditionField.MERCHANT,
                             RuleOperator.CONTAINS,
@@ -308,8 +311,8 @@ fun RuleEditorContent(
                     RuleActionType.RENAME
                 }
                 actionEntries.add(
-                    RuleEditorEntry(
-                        key = entryKeyCounter[0]++,
+                    OrbitAnimatedEntry(
+                        key = entryKeyCounter.nextKey(),
                         value = RuleDraftDefaults.actionForType(nextType, sourceTransaction, sortedCategories),
                         animateEnter = true
                     )
@@ -341,24 +344,5 @@ fun RuleEditorContent(
             previewResult = previewResult,
             onOpenRule = onOpenRule
         )
-    }
-}
-
-private fun <T> MutableList<RuleEditorEntry<T>>.updateActiveEntry(
-    key: Long,
-    transform: (T) -> T
-) {
-    val index = indexOfFirst { it.key == key && !it.isRemoving }
-    if (index >= 0) {
-        val current = this[index]
-        this[index] = current.copy(value = transform(current.value))
-    }
-}
-
-private fun <T> MutableList<RuleEditorEntry<T>>.markEntryRemoving(key: Long) {
-    if (count { !it.isRemoving } <= 1) return
-    val index = indexOfFirst { it.key == key && !it.isRemoving }
-    if (index >= 0) {
-        this[index] = this[index].copy(isRemoving = true)
     }
 }

@@ -109,11 +109,11 @@ fun DateFieldButton(
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                         modifier = Modifier.padding(end = 4.dp)
                     ) {
-                        if (date != null && onClear != null && enabled) {
+                        OrbitHorizontalReveal(visible = date != null && onClear != null && enabled) {
                             IconButton(
                                 onClick = {
                                     haptics.tick()
-                                    onClear()
+                                    onClear?.invoke()
                                 },
                                 modifier = Modifier.size(28.dp)
                             ) {

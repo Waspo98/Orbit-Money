@@ -177,7 +177,8 @@ fun OrbitModalFooterFrame(
         Column(modifier = Modifier.fillMaxWidth()) {
             HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
 
-            if (!errorBannerText.isNullOrBlank()) {
+            OrbitAccordionVisibility(visible = !errorBannerText.isNullOrBlank()) {
+                val message = errorBannerText.orEmpty()
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
@@ -207,7 +208,7 @@ fun OrbitModalFooterFrame(
                             modifier = Modifier.size(15.dp)
                         )
                         Text(
-                            text = errorBannerText,
+                            text = message,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onErrorContainer,
@@ -298,13 +299,18 @@ fun OrbitModalFooter(
                     .weight(if (dismissText.isNullOrBlank()) 1f else 1.25f)
                     .height(48.dp)
             ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                OrbitHorizontalReveal(
+                    visible = isSaving,
+                    expandFrom = Alignment.Start
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
                 }
                 Text(confirmText, fontWeight = FontWeight.Bold)
             }

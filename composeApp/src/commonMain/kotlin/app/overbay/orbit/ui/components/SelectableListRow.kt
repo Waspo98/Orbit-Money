@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,12 +14,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -44,16 +47,25 @@ fun SelectableListRow(
     enabled: Boolean = true
 ) {
     val haptics = LocalOrbitHaptics.current
-    val containerColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
-    }
-    val border = if (isSelected) {
-        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-    } else {
-        BorderStroke(1.dp, OrbitTheme.colors.cardBorder)
-    }
+    val containerColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "selectableRowBg"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+        } else {
+            OrbitTheme.colors.cardBorder
+        },
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "selectableRowBorder"
+    )
+    val border = BorderStroke(1.dp, borderColor)
 
     Surface(
         onClick = {

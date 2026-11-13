@@ -87,32 +87,38 @@ fun AdaptiveNavigationShell(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val showDesktopWebSidebar = PlatformRuntime.isWeb && maxWidth >= 1200.dp
-        if (showDesktopWebSidebar) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                DesktopSidebar(
-                    primaryTabs = primaryTabs,
-                    currentKey = currentKey,
-                    onNavigate = { haptics.tick(); onNavigate(it) },
-                    mhaEnabled = mhaEnabled,
-                    hiddenRouteNames = hiddenRouteNames,
-                    moreRouteOrder = moreRouteOrder
-                )
-                VerticalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                Box(modifier = Modifier.weight(1f).fillMaxHeight()) { content() }
-            }
-        } else {
-            // Persistent bottom NavigationBar across phones, folding phones, and tablets
-            Scaffold(
-                modifier = Modifier.fillMaxSize(),
-                contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                bottomBar = {
-                    PhoneBottomBar(
+        Row(modifier = Modifier.fillMaxSize()) {
+            OrbitHorizontalReveal(
+                visible = showDesktopWebSidebar,
+                expandFrom = Alignment.Start
+            ) {
+                Row(modifier = Modifier.fillMaxHeight()) {
+                    DesktopSidebar(
                         primaryTabs = primaryTabs,
                         currentKey = currentKey,
-                        isSecondaryRoute = isSecondaryRoute,
-                        onTabSelected = { haptics.tick(); onNavigate(it) },
-                        onOpenMore = { haptics.tick(); showMoreSheet = true }
+                        onNavigate = { haptics.tick(); onNavigate(it) },
+                        mhaEnabled = mhaEnabled,
+                        hiddenRouteNames = hiddenRouteNames,
+                        moreRouteOrder = moreRouteOrder
                     )
+                    VerticalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+                }
+            }
+
+            // Keep a unified Scaffold/content host across breakpoints so resizing preserves screen state.
+            Scaffold(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                bottomBar = {
+                    OrbitAccordionVisibility(visible = !showDesktopWebSidebar) {
+                        PhoneBottomBar(
+                            primaryTabs = primaryTabs,
+                            currentKey = currentKey,
+                            isSecondaryRoute = isSecondaryRoute,
+                            onTabSelected = { haptics.tick(); onNavigate(it) },
+                            onOpenMore = { haptics.tick(); showMoreSheet = true }
+                        )
+                    }
                 }
             ) { padding ->
                 Box(modifier = Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {

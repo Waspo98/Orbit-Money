@@ -7,12 +7,14 @@ import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.unit.IntOffset
+import app.overbay.orbit.theme.OrbitSprings
 import kotlinx.serialization.Serializable
 
 enum class OrbitTransitionDirection {
@@ -61,22 +63,28 @@ fun AnimatedContentTransitionScope<OrbitNavKey>.orbitNavigationTransitionSpec():
 
     return when (direction) {
         OrbitTransitionDirection.VIEWFINDER_RIGHT -> {
-            slideInHorizontally(
+            (slideInHorizontally(
                 animationSpec = snappySlideSpring,
                 initialOffsetX = { fullWidth -> fullWidth }
-            ) togetherWith slideOutHorizontally(
+            ) + fadeIn(animationSpec = fadeSpring) + scaleIn(
+                animationSpec = OrbitSprings.FloatSpatialDefault,
+                initialScale = 0.985f
+            )) togetherWith (slideOutHorizontally(
                 animationSpec = snappySlideSpring,
                 targetOffsetX = { fullWidth -> -fullWidth }
-            )
+            ) + fadeOut(animationSpec = fadeSpring))
         }
         OrbitTransitionDirection.VIEWFINDER_LEFT -> {
-            slideInHorizontally(
+            (slideInHorizontally(
                 animationSpec = snappySlideSpring,
                 initialOffsetX = { fullWidth -> -fullWidth }
-            ) togetherWith slideOutHorizontally(
+            ) + fadeIn(animationSpec = fadeSpring) + scaleIn(
+                animationSpec = OrbitSprings.FloatSpatialDefault,
+                initialScale = 0.985f
+            )) togetherWith (slideOutHorizontally(
                 animationSpec = snappySlideSpring,
                 targetOffsetX = { fullWidth -> fullWidth }
-            )
+            ) + fadeOut(animationSpec = fadeSpring))
         }
         OrbitTransitionDirection.MORE_PUSH -> {
             (fadeIn(animationSpec = fadeSpring) + slideInVertically(

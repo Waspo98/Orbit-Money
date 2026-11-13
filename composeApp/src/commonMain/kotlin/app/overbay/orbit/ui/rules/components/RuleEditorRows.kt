@@ -1,17 +1,6 @@
 package app.overbay.orbit.ui.rules.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,10 +31,11 @@ import app.overbay.orbit.data.model.RuleConditionField
 import app.overbay.orbit.data.model.RuleOperator
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.components.OrbitCompactCurrencyField
 import app.overbay.orbit.ui.components.OrbitCompactDropdownPill
 import app.overbay.orbit.ui.components.OrbitCompactTextField
+import app.overbay.orbit.ui.components.OrbitHorizontalReveal
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.ui.rules.RuleDraftDefaults
 import kotlin.math.abs
 
@@ -106,7 +96,7 @@ fun ConditionEditorRow(
 
         AnimatedContent(
             targetState = canonicalField to (condition.operator == RuleOperator.BETWEEN),
-            transitionSpec = { ruleRowContentTransform() },
+            transitionSpec = { orbitMorphContentTransform() },
             contentAlignment = Alignment.TopStart,
             label = "ConditionValueMorph",
             modifier = Modifier.fillMaxWidth()
@@ -283,7 +273,7 @@ fun ActionEditorRow(
 
         AnimatedContent(
             targetState = canonicalType,
-            transitionSpec = { ruleRowContentTransform() },
+            transitionSpec = { orbitMorphContentTransform() },
             contentAlignment = Alignment.TopStart,
             label = "ActionArgumentMorph",
             modifier = Modifier.fillMaxWidth()
@@ -344,17 +334,7 @@ private fun RuleRowDeleteButton(
     leadingSpacing: Dp = 0.dp,
     onClick: () -> Unit
 ) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = expandHorizontally(
-            animationSpec = OrbitSprings.IntSizeAccordionFast,
-            expandFrom = Alignment.End
-        ) + fadeIn(animationSpec = OrbitSprings.FloatEffectsFast),
-        exit = shrinkHorizontally(
-            animationSpec = OrbitSprings.IntSizeAccordionFast,
-            shrinkTowards = Alignment.End
-        ) + fadeOut(animationSpec = OrbitSprings.FloatEffectsFast)
-    ) {
+    OrbitHorizontalReveal(visible = visible) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (leadingSpacing > 0.dp) {
                 Spacer(modifier = Modifier.width(leadingSpacing))
@@ -370,15 +350,3 @@ private fun RuleRowDeleteButton(
         }
     }
 }
-
-private fun AnimatedContentTransitionScope<*>.ruleRowContentTransform(): ContentTransform =
-    ((fadeIn(animationSpec = OrbitSprings.FloatEffectsFast) +
-        expandVertically(
-            animationSpec = OrbitSprings.IntSizeAccordionFast,
-            expandFrom = Alignment.Top
-        )) togetherWith
-        (fadeOut(animationSpec = OrbitSprings.FloatEffectsFast) +
-            shrinkVertically(
-                animationSpec = OrbitSprings.IntSizeAccordionFast,
-                shrinkTowards = Alignment.Top
-            ))).using(SizeTransform(clip = true) { _, _ -> OrbitSprings.IntSizeSpatialDefault })
