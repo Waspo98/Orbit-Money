@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,12 +38,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.RulePreviewResult
 import app.overbay.orbit.data.model.Category
-import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
-import app.overbay.orbit.data.model.labelWithEmoji
-import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.rules.RulesUiState
 import app.overbay.orbit.ui.rules.sheets.RuleEditorContent
 import app.overbay.orbit.util.LocalOrbitHaptics

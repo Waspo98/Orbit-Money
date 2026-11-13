@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,7 +36,6 @@ import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
-import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
 fun AccountMergeDialog(
@@ -49,7 +47,6 @@ fun AccountMergeDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val eligibleTargets = availableAccounts.filter { it.id != sourceAccount.id && !it.isArchived }
 
     var selectedTarget by remember { mutableStateOf(eligibleTargets.firstOrNull()) }

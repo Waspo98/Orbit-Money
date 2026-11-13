@@ -2,7 +2,6 @@ package app.overbay.orbit.ui.networth.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,9 +15,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.LocalDateUtils
-import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.MonthlyNetWorthPoint
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.OrbitSprings
@@ -39,7 +34,6 @@ import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.ui.components.RollingTickerCents
 import app.overbay.orbit.ui.components.charts.NetWorthAreaChart
 import app.overbay.orbit.ui.networth.NetWorthPeriod
-import app.overbay.orbit.util.LocalOrbitHaptics
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +45,6 @@ fun NetWorthChartCard(
     onPointScrubbed: (MonthlyNetWorthPoint?) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val activePoint = scrubbedPoint ?: points.lastOrNull()
 
     Card(

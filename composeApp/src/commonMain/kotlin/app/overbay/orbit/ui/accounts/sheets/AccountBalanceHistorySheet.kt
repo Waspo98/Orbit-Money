@@ -47,30 +47,8 @@ import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.orbitFadeContentTransform
-import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSheetHeader
-
-@Composable
-fun AccountBalanceHistorySheet(
-    account: Account,
-    balanceRecords: List<BalanceRecord> = emptyList(),
-    onAddRecord: () -> Unit = {},
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    OrbitModalSheet(
-        onDismissRequest = onDismiss,
-        modifier = modifier
-    ) {
-        AccountBalanceHistoryContent(
-            account = account,
-            balanceRecords = balanceRecords,
-            onAddRecord = onAddRecord,
-            onDismiss = onDismiss
-        )
-    }
-}
 
 @Composable
 fun AccountBalanceHistoryContent(

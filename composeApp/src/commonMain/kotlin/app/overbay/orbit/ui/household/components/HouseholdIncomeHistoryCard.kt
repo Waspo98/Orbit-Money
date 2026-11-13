@@ -16,10 +16,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HouseholdIncomeRecord
 import app.overbay.orbit.data.model.HouseholdMember
-import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
@@ -47,7 +44,6 @@ import app.overbay.orbit.ui.household.HouseholdCalculations
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.min
 import kotlin.math.roundToLong
-import kotlinx.datetime.LocalDate
 
 @Composable
 fun HouseholdIncomeHistoryCard(

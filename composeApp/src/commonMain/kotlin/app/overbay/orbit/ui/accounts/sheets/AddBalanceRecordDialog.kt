@@ -35,7 +35,6 @@ import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitModalSheet
-import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -49,7 +48,6 @@ fun AddBalanceRecordDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     var date by remember { mutableStateOf(LocalDateUtils.todayLocalDate()) }
     var balanceCents by remember { mutableStateOf(account.currentBalanceCents) }
     var confirmedLargeDelta by remember { mutableStateOf(false) }

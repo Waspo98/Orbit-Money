@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.theme.OrbitColorTokens
-import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
@@ -47,7 +46,6 @@ import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitHorizontalReveal
 import app.overbay.orbit.ui.components.OrbitModalFooter
-import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitSwitchRow
@@ -70,33 +68,6 @@ private enum class EditorAccountKind(val label: String, val accountType: Account
             if (account.isProperty) return PROPERTY
             return entries.firstOrNull { !it.isProperty && it.accountType == account.type } ?: OTHER
         }
-    }
-}
-
-@Composable
-fun AccountEditorSheet(
-    account: Account,
-    availablePropertyAnchors: List<Account> = emptyList(),
-    onSave: (Account) -> Unit,
-    onDelete: ((Long) -> Unit)? = null,
-    onUnlinkSimpleFin: (() -> Unit)? = null,
-    onDismiss: () -> Unit,
-    showMhaOption: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    OrbitModalSheet(
-        onDismissRequest = onDismiss,
-        modifier = modifier
-    ) {
-        AccountEditorContent(
-            account = account,
-            availablePropertyAnchors = availablePropertyAnchors,
-            onSave = onSave,
-            onDelete = onDelete,
-            onUnlinkSimpleFin = onUnlinkSimpleFin,
-            onDismiss = onDismiss,
-            showMhaOption = showMhaOption
-        )
     }
 }
 

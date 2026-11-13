@@ -1,7 +1,6 @@
 package app.overbay.orbit.ui.transactions.sheets
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,15 +24,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.network.MerchantLogoCandidateDto
 import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
-import app.overbay.orbit.theme.OrbitTheme
-import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.transactions.components.MerchantLogoImageCache
 import app.overbay.orbit.util.LocalOrbitHaptics
