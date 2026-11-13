@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -39,6 +40,7 @@ import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
@@ -128,7 +130,11 @@ fun AccountEditorContent(
         availablePropertyAnchors.filter { it.id != 0L && it.id != account.id }
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    val isInsideSheet = LocalOrbitSheetDismiss.current != null
+
+    Column(
+        modifier = if (isInsideSheet) modifier.fillMaxWidth() else modifier.fillMaxSize()
+    ) {
         OrbitSheetHeader(
             title = if (account.id == 0L) "Add New Account" else "Edit Account",
             onDismiss = onDismiss,
@@ -152,7 +158,7 @@ fun AccountEditorContent(
 
         Column(
             modifier = Modifier
-                .weight(1f, fill = false)
+                .weight(1f, fill = !isInsideSheet)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 14.dp),

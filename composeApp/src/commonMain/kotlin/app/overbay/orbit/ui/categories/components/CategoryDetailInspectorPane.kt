@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -74,48 +75,42 @@ fun CategoryDetailInspectorPane(
         else -> "NONE"
     }
 
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-        modifier = modifier.fillMaxWidth()
-    ) {
-        AnimatedContent(
-            targetState = activeMode,
-            transitionSpec = { orbitMorphContentTransform(clip = false) },
-            label = "CategoryInspectorModeTransition"
-        ) { mode ->
-            when (mode) {
-                "EDIT" -> {
-                    CategoryEditorContent(
-                        category = state.editingCategory,
-                        onSave = onSaveCategory,
-                        onDelete = { id -> onDeleteCategory(id) },
-                        onDismiss = {
-                            if (state.inspectingSummary != null) {
-                                onCloseEdit()
-                            } else {
-                                onDismissPane()
-                            }
-                        },
-                        showMhaOption = state.mhaEnabled
+    AnimatedContent(
+        targetState = activeMode,
+        transitionSpec = { orbitMorphContentTransform(clip = false) },
+        modifier = modifier.fillMaxSize(),
+        label = "CategoryInspectorModeTransition"
+    ) { mode ->
+        when (mode) {
+            "EDIT" -> {
+                CategoryEditorContent(
+                    category = state.editingCategory,
+                    onSave = onSaveCategory,
+                    onDelete = { id -> onDeleteCategory(id) },
+                    onDismiss = {
+                        if (state.inspectingSummary != null) {
+                            onCloseEdit()
+                        } else {
+                            onDismissPane()
+                        }
+                    },
+                    showMhaOption = state.mhaEnabled
+                )
+            }
+            "DETAIL" -> {
+                val summary = state.inspectingSummary
+                if (summary != null) {
+                    CategoryInspectorDetailView(
+                        summary = summary,
+                        groupTitle = state.inspectingGroupTitle ?: "Category Cluster",
+                        onOpenEdit = { onOpenEdit(summary.category) },
+                        onDeleteCategory = { onDeleteCategory(summary.category.id) },
+                        onViewTransactions = onViewTransactions,
+                        onDismissPane = onDismissPane
                     )
                 }
-                "DETAIL" -> {
-                    val summary = state.inspectingSummary
-                    if (summary != null) {
-                        CategoryInspectorDetailView(
-                            summary = summary,
-                            groupTitle = state.inspectingGroupTitle ?: "Category Cluster",
-                            onOpenEdit = { onOpenEdit(summary.category) },
-                            onDeleteCategory = { onDeleteCategory(summary.category.id) },
-                            onViewTransactions = onViewTransactions,
-                            onDismissPane = onDismissPane
-                        )
-                    }
-                }
-                else -> {}
             }
+            else -> {}
         }
     }
 }

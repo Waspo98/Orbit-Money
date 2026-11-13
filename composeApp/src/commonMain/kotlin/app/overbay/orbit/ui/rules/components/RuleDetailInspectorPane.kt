@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -70,59 +71,53 @@ fun RuleDetailInspectorPane(
         else -> "NONE"
     }
 
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-        modifier = modifier.fillMaxWidth()
-    ) {
-        AnimatedContent(
-            targetState = activeMode,
-            transitionSpec = { orbitMorphContentTransform(clip = false) },
-            label = "RuleInspectorModeTransition"
-        ) { mode ->
-            when (mode) {
-                "EDIT" -> {
-                    RuleEditorContent(
-                        rule = state.editingRule,
-                        categories = state.categories,
-                        accounts = state.accounts,
-                        onSave = onSaveRule,
-                        onPreviewCount = onPreviewCount,
-                        onPreviewMatches = onPreviewMatches,
-                        onPreviewRule = onPreviewRule,
-                        onOpenRule = onOpenRule,
-                        onDismiss = {
-                            if (state.inspectingRule != null) {
-                                onCloseEdit()
-                            } else {
-                                onDismissPane()
-                            }
+    AnimatedContent(
+        targetState = activeMode,
+        transitionSpec = { orbitMorphContentTransform(clip = false) },
+        modifier = modifier.fillMaxSize(),
+        label = "RuleInspectorModeTransition"
+    ) { mode ->
+        when (mode) {
+            "EDIT" -> {
+                RuleEditorContent(
+                    rule = state.editingRule,
+                    categories = state.categories,
+                    accounts = state.accounts,
+                    onSave = onSaveRule,
+                    onPreviewCount = onPreviewCount,
+                    onPreviewMatches = onPreviewMatches,
+                    onPreviewRule = onPreviewRule,
+                    onOpenRule = onOpenRule,
+                    onDismiss = {
+                        if (state.inspectingRule != null) {
+                            onCloseEdit()
+                        } else {
+                            onDismissPane()
                         }
+                    }
+                )
+            }
+            "DETAIL" -> {
+                val rule = state.inspectingRule
+                if (rule != null) {
+                    val accountMap = remember(state.accounts) {
+                        state.accounts.associate { it.id to it.name }
+                    }
+                    RuleInspectorDetailView(
+                        rule = rule,
+                        categoryMap = state.categoryMap,
+                        accountMap = accountMap,
+                        isApplyingRules = state.isApplyingRules,
+                        onToggleEnabled = { enabled -> onToggleEnabled(rule.id, enabled) },
+                        onOpenEdit = { onOpenEdit(rule) },
+                        onDeleteRule = { onDeleteRule(rule.id) },
+                        onRunRulesNow = onRunRulesNow,
+                        onPreviewCount = onPreviewCount,
+                        onDismissPane = onDismissPane
                     )
                 }
-                "DETAIL" -> {
-                    val rule = state.inspectingRule
-                    if (rule != null) {
-                        val accountMap = remember(state.accounts) {
-                            state.accounts.associate { it.id to it.name }
-                        }
-                        RuleInspectorDetailView(
-                            rule = rule,
-                            categoryMap = state.categoryMap,
-                            accountMap = accountMap,
-                            isApplyingRules = state.isApplyingRules,
-                            onToggleEnabled = { enabled -> onToggleEnabled(rule.id, enabled) },
-                            onOpenEdit = { onOpenEdit(rule) },
-                            onDeleteRule = { onDeleteRule(rule.id) },
-                            onRunRulesNow = onRunRulesNow,
-                            onPreviewCount = onPreviewCount,
-                            onDismissPane = onDismissPane
-                        )
-                    }
-                }
-                else -> {}
             }
+            else -> {}
         }
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -67,61 +68,55 @@ fun HouseholdInspectorPane(
         else -> "NONE"
     }
 
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-        modifier = modifier.fillMaxWidth()
-    ) {
-        AnimatedContent(
-            targetState = activeMode,
-            transitionSpec = {
-                fadeIn(OrbitSprings.FloatEffectsDefault) togetherWith
-                    fadeOut(OrbitSprings.FloatEffectsFast)
-            },
-            label = "HouseholdInspectorModeTransition"
-        ) { mode ->
-            when (mode) {
-                "INVITE" -> {
-                    InviteMemberContent(
-                        onDismiss = {
-                            if (state.inspectingMember != null) {
-                                onCloseInvite()
-                            } else {
-                                onDismissPane()
-                            }
-                        },
-                        onInvite = onInviteMember
-                    )
-                }
-                "MEMBER_EDIT" -> {
-                    HouseholdMemberEditorContent(
-                        member = state.editingMember,
-                        availableAccounts = state.availableAccounts,
-                        onDismiss = {
-                            if (state.inspectingMember != null) {
-                                onCloseEditMember()
-                            } else {
-                                onDismissPane()
-                            }
-                        },
-                        onSave = onSaveMember
-                    )
-                }
-                "MEMBER_DETAIL" -> {
-                    val member = state.inspectingMember
-                    if (member != null) {
-                        HouseholdMemberDetailView(
-                            member = member,
-                            includeHsaInRetirementRate = state.includeHsaInRetirementRate,
-                            onOpenEdit = { onOpenEditMember(member) },
-                            onDelete = { onDeleteMember(member) },
-                            onDismissPane = onDismissPane
-                        )
-                    }
-                }
-                else -> {}
+    AnimatedContent(
+        targetState = activeMode,
+        transitionSpec = {
+            fadeIn(OrbitSprings.FloatEffectsDefault) togetherWith
+                fadeOut(OrbitSprings.FloatEffectsFast)
+        },
+        modifier = modifier.fillMaxSize(),
+        label = "HouseholdInspectorModeTransition"
+    ) { mode ->
+        when (mode) {
+            "INVITE" -> {
+                InviteMemberContent(
+                    onDismiss = {
+                        if (state.inspectingMember != null) {
+                            onCloseInvite()
+                        } else {
+                            onDismissPane()
+                        }
+                    },
+                    onInvite = onInviteMember
+                )
             }
+            "MEMBER_EDIT" -> {
+                HouseholdMemberEditorContent(
+                    member = state.editingMember,
+                    availableAccounts = state.availableAccounts,
+                    onDismiss = {
+                        if (state.inspectingMember != null) {
+                            onCloseEditMember()
+                        } else {
+                            onDismissPane()
+                        }
+                    },
+                    onSave = onSaveMember
+                )
+            }
+            "MEMBER_DETAIL" -> {
+                val member = state.inspectingMember
+                if (member != null) {
+                    HouseholdMemberDetailView(
+                        member = member,
+                        includeHsaInRetirementRate = state.includeHsaInRetirementRate,
+                        onOpenEdit = { onOpenEditMember(member) },
+                        onDelete = { onDeleteMember(member) },
+                        onDismissPane = onDismissPane
+                    )
+                }
+            }
+            else -> {}
         }
     }
 }

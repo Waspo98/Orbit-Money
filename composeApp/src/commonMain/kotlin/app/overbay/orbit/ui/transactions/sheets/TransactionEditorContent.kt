@@ -9,6 +9,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,6 +44,7 @@ import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitDropdownField
@@ -144,7 +146,11 @@ fun TransactionEditorContent(
         }
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    val isInsideSheet = LocalOrbitSheetDismiss.current != null
+
+    Column(
+        modifier = if (isInsideSheet) modifier.fillMaxWidth() else modifier.fillMaxSize()
+    ) {
         OrbitSheetHeader(
             title = when {
                 isPickingCategory -> "Select Category"
@@ -197,7 +203,7 @@ fun TransactionEditorContent(
                 (fadeIn(OrbitSprings.FloatEffectsDefault) togetherWith fadeOut(OrbitSprings.FloatEffectsFast))
                     .using(SizeTransform(clip = false) { _, _ -> OrbitSprings.IntSizeAccordionFast })
             },
-            modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
+            modifier = Modifier.weight(1f, fill = !isInsideSheet).fillMaxWidth(),
             label = "transactionEditorStageTransition"
         ) { pickingCategory ->
             if (pickingCategory) {

@@ -228,7 +228,7 @@ fun MhaTrackerScreen(
                                         shape = RoundedCornerShape(24.dp),
                                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                                        modifier = Modifier.fillMaxWidth()
+                                        modifier = Modifier.fillMaxSize()
                                     ) {
                                         MhaConfigContent(
                                             taxProfile = state.taxProfile,

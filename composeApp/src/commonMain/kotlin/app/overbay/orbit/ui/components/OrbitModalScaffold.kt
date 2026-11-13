@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -345,7 +346,11 @@ fun OrbitModalScaffold(
     scrollable: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    val isInsideSheet = LocalOrbitSheetDismiss.current != null
+
+    Column(
+        modifier = if (isInsideSheet) modifier.fillMaxWidth() else modifier.fillMaxSize()
+    ) {
         if (title != null) {
             OrbitSheetHeader(
                 title = title,
@@ -363,7 +368,7 @@ fun OrbitModalScaffold(
 
         Column(
             modifier = Modifier
-                .weight(1f, fill = false)
+                .weight(1f, fill = !isInsideSheet)
                 .fillMaxWidth()
                 .let { base ->
                     if (scrollable) base.verticalScroll(rememberScrollState()) else base
