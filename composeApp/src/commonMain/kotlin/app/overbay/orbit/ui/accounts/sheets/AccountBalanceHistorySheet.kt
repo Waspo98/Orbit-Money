@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.BalanceRecord
 import app.overbay.orbit.data.model.BalanceRecordSource
-import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
@@ -51,7 +50,6 @@ import app.overbay.orbit.ui.components.OrbitSheetHeader
 @Composable
 fun AccountBalanceHistorySheet(
     account: Account,
-    transactions: List<Transaction> = emptyList(),
     balanceRecords: List<BalanceRecord> = emptyList(),
     onAddRecord: () -> Unit = {},
     onDismiss: () -> Unit,
@@ -63,7 +61,6 @@ fun AccountBalanceHistorySheet(
     ) {
         AccountBalanceHistoryContent(
             account = account,
-            transactions = transactions,
             balanceRecords = balanceRecords,
             onAddRecord = onAddRecord,
             onDismiss = onDismiss
@@ -74,7 +71,6 @@ fun AccountBalanceHistorySheet(
 @Composable
 fun AccountBalanceHistoryContent(
     account: Account,
-    transactions: List<Transaction> = emptyList(),
     balanceRecords: List<BalanceRecord> = emptyList(),
     onAddRecord: () -> Unit = {},
     onNavigateBack: (() -> Unit)? = null,

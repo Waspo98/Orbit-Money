@@ -85,7 +85,6 @@ fun TransactionEditorContent(
 ) {
     val haptics = LocalOrbitHaptics.current
     val isEditing = transaction != null && transaction.id > 0L
-    val isManualOrNew = !isEditing || transaction.source.equals("manual", ignoreCase = true)
 
     var isPickingCategory by remember(transaction?.id) { mutableStateOf(false) }
     var merchant by remember(transaction) { mutableStateOf(transaction?.effectiveMerchant ?: "") }
@@ -218,14 +217,12 @@ fun TransactionEditorContent(
                         .padding(horizontal = 20.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    if (isManualOrNew) {
-                        OrbitSegmentedTabRow(
-                            items = listOf(true, false),
-                            selected = isExpense,
-                            onSelect = { isExpense = it },
-                            label = { if (it) "Expense" else "Income" }
-                        )
-                    }
+                    OrbitSegmentedTabRow(
+                        items = listOf(true, false),
+                        selected = isExpense,
+                        onSelect = { isExpense = it },
+                        label = { if (it) "Expense" else "Income" }
+                    )
 
                     if (!isEditing && accounts.isNotEmpty()) {
                         val selectedAccount = accounts.find { it.id == selectedAccountId } ?: accounts.first()

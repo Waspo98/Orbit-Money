@@ -499,6 +499,15 @@ class AccountsViewModelTest {
         assertTrue(viewModel.uiState.value.showHistorySheet)
         assertEquals(403L, viewModel.uiState.value.historyAccount?.id)
 
+        // openBalanceHistory on a standalone property stays on Transactions tab without opening sheet
+        val property = Account(id = 404L, name = "Primary Home", type = AccountType.OTHER, estimatedValueCents = 45_000_000L, isProperty = true)
+        repository.saveAccount(property)
+        viewModel.openBalanceHistory(property)
+        testScheduler.advanceUntilIdle()
+        assertEquals(404L, viewModel.uiState.value.selectedAccountId)
+        assertEquals(AccountDetailTab.TRANSACTIONS, viewModel.uiState.value.activeDetailTab)
+        assertFalse(viewModel.uiState.value.showHistorySheet)
+
         collectJob.cancel()
     }
 }

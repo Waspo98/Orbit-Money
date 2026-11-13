@@ -543,7 +543,11 @@ class AccountsViewModel(
             _historyAccount.value = account
             _showHistorySheet.value = true
         } else {
-            _activeDetailTab.value = AccountDetailTab.BALANCE_HISTORY
+            _activeDetailTab.value = if (account.isProperty) {
+                AccountDetailTab.TRANSACTIONS
+            } else {
+                AccountDetailTab.BALANCE_HISTORY
+            }
             _showHistorySheet.value = false
             _historyAccount.value = null
         }

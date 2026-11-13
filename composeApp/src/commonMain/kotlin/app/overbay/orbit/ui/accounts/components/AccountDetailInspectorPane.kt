@@ -126,7 +126,6 @@ fun AccountDetailInspectorPane(
                 if (histAcct != null) {
                     AccountBalanceHistoryContent(
                         account = histAcct,
-                        transactions = state.selectedAccountTransactions,
                         balanceRecords = state.historyBalanceRecords,
                         onAddRecord = { viewModel.openAddBalanceRecord(histAcct) },
                         onNavigateBack = if (state.selectedAccount != null) {
@@ -285,40 +284,50 @@ private fun AccountReadOnlyDetailContent(
                 )
             }
 
-            item(key = "acct_detail_tabs") {
-                OrbitSegmentedTabRow(
-                    items = AccountDetailTab.entries,
-                    selected = activeTab,
-                    onSelect = onSelectTab,
-                    label = { it.label },
-                    badgeCount = { tab ->
-                        when (tab) {
-                            AccountDetailTab.TRANSACTIONS -> transactions.size
-                            AccountDetailTab.BALANCE_HISTORY -> balanceRecords.size
+            if (account.isProperty) {
+                item(key = "acct_property_txns") {
+                    AccountRecentTransactionsSection(
+                        transactions = transactions,
+                        categoryMap = categoryMap,
+                        onSeeTransactions = onSeeTransactions
+                    )
+                }
+            } else {
+                item(key = "acct_detail_tabs") {
+                    OrbitSegmentedTabRow(
+                        items = AccountDetailTab.entries,
+                        selected = activeTab,
+                        onSelect = onSelectTab,
+                        label = { it.label },
+                        badgeCount = { tab ->
+                            when (tab) {
+                                AccountDetailTab.TRANSACTIONS -> transactions.size
+                                AccountDetailTab.BALANCE_HISTORY -> balanceRecords.size
+                            }
                         }
-                    }
-                )
-            }
+                    )
+                }
 
-            item(key = "acct_detail_tab_body") {
-                AnimatedContent(
-                    targetState = activeTab,
-                    transitionSpec = { fadeIn(OrbitSprings.FloatEffectsFast) togetherWith fadeOut(OrbitSprings.FloatEffectsFast) },
-                    label = "accountDetailTabTransition"
-                ) { tab ->
-                    when (tab) {
-                        AccountDetailTab.TRANSACTIONS -> {
-                            AccountRecentTransactionsSection(
-                                transactions = transactions,
-                                categoryMap = categoryMap,
-                                onSeeTransactions = onSeeTransactions
-                            )
-                        }
-                        AccountDetailTab.BALANCE_HISTORY -> {
-                            AccountInlineBalanceHistorySection(
-                                balanceRecords = balanceRecords,
-                                onAddRecord = onAddBalanceRecord
-                            )
+                item(key = "acct_detail_tab_body") {
+                    AnimatedContent(
+                        targetState = activeTab,
+                        transitionSpec = { fadeIn(OrbitSprings.FloatEffectsFast) togetherWith fadeOut(OrbitSprings.FloatEffectsFast) },
+                        label = "accountDetailTabTransition"
+                    ) { tab ->
+                        when (tab) {
+                            AccountDetailTab.TRANSACTIONS -> {
+                                AccountRecentTransactionsSection(
+                                    transactions = transactions,
+                                    categoryMap = categoryMap,
+                                    onSeeTransactions = onSeeTransactions
+                                )
+                            }
+                            AccountDetailTab.BALANCE_HISTORY -> {
+                                AccountInlineBalanceHistorySection(
+                                    balanceRecords = balanceRecords,
+                                    onAddRecord = onAddBalanceRecord
+                                )
+                            }
                         }
                     }
                 }
