@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -98,10 +97,21 @@ fun TransactionActionsCustomizeSheet(
 
     OrbitModalSheet(
         onDismissRequest = onDismiss,
-        modifier = modifier
+        modifier = modifier,
+        footer = {
+            val sheetDismiss = LocalOrbitSheetDismiss.current
+            OrbitModalFooter(
+                confirmText = "Save",
+                onDismiss = onDismiss,
+                onConfirm = {
+                    val orderedStrings = draftOrder.map { it.id }
+                    val pinnedOrdered = orderedStrings.filter { it in draftPinnedSet }
+                    sheetDismiss?.invoke { onSave(pinnedOrdered, orderedStrings) }
+                        ?: onSave(pinnedOrdered, orderedStrings)
+                }
+            )
+        }
     ) {
-        val sheetDismiss = LocalOrbitSheetDismiss.current
-
         OrbitSheetHeader(
             title = "Customize Quick Actions",
             subtitle = "Checked actions appear as buttons; unchecked stay in the ••• menu. Drag to reorder.",
@@ -123,7 +133,7 @@ fun TransactionActionsCustomizeSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 420.dp)
+                .weight(1f, fill = false)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
@@ -204,16 +214,5 @@ fun TransactionActionsCustomizeSheet(
             }
             Spacer(modifier = Modifier.height(4.dp))
         }
-
-        OrbitModalFooter(
-            confirmText = "Save",
-            onDismiss = onDismiss,
-            onConfirm = {
-                val orderedStrings = draftOrder.map { it.id }
-                val pinnedOrdered = orderedStrings.filter { it in draftPinnedSet }
-                sheetDismiss?.invoke { onSave(pinnedOrdered, orderedStrings) }
-                    ?: onSave(pinnedOrdered, orderedStrings)
-            }
-        )
     }
 }

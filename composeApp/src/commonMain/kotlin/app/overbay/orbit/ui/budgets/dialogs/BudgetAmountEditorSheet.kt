@@ -17,10 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,6 +37,8 @@ import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -88,86 +87,57 @@ fun BudgetAmountEditorContent(
         MaterialTheme.colorScheme.primary
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-    ) {
-        // Header with Category Chip & Optional Delete Pill
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = if (item.amountCents > 0L) "Edit Monthly Budget" else "Set Monthly Budget",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Allocated monthly envelope limit",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+    OrbitModalScaffold(
+        onDismiss = onDismiss,
+        confirmText = "Save",
+        onConfirm = {
+            haptics.confirm()
+            onSave(item.category.id, amountCents, rollover)
+        },
+        modifier = modifier,
+        title = if (item.amountCents > 0L) "Edit Monthly Budget" else "Set Monthly Budget",
+        subtitle = "Allocated monthly envelope limit",
+        headerTrailingActions = if (item.budgetId != null) {
+            {
+                OrbitActionChip(
+                    label = "Delete",
+                    onClick = {
+                        haptics.reject()
+                        onDelete(item.budgetId)
+                    },
+                    icon = Icons.Default.Delete,
+                    isDestructive = true
                 )
             }
-
+        } else null,
+        bodySpacing = 0.dp
+    ) {
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = categoryColor.copy(alpha = 0.15f),
+            border = BorderStroke(1.dp, categoryColor.copy(alpha = 0.3f))
+        ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = categoryColor.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, categoryColor.copy(alpha = 0.3f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(categoryColor)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = item.category.labelWithEmoji,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-
-                if (item.budgetId != null) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .clickable {
-                                haptics.reject()
-                                onDelete(item.budgetId)
-                            }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Remove Budget",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier
-                                .padding(7.dp)
-                                .size(16.dp)
-                        )
-                    }
-                }
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(categoryColor)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = item.category.labelWithEmoji,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // Amount Input
         CurrencyTextField(
@@ -207,38 +177,5 @@ fun BudgetAmountEditorContent(
             checked = rollover,
             onCheckedChange = { rollover = it }
         )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Actions: Cancel & Save
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-            ) {
-                Text("Cancel", fontWeight = FontWeight.SemiBold)
-            }
-
-            Button(
-                onClick = {
-                    haptics.confirm()
-                    onSave(item.category.id, amountCents, rollover)
-                },
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-            ) {
-                Text("Save", fontWeight = FontWeight.Bold)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
     }
 }

@@ -48,6 +48,7 @@ import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -79,34 +80,20 @@ fun AddBudgetCategorySheet(
 
         val threeMonthAvg = selectedCategory?.let { threeMonthAvgProvider(it.id) } ?: 0L
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-        ) {
-            // Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Add Category Budget",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                IconButton(onClick = { haptics.tick(); onDismiss() }) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+        OrbitModalScaffold(
+            onDismiss = onDismiss,
+            confirmText = "Save Budget",
+            onConfirm = {
+                val cat = selectedCategory
+                if (cat != null && amountCents > 0L) {
+                    haptics.confirm()
+                    onSave(cat.id, amountCents, rollover)
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            },
+            title = "Add Category Budget",
+            confirmEnabled = selectedCategory != null && amountCents > 0L,
+            bodySpacing = 0.dp
+        ) {
 
             // Category Picker
             Text(
@@ -186,38 +173,6 @@ fun AddBudgetCategorySheet(
                 onCheckedChange = { rollover = it }
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Action Buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { haptics.tick(); onDismiss() },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.weight(1f).height(48.dp)
-                ) {
-                    Text("Cancel")
-                }
-
-                Button(
-                    onClick = {
-                        val cat = selectedCategory
-                        if (cat != null && amountCents > 0L) {
-                            haptics.confirm()
-                            onSave(cat.id, amountCents, rollover)
-                        }
-                    },
-                    enabled = selectedCategory != null && amountCents > 0L,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.weight(1f).height(48.dp)
-                ) {
-                    Text("Save Budget")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

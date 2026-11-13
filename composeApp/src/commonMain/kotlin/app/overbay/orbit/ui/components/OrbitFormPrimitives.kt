@@ -90,6 +90,59 @@ object OrbitFormDefaults {
 }
 
 @Composable
+internal fun rememberSyncedTextField(
+    value: String,
+    onValueChange: (String) -> Unit
+): Pair<TextFieldValue, (TextFieldValue) -> Unit> {
+    var tfv by remember {
+        mutableStateOf(TextFieldValue(text = value, selection = TextRange(value.length)))
+    }
+    var lastExternalValue by remember { mutableStateOf(value) }
+    val pendingEmissions = remember { ArrayDeque<String>() }
+
+    if (value != lastExternalValue) {
+        val echoIdx = pendingEmissions.indexOf(value)
+        if (echoIdx >= 0) {
+            repeat(echoIdx + 1) { pendingEmissions.removeFirst() }
+        } else {
+            val hadPendingUserEdit = pendingEmissions.isNotEmpty()
+            pendingEmissions.clear()
+            if (tfv.text != value) {
+                val nextCursor = if (hadPendingUserEdit) {
+                    tfv.selection.end.coerceIn(0, value.length)
+                } else {
+                    value.length
+                }
+                tfv = TextFieldValue(text = value, selection = TextRange(nextCursor))
+            }
+        }
+        lastExternalValue = value
+    }
+
+    LaunchedEffect(tfv.text, value) {
+        if (tfv.text != value) {
+            delay(200)
+            if (tfv.text != value) {
+                pendingEmissions.clear()
+                val clamped = tfv.selection.end.coerceIn(0, value.length)
+                tfv = TextFieldValue(text = value, selection = TextRange(clamped))
+            }
+        }
+    }
+
+    val handleValueChange: (TextFieldValue) -> Unit = { next ->
+        val textChanged = next.text != tfv.text
+        tfv = next
+        if (textChanged) {
+            pendingEmissions.addLast(next.text)
+            onValueChange(next.text)
+        }
+    }
+
+    return tfv to handleValueChange
+}
+
+@Composable
 fun OrbitTextField(
     value: String,
     onValueChange: (String) -> Unit,
@@ -133,41 +186,7 @@ fun OrbitTextField(
         else -> null
     }
 
-    var tfv by remember {
-        mutableStateOf(TextFieldValue(text = value, selection = TextRange(value.length)))
-    }
-    var lastExternalValue by remember { mutableStateOf(value) }
-    val pendingEmissions = remember { ArrayDeque<String>() }
-
-    if (value != lastExternalValue) {
-        val echoIdx = pendingEmissions.indexOf(value)
-        if (echoIdx >= 0) {
-            repeat(echoIdx + 1) { pendingEmissions.removeFirst() }
-        } else {
-            val hadPendingUserEdit = pendingEmissions.isNotEmpty()
-            pendingEmissions.clear()
-            if (tfv.text != value) {
-                val nextCursor = if (hadPendingUserEdit) {
-                    tfv.selection.end.coerceIn(0, value.length)
-                } else {
-                    value.length
-                }
-                tfv = TextFieldValue(text = value, selection = TextRange(nextCursor))
-            }
-        }
-        lastExternalValue = value
-    }
-
-    LaunchedEffect(tfv.text, value) {
-        if (tfv.text != value) {
-            delay(200)
-            if (tfv.text != value) {
-                pendingEmissions.clear()
-                val clamped = tfv.selection.end.coerceIn(0, value.length)
-                tfv = TextFieldValue(text = value, selection = TextRange(clamped))
-            }
-        }
-    }
+    val (tfv, handleValueChange) = rememberSyncedTextField(value = value, onValueChange = onValueChange)
 
     Column(modifier = modifier) {
         if (label != null) {
@@ -190,14 +209,7 @@ fun OrbitTextField(
         }
         OutlinedTextField(
             value = tfv,
-            onValueChange = { next ->
-                val textChanged = next.text != tfv.text
-                tfv = next
-                if (textChanged) {
-                    pendingEmissions.addLast(next.text)
-                    onValueChange(next.text)
-                }
-            },
+            onValueChange = handleValueChange,
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
             readOnly = readOnly,

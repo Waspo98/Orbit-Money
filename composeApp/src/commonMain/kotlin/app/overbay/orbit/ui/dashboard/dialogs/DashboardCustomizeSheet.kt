@@ -4,14 +4,10 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,22 +15,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.zIndex
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitDragReorderState
+import app.overbay.orbit.ui.components.OrbitModalFooter
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.dragReorderItem
@@ -127,57 +118,50 @@ fun <K : Any> OrbitBentoCustomizeSheet(
     OrbitModalSheet(
         onDismissRequest = onDismiss,
         modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.surface
-    ) {
-        val sheetDismiss = LocalOrbitSheetDismiss.current
-        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-            OrbitSheetHeader(
-                title = title,
+        containerColor = MaterialTheme.colorScheme.surface,
+        footer = {
+            val sheetDismiss = LocalOrbitSheetDismiss.current
+            OrbitModalFooter(
+                confirmText = "Done",
                 onDismiss = onDismiss,
-                trailingActions = {
-                    OrbitActionChip(
-                        label = "Reset",
-                        onClick = { haptics.tick(); onReset() }
-                    )
-                }
+                onConfirm = { sheetDismiss?.invoke(onDismiss) ?: onDismiss() },
+                dismissText = null,
+                containerColor = MaterialTheme.colorScheme.surface
             )
+        }
+    ) {
+        OrbitSheetHeader(
+            title = title,
+            onDismiss = onDismiss,
+            trailingActions = {
+                OrbitActionChip(
+                    label = "Reset",
+                    onClick = { haptics.tick(); onReset() }
+                )
+            },
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+        )
 
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-            Spacer(modifier = Modifier.height(12.dp))
+        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 480.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items.forEach { config ->
-                    key(config.key) {
-                        CustomizeCardRow(
-                            config = config,
-                            reorderState = reorderState,
-                            showWidthPicker = showWidthPicker,
-                            isRightPlacement = standardPlacements[config.key] == true,
-                            onToggle = { haptics.tap(); onToggleVisibility(config.key) },
-                            onWideSpanChange = { span -> haptics.tick(); onSetWideSpan(config.key, span) }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Button(
-                    onClick = { haptics.confirm(); sheetDismiss?.invoke(onDismiss) ?: onDismiss() },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(42.dp)
-                ) {
-                    Text("Done", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items.forEach { config ->
+                key(config.key) {
+                    CustomizeCardRow(
+                        config = config,
+                        reorderState = reorderState,
+                        showWidthPicker = showWidthPicker,
+                        isRightPlacement = standardPlacements[config.key] == true,
+                        onToggle = { haptics.tap(); onToggleVisibility(config.key) },
+                        onWideSpanChange = { span -> haptics.tick(); onSetWideSpan(config.key, span) }
+                    )
                 }
             }
         }

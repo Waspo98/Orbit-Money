@@ -1,27 +1,19 @@
 package app.overbay.orbit.ui.transactions.sheets
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -142,30 +134,36 @@ fun BrandLogoFinderDialog(
     }
 
     OrbitModalSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface
+        onDismissRequest = { if (!saving) onDismiss() },
+        confirmText = if (saving) "Saving..." else "Save",
+        onConfirm = {
+            val trimmed = imageUrl.trim()
+            if (trimmed.isEmpty()) {
+                errorMessage = "Choose a result or paste a direct image URL."
+            } else if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+                errorMessage = "Logo URL must start with http:// or https://."
+            } else {
+                haptics.confirm()
+                MerchantLogoImageCache.clearFailed(trimmed)
+                scope.launch {
+                    saving = true
+                    errorMessage = null
+                    onSaveLogoUrl(trimmed)
+                        .onSuccess { onDismiss() }
+                        .onFailure { err ->
+                            saving = false
+                            errorMessage = err.message ?: "Logo override failed."
+                        }
+                }
+            }
+        },
+        title = "Find Logo",
+        subtitle = "Search brand logos for $subjectName, or paste a direct image URL.",
+        confirmEnabled = !saving,
+        isSaving = saving,
+        containerColor = MaterialTheme.colorScheme.surface,
+        bodySpacing = 0.dp
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp)
-                .padding(bottom = 24.dp)
-        ) {
-            Text(
-                text = "Find Logo",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Search brand logos for $subjectName, or paste a direct image URL.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -252,56 +250,5 @@ fun BrandLogoFinderDialog(
                     color = OrbitTheme.colors.expense
                 )
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(
-                    onClick = {
-                        haptics.tick()
-                        onDismiss()
-                    },
-                    enabled = !saving
-                ) {
-                    Text("Cancel")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = {
-                        val trimmed = imageUrl.trim()
-                        if (trimmed.isEmpty()) {
-                            errorMessage = "Choose a result or paste a direct image URL."
-                            return@Button
-                        }
-                        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-                            errorMessage = "Logo URL must start with http:// or https://."
-                            return@Button
-                        }
-                        haptics.confirm()
-                        MerchantLogoImageCache.clearFailed(trimmed)
-                        scope.launch {
-                            saving = true
-                            errorMessage = null
-                            onSaveLogoUrl(trimmed)
-                                .onSuccess { onDismiss() }
-                                .onFailure { err ->
-                                    saving = false
-                                    errorMessage = err.message ?: "Logo override failed."
-                                }
-                        }
-                    },
-                    enabled = !saving,
-                    shape = CircleShape
-                ) {
-                    Text(if (saving) "Saving..." else "Save")
-                }
-            }
-        }
     }
 }

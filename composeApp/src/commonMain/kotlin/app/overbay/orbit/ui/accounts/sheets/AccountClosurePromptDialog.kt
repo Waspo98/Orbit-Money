@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -47,6 +46,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitIcons
+import app.overbay.orbit.ui.components.OrbitModalFooterFrame
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.orbitTactilePress
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -88,7 +88,57 @@ fun AccountClosurePromptDialog(
 
     OrbitModalSheet(
         onDismissRequest = { if (!isResolving) onSnooze() },
-        modifier = modifier
+        modifier = modifier,
+        footer = {
+            OrbitModalFooterFrame(errorBannerText = errorMessage) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { haptics.confirm(); onConfirm() },
+                        enabled = !isResolving,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        if (isResolving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text("Confirm", fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { haptics.tick(); onSnooze() },
+                            enabled = !isResolving,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.weight(1f).height(44.dp)
+                        ) {
+                            Text("Ask Later", fontWeight = FontWeight.SemiBold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { haptics.tick(); onDismissPrompt() },
+                            enabled = !isResolving,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.weight(1f).height(44.dp)
+                        ) {
+                            Text("Still Open", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        }
     ) {
         Column(
             modifier = Modifier
@@ -208,78 +258,6 @@ fun AccountClosurePromptDialog(
                     }
                 )
             }
-
-            if (!errorMessage.isNullOrBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = errorMessage,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-
-            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-
-            Button(
-                onClick = { haptics.confirm(); onConfirm() },
-                enabled = !isResolving,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth().height(48.dp)
-            ) {
-                if (isResolving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text("Confirm", fontWeight = FontWeight.Bold)
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { haptics.tick(); onSnooze() },
-                    enabled = !isResolving,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.weight(1f).height(44.dp)
-                ) {
-                    Text("Ask Later", fontWeight = FontWeight.SemiBold)
-                }
-
-                OutlinedButton(
-                    onClick = { haptics.tick(); onDismissPrompt() },
-                    enabled = !isResolving,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.weight(1f).height(44.dp)
-                ) {
-                    Text("Still Open", fontWeight = FontWeight.SemiBold)
-                }
-            }
-            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }

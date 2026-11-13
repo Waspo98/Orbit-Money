@@ -67,19 +67,27 @@ fun FilterBottomSheet(
         modifier = modifier
     ) {
         val sheetDismiss = LocalOrbitSheetDismiss.current
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState())
+        OrbitModalScaffold(
+            onDismiss = { sheetDismiss?.invoke(onDismiss) ?: onDismiss() },
+            confirmText = "Apply Filters",
+            onConfirm = {
+                haptics.confirm()
+                val applyAndClose = {
+                    onApply(draft)
+                    onApplySort(sortDraft)
+                    onDismiss()
+                }
+                sheetDismiss?.invoke(applyAndClose) ?: applyAndClose()
+            },
+            title = "Filter & Sort Transactions",
+            dismissText = "Reset All",
+            onSecondaryAction = {
+                haptics.tick()
+                draft = TransactionFilterDraft()
+                sortDraft = TransactionSortOption.DATE_DESC
+            },
+            bodySpacing = 0.dp
         ) {
-            Text(
-                text = "Filter & Sort Transactions",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
 
             // 0. Sort By
             FilterSortSection(
@@ -171,41 +179,6 @@ fun FilterBottomSheet(
                 onIncludeIgnoredChange = { draft = draft.copy(includeIgnored = it) }
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
-
-            // Action Buttons (Title Case)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        haptics.tick()
-                        draft = TransactionFilterDraft()
-                        sortDraft = TransactionSortOption.DATE_DESC
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Reset All")
-                }
-
-                Button(
-                    onClick = {
-                        haptics.confirm()
-                        val applyAndClose = {
-                            onApply(draft)
-                            onApplySort(sortDraft)
-                            onDismiss()
-                        }
-                        sheetDismiss?.invoke(applyAndClose) ?: applyAndClose()
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Apply Filters")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

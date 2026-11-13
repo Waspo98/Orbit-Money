@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSwitchGroupCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
@@ -102,16 +104,33 @@ fun CategoryEditorContent(
         })
     }
 
-    Column(
-        modifier = modifier.fillMaxWidth().padding(20.dp).verticalScroll(rememberScrollState())
+    OrbitModalScaffold(
+        onDismiss = onDismiss,
+        confirmText = "Save Category",
+        onConfirm = {
+            haptics.confirm()
+            val isTransfer = category?.isTransfer ?: (categoryKind == "transfer")
+            val isIncome = category?.isIncome ?: (categoryKind == "income")
+            onSave(category?.id ?: 0L, name.trim(), selectedColor, selectedIcon.trim().ifBlank { null }, isTransfer, isIncome, mhaEligible)
+        },
+        modifier = modifier,
+        title = if (isEditing) "Edit Category" else "New Category",
+        confirmEnabled = name.isNotBlank(),
+        headerTrailingActions = if (category != null && onDelete != null) {
+            {
+                OrbitActionChip(
+                    label = "Delete",
+                    onClick = {
+                        haptics.reject()
+                        onDelete(category.id)
+                    },
+                    icon = Icons.Default.Delete,
+                    isDestructive = true
+                )
+            }
+        } else null,
+        bodySpacing = 0.dp
     ) {
-        Text(
-            text = if (isEditing) "Edit Category" else "New Category",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(12.dp))
 
         val previewComposeColor = remember(selectedColor) {
             selectedColor.toComposeColor(Color(0xFF2E7D32))
@@ -168,43 +187,14 @@ fun CategoryEditorContent(
             onMhaChange = { mhaEligible = it },
             showMhaOption = showMhaOption
         )
-        Spacer(modifier = Modifier.height(20.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cancel") }
-            Button(
-                onClick = {
-                    haptics.confirm()
-                    val isTransfer = if (isEditing) category.isTransfer else categoryKind == "transfer"
-                    val isIncome = if (isEditing) category.isIncome else categoryKind == "income"
-                    onSave(category?.id ?: 0L, name.trim(), selectedColor, selectedIcon.trim().ifBlank { null }, isTransfer, isIncome, mhaEligible)
-                },
-                enabled = name.isNotBlank(),
-                modifier = Modifier.weight(1f)
-            ) { Text("Save Category") }
-        }
-
-        if (isEditing && onViewTransactions != null) {
-            Spacer(modifier = Modifier.height(10.dp))
+        if (category != null && onViewTransactions != null) {
+            Spacer(modifier = Modifier.height(14.dp))
             OutlinedButton(
                 onClick = { haptics.tick(); onViewTransactions(category.id) },
-                enabled = (category?.transactionCount ?: 0) > 0,
+                enabled = category.transactionCount > 0,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("See Transactions")
-            }
-        }
-
-        if (isEditing && onDelete != null) {
-            Spacer(modifier = Modifier.height(10.dp))
-            OutlinedButton(
-                onClick = { haptics.reject(); onDelete(category.id) },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Delete Category")
             }
         }
     }

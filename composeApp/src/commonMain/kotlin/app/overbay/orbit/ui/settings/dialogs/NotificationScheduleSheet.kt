@@ -7,13 +7,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -22,7 +18,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -38,7 +33,6 @@ import app.overbay.orbit.data.model.NotificationTypeSchedule
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitModalSheet
-import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
 
 enum class NotificationScheduleType {
@@ -115,19 +109,36 @@ fun NotificationScheduleSheet(
 
     OrbitModalSheet(
         onDismissRequest = onDismiss,
-        modifier = modifier
+        confirmText = "Save Schedule",
+        onConfirm = {
+            val updated = when (notificationType) {
+                NotificationScheduleType.WEEKLY_SNAPSHOT -> schedule.copy(
+                    dayOfWeek = selectedDayOfWeek,
+                    time = timeText.ifBlank { "08:00" }
+                )
+                NotificationScheduleType.INCOME -> schedule.copy(
+                    timing = if (isScheduledIncome) "scheduled" else "after_sync",
+                    time = if (isScheduledIncome) timeText.ifBlank { "09:00" } else null
+                )
+                NotificationScheduleType.SYNC_ISSUES -> schedule
+                NotificationScheduleType.ACCOUNT_SNAPSHOTS -> {
+                    val parsedDay = dayOfMonthText.toIntOrNull()?.coerceIn(1, 28) ?: 1
+                    schedule.copy(
+                        cadence = cadence,
+                        dayOfMonth = parsedDay,
+                        dayOfWeek = parsedDay,
+                        time = timeText.ifBlank { "09:00" },
+                        accountIds = selectedAccountIds.toList()
+                    )
+                }
+            }
+            onSave(updated)
+        },
+        modifier = modifier,
+        title = title,
+        subtitle = subtitle,
+        bodySpacing = 14.dp
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            OrbitSheetHeader(
-                title = title,
-                subtitle = subtitle
-            )
 
             when (notificationType) {
                 NotificationScheduleType.WEEKLY_SNAPSHOT -> {
@@ -284,10 +295,7 @@ fun NotificationScheduleSheet(
                         )
                     } else {
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 200.dp)
-                                .verticalScroll(rememberScrollState()),
+                            modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             accounts.forEach { account ->
@@ -343,50 +351,5 @@ fun NotificationScheduleSheet(
                     }
                 }
             }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Cancel")
-                }
-                Button(
-                    onClick = {
-                        val updated = when (notificationType) {
-                            NotificationScheduleType.WEEKLY_SNAPSHOT -> schedule.copy(
-                                dayOfWeek = selectedDayOfWeek,
-                                time = timeText.ifBlank { "08:00" }
-                            )
-                            NotificationScheduleType.INCOME -> schedule.copy(
-                                timing = if (isScheduledIncome) "scheduled" else "after_sync",
-                                time = if (isScheduledIncome) timeText.ifBlank { "09:00" } else null
-                            )
-                            NotificationScheduleType.SYNC_ISSUES -> schedule
-                            NotificationScheduleType.ACCOUNT_SNAPSHOTS -> {
-                                val parsedDay = dayOfMonthText.toIntOrNull()?.coerceIn(1, 28) ?: 1
-                                schedule.copy(
-                                    cadence = cadence,
-                                    dayOfMonth = parsedDay,
-                                    dayOfWeek = parsedDay,
-                                    time = timeText.ifBlank { "09:00" },
-                                    accountIds = selectedAccountIds.toList()
-                                )
-                            }
-                        }
-                        onSave(updated)
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("Save Schedule")
-                }
-            }
         }
-    }
 }

@@ -212,92 +212,71 @@ private fun AddIncomeSnapshotSheet(
     var netCents by remember(selectedMember) { mutableStateOf(selectedMember.netPayPerPeriodCents) }
     var notes by remember { mutableStateOf("") }
 
-    OrbitModalSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Text(
-                text = "Add Income Snapshot",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+    OrbitModalSheet(
+        onDismissRequest = onDismiss,
+        confirmText = "Save Snapshot",
+        onConfirm = {
+            haptics.tick()
+            val record = HouseholdIncomeRecord(
+                householdId = selectedMember.householdId,
+                memberId = selectedMember.id,
+                effectiveDate = effectiveDate.toString(),
+                grossIncomeAnnualCents = grossCents,
+                netPayPerPeriodCents = netCents,
+                payFrequency = selectedMember.payFrequency,
+                payPeriodsPerYear = selectedMember.payPeriodsPerYear,
+                employeeContributionPercent = selectedMember.employeeContributionPercent ?: 0.0,
+                employeeContributionAnnualCents = selectedMember.employeeContributionAnnualCents,
+                employerMatchPercent = selectedMember.employerMatchPercent,
+                employerMatchLimitPercent = selectedMember.employerMatchLimitPercent,
+                employerMatchAnnualCapCents = selectedMember.employerMatchAnnualCapCents,
+                healthPremiumPerMonthCents = selectedMember.healthPremiumPerMonthCents,
+                hsaContributionAnnualCents = selectedMember.hsaContributionAnnualCents,
+                dependentCareFsaAnnualCents = selectedMember.dependentCareFsaAnnualCents,
+                otherBenefitsAnnualCents = selectedMember.otherBenefitsAnnualCents,
+                source = "manual",
+                notes = notes.ifBlank { null }
             )
-
-            OrbitDropdownField(
-                label = "Household Member",
-                selectedText = selectedMember.name,
-                options = members,
-                optionLabel = { it.name },
-                onOptionSelected = {
-                    selectedMember = it
-                    grossCents = it.grossIncomeAnnualCents
-                    netCents = it.netPayPerPeriodCents
-                }
-            )
-
-            DateFieldButton(
-                date = effectiveDate,
-                onDateSelected = { effectiveDate = it },
-                label = "Effective Date"
-            )
-
-            CurrencyTextField(
-                cents = grossCents,
-                onCentsChange = { grossCents = it },
-                label = "Annual Gross Income"
-            )
-
-            CurrencyTextField(
-                cents = netCents,
-                onCentsChange = { netCents = it },
-                label = "Net Pay Per Period"
-            )
-
-            OrbitTextField(
-                value = notes,
-                onValueChange = { notes = it },
-                label = { Text("Milestone Notes (e.g. Promotion, Annual Merit)") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                OutlinedButton(onClick = onDismiss) {
-                    Text("Cancel")
-                }
-                Spacer(modifier = Modifier.size(10.dp))
-                Button(
-                    onClick = {
-                        haptics.tick()
-                        val record = HouseholdIncomeRecord(
-                            householdId = selectedMember.householdId,
-                            memberId = selectedMember.id,
-                            effectiveDate = effectiveDate.toString(),
-                            grossIncomeAnnualCents = grossCents,
-                            netPayPerPeriodCents = netCents,
-                            payFrequency = selectedMember.payFrequency,
-                            payPeriodsPerYear = selectedMember.payPeriodsPerYear,
-                            employeeContributionPercent = selectedMember.employeeContributionPercent ?: 0.0,
-                            employeeContributionAnnualCents = selectedMember.employeeContributionAnnualCents,
-                            employerMatchPercent = selectedMember.employerMatchPercent,
-                            employerMatchLimitPercent = selectedMember.employerMatchLimitPercent,
-                            employerMatchAnnualCapCents = selectedMember.employerMatchAnnualCapCents,
-                            healthPremiumPerMonthCents = selectedMember.healthPremiumPerMonthCents,
-                            hsaContributionAnnualCents = selectedMember.hsaContributionAnnualCents,
-                            dependentCareFsaAnnualCents = selectedMember.dependentCareFsaAnnualCents,
-                            otherBenefitsAnnualCents = selectedMember.otherBenefitsAnnualCents,
-                            source = "manual",
-                            notes = notes.ifBlank { null }
-                        )
-                        onSave(record)
-                    }
-                ) {
-                    Text("Save Snapshot")
-                }
+            onSave(record)
+        },
+        title = "Add Income Snapshot",
+        bodySpacing = 14.dp
+    ) {
+        OrbitDropdownField(
+            label = "Household Member",
+            selectedText = selectedMember.name,
+            options = members,
+            optionLabel = { it.name },
+            onOptionSelected = {
+                selectedMember = it
+                grossCents = it.grossIncomeAnnualCents
+                netCents = it.netPayPerPeriodCents
             }
-        }
+        )
+
+        DateFieldButton(
+            date = effectiveDate,
+            onDateSelected = { effectiveDate = it },
+            label = "Effective Date"
+        )
+
+        CurrencyTextField(
+            cents = grossCents,
+            onCentsChange = { grossCents = it },
+            label = "Annual Gross Income"
+        )
+
+        CurrencyTextField(
+            cents = netCents,
+            onCentsChange = { netCents = it },
+            label = "Net Pay Per Period"
+        )
+
+        OrbitTextField(
+            value = notes,
+            onValueChange = { notes = it },
+            label = { Text("Milestone Notes (e.g. Promotion, Annual Merit)") },
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }

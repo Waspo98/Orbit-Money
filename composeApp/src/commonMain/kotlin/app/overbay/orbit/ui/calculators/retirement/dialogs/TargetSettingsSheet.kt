@@ -1,19 +1,12 @@
 package app.overbay.orbit.ui.calculators.retirement.dialogs
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -31,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.RetirementTargetMode
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.roundToInt
@@ -55,8 +49,7 @@ fun TargetSettingsSheet(
             legacyAmountCents = legacyAmountCents,
             runwayEndAge = runwayEndAge,
             onDismiss = onDismiss,
-            onSave = onSave,
-            modifier = Modifier.padding(bottom = 24.dp)
+            onSave = onSave
         )
     }
 }
@@ -79,18 +72,17 @@ fun TargetSettingsContent(
     var legacyTarget by remember(legacyAmountCents) { mutableStateOf(legacyAmountCents) }
     var endAge by remember(runwayEndAge) { mutableStateOf(runwayEndAge) }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    OrbitModalScaffold(
+        onDismiss = onDismiss,
+        confirmText = "Save Target Settings",
+        onConfirm = {
+            haptics.tick()
+            onSave(selectedMode, if (selectedMode == RetirementTargetMode.CUSTOM) customTarget else null, legacyTarget, endAge)
+        },
+        modifier = modifier,
+        title = "Retirement Target & Runway Settings",
+        bodySpacing = 16.dp
     ) {
-        Text(
-            text = "Retirement Target & Runway Settings",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
 
         Text(
             text = "Configure your target nest egg calculation model and the horizon age for retirement capital drawdown.",
@@ -199,26 +191,5 @@ fun TargetSettingsContent(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline
         )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Actions
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            OutlinedButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-            Spacer(modifier = Modifier.padding(horizontal = 6.dp))
-            Button(
-                onClick = {
-                    haptics.tick()
-                    onSave(selectedMode, if (selectedMode == RetirementTargetMode.CUSTOM) customTarget else null, legacyTarget, endAge)
-                }
-            ) {
-                Text("Save Target Settings")
-            }
-        }
     }
 }

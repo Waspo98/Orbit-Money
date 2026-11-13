@@ -1,19 +1,10 @@
 package app.overbay.orbit.ui.household.dialogs
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -32,6 +23,7 @@ import app.overbay.orbit.data.model.HouseholdRetirementAccount
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.household.HouseholdCalculations
@@ -129,19 +121,51 @@ fun HouseholdMemberEditorContent(
         mutableStateOf(member?.retirementAccounts ?: emptyList())
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    OrbitModalScaffold(
+        onDismiss = onDismiss,
+        confirmText = "Save Member",
+        onConfirm = {
+            if (name.isNotBlank()) {
+                haptics.tick()
+                val periods = HouseholdCalculations.periodsPerYear(payFrequency).toDouble()
+                val healthPremiumMonthly = if (periods > 0) ((healthPerPaycheckCents.toDouble() * periods) / 12.0).roundToLong() else 0L
+                val hsaAnnual = (hsaPerPaycheckCents.toDouble() * periods).roundToLong()
+                val fsaAnnual = (fsaPerPaycheckCents.toDouble() * periods).roundToLong()
+                val otherAnnual = (otherPerPaycheckCents.toDouble() * periods).roundToLong()
+
+                val updated = (member ?: HouseholdMember(name = name.trim())).copy(
+                    name = name.trim(),
+                    role = role,
+                    birthDate = birthDate?.toString(),
+                    employmentStatus = employmentStatus,
+                    employer = employer.ifBlank { null },
+                    jobTitle = jobTitle.ifBlank { null },
+                    grossIncomeAnnualCents = grossIncomeCents,
+                    netPayPerPeriodCents = netPayPerPeriodCents,
+                    payFrequency = payFrequency,
+                    payPeriodsPerYear = payPeriodsPerYear,
+                    retirementAccountType = retirementType.ifBlank { null },
+                    employeeContributionPercent = employeeContribPercent,
+                    employeeContributionAnnualCents = employeeContribAnnualCents,
+                    employerMatchPercent = employerMatchPercent,
+                    employerMatchLimitPercent = employerMatchLimitPercent,
+                    employerMatchAnnualCapCents = employerMatchAnnualCapCents,
+                    healthPremiumPerMonthCents = healthPremiumMonthly,
+                    hsaContributionAnnualCents = hsaAnnual,
+                    dependentCareFsaAnnualCents = fsaAnnual,
+                    otherBenefitsAnnualCents = otherAnnual,
+                    notes = notes.ifBlank { null },
+                    retirementAccounts = linkedAccounts
+                )
+                val effDateStr = effectiveDate?.toString()
+                onSave(updated, effDateStr)
+            }
+        },
+        modifier = modifier,
+        title = if (member == null) "Add Household Member" else "Edit Member Profile",
+        confirmEnabled = name.isNotBlank(),
+        bodySpacing = 16.dp
     ) {
-        Text(
-            text = if (member == null) "Add Household Member" else "Edit Member Profile",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
 
         // Section: Identity
         Text(
@@ -274,66 +298,5 @@ fun HouseholdMemberEditorContent(
                 linkedAccounts = linkedAccounts.filterNot { it.accountId == acctId }
             }
         )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Action Buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.weight(1f).height(48.dp)
-            ) {
-                Text("Cancel", fontWeight = FontWeight.SemiBold)
-            }
-            Button(
-                onClick = {
-                    if (name.isNotBlank()) {
-                        haptics.tick()
-                        val periods = HouseholdCalculations.periodsPerYear(payFrequency).toDouble()
-                        val healthPremiumMonthly = if (periods > 0) ((healthPerPaycheckCents.toDouble() * periods) / 12.0).roundToLong() else 0L
-                        val hsaAnnual = (hsaPerPaycheckCents.toDouble() * periods).roundToLong()
-                        val fsaAnnual = (fsaPerPaycheckCents.toDouble() * periods).roundToLong()
-                        val otherAnnual = (otherPerPaycheckCents.toDouble() * periods).roundToLong()
-
-                        val updated = (member ?: HouseholdMember(name = name.trim())).copy(
-                            name = name.trim(),
-                            role = role,
-                            birthDate = birthDate?.toString(),
-                            employmentStatus = employmentStatus,
-                            employer = employer.ifBlank { null },
-                            jobTitle = jobTitle.ifBlank { null },
-                            grossIncomeAnnualCents = grossIncomeCents,
-                            netPayPerPeriodCents = netPayPerPeriodCents,
-                            payFrequency = payFrequency,
-                            payPeriodsPerYear = payPeriodsPerYear,
-                            retirementAccountType = retirementType.ifBlank { null },
-                            employeeContributionPercent = employeeContribPercent,
-                            employeeContributionAnnualCents = employeeContribAnnualCents,
-                            employerMatchPercent = employerMatchPercent,
-                            employerMatchLimitPercent = employerMatchLimitPercent,
-                            employerMatchAnnualCapCents = employerMatchAnnualCapCents,
-                            healthPremiumPerMonthCents = healthPremiumMonthly,
-                            hsaContributionAnnualCents = hsaAnnual,
-                            dependentCareFsaAnnualCents = fsaAnnual,
-                            otherBenefitsAnnualCents = otherAnnual,
-                            notes = notes.ifBlank { null },
-                            retirementAccounts = linkedAccounts
-                        )
-                        val effDateStr = effectiveDate?.toString()
-                        onSave(updated, effDateStr)
-                    }
-                },
-                enabled = name.isNotBlank(),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.weight(1f).height(48.dp)
-            ) {
-                Text("Save Member", fontWeight = FontWeight.Bold)
-            }
-        }
-        Spacer(modifier = Modifier.height(12.dp))
     }
 }

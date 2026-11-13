@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -72,10 +71,19 @@ fun CategoryPickerSheet(
 
     OrbitModalSheet(
         onDismissRequest = onDismiss,
-        modifier = modifier
+        modifier = modifier,
+        footer = {
+            val sheetDismiss = LocalOrbitSheetDismiss.current
+            OrbitModalFooter(
+                confirmText = "Save",
+                onDismiss = onDismiss,
+                onConfirm = {
+                    val chosen = selectedCategoryId
+                    sheetDismiss?.invoke { onSaveCategory(chosen) } ?: onSaveCategory(chosen)
+                }
+            )
+        }
     ) {
-        val sheetDismiss = LocalOrbitSheetDismiss.current
-
         OrbitSheetHeader(
             title = "Select Category",
             subtitle = transaction.effectiveMerchant,
@@ -88,6 +96,7 @@ fun CategoryPickerSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .weight(1f, fill = false)
                 .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
             OrbitTextField(
@@ -129,7 +138,7 @@ fun CategoryPickerSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 360.dp)
+                    .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -207,14 +216,5 @@ fun CategoryPickerSheet(
                 }
             }
         }
-
-        OrbitModalFooter(
-            confirmText = "Save",
-            onDismiss = onDismiss,
-            onConfirm = {
-                val chosen = selectedCategoryId
-                sheetDismiss?.invoke { onSaveCategory(chosen) } ?: onSaveCategory(chosen)
-            }
-        )
     }
 }

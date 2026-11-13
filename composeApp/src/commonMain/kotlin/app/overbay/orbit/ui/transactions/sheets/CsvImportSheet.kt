@@ -6,7 +6,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -19,9 +18,11 @@ import app.overbay.orbit.data.*
 import app.overbay.orbit.data.model.*
 import app.overbay.orbit.domain.CsvImportEngine
 import app.overbay.orbit.domain.CsvImportPreview
-import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitModalFooter
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalFileImportExportHelper
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -77,43 +78,95 @@ fun CsvImportSheet(
 
     OrbitModalSheet(
         onDismissRequest = onDismiss,
-        modifier = modifier
+        modifier = modifier,
+        footer = {
+            val preview = previewResult
+            OrbitModalFooter(
+                confirmText = if (preview == null) "Preview Import" else "Import (${preview.transactions.size})",
+                onDismiss = onDismiss,
+                onConfirm = {
+                    if (preview == null) {
+                        parseCsv()
+                    } else {
+                        haptics.confirm()
+                        val accountName = accounts.find { it.id == selectedAccountId }?.name ?: ""
+                        val assignedTxns = preview.transactions.map {
+                            it.copy(accountId = selectedAccountId, accountName = accountName)
+                        }
+                        val generatedRules = if (includeRules) {
+                            preview.rules.map { candidate ->
+                                TransactionRule(
+                                    name = candidate.friendlyRuleName,
+                                    conditions = listOf(
+                                        RuleCondition(
+                                            field = RuleConditionField.MERCHANT,
+                                            operator = RuleOperator.CONTAINS,
+                                            value = candidate.originalName
+                                        )
+                                    ),
+                                    actions = listOf(
+                                        RuleAction(
+                                            type = RuleActionType.RENAME,
+                                            value = candidate.customName,
+                                            textValue = candidate.customName
+                                        )
+                                    ),
+                                    enabled = true
+                                )
+                            }
+                        } else emptyList()
+
+                        if (onImportBatch != null) {
+                            onImportBatch("import.csv", csvText, assignedTxns, generatedRules)
+                        } else {
+                            onImportConfirmed(assignedTxns, generatedRules)
+                        }
+                    }
+                },
+                confirmEnabled = if (preview == null) csvText.isNotBlank() else preview.transactions.isNotEmpty()
+            )
+        }
     ) {
+        OrbitSheetHeader(
+            title = "Import Transactions CSV",
+            onDismiss = onDismiss,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+        )
+
+        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .weight(1f, fill = false)
                 .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "Import Transactions CSV",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = {
+                OutlinedButton(
+                    onClick = {
                         haptics.tick()
                         fileHelper.pickAndImportFile("text/csv") { content ->
                             csvText = content
                             parseCsv()
                         }
-                    }) {
-                        Text("Choose CSV File")
-                    }
-                    TextButton(onClick = {
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Choose CSV File")
+                }
+                TextButton(
+                    onClick = {
                         haptics.tick()
                         csvText = sampleCsv
                         parseCsv()
-                    }) {
-                        Text("Load Sample CSV")
-                    }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Load Sample CSV")
                 }
             }
 
@@ -160,25 +213,6 @@ fun CsvImportSheet(
                     .height(140.dp),
                 maxLines = 8
             )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Parse / Preview Button (Title Case)
-            OrbitAccordionVisibility(visible = previewResult == null) {
-                Button(
-                    onClick = { parseCsv() },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "Preview",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Preview Import")
-                }
-            }
 
             // Error Message
             var lastError by remember { mutableStateOf<String?>(null) }
@@ -284,64 +318,6 @@ fun CsvImportSheet(
                                     )
                                 }
                             }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Action Buttons
-                    val sheetDismiss = LocalOrbitSheetDismiss.current
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = { haptics.tick(); sheetDismiss?.invoke(onDismiss) ?: onDismiss() },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Cancel")
-                        }
-
-                        Button(
-                            onClick = {
-                                haptics.confirm()
-                                val accountName = accounts.find { it.id == selectedAccountId }?.name ?: ""
-                                val assignedTxns = preview.transactions.map {
-                                    it.copy(accountId = selectedAccountId, accountName = accountName)
-                                }
-                                val generatedRules = if (includeRules) {
-                                    preview.rules.map { candidate ->
-                                        TransactionRule(
-                                            name = candidate.friendlyRuleName,
-                                            conditions = listOf(
-                                                RuleCondition(
-                                                    field = RuleConditionField.MERCHANT,
-                                                    operator = RuleOperator.CONTAINS,
-                                                    value = candidate.originalName
-                                                )
-                                            ),
-                                            actions = listOf(
-                                                RuleAction(
-                                                    type = RuleActionType.RENAME,
-                                                    value = candidate.customName,
-                                                    textValue = candidate.customName
-                                                )
-                                            ),
-                                            enabled = true
-                                        )
-                                    }
-                                } else emptyList()
-
-                                if (onImportBatch != null) {
-                                    onImportBatch("import.csv", csvText, assignedTxns, generatedRules)
-                                } else {
-                                    onImportConfirmed(assignedTxns, generatedRules)
-                                }
-                            },
-                            enabled = preview.transactions.isNotEmpty(),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Import (${preview.transactions.size})")
                         }
                     }
                 }

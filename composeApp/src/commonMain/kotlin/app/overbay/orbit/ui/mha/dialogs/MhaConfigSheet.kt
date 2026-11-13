@@ -8,13 +8,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -34,8 +30,8 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MhaTaxEngine
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
-import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -63,8 +59,7 @@ fun MhaConfigSheet(
             mhaEnabled = mhaEnabled,
             onToggleMhaEnabled = onToggleMhaEnabled,
             onDismiss = onDismiss,
-            onSave = onSave,
-            modifier = Modifier.padding(bottom = 24.dp)
+            onSave = onSave
         )
     }
 }
@@ -112,18 +107,33 @@ fun MhaConfigContent(
         mutableStateOf(taxProfile.stateRateOverridePercent?.toString() ?: "")
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    OrbitModalScaffold(
+        onDismiss = onDismiss,
+        confirmText = "Save",
+        onConfirm = {
+            haptics.tick()
+            val resolvedCap = if (enableDesignatedCap) max(0L, inputDesignatedCapCents) else null
+            val resolvedFmrv = if (enableFmrv) max(0L, inputFmrvCents) else null
+            val updated = taxProfile.copy(
+                mode = mode,
+                simpleFederalRatePercent = simpleFedRate.toDoubleOrNull() ?: 22.0,
+                simpleStateRatePercent = simpleStateRate.toDoubleOrNull() ?: 4.95,
+                state = stateCode.take(2).uppercase().ifEmpty { "IL" },
+                filingStatus = selectedFilingStatus,
+                deductionMode = deductionMode,
+                itemizedDeductionCents = itemizedDeductionCents,
+                taxableIncomeOverrideCents = if (enableTaxableIncomeOverride) max(0L, inputTaxableIncomeOverrideCents) else null,
+                stateRateOverridePercent = if (enableStateRateOverride) inputStateRateOverride.toDoubleOrNull()?.coerceIn(0.0, 100.0) else null,
+                designatedCapCents = resolvedCap,
+                fairMarketRentalValueCents = resolvedFmrv
+            )
+            onSave(updated, resolvedCap, resolvedFmrv)
+        },
+        modifier = modifier,
+        title = "MHA Tax Assumptions",
+        subtitle = "Configure IRS Section 107 limits and federal/state tax rates.",
+        bodySpacing = 16.dp
     ) {
-        OrbitSheetHeader(
-            title = "MHA Tax Assumptions",
-            subtitle = "Configure IRS Section 107 limits and federal/state tax rates.",
-            onDismiss = onDismiss
-        )
 
         OrbitSwitchRow(
             title = "MHA Tracker Active",
@@ -328,42 +338,6 @@ fun MhaConfigContent(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Actions
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            OutlinedButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Button(
-                onClick = {
-                    haptics.tick()
-                    val resolvedCap = if (enableDesignatedCap) max(0L, inputDesignatedCapCents) else null
-                    val resolvedFmrv = if (enableFmrv) max(0L, inputFmrvCents) else null
-                    val updated = taxProfile.copy(
-                        mode = mode,
-                        simpleFederalRatePercent = simpleFedRate.toDoubleOrNull() ?: 22.0,
-                        simpleStateRatePercent = simpleStateRate.toDoubleOrNull() ?: 4.95,
-                        state = stateCode.take(2).uppercase().ifEmpty { "IL" },
-                        filingStatus = selectedFilingStatus,
-                        deductionMode = deductionMode,
-                        itemizedDeductionCents = itemizedDeductionCents,
-                        taxableIncomeOverrideCents = if (enableTaxableIncomeOverride) max(0L, inputTaxableIncomeOverrideCents) else null,
-                        stateRateOverridePercent = if (enableStateRateOverride) inputStateRateOverride.toDoubleOrNull()?.coerceIn(0.0, 100.0) else null,
-                        designatedCapCents = resolvedCap,
-                        fairMarketRentalValueCents = resolvedFmrv
-                    )
-                    onSave(updated, resolvedCap, resolvedFmrv)
-                }
-            ) {
-                Text("Save")
             }
         }
     }

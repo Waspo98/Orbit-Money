@@ -1,22 +1,15 @@
 package app.overbay.orbit.ui.household.dialogs
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HouseholdRole
+import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitTextField
 
@@ -53,50 +47,25 @@ fun InviteMemberContent(
     var email by remember { mutableStateOf("") }
     var selectedRole by remember { mutableStateOf(HouseholdRole.MEMBER) }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(20.dp)
+    OrbitModalScaffold(
+        onDismiss = onDismiss,
+        confirmText = "Send Invite",
+        onConfirm = {
+            if (email.isNotBlank()) {
+                onInvite(email, selectedRole)
+            }
+        },
+        modifier = modifier,
+        title = "Invite Household Member",
+        confirmEnabled = email.contains("@") && email.contains("."),
+        bodySpacing = 0.dp
     ) {
-        Text(
-            text = "Invite Household Member",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-
         InviteMemberFormFields(
             email = email,
             onEmailChange = { email = it },
             selectedRole = selectedRole,
             onRoleChange = { selectedRole = it }
         )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Cancel")
-            }
-            Button(
-                onClick = {
-                    if (email.isNotBlank()) {
-                        onInvite(email, selectedRole)
-                    }
-                },
-                enabled = email.contains("@") && email.contains("."),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Send Invite")
-            }
-        }
     }
 }
 

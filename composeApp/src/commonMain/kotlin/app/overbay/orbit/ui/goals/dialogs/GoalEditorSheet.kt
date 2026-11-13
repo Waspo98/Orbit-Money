@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,16 +16,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -56,8 +53,8 @@ import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
-import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.goals.components.GoalAllocationRowEditor
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -152,31 +149,54 @@ fun GoalEditorContent(
         )
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // Top Header Row
-        OrbitSheetHeader(
-            title = if (isEditing) "Edit Savings Goal" else "New Savings Goal",
-            onDismiss = onDismiss,
-            trailingActions = {
-                if (goal != null && goal.id > 0L) {
-                    OrbitActionChip(
-                        label = "Delete",
-                        leadingIcon = Icons.Default.Delete,
-                        isDestructive = true,
-                        onClick = {
-                            haptics.reject()
-                            onDelete(goal.id)
-                        }
-                    )
-                }
+    OrbitModalScaffold(
+        title = if (isEditing) "Edit Savings Goal" else "New Savings Goal",
+        onDismiss = onDismiss,
+        headerTrailingActions = {
+            if (goal != null && goal.id > 0L) {
+                OrbitActionChip(
+                    label = "Delete",
+                    leadingIcon = Icons.Default.Delete,
+                    isDestructive = true,
+                    onClick = {
+                        haptics.reject()
+                        onDelete(goal.id)
+                    }
+                )
             }
-        )
+        },
+        confirmText = "Save Goal",
+        confirmEnabled = name.isNotBlank() && targetAmountCents > 0L,
+        onConfirm = {
+            val targetDateIso = if (!isOngoing) targetDate?.toString() else null
+            val currentSaved = if (allocations.isNotEmpty()) totalAllocatedCents else (goal?.currentAmountCents ?: 0L)
+            val updated = (goal ?: Goal(
+                name = name,
+                targetAmountCents = targetAmountCents,
+                currentAmountCents = currentSaved
+            )).copy(
+                name = name.trim(),
+                kind = selectedKind,
+                icon = selectedIcon.trim().ifBlank { "🎯" },
+                targetAmountCents = targetAmountCents,
+                currentAmountCents = currentSaved,
+                targetDate = targetDateIso,
+                allocations = allocations,
+                notes = notes.trim().ifBlank { null }
+            )
+
+            val detected = GoalAllocationEngine.detectConflicts(updated, existingGoals, accounts)
+            if (detected.isNotEmpty()) {
+                pendingGoalToSave = updated
+                conflicts = detected
+            } else {
+                onSave(updated, false)
+            }
+        },
+        bodyPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        bodySpacing = 14.dp,
+        modifier = modifier
+    ) {
 
         // Preset Chips
         Row(
@@ -326,58 +346,5 @@ fun GoalEditorContent(
             existingGoals = existingGoals,
             onAllocationsChange = { allocations = it }
         )
-
-        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-
-        // Action Buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.weight(1f).height(48.dp)
-            ) {
-                Text("Cancel", fontWeight = FontWeight.SemiBold)
-            }
-
-            Button(
-                onClick = {
-                    haptics.confirm()
-                    val targetDateIso = if (!isOngoing) targetDate?.toString() else null
-                    val currentSaved = if (allocations.isNotEmpty()) totalAllocatedCents else (goal?.currentAmountCents ?: 0L)
-                    val updated = (goal ?: Goal(
-                        name = name,
-                        targetAmountCents = targetAmountCents,
-                        currentAmountCents = currentSaved
-                    )).copy(
-                        name = name.trim(),
-                        kind = selectedKind,
-                        icon = selectedIcon.trim().ifBlank { "🎯" },
-                        targetAmountCents = targetAmountCents,
-                        currentAmountCents = currentSaved,
-                        targetDate = targetDateIso,
-                        allocations = allocations,
-                        notes = notes.trim().ifBlank { null }
-                    )
-
-                    val detected = GoalAllocationEngine.detectConflicts(updated, existingGoals, accounts)
-                    if (detected.isNotEmpty()) {
-                        pendingGoalToSave = updated
-                        conflicts = detected
-                    } else {
-                        onSave(updated, false)
-                    }
-                },
-                enabled = name.isNotBlank() && targetAmountCents > 0L,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.weight(1f).height(48.dp)
-            ) {
-                Text("Save Goal", fontWeight = FontWeight.Bold)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
     }
 }

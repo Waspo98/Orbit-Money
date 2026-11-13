@@ -6,24 +6,21 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,8 +49,8 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
-import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
 
@@ -121,19 +118,23 @@ fun SplitTransactionContent(
     val remaining = parentAbsAmount - totalAllocated
     val isBalanced = remaining == 0L && splitItems.all { it.amountCents > 0L }
 
-    Column(
+    OrbitModalScaffold(
+        title = "Split Transaction",
+        subtitle = "${transaction.effectiveMerchant} • Total: ${MoneyUtils.formatCents(parentAbsAmount)}",
+        onDismiss = onDismiss,
+        confirmText = "Save Split",
+        confirmEnabled = isBalanced,
+        onConfirm = {
+            val splits = splitItems.map { split ->
+                val signed = if (isExpense) -split.amountCents else split.amountCents
+                Pair(signed, split.categoryId)
+            }
+            onSplitConfirmed(transaction.id, splits)
+        },
+        bodyPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        bodySpacing = 0.dp,
         modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-            .verticalScroll(rememberScrollState())
     ) {
-        OrbitSheetHeader(
-            title = "Split Transaction",
-            subtitle = "${transaction.effectiveMerchant} • Total: ${MoneyUtils.formatCents(parentAbsAmount)}",
-            onDismiss = onDismiss
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
 
         // Balance Indicator Banner
         Surface(
@@ -214,38 +215,6 @@ fun SplitTransactionContent(
             Spacer(modifier = Modifier.width(6.dp))
             Text("Add Split Line")
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Action Buttons (Title Case)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Cancel")
-            }
-
-            Button(
-                onClick = {
-                    haptics.confirm()
-                    val splits = splitItems.map { split ->
-                        val signed = if (isExpense) -split.amountCents else split.amountCents
-                        Pair(signed, split.categoryId)
-                    }
-                    onSplitConfirmed(transaction.id, splits)
-                },
-                enabled = isBalanced,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Save Split")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
