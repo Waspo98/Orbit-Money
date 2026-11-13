@@ -107,6 +107,8 @@ class CardEditorController(
                 hasAnnualFee = (applied.annualFeeCents ?: 0L) > 0L,
                 benefits = applied.benefits,
                 rewardCategories = applied.rewardCategories,
+                rewardRowIds = List(applied.rewardCategories.size) { current.nextRewardRowId + it },
+                nextRewardRowId = current.nextRewardRowId + applied.rewardCategories.size,
                 isBusinessCard = applied.strategy.isBusinessCard,
                 countsToward524Override = applied.strategy.countsToward524Override,
                 subCooldownMonths = applied.strategy.subCooldownMonths,
@@ -221,7 +223,13 @@ class CardEditorController(
     }
 
     fun addReward(reward: RewardCategory) {
-        modifyDraft { it?.copy(rewardCategories = it.rewardCategories + reward) }
+        modifyDraft { current ->
+            current?.copy(
+                rewardCategories = current.rewardCategories + reward,
+                rewardRowIds = current.rewardRowIds + current.nextRewardRowId,
+                nextRewardRowId = current.nextRewardRowId + 1L
+            )
+        }
     }
 
     fun updateReward(index: Int, reward: RewardCategory) {
@@ -236,7 +244,10 @@ class CardEditorController(
         modifyDraft { current ->
             if (current == null || index !in current.rewardCategories.indices) return@modifyDraft current
             val updated = current.rewardCategories.toMutableList().also { it.removeAt(index) }
-            current.copy(rewardCategories = updated)
+            val updatedIds = current.rewardRowIds.toMutableList().also {
+                if (index in it.indices) it.removeAt(index)
+            }
+            current.copy(rewardCategories = updated, rewardRowIds = updatedIds)
         }
     }
 

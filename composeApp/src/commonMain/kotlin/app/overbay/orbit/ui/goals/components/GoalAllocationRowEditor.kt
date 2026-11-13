@@ -7,18 +7,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +25,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,7 +46,7 @@ import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitAnimatedEntryColumn
 import app.overbay.orbit.ui.components.OrbitDropdownField
-import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.components.OrbitEntryKeyGenerator
 import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.ui.components.rememberAnimatedExternalEntries
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -67,11 +64,24 @@ fun GoalAllocationRowEditor(
     accounts: List<Account>,
     existingGoals: List<Goal> = emptyList(),
     onAllocationsChange: (List<GoalAllocation>) -> Unit,
+    resetKey: Any = Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
     val eligibleAccounts = remember(accounts) {
         accounts.filter { GoalAllocationEngine.isAccountEligible(it) }
+    }
+    val keyGen = remember(resetKey) { OrbitEntryKeyGenerator() }
+    val rowKeys = remember(resetKey) {
+        mutableStateListOf<Long>().apply {
+            repeat(allocations.size) { add(keyGen.nextKey()) }
+        }
+    }
+    while (rowKeys.size < allocations.size) {
+        rowKeys.add(keyGen.nextKey())
+    }
+    while (rowKeys.size > allocations.size) {
+        rowKeys.removeAt(rowKeys.lastIndex)
     }
 
     Column(
@@ -116,23 +126,18 @@ fun GoalAllocationRowEditor(
                             allocationAmountCents = 0L,
                             reserveAmountCents = 0L
                         )
+                        rowKeys.add(keyGen.nextKey())
                         onAllocationsChange(allocations + newAlloc)
                     }
                 )
             }
         }
 
-        val keyedAllocations = remember(allocations) {
-            val seenCounts = mutableMapOf<Long, Int>()
-            allocations.map { alloc ->
-                val count = seenCounts[alloc.accountId] ?: 0
-                seenCounts[alloc.accountId] = count + 1
-                "${alloc.accountId}#$count" to alloc
-            }
-        }
+        val keyedAllocations = allocations.mapIndexed { idx, alloc -> rowKeys[idx] to alloc }
         val (allocationEntries, onAllocationRemoveFinished) = rememberAnimatedExternalEntries(
             items = keyedAllocations,
-            itemKey = { it.first }
+            itemKey = { it.first },
+            resetKey = resetKey
         )
 
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -165,6 +170,9 @@ fun GoalAllocationRowEditor(
                         if (displayIndex < allocations.size) {
                             val list = allocations.toMutableList()
                             list.removeAt(displayIndex)
+                            if (displayIndex < rowKeys.size) {
+                                rowKeys.removeAt(displayIndex)
+                            }
                             onAllocationsChange(list)
                         }
                     }

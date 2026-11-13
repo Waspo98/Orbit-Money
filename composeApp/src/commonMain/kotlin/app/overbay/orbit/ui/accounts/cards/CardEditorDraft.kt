@@ -65,6 +65,8 @@ data class CardEditorDraft(
     // Lists & Notes
     val benefits: List<CardBenefit> = emptyList(),
     val rewardCategories: List<RewardCategory> = emptyList(),
+    val rewardRowIds: List<Long> = emptyList(),
+    val nextRewardRowId: Long = 1L,
     val authorizedUsers: List<String> = emptyList(),
     val authorizedUserMemberIds: List<Long> = emptyList(),
     val notes: String? = null,
@@ -219,6 +221,8 @@ data class CardEditorDraft(
                 subCompleted = strat.subCompleted, subReceivedDate = strat.subReceivedDate, subCooldownMonths = strat.subCooldownMonths,
                 benefits = p.benefits,
                 rewardCategories = p.rewardCategories,
+                rewardRowIds = List(p.rewardCategories.size) { it + 1L },
+                nextRewardRowId = p.rewardCategories.size + 1L,
                 authorizedUsers = p.authorizedUsers,
                 authorizedUserMemberIds = strat.authorizedUserMemberIds,
                 notes = p.notes,

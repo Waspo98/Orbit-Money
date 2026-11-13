@@ -345,7 +345,8 @@ fun GoalEditorContent(
             allocations = allocations,
             accounts = accounts,
             existingGoals = existingGoals,
-            onAllocationsChange = { allocations = it }
+            onAllocationsChange = { allocations = it },
+            resetKey = goal ?: 0L
         )
     }
 }

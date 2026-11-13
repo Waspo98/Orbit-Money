@@ -134,6 +134,7 @@ private fun <T> OrbitAnimatedEntryContainer(
 ) {
     val visibleState = remember { MutableTransitionState(!entry.animateEnter) }
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val shouldBringIntoView = remember { entry.animateEnter }
     var hasBroughtIntoView by remember { mutableStateOf(false) }
 
     // Latch index/connector state while exiting so labels and dividers don't jump mid-collapse.
@@ -179,7 +180,7 @@ private fun <T> OrbitAnimatedEntryContainer(
         ) + fadeOut(animationSpec = OrbitSprings.FloatEffectsFast),
         modifier = Modifier.fillMaxWidth()
     ) {
-        if (bringIntoViewOnAdd && entry.animateEnter && !entry.isRemoving && !hasBroughtIntoView) {
+        if (bringIntoViewOnAdd && shouldBringIntoView && !entry.isRemoving && !hasBroughtIntoView) {
             LaunchedEffect(entry.key) {
                 delay(180)
                 bringIntoViewRequester.bringIntoView()

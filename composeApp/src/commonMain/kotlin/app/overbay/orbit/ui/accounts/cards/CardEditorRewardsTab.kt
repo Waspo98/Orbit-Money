@@ -179,17 +179,15 @@ fun CardEditorRewardsTab(
                 )
             }
         ) {
-            val keyedRewards = remember(draft.rewardCategories) {
-                val seenCounts = mutableMapOf<String, Int>()
-                draft.rewardCategories.map { r ->
-                    val count = seenCounts[r.category] ?: 0
-                    seenCounts[r.category] = count + 1
-                    "${r.category}#$count" to r
+            val keyedRewards = remember(draft.rewardCategories, draft.rewardRowIds) {
+                draft.rewardCategories.mapIndexed { idx, r ->
+                    (draft.rewardRowIds.getOrElse(idx) { -(idx + 1L) }) to r
                 }
             }
             val (rewardEntries, onRewardRemoveFinished) = rememberAnimatedExternalEntries(
                 items = keyedRewards,
-                itemKey = { it.first }
+                itemKey = { it.first },
+                resetKey = draft.accountId
             )
             Column(modifier = Modifier.fillMaxWidth()) {
                 OrbitAccordionVisibility(visible = draft.rewardCategories.isEmpty()) {
