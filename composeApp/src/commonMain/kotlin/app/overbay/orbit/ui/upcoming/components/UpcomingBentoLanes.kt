@@ -34,8 +34,11 @@ import app.overbay.orbit.domain.ProjectedAmountResult
 import app.overbay.orbit.domain.UpcomingScheduleHelper
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitAnimatedEntryColumn
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.rememberAnimatedExternalEntries
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 data class LaneConfig(
@@ -86,39 +89,49 @@ fun UpcomingLaneCard(
         },
         modifier = modifier.fillMaxWidth().padding(bottom = 6.dp)
     ) {
-        if (items.isEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "No ${title.lowercase()} saved.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                OutlinedButton(
-                    onClick = { onAddClick(laneKind) },
-                    shape = CircleShape,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
-                    modifier = Modifier.height(28.dp)
+        val (itemEntries, onItemRemoveFinished) = rememberAnimatedExternalEntries(
+            items = items,
+            itemKey = { it.id }
+        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            OrbitAccordionVisibility(visible = items.isEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Add", style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        text = "No ${title.lowercase()} saved.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedButton(
+                        onClick = { onAddClick(laneKind) },
+                        shape = CircleShape,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text("Add", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
             }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items.forEach { item ->
-                    UpcomingItemRow(
-                        item = item,
-                        category = item.categoryId?.let { categoryMap[it] },
-                        accountName = item.accountId?.let { accountMap[it]?.name },
-                        projected = projectedAmounts[item.id],
-                        isInspected = item.id == inspectingItemId,
-                        onClick = { onItemClick(item) },
-                        onMarkPaid = { onMarkPaid(item) }
-                    )
-                }
+            OrbitAnimatedEntryColumn(
+                entries = itemEntries,
+                onRemoveFinished = onItemRemoveFinished,
+                minActiveCount = 0,
+                itemSpacing = 8.dp,
+                bringIntoViewOnAdd = false
+            ) { entry, _, _ ->
+                val item = entry.value
+                UpcomingItemRow(
+                    item = item,
+                    category = item.categoryId?.let { categoryMap[it] },
+                    accountName = item.accountId?.let { accountMap[it]?.name },
+                    projected = projectedAmounts[item.id],
+                    isInspected = item.id == inspectingItemId,
+                    onClick = { onItemClick(item) },
+                    onMarkPaid = { onMarkPaid(item) }
+                )
             }
         }
     }

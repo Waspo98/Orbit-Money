@@ -33,6 +33,7 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
@@ -98,7 +99,7 @@ fun AddBalanceRecordDialog(
             modifier = Modifier.fillMaxWidth()
         )
 
-        if (isLargeDelta) {
+        OrbitAccordionVisibility(visible = isLargeDelta) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),

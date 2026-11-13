@@ -52,6 +52,7 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
@@ -317,7 +318,7 @@ fun GoalEditorContent(
                 )
             }
 
-            if (!isOngoing) {
+            OrbitAccordionVisibility(visible = !isOngoing) {
                 val displayDate = targetDate ?: LocalDateUtils.todayLocalDate()
                 DateFieldButton(
                     date = displayDate,

@@ -37,6 +37,7 @@ import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
@@ -147,23 +148,25 @@ fun BudgetAmountEditorContent(
         )
 
         // 3-Month Average Helper Suggestion Pill
-        if (threeMonthAvgCents > 0L) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(
-                    onClick = {
-                        haptics.tick()
-                        amountCents = threeMonthAvgCents
-                    }
+        OrbitAccordionVisibility(visible = threeMonthAvgCents > 0L) {
+            Column {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text(
-                        text = "Apply 3-Month Average (${MoneyUtils.formatCents(threeMonthAvgCents, showCents = false)})",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    TextButton(
+                        onClick = {
+                            haptics.tick()
+                            amountCents = threeMonthAvgCents
+                        }
+                    ) {
+                        Text(
+                            text = "Apply 3-Month Average (${MoneyUtils.formatCents(threeMonthAvgCents, showCents = false)})",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
         }

@@ -34,6 +34,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -118,35 +119,37 @@ fun AccountMergeDialog(
             )
 
             // Projected Target Impact Card
-            selectedTarget?.let { target ->
-                val targetTxns = getTransactionCount(target.id)
-                val projectedTxns = targetTxns + sourceTransactionCount
-                val projectedBalance = if (combineBalances) target.currentBalanceCents + sourceAccount.currentBalanceCents else target.currentBalanceCents
+            OrbitAccordionVisibility(visible = selectedTarget != null) {
+                selectedTarget?.let { target ->
+                    val targetTxns = getTransactionCount(target.id)
+                    val projectedTxns = targetTxns + sourceTransactionCount
+                    val projectedBalance = if (combineBalances) target.currentBalanceCents + sourceAccount.currentBalanceCents else target.currentBalanceCents
 
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = "PROJECTED OUTCOME FOR ${target.name.uppercase()}",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Transactions:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("$targetTxns → $projectedTxns", style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold))
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Projected Balance:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
-                                "${MoneyUtils.formatCents(target.currentBalanceCents)} → ${MoneyUtils.formatCents(projectedBalance)}",
-                                style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                text = "PROJECTED OUTCOME FOR ${target.name.uppercase()}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.outline
                             )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Transactions:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("$targetTxns → $projectedTxns", style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold))
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Projected Balance:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    "${MoneyUtils.formatCents(target.currentBalanceCents)} → ${MoneyUtils.formatCents(projectedBalance)}",
+                                    style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                )
+                            }
                         }
                     }
                 }

@@ -18,6 +18,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -26,9 +28,12 @@ import app.overbay.orbit.data.model.BenefitAnchor
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitAnimatedEntryColumn
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.rememberAnimatedExternalEntries
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -60,44 +65,63 @@ fun CardEditorRewardsTab(
             }
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                draft.lastDeletedBenefit?.let { deleted ->
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
-                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                val lastShownDeleted = remember { mutableStateOf(draft.lastDeletedBenefit) }
+                if (draft.lastDeletedBenefit != null) {
+                    lastShownDeleted.value = draft.lastDeletedBenefit
+                }
+                OrbitAccordionVisibility(visible = draft.lastDeletedBenefit != null) {
+                    val deleted = lastShownDeleted.value
+                    if (deleted != null) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+                            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                text = "Removed \"${deleted.title}\"",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.weight(1f)
-                            )
-                            TextButton(
-                                onClick = {
-                                    haptics.tick()
-                                    controller.undoRemoveBenefit()
-                                }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Undo", fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "Removed \"${deleted.title}\"",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TextButton(
+                                    onClick = {
+                                        haptics.tick()
+                                        controller.undoRemoveBenefit()
+                                    }
+                                ) {
+                                    Text("Undo", fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
                 }
 
-                if (draft.benefits.isEmpty()) {
-                    EmptyRewardsListHint(
-                        message = "No statement credits configured yet. Add credits like Uber Cash, Dining, or Airline incidentals."
-                    )
-                } else {
-                    draft.benefits.forEach { b ->
+                val (benefitEntries, onBenefitRemoveFinished) = rememberAnimatedExternalEntries(
+                    items = draft.benefits,
+                    itemKey = { it.id }
+                )
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    OrbitAccordionVisibility(visible = draft.benefits.isEmpty()) {
+                        EmptyRewardsListHint(
+                            message = "No statement credits configured yet. Add credits like Uber Cash, Dining, or Airline incidentals."
+                        )
+                    }
+                    OrbitAnimatedEntryColumn(
+                        entries = benefitEntries,
+                        onRemoveFinished = onBenefitRemoveFinished,
+                        minActiveCount = 0,
+                        itemSpacing = 8.dp,
+                        bringIntoViewOnAdd = false
+                    ) { entry, _, _ ->
+                        val b = entry.value
                         val subtitle = buildString {
                             append(b.cadence.displayName)
                             if (b.anchor == BenefitAnchor.CARDMEMBER_YEAR) append(" · Cardmember Year")
@@ -155,49 +179,67 @@ fun CardEditorRewardsTab(
                 )
             }
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (draft.rewardCategories.isEmpty()) {
+            val keyedRewards = remember(draft.rewardCategories) {
+                val seenCounts = mutableMapOf<String, Int>()
+                draft.rewardCategories.map { r ->
+                    val count = seenCounts[r.category] ?: 0
+                    seenCounts[r.category] = count + 1
+                    "${r.category}#$count" to r
+                }
+            }
+            val (rewardEntries, onRewardRemoveFinished) = rememberAnimatedExternalEntries(
+                items = keyedRewards,
+                itemKey = { it.first }
+            )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OrbitAccordionVisibility(visible = draft.rewardCategories.isEmpty()) {
                     EmptyRewardsListHint(
                         message = "No earning multipliers configured. Add category rates like 3× Dining or 2% Everything Else."
                     )
-                } else {
-                    draft.rewardCategories.forEachIndexed { idx, r ->
-                        val metaParts = listOfNotNull(
-                            if (r.isRotating) "Rotating Quarterly" else null,
-                            r.capCents?.takeIf { it > 0L }?.let { "Cap ${MoneyUtils.formatCents(it, showCents = false)}" },
-                            r.notes?.takeIf { it.isNotBlank() }
-                        )
-                        OrbitCompactListRow(
-                            title = r.label.ifBlank { r.category },
-                            subtitle = metaParts.joinToString(" · ").takeIf { it.isNotBlank() },
-                            showTopDivider = false,
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                            borderColor = OrbitTheme.colors.cardBorder,
-                            leadingContent = {
-                                RateOrCreditPill(text = CardFormat.formatEarnRate(r))
-                            },
-                            trailingContent = {
-                                IconButton(
-                                    onClick = {
-                                        haptics.reject()
-                                        controller.removeReward(idx)
-                                    },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Delete Multiplier",
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                }
-                            },
-                            onClick = {
-                                haptics.tick()
-                                controller.updateDraft { it.copy(editingRewardIndex = idx) }
+                }
+                OrbitAnimatedEntryColumn(
+                    entries = rewardEntries,
+                    onRemoveFinished = onRewardRemoveFinished,
+                    minActiveCount = 0,
+                    itemSpacing = 8.dp,
+                    bringIntoViewOnAdd = false
+                ) { entry, displayIndex, _ ->
+                    val r = entry.value.second
+                    val metaParts = listOfNotNull(
+                        if (r.isRotating) "Rotating Quarterly" else null,
+                        r.capCents?.takeIf { it > 0L }?.let { "Cap ${MoneyUtils.formatCents(it, showCents = false)}" },
+                        r.notes?.takeIf { it.isNotBlank() }
+                    )
+                    OrbitCompactListRow(
+                        title = r.label.ifBlank { r.category },
+                        subtitle = metaParts.joinToString(" · ").takeIf { it.isNotBlank() },
+                        showTopDivider = false,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        borderColor = OrbitTheme.colors.cardBorder,
+                        leadingContent = {
+                            RateOrCreditPill(text = CardFormat.formatEarnRate(r))
+                        },
+                        trailingContent = {
+                            IconButton(
+                                onClick = {
+                                    haptics.reject()
+                                    controller.removeReward(displayIndex)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete Multiplier",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(17.dp)
+                                )
                             }
-                        )
-                    }
+                        },
+                        onClick = {
+                            haptics.tick()
+                            controller.updateDraft { it.copy(editingRewardIndex = displayIndex) }
+                        }
+                    )
                 }
             }
         }

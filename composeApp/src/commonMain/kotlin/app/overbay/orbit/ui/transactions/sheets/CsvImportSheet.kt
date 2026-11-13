@@ -289,14 +289,14 @@ fun CsvImportSheet(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            if (preview.duplicateRowCount > 0) {
+                            OrbitAccordionVisibility(visible = preview.duplicateRowCount > 0) {
                                 Text(
                                     text = "• Duplicates skipped: ${preview.duplicateRowCount}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.outline
                                 )
                             }
-                            if (preview.invalidRowCount > 0) {
+                            OrbitAccordionVisibility(visible = preview.invalidRowCount > 0) {
                                 Text(
                                     text = "• Invalid rows skipped: ${preview.invalidRowCount}",
                                     style = MaterialTheme.typography.bodySmall,
@@ -304,18 +304,20 @@ fun CsvImportSheet(
                                 )
                             }
 
-                            if (preview.rules.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Checkbox(
-                                        checked = includeRules,
-                                        onCheckedChange = { includeRules = it }
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Generate ${preview.rules.size} merchant renaming rule(s)",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
+                            OrbitAccordionVisibility(visible = preview.rules.isNotEmpty()) {
+                                Column {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(
+                                            checked = includeRules,
+                                            onCheckedChange = { includeRules = it }
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Generate ${preview.rules.size} merchant renaming rule(s)",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -323,12 +325,16 @@ fun CsvImportSheet(
                 }
             }
 
-            if (importBatches.isNotEmpty() && onUndoBatch != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-                ImportBatchesSection(
-                    batches = importBatches,
-                    onUndoBatch = onUndoBatch
-                )
+            OrbitAccordionVisibility(visible = importBatches.isNotEmpty() && onUndoBatch != null) {
+                if (onUndoBatch != null) {
+                    Column {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        ImportBatchesSection(
+                            batches = importBatches,
+                            onUndoBatch = onUndoBatch
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))

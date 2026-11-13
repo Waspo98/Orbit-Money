@@ -1,5 +1,7 @@
 package app.overbay.orbit.ui.transactions.sheets
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -47,10 +49,18 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitAnimatedEntry
+import app.overbay.orbit.ui.components.OrbitAnimatedEntryColumn
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitEntryKeyGenerator
+import app.overbay.orbit.ui.components.OrbitHorizontalReveal
 import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.markEntryRemoving
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
+import app.overbay.orbit.ui.components.updateActiveEntry
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
 
@@ -107,16 +117,24 @@ fun SplitTransactionContent(
 
     // Initialize with two split items (half each, or 0)
     val initialHalf = parentAbsAmount / 2L
+    val entryKeyCounter = remember(transaction) { OrbitEntryKeyGenerator() }
     val splitItems = remember(transaction) {
         mutableStateListOf(
-            SplitItemState(initialHalf, transaction.effectiveCategoryId),
-            SplitItemState(parentAbsAmount - initialHalf, null)
+            OrbitAnimatedEntry(
+                key = entryKeyCounter.nextKey(),
+                value = SplitItemState(initialHalf, transaction.effectiveCategoryId)
+            ),
+            OrbitAnimatedEntry(
+                key = entryKeyCounter.nextKey(),
+                value = SplitItemState(parentAbsAmount - initialHalf, null)
+            )
         )
     }
 
-    val totalAllocated = splitItems.sumOf { it.amountCents }
+    val activeSplits = splitItems.filter { !it.isRemoving }
+    val totalAllocated = activeSplits.sumOf { it.value.amountCents }
     val remaining = parentAbsAmount - totalAllocated
-    val isBalanced = remaining == 0L && splitItems.all { it.amountCents > 0L }
+    val isBalanced = remaining == 0L && activeSplits.all { it.value.amountCents > 0L }
 
     OrbitModalScaffold(
         title = "Split Transaction",
@@ -125,7 +143,8 @@ fun SplitTransactionContent(
         confirmText = "Save Split",
         confirmEnabled = isBalanced,
         onConfirm = {
-            val splits = splitItems.map { split ->
+            val splits = splitItems.filter { !it.isRemoving }.map { entry ->
+                val split = entry.value
                 val signed = if (isExpense) -split.amountCents else split.amountCents
                 Pair(signed, split.categoryId)
             }
@@ -137,25 +156,47 @@ fun SplitTransactionContent(
     ) {
 
         // Balance Indicator Banner
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = if (isBalanced) {
+        val bannerBgColor by animateColorAsState(
+            targetValue = if (isBalanced) {
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
             } else {
                 MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
             },
+            animationSpec = OrbitSprings.ColorEffectsFast
+        )
+        val bannerIconTint by animateColorAsState(
+            targetValue = if (isBalanced) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            animationSpec = OrbitSprings.ColorEffectsFast
+        )
+        val bannerTextColor by animateColorAsState(
+            targetValue = if (isBalanced) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onErrorContainer
+            },
+            animationSpec = OrbitSprings.ColorEffectsFast
+        )
+
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = bannerBgColor,
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (isBalanced) Icons.Default.CheckCircle else Icons.Default.Warning,
-                    contentDescription = "Status",
-                    tint = if (isBalanced) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp)
-                )
+                AnimatedContent(
+                    targetState = isBalanced,
+                    transitionSpec = { orbitFadeContentTransform() }
+                ) { balanced ->
+                    Icon(
+                        imageVector = if (balanced) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        contentDescription = "Status",
+                        tint = bannerIconTint,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (isBalanced) {
@@ -165,11 +206,7 @@ fun SplitTransactionContent(
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isBalanced) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onErrorContainer
-                    }
+                    color = bannerTextColor
                 )
             }
         }
@@ -177,32 +214,47 @@ fun SplitTransactionContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Split Line Items
-        splitItems.forEachIndexed { index, item ->
+        OrbitAnimatedEntryColumn(
+            entries = splitItems,
+            onRemoveFinished = { finishedKey ->
+                splitItems.removeAll { it.key == finishedKey }
+            },
+            minActiveCount = 2,
+            itemSpacing = 10.dp,
+            bringIntoViewOnAdd = true
+        ) { entry, displayIndex, canDelete ->
             SplitLineRow(
-                index = index,
-                item = item,
+                index = displayIndex,
+                item = entry.value,
                 categories = categories,
-                canDelete = splitItems.size > 2,
+                canDelete = canDelete,
                 onAmountChanged = { newAmount ->
-                    splitItems[index] = item.copy(amountCents = newAmount)
+                    splitItems.updateActiveEntry(entry.key) { it.copy(amountCents = newAmount) }
                 },
                 onCategoryChanged = { newCatId ->
-                    splitItems[index] = item.copy(categoryId = newCatId)
+                    splitItems.updateActiveEntry(entry.key) { it.copy(categoryId = newCatId) }
                 },
                 onDelete = {
                     haptics.reject()
-                    splitItems.removeAt(index)
+                    splitItems.markEntryRemoving(entry.key, minActiveCount = 2)
                 }
             )
-            Spacer(modifier = Modifier.height(10.dp))
         }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         // + Add Split Button (Title Case)
         OutlinedButton(
             onClick = {
                 haptics.tick()
                 val nextAmount = if (remaining > 0L) remaining else 0L
-                splitItems.add(SplitItemState(nextAmount, null))
+                splitItems.add(
+                    OrbitAnimatedEntry(
+                        key = entryKeyCounter.nextKey(),
+                        value = SplitItemState(nextAmount, null),
+                        animateEnter = true
+                    )
+                )
             },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
@@ -249,7 +301,7 @@ private fun SplitLineRow(
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                if (canDelete) {
+                OrbitHorizontalReveal(visible = canDelete) {
                     IconButton(
                         onClick = onDelete,
                         modifier = Modifier.size(28.dp)

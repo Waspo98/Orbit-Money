@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.rules.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -42,7 +43,11 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -102,7 +107,7 @@ fun RuleMatchPreviewWindow(
                     )
                 }
 
-                if (allConditionsValid) {
+                OrbitScaleBadgeVisibility(visible = allConditionsValid) {
                     val count = previewResult?.matchedCount ?: matchCount
                     Surface(
                         shape = RoundedCornerShape(999.dp),
@@ -124,171 +129,141 @@ fun RuleMatchPreviewWindow(
             )
 
             // Conflict Warning Banners (Priority Conflicts)
-            if (previewResult != null && previewResult.conflicts.isNotEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = "Conflicts",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Priority Conflicts (${previewResult.conflicts.size})",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-
-                    previewResult.conflicts.forEach { conflict ->
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+            OrbitAccordionVisibility(visible = previewResult != null && previewResult.conflicts.isNotEmpty()) {
+                val conflicts = previewResult?.conflicts.orEmpty()
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Warning, "Conflicts", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Priority Conflicts (${conflicts.size})", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                        }
+                        conflicts.forEach { conflict ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(
-                                    text = "Conflict with Rule #${conflict.conflictingRuleId}: ${conflict.conflictingRuleName}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                if (onOpenRule != null) {
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.clickable {
-                                            haptics.tick()
-                                            onOpenRule(conflict.conflictingRuleId)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Conflict with Rule #${conflict.conflictingRuleId}: ${conflict.conflictingRuleName}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (onOpenRule != null) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.clickable { haptics.tick(); onOpenRule(conflict.conflictingRuleId) }
+                                        ) {
+                                            Text("Edit Rule", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onError, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
                                         }
-                                    ) {
-                                        Text(
-                                            text = "Edit Rule",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onError,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                        )
                                     }
                                 }
                             }
                         }
                     }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
             }
 
             // Mutation Diffs Chips (Will Change X)
-            if (previewResult != null && previewResult.diffs.isNotEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = "Will Change (${previewResult.willChangeCount})",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        val flattenedChanges = previewResult.diffs
-                            .flatMap { mut -> mut.changes.map { mut.merchant to it } }
-                            .take(12)
-                        flattenedChanges.forEach { (merchant, change) ->
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
-                            ) {
-                                val prefix = if (merchant.isNotBlank()) "$merchant · " else ""
-                                Text(
-                                    text = "$prefix${change.field}: ${change.beforeValue} → ${change.afterValue}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
+            OrbitAccordionVisibility(visible = previewResult != null && previewResult.diffs.isNotEmpty()) {
+                val currentDiffs = previewResult?.diffs.orEmpty()
+                val willChangeCount = previewResult?.willChangeCount ?: 0
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text("Will Change ($willChangeCount)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            currentDiffs.flatMap { mut -> mut.changes.map { mut.merchant to it } }.take(12).forEach { (merchant, change) ->
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                                ) {
+                                    val prefix = if (merchant.isNotBlank()) "$merchant · " else ""
+                                    Text(
+                                        text = "$prefix${change.field}: ${change.beforeValue} → ${change.afterValue}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
                             }
                         }
                     }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
             }
 
             // Window Body
-            when {
-                !allConditionsValid -> {
-                    Text(
+            val bodyMode = when {
+                !allConditionsValid -> 0
+                displayedTransactions.isEmpty() -> 1
+                else -> 2
+            }
+            AnimatedContent(
+                targetState = bodyMode,
+                transitionSpec = { orbitMorphContentTransform() },
+                modifier = Modifier.fillMaxWidth()
+            ) { mode ->
+                when (mode) {
+                    0 -> Text(
                         text = "Fill in conditions above to preview matching transactions.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(12.dp)
                     )
-                }
-
-                displayedTransactions.isEmpty() -> {
-                    Text(
-                        text = if (matchCount > 0) {
-                            "Matches $matchCount existing transaction${if (matchCount == 1) "" else "s"}."
-                        } else {
-                            "No existing transactions match these conditions."
-                        },
+                    1 -> Text(
+                        text = if (matchCount > 0) "Matches $matchCount existing transaction${if (matchCount == 1) "" else "s"}." else "No existing transactions match these conditions.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(12.dp)
                     )
-                }
-
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 216.dp),
-                        contentPadding = PaddingValues(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        items(
-                            items = displayedTransactions,
-                            key = { it.id }
-                        ) { txn ->
-                            RulePreviewTransactionRow(
-                                transaction = txn,
-                                accountName = accountMap[txn.accountId]?.name ?: txn.accountName,
-                                categoryLabel = txn.effectiveCategoryId?.let { categoryMap[it]?.labelWithEmoji },
-                                isSource = sourceTransactionId != null && txn.id == sourceTransactionId
-                            )
-                        }
-
-                        if (matchingTransactions.size > MAX_PREVIEW_ROWS) {
-                            item(key = "preview_overflow_footer") {
-                                Text(
-                                    text = "Showing latest $MAX_PREVIEW_ROWS of ${matchingTransactions.size} matching transactions",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 216.dp),
+                            contentPadding = PaddingValues(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(items = displayedTransactions, key = { it.id }) { txn ->
+                                RulePreviewTransactionRow(
+                                    transaction = txn,
+                                    accountName = accountMap[txn.accountId]?.name ?: txn.accountName,
+                                    categoryLabel = txn.effectiveCategoryId?.let { categoryMap[it]?.labelWithEmoji },
+                                    isSource = sourceTransactionId != null && txn.id == sourceTransactionId,
+                                    modifier = Modifier.animateItem(
+                                        fadeInSpec = OrbitSprings.FloatEffectsFast,
+                                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                    )
                                 )
+                            }
+                            if (matchingTransactions.size > MAX_PREVIEW_ROWS) {
+                                item(key = "preview_overflow_footer") {
+                                    Text(
+                                        text = "Showing latest $MAX_PREVIEW_ROWS of ${matchingTransactions.size} matching transactions",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -303,7 +278,8 @@ private fun RulePreviewTransactionRow(
     transaction: Transaction,
     accountName: String,
     categoryLabel: String?,
-    isSource: Boolean
+    isSource: Boolean,
+    modifier: Modifier = Modifier
 ) {
     val colors = OrbitTheme.colors
     val borderColor = if (isSource) {

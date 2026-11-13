@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.transactions.sheets
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.network.MerchantLogoCandidateDto
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitHorizontalReveal
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.ui.transactions.components.MerchantLogoImageCache
 import app.overbay.orbit.ui.transactions.components.RemoteLogoImage
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -50,44 +55,61 @@ internal fun MerchantLogoCandidatesSection(
     onSelectCandidate: (String) -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
-    if (candidates.isNotEmpty()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 240.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            candidates.forEach { candidate ->
-                val candUrl = candidate.logoUrl ?: ""
-                val isSelected = selectedImageUrl.trim() == candUrl && candUrl.isNotBlank()
-                CandidateLogoRow(
-                    candidate = candidate,
-                    isSelected = isSelected,
-                    onClick = {
-                        haptics.tick()
-                        MerchantLogoImageCache.clearFailed(candUrl)
-                        onSelectCandidate(candUrl)
+    val lastCandidates = remember { mutableStateOf(candidates) }
+    if (candidates.isNotEmpty()) lastCandidates.value = candidates
+    val bodyMode = when {
+        candidates.isNotEmpty() -> 0
+        !searching && hasSearched && errorMessage == null -> 1
+        else -> 2
+    }
+    AnimatedContent(
+        targetState = bodyMode,
+        transitionSpec = { orbitMorphContentTransform() },
+        modifier = Modifier.fillMaxWidth()
+    ) { mode ->
+        when (mode) {
+            0 -> Column {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 240.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    lastCandidates.value.forEach { candidate ->
+                        val candUrl = candidate.logoUrl ?: ""
+                        val isSelected = selectedImageUrl.trim() == candUrl && candUrl.isNotBlank()
+                        CandidateLogoRow(
+                            candidate = candidate,
+                            isSelected = isSelected,
+                            onClick = {
+                                haptics.tick()
+                                MerchantLogoImageCache.clearFailed(candUrl)
+                                onSelectCandidate(candUrl)
+                            }
+                        )
                     }
-                )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
             }
+            1 -> Column {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "No Logo.dev matches found. Try a simpler merchant name or paste a direct image URL.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            else -> Unit
         }
-        Spacer(modifier = Modifier.height(12.dp))
-    } else if (!searching && hasSearched && errorMessage == null) {
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = "No Logo.dev matches found. Try a simpler merchant name or paste a direct image URL.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(12.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
     }
 }
 
@@ -104,32 +126,36 @@ internal fun MerchantLogoPreviewAndToolsRow(
     val haptics = LocalOrbitHaptics.current
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        verticalAlignment = Alignment.CenterVertically
     ) {
         val previewUrl = imageUrl.trim().takeIf { it.startsWith("http://") || it.startsWith("https://") }
-        if (previewUrl != null) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                modifier = Modifier.size(48.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(5.dp)) {
-                    RemoteLogoImage(
-                        url = previewUrl,
-                        contentDescription = "Selected logo preview",
-                        modifier = Modifier.fillMaxSize(),
-                        fallback = {
-                            Text(
-                                text = merchantInitial,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    )
+        val lastPreviewUrl = remember { mutableStateOf("") }
+        if (previewUrl != null) lastPreviewUrl.value = previewUrl
+        OrbitHorizontalReveal(visible = previewUrl != null, expandFrom = Alignment.Start) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(5.dp)) {
+                        RemoteLogoImage(
+                            url = lastPreviewUrl.value,
+                            contentDescription = "Selected logo preview",
+                            modifier = Modifier.fillMaxSize(),
+                            fallback = {
+                                Text(
+                                    text = merchantInitial,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        )
+                    }
                 }
+                Spacer(modifier = Modifier.width(12.dp))
             }
         }
 

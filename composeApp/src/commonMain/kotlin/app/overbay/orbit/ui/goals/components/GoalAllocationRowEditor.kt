@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.goals.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -44,9 +45,13 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitAnimatedEntryColumn
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
+import app.overbay.orbit.ui.components.rememberAnimatedExternalEntries
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 import kotlin.math.min
@@ -117,27 +122,51 @@ fun GoalAllocationRowEditor(
             }
         }
 
-        if (allocations.isEmpty()) {
-            EmptyStateCard(
-                title = "No Accounts Linked Yet",
-                description = "Tap '+ Add Account' above to allocate savings from your checking or savings accounts."
-            )
-        } else {
-            allocations.forEachIndexed { index, alloc ->
+        val keyedAllocations = remember(allocations) {
+            val seenCounts = mutableMapOf<Long, Int>()
+            allocations.map { alloc ->
+                val count = seenCounts[alloc.accountId] ?: 0
+                seenCounts[alloc.accountId] = count + 1
+                "${alloc.accountId}#$count" to alloc
+            }
+        }
+        val (allocationEntries, onAllocationRemoveFinished) = rememberAnimatedExternalEntries(
+            items = keyedAllocations,
+            itemKey = { it.first }
+        )
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+            OrbitAccordionVisibility(visible = allocations.isEmpty()) {
+                EmptyStateCard(
+                    title = "No Accounts Linked Yet",
+                    description = "Tap '+ Add Account' above to allocate savings from your checking or savings accounts."
+                )
+            }
+            OrbitAnimatedEntryColumn(
+                entries = allocationEntries,
+                onRemoveFinished = onAllocationRemoveFinished,
+                minActiveCount = 0,
+                itemSpacing = 12.dp,
+                bringIntoViewOnAdd = false
+            ) { entry, displayIndex, _ ->
                 SingleAllocationCard(
-                    allocation = alloc,
+                    allocation = entry.value.second,
                     eligibleAccounts = eligibleAccounts,
                     existingGoals = existingGoals,
                     onChange = { updated ->
-                        val list = allocations.toMutableList()
-                        list[index] = updated
-                        onAllocationsChange(list)
+                        if (displayIndex < allocations.size) {
+                            val list = allocations.toMutableList()
+                            list[displayIndex] = updated
+                            onAllocationsChange(list)
+                        }
                     },
                     onDelete = {
                         haptics.reject()
-                        val list = allocations.toMutableList()
-                        list.removeAt(index)
-                        onAllocationsChange(list)
+                        if (displayIndex < allocations.size) {
+                            val list = allocations.toMutableList()
+                            list.removeAt(displayIndex)
+                            onAllocationsChange(list)
+                        }
                     }
                 )
             }
@@ -297,65 +326,48 @@ private fun SingleAllocationCard(
             }
 
             // Percent or Amount input with Interactive Slider
-            if (allocation.allocationType == GoalAllocationType.PERCENT) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Allocation Percent",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "${allocation.allocationPercent.toInt()}%",
-                            style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Slider(
-                        value = allocation.allocationPercent.toFloat(),
-                        onValueChange = { onChange(allocation.copy(allocationPercent = it.toDouble())) },
-                        valueRange = 0f..100f,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            } else {
-                val maxOpenDollars = max(10f, (openBalanceCents / 100L).toFloat())
-                val currentDollars = (allocation.allocationAmountCents / 100L).toFloat()
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Fixed Allocation Amount",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = MoneyUtils.formatCents(allocation.allocationAmountCents, showCents = false),
-                            style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
+            AnimatedContent(
+                targetState = allocation.allocationType,
+                transitionSpec = { orbitMorphContentTransform(clip = false) },
+                modifier = Modifier.fillMaxWidth()
+            ) { allocType ->
+                if (allocType == GoalAllocationType.PERCENT) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Allocation Percent", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${allocation.allocationPercent.toInt()}%", style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
+                        }
+                        Slider(
+                            value = allocation.allocationPercent.toFloat(),
+                            onValueChange = { onChange(allocation.copy(allocationPercent = it.toDouble())) },
+                            valueRange = 0f..100f,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
-                    Slider(
-                        value = currentDollars.coerceIn(0f, maxOpenDollars),
-                        onValueChange = {
-                            val newCents = (it.toLong() * 100L)
-                            onChange(allocation.copy(allocationAmountCents = newCents))
-                        },
-                        valueRange = 0f..maxOpenDollars,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    CurrencyTextField(
-                        cents = allocation.allocationAmountCents,
-                        onCentsChange = { onChange(allocation.copy(allocationAmountCents = it)) },
-                        label = "Type Exact Amount"
-                    )
+                } else {
+                    val maxOpenDollars = max(10f, (openBalanceCents / 100L).toFloat())
+                    val currentDollars = (allocation.allocationAmountCents / 100L).toFloat()
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Fixed Allocation Amount", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(MoneyUtils.formatCents(allocation.allocationAmountCents, showCents = false), style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
+                        }
+                        Slider(
+                            value = currentDollars.coerceIn(0f, maxOpenDollars),
+                            onValueChange = { onChange(allocation.copy(allocationAmountCents = it.toLong() * 100L)) },
+                            valueRange = 0f..maxOpenDollars,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        CurrencyTextField(cents = allocation.allocationAmountCents, onCentsChange = { onChange(allocation.copy(allocationAmountCents = it)) }, label = "Type Exact Amount")
+                    }
                 }
             }
 

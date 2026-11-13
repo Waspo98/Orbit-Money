@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.accounts.cards
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -20,11 +21,13 @@ import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitFieldLabel
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 private val COOLDOWN_OPTIONS = listOf(
@@ -63,8 +66,11 @@ fun CardEditorStrategyTab(
                 showHeaderDivider = false
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    historySuggestions.suggestedOpenedDate?.let { opDate ->
-                        if (draft.openedDate != opDate) {
+                    OrbitAccordionVisibility(
+                        visible = historySuggestions.suggestedOpenedDate != null &&
+                            draft.openedDate != historySuggestions.suggestedOpenedDate
+                    ) {
+                        historySuggestions.suggestedOpenedDate?.let { opDate ->
                             AssistChip(
                                 onClick = {
                                     haptics.confirm()
@@ -135,57 +141,65 @@ fun CardEditorStrategyTab(
                         }
                     )
 
-                    when (draft.welcomeBonusMode) {
-                        WelcomeBonusMode.WORKING -> {
-                            OrbitTextField(
-                                value = draft.subRewardText.orEmpty(),
-                                onValueChange = { t -> controller.updateDraft { it.copy(subRewardText = t.ifBlank { null }) } },
-                                label = { Text("Bonus Offer") },
-                                placeholder = { Text("e.g. 75,000 Ultimate Rewards pts") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                CurrencyTextField(
-                                    cents = draft.targetSpendCents ?: 0L,
-                                    onCentsChange = { c ->
-                                        controller.updateDraft { it.copy(targetSpendCents = c.takeIf { it > 0L }) }
-                                    },
-                                    label = "Min Spend",
-                                    modifier = Modifier.weight(1f)
-                                )
+                    AnimatedContent(
+                        targetState = draft.welcomeBonusMode,
+                        transitionSpec = { orbitMorphContentTransform(clip = false) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { bonusMode ->
+                        when (bonusMode) {
+                            WelcomeBonusMode.WORKING -> {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    OrbitTextField(
+                                        value = draft.subRewardText.orEmpty(),
+                                        onValueChange = { t -> controller.updateDraft { it.copy(subRewardText = t.ifBlank { null }) } },
+                                        label = { Text("Bonus Offer") },
+                                        placeholder = { Text("e.g. 75,000 Ultimate Rewards pts") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        CurrencyTextField(
+                                            cents = draft.targetSpendCents ?: 0L,
+                                            onCentsChange = { c ->
+                                                controller.updateDraft { it.copy(targetSpendCents = c.takeIf { it > 0L }) }
+                                            },
+                                            label = "Min Spend",
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        DateFieldButton(
+                                            date = draft.targetDeadlineDate?.let { LocalDateUtils.parseIsoDate(it) },
+                                            onDateSelected = { dt ->
+                                                controller.updateDraft { it.copy(targetDeadlineDate = LocalDateUtils.formatIsoDate(dt)) }
+                                            },
+                                            onClear = {
+                                                controller.updateDraft { it.copy(targetDeadlineDate = null) }
+                                            },
+                                            label = "Spend Deadline",
+                                            placeholder = "Not Set",
+                                            isError = draft.errors.containsKey("targetDeadlineDate"),
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            }
+                            WelcomeBonusMode.EARNED -> {
                                 DateFieldButton(
-                                    date = draft.targetDeadlineDate?.let { LocalDateUtils.parseIsoDate(it) },
+                                    date = draft.subReceivedDate?.let { LocalDateUtils.parseIsoDate(it) },
                                     onDateSelected = { dt ->
-                                        controller.updateDraft { it.copy(targetDeadlineDate = LocalDateUtils.formatIsoDate(dt)) }
+                                        controller.updateDraft { it.copy(subReceivedDate = LocalDateUtils.formatIsoDate(dt)) }
                                     },
                                     onClear = {
-                                        controller.updateDraft { it.copy(targetDeadlineDate = null) }
+                                        controller.updateDraft { it.copy(subReceivedDate = null) }
                                     },
-                                    label = "Spend Deadline",
-                                    placeholder = "Not Set",
-                                    isError = draft.errors.containsKey("targetDeadlineDate"),
-                                    modifier = Modifier.weight(1f)
+                                    label = "Bonus Received Date",
+                                    placeholder = "Not Set"
                                 )
                             }
+                            WelcomeBonusMode.NONE -> Unit
                         }
-                        WelcomeBonusMode.EARNED -> {
-                            DateFieldButton(
-                                date = draft.subReceivedDate?.let { LocalDateUtils.parseIsoDate(it) },
-                                onDateSelected = { dt ->
-                                    controller.updateDraft { it.copy(subReceivedDate = LocalDateUtils.formatIsoDate(dt)) }
-                                },
-                                onClear = {
-                                    controller.updateDraft { it.copy(subReceivedDate = null) }
-                                },
-                                label = "Bonus Received Date",
-                                placeholder = "Not Set"
-                            )
-                        }
-                        WelcomeBonusMode.NONE -> {}
                     }
                 }
             }

@@ -33,10 +33,13 @@ import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitAnimatedEntryColumn
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.rememberAnimatedExternalEntries
 import app.overbay.orbit.ui.dashboard.GoalFocusState
 import app.overbay.orbit.ui.dashboard.GoalsProgressState
 import app.overbay.orbit.ui.dashboard.SubscriptionsState
@@ -115,49 +118,58 @@ fun UpcomingBillsCard(
                 onViewAll()
             }
     ) {
-        if (bills.isEmpty()) {
-            Text(
-                text = "No bills or income scheduled for the next 14 days.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                bills.take(3).forEachIndexed { index, bill ->
-                    val amtColor = if (bill.isExpense) colors.expense else colors.income
-                    val formattedAmt = if (bill.isExpense) {
-                        "-${MoneyUtils.formatCents(bill.amountCents)}"
-                    } else {
-                        "+${MoneyUtils.formatCents(bill.amountCents)}"
-                    }
-
-                    val catPrefix = CategoryEmojiMapper.resolveEmoji(bill.categoryIcon)?.let { "$it " } ?: ""
-                    val catLabel = bill.categoryName?.let { "$catPrefix$it" } ?: "General"
-                    OrbitCompactListRow(
-                        title = bill.merchant ?: bill.name,
-                        subtitle = "$catLabel · ${bill.dueLabel}",
-                        amount = formattedAmt,
-                        amountColor = amtColor,
-                        showTopDivider = index > 0,
-                        trailingAction = {
-                            OutlinedButton(
-                                onClick = {
-                                    haptics.confirm()
-                                    onReconcile(bill.upcomingItemId, bill.dueDateIso)
-                                },
-                                shape = CircleShape,
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                                modifier = Modifier.height(28.dp)
-                            ) {
-                                Text(
-                                    text = "Pay",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    )
+        val (billEntries, onBillRemoveFinished) = rememberAnimatedExternalEntries(
+            items = bills.take(3),
+            itemKey = { "${it.upcomingItemId}_${it.dueDateIso}" }
+        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            OrbitAccordionVisibility(visible = bills.isEmpty()) {
+                Text(
+                    text = "No bills or income scheduled for the next 14 days.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            OrbitAnimatedEntryColumn(
+                entries = billEntries,
+                onRemoveFinished = onBillRemoveFinished,
+                minActiveCount = 0,
+                bringIntoViewOnAdd = false
+            ) { entry, displayIndex, _ ->
+                val bill = entry.value
+                val amtColor = if (bill.isExpense) colors.expense else colors.income
+                val formattedAmt = if (bill.isExpense) {
+                    "-${MoneyUtils.formatCents(bill.amountCents)}"
+                } else {
+                    "+${MoneyUtils.formatCents(bill.amountCents)}"
                 }
+
+                val catPrefix = CategoryEmojiMapper.resolveEmoji(bill.categoryIcon)?.let { "$it " } ?: ""
+                val catLabel = bill.categoryName?.let { "$catPrefix$it" } ?: "General"
+                OrbitCompactListRow(
+                    title = bill.merchant ?: bill.name,
+                    subtitle = "$catLabel · ${bill.dueLabel}",
+                    amount = formattedAmt,
+                    amountColor = amtColor,
+                    showTopDivider = displayIndex > 0,
+                    trailingAction = {
+                        OutlinedButton(
+                            onClick = {
+                                haptics.confirm()
+                                onReconcile(bill.upcomingItemId, bill.dueDateIso)
+                            },
+                            shape = CircleShape,
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text(
+                                text = "Pay",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                )
             }
         }
     }

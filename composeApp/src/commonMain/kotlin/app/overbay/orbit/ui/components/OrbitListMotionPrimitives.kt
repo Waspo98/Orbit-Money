@@ -17,9 +17,11 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -200,4 +202,126 @@ private fun <T> OrbitAnimatedEntryContainer(
             content(lastActiveIndex)
         }
     }
+}
+
+private data class ActiveExternalSlot<T>(
+    val externalId: Any,
+    val key: Long,
+    val value: T
+)
+
+private data class RemovingExternalSlot<T>(
+    val externalId: Any,
+    val key: Long,
+    val value: T,
+    val insertBeforeExternalId: Any?
+)
+
+private class ExternalListMotionRegistry<T> {
+    val keyGen = OrbitEntryKeyGenerator()
+    val keyByExternalId = mutableMapOf<Any, Long>()
+    var initialized = false
+    var previousActive: List<ActiveExternalSlot<T>> = emptyList()
+    val removingQueue = mutableStateListOf<RemovingExternalSlot<T>>()
+}
+
+/**
+ * Reconciles a parent-owned immutable [items] list into keyed [OrbitAnimatedEntry] rows that
+ * smoothly animate insertions and defer removal from composition until exit springs finish.
+ */
+@Composable
+fun <T> rememberAnimatedExternalEntries(
+    items: List<T>,
+    itemKey: (T) -> Any,
+    resetKey: Any = Unit,
+    animateInitial: Boolean = false
+): Pair<List<OrbitAnimatedEntry<T>>, (Long) -> Unit> {
+    val registry = remember(resetKey) { ExternalListMotionRegistry<T>() }
+    val removingSnapshot = registry.removingQueue.toList()
+    val previousIds = remember(registry.previousActive) {
+        registry.previousActive.map { it.externalId }.toSet()
+    }
+    val removingIds = removingSnapshot.map { it.externalId }.toSet()
+
+    val currentSlots = items.map { item ->
+        val extId = itemKey(item)
+        val assignedKey = registry.keyByExternalId[extId]
+            ?: removingSnapshot.firstOrNull { it.externalId == extId }?.key
+            ?: registry.keyGen.nextKey().also { registry.keyByExternalId[extId] = it }
+        ActiveExternalSlot(externalId = extId, key = assignedKey, value = item)
+    }
+    val currentIds = currentSlots.map { it.externalId }.toSet()
+
+    val newlyRemoved = buildList {
+        registry.previousActive.forEachIndexed { idx, prev ->
+            if (prev.externalId !in currentIds && prev.externalId !in removingIds) {
+                val nextSurviving = registry.previousActive
+                    .subList(idx + 1, registry.previousActive.size)
+                    .firstOrNull { it.externalId in currentIds }
+                    ?.externalId
+                add(RemovingExternalSlot(prev.externalId, prev.key, prev.value, nextSurviving))
+            }
+        }
+    }
+
+    val allRemoving = removingSnapshot.filter { it.externalId !in currentIds } + newlyRemoved
+    val removingBefore = mutableMapOf<Any, MutableList<RemovingExternalSlot<T>>>()
+    val trailingRemoving = mutableListOf<RemovingExternalSlot<T>>()
+    allRemoving.forEach { slot ->
+        val anchor = slot.insertBeforeExternalId
+        if (anchor != null && anchor in currentIds) {
+            removingBefore.getOrPut(anchor) { mutableListOf() }.add(slot)
+        } else {
+            trailingRemoving.add(slot)
+        }
+    }
+
+    val entries = buildList {
+        currentSlots.forEach { slot ->
+            removingBefore[slot.externalId]?.forEach { rem ->
+                add(OrbitAnimatedEntry(rem.key, rem.value, animateEnter = false, isRemoving = true))
+            }
+            val shouldAnimateEnter = if (registry.initialized) {
+                slot.externalId !in previousIds && slot.externalId !in removingIds
+            } else {
+                animateInitial
+            }
+            add(
+                OrbitAnimatedEntry(
+                    key = slot.key,
+                    value = slot.value,
+                    animateEnter = shouldAnimateEnter,
+                    isRemoving = false
+                )
+            )
+        }
+        trailingRemoving.forEach { rem ->
+            add(OrbitAnimatedEntry(rem.key, rem.value, animateEnter = false, isRemoving = true))
+        }
+    }
+
+    SideEffect {
+        registry.removingQueue.removeAll { it.externalId in currentIds }
+        newlyRemoved.forEach { rem ->
+            if (registry.removingQueue.none { it.key == rem.key }) {
+                registry.removingQueue.add(rem)
+            }
+        }
+        registry.previousActive = currentSlots
+        registry.initialized = true
+    }
+
+    val onRemoveFinished = remember(registry) {
+        { finishedKey: Long ->
+            val removedIndex = registry.removingQueue.indexOfFirst { it.key == finishedKey }
+            if (removedIndex >= 0) {
+                val removed = registry.removingQueue.removeAt(removedIndex)
+                if (registry.previousActive.none { it.externalId == removed.externalId }) {
+                    registry.keyByExternalId.remove(removed.externalId)
+                }
+            }
+        }
+    }
+
+    return entries to onRemoveFinished
 }

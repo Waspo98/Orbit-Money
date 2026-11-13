@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.upcoming.sheets
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,8 +27,10 @@ import app.overbay.orbit.data.model.AmountStrategy
 import app.overbay.orbit.data.model.RecurrenceFrequency
 import app.overbay.orbit.data.model.UpcomingKind
 import app.overbay.orbit.data.model.UpcomingStatus
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 enum class ScheduleMode(val label: String) {
@@ -123,34 +126,30 @@ fun RecurringAmountStrategySection(
             }
         }
 
-        if (amountStrategy == AmountStrategy.HISTORY_AVERAGE) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Lookback Window:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                SingleChoiceSegmentedButtonRow {
-                    lookbackWindows.forEachIndexed { index, months ->
-                        val isSel = lookbackMonths == months
-                        SegmentedButton(
-                            selected = isSel,
-                            onClick = { haptics.tick(); onLookbackChanged(months) },
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = lookbackWindows.size),
-                            icon = {},
-                            label = {
-                                Text(
-                                    text = "${months}M",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        )
+        OrbitAccordionVisibility(visible = amountStrategy == AmountStrategy.HISTORY_AVERAGE) {
+            Column {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Lookback Window:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    SingleChoiceSegmentedButtonRow {
+                        lookbackWindows.forEachIndexed { index, months ->
+                            val isSel = lookbackMonths == months
+                            SegmentedButton(
+                                selected = isSel,
+                                onClick = { haptics.tick(); onLookbackChanged(months) },
+                                shape = SegmentedButtonDefaults.itemShape(index = index, count = lookbackWindows.size),
+                                icon = {},
+                                label = { Text("${months}M", style = MaterialTheme.typography.labelSmall, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal) }
+                            )
+                        }
                     }
                 }
             }
@@ -176,111 +175,111 @@ fun RecurringScheduleModeSection(
     onWeekdayChanged: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (frequency != RecurrenceFrequency.MONTHLY && frequency != RecurrenceFrequency.SEMIMONTHLY) return
     val haptics = LocalOrbitHaptics.current
     val modes = ScheduleMode.entries
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(
-            text = "SCHEDULE MODE",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(6.dp))
+    OrbitAccordionVisibility(
+        visible = frequency == RecurrenceFrequency.MONTHLY || frequency == RecurrenceFrequency.SEMIMONTHLY,
+        modifier = modifier
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "SCHEDULE MODE",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(6.dp))
 
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            modes.forEachIndexed { index, mode ->
-                val isSelected = scheduleMode == mode
-                SegmentedButton(
-                    selected = isSelected,
-                    onClick = { haptics.tick(); onScheduleModeChanged(mode) },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
-                    icon = {},
-                    label = {
-                        Text(
-                            text = mode.label,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                        )
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                modes.forEachIndexed { index, mode ->
+                    val isSelected = scheduleMode == mode
+                    SegmentedButton(
+                        selected = isSelected,
+                        onClick = { haptics.tick(); onScheduleModeChanged(mode) },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
+                        icon = {},
+                        label = { Text(mode.label, style = MaterialTheme.typography.labelSmall, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) }
+                    )
+                }
+            }
+
+            AnimatedContent(
+                targetState = scheduleMode,
+                transitionSpec = { orbitMorphContentTransform(clip = false) },
+                modifier = Modifier.fillMaxWidth()
+            ) { currentMode ->
+                when (currentMode) {
+                    ScheduleMode.MONTH_DAYS -> {
+                        val dayOptions = (1..31).toList() + listOf(-1)
+                        Column {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OrbitDropdownField(
+                                    label = if (frequency == RecurrenceFrequency.SEMIMONTHLY) "First Day" else "Day of Month",
+                                    selectedText = if (monthDayOne == -1) "Final Day" else monthDayOne.toString(),
+                                    options = dayOptions,
+                                    optionLabel = { if (it == -1) "Final Day" else it.toString() },
+                                    onOptionSelected = onMonthDayOneChanged,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (frequency == RecurrenceFrequency.SEMIMONTHLY) {
+                                    OrbitDropdownField(
+                                        label = "Second Day",
+                                        selectedText = monthDayTwo?.let { if (it == -1) "Final Day" else it.toString() } ?: "None",
+                                        options = dayOptions,
+                                        optionLabel = { if (it == -1) "Final Day" else it.toString() },
+                                        onOptionSelected = onMonthDayTwoChanged,
+                                        nullOptionLabel = "None",
+                                        onNullSelected = { onMonthDayTwoChanged(null) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
                     }
-                )
-            }
-        }
-
-        if (scheduleMode == ScheduleMode.MONTH_DAYS) {
-            Spacer(modifier = Modifier.height(10.dp))
-            val dayOptions = (1..31).toList() + listOf(-1)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OrbitDropdownField(
-                    label = if (frequency == RecurrenceFrequency.SEMIMONTHLY) "First Day" else "Day of Month",
-                    selectedText = if (monthDayOne == -1) "Final Day" else monthDayOne.toString(),
-                    options = dayOptions,
-                    optionLabel = { if (it == -1) "Final Day" else it.toString() },
-                    onOptionSelected = onMonthDayOneChanged,
-                    modifier = Modifier.weight(1f)
-                )
-
-                if (frequency == RecurrenceFrequency.SEMIMONTHLY) {
-                    OrbitDropdownField(
-                        label = "Second Day",
-                        selectedText = monthDayTwo?.let { if (it == -1) "Final Day" else it.toString() } ?: "None",
-                        options = dayOptions,
-                        optionLabel = { if (it == -1) "Final Day" else it.toString() },
-                        onOptionSelected = onMonthDayTwoChanged,
-                        nullOptionLabel = "None",
-                        onNullSelected = { onMonthDayTwoChanged(null) },
-                        modifier = Modifier.weight(1f)
-                    )
+                    ScheduleMode.MONTH_WEEKDAYS -> {
+                        val ordinals = listOf(1, 2, 3, 4, 5, -1)
+                        val ordinalLabels = mapOf(1 to "1st", 2 to "2nd", 3 to "3rd", 4 to "4th", 5 to "5th", -1 to "Last")
+                        val weekdays = (0..6).toList()
+                        val weekdayLabels = listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+                        Column {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OrbitDropdownField(
+                                    label = if (frequency == RecurrenceFrequency.SEMIMONTHLY) "First Week" else "Week Ordinal",
+                                    selectedText = ordinalLabels[ordinalOne] ?: "1st",
+                                    options = ordinals,
+                                    optionLabel = { ordinalLabels[it] ?: it.toString() },
+                                    onOptionSelected = onOrdinalOneChanged,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (frequency == RecurrenceFrequency.SEMIMONTHLY) {
+                                    OrbitDropdownField(
+                                        label = "Second Week",
+                                        selectedText = ordinalTwo?.let { ordinalLabels[it] ?: it.toString() } ?: "None",
+                                        options = ordinals,
+                                        optionLabel = { ordinalLabels[it] ?: it.toString() },
+                                        onOptionSelected = onOrdinalTwoChanged,
+                                        nullOptionLabel = "None",
+                                        onNullSelected = { onOrdinalTwoChanged(null) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                OrbitDropdownField(
+                                    label = "Weekday",
+                                    selectedText = weekdayLabels.getOrElse(weekday) { "Friday" },
+                                    options = weekdays,
+                                    optionLabel = { weekdayLabels.getOrElse(it) { it.toString() } },
+                                    onOptionSelected = onWeekdayChanged,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                    ScheduleMode.STANDARD -> Unit
                 }
-            }
-        }
-
-        if (scheduleMode == ScheduleMode.MONTH_WEEKDAYS) {
-            Spacer(modifier = Modifier.height(10.dp))
-            val ordinals = listOf(1, 2, 3, 4, 5, -1)
-            val ordinalLabels = mapOf(1 to "1st", 2 to "2nd", 3 to "3rd", 4 to "4th", 5 to "5th", -1 to "Last")
-            val weekdays = (0..6).toList()
-            val weekdayLabels = listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OrbitDropdownField(
-                    label = if (frequency == RecurrenceFrequency.SEMIMONTHLY) "First Week" else "Week Ordinal",
-                    selectedText = ordinalLabels[ordinalOne] ?: "1st",
-                    options = ordinals,
-                    optionLabel = { ordinalLabels[it] ?: it.toString() },
-                    onOptionSelected = onOrdinalOneChanged,
-                    modifier = Modifier.weight(1f)
-                )
-
-                if (frequency == RecurrenceFrequency.SEMIMONTHLY) {
-                    OrbitDropdownField(
-                        label = "Second Week",
-                        selectedText = ordinalTwo?.let { ordinalLabels[it] ?: it.toString() } ?: "None",
-                        options = ordinals,
-                        optionLabel = { ordinalLabels[it] ?: it.toString() },
-                        onOptionSelected = onOrdinalTwoChanged,
-                        nullOptionLabel = "None",
-                        onNullSelected = { onOrdinalTwoChanged(null) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                OrbitDropdownField(
-                    label = "Weekday",
-                    selectedText = weekdayLabels.getOrElse(weekday) { "Friday" },
-                    options = weekdays,
-                    optionLabel = { weekdayLabels.getOrElse(it) { it.toString() } },
-                    onOptionSelected = onWeekdayChanged,
-                    modifier = Modifier.weight(1f)
-                )
             }
         }
     }
@@ -295,40 +294,41 @@ fun RecurringCustomScheduleFields(
     onUnitChanged: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (frequency != RecurrenceFrequency.CUSTOM) return
-    var intervalText by remember { mutableStateOf(if (customInterval > 0) customInterval.toString() else "1") }
-    LaunchedEffect(customInterval) {
-        val parsed = intervalText.toIntOrNull()
-        if (parsed != null && parsed != customInterval && customInterval > 0) {
-            intervalText = customInterval.toString()
+    OrbitAccordionVisibility(visible = frequency == RecurrenceFrequency.CUSTOM, modifier = modifier) {
+        var intervalText by remember { mutableStateOf(if (customInterval > 0) customInterval.toString() else "1") }
+        LaunchedEffect(customInterval) {
+            val parsed = intervalText.toIntOrNull()
+            if (parsed != null && parsed != customInterval && customInterval > 0) {
+                intervalText = customInterval.toString()
+            }
         }
-    }
-    Column(modifier = modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OrbitTextField(
-                value = intervalText,
-                onValueChange = { str ->
-                    val digits = str.filter { it.isDigit() }.take(4)
-                    intervalText = digits
-                    digits.toIntOrNull()?.takeIf { it > 0 }?.let(onIntervalChanged)
-                },
-                label = { Text("Every (N)") },
-                singleLine = true,
-                modifier = Modifier.weight(0.45f)
-            )
-            OrbitDropdownField(
-                label = "Unit",
-                selectedText = customUnit.replaceFirstChar { it.uppercase() },
-                options = listOf("days", "weeks", "months"),
-                optionLabel = { it.replaceFirstChar { c -> c.uppercase() } },
-                onOptionSelected = onUnitChanged,
-                modifier = Modifier.weight(0.55f)
-            )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OrbitTextField(
+                    value = intervalText,
+                    onValueChange = { str ->
+                        val digits = str.filter { it.isDigit() }.take(4)
+                        intervalText = digits
+                        digits.toIntOrNull()?.takeIf { it > 0 }?.let(onIntervalChanged)
+                    },
+                    label = { Text("Every (N)") },
+                    singleLine = true,
+                    modifier = Modifier.weight(0.45f)
+                )
+                OrbitDropdownField(
+                    label = "Unit",
+                    selectedText = customUnit.replaceFirstChar { it.uppercase() },
+                    options = listOf("days", "weeks", "months"),
+                    optionLabel = { it.replaceFirstChar { c -> c.uppercase() } },
+                    onOptionSelected = onUnitChanged,
+                    modifier = Modifier.weight(0.55f)
+                )
+            }
         }
     }
 }

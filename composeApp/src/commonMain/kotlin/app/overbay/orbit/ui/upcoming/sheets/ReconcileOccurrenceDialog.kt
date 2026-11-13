@@ -39,6 +39,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.UpcomingEngine
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
@@ -116,31 +117,33 @@ fun ReconcileOccurrenceDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                if (candidateMatches.isNotEmpty()) {
-                    Text(
-                        text = "LINK POSTED TRANSACTION (OPTIONAL)",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
+                OrbitAccordionVisibility(visible = candidateMatches.isNotEmpty()) {
+                    Column {
+                        Text(
+                            text = "LINK POSTED TRANSACTION (OPTIONAL)",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
 
-                    val selectedMatch = candidateMatches.find { it.id == selectedTxnId }
-                    OrbitDropdownField(
-                        label = "Matched Transaction",
-                        selectedText = selectedMatch?.let {
-                            "${it.effectiveMerchant} · ${it.effectiveDate} (${MoneyUtils.formatCents(abs(it.effectiveAmountCents))})"
-                        } ?: "Record New Transaction Automatically",
-                        options = candidateMatches,
-                        optionLabel = {
-                            "${it.effectiveMerchant} · ${it.effectiveDate} (${MoneyUtils.formatCents(abs(it.effectiveAmountCents))})"
-                        },
-                        onOptionSelected = { selectedTxnId = it.id },
-                        nullOptionLabel = "Record New Transaction Automatically",
-                        onNullSelected = { selectedTxnId = null }
-                    )
+                        val selectedMatch = candidateMatches.find { it.id == selectedTxnId }
+                        OrbitDropdownField(
+                            label = "Matched Transaction",
+                            selectedText = selectedMatch?.let {
+                                "${it.effectiveMerchant} · ${it.effectiveDate} (${MoneyUtils.formatCents(abs(it.effectiveAmountCents))})"
+                            } ?: "Record New Transaction Automatically",
+                            options = candidateMatches,
+                            optionLabel = {
+                                "${it.effectiveMerchant} · ${it.effectiveDate} (${MoneyUtils.formatCents(abs(it.effectiveAmountCents))})"
+                            },
+                            onOptionSelected = { selectedTxnId = it.id },
+                            nullOptionLabel = "Record New Transaction Automatically",
+                            onNullSelected = { selectedTxnId = null }
+                        )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
                 }
 
                 Text(

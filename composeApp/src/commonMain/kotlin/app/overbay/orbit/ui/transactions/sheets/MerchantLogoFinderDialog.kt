@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.transactions.sheets
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,6 +33,7 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.network.MerchantLogoCandidateDto
 import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.transactions.components.MerchantLogoImageCache
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -242,13 +244,17 @@ fun BrandLogoFinderDialog(
                 fallbackButtonLabel = fallbackButtonLabel
             )
 
-            if (errorMessage != null) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = errorMessage!!,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OrbitTheme.colors.expense
-                )
+            val lastError = remember { mutableStateOf("") }
+            if (!errorMessage.isNullOrBlank()) lastError.value = errorMessage!!
+            OrbitAccordionVisibility(visible = errorMessage != null) {
+                Column {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = lastError.value,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OrbitTheme.colors.expense
+                    )
+                }
             }
     }
 }

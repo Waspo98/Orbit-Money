@@ -33,6 +33,7 @@ import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitAmountTypeCard
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitHorizontalReveal
 import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitTextField
@@ -148,25 +149,30 @@ fun RecurringItemEditorContent(
         title = if (isEditing) "Edit Recurring Schedule" else "New Recurring Schedule",
         onDismiss = onDismiss,
         headerTrailingActions = {
-            if (isEditing) {
-                if (onViewHistory != null) {
+            OrbitHorizontalReveal(visible = isEditing) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onViewHistory != null && item != null) {
+                        OrbitActionChip(
+                            label = "History",
+                            onClick = {
+                                haptics.tick()
+                                onViewHistory(item)
+                            }
+                        )
+                    }
                     OrbitActionChip(
-                        label = "History",
+                        label = "Delete",
+                        leadingIcon = Icons.Default.Delete,
+                        isDestructive = true,
                         onClick = {
-                            haptics.tick()
-                            onViewHistory(item)
+                            haptics.reject()
+                            showDeleteConfirm = true
                         }
                     )
                 }
-                OrbitActionChip(
-                    label = "Delete",
-                    leadingIcon = Icons.Default.Delete,
-                    isDestructive = true,
-                    onClick = {
-                        haptics.reject()
-                        showDeleteConfirm = true
-                    }
-                )
             }
         },
         confirmText = "Save",

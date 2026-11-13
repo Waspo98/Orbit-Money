@@ -148,24 +148,26 @@ fun CardEditorBillingTab(
                             .padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        historySuggestions.suggestedAnnualFeeDate?.let { feeDate ->
-                            val feeCents = historySuggestions.detectedAnnualFeeCents
-                            AssistChip(
-                                onClick = {
-                                    haptics.confirm()
-                                    controller.updateDraft {
-                                        it.copy(
-                                            annualFeeCents = feeCents ?: it.annualFeeCents,
-                                            annualFeePostDate = feeDate
+                        OrbitAccordionVisibility(visible = historySuggestions.suggestedAnnualFeeDate != null) {
+                            historySuggestions.suggestedAnnualFeeDate?.let { feeDate ->
+                                val feeCents = historySuggestions.detectedAnnualFeeCents
+                                AssistChip(
+                                    onClick = {
+                                        haptics.confirm()
+                                        controller.updateDraft {
+                                            it.copy(
+                                                annualFeeCents = feeCents ?: it.annualFeeCents,
+                                                annualFeePostDate = feeDate
+                                            )
+                                        }
+                                    },
+                                    label = {
+                                        Text(
+                                            "Use detected fee: ${feeCents?.let { MoneyUtils.formatCents(it) } ?: ""} on ${CardFormat.formatCardDate(feeDate)}"
                                         )
                                     }
-                                },
-                                label = {
-                                    Text(
-                                        "Use detected fee: ${feeCents?.let { MoneyUtils.formatCents(it) } ?: ""} on ${CardFormat.formatCardDate(feeDate)}"
-                                    )
-                                }
-                            )
+                                )
+                            }
                         }
 
                         Row(

@@ -30,10 +30,13 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitAnimatedEntryColumn
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.rememberAnimatedExternalEntries
 import app.overbay.orbit.ui.dashboard.BiggestTransactionsState
 import app.overbay.orbit.ui.dashboard.MonthComparisonState
 import app.overbay.orbit.ui.dashboard.TopSpendingState
@@ -159,62 +162,73 @@ fun BiggestTransactionsCard(
                 onClick()
             }
     ) {
+        val (txnEntries, onTxnRemoveFinished) = rememberAnimatedExternalEntries(
+            items = state.transactions,
+            itemKey = { it.id }
+        )
         Column(modifier = Modifier.fillMaxWidth()) {
-            if (state.transactions.isEmpty()) {
+            OrbitAccordionVisibility(visible = state.transactions.isEmpty()) {
                 Text(
                     text = "No large expenses recorded this month.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            } else {
-                state.transactions.forEachIndexed { index, txn ->
-                    val catPrefix = CategoryEmojiMapper.resolveEmoji(txn.categoryIcon)?.let { "$it " } ?: ""
-                    val catLabel = txn.categoryName?.let { "$catPrefix$it" } ?: "❓ Uncategorized"
-                    OrbitCompactListRow(
-                        title = txn.merchant,
-                        subtitle = "${txn.dateDisplay} · $catLabel",
-                        amount = txn.formattedAmount,
-                        amountColor = colors.expense,
-                        showTopDivider = index > 0,
-                        trailingAction = {
-                            Text(
-                                text = "Hide",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                modifier = Modifier
-                                    .clickable {
-                                        haptics.tick()
-                                        onHideTransaction(txn.id)
-                                    }
-                                    .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-                            )
-                        }
-                    )
-                }
+            }
+            OrbitAnimatedEntryColumn(
+                entries = txnEntries,
+                onRemoveFinished = onTxnRemoveFinished,
+                minActiveCount = 0,
+                bringIntoViewOnAdd = false
+            ) { entry, displayIndex, _ ->
+                val txn = entry.value
+                val catPrefix = CategoryEmojiMapper.resolveEmoji(txn.categoryIcon)?.let { "$it " } ?: ""
+                val catLabel = txn.categoryName?.let { "$catPrefix$it" } ?: "❓ Uncategorized"
+                OrbitCompactListRow(
+                    title = txn.merchant,
+                    subtitle = "${txn.dateDisplay} · $catLabel",
+                    amount = txn.formattedAmount,
+                    amountColor = colors.expense,
+                    showTopDivider = displayIndex > 0,
+                    trailingAction = {
+                        Text(
+                            text = "Hide",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier
+                                .clickable {
+                                    haptics.tick()
+                                    onHideTransaction(txn.id)
+                                }
+                                .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
+                        )
+                    }
+                )
             }
 
-            if (state.hiddenCount > 0) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "${state.hiddenCount} transaction(s) hidden",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Reset Hidden",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            haptics.tick()
-                            onResetHidden()
-                        }
-                    )
+            OrbitAccordionVisibility(visible = state.hiddenCount > 0) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${state.hiddenCount} transaction(s) hidden",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Reset Hidden",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable {
+                                haptics.tick()
+                                onResetHidden()
+                            }
+                        )
+                    }
                 }
             }
         }

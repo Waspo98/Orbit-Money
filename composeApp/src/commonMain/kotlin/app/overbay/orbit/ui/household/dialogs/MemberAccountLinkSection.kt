@@ -29,7 +29,10 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.HouseholdRetirementAccount
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitAnimatedEntryColumn
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.rememberAnimatedExternalEntries
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 val RETIREMENT_ACCOUNT_KINDS = listOf(
@@ -80,21 +83,35 @@ fun MemberAccountLinkSection(
             color = MaterialTheme.colorScheme.outline
         )
 
-        if (linkedAccounts.isEmpty()) {
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "No linked accounts yet. Link an Investment or HSA account below.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(12.dp)
-                )
+        val (linkEntries, onLinkRemoveFinished) = rememberAnimatedExternalEntries(
+            items = linkedAccounts,
+            itemKey = { it.accountId }
+        )
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+            OrbitAccordionVisibility(visible = linkedAccounts.isEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "No linked accounts yet. Link an Investment or HSA account below.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             }
-        } else {
-            linkedAccounts.forEach { link ->
+
+            OrbitAnimatedEntryColumn(
+                entries = linkEntries,
+                onRemoveFinished = onLinkRemoveFinished,
+                minActiveCount = 0,
+                itemSpacing = 10.dp,
+                bringIntoViewOnAdd = false
+            ) { entry, _, _ ->
+                val link = entry.value
                 val account = accountMap[link.accountId]
                 Surface(
                     shape = RoundedCornerShape(12.dp),

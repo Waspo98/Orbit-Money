@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.*
 import app.overbay.orbit.data.model.*
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitAnimatedEntryColumn
+import app.overbay.orbit.ui.components.rememberAnimatedExternalEntries
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -37,8 +39,11 @@ fun ImportBatchesSection(
     onUndoBatch: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (batches.isEmpty()) return
     val haptics = LocalOrbitHaptics.current
+    val (batchEntries, onBatchRemoveFinished) = rememberAnimatedExternalEntries(
+        items = batches.take(5),
+        itemKey = { it.id }
+    )
 
     Column(modifier = modifier.fillMaxWidth()) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
@@ -64,56 +69,58 @@ fun ImportBatchesSection(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            batches.take(5).forEach { batch ->
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                    modifier = Modifier.fillMaxWidth()
+        OrbitAnimatedEntryColumn(
+            entries = batchEntries,
+            onRemoveFinished = onBatchRemoveFinished,
+            minActiveCount = 0,
+            itemSpacing = 8.dp,
+            bringIntoViewOnAdd = false
+        ) { entry, _, _ ->
+            val batch = entry.value
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = batch.fileName.ifBlank { "Import #${batch.id}" },
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Batch #${batch.id}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = batch.fileName.ifBlank { "Import #${batch.id}" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Batch #${batch.id}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
-                        OutlinedButton(
-                            onClick = {
-                                haptics.confirm()
-                                onUndoBatch(batch.id)
-                            },
-                            shape = CircleShape,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
-                        ) {
-                            Text(
-                                text = "Undo Import",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                    OutlinedButton(
+                        onClick = {
+                            haptics.confirm()
+                            onUndoBatch(batch.id)
+                        },
+                        shape = CircleShape,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            text = "Undo Import",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }

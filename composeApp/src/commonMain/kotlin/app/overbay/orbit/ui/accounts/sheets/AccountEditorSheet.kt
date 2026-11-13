@@ -36,11 +36,14 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitDropdownField
+import app.overbay.orbit.ui.components.OrbitHorizontalReveal
 import app.overbay.orbit.ui.components.OrbitModalFooter
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSectionCard
@@ -221,7 +224,7 @@ fun AccountEditorContent(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    if (!selectedKind.isProperty) {
+                    OrbitAccordionVisibility(visible = !selectedKind.isProperty) {
                         OrbitTextField(
                             value = institution,
                             onValueChange = { institution = it },
@@ -232,10 +235,7 @@ fun AccountEditorContent(
                         )
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
                         OrbitDropdownField(
                             label = "Account Type",
                             selectedText = selectedKind.label,
@@ -247,23 +247,26 @@ fun AccountEditorContent(
                                     linkedPropertyId = null
                                 }
                             },
-                            modifier = if (selectedKind.isProperty) Modifier.fillMaxWidth() else Modifier.weight(0.58f)
+                            modifier = Modifier.weight(1f)
                         )
 
-                        if (!selectedKind.isProperty) {
-                            OrbitTextField(
-                                value = accountNumberLast4,
-                                onValueChange = { accountNumberLast4 = it.filter(Char::isDigit).take(4) },
-                                label = { Text("Last 4 Digits") },
-                                placeholder = { Text("1234") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                singleLine = true,
-                                modifier = Modifier.weight(0.42f)
-                            )
+                        OrbitHorizontalReveal(visible = !selectedKind.isProperty) {
+                            Row {
+                                Spacer(modifier = Modifier.width(10.dp))
+                                OrbitTextField(
+                                    value = accountNumberLast4,
+                                    onValueChange = { accountNumberLast4 = it.filter(Char::isDigit).take(4) },
+                                    label = { Text("Last 4 Digits") },
+                                    placeholder = { Text("1234") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true,
+                                    modifier = Modifier.width(128.dp)
+                                )
+                            }
                         }
                     }
 
-                    if (!selectedKind.isProperty) {
+                    OrbitAccordionVisibility(visible = !selectedKind.isProperty) {
                         CurrencyTextField(
                             cents = balanceCents,
                             onCentsChange = { balanceCents = it },
@@ -273,7 +276,7 @@ fun AccountEditorContent(
                         )
                     }
 
-                    if ((selectedType == AccountType.MORTGAGE || selectedType == AccountType.LOAN) && eligibleProperties.isNotEmpty()) {
+                    OrbitAccordionVisibility(visible = (selectedType == AccountType.MORTGAGE || selectedType == AccountType.LOAN) && eligibleProperties.isNotEmpty()) {
                         val linkOptions = listOf<Long?>(null) + eligibleProperties.map { it.id }
                         val selectedProp = eligibleProperties.find { it.id == linkedPropertyId }
                         OrbitDropdownField(
@@ -292,20 +295,16 @@ fun AccountEditorContent(
                         )
                     }
 
-                    if (selectedKind.isProperty || ((selectedType == AccountType.MORTGAGE || selectedType == AccountType.OTHER) && linkedPropertyId == null)) {
+                    OrbitAccordionVisibility(visible = selectedKind.isProperty || ((selectedType == AccountType.MORTGAGE || selectedType == AccountType.OTHER) && linkedPropertyId == null)) {
                         CurrencyTextField(
                             cents = estimatedValueCents,
                             onCentsChange = { estimatedValueCents = it },
-                            label = if (selectedKind.isProperty || selectedType == AccountType.MORTGAGE) {
-                                "Estimated Property Value"
-                            } else {
-                                "Estimated Property / Asset Value"
-                            },
+                            label = if (selectedKind.isProperty || selectedType == AccountType.MORTGAGE) "Estimated Property Value" else "Estimated Property / Asset Value",
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
 
-                    if (selectedType == AccountType.MORTGAGE && linkedPropertyId == null && estimatedValueCents > 0L) {
+                    OrbitAccordionVisibility(visible = selectedType == AccountType.MORTGAGE && linkedPropertyId == null && estimatedValueCents > 0L) {
                         OrbitTextField(
                             value = propertyName,
                             onValueChange = { propertyName = it },
@@ -318,11 +317,11 @@ fun AccountEditorContent(
                 }
             }
 
-            if (selectedType == AccountType.CREDIT) {
+            OrbitAccordionVisibility(visible = selectedType == AccountType.CREDIT) {
                 AccountEditorBillingSection(state = billingState)
             }
 
-            if (showMhaOption && !selectedKind.isProperty) {
+            OrbitAccordionVisibility(visible = showMhaOption && !selectedKind.isProperty) {
                 OrbitSwitchRow(
                     title = "MHA Expense Eligible",
                     subtitle = "Treat transactions from this account as household-eligible by default",

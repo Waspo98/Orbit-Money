@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.mha.dialogs
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,11 +30,13 @@ import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MhaTaxEngine
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 
@@ -151,7 +154,7 @@ fun MhaConfigContent(
             checked = enableDesignatedCap,
             onCheckedChange = { enableDesignatedCap = it }
         )
-        if (enableDesignatedCap) {
+        OrbitAccordionVisibility(visible = enableDesignatedCap) {
             CurrencyTextField(
                 cents = inputDesignatedCapCents,
                 onCentsChange = { inputDesignatedCapCents = it },
@@ -166,7 +169,7 @@ fun MhaConfigContent(
             checked = enableFmrv,
             onCheckedChange = { enableFmrv = it }
         )
-        if (enableFmrv) {
+        OrbitAccordionVisibility(visible = enableFmrv) {
             CurrencyTextField(
                 cents = inputFmrvCents,
                 onCentsChange = { inputFmrvCents = it },
@@ -204,140 +207,154 @@ fun MhaConfigContent(
             }
         }
 
-        if (mode == "simple") {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OrbitTextField(
-                    value = simpleFedRate,
-                    onValueChange = { simpleFedRate = it },
-                    label = { Text("Federal Rate (%)") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                OrbitTextField(
-                    value = simpleStateRate,
-                    onValueChange = { simpleStateRate = it },
-                    label = { Text("State Rate (%)") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        } else {
-            val selectedStatePair = remember(stateCode) {
-                MhaTaxEngine.US_STATES.firstOrNull { it.first.equals(stateCode, ignoreCase = true) }
-                    ?: ("IL" to "Illinois")
-            }
-
-            OrbitDropdownField(
-                label = "State",
-                selectedText = "${selectedStatePair.second} (${selectedStatePair.first})",
-                options = MhaTaxEngine.US_STATES,
-                optionLabel = { "${it.second} (${it.first})" },
-                onOptionSelected = { stateCode = it.first }
-            )
-
-            OrbitDropdownField(
-                label = "Filing Status",
-                selectedText = selectedFilingStatus.displayName,
-                options = FilingStatus.entries,
-                optionLabel = { it.displayName },
-                onOptionSelected = { selectedFilingStatus = it }
-            )
-
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = deductionMode == "standard",
-                    onClick = {
-                        haptics.tick()
-                        deductionMode = "standard"
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) {
-                    Text("Standard Deduction")
+        AnimatedContent(
+            targetState = mode == "simple",
+            transitionSpec = { orbitMorphContentTransform(clip = false) },
+            modifier = Modifier.fillMaxWidth()
+        ) { isSimpleMode ->
+            if (isSimpleMode) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OrbitTextField(
+                        value = simpleFedRate,
+                        onValueChange = { simpleFedRate = it },
+                        label = { Text("Federal Rate (%)") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OrbitTextField(
+                        value = simpleStateRate,
+                        onValueChange = { simpleStateRate = it },
+                        label = { Text("State Rate (%)") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
-                SegmentedButton(
-                    selected = deductionMode == "itemized",
-                    onClick = {
-                        haptics.tick()
-                        deductionMode = "itemized"
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) {
-                    Text("Itemized Deduction")
-                }
-            }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    val selectedStatePair = remember(stateCode) {
+                        MhaTaxEngine.US_STATES.firstOrNull { it.first.equals(stateCode, ignoreCase = true) }
+                            ?: ("IL" to "Illinois")
+                    }
 
-            if (deductionMode == "standard") {
-                val standardDeductionRef = when (selectedFilingStatus) {
-                    FilingStatus.SINGLE -> "$16,100"
-                    FilingStatus.MARRIED_JOINT -> "$32,200"
-                    FilingStatus.MARRIED_SEPARATE -> "$16,100"
-                    FilingStatus.HEAD_OF_HOUSEHOLD -> "$24,150"
-                }
+                    OrbitDropdownField(
+                        label = "State",
+                        selectedText = "${selectedStatePair.second} (${selectedStatePair.first})",
+                        options = MhaTaxEngine.US_STATES,
+                        optionLabel = { "${it.second} (${it.first})" },
+                        onOptionSelected = { stateCode = it.first }
+                    )
 
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = "2026 IRS Standard Deduction Reference",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
+                    OrbitDropdownField(
+                        label = "Filing Status",
+                        selectedText = selectedFilingStatus.displayName,
+                        options = FilingStatus.entries,
+                        optionLabel = { it.displayName },
+                        onOptionSelected = { selectedFilingStatus = it }
+                    )
+
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = deductionMode == "standard",
+                            onClick = {
+                                haptics.tick()
+                                deductionMode = "standard"
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        ) {
+                            Text("Standard Deduction")
+                        }
+                        SegmentedButton(
+                            selected = deductionMode == "itemized",
+                            onClick = {
+                                haptics.tick()
+                                deductionMode = "itemized"
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        ) {
+                            Text("Itemized Deduction")
+                        }
+                    }
+
+                    AnimatedContent(
+                        targetState = deductionMode == "standard",
+                        transitionSpec = { orbitMorphContentTransform(clip = false) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { isStandard ->
+                        if (isStandard) {
+                            val standardDeductionRef = when (selectedFilingStatus) {
+                                FilingStatus.SINGLE -> "$16,100"
+                                FilingStatus.MARRIED_JOINT -> "$32,200"
+                                FilingStatus.MARRIED_SEPARATE -> "$16,100"
+                                FilingStatus.HEAD_OF_HOUSEHOLD -> "$24,150"
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = "2026 IRS Standard Deduction Reference",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "${selectedFilingStatus.displayName}: $standardDeductionRef",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        } else {
+                            CurrencyTextField(
+                                cents = itemizedDeductionCents,
+                                onCentsChange = { itemizedDeductionCents = it },
+                                label = "Annual Itemized Deductions ($)",
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    OrbitSwitchRow(
+                        title = "Taxable Income Override",
+                        subtitle = if (enableTaxableIncomeOverride) "Using custom taxable income" else "Calculated from gross income and deductions",
+                        checked = enableTaxableIncomeOverride,
+                        onCheckedChange = { enableTaxableIncomeOverride = it }
+                    )
+
+                    OrbitAccordionVisibility(visible = enableTaxableIncomeOverride) {
+                        CurrencyTextField(
+                            cents = inputTaxableIncomeOverrideCents,
+                            onCentsChange = { inputTaxableIncomeOverrideCents = it },
+                            label = "Taxable Income Override ($)",
+                            modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "${selectedFilingStatus.displayName}: $standardDeductionRef",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    OrbitSwitchRow(
+                        title = "State Tax Rate Override",
+                        subtitle = if (enableStateRateOverride) "Using custom state tax rate" else "Using bundled state rate if single-rate state",
+                        checked = enableStateRateOverride,
+                        onCheckedChange = { enableStateRateOverride = it }
+                    )
+
+                    OrbitAccordionVisibility(visible = enableStateRateOverride) {
+                        OrbitTextField(
+                            value = inputStateRateOverride,
+                            onValueChange = { inputStateRateOverride = it },
+                            label = { Text("State Tax Rate Override (%)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
-            } else {
-                CurrencyTextField(
-                    cents = itemizedDeductionCents,
-                    onCentsChange = { itemizedDeductionCents = it },
-                    label = "Annual Itemized Deductions ($)",
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            OrbitSwitchRow(
-                title = "Taxable Income Override",
-                subtitle = if (enableTaxableIncomeOverride) "Using custom taxable income" else "Calculated from gross income and deductions",
-                checked = enableTaxableIncomeOverride,
-                onCheckedChange = { enableTaxableIncomeOverride = it }
-            )
-
-            if (enableTaxableIncomeOverride) {
-                CurrencyTextField(
-                    cents = inputTaxableIncomeOverrideCents,
-                    onCentsChange = { inputTaxableIncomeOverrideCents = it },
-                    label = "Taxable Income Override ($)",
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            OrbitSwitchRow(
-                title = "State Tax Rate Override",
-                subtitle = if (enableStateRateOverride) "Using custom state tax rate" else "Using bundled state rate if single-rate state",
-                checked = enableStateRateOverride,
-                onCheckedChange = { enableStateRateOverride = it }
-            )
-
-            if (enableStateRateOverride) {
-                OrbitTextField(
-                    value = inputStateRateOverride,
-                    onValueChange = { inputStateRateOverride = it },
-                    label = { Text("State Tax Rate Override (%)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
         }
     }

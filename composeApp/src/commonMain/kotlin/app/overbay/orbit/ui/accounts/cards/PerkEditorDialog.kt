@@ -26,6 +26,7 @@ import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.domain.CreditCardBenefitEngine
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitFieldLabel
 import app.overbay.orbit.ui.components.OrbitModalFooter
 import app.overbay.orbit.ui.components.OrbitSectionCard
@@ -129,7 +130,7 @@ fun PerkEditorSubform(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    if (cadence == BenefitCadence.ANNUAL) {
+                    OrbitAccordionVisibility(visible = cadence == BenefitCadence.ANNUAL) {
                         Column {
                             OrbitFieldLabel("Annual Reset Schedule")
                             OrbitSegmentedTabRow(

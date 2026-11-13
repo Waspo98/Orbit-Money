@@ -43,9 +43,11 @@ import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.DateFieldButton
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalFooter
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
 import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.components.OrbitTextField
@@ -152,8 +154,8 @@ fun TransactionEditorContent(
             subtitle = if (isPickingCategory) merchant.takeIf { it.isNotBlank() } else statementSubtitle,
             onNavigateBack = if (isPickingCategory) ({ isPickingCategory = false }) else null,
             onDismiss = onDismiss,
-            trailingActions = if (!isPickingCategory) {
-                {
+            trailingActions = {
+                OrbitScaleBadgeVisibility(visible = !isPickingCategory) {
                     if (!isEditing && onImportCsv != null) {
                         OrbitActionChip(
                             label = "Import CSV",
@@ -183,7 +185,7 @@ fun TransactionEditorContent(
                         }
                     }
                 }
-            } else null,
+            },
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
         )
 
@@ -300,7 +302,7 @@ fun TransactionEditorContent(
             }
         }
 
-        if (!isPickingCategory) {
+        OrbitAccordionVisibility(visible = !isPickingCategory) {
             OrbitModalFooter(
                 confirmText = if (isEditing) "Save" else "Add Transaction",
                 confirmEnabled = merchant.isNotBlank() && rawAmountCents > 0L,
