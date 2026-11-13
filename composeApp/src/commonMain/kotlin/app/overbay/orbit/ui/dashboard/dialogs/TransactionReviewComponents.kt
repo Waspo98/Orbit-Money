@@ -1,5 +1,11 @@
 package app.overbay.orbit.ui.dashboard.dialogs
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +37,7 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.domain.ReviewQueueCandidate
 import app.overbay.orbit.domain.ReviewQueueEngine
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
@@ -49,11 +57,15 @@ internal fun ReviewTransactionCardContent(
     val colors = OrbitTheme.colors
     val primary = MaterialTheme.colorScheme.primary
     val catColor = (category?.color ?: txn.categoryColor).toComposeColor(primary)
-    val borderColor = when (cardTone) {
-        "yes" -> primary.copy(alpha = 0.65f)
-        "no" -> colors.danger.copy(alpha = 0.65f)
-        else -> colors.cardBorder
-    }
+    val borderColor by animateColorAsState(
+        targetValue = when (cardTone) {
+            "yes" -> primary.copy(alpha = 0.65f)
+            "no" -> colors.danger.copy(alpha = 0.65f)
+            else -> colors.cardBorder
+        },
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "reviewCardBorderColor"
+    )
 
     Surface(
         shape = RoundedCornerShape(18.dp),
@@ -217,10 +229,21 @@ internal fun ReviewTransactionCardContent(
                 }
             }
 
-            if (cardTone == "yes") {
-                SwipeChoiceBadge("YES", primary, Modifier.align(Alignment.TopStart).padding(18.dp))
-            } else if (cardTone == "no") {
-                SwipeChoiceBadge("NO", colors.expense, Modifier.align(Alignment.TopEnd).padding(18.dp))
+            AnimatedVisibility(
+                visible = cardTone == "yes",
+                enter = scaleIn(OrbitSprings.FloatSpatialFast, initialScale = 0.72f) + fadeIn(OrbitSprings.FloatEffectsFast),
+                exit = scaleOut(OrbitSprings.FloatSpatialFast, targetScale = 0.72f) + fadeOut(OrbitSprings.FloatEffectsFast),
+                modifier = Modifier.align(Alignment.TopStart).padding(18.dp)
+            ) {
+                SwipeChoiceBadge("YES", primary)
+            }
+            AnimatedVisibility(
+                visible = cardTone == "no",
+                enter = scaleIn(OrbitSprings.FloatSpatialFast, initialScale = 0.72f) + fadeIn(OrbitSprings.FloatEffectsFast),
+                exit = scaleOut(OrbitSprings.FloatSpatialFast, targetScale = 0.72f) + fadeOut(OrbitSprings.FloatEffectsFast),
+                modifier = Modifier.align(Alignment.TopEnd).padding(18.dp)
+            ) {
+                SwipeChoiceBadge("NO", colors.expense)
             }
         }
     }

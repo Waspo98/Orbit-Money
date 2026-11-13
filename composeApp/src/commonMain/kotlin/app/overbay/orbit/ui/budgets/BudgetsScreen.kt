@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.budgets
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.CategorySortOption
 import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.budgets.components.BudgetDetailInspectorPane
 import app.overbay.orbit.ui.budgets.components.BudgetSummaryHeroCard
 import app.overbay.orbit.ui.budgets.components.NotablePanel
@@ -43,6 +45,7 @@ import app.overbay.orbit.ui.components.CanopyMenuAction
 import app.overbay.orbit.ui.components.CanopyMoreMenuButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
@@ -180,91 +183,104 @@ fun BudgetsScreen(
                     }
                 )
 
-                if (state.isLoading) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                } else {
-                    val startPad = if (isTwoPane) 20.dp else 16.dp
-                    val endPad = if (isTwoPane) 0.dp else 16.dp
-
-                    val masterList: @Composable () -> Unit = {
-                        LazyColumn(
+                AnimatedContent(
+                    targetState = state.isLoading,
+                    transitionSpec = { orbitFadeContentTransform() },
+                    modifier = Modifier.fillMaxSize(),
+                    label = "budgetsLoadingState"
+                ) { isLoading ->
+                    if (isLoading) {
+                        Box(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            contentAlignment = Alignment.Center
                         ) {
-                            item(key = "budget_summary_hero", contentType = "summary_hero") {
-                                BudgetSummaryHeroCard(
-                                    overview = state.overview,
-                                    monthLabel = state.monthLabel,
-                                    daysRemaining = state.daysRemaining,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                            }
+                            CircularProgressIndicator()
+                        }
+                    } else {
+                        val startPad = if (isTwoPane) 20.dp else 16.dp
+                        val endPad = if (isTwoPane) 0.dp else 16.dp
 
-                            if (state.notables.hasNotables) {
-                                item(key = "budget_notables", contentType = "notables") {
-                                    NotablePanel(
-                                        notables = state.notables,
-                                        onInspectCategory = { categoryId ->
-                                            if (isTwoPane) {
-                                                viewModel.toggleExpandCategory(categoryId)
-                                            } else {
-                                                val found = (state.budgetedItems + state.unbudgetedItems + state.inactiveItems)
-                                                    .find { it.category.id == categoryId }
-                                                if (found != null) viewModel.openBudgetEditor(found)
-                                            }
-                                        },
-                                        onAddBudget = { item ->
-                                            viewModel.openAddBudgetPicker(item.category.id)
-                                        },
+                        val masterList: @Composable () -> Unit = {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                item(key = "budget_summary_hero", contentType = "summary_hero") {
+                                    BudgetSummaryHeroCard(
+                                        overview = state.overview,
+                                        monthLabel = state.monthLabel,
+                                        daysRemaining = state.daysRemaining,
                                         modifier = Modifier.padding(bottom = 8.dp)
                                     )
                                 }
-                            }
 
-                            budgetCategoryGroupItems(
-                                budgeted = state.budgetedItems,
-                                unbudgeted = state.unbudgetedItems,
-                                inactive = state.inactiveItems,
-                                expandedCategoryId = state.expandedCategoryId,
-                                categoryTransactions = state.categoryTransactions,
-                                onToggleExpand = { viewModel.toggleExpandCategory(it) },
-                                onEditBudget = { viewModel.openBudgetEditor(it) },
-                                onDeleteBudget = { viewModel.deleteBudget(it) },
-                                onViewTransactions = { categoryId ->
-                                    val (y, m) = LocalDateUtils.parseYearMonth(state.selectedMonth) ?: Pair(2026, 1)
-                                    val days = LocalDateUtils.daysInMonth(y, m)
-                                    val start = "${state.selectedMonth}-01"
-                                    val end = "${state.selectedMonth}-${days.toString().padStart(2, '0')}"
-                                    onNavigate(OrbitNavKey.Transactions(categoryId = categoryId, startDate = start, endDate = end))
-                                },
-                                isWideScreen = isTwoPane
-                            )
-                        }
-                    }
+                                if (state.notables.hasNotables) {
+                                    item(key = "budget_notables", contentType = "notables") {
+                                        NotablePanel(
+                                            notables = state.notables,
+                                            onInspectCategory = { categoryId ->
+                                                if (isTwoPane) {
+                                                    viewModel.toggleExpandCategory(categoryId)
+                                                } else {
+                                                    val found = (state.budgetedItems + state.unbudgetedItems + state.inactiveItems)
+                                                        .find { it.category.id == categoryId }
+                                                    if (found != null) viewModel.openBudgetEditor(found)
+                                                }
+                                            },
+                                            onAddBudget = { item ->
+                                                viewModel.openAddBudgetPicker(item.category.id)
+                                            },
+                                            modifier = Modifier
+                                                .padding(bottom = 8.dp)
+                                                .animateItem(
+                                                    fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                                    placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                                    fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                                )
+                                        )
+                                    }
+                                }
 
-                    if (isTwoPane) {
-                        OrbitMorphingSplitLayout(
-                            isDetailOpen = isDetailOpen,
-                            onDismissDetail = { viewModel.dismissInspectorPane() },
-                            masterContent = masterList,
-                            detailContent = {
-                                BudgetDetailInspectorPane(
-                                    state = state,
-                                    viewModel = viewModel,
-                                    onNavigate = onNavigate,
-                                    onClosePane = { viewModel.dismissInspectorPane() }
+                                budgetCategoryGroupItems(
+                                    budgeted = state.budgetedItems,
+                                    unbudgeted = state.unbudgetedItems,
+                                    inactive = state.inactiveItems,
+                                    expandedCategoryId = state.expandedCategoryId,
+                                    categoryTransactions = state.categoryTransactions,
+                                    onToggleExpand = { viewModel.toggleExpandCategory(it) },
+                                    onEditBudget = { viewModel.openBudgetEditor(it) },
+                                    onDeleteBudget = { viewModel.deleteBudget(it) },
+                                    onViewTransactions = { categoryId ->
+                                        val (y, m) = LocalDateUtils.parseYearMonth(state.selectedMonth) ?: Pair(2026, 1)
+                                        val days = LocalDateUtils.daysInMonth(y, m)
+                                        val start = "${state.selectedMonth}-01"
+                                        val end = "${state.selectedMonth}-${days.toString().padStart(2, '0')}"
+                                        onNavigate(OrbitNavKey.Transactions(categoryId = categoryId, startDate = start, endDate = end))
+                                    },
+                                    isWideScreen = isTwoPane
                                 )
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        masterList()
+                            }
+                        }
+
+                        if (isTwoPane) {
+                            OrbitMorphingSplitLayout(
+                                isDetailOpen = isDetailOpen,
+                                onDismissDetail = { viewModel.dismissInspectorPane() },
+                                masterContent = masterList,
+                                detailContent = {
+                                    BudgetDetailInspectorPane(
+                                        state = state,
+                                        viewModel = viewModel,
+                                        onNavigate = onNavigate,
+                                        onClosePane = { viewModel.dismissInspectorPane() }
+                                    )
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            masterList()
+                        }
                     }
                 }
             }

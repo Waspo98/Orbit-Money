@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.settings.dialogs
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,7 @@ import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 
 enum class NotificationScheduleType {
     WEEKLY_SNAPSHOT,
@@ -185,27 +187,33 @@ fun NotificationScheduleSheet(
                         )
                     }
 
-                    if (isScheduledIncome) {
-                        OrbitTextField(
-                            value = timeText,
-                            onValueChange = { timeText = it },
-                            label = { Text("Delivery Time (HH:MM)") },
-                            placeholder = { Text("09:00") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "Income alerts are sent immediately after transactions sync via SimpleFIN.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(12.dp)
+                    AnimatedContent(
+                        targetState = isScheduledIncome,
+                        transitionSpec = { orbitMorphContentTransform(clip = false) },
+                        label = "incomeAlertTimingContent"
+                    ) { scheduled ->
+                        if (scheduled) {
+                            OrbitTextField(
+                                value = timeText,
+                                onValueChange = { timeText = it },
+                                label = { Text("Delivery Time (HH:MM)") },
+                                placeholder = { Text("09:00") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
                             )
+                        } else {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "Income alerts are sent immediately after transactions sync via SimpleFIN.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
                         }
                     }
                 }

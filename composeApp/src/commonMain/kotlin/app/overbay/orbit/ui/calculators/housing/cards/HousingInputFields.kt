@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitFieldLabel
 import app.overbay.orbit.ui.components.OrbitFormDefaults
 import app.overbay.orbit.ui.components.OrbitTextField
@@ -259,21 +260,23 @@ fun HousingLoanTermControl(
             )
         }
 
-        if (isCustom) {
-            Spacer(modifier = Modifier.height(6.dp))
-            OrbitTextField(
-                value = customText,
-                onValueChange = { str ->
-                    val digits = str.filter { it.isDigit() }
-                    customText = digits
-                    val parsed = digits.toIntOrNull()
-                    onChange(parsed)
-                },
-                label = { Text("Custom Years (e.g. 20, 25)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
+        OrbitAccordionVisibility(visible = isCustom) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                OrbitTextField(
+                    value = customText,
+                    onValueChange = { str ->
+                        val digits = str.filter { it.isDigit() }
+                        customText = digits
+                        val parsed = digits.toIntOrNull()
+                        onChange(parsed)
+                    },
+                    label = { Text("Custom Years (e.g. 20, 25)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+            }
         }
     }
 }

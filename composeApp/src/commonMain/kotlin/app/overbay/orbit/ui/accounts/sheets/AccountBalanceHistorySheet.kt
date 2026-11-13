@@ -1,11 +1,13 @@
 package app.overbay.orbit.ui.accounts.sheets
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -40,9 +42,11 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitCompactListRow
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSheetHeader
@@ -122,17 +126,17 @@ fun AccountInlineBalanceHistorySection(
     modifier: Modifier = Modifier,
     showHeaderAction: Boolean = true
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        if (balanceRecords.size >= 2) {
-            BalanceTrendSparkline(
-                records = balanceRecords,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(96.dp)
-            )
+    Column(modifier = modifier.fillMaxWidth()) {
+        OrbitAccordionVisibility(visible = balanceRecords.size >= 2) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                BalanceTrendSparkline(
+                    records = balanceRecords,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(96.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
         }
 
         OrbitSectionCard(
@@ -150,12 +154,17 @@ fun AccountInlineBalanceHistorySection(
             showHeaderDivider = balanceRecords.isNotEmpty(),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
         ) {
-            if (balanceRecords.isEmpty()) {
-                EmptyStateCard(
-                    title = "No Balance History Yet",
-                    description = "Snapshots are captured automatically as balances change, or tap \"Add Record\" above to log a past date."
-                )
-            } else {
+            AnimatedContent(
+                targetState = balanceRecords.isEmpty(),
+                transitionSpec = { orbitFadeContentTransform() },
+                label = "balanceHistorySnapshotsEmpty"
+            ) { isEmpty ->
+                if (isEmpty) {
+                    EmptyStateCard(
+                        title = "No Balance History Yet",
+                        description = "Snapshots are captured automatically as balances change, or tap \"Add Record\" above to log a past date."
+                    )
+                } else {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     balanceRecords.forEachIndexed { index, record ->
                         val older = balanceRecords.getOrNull(index + 1)
@@ -201,6 +210,7 @@ fun AccountInlineBalanceHistorySection(
                                 }
                             }
                         )
+                    }
                     }
                 }
             }

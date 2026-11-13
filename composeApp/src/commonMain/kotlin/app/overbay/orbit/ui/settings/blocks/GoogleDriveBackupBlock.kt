@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
@@ -103,34 +104,39 @@ fun GoogleDriveBackupBlock(
                 }
             }
 
-            if (isDriveSyncEnabled) {
-                Row(
+            OrbitAccordionVisibility(visible = isDriveSyncEnabled) {
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Button(
-                        onClick = onBackupNow,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text("Back Up Now")
+                        Button(
+                            onClick = onBackupNow,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Back Up Now")
+                        }
+                        OutlinedButton(
+                            onClick = { showRestoreConfirm = true },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Restore Drive")
+                        }
                     }
-                    OutlinedButton(
-                        onClick = { showRestoreConfirm = true },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("Restore Drive")
-                    }
-                }
 
-                OutlinedButton(
-                    onClick = onDisconnect,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Disconnect Drive")
+                    OutlinedButton(
+                        onClick = onDisconnect,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Disconnect Drive")
+                    }
                 }
             }
         }

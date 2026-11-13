@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.rules
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,8 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.components.CanopyActionPillButton
 import app.overbay.orbit.ui.components.CanopyIconButton
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.EmptyStateCard
@@ -119,7 +122,7 @@ fun RulesScreen(
                                     .fillMaxHeight()
                             )
 
-                            if (state.rules.isNotEmpty()) {
+                            OrbitScaleBadgeVisibility(visible = state.rules.isNotEmpty()) {
                                 CanopyActionPillButton(
                                     icon = Icons.Default.PlayArrow,
                                     label = if (state.isApplyingRules) "Running..." else "Run Rules",
@@ -183,79 +186,96 @@ fun RulesScreen(
                                     .padding(start = startPad, end = if (isTwoPane) 16.dp else endPad, top = 8.dp, bottom = 4.dp)
                             )
 
-                            if (state.rules.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (state.searchQuery.isNotBlank()) {
-                                        EmptyStateCard(
-                                            title = "No matching rules",
-                                            description = "No rules match \"${state.searchQuery}\". Try searching for a different name, merchant, or category.",
-                                            actionButtonText = "Clear Search",
-                                            onActionClick = { viewModel.setSearchQuery("") }
-                                        )
-                                    } else {
-                                        EmptyStateCard(
-                                            title = "No Rules Configured",
-                                            description = "Create automated rules to rename merchants, assign categories, or flag transfers automatically.",
-                                            actionButtonText = "+ Add First Rule",
-                                            onActionClick = { viewModel.openAddRule() }
-                                        )
-                                    }
-                                }
-                            } else {
-                                LazyColumn(
-                                    state = listState,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = startPad, end = endPad, top = 8.dp, bottom = 88.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    items(
-                                        items = state.rules,
-                                        key = { it.id }
-                                    ) { rule ->
-                                        RuleItemCard(
-                                            rule = rule,
-                                            categoryMap = state.categoryMap,
-                                            accountMap = accountMap,
-                                            matchCount = state.ruleMatchCounts[rule.id] ?: 0,
-                                            isInspected = isTwoPane && state.inspectingRuleId == rule.id,
-                                            onClick = if (isTwoPane) {
-                                                { viewModel.selectRuleForInspect(rule.id) }
-                                            } else {
-                                                null
-                                            },
-                                            onToggleEnabled = { enabled -> viewModel.toggleRuleEnabled(rule.id, enabled) },
-                                            onEdit = { viewModel.openEditRule(rule) },
-                                            onDelete = { viewModel.requestDeleteRule(rule.id) },
-                                            modifier = Modifier.animateItem(
-                                                fadeInSpec = OrbitSprings.FloatEffectsDefault,
-                                                placementSpec = OrbitSprings.IntOffsetSpatialDefault,
-                                                fadeOutSpec = OrbitSprings.FloatEffectsFast
+                            AnimatedContent(
+                                targetState = Pair(state.rules.isEmpty(), state.searchQuery.isNotBlank()),
+                                contentKey = { (isEmpty, hasSearch) -> isEmpty to (isEmpty && hasSearch) },
+                                transitionSpec = { orbitFadeContentTransform() },
+                                label = "rulesListContentState"
+                            ) { (isEmpty, hasSearch) ->
+                                if (isEmpty) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (hasSearch) {
+                                            EmptyStateCard(
+                                                title = "No matching rules",
+                                                description = "No rules match \"${state.searchQuery}\". Try searching for a different name, merchant, or category.",
+                                                actionButtonText = "Clear Search",
+                                                onActionClick = { viewModel.setSearchQuery("") }
                                             )
-                                        )
+                                        } else {
+                                            EmptyStateCard(
+                                                title = "No Rules Configured",
+                                                description = "Create automated rules to rename merchants, assign categories, or flag transfers automatically.",
+                                                actionButtonText = "+ Add First Rule",
+                                                onActionClick = { viewModel.openAddRule() }
+                                            )
+                                        }
                                     }
+                                } else {
+                                    LazyColumn(
+                                        state = listState,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentPadding = PaddingValues(start = startPad, end = endPad, top = 8.dp, bottom = 88.dp),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        items(
+                                            items = state.rules,
+                                            key = { it.id }
+                                        ) { rule ->
+                                            RuleItemCard(
+                                                rule = rule,
+                                                categoryMap = state.categoryMap,
+                                                accountMap = accountMap,
+                                                matchCount = state.ruleMatchCounts[rule.id] ?: 0,
+                                                isInspected = isTwoPane && state.inspectingRuleId == rule.id,
+                                                onClick = if (isTwoPane) {
+                                                    { viewModel.selectRuleForInspect(rule.id) }
+                                                } else {
+                                                    null
+                                                },
+                                                onToggleEnabled = { enabled -> viewModel.toggleRuleEnabled(rule.id, enabled) },
+                                                onEdit = { viewModel.openEditRule(rule) },
+                                                onDelete = { viewModel.requestDeleteRule(rule.id) },
+                                                modifier = Modifier.animateItem(
+                                                    fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                                    placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                                    fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                                )
+                                            )
+                                        }
 
-                                    item {
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        OutlinedButton(
-                                            onClick = { viewModel.openWipeAllRulesDialog() },
-                                            colors = ButtonDefaults.outlinedButtonColors(
-                                                contentColor = MaterialTheme.colorScheme.error
-                                            ),
-                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Delete,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Wipe All Rules")
+                                        item(key = "wipe_all_rules_action") {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .animateItem(
+                                                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                                    )
+                                            ) {
+                                                Spacer(modifier = Modifier.height(16.dp))
+                                                OutlinedButton(
+                                                    onClick = { viewModel.openWipeAllRulesDialog() },
+                                                    colors = ButtonDefaults.outlinedButtonColors(
+                                                        contentColor = MaterialTheme.colorScheme.error
+                                                    ),
+                                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Delete,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text("Wipe All Rules")
+                                                }
+                                            }
                                         }
                                     }
                                 }

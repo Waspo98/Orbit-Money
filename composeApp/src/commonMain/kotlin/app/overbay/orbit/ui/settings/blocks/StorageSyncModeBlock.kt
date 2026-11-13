@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.settings.blocks
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,6 +39,7 @@ import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.util.LocalOidcAuthLauncher
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,118 +93,126 @@ fun StorageSyncModeBlock(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (preferences.storageMode == StorageMode.LOCAL && onOpenMigrateWizard != null) {
-            OutlinedButton(
-                onClick = onOpenMigrateWizard,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text("Migrate Local Workspace to Server")
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-        }
-
-        if (preferences.storageMode == StorageMode.SELF_HOSTED) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OrbitTextField(
-                    value = serverUrl,
-                    onValueChange = {
-                        serverUrl = it
-                        onServerUrlChange(it)
-                    },
-                    label = { Text("Server Base URL") },
-                    placeholder = { Text("https://orbit.yourdomain.com") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
-
-                Button(
-                    onClick = onTriggerSync,
-                    enabled = !isSyncing
-                ) {
-                    if (isSyncing) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                    }
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text("Sync")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = {
-                    onServerUrlChange(serverUrl)
-                    oidcLauncher.launchOidcLogin(serverUrl, "/api/auth/oidc/login")
-                },
-                enabled = !isSyncing && serverUrl.isNotBlank(),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Continue with Authentik / SSO")
-            }
-
-            if (onAuthenticateServer != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OrbitTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        label = { Text("Username") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    OrbitTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Password") },
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    Button(
-                        onClick = { onAuthenticateServer(username, password) },
-                        enabled = !isSyncing && username.isNotBlank() && password.isNotBlank()
+        AnimatedContent(
+            targetState = preferences.storageMode,
+            transitionSpec = { orbitMorphContentTransform(clip = false) },
+            label = "storageSyncModeBody"
+        ) { mode ->
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (mode == StorageMode.LOCAL && onOpenMigrateWizard != null) {
+                    OutlinedButton(
+                        onClick = onOpenMigrateWizard,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Login")
+                        Text("Migrate Local Workspace to Server")
                     }
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
-            }
 
-            if (onOpenLoginScreen != null || onLogout != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (onOpenLoginScreen != null) {
-                        OutlinedButton(
-                            onClick = onOpenLoginScreen,
-                            modifier = Modifier.weight(1f)
+                if (mode == StorageMode.SELF_HOSTED) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OrbitTextField(
+                            value = serverUrl,
+                            onValueChange = {
+                                serverUrl = it
+                                onServerUrlChange(it)
+                            },
+                            label = { Text("Server Base URL") },
+                            placeholder = { Text("https://orbit.yourdomain.com") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+
+                        Button(
+                            onClick = onTriggerSync,
+                            enabled = !isSyncing
                         ) {
-                            Text("Sign In / Switch Account")
+                            if (isSyncing) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                            Spacer(modifier = Modifier.size(6.dp))
+                            Text("Sync")
                         }
                     }
-                    if (onLogout != null) {
-                        OutlinedButton(
-                            onClick = onLogout,
-                            modifier = Modifier.weight(1f)
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            onServerUrlChange(serverUrl)
+                            oidcLauncher.launchOidcLogin(serverUrl, "/api/auth/oidc/login")
+                        },
+                        enabled = !isSyncing && serverUrl.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Continue with Authentik / SSO")
+                    }
+
+                    if (onAuthenticateServer != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Log Out")
+                            OrbitTextField(
+                                value = username,
+                                onValueChange = { username = it },
+                                label = { Text("Username") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            OrbitTextField(
+                                value = password,
+                                onValueChange = { password = it },
+                                label = { Text("Password") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            Button(
+                                onClick = { onAuthenticateServer(username, password) },
+                                enabled = !isSyncing && username.isNotBlank() && password.isNotBlank()
+                            ) {
+                                Text("Login")
+                            }
                         }
                     }
+
+                    if (onOpenLoginScreen != null || onLogout != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (onOpenLoginScreen != null) {
+                                OutlinedButton(
+                                    onClick = onOpenLoginScreen,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Sign In / Switch Account")
+                                }
+                            }
+                            if (onLogout != null) {
+                                OutlinedButton(
+                                    onClick = onLogout,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Log Out")
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
             }
-
-            Spacer(modifier = Modifier.height(10.dp))
         }
 
         // Status pill

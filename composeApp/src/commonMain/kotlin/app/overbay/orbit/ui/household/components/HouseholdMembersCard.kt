@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.household.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,7 @@ import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.household.HouseholdCalculations
 import kotlin.math.roundToInt
 
@@ -114,29 +116,35 @@ fun HouseholdMembersCard(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (members.isEmpty()) {
-            EmptyStateCard(
-                title = "No Household Members",
-                description = "Add partners, children, or dependents to track household allowances."
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                members.forEach { member ->
-                    val isInspected = inspectingMemberId == member.id
-                    MemberSummaryCard(
-                        member = member,
-                        isInspected = isInspected,
-                        includeHsaInRetirementRate = includeHsaInRetirementRate,
-                        onClick = {
-                            if (onInspectMember != null) {
-                                onInspectMember(member)
-                            } else {
-                                onEditMember(member)
-                            }
-                        },
-                        onEdit = { onEditMember(member) },
-                        onDelete = { onDeleteMember(member) }
-                    )
+        AnimatedContent(
+            targetState = members.isEmpty(),
+            transitionSpec = { orbitFadeContentTransform() },
+            label = "householdMembersEmpty"
+        ) { isEmpty ->
+            if (isEmpty) {
+                EmptyStateCard(
+                    title = "No Household Members",
+                    description = "Add partners, children, or dependents to track household allowances."
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    members.forEach { member ->
+                        val isInspected = inspectingMemberId == member.id
+                        MemberSummaryCard(
+                            member = member,
+                            isInspected = isInspected,
+                            includeHsaInRetirementRate = includeHsaInRetirementRate,
+                            onClick = {
+                                if (onInspectMember != null) {
+                                    onInspectMember(member)
+                                } else {
+                                    onEditMember(member)
+                                }
+                            },
+                            onEdit = { onEditMember(member) },
+                            onDelete = { onDeleteMember(member) }
+                        )
+                    }
                 }
             }
         }

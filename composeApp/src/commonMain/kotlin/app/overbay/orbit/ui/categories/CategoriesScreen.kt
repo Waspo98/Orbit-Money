@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.categories
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,7 @@ import app.overbay.orbit.ui.components.OrbitDragHandle
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.dragReorderItem
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.transactions.components.CanopyMorphingSearchContent
@@ -106,22 +108,27 @@ fun CategoriesScreen(
                 }
             }
         ) { paddingValues ->
-            if (state.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .nestedScroll(heroScrollState.nestedScrollConnection)
-                ) {
+            AnimatedContent(
+                targetState = state.isLoading,
+                transitionSpec = { orbitFadeContentTransform() },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                label = "categoriesLoadingState"
+            ) { isLoading ->
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScroll(heroScrollState.nestedScrollConnection)
+                    ) {
                     MorphingPageHero(
                         kicker = "CATEGORIES",
                         title = "Category Manager",
@@ -270,6 +277,7 @@ fun CategoriesScreen(
                         masterList()
                     }
                 }
+            }
             }
         }
 

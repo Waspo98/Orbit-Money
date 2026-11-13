@@ -29,7 +29,9 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.retirement.RetirementUiState
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import kotlin.math.abs
 import kotlin.math.max
@@ -202,24 +204,28 @@ fun HouseholdIncomeAssumptionsCard(
             }
         }
 
-        if (uiState.targetMode == RetirementTargetMode.LEAVE_LEGACY) {
-            Spacer(modifier = Modifier.height(10.dp))
-            CurrencyTextField(
-                cents = uiState.legacyAmountCents,
-                onCentsChange = onLegacyAmountChange,
-                label = "Target Legacy to Leave Behind",
-                modifier = Modifier.fillMaxWidth()
-            )
+        OrbitAccordionVisibility(visible = uiState.targetMode == RetirementTargetMode.LEAVE_LEGACY) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                CurrencyTextField(
+                    cents = uiState.legacyAmountCents,
+                    onCentsChange = onLegacyAmountChange,
+                    label = "Target Legacy to Leave Behind",
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
-        if (uiState.targetMode == RetirementTargetMode.CUSTOM) {
-            Spacer(modifier = Modifier.height(10.dp))
-            CurrencyTextField(
-                cents = uiState.customTargetCents ?: 0L,
-                onCentsChange = { onCustomTargetChange(if (it == 0L) null else it) },
-                label = "Custom Nest Egg Target Amount",
-                modifier = Modifier.fillMaxWidth()
-            )
+        OrbitAccordionVisibility(visible = uiState.targetMode == RetirementTargetMode.CUSTOM) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                CurrencyTextField(
+                    cents = uiState.customTargetCents ?: 0L,
+                    onCentsChange = { onCustomTargetChange(if (it == 0L) null else it) },
+                    label = "Custom Nest Egg Target Amount",
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -236,7 +242,7 @@ fun HouseholdIncomeAssumptionsCard(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
-            if (uiState.annualSpendingOverridden) {
+            OrbitScaleBadgeVisibility(visible = uiState.annualSpendingOverridden) {
                 TextButton(
                     onClick = onResetAnnualSpending,
                     modifier = Modifier.height(32.dp)

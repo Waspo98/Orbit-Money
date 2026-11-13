@@ -15,6 +15,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.calculators.housing.HousingUiState
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitBarSegment
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
@@ -58,48 +63,57 @@ fun MonthlyPaymentBreakdownCard(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            var lastPositiveTotal by remember { mutableStateOf(total ?: 0L) }
             if (total != null && total > 0L) {
-                // Hero Total
-                Surface(
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.fillMaxWidth()
+                lastPositiveTotal = total
+            }
+            OrbitAccordionVisibility(visible = total != null && total > 0L) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    // Hero Total
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = "PROJECTED MONTHLY PAYMENT",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        RollingTickerCents(
-                            cents = total,
-                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "PROJECTED MONTHLY PAYMENT",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            RollingTickerCents(
+                                cents = lastPositiveTotal,
+                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
                     }
+
+                    // Visual Proportion Bar
+                    OrbitStackedSegmentBar(
+                        segments = listOf(
+                            OrbitBarSegment("pi", piRatio, piColor),
+                            OrbitBarSegment("tax", taxRatio, taxColor),
+                            OrbitBarSegment("ins", insRatio, insColor),
+                            OrbitBarSegment("hoa", hoaRatio, hoaColor)
+                        ),
+                        height = 8.dp,
+                        cornerRadius = 4.dp,
+                        normalizeToFullWidth = true
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
                 }
-
-                // Visual Proportion Bar
-                OrbitStackedSegmentBar(
-                    segments = listOf(
-                        OrbitBarSegment("pi", piRatio, piColor),
-                        OrbitBarSegment("tax", taxRatio, taxColor),
-                        OrbitBarSegment("ins", insRatio, insColor),
-                        OrbitBarSegment("hoa", hoaRatio, hoaColor)
-                    ),
-                    height = 8.dp,
-                    cornerRadius = 4.dp,
-                    normalizeToFullWidth = true
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
             }
 
             // The 5 Monthly Payment Rows

@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
@@ -135,49 +136,60 @@ fun CategoryPickerSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f, fill = false)
-                    .verticalScroll(rememberScrollState()),
+                    .weight(1f, fill = false),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (showUncategorized) {
-                    val isCurrentOrig = transaction.effectiveCategoryId == null
-                    SelectableListRow(
-                        title = "Uncategorized",
-                        isSelected = selectedCategoryId == null,
-                        onClick = { selectedCategoryId = null },
-                        leadingContent = {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Text("❓", style = MaterialTheme.typography.titleSmall)
+                    item(key = "uncategorized") {
+                        val isCurrentOrig = transaction.effectiveCategoryId == null
+                        SelectableListRow(
+                            title = "Uncategorized",
+                            isSelected = selectedCategoryId == null,
+                            onClick = { selectedCategoryId = null },
+                            modifier = Modifier.animateItem(
+                                fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                fadeOutSpec = OrbitSprings.FloatEffectsFast
+                            ),
+                            leadingContent = {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Text("❓", style = MaterialTheme.typography.titleSmall)
+                                    }
                                 }
-                            }
-                        },
-                        trailingContent = if (isCurrentOrig) {
-                            {
-                                OrbitBadge(
-                                    text = "Current",
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                                    contentColor = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        } else null
-                    )
+                            },
+                            trailingContent = if (isCurrentOrig) {
+                                {
+                                    OrbitBadge(
+                                        text = "Current",
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                        contentColor = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            } else null
+                        )
+                    }
                 }
 
-                filteredCategories.forEach { category ->
+                items(filteredCategories, key = { it.id }) { category ->
                     val isCurrent = category.id == transaction.effectiveCategoryId
                     val catColor = category.color.toComposeColor(MaterialTheme.colorScheme.primary)
                     SelectableListRow(
                         title = category.name,
                         isSelected = selectedCategoryId == category.id,
                         onClick = { selectedCategoryId = category.id },
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                            placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                            fadeOutSpec = OrbitSprings.FloatEffectsFast
+                        ),
                         leadingContent = {
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
@@ -207,12 +219,20 @@ fun CategoryPickerSheet(
                 }
 
                 if (!showUncategorized && filteredCategories.isEmpty()) {
-                    Text(
-                        text = "No categories match \"$searchQuery\"",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 16.dp)
-                    )
+                    item(key = "empty_category_search") {
+                        Text(
+                            text = "No categories match \"$searchQuery\"",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .padding(vertical = 16.dp)
+                                .animateItem(
+                                    fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                    placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                    fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                )
+                        )
+                    }
                 }
             }
         }

@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.ui.components.RollingTickerText
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -185,7 +186,7 @@ fun TransactionBatchActionBar(
                         Text("Transfer")
                     }
 
-                    if (showMha) {
+                    OrbitScaleBadgeVisibility(visible = showMha) {
                         FilledTonalButton(
                             onClick = {
                                 haptics.tick()

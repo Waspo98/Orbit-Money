@@ -41,6 +41,7 @@ import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.transactions.TransactionsUiState
 import app.overbay.orbit.ui.transactions.TransactionsViewModel
@@ -172,40 +173,49 @@ fun TransactionsListPane(
                             },
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            when {
-                                state.isLoading -> {
-                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        CircularProgressIndicator()
+                            val isFiltered = state.searchQuery.isNotBlank() || state.hasActiveFilters
+                            AnimatedContent(
+                                targetState = Triple(state.isLoading, state.groupedTransactions.isEmpty(), isFiltered),
+                                contentKey = { (loading, empty, filtered) ->
+                                    Triple(loading, empty, empty && filtered)
+                                },
+                                transitionSpec = { orbitFadeContentTransform() },
+                                label = "transactionsListBodyState"
+                            ) { (loading, empty, filtered) ->
+                                when {
+                                    loading -> {
+                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            CircularProgressIndicator()
+                                        }
                                     }
-                                }
-                                state.groupedTransactions.isEmpty() -> {
-                                    val filtered = state.searchQuery.isNotBlank() || state.hasActiveFilters
-                                    Box(
-                                        modifier = Modifier.fillMaxSize().nestedScroll(heroScrollState.nestedScrollConnection).padding(24.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        EmptyStateCard(
-                                            title = if (filtered) "No matching transactions" else "No transactions recorded",
-                                            description = if (filtered) {
-                                                "Try clearing your search query or adjusting your filters."
-                                            } else {
-                                                "Pull down to sync with SimpleFIN or tap '+' to record a transaction."
-                                            },
-                                            icon = OrbitIcons.Transactions,
-                                            actionButtonText = if (filtered) "Reset Filters" else null,
-                                            onActionClick = { viewModel.setSearchQuery(""); viewModel.clearFilters() }
+                                    empty -> {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize().nestedScroll(heroScrollState.nestedScrollConnection).padding(24.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            EmptyStateCard(
+                                                title = if (filtered) "No matching transactions" else "No transactions recorded",
+                                                description = if (filtered) {
+                                                    "Try clearing your search query or adjusting your filters."
+                                                } else {
+                                                    "Pull down to sync with SimpleFIN or tap '+' to record a transaction."
+                                                },
+                                                icon = OrbitIcons.Transactions,
+                                                actionButtonText = if (filtered) "Reset Filters" else null,
+                                                onActionClick = { viewModel.setSearchQuery(""); viewModel.clearFilters() }
+                                            )
+                                        }
+                                    }
+                                    else -> {
+                                        TransactionsGroupedLazyList(
+                                            state = state,
+                                            viewModel = viewModel,
+                                            isWideScreen = isWideScreen,
+                                            onSelectForInspect = onSelectForInspect,
+                                            onNavigate = onNavigate,
+                                            modifier = Modifier.fillMaxSize().nestedScroll(heroScrollState.nestedScrollConnection)
                                         )
                                     }
-                                }
-                                else -> {
-                                    TransactionsGroupedLazyList(
-                                        state = state,
-                                        viewModel = viewModel,
-                                        isWideScreen = isWideScreen,
-                                        onSelectForInspect = onSelectForInspect,
-                                        onNavigate = onNavigate,
-                                        modifier = Modifier.fillMaxSize().nestedScroll(heroScrollState.nestedScrollConnection)
-                                    )
                                 }
                             }
                         }
@@ -347,7 +357,13 @@ private fun TransactionsGroupedLazyList(
                     totalItemsCount = state.filteredTransactions.size,
                     onPageChange = { page -> viewModel.setCurrentPage(page) },
                     onPageSizeChange = { size -> viewModel.setPageSize(size) },
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .animateItem(
+                            fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                            placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                            fadeOutSpec = OrbitSprings.FloatEffectsFast
+                        )
                 )
             }
         }

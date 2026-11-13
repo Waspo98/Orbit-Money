@@ -76,7 +76,12 @@ fun LazyListScope.upcomingTimelineItems(
                     title = "No Suggestions Right Now",
                     description = "We automatically detect recurring subscriptions, utility bills, and paychecks from past transactions.",
                     actionButtonText = "+ Add Recurring Item",
-                    onActionClick = { onAddClick(UpcomingKind.BILL) }
+                    onActionClick = { onAddClick(UpcomingKind.BILL) },
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                    )
                 )
             }
         } else {
@@ -145,7 +150,12 @@ fun LazyListScope.upcomingTimelineItems(
                 title = "No Upcoming Items",
                 description = "Track recurring subscriptions, utility bills, and paychecks to forecast cashflow.",
                 actionButtonText = "+ Add Recurring Item",
-                onActionClick = { onAddClick(UpcomingKind.BILL) }
+                onActionClick = { onAddClick(UpcomingKind.BILL) },
+                modifier = Modifier.animateItem(
+                    fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                    placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                    fadeOutSpec = OrbitSprings.FloatEffectsFast
+                )
             )
         }
     } else {

@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.trends.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.charts.ChartScrubberHeader
 import app.overbay.orbit.ui.components.charts.DeltaTone
 import app.overbay.orbit.ui.components.charts.SpendingBarItem
@@ -92,8 +94,12 @@ fun CategoryHistoryCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                if (selectedTrend != null && selectedTrend.category.id != UNCATEGORIZED_CATEGORY_ID) {
-                    val budgetLabel = if (selectedTrend.budgetAmountCents != null) "Edit Budget" else "Add Budget"
+                val canEditBudget = selectedTrend != null && selectedTrend.category.id != UNCATEGORIZED_CATEGORY_ID
+                var lastBudgetLabel by remember { mutableStateOf("Add Budget") }
+                if (selectedTrend != null) {
+                    lastBudgetLabel = if (selectedTrend.budgetAmountCents != null) "Edit Budget" else "Add Budget"
+                }
+                OrbitScaleBadgeVisibility(visible = canEditBudget) {
                     Button(
                         onClick = {
                             haptics.tick()
@@ -101,7 +107,13 @@ fun CategoryHistoryCard(
                         },
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text(text = budgetLabel)
+                        AnimatedContent(
+                            targetState = lastBudgetLabel,
+                            transitionSpec = { orbitFadeContentTransform() },
+                            label = "categoryHistoryBudgetLabel"
+                        ) { label ->
+                            Text(text = label)
+                        }
                     }
                 }
             }

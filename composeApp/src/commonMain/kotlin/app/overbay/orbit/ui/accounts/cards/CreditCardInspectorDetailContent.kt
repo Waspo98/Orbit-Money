@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.accounts.cards
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.CreditCardStrategyEngine
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.accounts.components.AccountClosureAlertBanner
 import app.overbay.orbit.ui.accounts.components.AccountInspectorHeader
@@ -92,11 +94,19 @@ fun CreditCardInspectorDetailContent(
         ) {
             if (showClosureBanner) {
                 item(key = "card_closure_alert") {
-                    AccountClosureAlertBanner(
-                        account = account,
-                        hasClosureAlert = hasClosureAlert,
-                        onReviewClosure = onReviewClosure!!
-                    )
+                    Box(
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                            placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                            fadeOutSpec = OrbitSprings.FloatEffectsFast
+                        )
+                    ) {
+                        AccountClosureAlertBanner(
+                            account = account,
+                            hasClosureAlert = hasClosureAlert,
+                            onReviewClosure = onReviewClosure!!
+                        )
+                    }
                 }
             }
 

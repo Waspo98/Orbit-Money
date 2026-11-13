@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.household
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -51,6 +52,7 @@ import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.household.components.HouseholdIncomeHistoryCard
 import app.overbay.orbit.ui.household.components.HouseholdInspectorPane
@@ -244,30 +246,36 @@ fun HouseholdScreen(
                                         }
                                     }
                                 ) {
-                                    if (uiState.shares.isEmpty()) {
-                                        Text(
-                                            text = "No active invites or shared members. Invite a spouse or co-planner to share access to this household.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(vertical = 8.dp)
-                                        )
-                                    } else {
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            uiState.shares.forEach { share ->
-                                                OrbitCompactListRow(
-                                                    title = share.invitedEmail,
-                                                    subtitle = "Role: ${share.role.name} • Status: ${if (share.acceptedAt != null) "Accepted" else "Pending Invite"}",
-                                                    trailingContent = {
-                                                        IconButton(onClick = { viewModel.revokeInvite(share.id) }) {
-                                                            Icon(
-                                                                imageVector = Icons.Default.Person,
-                                                                contentDescription = "Revoke",
-                                                                tint = MaterialTheme.colorScheme.error,
-                                                                modifier = Modifier.size(20.dp)
-                                                            )
+                                    AnimatedContent(
+                                        targetState = uiState.shares.isEmpty(),
+                                        transitionSpec = { orbitFadeContentTransform() },
+                                        label = "householdSharesEmpty"
+                                    ) { isEmpty ->
+                                        if (isEmpty) {
+                                            Text(
+                                                text = "No active invites or shared members. Invite a spouse or co-planner to share access to this household.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(vertical = 8.dp)
+                                            )
+                                        } else {
+                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                uiState.shares.forEach { share ->
+                                                    OrbitCompactListRow(
+                                                        title = share.invitedEmail,
+                                                        subtitle = "Role: ${share.role.name} • Status: ${if (share.acceptedAt != null) "Accepted" else "Pending Invite"}",
+                                                        trailingContent = {
+                                                            IconButton(onClick = { viewModel.revokeInvite(share.id) }) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Person,
+                                                                    contentDescription = "Revoke",
+                                                                    tint = MaterialTheme.colorScheme.error,
+                                                                    modifier = Modifier.size(20.dp)
+                                                                )
+                                                            }
                                                         }
-                                                    }
-                                                )
+                                                    )
+                                                }
                                             }
                                         }
                                     }

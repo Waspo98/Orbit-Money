@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.rules.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -24,8 +25,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,6 +40,7 @@ import app.overbay.orbit.data.model.RuleConditionField
 import app.overbay.orbit.data.model.RuleOperator
 import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.model.labelWithEmoji
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -55,6 +59,36 @@ fun RuleItemCard(
 ) {
     val haptics = LocalOrbitHaptics.current
 
+    val cardBorderColor by animateColorAsState(
+        targetValue = if (isInspected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        animationSpec = OrbitSprings.ColorEffectsDefault,
+        label = "ruleCardBorder"
+    )
+    val cardContainerColor by animateColorAsState(
+        targetValue = when {
+            isInspected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+            rule.enabled -> MaterialTheme.colorScheme.surfaceContainer
+            else -> MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.6f)
+        },
+        animationSpec = OrbitSprings.ColorEffectsDefault,
+        label = "ruleCardContainer"
+    )
+    val titleColor by animateColorAsState(
+        targetValue = if (rule.enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "ruleTitleColor"
+    )
+    val badgeContainerColor by animateColorAsState(
+        targetValue = if (matchCount > 0) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "ruleBadgeContainer"
+    )
+    val badgeContentColor by animateColorAsState(
+        targetValue = if (matchCount > 0) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "ruleBadgeContent"
+    )
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -69,13 +103,9 @@ fun RuleItemCard(
                 }
             ),
         shape = RoundedCornerShape(16.dp),
-        border = if (isInspected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+        border = BorderStroke(1.5.dp, cardBorderColor),
         colors = CardDefaults.cardColors(
-            containerColor = when {
-                isInspected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                rule.enabled -> MaterialTheme.colorScheme.surfaceContainer
-                else -> MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.6f)
-            }
+            containerColor = cardContainerColor
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -100,7 +130,7 @@ fun RuleItemCard(
                         text = rule.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (rule.enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                        color = titleColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -109,8 +139,8 @@ fun RuleItemCard(
 
                     OrbitBadge(
                         text = "$matchCount ${if (matchCount == 1) "match" else "matches"}",
-                        containerColor = if (matchCount > 0) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = if (matchCount > 0) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                        containerColor = badgeContainerColor,
+                        contentColor = badgeContentColor
                     )
                 }
 

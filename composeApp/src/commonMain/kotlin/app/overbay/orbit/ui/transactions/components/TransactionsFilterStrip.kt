@@ -25,6 +25,7 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.OrbitIcons
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.ui.transactions.QuickFilter
 import app.overbay.orbit.ui.transactions.TransactionSortOption
 import app.overbay.orbit.ui.transactions.TransactionsUiState
@@ -168,7 +169,7 @@ fun TransactionsActiveFilterChipsBar(
                 }
             }
 
-            if (activeChips.size > 1) {
+            OrbitScaleBadgeVisibility(visible = activeChips.size > 1) {
                 Surface(
                     onClick = {
                         haptics.tick()

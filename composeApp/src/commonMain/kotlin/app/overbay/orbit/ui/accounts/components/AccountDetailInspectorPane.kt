@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -269,11 +270,19 @@ private fun AccountReadOnlyDetailContent(
         ) {
             if (showClosureBanner) {
                 item(key = "acct_closure_alert") {
-                    AccountClosureAlertBanner(
-                        account = account,
-                        hasClosureAlert = hasClosureAlert,
-                        onReviewClosure = onReviewClosure!!
-                    )
+                    Box(
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                            placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                            fadeOutSpec = OrbitSprings.FloatEffectsFast
+                        )
+                    ) {
+                        AccountClosureAlertBanner(
+                            account = account,
+                            hasClosureAlert = hasClosureAlert,
+                            onReviewClosure = onReviewClosure!!
+                        )
+                    }
                 }
             }
 

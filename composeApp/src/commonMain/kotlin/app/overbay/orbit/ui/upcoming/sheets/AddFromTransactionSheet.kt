@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.upcoming.sheets
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,11 +37,13 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.abs
 
@@ -129,35 +132,46 @@ fun AddFromTransactionSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (filtered.isEmpty()) {
-                EmptyStateCard(
-                    title = "No Matching Transactions",
-                    description = "Try searching for a different merchant or payee.",
-                    actionButtonText = "Clear Search",
-                    onActionClick = { query = "" }
-                )
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(350.dp)
-                ) {
-                    items(filtered) { txn ->
-                        val cat = txn.effectiveCategoryId?.let { categoryMap[it] }
-                        val acct = accountMap[txn.accountId]
-                        val isNegative = txn.effectiveAmountCents < 0L
+            AnimatedContent(
+                targetState = filtered.isEmpty(),
+                transitionSpec = { orbitFadeContentTransform() },
+                label = "addFromTransactionSearchState"
+            ) { isEmpty ->
+                if (isEmpty) {
+                    EmptyStateCard(
+                        title = "No Matching Transactions",
+                        description = "Try searching for a different merchant or payee.",
+                        actionButtonText = "Clear Search",
+                        onActionClick = { query = "" }
+                    )
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(350.dp)
+                    ) {
+                        items(filtered, key = { it.id }) { txn ->
+                            val cat = txn.effectiveCategoryId?.let { categoryMap[it] }
+                            val acct = accountMap[txn.accountId]
+                            val isNegative = txn.effectiveAmountCents < 0L
 
-                        Surface(
-                            onClick = {
-                                haptics.confirm()
-                                onSelectTransaction(txn.id)
-                            },
-                            shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
+                            Surface(
+                                onClick = {
+                                    haptics.confirm()
+                                    onSelectTransaction(txn.id)
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .animateItem(
+                                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                    )
+                            ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -199,6 +213,7 @@ fun AddFromTransactionSheet(
                         }
                     }
                 }
+            }
             }
 
             Spacer(modifier = Modifier.height(14.dp))

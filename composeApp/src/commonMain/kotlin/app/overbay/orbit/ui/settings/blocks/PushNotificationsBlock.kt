@@ -32,6 +32,7 @@ import app.overbay.orbit.data.model.NotificationPreferencesConfig
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.PushNotificationConfigInfo
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
@@ -121,90 +122,92 @@ fun PushNotificationsBlock(
             }
         }
 
-        if (config.enabled) {
-            Spacer(modifier = Modifier.height(14.dp))
-            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-            Spacer(modifier = Modifier.height(14.dp))
+        OrbitAccordionVisibility(visible = config.enabled) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
+                Spacer(modifier = Modifier.height(14.dp))
 
-            OrbitSwitchRow(
-                title = "Show Dollar Amounts",
-                subtitle = "Include exact balances and transaction figures in notification previews",
-                checked = config.showAmounts,
-                onCheckedChange = { onUpdateNotificationPreferences(config.copy(showAmounts = it)) }
-            )
+                OrbitSwitchRow(
+                    title = "Show Dollar Amounts",
+                    subtitle = "Include exact balances and transaction figures in notification previews",
+                    checked = config.showAmounts,
+                    onCheckedChange = { onUpdateNotificationPreferences(config.copy(showAmounts = it)) }
+                )
 
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Scheduled Alerts",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Scheduled Alerts",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
-            val dayNames = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
-            val weeklyDay = dayNames.getOrElse(config.weeklySnapshot.dayOfWeek ?: 1) { "Mon" }
-            val weeklyTime = config.weeklySnapshot.time ?: "08:00"
+                val dayNames = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+                val weeklyDay = dayNames.getOrElse(config.weeklySnapshot.dayOfWeek ?: 1) { "Mon" }
+                val weeklyTime = config.weeklySnapshot.time ?: "08:00"
 
-            NotificationPreferenceRow(
-                title = "Weekly Summary",
-                subtitle = "Weekly recap of net worth changes, savings progress, and top spending categories",
-                checked = config.weeklySnapshot.enabled,
-                onCheckedChange = {
-                    onUpdateNotificationPreferences(config.copy(weeklySnapshot = config.weeklySnapshot.copy(enabled = it)))
-                },
-                onCustomize = { activeScheduleType = NotificationScheduleType.WEEKLY_SNAPSHOT },
-                scheduleChipText = "$weeklyDay at $weeklyTime"
-            )
+                NotificationPreferenceRow(
+                    title = "Weekly Summary",
+                    subtitle = "Weekly recap of net worth changes, savings progress, and top spending categories",
+                    checked = config.weeklySnapshot.enabled,
+                    onCheckedChange = {
+                        onUpdateNotificationPreferences(config.copy(weeklySnapshot = config.weeklySnapshot.copy(enabled = it)))
+                    },
+                    onCustomize = { activeScheduleType = NotificationScheduleType.WEEKLY_SNAPSHOT },
+                    scheduleChipText = "$weeklyDay at $weeklyTime"
+                )
 
-            Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-            val isIncomeScheduled = config.income.timing == "scheduled" ||
-                (config.income.timing == null && !config.income.time.isNullOrBlank() && config.income.time != "after_sync")
-            val incomeScheduleLabel = if (isIncomeScheduled) "Scheduled at ${config.income.time ?: "09:00"}" else "After bank sync"
+                val isIncomeScheduled = config.income.timing == "scheduled" ||
+                    (config.income.timing == null && !config.income.time.isNullOrBlank() && config.income.time != "after_sync")
+                val incomeScheduleLabel = if (isIncomeScheduled) "Scheduled at ${config.income.time ?: "09:00"}" else "After bank sync"
 
-            NotificationPreferenceRow(
-                title = "Income & Paycheck Alerts",
-                subtitle = "Notify when paychecks and deposits over $100 post",
-                checked = config.income.enabled,
-                onCheckedChange = {
-                    onUpdateNotificationPreferences(config.copy(income = config.income.copy(enabled = it)))
-                },
-                onCustomize = { activeScheduleType = NotificationScheduleType.INCOME },
-                scheduleChipText = incomeScheduleLabel
-            )
+                NotificationPreferenceRow(
+                    title = "Income & Paycheck Alerts",
+                    subtitle = "Notify when paychecks and deposits over $100 post",
+                    checked = config.income.enabled,
+                    onCheckedChange = {
+                        onUpdateNotificationPreferences(config.copy(income = config.income.copy(enabled = it)))
+                    },
+                    onCustomize = { activeScheduleType = NotificationScheduleType.INCOME },
+                    scheduleChipText = incomeScheduleLabel
+                )
 
-            Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-            NotificationPreferenceRow(
-                title = "Bank Sync Issues",
-                subtitle = "Notify when bank connections require attention",
-                checked = config.syncIssues.enabled,
-                onCheckedChange = {
-                    onUpdateNotificationPreferences(config.copy(syncIssues = config.syncIssues.copy(enabled = it)))
-                },
-                onCustomize = { activeScheduleType = NotificationScheduleType.SYNC_ISSUES },
-                scheduleChipText = "Immediate"
-            )
+                NotificationPreferenceRow(
+                    title = "Bank Sync Issues",
+                    subtitle = "Notify when bank connections require attention",
+                    checked = config.syncIssues.enabled,
+                    onCheckedChange = {
+                        onUpdateNotificationPreferences(config.copy(syncIssues = config.syncIssues.copy(enabled = it)))
+                    },
+                    onCustomize = { activeScheduleType = NotificationScheduleType.SYNC_ISSUES },
+                    scheduleChipText = "Immediate"
+                )
 
-            Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-            val snapshotDay = config.accountSnapshots.dayOfMonth ?: config.accountSnapshots.dayOfWeek ?: 1
-            val snapshotCadence = if (config.accountSnapshots.cadence == "quarterly") "Quarterly" else "Monthly"
-            val snapshotTime = config.accountSnapshots.time ?: "09:00"
-            val snapshotCount = config.accountSnapshots.accountIds.size
-            val snapshotLabel = "$snapshotCadence · Day $snapshotDay at $snapshotTime · $snapshotCount accts"
+                val snapshotDay = config.accountSnapshots.dayOfMonth ?: config.accountSnapshots.dayOfWeek ?: 1
+                val snapshotCadence = if (config.accountSnapshots.cadence == "quarterly") "Quarterly" else "Monthly"
+                val snapshotTime = config.accountSnapshots.time ?: "09:00"
+                val snapshotCount = config.accountSnapshots.accountIds.size
+                val snapshotLabel = "$snapshotCadence · Day $snapshotDay at $snapshotTime · $snapshotCount accts"
 
-            NotificationPreferenceRow(
-                title = "Manual Balance Reminders",
-                subtitle = "Periodic reminder to update balances on manual accounts",
-                checked = config.accountSnapshots.enabled,
-                onCheckedChange = {
-                    onUpdateNotificationPreferences(config.copy(accountSnapshots = config.accountSnapshots.copy(enabled = it)))
-                },
-                onCustomize = { activeScheduleType = NotificationScheduleType.ACCOUNT_SNAPSHOTS },
-                scheduleChipText = snapshotLabel
-            )
+                NotificationPreferenceRow(
+                    title = "Manual Balance Reminders",
+                    subtitle = "Periodic reminder to update balances on manual accounts",
+                    checked = config.accountSnapshots.enabled,
+                    onCheckedChange = {
+                        onUpdateNotificationPreferences(config.copy(accountSnapshots = config.accountSnapshots.copy(enabled = it)))
+                    },
+                    onCustomize = { activeScheduleType = NotificationScheduleType.ACCOUNT_SNAPSHOTS },
+                    scheduleChipText = snapshotLabel
+                )
+            }
         }
     }
 }

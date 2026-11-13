@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.ui.dashboard.DashboardRecentTransactionItem
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -62,38 +64,40 @@ fun RecentTransactionQuickActionsRow(
             .padding(vertical = 4.dp)
     ) {
         // Quick Category Suggestions (first 4 categories if available)
-        if (categories.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Category:",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = 2.dp)
-                )
-                categories.take(5).forEach { cat ->
-                    val isCurrent = transaction.categoryId == cat.id
-                    FilterChip(
-                        selected = isCurrent,
-                        onClick = {
-                            haptics.tick()
-                            onQuickCategorize(cat.id)
-                        },
-                        label = { Text(cat.name, fontSize = 11.sp) },
-                        leadingIcon = if (isCurrent) {
-                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
-                        } else null,
-                        modifier = Modifier.height(28.dp)
+        OrbitAccordionVisibility(visible = categories.isNotEmpty()) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Category:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 2.dp)
                     )
+                    categories.take(5).forEach { cat ->
+                        val isCurrent = transaction.categoryId == cat.id
+                        FilterChip(
+                            selected = isCurrent,
+                            onClick = {
+                                haptics.tick()
+                                onQuickCategorize(cat.id)
+                            },
+                            label = { Text(cat.name, fontSize = 11.sp) },
+                            leadingIcon = if (isCurrent) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                            } else null,
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(6.dp))
+            }
         }
 
         // Action Buttons Row
@@ -133,7 +137,7 @@ fun RecentTransactionQuickActionsRow(
             )
 
             // Toggle MHA (if enabled)
-            if (mhaEnabled) {
+            OrbitScaleBadgeVisibility(visible = mhaEnabled) {
                 FilterChip(
                     selected = transaction.isMhaEligible,
                     onClick = {
@@ -159,7 +163,7 @@ fun RecentTransactionQuickActionsRow(
             )
 
             // Reset Edits (if edited)
-            if (transaction.hasEdits) {
+            OrbitScaleBadgeVisibility(visible = transaction.hasEdits) {
                 AssistChip(
                     onClick = {
                         haptics.tick()

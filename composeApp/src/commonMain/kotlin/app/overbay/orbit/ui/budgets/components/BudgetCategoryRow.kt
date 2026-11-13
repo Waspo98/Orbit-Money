@@ -42,6 +42,7 @@ import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -68,11 +69,15 @@ fun BudgetCategoryRow(
     val isOverBudget = item.spentCents > item.amountCents && item.amountCents > 0L
     val isWatch = item.paceStatus == BudgetPaceStatus.WATCH
 
-    val statusColor = when {
-        isOverBudget -> colors.danger
-        isWatch -> colors.warning
-        else -> colors.income
-    }
+    val statusColor by animateColorAsState(
+        targetValue = when {
+            isOverBudget -> colors.danger
+            isWatch -> colors.warning
+            else -> colors.income
+        },
+        animationSpec = OrbitSprings.ColorEffectsDefault,
+        label = "budgetStatusColor"
+    )
 
     val rowBgColor by animateColorAsState(
         targetValue = if (isInspected) {
@@ -291,7 +296,7 @@ fun BudgetCategoryRow(
                                     )
                                 }
 
-                                if (item.budgetId != null) {
+                                OrbitScaleBadgeVisibility(visible = item.budgetId != null) {
                                     OutlinedButton(
                                         onClick = {
                                             haptics.reject()

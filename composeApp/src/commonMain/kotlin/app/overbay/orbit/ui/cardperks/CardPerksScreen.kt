@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.domain.CreditCardStrategyEngine
@@ -211,11 +212,21 @@ fun CardPerksScreen(
                                         items = gridRows,
                                         key = { row -> "${row.leftCard.name}_${row.rightCard?.name ?: "single"}" }
                                     ) { row ->
+                                        val rowAnimModifier = Modifier.animateItem(
+                                            fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                            placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                            fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                        )
                                         if (row.isFullSpan) {
-                                            CardPerksBentoItem(row.leftCard, state, bentoActions)
+                                            CardPerksBentoItem(
+                                                cardType = row.leftCard,
+                                                uiState = state,
+                                                actions = bentoActions,
+                                                modifier = rowAnimModifier
+                                            )
                                         } else {
                                             Row(
-                                                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                                                modifier = rowAnimModifier.fillMaxWidth().height(IntrinsicSize.Max),
                                                 horizontalArrangement = Arrangement.spacedBy(14.dp)
                                             ) {
                                                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
@@ -246,7 +257,16 @@ fun CardPerksScreen(
                                         items = visibleItems,
                                         key = { it.key.name }
                                     ) { item ->
-                                        CardPerksBentoItem(item.key, state, bentoActions)
+                                        CardPerksBentoItem(
+                                            cardType = item.key,
+                                            uiState = state,
+                                            actions = bentoActions,
+                                            modifier = Modifier.animateItem(
+                                                fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                                placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                                fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                            )
+                                        )
                                     }
                                 }
                             }

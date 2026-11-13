@@ -38,6 +38,7 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -100,43 +101,55 @@ fun NotablePanel(
                 )
             }
 
-            // Bucket 1: Over Budget
-            if (notables.overBudget.isNotEmpty()) {
-                NotableBucketSection(
-                    title = "OVER BUDGET",
-                    badgeText = "${notables.overBudget.size}",
-                    badgeColor = colors.danger,
-                    items = notables.overBudget,
-                    onInspectCategory = onInspectCategory,
-                    onAddBudget = onAddBudget,
-                    isOverBudget = true
-                )
-            }
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Bucket 1: Over Budget
+                OrbitAccordionVisibility(visible = notables.overBudget.isNotEmpty()) {
+                    NotableBucketSection(
+                        title = "OVER BUDGET",
+                        badgeText = "${notables.overBudget.size}",
+                        badgeColor = colors.danger,
+                        items = notables.overBudget,
+                        onInspectCategory = onInspectCategory,
+                        onAddBudget = onAddBudget,
+                        isOverBudget = true
+                    )
+                }
 
-            // Bucket 2: Near Limit (>= 80%)
-            if (notables.nearLimit.isNotEmpty()) {
-                NotableBucketSection(
-                    title = "APPROACHING LIMIT (80%+)",
-                    badgeText = "${notables.nearLimit.size}",
-                    badgeColor = colors.warning,
-                    items = notables.nearLimit,
-                    onInspectCategory = onInspectCategory,
-                    onAddBudget = onAddBudget,
-                    isNearLimit = true
-                )
-            }
+                // Bucket 2: Near Limit (>= 80%)
+                OrbitAccordionVisibility(visible = notables.nearLimit.isNotEmpty()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        if (notables.overBudget.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                        }
+                        NotableBucketSection(
+                            title = "APPROACHING LIMIT (80%+)",
+                            badgeText = "${notables.nearLimit.size}",
+                            badgeColor = colors.warning,
+                            items = notables.nearLimit,
+                            onInspectCategory = onInspectCategory,
+                            onAddBudget = onAddBudget,
+                            isNearLimit = true
+                        )
+                    }
+                }
 
-            // Bucket 3: Variances (Unbudgeted & Material Spend or Refunds)
-            if (notables.variances.isNotEmpty()) {
-                NotableBucketSection(
-                    title = "UNBUDGETED & REFUND VARIANCES",
-                    badgeText = "${notables.variances.size}",
-                    badgeColor = MaterialTheme.colorScheme.tertiary,
-                    items = notables.variances,
-                    onInspectCategory = onInspectCategory,
-                    onAddBudget = onAddBudget,
-                    isVariance = true
-                )
+                // Bucket 3: Variances (Unbudgeted & Material Spend or Refunds)
+                OrbitAccordionVisibility(visible = notables.variances.isNotEmpty()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        if (notables.overBudget.isNotEmpty() || notables.nearLimit.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                        }
+                        NotableBucketSection(
+                            title = "UNBUDGETED & REFUND VARIANCES",
+                            badgeText = "${notables.variances.size}",
+                            badgeColor = MaterialTheme.colorScheme.tertiary,
+                            items = notables.variances,
+                            onInspectCategory = onInspectCategory,
+                            onAddBudget = onAddBudget,
+                            isVariance = true
+                        )
+                    }
+                }
             }
         }
     }

@@ -1,10 +1,8 @@
 package app.overbay.orbit.ui.settings.blocks
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.AnimatedContent
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -187,37 +185,43 @@ fun SimpleFinBankSyncBlock(
         Spacer(modifier = Modifier.height(12.dp))
 
         // Action Buttons: Save / Connect, Sync Now, Disconnect
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (isConnected) {
-                Button(
-                    onClick = onTriggerSync,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("Sync Now")
-                }
-                OutlinedButton(
-                    onClick = { showDisconnectConfirm = true },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Disconnect")
-                }
-            } else {
-                Button(
-                    onClick = {
-                        onSetupBridge(rawToken, selectedCutoverDate.toString())
-                        onTokenChange(rawToken.ifBlank { null })
-                    },
-                    enabled = rawToken.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("Connect SimpleFIN")
+        AnimatedContent(
+            targetState = isConnected,
+            transitionSpec = { orbitFadeContentTransform() },
+            label = "simpleFinConnectionActions"
+        ) { connected ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (connected) {
+                    Button(
+                        onClick = onTriggerSync,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Sync Now")
+                    }
+                    OutlinedButton(
+                        onClick = { showDisconnectConfirm = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Disconnect")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            onSetupBridge(rawToken, selectedCutoverDate.toString())
+                            onTokenChange(rawToken.ifBlank { null })
+                        },
+                        enabled = rawToken.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Connect SimpleFIN")
+                    }
                 }
             }
         }
@@ -250,11 +254,7 @@ fun SimpleFinBankSyncBlock(
                 )
             }
 
-            AnimatedVisibility(
-                visible = isLogsExpanded,
-                enter = expandVertically(animationSpec = OrbitSprings.spatialDefault()) + fadeIn(),
-                exit = shrinkVertically(animationSpec = OrbitSprings.spatialDefault()) + fadeOut()
-            ) {
+            OrbitAccordionVisibility(visible = isLogsExpanded) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)

@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.dashboard
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +37,8 @@ import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.dashboard.cards.EmptyWorkspaceSetupCard
 import app.overbay.orbit.ui.dashboard.dialogs.DashboardCustomizeSheet
@@ -107,7 +110,7 @@ fun DashboardScreen(
                             .fillMaxHeight()
                     )
 
-                    if (uiState.uncategorized.count > 0) {
+                    OrbitScaleBadgeVisibility(visible = uiState.uncategorized.count > 0) {
                         CanopyIconButton(
                             icon = OrbitIcons.Categories,
                             contentDescription = "Categorize Recent Transactions",
@@ -132,19 +135,25 @@ fun DashboardScreen(
                 }
             )
 
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
-            } else {
+            AnimatedContent(
+                targetState = uiState.isLoading,
+                transitionSpec = { orbitFadeContentTransform() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                label = "dashboardLoadingState"
+            ) { isLoading ->
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                } else {
                 val visibleConfigs = remember(
                     uiState.customization.cardConfigs,
                     uiState.visibleCards,
@@ -202,7 +211,12 @@ fun DashboardScreen(
                                     },
                                     onAddManualAccount = {
                                         onNavigate(OrbitNavKey.Accounts())
-                                    }
+                                    },
+                                    modifier = Modifier.animateItem(
+                                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                    )
                                 )
                             }
                         }
@@ -280,6 +294,7 @@ fun DashboardScreen(
                         }
                     }
                 }
+            }
             }
         }
 

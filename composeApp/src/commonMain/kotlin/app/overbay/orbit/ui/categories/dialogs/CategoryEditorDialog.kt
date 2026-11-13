@@ -1,5 +1,10 @@
 package app.overbay.orbit.ui.categories.dialogs
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryEmojiMapper
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitModalScaffold
@@ -249,10 +255,20 @@ private fun CategoryEditorFormFields(
         ) {
             PRESET_ICONS.forEach { emoji ->
                 val isIconSelected = selectedIcon == emoji
+                val iconBgColor by animateColorAsState(
+                    targetValue = if (isIconSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                    animationSpec = OrbitSprings.ColorEffectsFast,
+                    label = "catIconBg"
+                )
+                val iconBorderColor by animateColorAsState(
+                    targetValue = if (isIconSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    animationSpec = OrbitSprings.ColorEffectsFast,
+                    label = "catIconBorder"
+                )
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = if (isIconSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                    border = if (isIconSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                    color = iconBgColor,
+                    border = BorderStroke(1.5.dp, iconBorderColor),
                     modifier = Modifier
                         .size(34.dp)
                         .clickable {
@@ -298,7 +314,11 @@ private fun CategoryEditorFormFields(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (isSelected) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = isSelected,
+                        enter = scaleIn(OrbitSprings.FloatSpatialFast, initialScale = 0.65f) + fadeIn(OrbitSprings.FloatEffectsFast),
+                        exit = scaleOut(OrbitSprings.FloatSpatialFast, targetScale = 0.65f) + fadeOut(OrbitSprings.FloatEffectsFast)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = "Selected",

@@ -1,9 +1,7 @@
 package app.overbay.orbit.ui.cardperks
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -57,7 +55,7 @@ fun CardPerksInspectorPane(
 
     AnimatedContent(
         targetState = mode,
-        transitionSpec = { fadeIn(OrbitSprings.effectsDefault()) togetherWith fadeOut(OrbitSprings.effectsDefault()) },
+        transitionSpec = { orbitMorphContentTransform(clip = false) },
         modifier = modifier.fillMaxWidth(),
         label = "cardPerksInspectorTransition"
     ) { currentMode ->

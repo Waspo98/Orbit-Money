@@ -1,9 +1,7 @@
 package app.overbay.orbit.ui.rules.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -80,10 +78,7 @@ fun RuleDetailInspectorPane(
     ) {
         AnimatedContent(
             targetState = activeMode,
-            transitionSpec = {
-                fadeIn(OrbitSprings.FloatEffectsDefault) togetherWith
-                    fadeOut(OrbitSprings.FloatEffectsFast)
-            },
+            transitionSpec = { orbitMorphContentTransform(clip = false) },
             label = "RuleInspectorModeTransition"
         ) { mode ->
             when (mode) {

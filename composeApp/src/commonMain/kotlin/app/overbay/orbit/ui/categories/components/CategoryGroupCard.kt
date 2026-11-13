@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.categories.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -36,11 +37,13 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.categories.CategoryGroupDisplay
 import app.overbay.orbit.ui.categories.CategorySummary
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitDragHandle
+import app.overbay.orbit.ui.components.RollingTickerCents
 import app.overbay.orbit.ui.components.SelectableListRow
 import app.overbay.orbit.ui.components.dragReorderItem
 import app.overbay.orbit.ui.components.rememberDragReorderState
@@ -74,7 +77,11 @@ fun CategoryGroupCard(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .animateContentSize(animationSpec = OrbitSprings.IntSizeSpatialDefault)
+        ) {
             // Group Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -104,10 +111,9 @@ fun CategoryGroupCard(
                     }
                 }
 
-                Text(
-                    text = MoneyUtils.formatCents(group.totalCents),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                RollingTickerCents(
+                    cents = group.totalCents,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.primary
                 )
             }

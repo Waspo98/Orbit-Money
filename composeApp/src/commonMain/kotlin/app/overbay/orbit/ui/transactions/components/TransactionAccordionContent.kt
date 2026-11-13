@@ -16,6 +16,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -30,6 +34,8 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -134,16 +140,18 @@ fun TransactionAccordionContent(
                             categoryColor = categoryColor,
                             onClick = onOpenCategoryPicker
                         )
-                        if (categoryProv != FieldEditProvenance.None) {
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Originally: ${originalCategoryLabel ?: "Uncategorized"}",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        OrbitAccordionVisibility(visible = categoryProv != FieldEditProvenance.None) {
+                            Column {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Originally: ${originalCategoryLabel ?: "Uncategorized"}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
 
@@ -159,64 +167,66 @@ fun TransactionAccordionContent(
                 }
             }
 
-            if (showStatusStrip) {
-                Spacer(modifier = Modifier.height(10.dp))
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    if (amountProv != FieldEditProvenance.None) {
-                        StatusProvenancePill(
-                            text = "Amount (Orig: ${MoneyUtils.formatCents(transaction.originalAmountCents, signed = true)})",
-                            provenance = amountProv,
-                            onReset = { onResetField("amount") },
-                            onViewRule = onViewRule
-                        )
-                    }
-                    if (showTransferPill) {
-                        StatusProvenancePill(
-                            text = if (transaction.effectiveIsTransfer) "Transfer" else "Not Transfer",
-                            provenance = transferProv,
-                            onReset = { onResetField("transfer") },
-                            onViewRule = onViewRule
-                        )
-                    }
-                    if (showMhaPill) {
-                        StatusProvenancePill(
-                            text = "MHA Eligible",
-                            provenance = mhaProv,
-                            onReset = { onResetField("mha") },
-                            onViewRule = onViewRule
-                        )
-                    }
-                    if (showIgnorePill) {
-                        StatusProvenancePill(
-                            text = if (transaction.effectiveIsIgnored) "Ignored" else "Included",
-                            provenance = ignoreProv,
-                            onReset = { onResetField("ignored") },
-                            onViewRule = onViewRule
-                        )
-                    }
-                    if (hasManualEdits) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .clickable {
-                                    haptics.tick()
-                                    onResetAll()
-                                }
-                        ) {
-                            Text(
-                                text = "Restore All",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+            OrbitAccordionVisibility(visible = showStatusStrip) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OrbitScaleBadgeVisibility(visible = amountProv != FieldEditProvenance.None) {
+                            StatusProvenancePill(
+                                text = "Amount (Orig: ${MoneyUtils.formatCents(transaction.originalAmountCents, signed = true)})",
+                                provenance = amountProv,
+                                onReset = { onResetField("amount") },
+                                onViewRule = onViewRule
                             )
+                        }
+                        OrbitScaleBadgeVisibility(visible = showTransferPill) {
+                            StatusProvenancePill(
+                                text = if (transaction.effectiveIsTransfer) "Transfer" else "Not Transfer",
+                                provenance = transferProv,
+                                onReset = { onResetField("transfer") },
+                                onViewRule = onViewRule
+                            )
+                        }
+                        OrbitScaleBadgeVisibility(visible = showMhaPill) {
+                            StatusProvenancePill(
+                                text = "MHA Eligible",
+                                provenance = mhaProv,
+                                onReset = { onResetField("mha") },
+                                onViewRule = onViewRule
+                            )
+                        }
+                        OrbitScaleBadgeVisibility(visible = showIgnorePill) {
+                            StatusProvenancePill(
+                                text = if (transaction.effectiveIsIgnored) "Ignored" else "Included",
+                                provenance = ignoreProv,
+                                onReset = { onResetField("ignored") },
+                                onViewRule = onViewRule
+                            )
+                        }
+                        OrbitScaleBadgeVisibility(visible = hasManualEdits) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        haptics.tick()
+                                        onResetAll()
+                                    }
+                            ) {
+                                Text(
+                                    text = "Restore All",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -262,9 +272,13 @@ private fun AccordionMetaField(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
+        var lastOriginalSubtext by remember { mutableStateOf<String?>(null) }
         if (originalSubtext != null) {
+            lastOriginalSubtext = originalSubtext
+        }
+        OrbitAccordionVisibility(visible = originalSubtext != null) {
             Text(
-                text = originalSubtext,
+                text = lastOriginalSubtext.orEmpty(),
                 style = MaterialTheme.typography.labelSmall,
                 fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

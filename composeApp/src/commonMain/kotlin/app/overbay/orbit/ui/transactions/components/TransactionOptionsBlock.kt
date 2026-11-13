@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.transactions.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -35,8 +36,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitIcons
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.orbitTactilePress
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -82,7 +86,7 @@ fun TransactionOptionsBlock(
                 onCheckedChange = onIgnoredChange
             )
 
-            if (showMhaOption) {
+            OrbitScaleBadgeVisibility(visible = showMhaOption) {
                 TransactionFlagPill(
                     label = "MHA Eligible",
                     icon = OrbitIcons.MhaTracker,
@@ -92,47 +96,49 @@ fun TransactionOptionsBlock(
             }
         }
 
-        if (hasTools) {
-            Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder.copy(alpha = 0.7f))
-            Spacer(modifier = Modifier.height(8.dp))
+        OrbitAccordionVisibility(visible = hasTools) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder.copy(alpha = 0.7f))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (onSplit != null) {
-                    OrbitActionChip(
-                        label = "Split",
-                        leadingIcon = OrbitIcons.Split,
-                        onClick = onSplit
-                    )
-                }
-                if (onCreateRule != null) {
-                    OrbitActionChip(
-                        label = "Create Rule",
-                        leadingIcon = OrbitIcons.Rules,
-                        onClick = onCreateRule
-                    )
-                }
-                if (onMarkRecurring != null) {
-                    OrbitActionChip(
-                        label = "Mark Recurring",
-                        leadingIcon = OrbitIcons.Upcoming,
-                        onClick = onMarkRecurring
-                    )
-                }
-                if (onRestoreOriginal != null) {
-                    OrbitActionChip(
-                        label = "Restore Original",
-                        leadingIcon = Icons.Default.Refresh,
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        onClick = onRestoreOriginal
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onSplit != null) {
+                        OrbitActionChip(
+                            label = "Split",
+                            leadingIcon = OrbitIcons.Split,
+                            onClick = onSplit
+                        )
+                    }
+                    if (onCreateRule != null) {
+                        OrbitActionChip(
+                            label = "Create Rule",
+                            leadingIcon = OrbitIcons.Rules,
+                            onClick = onCreateRule
+                        )
+                    }
+                    if (onMarkRecurring != null) {
+                        OrbitActionChip(
+                            label = "Mark Recurring",
+                            leadingIcon = OrbitIcons.Upcoming,
+                            onClick = onMarkRecurring
+                        )
+                    }
+                    OrbitScaleBadgeVisibility(visible = onRestoreOriginal != null) {
+                        OrbitActionChip(
+                            label = "Restore Original",
+                            leadingIcon = Icons.Default.Refresh,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            onClick = { onRestoreOriginal?.invoke() }
+                        )
+                    }
                 }
             }
         }
@@ -165,11 +171,15 @@ private fun TransactionFlagPill(
         animationSpec = OrbitSprings.ColorEffectsFast,
         label = "txFlagPillFg"
     )
-    val borderColor = if (checked) {
-        MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f)
-    } else {
-        OrbitTheme.colors.cardBorder
-    }
+    val borderColor by animateColorAsState(
+        targetValue = if (checked) {
+            MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f)
+        } else {
+            OrbitTheme.colors.cardBorder
+        },
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "txFlagPillBorder"
+    )
 
     Surface(
         shape = CircleShape,
@@ -188,12 +198,18 @@ private fun TransactionFlagPill(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(
-                imageVector = if (checked) Icons.Default.Check else icon,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(15.dp)
-            )
+            AnimatedContent(
+                targetState = checked,
+                transitionSpec = { orbitFadeContentTransform() },
+                label = "txFlagPillIcon"
+            ) { isChecked ->
+                Icon(
+                    imageVector = if (isChecked) Icons.Default.Check else icon,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(15.dp)
+                )
+            }
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,

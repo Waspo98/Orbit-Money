@@ -1,6 +1,10 @@
 package app.overbay.orbit.ui.accounts.sheets
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -35,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -282,6 +287,27 @@ private fun ClosureChoiceCard(
         animationSpec = OrbitSprings.ColorEffectsDefault,
         label = "closureCardBorder"
     )
+    val iconBoxColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        else MaterialTheme.colorScheme.surfaceContainerHigh,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "closureIconBoxColor"
+    )
+    val iconTintColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "closureIconTintColor"
+    )
+    val radioFillColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "closureRadioFillColor"
+    )
+    val radioBorderColor by animateColorAsState(
+        targetValue = if (selected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "closureRadioBorderColor"
+    )
 
     Surface(
         onClick = onClick,
@@ -301,16 +327,13 @@ private fun ClosureChoiceCard(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(RoundedCornerShape(9.dp))
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                        else MaterialTheme.colorScheme.surfaceContainerHigh
-                    ),
+                    .background(iconBoxColor),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = iconTintColor,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -335,16 +358,15 @@ private fun ClosureChoiceCard(
                 modifier = Modifier
                     .size(22.dp)
                     .clip(CircleShape)
-                    .then(
-                        if (selected) {
-                            Modifier.background(MaterialTheme.colorScheme.primary)
-                        } else {
-                            Modifier.border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
-                        }
-                    ),
+                    .background(radioFillColor)
+                    .border(1.5.dp, radioBorderColor, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                if (selected) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = selected,
+                    enter = scaleIn(OrbitSprings.FloatSpatialFast, initialScale = 0.65f) + fadeIn(OrbitSprings.FloatEffectsFast),
+                    exit = scaleOut(OrbitSprings.FloatSpatialFast, targetScale = 0.65f) + fadeOut(OrbitSprings.FloatEffectsFast)
+                ) {
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = "Selected",

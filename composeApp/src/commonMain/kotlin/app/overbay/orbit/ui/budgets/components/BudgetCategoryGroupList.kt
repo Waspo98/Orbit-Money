@@ -58,7 +58,13 @@ fun LazyListScope.budgetCategoryGroupItems(
         item(key = "budget_spending_mix", contentType = "spending_mix") {
             SpendingMixPanel(
                 items = allActive,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier
+                    .animateItem(
+                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                    )
+                    .padding(bottom = 8.dp)
             )
         }
     }
@@ -68,7 +74,12 @@ fun LazyListScope.budgetCategoryGroupItems(
         item(key = "budgeted_section_header", contentType = "section_header") {
             SectionHeader(
                 title = "Budgeted Categories",
-                subtitle = "${budgeted.size} categories • ${MoneyUtils.formatCents(totalBudgeted, showCents = false)}"
+                subtitle = "${budgeted.size} categories • ${MoneyUtils.formatCents(totalBudgeted, showCents = false)}",
+                modifier = Modifier.animateItem(
+                    fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                    placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                    fadeOutSpec = OrbitSprings.FloatEffectsFast
+                )
             )
         }
 
@@ -101,7 +112,12 @@ fun LazyListScope.budgetCategoryGroupItems(
         item(key = "unbudgeted_section_header", contentType = "section_header") {
             SectionHeader(
                 title = "Unbudgeted Spending",
-                subtitle = "${unbudgeted.size} categories • ${MoneyUtils.formatCents(totalUnbudgeted, showCents = false)}"
+                subtitle = "${unbudgeted.size} categories • ${MoneyUtils.formatCents(totalUnbudgeted, showCents = false)}",
+                modifier = Modifier.animateItem(
+                    fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                    placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                    fadeOutSpec = OrbitSprings.FloatEffectsFast
+                )
             )
         }
 
@@ -131,16 +147,24 @@ fun LazyListScope.budgetCategoryGroupItems(
 
     if (inactive.isNotEmpty()) {
         item(key = "inactive_categories_section", contentType = "inactive_section") {
-            InactiveBudgetCategoriesSection(
-                inactive = inactive,
-                expandedCategoryId = expandedCategoryId,
-                categoryTransactions = categoryTransactions,
-                onToggleExpand = onToggleExpand,
-                onEditBudget = onEditBudget,
-                onDeleteBudget = onDeleteBudget,
-                onViewTransactions = onViewTransactions,
-                isWideScreen = isWideScreen
-            )
+            Box(
+                modifier = Modifier.animateItem(
+                    fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                    placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                    fadeOutSpec = OrbitSprings.FloatEffectsFast
+                )
+            ) {
+                InactiveBudgetCategoriesSection(
+                    inactive = inactive,
+                    expandedCategoryId = expandedCategoryId,
+                    categoryTransactions = categoryTransactions,
+                    onToggleExpand = onToggleExpand,
+                    onEditBudget = onEditBudget,
+                    onDeleteBudget = onDeleteBudget,
+                    onViewTransactions = onViewTransactions,
+                    isWideScreen = isWideScreen
+                )
+            }
         }
     }
 }
@@ -280,9 +304,9 @@ private fun SpendingMixPanel(
 }
 
 @Composable
-private fun SectionHeader(title: String, subtitle: String) {
+private fun SectionHeader(title: String, subtitle: String, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -34,9 +34,11 @@ import app.overbay.orbit.data.model.UpcomingItem
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MatchedTransactionHistory
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitModalSheet
@@ -98,56 +100,58 @@ fun RecurringHistoryModal(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Summary stats hero
-            if (matches.isNotEmpty()) {
+            OrbitAccordionVisibility(visible = matches.isNotEmpty()) {
                 val totalCents = matches.sumOf { abs(it.transaction.effectiveAmountCents) }
-                val avgCents = totalCents / matches.size
+                val avgCents = if (matches.isNotEmpty()) totalCents / matches.size else 0L
 
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column {
-                            Text(
-                                text = "Historical Average",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = MoneyUtils.formatCents(avgCents),
-                                style = TabularNumStyle.copy(
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            )
-                        }
-
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "${matches.size} past charges",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            )
+                            Column {
+                                Text(
+                                    text = "Historical Average",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = MoneyUtils.formatCents(avgCents),
+                                    style = TabularNumStyle.copy(
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                )
+                            }
+
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Text(
+                                    text = "${matches.size} past charges",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
             }
 
             if (matches.isEmpty()) {
@@ -164,7 +168,7 @@ fun RecurringHistoryModal(
                         .fillMaxWidth()
                         .height(340.dp)
                 ) {
-                    items(matches) { match ->
+                    items(matches, key = { it.transaction.id }) { match ->
                         val txn = match.transaction
                         val cat = txn.effectiveCategoryId?.let { categoryMap[it] }
                         val acct = accountMap[txn.accountId]
@@ -184,31 +188,39 @@ fun RecurringHistoryModal(
                             cat?.labelWithEmoji
                         ).joinToString(" • ").ifBlank { null }
 
-                        OrbitCompactListRow(
-                            title = txn.effectiveDate,
-                            subtitle = subtitle,
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            trailingContent = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    OrbitBadge(
-                                        text = "${match.matchScore}% Match",
-                                        containerColor = badgeColor,
-                                        contentColor = textColor
-                                    )
-                                    Text(
-                                        text = "${if (isNegative) "-" else "+"}${MoneyUtils.formatCents(abs(txn.effectiveAmountCents))}",
-                                        style = TabularNumStyle.copy(
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isNegative) OrbitTheme.colors.expense else OrbitTheme.colors.income
+                        Box(
+                            modifier = Modifier.animateItem(
+                                fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                fadeOutSpec = OrbitSprings.FloatEffectsFast
+                            )
+                        ) {
+                            OrbitCompactListRow(
+                                title = txn.effectiveDate,
+                                subtitle = subtitle,
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                trailingContent = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OrbitBadge(
+                                            text = "${match.matchScore}% Match",
+                                            containerColor = badgeColor,
+                                            contentColor = textColor
                                         )
-                                    )
+                                        Text(
+                                            text = "${if (isNegative) "-" else "+"}${MoneyUtils.formatCents(abs(txn.effectiveAmountCents))}",
+                                            style = TabularNumStyle.copy(
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isNegative) OrbitTheme.colors.expense else OrbitTheme.colors.income
+                                            )
+                                        )
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }

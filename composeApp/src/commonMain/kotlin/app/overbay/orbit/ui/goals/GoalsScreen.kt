@@ -178,13 +178,19 @@ fun GoalsScreen(
 
                             // Mobile Focus Card for Selected Goal on compact phone screens
                             if (!isTwoPane && state.inspectingGoal != null) {
-                                item {
+                                item(key = "mobile_goal_focus", contentType = "mobile_focus") {
                                     val selected = state.inspectingGoal!!
                                     Surface(
                                         shape = RoundedCornerShape(20.dp),
                                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                                        modifier = Modifier.fillMaxWidth()
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .animateItem(
+                                                fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                                placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                                fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                            )
                                     ) {
                                         Column(
                                             modifier = Modifier.padding(16.dp),
@@ -228,12 +234,17 @@ fun GoalsScreen(
                             }
 
                             if (state.activeGoals.isNotEmpty()) {
-                                item {
+                                item(key = "active_goals_header") {
                                     Text(
                                         text = "Active Goals (${state.activeGoals.size})",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.animateItem(
+                                            fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                            placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                            fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                        )
                                     )
                                 }
 

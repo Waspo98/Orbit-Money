@@ -41,6 +41,7 @@ import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.calculators.retirement.LinkedRetirementAccountDetail
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.charts.chartHorizontalScrub
 import app.overbay.orbit.ui.components.charts.rememberSmoothScrubPosition
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -103,108 +104,97 @@ fun RetirementHistoryTrajectoryCard(
                 }
             }
 
-            if (filteredPoints.isEmpty()) {
-                EmptyStateCard(
-                    title = "No Historical Snapshots",
-                    description = "Historical investment balances will appear here as periodic balance snapshots accumulate."
-                )
-            } else {
-                // Proportional Account Mix Stacked Bar above chart
-                val latestPoint = filteredPoints.last()
-                val accountBalances = latestPoint.accounts
-                val totalAccountBal = accountBalances.sumOf { it.balanceCents }
-
-                if (totalAccountBal > 0L && accountBalances.isNotEmpty()) {
-                    OrbitStackedSegmentBar(
-                        segments = accountBalances.mapIndexed { index, acct ->
-                            OrbitBarSegment(
-                                key = acct.accountId,
-                                fraction = max(0.02f, acct.balanceCents.toFloat() / totalAccountBal.toFloat()),
-                                color = accountColorMap[acct.accountId] ?: palette[index % palette.size]
-                            )
-                        },
-                        height = 8.dp,
-                        cornerRadius = 4.dp,
-                        normalizeToFullWidth = true
+            var lastNonEmptyPoints by remember { mutableStateOf(filteredPoints) }
+            if (filteredPoints.isNotEmpty()) {
+                lastNonEmptyPoints = filteredPoints
+            }
+            AnimatedContent(
+                targetState = filteredPoints.isEmpty(),
+                transitionSpec = { orbitFadeContentTransform() },
+                label = "retirementHistoryEmpty"
+            ) { isEmpty ->
+                if (isEmpty || lastNonEmptyPoints.isEmpty()) {
+                    EmptyStateCard(
+                        title = "No Historical Snapshots",
+                        description = "Historical investment balances will appear here as periodic balance snapshots accumulate."
                     )
-                }
-
-                // Interactive Multi-Series Canvas Line Chart
-                InteractiveHistoryChart(
-                    points = filteredPoints,
-                    accountColorMap = accountColorMap,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                // Growth Summary Banner
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                } else {
+                    val activePoints = lastNonEmptyPoints
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column {
-                            Text("Latest Total Balance", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                            Text(MoneyUtils.formatCents(latestBalance, showCents = false), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("$selectedHorizon Change", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                            val isGain = diffCents >= 0L
-                            Text(
-                                text = "${if (isGain) "+" else ""}${MoneyUtils.formatCents(diffCents, showCents = false)} (${if (isGain) "+" else ""}${diffPercent.toInt()}%)",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isGain) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        // Proportional Account Mix Stacked Bar above chart
+                        val latestPoint = activePoints.last()
+                        val accountBalances = latestPoint.accounts
+                        val totalAccountBal = accountBalances.sumOf { it.balanceCents }
+
+                        if (totalAccountBal > 0L && accountBalances.isNotEmpty()) {
+                            OrbitStackedSegmentBar(
+                                segments = accountBalances.mapIndexed { index, acct ->
+                                    OrbitBarSegment(acct.accountId, max(0.02f, acct.balanceCents.toFloat() / totalAccountBal.toFloat()), accountColorMap[acct.accountId] ?: palette[index % palette.size])
+                                },
+                                height = 8.dp, cornerRadius = 4.dp, normalizeToFullWidth = true
                             )
                         }
-                    }
-                }
 
-                // Per-Account Change Over Selected Horizon
-                if (linkedAccounts.isNotEmpty() && filteredPoints.size >= 2) {
-                    val firstPt = filteredPoints.first()
-                    val lastPt = filteredPoints.last()
-
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "Account Growth Over $selectedHorizon",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                        // Interactive Multi-Series Canvas Line Chart
+                        InteractiveHistoryChart(
+                            points = activePoints,
+                            accountColorMap = accountColorMap,
+                            modifier = Modifier.fillMaxWidth()
                         )
 
-                        linkedAccounts.forEachIndexed { index, account ->
-                            val color = account.accountId?.let { accountColorMap[it] } ?: palette[index % palette.size]
-                            val startBal = firstPt.accounts.find { it.accountId == account.accountId }?.balanceCents ?: 0L
-                            val endBal = lastPt.accounts.find { it.accountId == account.accountId }?.balanceCents ?: account.balanceCents
-                            val changeCents = endBal - startBal
-                            val changePct = if (startBal > 0L) (changeCents.toDouble() / startBal.toDouble()) * 100.0 else 0.0
-                            val isGain = changeCents >= 0L
-
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Box(modifier = Modifier.height(10.dp).width(10.dp).background(color, RoundedCornerShape(2.dp)))
-                                        Text(account.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                                    }
+                        // Growth Summary Banner
+                        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Column {
+                                    Text("Latest Total Balance", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                    Text(MoneyUtils.formatCents(latestBalance, showCents = false), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("$selectedHorizon Change", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                    val isGain = diffCents >= 0L
                                     Text(
-                                        text = "${if (isGain) "+" else ""}${MoneyUtils.formatCompactCents(changeCents)} (${if (isGain) "+" else ""}${changePct.toInt()}%)",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.SemiBold,
+                                        text = "${if (isGain) "+" else ""}${MoneyUtils.formatCents(diffCents, showCents = false)} (${if (isGain) "+" else ""}${diffPercent.toInt()}%)",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
                                         color = if (isGain) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                                     )
+                                }
+                            }
+                        }
+
+                        // Per-Account Change Over Selected Horizon
+                        if (linkedAccounts.isNotEmpty() && activePoints.size >= 2) {
+                            val firstPt = activePoints.first()
+                            val lastPt = activePoints.last()
+
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(text = "Account Growth Over $selectedHorizon", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+
+                                linkedAccounts.forEachIndexed { index, account ->
+                                    val color = account.accountId?.let { accountColorMap[it] } ?: palette[index % palette.size]
+                                    val startBal = firstPt.accounts.find { it.accountId == account.accountId }?.balanceCents ?: 0L
+                                    val endBal = lastPt.accounts.find { it.accountId == account.accountId }?.balanceCents ?: account.balanceCents
+                                    val changeCents = endBal - startBal
+                                    val changePct = if (startBal > 0L) (changeCents.toDouble() / startBal.toDouble()) * 100.0 else 0.0
+                                    val isGain = changeCents >= 0L
+
+                                    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
+                                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                Box(modifier = Modifier.height(10.dp).width(10.dp).background(color, RoundedCornerShape(2.dp)))
+                                                Text(account.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                            }
+                                            Text(
+                                                text = "${if (isGain) "+" else ""}${MoneyUtils.formatCompactCents(changeCents)} (${if (isGain) "+" else ""}${changePct.toInt()}%)",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (isGain) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -266,11 +256,17 @@ private fun InteractiveHistoryChart(
     }
     val smoothScrubNorm = rememberSmoothScrubPosition(scrubNormTarget)
 
+    val readoutAlpha by animateFloatAsState(
+        targetValue = if (activePt != null) 1f else 0.5f,
+        animationSpec = OrbitSprings.FloatEffectsFast,
+        label = "retirementHistoryReadoutAlpha"
+    )
+
     Column(modifier = modifier) {
         // Constant-height readout bar (zero vertical layout shift on touch)
         Surface(
             shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = if (activePt != null) 1f else 0.5f),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = readoutAlpha),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 6.dp)

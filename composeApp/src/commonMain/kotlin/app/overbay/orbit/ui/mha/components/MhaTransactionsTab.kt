@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.mha.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,7 @@ import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.mha.MhaTransactionItem
 import app.overbay.orbit.ui.mha.MhaTransactionTabFilter
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -114,33 +116,39 @@ fun MhaTransactionsTab(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Transaction List
-            if (transactions.isEmpty()) {
-                EmptyStateCard(
-                    title = "No Transactions Found",
-                    description = if (searchQuery.isNotEmpty()) "No transactions match '$searchQuery'" else "No transactions in this queue."
-                )
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    transactions.forEach { item ->
-                        MhaTransactionRow(
-                            item = item,
-                            onToggle = {
-                                haptics.tick()
-                                onToggleEligible(item.id, item.isEligible)
-                            },
-                            onResetOverride = {
-                                haptics.tick()
-                                onResetEligible(item.id)
-                            },
-                            onIgnore = {
-                                haptics.tick()
-                                onIgnoreFromBudget(item.id, !item.transaction.effectiveIsIgnored)
-                            },
-                            onInspect = {
-                                haptics.tick()
-                                onInspectTransaction(item.id)
-                            }
-                        )
+            AnimatedContent(
+                targetState = transactions.isEmpty(),
+                transitionSpec = { orbitFadeContentTransform() },
+                label = "mhaTransactionsListState"
+            ) { isEmpty ->
+                if (isEmpty) {
+                    EmptyStateCard(
+                        title = "No Transactions Found",
+                        description = if (searchQuery.isNotEmpty()) "No transactions match '$searchQuery'" else "No transactions in this queue."
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        transactions.forEach { item ->
+                            MhaTransactionRow(
+                                item = item,
+                                onToggle = {
+                                    haptics.tick()
+                                    onToggleEligible(item.id, item.isEligible)
+                                },
+                                onResetOverride = {
+                                    haptics.tick()
+                                    onResetEligible(item.id)
+                                },
+                                onIgnore = {
+                                    haptics.tick()
+                                    onIgnoreFromBudget(item.id, !item.transaction.effectiveIsIgnored)
+                                },
+                                onInspect = {
+                                    haptics.tick()
+                                    onInspectTransaction(item.id)
+                                }
+                            )
+                        }
                     }
                 }
             }

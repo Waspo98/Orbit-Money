@@ -1,5 +1,12 @@
 package app.overbay.orbit.ui.accounts.cards
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -49,6 +58,17 @@ fun CardPerkRow(
     val haptics = LocalOrbitHaptics.current
     val isFullyUsed = if (valueCents > 0L) usedCents >= valueCents else usedCents > 0L
     val isPartial = valueCents > 0L && usedCents > 0L && usedCents < valueCents
+
+    val titleColor by animateColorAsState(
+        targetValue = if (isFullyUsed) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "perkTitleColor"
+    )
+    val valueColor by animateColorAsState(
+        targetValue = if (isFullyUsed) OrbitTheme.colors.income else MaterialTheme.colorScheme.primary,
+        animationSpec = OrbitSprings.ColorEffectsFast,
+        label = "perkValueColor"
+    )
 
     Surface(
         shape = RoundedCornerShape(12.dp),
@@ -69,19 +89,28 @@ fun CardPerkRow(
                 },
                 modifier = Modifier.size(48.dp)
             ) {
-                if (isFullyUsed) {
-                    Icon(
-                        imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = "Perk Used",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(22.dp)
-                            .border(2.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
-                    )
+                AnimatedContent(
+                    targetState = isFullyUsed,
+                    transitionSpec = {
+                        (scaleIn(OrbitSprings.FloatSpatialFast, initialScale = 0.72f) + fadeIn(OrbitSprings.FloatEffectsFast)) togetherWith
+                            (scaleOut(OrbitSprings.FloatSpatialFast, targetScale = 0.72f) + fadeOut(OrbitSprings.FloatEffectsFast))
+                    },
+                    label = "perkCheckToggle"
+                ) { used ->
+                    if (used) {
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = "Perk Used",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .border(2.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
+                        )
+                    }
                 }
             }
 
@@ -99,7 +128,7 @@ fun CardPerkRow(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
-                    color = if (isFullyUsed) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+                    color = titleColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -147,7 +176,7 @@ fun CardPerkRow(
                     text = MoneyUtils.formatCents(valueCents),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isFullyUsed) OrbitTheme.colors.income else MaterialTheme.colorScheme.primary,
+                    color = valueColor,
                     modifier = Modifier.padding(end = 8.dp)
                 )
             }

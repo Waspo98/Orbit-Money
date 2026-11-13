@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.upcoming.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.UpcomingItem
 import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
+import app.overbay.orbit.ui.components.orbitTactilePress
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
@@ -63,26 +68,55 @@ fun UpcomingCalendarStrip(
             val dayOfWeek = parsed?.dayOfWeek?.name?.take(3) ?: ""
             val dayNum = parsed?.dayOfMonth?.toString() ?: ""
 
+            val pillColor by animateColorAsState(
+                targetValue = when {
+                    isSelected -> MaterialTheme.colorScheme.primaryContainer
+                    isToday -> MaterialTheme.colorScheme.surfaceContainerHigh
+                    else -> MaterialTheme.colorScheme.surface
+                },
+                animationSpec = OrbitSprings.ColorEffectsFast,
+                label = "calendarPillColor"
+            )
+            val pillBorderColor by animateColorAsState(
+                targetValue = when {
+                    isSelected -> MaterialTheme.colorScheme.primary
+                    isToday -> MaterialTheme.colorScheme.outline
+                    else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                },
+                animationSpec = OrbitSprings.ColorEffectsFast,
+                label = "calendarPillBorder"
+            )
+            val dayTextColor by animateColorAsState(
+                targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                animationSpec = OrbitSprings.ColorEffectsFast,
+                label = "calendarDayTextColor"
+            )
+            val numTextColor by animateColorAsState(
+                targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                animationSpec = OrbitSprings.ColorEffectsFast,
+                label = "calendarNumTextColor"
+            )
+            val dotColor by animateColorAsState(
+                targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                animationSpec = OrbitSprings.ColorEffectsFast,
+                label = "calendarDotColor"
+            )
+
             Surface(
                 onClick = {
                     haptics.tick()
                     onSelectDate(if (isSelected) null else dateIso)
                 },
                 shape = RoundedCornerShape(16.dp),
-                color = when {
-                    isSelected -> MaterialTheme.colorScheme.primaryContainer
-                    isToday -> MaterialTheme.colorScheme.surfaceContainerHigh
-                    else -> MaterialTheme.colorScheme.surface
-                },
+                color = pillColor,
                 border = BorderStroke(
                     width = if (isSelected || isToday) 1.5.dp else 1.dp,
-                    color = when {
-                        isSelected -> MaterialTheme.colorScheme.primary
-                        isToday -> MaterialTheme.colorScheme.outline
-                        else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-                    }
+                    color = pillBorderColor
                 ),
-                modifier = Modifier.width(52.dp).height(74.dp)
+                modifier = Modifier
+                    .width(52.dp)
+                    .height(74.dp)
+                    .orbitTactilePress()
             ) {
                 Column(
                     modifier = Modifier.padding(vertical = 8.dp),
@@ -93,7 +127,7 @@ fun UpcomingCalendarStrip(
                         text = dayOfWeek,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = dayTextColor
                     )
 
                     Spacer(modifier = Modifier.height(2.dp))
@@ -102,22 +136,23 @@ fun UpcomingCalendarStrip(
                         text = dayNum,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        color = numTextColor
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    if (hasItems) {
-                        Box(
-                            modifier = Modifier
-                                .size(5.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                                )
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.size(5.dp))
+                    Box(
+                        modifier = Modifier.size(5.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        OrbitScaleBadgeVisibility(visible = hasItems) {
+                            Box(
+                                modifier = Modifier
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(dotColor)
+                            )
+                        }
                     }
                 }
             }
