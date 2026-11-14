@@ -143,22 +143,6 @@ fun LazyListScope.budgetCategoryGroupItems(
             )
         }
     }
-
-    val allActive = (budgeted + unbudgeted).filter { it.spentCents > 0L }
-    if (allActive.isNotEmpty()) {
-        item(key = "budget_spending_mix", contentType = "spending_mix") {
-            SpendingMixPanel(
-                items = allActive,
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .animateItem(
-                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
-                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
-                        fadeOutSpec = OrbitSprings.FloatEffectsFast
-                    )
-            )
-        }
-    }
 }
 
 @Composable

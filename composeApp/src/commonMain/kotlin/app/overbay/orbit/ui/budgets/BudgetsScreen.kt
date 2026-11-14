@@ -37,6 +37,7 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.budgets.components.BudgetDetailInspectorPane
 import app.overbay.orbit.ui.budgets.components.BudgetSummaryHeroCard
+import app.overbay.orbit.ui.budgets.components.SpendingMixPanel
 import app.overbay.orbit.ui.budgets.components.budgetCategoryGroupItems
 import app.overbay.orbit.ui.budgets.dialogs.AddBudgetCategorySheet
 import app.overbay.orbit.ui.budgets.dialogs.BudgetAmountEditorSheet
@@ -199,6 +200,14 @@ fun BudgetsScreen(
                         val startPad = if (isTwoPane) 20.dp else 16.dp
                         val endPad = if (isTwoPane) 0.dp else 16.dp
 
+                        val openCategoryTransactions: (Long) -> Unit = { categoryId ->
+                            val (y, m) = LocalDateUtils.parseYearMonth(state.selectedMonth) ?: Pair(2026, 1)
+                            val days = LocalDateUtils.daysInMonth(y, m)
+                            val start = "${state.selectedMonth}-01"
+                            val end = "${state.selectedMonth}-${days.toString().padStart(2, '0')}"
+                            onNavigate(OrbitNavKey.Transactions(categoryId = categoryId, startDate = start, endDate = end))
+                        }
+
                         val masterList: @Composable () -> Unit = {
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
@@ -228,16 +237,35 @@ fun BudgetsScreen(
                                     onToggleExpand = { viewModel.toggleExpandCategory(it) },
                                     onEditBudget = { viewModel.openBudgetEditor(it) },
                                     onDeleteBudget = { viewModel.deleteBudget(it) },
-                                    onViewTransactions = { categoryId ->
-                                        val (y, m) = LocalDateUtils.parseYearMonth(state.selectedMonth) ?: Pair(2026, 1)
-                                        val days = LocalDateUtils.daysInMonth(y, m)
-                                        val start = "${state.selectedMonth}-01"
-                                        val end = "${state.selectedMonth}-${days.toString().padStart(2, '0')}"
-                                        onNavigate(OrbitNavKey.Transactions(categoryId = categoryId, startDate = start, endDate = end))
-                                    },
+                                    onViewTransactions = openCategoryTransactions,
                                     monthProgressFraction = state.monthProgressFraction,
                                     isWideScreen = isTwoPane
                                 )
+
+                                val allActive = (state.budgetedItems + state.unbudgetedItems).filter { it.spentCents > 0L }
+                                if (allActive.isNotEmpty()) {
+                                    item(key = "budget_spending_mix", contentType = "spending_mix") {
+                                        SpendingMixPanel(
+                                            items = allActive,
+                                            totalBudgetedCents = state.totalBudgetedCents,
+                                            mode = state.spendingMixMode,
+                                            selectedKey = state.selectedSpendingMixKey,
+                                            onSelectMode = { viewModel.setSpendingMixMode(it) },
+                                            onToggleSlice = { viewModel.toggleSpendingMixKey(it) },
+                                            onClearSelection = { viewModel.clearSpendingMixSelection() },
+                                            onInspectCategory = { viewModel.inspectCategoryFromMix(it) },
+                                            onEditBudget = { viewModel.openBudgetEditor(it) },
+                                            onViewTransactions = openCategoryTransactions,
+                                            modifier = Modifier
+                                                .padding(top = 4.dp)
+                                                .animateItem(
+                                                    fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                                                    placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                                                    fadeOutSpec = OrbitSprings.FloatEffectsFast
+                                                )
+                                        )
+                                    }
+                                }
                             }
                         }
 

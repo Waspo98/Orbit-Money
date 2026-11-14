@@ -271,4 +271,50 @@ class BudgetsViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testSpendingMixState_modeToggleSelectionAndInspect() = runTest(testDispatcher) {
+        val currentMonth = LocalDateUtils.currentYearMonth()
+        val catUnbudgeted = Category(id = 77L, name = "Travel", isIncome = false, isTransfer = false)
+        repository.saveCategory(catUnbudgeted)
+        repository.saveTransaction(
+            Transaction(
+                id = 88L,
+                accountId = 1L,
+                originalDate = "$currentMonth-03",
+                originalMerchant = "Airline",
+                originalAmountCents = -32000L,
+                originalCategoryId = 77L
+            )
+        )
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(SpendingMixMode.BY_CATEGORY, viewModel.uiState.value.spendingMixMode)
+        assertNull(viewModel.uiState.value.selectedSpendingMixKey)
+
+        viewModel.setSpendingMixMode(SpendingMixMode.COVERAGE)
+        viewModel.toggleSpendingMixKey("cat:77")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(SpendingMixMode.COVERAGE, viewModel.uiState.value.spendingMixMode)
+        assertEquals("cat:77", viewModel.uiState.value.selectedSpendingMixKey)
+
+        // Inspecting an unbudgeted category auto-expands Everything Else and selects the category
+        viewModel.inspectCategoryFromMix(77L)
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.showUnbudgeted)
+        assertEquals(77L, viewModel.uiState.value.expandedCategoryId)
+
+        // Month navigation clears selected Spending Mix slice
+        viewModel.onPreviousMonth()
+        testScheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.selectedSpendingMixKey)
+
+        collectJob.cancel()
+    }
 }

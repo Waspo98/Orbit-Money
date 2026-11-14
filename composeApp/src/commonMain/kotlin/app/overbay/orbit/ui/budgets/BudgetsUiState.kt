@@ -5,6 +5,11 @@ import app.overbay.orbit.data.model.CategorySortOption
 import app.overbay.orbit.data.model.MonthlyBudgetOverview
 import app.overbay.orbit.data.model.Transaction
 
+enum class SpendingMixMode {
+    BY_CATEGORY,
+    COVERAGE
+}
+
 data class BudgetsUiState(
     val selectedMonth: String = "",
     val monthLabel: String = "",
@@ -19,6 +24,8 @@ data class BudgetsUiState(
     val expandedCategoryId: Long? = null,
     val showUnbudgeted: Boolean = false,
     val showInactive: Boolean = false,
+    val spendingMixMode: SpendingMixMode = SpendingMixMode.BY_CATEGORY,
+    val selectedSpendingMixKey: String? = null,
     val categoryTransactions: Map<Long, List<Transaction>> = emptyMap(),
     val editingItem: CategoryBudgetOverviewItem? = null,
     val showEditorSheet: Boolean = false,

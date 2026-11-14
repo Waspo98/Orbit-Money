@@ -31,6 +31,8 @@ class BudgetsViewModel(
     private val _expandedCategoryId = MutableStateFlow<Long?>(null)
     private val _showUnbudgeted = MutableStateFlow(false)
     private val _showInactive = MutableStateFlow(false)
+    private val _spendingMixMode = MutableStateFlow(SpendingMixMode.BY_CATEGORY)
+    private val _selectedSpendingMixKey = MutableStateFlow<String?>(null)
     private val _editingItem = MutableStateFlow<CategoryBudgetOverviewItem?>(null)
     private val _showEditorSheet = MutableStateFlow(false)
     private val _showAddCategorySheet = MutableStateFlow(false)
@@ -74,9 +76,11 @@ class BudgetsViewModel(
     private val sectionsFlow = combine(
         _expandedCategoryId,
         _showUnbudgeted,
-        _showInactive
-    ) { expandedCatId, showUnbudgeted, showInactive ->
-        BudgetSectionsState(expandedCatId, showUnbudgeted, showInactive)
+        _showInactive,
+        _spendingMixMode,
+        _selectedSpendingMixKey
+    ) { expandedCatId, showUnbudgeted, showInactive, mixMode, mixKey ->
+        BudgetSectionsState(expandedCatId, showUnbudgeted, showInactive, mixMode, mixKey)
     }
 
     private val controlFlow = combine(
@@ -140,6 +144,8 @@ class BudgetsViewModel(
             expandedCategoryId = control.sections.expandedCategoryId,
             showUnbudgeted = control.sections.showUnbudgeted,
             showInactive = control.sections.showInactive,
+            spendingMixMode = control.sections.spendingMixMode,
+            selectedSpendingMixKey = control.sections.selectedSpendingMixKey,
             categoryTransactions = categoryTransactions,
             editingItem = control.sheets.editingItem,
             showEditorSheet = control.sheets.showEditorSheet,
@@ -155,21 +161,25 @@ class BudgetsViewModel(
 
     fun onPreviousMonth() {
         _selectedMonth.value = LocalDateUtils.addMonthsToYearMonth(_selectedMonth.value, -1)
+        _selectedSpendingMixKey.value = null
     }
 
     fun onNextMonth() {
         val maxFuture = LocalDateUtils.addMonthsToYearMonth(currentMonth, 24)
         if (_selectedMonth.value < maxFuture) {
             _selectedMonth.value = LocalDateUtils.addMonthsToYearMonth(_selectedMonth.value, 1)
+            _selectedSpendingMixKey.value = null
         }
     }
 
     fun jumpToMonth(month: String) {
         _selectedMonth.value = month
+        _selectedSpendingMixKey.value = null
     }
 
     fun onResetToCurrentMonth() {
         _selectedMonth.value = currentMonth
+        _selectedSpendingMixKey.value = null
     }
 
     fun setSortOption(option: CategorySortOption) {
@@ -195,6 +205,27 @@ class BudgetsViewModel(
 
     fun toggleShowInactive() {
         _showInactive.value = !_showInactive.value
+    }
+
+    fun setSpendingMixMode(mode: SpendingMixMode) {
+        _spendingMixMode.value = mode
+    }
+
+    fun toggleSpendingMixKey(key: String) {
+        _selectedSpendingMixKey.value = if (_selectedSpendingMixKey.value == key) null else key
+    }
+
+    fun clearSpendingMixSelection() {
+        _selectedSpendingMixKey.value = null
+    }
+
+    fun inspectCategoryFromMix(categoryId: Long) {
+        if (uiState.value.unbudgetedItems.any { it.category.id == categoryId }) {
+            _showUnbudgeted.value = true
+        }
+        _expandedCategoryId.value = categoryId
+        _showEditorSheet.value = false
+        _editingItem.value = null
     }
 
     fun dismissInspectorPane() {
@@ -266,7 +297,9 @@ class BudgetsViewModel(
     private data class BudgetSectionsState(
         val expandedCategoryId: Long?,
         val showUnbudgeted: Boolean,
-        val showInactive: Boolean
+        val showInactive: Boolean,
+        val spendingMixMode: SpendingMixMode,
+        val selectedSpendingMixKey: String?
     )
 
     private data class BudgetSheetsState(
