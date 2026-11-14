@@ -6,7 +6,10 @@ import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.domain.ReviewQueueCandidate
 import app.overbay.orbit.domain.ReviewQueueEngine
+import app.overbay.orbit.ui.dashboard.dialogs.ReviewSheetStage
+import app.overbay.orbit.ui.dashboard.dialogs.resolveReviewSheetStage
 import app.overbay.orbit.util.PlatformStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -363,5 +366,45 @@ class CategorizeRecentReviewTest {
         assertEquals(0, viewModel.uiState.value.reviewQueueCount)
 
         collectJob.cancel()
+    }
+
+    @Test
+    fun resolveReviewSheetStage_updatesHeaderTitleOutsideSwipeQuestion() {
+        val candidate = ReviewQueueCandidate(
+            id = 500L,
+            merchant = "Coffee Shop",
+            originalMerchant = "COFFEE SHOP",
+            originalDescription = null,
+            amountCents = -500L,
+            isExpense = true,
+            formattedAmount = "-$5.00",
+            dateIso = "2026-11-01",
+            dateDisplay = "Nov 1, 2026",
+            accountId = 1L,
+            accountName = "Checking",
+            categoryId = null,
+            categoryName = null,
+            categoryColor = "",
+            categoryIcon = null,
+            suggestedCategoryId = null,
+            reviewReasons = listOf("uncategorized"),
+            merchantLogoUrl = null
+        )
+
+        val swipe = CategorizeReviewState(items = listOf(candidate), batchReviewed = 3)
+        assertEquals(ReviewSheetStage.SWIPE_STAGE, resolveReviewSheetStage(swipe))
+        assertEquals("Is this category correct?", resolveReviewSheetStage(swipe).headerTitle)
+
+        val picker = swipe.copy(isCategoryPickerOpen = true)
+        assertEquals(ReviewSheetStage.CATEGORY_PICKER, resolveReviewSheetStage(picker))
+        assertEquals("Select Category", resolveReviewSheetStage(picker).headerTitle)
+
+        val batchComplete = CategorizeReviewState(items = listOf(candidate), batchReviewed = 10)
+        assertEquals(ReviewSheetStage.BATCH_COMPLETE, resolveReviewSheetStage(batchComplete))
+        assertEquals("Stack Complete", resolveReviewSheetStage(batchComplete).headerTitle)
+
+        val allDone = CategorizeReviewState(allDone = true)
+        assertEquals(ReviewSheetStage.ALL_DONE, resolveReviewSheetStage(allDone))
+        assertEquals("All Caught Up", resolveReviewSheetStage(allDone).headerTitle)
     }
 }

@@ -38,7 +38,6 @@ import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.HeroScrollState
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
-import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.components.rememberOrbitLazyListState
@@ -115,16 +114,6 @@ fun DashboardScreen(
                             .weight(1f)
                             .fillMaxHeight()
                     )
-
-                    OrbitScaleBadgeVisibility(visible = uiState.reviewQueueCount > 0) {
-                        CanopyIconButton(
-                            icon = OrbitIcons.Categories,
-                            contentDescription = "Categorize Recent Transactions",
-                            onClick = { onAction(DashboardAction.OpenCategorizeReview) },
-                            buttonSize = barHeight,
-                            badgeCount = uiState.reviewQueueCount
-                        )
-                    }
 
                     CanopyIconButton(
                         icon = OrbitIcons.ViewSliders,

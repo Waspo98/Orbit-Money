@@ -44,7 +44,22 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.SelectableListRow
+import app.overbay.orbit.ui.dashboard.CategorizeReviewState
 import app.overbay.orbit.util.LocalOrbitHaptics
+
+internal enum class ReviewSheetStage(val headerTitle: String) {
+    ALL_DONE("All Caught Up"),
+    BATCH_COMPLETE("Stack Complete"),
+    CATEGORY_PICKER("Select Category"),
+    SWIPE_STAGE("Is this category correct?")
+}
+
+internal fun resolveReviewSheetStage(state: CategorizeReviewState): ReviewSheetStage = when {
+    state.allDone -> ReviewSheetStage.ALL_DONE
+    state.isBatchComplete -> ReviewSheetStage.BATCH_COMPLETE
+    state.currentTxn != null && state.isCategoryPickerOpen -> ReviewSheetStage.CATEGORY_PICKER
+    else -> ReviewSheetStage.SWIPE_STAGE
+}
 
 /**
  * Empty state shown when all transactions are categorized (`allDone`) or when a 10-card stack completes (`batchComplete`).

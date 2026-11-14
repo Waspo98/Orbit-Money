@@ -45,13 +45,6 @@ import app.overbay.orbit.ui.rules.sheets.RuleEditorSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.coroutines.launch
 
-private enum class ReviewSheetStage {
-    ALL_DONE,
-    BATCH_COMPLETE,
-    CATEGORY_PICKER,
-    SWIPE_STAGE
-}
-
 /**
  * Interactive "Categorize Recent Transactions" modal dialog matching `TransactionReviewModal` on `main`.
  */
@@ -86,21 +79,16 @@ fun TransactionReviewSheet(
                 .padding(20.dp)
                 .verticalScroll(rememberScrollState())
         ) {
+            val reviewStage = resolveReviewSheetStage(state)
+
             OrbitSheetHeader(
-                title = "Is this category correct?",
+                title = reviewStage.headerTitle,
                 onDismiss = { onAction(DashboardAction.CloseCategorizeReview) }
             )
 
             Spacer(modifier = Modifier.height(14.dp))
             HorizontalDivider(color = colors.cardBorder)
             Spacer(modifier = Modifier.height(14.dp))
-
-            val reviewStage = when {
-                state.allDone -> ReviewSheetStage.ALL_DONE
-                state.isBatchComplete -> ReviewSheetStage.BATCH_COMPLETE
-                currentTxn != null && state.isCategoryPickerOpen -> ReviewSheetStage.CATEGORY_PICKER
-                else -> ReviewSheetStage.SWIPE_STAGE
-            }
 
             AnimatedContent(
                 targetState = reviewStage,
