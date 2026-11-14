@@ -50,7 +50,11 @@ import {
   parseInteger,
   readIdParam
 } from '../lib/routeParams.js';
-import { effectiveCategoryIdSql } from '../lib/effectiveSql.js';
+import {
+  effectiveCategoryIdSql,
+  isUncategorizedCategoryName,
+  uncategorizedTransactionWhereSql
+} from '../lib/effectiveSql.js';
 import { appendUserEditAssignment } from '../lib/editAssignments.js';
 
 const router = express.Router();
@@ -211,10 +215,11 @@ function looksNoisyMerchant(row) {
   return false;
 }
 
-function buildMerchantPatterns(rows) {
+function buildMerchantPatterns(rows, categoriesById = null) {
   const patterns = new Map();
   for (const row of rows) {
     if (!row.category_id || row.is_transfer || row.is_ignored) continue;
+    if (categoriesById && isUncategorizedCategoryName(categoriesById.get(row.category_id)?.name)) continue;
     const key = normalizeMerchant(row.merchant);
     if (!key || key.length < 3) continue;
     if (!patterns.has(key)) patterns.set(key, { total: 0, categories: new Map() });
@@ -293,7 +298,8 @@ function buildFilterWhere(q, householdId) {
       args.push(...catIds);
     }
     if (includeUncategorized) {
-      parts.push(`${EFFECTIVE_CATEGORY_ID_SQL} IS NULL`);
+      parts.push(uncategorizedTransactionWhereSql());
+      args.push(householdId);
     }
     wheres.push(`(${parts.join(' OR ')})`);
   }
@@ -518,7 +524,7 @@ router.get('/review-queue', requireAuth, (req, res) => {
       .all(householdId)
       .map(hydrate);
 
-    const patterns = buildMerchantPatterns(rows);
+    const patterns = buildMerchantPatterns(rows, categoriesById);
     const candidates = [];
 
     for (const row of rows) {
@@ -527,7 +533,7 @@ router.get('/review-queue', requireAuth, (req, res) => {
       const reasons = [];
       const suggestedCategoryId = changedCategoryPattern(row, patterns);
 
-      if (!row.category_id || String(categoryName || '').toLowerCase() === 'uncategorized') {
+      if (!row.is_transfer && (!row.category_id || isUncategorizedCategoryName(categoryName))) {
         reasons.push('uncategorized');
       }
       if (looksNoisyMerchant(row)) {

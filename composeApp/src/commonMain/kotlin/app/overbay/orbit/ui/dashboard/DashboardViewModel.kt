@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.abs
 
 /**
@@ -45,6 +47,7 @@ class DashboardViewModel(
     private val _retirementAge = MutableStateFlow(repository.preferences.value.dashboardRetirementAge)
     private val _retirementPreset = MutableStateFlow(repository.preferences.value.dashboardRetirementPreset.ifBlank { "balanced" })
     private val _reviewState = MutableStateFlow(CategorizeReviewState())
+    private val reviewPrefsMutex = Mutex()
 
     init {
         viewModelScope.launch(computeDispatcher) {
@@ -325,14 +328,14 @@ class DashboardViewModel(
         )
     }
 
-    private suspend fun recordHandledReviewId(transactionId: Long): Set<Long> {
+    private suspend fun recordHandledReviewId(transactionId: Long): Set<Long> = reviewPrefsMutex.withLock {
         val currentPrefs = repository.preferences.value
         val existing = currentPrefs.handledReviewTransactionIds
         val updatedIds = if (transactionId in existing) existing else existing + transactionId
         if (updatedIds != existing) {
             repository.updatePreferences(currentPrefs.copy(handledReviewTransactionIds = updatedIds))
         }
-        return updatedIds.toSet()
+        updatedIds.toSet()
     }
 
     fun approveReviewTransaction() {

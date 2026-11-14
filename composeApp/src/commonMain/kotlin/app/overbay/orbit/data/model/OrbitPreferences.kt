@@ -119,16 +119,15 @@ data class OrbitPreferences(
             DashboardWidgetConfig("this_month", "This Month", isVisible = true, sortOrder = 3),
             DashboardWidgetConfig("biggest_transactions", "Biggest Monthly Transactions", isVisible = true, sortOrder = 4),
             DashboardWidgetConfig("subscriptions", "Subscriptions / Recurring", isVisible = true, sortOrder = 5),
-            DashboardWidgetConfig("uncategorized", "Uncategorized Transactions", isVisible = true, sortOrder = 6),
-            DashboardWidgetConfig("categorize_recent", "Categorize Recent Transactions", isVisible = true, sortOrder = 7),
-            DashboardWidgetConfig("month_comparison", "Month vs Last Month", isVisible = true, sortOrder = 8),
-            DashboardWidgetConfig("goals_progress", "Goals Progress", isVisible = true, sortOrder = 9),
-            DashboardWidgetConfig("goal_focus", "Goal Focus", isVisible = true, sortOrder = 10),
-            DashboardWidgetConfig("retirement", "Retirement Snapshot", isVisible = true, sortOrder = 11),
-            DashboardWidgetConfig("mha", "MHA Tracker Summary", isVisible = true, sortOrder = 12),
-            DashboardWidgetConfig("upcoming_bills", "Upcoming: Bills and Income", isVisible = true, sortOrder = 13),
-            DashboardWidgetConfig("mortgage", "Mortgage Snapshot", isVisible = true, sortOrder = 14),
-            DashboardWidgetConfig("recent_transactions", "Recent Transactions", isVisible = true, sortOrder = 15, wideSpan = 2)
+            DashboardWidgetConfig("categorize_recent", "Categorize Recent Transactions", isVisible = true, sortOrder = 6),
+            DashboardWidgetConfig("month_comparison", "Month vs Last Month", isVisible = true, sortOrder = 7),
+            DashboardWidgetConfig("goals_progress", "Goals Progress", isVisible = true, sortOrder = 8),
+            DashboardWidgetConfig("goal_focus", "Goal Focus", isVisible = true, sortOrder = 9),
+            DashboardWidgetConfig("retirement", "Retirement Snapshot", isVisible = true, sortOrder = 10),
+            DashboardWidgetConfig("mha", "MHA Tracker Summary", isVisible = true, sortOrder = 11),
+            DashboardWidgetConfig("upcoming_bills", "Upcoming: Bills and Income", isVisible = true, sortOrder = 12),
+            DashboardWidgetConfig("mortgage", "Mortgage Snapshot", isVisible = true, sortOrder = 13),
+            DashboardWidgetConfig("recent_transactions", "Recent Transactions", isVisible = true, sortOrder = 14, wideSpan = 2)
         )
 
         fun defaultCardPerksWidgets(): List<DashboardWidgetConfig> = listOf(

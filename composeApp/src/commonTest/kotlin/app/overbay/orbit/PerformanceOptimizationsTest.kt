@@ -4,6 +4,7 @@ import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.engine.LocalSnapshotEngine
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.MerchantLogo
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
@@ -84,6 +85,23 @@ class PerformanceOptimizationsTest {
         assertEquals(2, scan.uncategorizedCount)
         // Stable tie-breaker on same date ("2026-10-18"): id=12 encountered before id=13
         assertEquals(listOf(12L, 13L), scan.topUncategorized.map { it.id })
+
+        // Verify unified isUncategorized with category map matches seeded "Uncategorized" and excludes null transfers
+        val catMap = mapOf(99L to Category(id = 99L, name = "Uncategorized"))
+        val scanUnified = DashboardTransactionAggregator.scan(
+            transactions = transactions + listOf(
+                Transaction(id = 20L, accountId = 1L, originalDate = "2026-10-26", originalMerchant = "DB Uncat", originalAmountCents = -1_500L, originalCategoryId = 99L),
+                Transaction(id = 21L, accountId = 1L, originalDate = "2026-10-27", originalMerchant = "Null Transfer", originalAmountCents = -2_000L, originalCategoryId = null, isTransfer = true)
+            ),
+            accountById = accountById,
+            selectedMonth = "2026-10",
+            priorMonth = "2026-09",
+            currentYearStr = "2026",
+            hiddenBiggestIds = hiddenIds,
+            categoryById = catMap
+        )
+        assertEquals(3, scanUnified.uncategorizedCount)
+        assertEquals(20L, scanUnified.topUncategorized.first().id)
         // Recent top-5 sorts by effectiveDate DESC then id DESC (includes transfers, excludes ignored)
         val expectedRecentIds = transactions
             .filter { !it.effectiveIsIgnored }

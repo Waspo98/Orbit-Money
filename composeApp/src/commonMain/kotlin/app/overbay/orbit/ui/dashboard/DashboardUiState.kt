@@ -26,16 +26,15 @@ enum class DashboardCardType(
     CASHFLOW_HERO("this_month", "This Month", "Income, expenses, and net cash flow.", 3),
     BIGGEST_TRANSACTIONS("biggest_transactions", "Biggest Monthly Transactions", "Top 5 current-month expense transactions with dashboard-only hiding.", 4),
     SUBSCRIPTIONS("subscriptions", "Subscriptions / Recurring", "Saved subscription items from Upcoming.", 5),
-    UNCATEGORIZED("uncategorized", "Uncategorized Transactions", "Recent transactions that need a category.", 6),
-    CATEGORIZE_RECENT("categorize_recent", "Categorize Recent Transactions", "Swipe through transactions that need a quick category check.", 7),
-    MONTH_COMPARISON("month_comparison", "Month vs Last Month", "Spending, income, and net change.", 8),
-    GOALS_PROGRESS("goals_progress", "Goals Progress", "Overall progress across active goals.", 9),
-    GOAL_FOCUS("goal_focus", "Goal Focus", "One goal that deserves attention.", 10),
-    RETIREMENT_SNAPSHOT("retirement", "Retirement Snapshot", "Linked retirement balance and contributions.", 11),
-    MHA_SUMMARY("mha", "MHA Tracker Summary", "Year-to-date MHA eligible spending.", 12),
-    UPCOMING_BILLS("upcoming_bills", "Upcoming: Bills and Income", "Saved bills, subscriptions, and income.", 13),
-    MORTGAGE_SNAPSHOT("mortgage", "Mortgage Snapshot", "Home value, balance, and equity.", 14),
-    RECENT_TRANSACTIONS("recent_transactions", "Recent Transactions", "Latest activity with full transaction actions.", 15, defaultWideSpan = 2);
+    CATEGORIZE_RECENT("categorize_recent", "Categorize Recent Transactions", "Swipe through transactions that need a quick category check.", 6),
+    MONTH_COMPARISON("month_comparison", "Month vs Last Month", "Spending, income, and net change.", 7),
+    GOALS_PROGRESS("goals_progress", "Goals Progress", "Overall progress across active goals.", 8),
+    GOAL_FOCUS("goal_focus", "Goal Focus", "One goal that deserves attention.", 9),
+    RETIREMENT_SNAPSHOT("retirement", "Retirement Snapshot", "Linked retirement balance and contributions.", 10),
+    MHA_SUMMARY("mha", "MHA Tracker Summary", "Year-to-date MHA eligible spending.", 11),
+    UPCOMING_BILLS("upcoming_bills", "Upcoming: Bills and Income", "Saved bills, subscriptions, and income.", 12),
+    MORTGAGE_SNAPSHOT("mortgage", "Mortgage Snapshot", "Home value, balance, and equity.", 13),
+    RECENT_TRANSACTIONS("recent_transactions", "Recent Transactions", "Latest activity with full transaction actions.", 14, defaultWideSpan = 2);
 
     companion object {
         fun fromWidgetId(widgetId: String): DashboardCardType? {
@@ -50,7 +49,6 @@ enum class DashboardCardType(
                     "this_month", "cashflow_hero" -> entry == CASHFLOW_HERO
                     "biggest_transactions" -> entry == BIGGEST_TRANSACTIONS
                     "subscriptions", "recurring" -> entry == SUBSCRIPTIONS
-                    "uncategorized" -> entry == UNCATEGORIZED
                     "categorize_recent" -> entry == CATEGORIZE_RECENT
                     "month_comparison" -> entry == MONTH_COMPARISON
                     "goals_progress" -> entry == GOALS_PROGRESS
@@ -159,11 +157,6 @@ data class SubscriptionsState(
     val items: List<SubscriptionItem> = emptyList(),
     val totalActiveCount: Int = 0,
     val estimatedMonthlyTotalCents: Cents = 0L
-)
-
-data class UncategorizedTransactionsState(
-    val count: Int = 0,
-    val transactions: List<DashboardRecentTransactionItem> = emptyList()
 )
 
 data class MonthComparisonRow(
@@ -338,7 +331,7 @@ data class DashboardUiState(
     val topSpending: TopSpendingState = TopSpendingState(),
     val biggestTransactions: BiggestTransactionsState = BiggestTransactionsState(),
     val subscriptions: SubscriptionsState = SubscriptionsState(),
-    val uncategorized: UncategorizedTransactionsState = UncategorizedTransactionsState(),
+    val reviewQueueCount: Int = 0,
     val monthComparison: MonthComparisonState = MonthComparisonState(),
     val goals: GoalsProgressState = GoalsProgressState(),
     val goalFocus: GoalFocusState = GoalFocusState(),

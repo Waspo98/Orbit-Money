@@ -125,6 +125,18 @@ data class Transaction(
     val mhaEligibleOverrideSource: String? get() = editedMhaEligibleSource
 }
 
+/**
+ * Canonical rule for whether a transaction is uncategorized: excludes transfers, and matches
+ * either a null [Transaction.effectiveCategoryId] or an assigned category named "Uncategorized".
+ */
+fun Transaction.isUncategorized(categoryById: Map<Long, Category> = emptyMap()): Boolean {
+    if (effectiveIsTransfer) return false
+    val catId = effectiveCategoryId ?: return true
+    val category = categoryById[catId]
+    if (category != null) return category.isUncategorizedCategory()
+    return categoryName?.trim()?.equals("uncategorized", ignoreCase = true) == true
+}
+
 @Serializable
 data class TransactionFilter(
     val query: String = "",

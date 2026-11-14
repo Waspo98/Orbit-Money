@@ -159,7 +159,7 @@ class OrbitRepository(
             storage.delete(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
             _isAuthenticated.value = true
             _currentUser.value = me.displayName ?: me.username ?: me.email
-            val loaded = remoteEngine.loadSnapshot(preFetchedMe = me).copy(preferences = pref)
+            val loaded = remoteEngine.loadSnapshot(preFetchedMe = me)
             val existing = _snapshot.value
             val sameData = loaded.copy(preferences = loaded.preferences.copy(sharedSessionCachedAtEpochMs = existing.preferences.sharedSessionCachedAtEpochMs)) == existing
             if (!sameData) updateMemoryState(loaded) else _preferences.value = loaded.preferences
@@ -243,7 +243,7 @@ class OrbitRepository(
         _currentUser.value = userLabel
         localEngine.saveStartupPreferences(updatedPref)
         activeEngine = SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
-        val fresh = activeEngine.loadSnapshot().copy(preferences = updatedPref)
+        val fresh = activeEngine.loadSnapshot()
         commitSnapshot(fresh, immediate = true)
         _syncStatus.value = SyncResult.Success("Signed in as $userLabel (${fresh.transactions.size} transactions)")
     }
@@ -252,6 +252,9 @@ class OrbitRepository(
         _isAuthenticated.value = false
         _currentUser.value = null
         _syncStatus.value = SyncResult.NoOp
+        val clearedPrefs = _preferences.value.copy(handledReviewTransactionIds = emptyList())
+        _preferences.value = clearedPrefs
+        localEngine.saveStartupPreferences(clearedPrefs)
         runCatching { createApiClient().logout() }
         activeEngine.clear()
     }

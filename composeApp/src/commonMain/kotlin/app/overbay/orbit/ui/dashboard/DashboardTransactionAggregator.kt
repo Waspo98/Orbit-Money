@@ -1,7 +1,9 @@
 package app.overbay.orbit.ui.dashboard
 
 import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.isUncategorized
 import app.overbay.orbit.domain.Cents
 import kotlin.math.abs
 
@@ -33,7 +35,8 @@ internal object DashboardTransactionAggregator {
         selectedMonth: String,
         priorMonth: String,
         currentYearStr: String,
-        hiddenBiggestIds: Set<Long>
+        hiddenBiggestIds: Set<Long>,
+        categoryById: Map<Long, Category> = emptyMap()
     ): DashboardTransactionScanResult {
         val monthTxns = ArrayList<Transaction>()
         var incomeCents: Cents = 0L
@@ -54,7 +57,7 @@ internal object DashboardTransactionAggregator {
             val effDate = txn.effectiveDate
             insertTopRecent(topRecent, txn)
 
-            if (txn.effectiveCategoryId == null) {
+            if (txn.isUncategorized(categoryById)) {
                 uncategorizedCount++
                 insertTopByDateDesc(topUncategorized, txn)
             }
@@ -80,7 +83,7 @@ internal object DashboardTransactionAggregator {
                 } else if (amt < 0L) {
                     val absAmt = -amt
                     expenseCents += absAmt
-                    val catId = txn.effectiveCategoryId ?: 0L
+                    val catId = if (txn.isUncategorized(categoryById)) 0L else (txn.effectiveCategoryId ?: 0L)
                     categorySpendingMap[catId] = (categorySpendingMap[catId] ?: 0L) + absAmt
                     if (txn.id !in hiddenBiggestIds) {
                         insertTopByAbsAmountDesc(topBiggestExpenses, txn, absAmt)

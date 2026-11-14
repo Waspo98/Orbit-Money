@@ -210,8 +210,44 @@ class TransactionsViewModelTest {
         viewModel.setQuickFilter(QuickFilter.UNCATEGORIZED)
         testScheduler.advanceUntilIdle()
         val uncat = viewModel.uiState.value.filteredTransactions
-        assertTrue(uncat.all { it.effectiveCategoryId == null && !it.effectiveIsTransfer })
+        assertEquals(setOf(4L, 5L, 6L), uncat.map { it.id }.toSet())
 
+        // Verify DB "Uncategorized" category is unified with null categoryId and transfers are excluded
+        repository.saveCategory(Category(id = 99L, name = "Uncategorized"))
+        repository.saveTransaction(
+            Transaction(
+                id = 7L,
+                accountId = 1L,
+                originalDate = "2026-05-07",
+                originalMerchant = "Seeded Uncategorized Row",
+                originalAmountCents = -900L,
+                originalCategoryId = 99L
+            )
+        )
+        repository.saveTransaction(
+            Transaction(
+                id = 8L,
+                accountId = 1L,
+                originalDate = "2026-05-08",
+                originalMerchant = "Transfer Uncategorized Row",
+                originalAmountCents = -1000L,
+                originalCategoryId = 99L,
+                isTransfer = true
+            )
+        )
+        testScheduler.advanceUntilIdle()
+        assertEquals(setOf(4L, 5L, 6L, 7L), viewModel.uiState.value.filteredTransactions.map { it.id }.toSet())
+
+        viewModel.setQuickFilter(QuickFilter.ALL)
+        viewModel.applyFilterDraft(TransactionFilterDraft(uncategorizedOnly = true))
+        testScheduler.advanceUntilIdle()
+        assertEquals(setOf(4L, 5L, 6L, 7L), viewModel.uiState.value.filteredTransactions.map { it.id }.toSet())
+
+        viewModel.applyFilterDraft(TransactionFilterDraft(categoryIds = setOf(99L), categoryId = 99L))
+        testScheduler.advanceUntilIdle()
+        assertEquals(setOf(4L, 5L, 6L, 7L), viewModel.uiState.value.filteredTransactions.map { it.id }.toSet())
+
+        viewModel.applyFilterDraft(TransactionFilterDraft())
         viewModel.setQuickFilter(QuickFilter.PENDING)
         testScheduler.advanceUntilIdle()
         val pending = viewModel.uiState.value.filteredTransactions

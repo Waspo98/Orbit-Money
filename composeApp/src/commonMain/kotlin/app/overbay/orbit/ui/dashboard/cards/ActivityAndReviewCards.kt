@@ -27,102 +27,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.theme.OrbitTheme
-import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitBadge
-import app.overbay.orbit.ui.components.OrbitCompactListRow
-import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitSectionCard
-import app.overbay.orbit.ui.dashboard.UncategorizedTransactionsState
-import app.overbay.orbit.util.LocalOrbitHaptics
-
-/**
- * Uncategorized transactions card listing up to 5 transactions requiring a category,
- * with a live count badge, formatted dates, per-row inspection, and direct Quick Review launch.
- */
-@Composable
-fun UncategorizedCard(
-    state: UncategorizedTransactionsState,
-    onClick: () -> Unit,
-    onOpenReview: () -> Unit = onClick,
-    onSelectTransaction: (Long) -> Unit = { onClick() },
-    modifier: Modifier = Modifier
-) {
-    val haptics = LocalOrbitHaptics.current
-    val colors = OrbitTheme.colors
-    val hasPending = state.count > 0
-
-    OrbitSectionCard(
-        title = "Uncategorized Transactions",
-        headerBadge = {
-            OrbitBadge(
-                text = if (hasPending) "${state.count}" else "All set",
-                containerColor = (if (hasPending) colors.warning else colors.income).copy(alpha = 0.14f),
-                contentColor = if (hasPending) colors.warning else colors.income
-            )
-        },
-        actionText = "Browse",
-        onActionClick = onClick,
-        onCardClick = onClick,
-        modifier = modifier
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            if (state.transactions.isEmpty()) {
-                Text(
-                    text = "All transactions are neatly categorized! 🎉",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                state.transactions.take(5).forEachIndexed { index, txn ->
-                    OrbitCompactListRow(
-                        title = txn.merchant,
-                        subtitle = "${txn.dateDisplay} · ${txn.accountName}",
-                        amount = txn.formattedAmount,
-                        amountColor = if (txn.isExpense) colors.expense else colors.income,
-                        showTopDivider = index > 0,
-                        onClick = {
-                            haptics.tick()
-                            onSelectTransaction(txn.id)
-                        }
-                    )
-                }
-
-                if (hasPending) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        OrbitActionChip(
-                            label = "Quick Review (${state.count})",
-                            icon = OrbitIcons.Categories,
-                            onClick = onOpenReview
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 /**
  * Quick category check launch card opening the swipeable review modal,
- * reflecting the live uncategorized review queue count.
+ * reflecting the live review queue count.
  */
 @Composable
 fun CategorizeRecentCard(
     onOpenReview: () -> Unit,
-    uncategorizedCount: Int = 0,
+    reviewCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val colors = OrbitTheme.colors
-    val hasItems = uncategorizedCount > 0
+    val hasItems = reviewCount > 0
 
     OrbitSectionCard(
         title = "Categorize Recent Transactions",
         headerBadge = {
             OrbitBadge(
-                text = if (hasItems) "$uncategorizedCount waiting" else "Caught up",
+                text = if (hasItems) "$reviewCount waiting" else "Caught up",
                 containerColor = (if (hasItems) colors.warning else colors.income).copy(alpha = 0.14f),
                 contentColor = if (hasItems) colors.warning else colors.income
             )
@@ -149,8 +74,8 @@ fun CategorizeRecentCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = if (hasItems) {
-                        val noun = if (uncategorizedCount == 1) "transaction needs" else "transactions need"
-                        "$uncategorizedCount $noun a quick category review."
+                        val noun = if (reviewCount == 1) "transaction needs" else "transactions need"
+                        "$reviewCount $noun a quick category review."
                     } else {
                         "Everything is categorized—tap to review recent activity anyway."
                     },

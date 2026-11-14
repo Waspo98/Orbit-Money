@@ -18,7 +18,6 @@ import app.overbay.orbit.ui.dashboard.cards.RecentTransactionsCard
 import app.overbay.orbit.ui.dashboard.cards.RetirementSnapshotCard
 import app.overbay.orbit.ui.dashboard.cards.SubscriptionsCard
 import app.overbay.orbit.ui.dashboard.cards.TopSpendingCard
-import app.overbay.orbit.ui.dashboard.cards.UncategorizedCard
 import app.overbay.orbit.ui.dashboard.cards.UpcomingBillsCard
 
 data class DashboardGridRow(
@@ -117,16 +116,9 @@ fun DashboardCardItem(
             onClick = { onNavigate(OrbitNavKey.Upcoming) },
             modifier = modifier
         )
-        DashboardCardType.UNCATEGORIZED -> UncategorizedCard(
-            state = uiState.uncategorized,
-            onClick = { onNavigate(OrbitNavKey.Transactions(uncategorizedOnly = true)) },
-            onOpenReview = { onAction(DashboardAction.OpenCategorizeReview) },
-            onSelectTransaction = { txnId -> onNavigate(OrbitNavKey.Transactions(transactionId = txnId)) },
-            modifier = modifier
-        )
         DashboardCardType.CATEGORIZE_RECENT -> CategorizeRecentCard(
             onOpenReview = { onAction(DashboardAction.OpenCategorizeReview) },
-            uncategorizedCount = uiState.uncategorized.count,
+            reviewCount = uiState.reviewQueueCount,
             modifier = modifier
         )
         DashboardCardType.MONTH_COMPARISON -> MonthComparisonCard(

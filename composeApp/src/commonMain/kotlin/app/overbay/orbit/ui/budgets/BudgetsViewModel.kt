@@ -6,6 +6,7 @@ import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.getActiveBudgetMonths
 import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
 import app.overbay.orbit.data.model.CategorySortOption
+import app.overbay.orbit.data.model.isUncategorized
 import app.overbay.orbit.domain.BudgetEngine
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
@@ -125,11 +126,12 @@ class BudgetsViewModel(
         }
 
         // Group transactions for this month across all categories (including Uncategorized = -1L)
+        val categoryById = categories.associateBy { it.id }
         val monthTxns = transactions.filter {
             it.effectiveDate.take(7) == control.month && !it.effectiveIsIgnored && !it.effectiveIsTransfer
         }
         val categoryTransactions = monthTxns.groupBy {
-            it.effectiveCategoryId ?: BudgetEngine.UNCATEGORIZED_CATEGORY.id
+            if (it.isUncategorized(categoryById)) BudgetEngine.UNCATEGORIZED_CATEGORY.id else it.effectiveCategoryId!!
         }
 
         BudgetsUiState(

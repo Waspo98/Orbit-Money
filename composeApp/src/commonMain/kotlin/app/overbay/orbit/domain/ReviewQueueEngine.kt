@@ -3,6 +3,7 @@ package app.overbay.orbit.domain
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.isUncategorized
 
 /**
  * Candidate transaction surfaced in the "Categorize Recent Transactions" swipe queue.
@@ -64,6 +65,26 @@ object ReviewQueueEngine {
     private val PAYMENT_TO_CARD_ENDING_REGEX = Regex("payment\\s+to\\s+.+\\bcard\\s+ending\\b")
     private val CARD_ENDING_REGEX = Regex("\\bcard\\s+ending\\s+(in\\s+)?[#*\\d]{2,}")
 
+    /**
+     * Counts all pending non-fun review queue items matching [buildReviewQueue] criteria
+     * (uncategorized, noisy merchant, or changed pattern) without building UI candidate objects.
+     */
+    fun countReviewQueue(
+        transactions: List<Transaction>,
+        categories: List<Category>,
+        excludedIds: Set<Long>
+    ): Int {
+        var count = 0
+        scanReviewQueue(
+            transactions = transactions,
+            categoriesById = categories.associateBy { it.id },
+            excludedIds = excludedIds,
+            funMode = false,
+            limit = Int.MAX_VALUE
+        ) { _, _, _ -> count++ }
+        return count
+    }
+
     fun buildReviewQueue(
         transactions: List<Transaction>,
         categories: List<Category>,
@@ -74,40 +95,63 @@ object ReviewQueueEngine {
     ): List<ReviewQueueCandidate> {
         val categoriesById = categories.associateBy { it.id }
         val accountsById = accounts.associateBy { it.id }
+        val candidates = mutableListOf<ReviewQueueCandidate>()
+
+        scanReviewQueue(
+            transactions = transactions,
+            categoriesById = categoriesById,
+            excludedIds = excludedIds,
+            funMode = funMode,
+            limit = limit
+        ) { row, reasons, suggestedCategoryId ->
+            candidates.add(
+                toCandidate(
+                    row = row,
+                    categoriesById = categoriesById,
+                    accountsById = accountsById,
+                    reasons = reasons,
+                    suggestedCategoryId = suggestedCategoryId
+                )
+            )
+        }
+
+        return candidates
+    }
+
+    private inline fun scanReviewQueue(
+        transactions: List<Transaction>,
+        categoriesById: Map<Long, Category>,
+        excludedIds: Set<Long>,
+        funMode: Boolean,
+        limit: Int,
+        onCandidate: (row: Transaction, reasons: List<String>, suggestedCategoryId: Long?) -> Unit
+    ) {
+        if (limit <= 0) return
 
         val sortedNonIgnored = transactions
             .filter { !it.effectiveIsIgnored }
             .sortedWith(compareByDescending<Transaction> { it.effectiveDate }.thenByDescending { it.id })
 
+        var emitted = 0
         if (funMode) {
-            return sortedNonIgnored
-                .take(100)
-                .filter { it.id !in excludedIds }
-                .take(limit)
-                .map { row ->
-                    toCandidate(
-                        row = row,
-                        categoriesById = categoriesById,
-                        accountsById = accountsById,
-                        reasons = listOf("fun_review"),
-                        suggestedCategoryId = null
-                    )
-                }
+            for (row in sortedNonIgnored.take(100)) {
+                if (row.id in excludedIds) continue
+                onCandidate(row, listOf("fun_review"), null)
+                emitted++
+                if (emitted >= limit) break
+            }
+            return
         }
 
         val rows = sortedNonIgnored.take(1000)
-        val patterns = buildMerchantPatterns(rows)
-        val candidates = mutableListOf<ReviewQueueCandidate>()
+        val patterns = buildMerchantPatterns(rows, categoriesById)
 
         for (row in rows) {
             if (row.id in excludedIds) continue
-            val catId = row.effectiveCategoryId
-            val category = catId?.let { categoriesById[it] }
-            val categoryName = category?.name ?: row.categoryName
             val reasons = mutableListOf<String>()
             val suggestedCategoryId = changedCategoryPattern(row, patterns)
 
-            if (catId == null || categoryName.equals("uncategorized", ignoreCase = true)) {
+            if (row.isUncategorized(categoriesById)) {
                 reasons.add("uncategorized")
             }
             if (looksNoisyMerchant(row)) {
@@ -119,19 +163,10 @@ object ReviewQueueEngine {
 
             if (reasons.isEmpty()) continue
 
-            candidates.add(
-                toCandidate(
-                    row = row,
-                    categoriesById = categoriesById,
-                    accountsById = accountsById,
-                    reasons = reasons,
-                    suggestedCategoryId = suggestedCategoryId
-                )
-            )
-            if (candidates.size >= limit) break
+            onCandidate(row, reasons, suggestedCategoryId)
+            emitted++
+            if (emitted >= limit) break
         }
-
-        return candidates
     }
 
     internal fun normalizeMerchant(value: String?): String =
@@ -173,11 +208,14 @@ object ReviewQueueEngine {
         var dominantCount: Int = 0
     )
 
-    internal fun buildMerchantPatterns(rows: List<Transaction>): Map<String, MerchantPattern> {
+    internal fun buildMerchantPatterns(
+        rows: List<Transaction>,
+        categoriesById: Map<Long, Category> = emptyMap()
+    ): Map<String, MerchantPattern> {
         val patterns = mutableMapOf<String, MerchantPattern>()
         for (row in rows) {
             val catId = row.effectiveCategoryId ?: continue
-            if (row.effectiveIsTransfer || row.effectiveIsIgnored) continue
+            if (row.effectiveIsTransfer || row.effectiveIsIgnored || row.isUncategorized(categoriesById)) continue
             val key = normalizeMerchant(row.effectiveMerchant)
             if (key.length < 3) continue
             val pattern = patterns.getOrPut(key) { MerchantPattern() }

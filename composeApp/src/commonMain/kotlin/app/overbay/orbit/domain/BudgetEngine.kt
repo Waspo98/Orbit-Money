@@ -9,6 +9,8 @@ import app.overbay.orbit.data.model.DailySafeSpend
 import app.overbay.orbit.data.model.MerchantBudgetMixItem
 import app.overbay.orbit.data.model.MonthlyBudgetOverview
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.isUncategorized
+import app.overbay.orbit.data.model.isUncategorizedCategory
 import kotlin.math.max
 
 object BudgetEngine {
@@ -58,7 +60,12 @@ object BudgetEngine {
 
         for (txn in monthTxns) {
             val amount = txn.effectiveAmountCents
-            val catId = txn.effectiveCategoryId
+            val rawCatId = txn.effectiveCategoryId
+            val catId = if (txn.isUncategorized(categoryById) && (rawCatId == null || budgetByCat[rawCatId] == null)) {
+                null
+            } else {
+                rawCatId
+            }
 
             if (amount > 0) {
                 totalIncomeCents += amount
@@ -84,7 +91,9 @@ object BudgetEngine {
         val unbudgetedItems = mutableListOf<CategoryBudgetOverviewItem>()
         val inactiveItems = mutableListOf<CategoryBudgetOverviewItem>()
 
-        val spendingCategories = categories.filter { !it.isIncome && !it.isTransfer }
+        val spendingCategories = categories.filter {
+            !it.isIncome && !it.isTransfer && (!it.isUncategorizedCategory() || budgetByCat[it.id] != null)
+        }
 
         for (cat in spendingCategories) {
             val budget = budgetByCat[cat.id]
@@ -205,7 +214,8 @@ object BudgetEngine {
     ): Boolean {
         val cat = txn.effectiveCategoryId?.let { categoryById[it] }
         if (cat?.isIncome == true || cat?.isTransfer == true) return false
-        return cat != null || txn.effectiveAmountCents < 0L
+        if (txn.isUncategorized(categoryById)) return txn.effectiveAmountCents < 0L
+        return true
     }
 
     private fun sumNetSpendingForRange(

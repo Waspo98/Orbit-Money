@@ -17,6 +17,7 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.NetWorthEngine
 import app.overbay.orbit.domain.RetirementCalculatorEngine
+import app.overbay.orbit.domain.ReviewQueueEngine
 import app.overbay.orbit.domain.UpcomingEngine
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
@@ -70,7 +71,8 @@ object DashboardDataTransform {
             selectedMonth = selectedMonth,
             priorMonth = priorMonth,
             currentYearStr = currentYearStr,
-            hiddenBiggestIds = hiddenBiggestIds
+            hiddenBiggestIds = hiddenBiggestIds,
+            categoryById = categoryById
         )
         val monthTxns = scan.monthTxns
         val incomeCents = scan.incomeCents
@@ -217,30 +219,11 @@ object DashboardDataTransform {
             estimatedMonthlyTotalCents = estimatedMonthlyTotal
         )
 
-        // 6. Uncategorized Transactions
-        val uncategorizedState = UncategorizedTransactionsState(
-            count = scan.uncategorizedCount,
-            transactions = scan.topUncategorized.map { txn ->
-                val acct = accountById[txn.accountId]
-                val dateDisplay = LocalDateUtils.parseIsoDate(txn.effectiveDate)?.let {
-                    LocalDateUtils.formatRelativeOrDisplayDate(it)
-                } ?: txn.effectiveDate
-                DashboardRecentTransactionItem(
-                    id = txn.id,
-                    merchant = txn.effectiveMerchant,
-                    amountCents = txn.effectiveAmountCents,
-                    isExpense = txn.isExpense,
-                    formattedAmount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
-                    dateIso = txn.effectiveDate,
-                    dateDisplay = dateDisplay,
-                    categoryName = "Uncategorized",
-                    categoryColor = null,
-                    categoryIcon = null,
-                    accountName = acct?.name ?: txn.accountName,
-                    isPending = txn.isPending,
-                    merchantLogoUrl = txn.merchantLogo?.url?.takeIf { it.isNotBlank() && txn.merchantLogo.status != "hidden" && txn.merchantLogo.status != "failed" }
-                )
-            }
+        // 6. Categorize Recent Review Queue Count
+        val reviewQueueCount = ReviewQueueEngine.countReviewQueue(
+            transactions = snapshot.transactions,
+            categories = snapshot.categories,
+            excludedIds = snapshot.preferences.handledReviewTransactionIds.toSet()
         )
 
         // 7. Month Comparison Table
@@ -562,7 +545,7 @@ object DashboardDataTransform {
             topSpending = topSpendingState,
             biggestTransactions = biggestTransactionsState,
             subscriptions = subscriptionsState,
-            uncategorized = uncategorizedState,
+            reviewQueueCount = reviewQueueCount,
             monthComparison = monthComparisonState,
             goals = goalsState,
             goalFocus = goalFocusState,

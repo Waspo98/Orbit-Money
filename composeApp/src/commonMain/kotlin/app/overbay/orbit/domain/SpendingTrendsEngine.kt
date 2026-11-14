@@ -3,6 +3,8 @@ package app.overbay.orbit.domain
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryBudget
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.isUncategorized
+import app.overbay.orbit.data.model.isUncategorizedCategory
 
 data class MonthlyFlow(
     val month: String,
@@ -95,7 +97,11 @@ object SpendingTrendsEngine {
                 val netExpense = -amt
                 flowAcc.expensesCents += netExpense
 
-                val catId = txn.effectiveCategoryId ?: if (amt < 0L) UNCATEGORIZED_CATEGORY_ID else null
+                val catId = if (txn.isUncategorized(categoriesMap)) {
+                    if (amt < 0L || category != null) UNCATEGORIZED_CATEGORY_ID else null
+                } else {
+                    txn.effectiveCategoryId
+                }
                 if (catId != null) {
                     val byMonth = catMonthMap.getOrPut(catId) { HashMap(monthsCount * 2) }
                     val catAcc = byMonth.getOrPut(m) { CatMonthAccumulator() }
@@ -131,7 +137,7 @@ object SpendingTrendsEngine {
         val totalPeriodIncome = flowSeries.sumOf { it.incomeCents }
 
         // Category trends
-        val spendingCategories = categories.filter { !it.isIncome && !it.isTransfer } + UNCATEGORIZED_CATEGORY
+        val spendingCategories = categories.filter { !it.isIncome && !it.isTransfer && !it.isUncategorizedCategory() } + UNCATEGORIZED_CATEGORY
         val categoryTrends = spendingCategories.mapNotNull { cat ->
             val byMonth = catMonthMap[cat.id]
             val budget = budgetMap[cat.id]

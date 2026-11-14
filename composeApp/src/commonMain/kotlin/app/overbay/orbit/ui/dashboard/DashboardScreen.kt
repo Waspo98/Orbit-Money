@@ -116,13 +116,13 @@ fun DashboardScreen(
                             .fillMaxHeight()
                     )
 
-                    OrbitScaleBadgeVisibility(visible = uiState.uncategorized.count > 0) {
+                    OrbitScaleBadgeVisibility(visible = uiState.reviewQueueCount > 0) {
                         CanopyIconButton(
                             icon = OrbitIcons.Categories,
                             contentDescription = "Categorize Recent Transactions",
                             onClick = { onAction(DashboardAction.OpenCategorizeReview) },
                             buttonSize = barHeight,
-                            badgeCount = uiState.uncategorized.count
+                            badgeCount = uiState.reviewQueueCount
                         )
                     }
 

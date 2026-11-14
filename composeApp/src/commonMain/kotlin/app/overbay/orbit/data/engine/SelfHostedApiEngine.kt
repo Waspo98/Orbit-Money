@@ -138,6 +138,20 @@ class SelfHostedApiEngine(
         val retirementAccountLinks = runCatching { householdDto?.retirementAccounts?.map { it.toDomain(it.memberId) } }
             .getOrNull()?.ifEmpty { null } ?: memberRetirementLinks
 
+        val remoteHandledIds = remotePrefs?.prefOr<List<Long>?>("handledReviewTransactionIds", null)
+        val mergedHandledIds = if (remotePrefs != null) {
+            (remoteHandledIds.orEmpty() + currentPrefs.handledReviewTransactionIds).distinct()
+        } else {
+            currentPrefs.handledReviewTransactionIds
+        }
+        if (remotePrefs != null && mergedHandledIds.size > remoteHandledIds.orEmpty().distinct().size) {
+            runCatching {
+                apiClient.putRemotePreferences(
+                    mapOf("handledReviewTransactionIds" to json.encodeToJsonElement(mergedHandledIds))
+                )
+            }
+        }
+
         val resolvedPrefs = currentPrefs.copy(
             mhaTrackerEnabled = mhaDto?.enabled ?: currentPrefs.mhaTrackerEnabled,
             cardRewardsToolsEnabled = remotePrefs?.prefOr<Boolean?>("cardRewardsToolsEnabled", currentPrefs.cardRewardsToolsEnabled) ?: currentPrefs.cardRewardsToolsEnabled,
@@ -149,6 +163,7 @@ class SelfHostedApiEngine(
             } ?: currentPrefs.budgetSortOption,
             dashboardWidgets = remotePrefs?.prefOr("dashboardWidgets", currentPrefs.dashboardWidgets) ?: currentPrefs.dashboardWidgets,
             cardPerksWidgets = remotePrefs?.prefOr("cardPerksWidgets", currentPrefs.cardPerksWidgets) ?: currentPrefs.cardPerksWidgets,
+            handledReviewTransactionIds = mergedHandledIds,
             dashboardHiddenBiggestIds = remotePrefs?.prefOr("dashboardHiddenBiggestIds", currentPrefs.dashboardHiddenBiggestIds) ?: currentPrefs.dashboardHiddenBiggestIds,
             dashboardFocusedGoalId = remotePrefs?.prefOr("dashboardFocusedGoalId", currentPrefs.dashboardFocusedGoalId),
             dashboardRetirementAge = remotePrefs?.prefOr("dashboardRetirementAge", currentPrefs.dashboardRetirementAge) ?: currentPrefs.dashboardRetirementAge,
@@ -431,6 +446,7 @@ class SelfHostedApiEngine(
             map["accountInstitutionLogoOverrides"] = json.encodeToJsonElement(preferences.accountInstitutionLogoOverrides)
             map["dashboardWidgets"] = json.encodeToJsonElement(preferences.dashboardWidgets)
             map["cardPerksWidgets"] = json.encodeToJsonElement(preferences.cardPerksWidgets)
+            map["handledReviewTransactionIds"] = json.encodeToJsonElement(preferences.handledReviewTransactionIds)
             map["notificationPreferences"] = json.encodeToJsonElement(preferences.notificationPreferences)
             map["transactionPinnedActions"] = json.encodeToJsonElement(preferences.transactionPinnedActions)
             map["transactionActionOrder"] = json.encodeToJsonElement(preferences.transactionActionOrder)

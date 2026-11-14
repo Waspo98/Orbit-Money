@@ -4,7 +4,10 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.isUncategorized
+import app.overbay.orbit.data.model.isUncategorizedCategory
 import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.domain.UNCATEGORIZED_CATEGORY_ID
 import app.overbay.orbit.ui.components.TransactionFilterDraft
 import kotlinx.datetime.LocalDate
 import kotlin.math.abs
@@ -66,7 +69,7 @@ object TransactionsFilterHelper {
                 QuickFilter.EXPENSES -> if (!txn.isExpense || txn.effectiveIsTransfer) return@filter false
                 QuickFilter.INCOME -> if (!txn.isIncome || txn.effectiveIsTransfer) return@filter false
                 QuickFilter.TRANSFERS -> if (!txn.effectiveIsTransfer) return@filter false
-                QuickFilter.UNCATEGORIZED -> if (txn.effectiveCategoryId != null || txn.effectiveIsTransfer) return@filter false
+                QuickFilter.UNCATEGORIZED -> if (!txn.isUncategorized(categoryMap)) return@filter false
                 QuickFilter.PENDING -> if (!txn.isPending) return@filter false
                 QuickFilter.MHA -> if (txn.effectiveMhaEligible != true) return@filter false
             }
@@ -117,10 +120,16 @@ object TransactionsFilterHelper {
 
             // 7. Draft Filter: Categories
             if (draft.uncategorizedOnly) {
-                if (txn.effectiveCategoryId != null || txn.effectiveIsTransfer) return@filter false
+                if (!txn.isUncategorized(categoryMap)) return@filter false
             } else if (targetCategoryIds.isNotEmpty()) {
-                val catId = txn.effectiveCategoryId
-                if (catId == null || !targetCategoryIds.contains(catId)) return@filter false
+                val matchesCategory = targetCategoryIds.any { targetId ->
+                    val isUncatTarget = targetId == 0L ||
+                        targetId == UNCATEGORIZED_CATEGORY_ID ||
+                        categoryMap[targetId]?.isUncategorizedCategory() == true
+                    if (isUncatTarget) txn.isUncategorized(categoryMap)
+                    else txn.effectiveCategoryId == targetId
+                }
+                if (!matchesCategory) return@filter false
             }
 
             // 8. Draft Filter: Amount Range (absolute cents)

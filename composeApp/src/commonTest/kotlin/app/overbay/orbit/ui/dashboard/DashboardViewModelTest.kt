@@ -63,7 +63,7 @@ class DashboardViewModelTest {
         testScheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(15, state.visibleCards.size, "Must have 15 default visible cards")
+        assertEquals(14, state.visibleCards.size, "Must have 14 default visible cards")
         assertEquals(DashboardCardType.ACCOUNTS_OVERVIEW, state.visibleCards[0])
         assertEquals(DashboardCardType.BUDGET_PULSE, state.visibleCards[1])
 
@@ -139,14 +139,14 @@ class DashboardViewModelTest {
 
         val state = viewModel.uiState.value
         assertFalse(state.visibleCards.contains(DashboardCardType.CASHFLOW_HERO))
-        assertEquals(14, state.visibleCards.size)
+        assertEquals(13, state.visibleCards.size)
 
         // Show CASHFLOW_HERO again
         viewModel.toggleCardVisibility(DashboardCardType.CASHFLOW_HERO, isVisible = true)
         testScheduler.advanceUntilIdle()
 
         assertTrue(viewModel.uiState.value.visibleCards.contains(DashboardCardType.CASHFLOW_HERO))
-        assertEquals(15, viewModel.uiState.value.visibleCards.size)
+        assertEquals(14, viewModel.uiState.value.visibleCards.size)
 
         collectJob.cancel()
     }
@@ -279,20 +279,20 @@ class DashboardViewModelTest {
         testScheduler.advanceUntilIdle()
 
         val visible = viewModel.uiState.value.visibleCards
-        assertEquals(13, visible.size)
+        assertEquals(12, visible.size)
         assertFalse(visible.contains(DashboardCardType.BUDGET_PULSE))
         assertFalse(visible.contains(DashboardCardType.GOALS_PROGRESS))
 
-        // Card configs in customization state still contain all 16 items
+        // Card configs in customization state still contain all 15 items
         val configs = viewModel.uiState.value.customization.cardConfigs
-        assertEquals(16, configs.size)
+        assertEquals(15, configs.size)
         assertFalse(configs.first { it.type == DashboardCardType.BUDGET_PULSE }.isVisible)
         assertFalse(configs.first { it.type == DashboardCardType.GOALS_PROGRESS }.isVisible)
 
         // Reset to default
         viewModel.resetCardsToDefault()
         testScheduler.advanceUntilIdle()
-        assertEquals(15, viewModel.uiState.value.visibleCards.size)
+        assertEquals(14, viewModel.uiState.value.visibleCards.size)
         assertTrue(viewModel.uiState.value.visibleCards.contains(DashboardCardType.BUDGET_PULSE))
         assertTrue(viewModel.uiState.value.visibleCards.contains(DashboardCardType.GOALS_PROGRESS))
 
