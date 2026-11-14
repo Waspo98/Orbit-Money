@@ -39,9 +39,9 @@ This repo lives inside the `C:\Docker` workspace as an **app & self-hosted stack
 - **Zero-Polling on Asynchronous Tasks (CRITICAL):** Long-running commands (Gradle builds, Docker builds, unit tests) run in the background. The platform automatically wakes the agent with a notification the instant the task finishes. **NEVER poll `manage_task: status` in a loop**, and **NEVER spam `schedule` timers** to check build progress. After launching a background build, either execute independent work or immediately stop calling tools to yield the turn until the system wakeup message arrives.
 - **Batch Build Pipeline:**
   - While iterating on UI/domain code, validate with `.\gradlew.bat compileDebugKotlinAndroid` or `.\gradlew.bat testDebugUnitTest`.
-  - For Web PWA bundle compilation, validate with `cmd /c scripts\build-frontend.cmd` (runs `.\gradlew.bat :composeApp:wasmJsBrowserDistribution`).
+  - **On-Demand Web PWA Builds ONLY (CRITICAL):** **NEVER** run `cmd /c scripts\build-frontend.cmd` (or `.\gradlew.bat :composeApp:wasmJsBrowserDistribution`) or Docker PWA deploys (`cmd /c scripts\deploy-beta.cmd` / `cmd /c scripts\deploy-live.cmd`) automatically during validation, commits, or pushes. Only build or deploy the Web PWA when the user **explicitly asks** for a PWA/web build or deployment.
   - After backend edits, validate with `cmd /c scripts\check-backend.cmd` from the repo root plus relevant test suites (`node --test`).
-  - Once all code edits and tests for an app/UI/domain task are complete, **automatically run `cmd /c scripts\build-apk.cmd`** (do not wait to be asked) so the latest APK is always built and uploaded to GitHub Releases. Run `cmd /c scripts\deploy-beta.cmd` when deploying Docker beta.
+  - Once all code edits and tests for an app/UI/domain task are complete, **automatically run `cmd /c scripts\build-apk.cmd`** (do not wait to be asked) so the latest APK is always built and uploaded to GitHub Releases.
 - **Compiler & Test Circuit-Breaker:** If compilation or a test fails twice consecutively with the same or related error, STOP making speculative code edits. Inspect the exact stack trace, component props, contract, or schema definition before making further changes.
 - **Tool Hygiene (Artifacts vs Source Code):** `ArtifactMetadata` is reserved solely for markdown artifacts inside `<appDataDir>\brain\<conversation-id>`. When writing Kotlin, JS, CSS, SQL, XML, or Gradle repository files with `write_file`, never supply `ArtifactMetadata`.
 - **Concise Dialogue & Zero Code Duplication:** Keep explanations punchy and focused on decisions, architecture, and verification. Never paste verbatim code blocks or large diffs into chat dialogue—the user can inspect file edits directly in their diff viewer.
@@ -110,9 +110,10 @@ This repo lives inside the `C:\Docker` workspace as an **app & self-hosted stack
   - **Destructive Command Ban:** Never execute destructive git commands (`git reset --hard`, `git clean -fd`, `git restore .`, `git checkout -- .`) without explicit user instruction.
   - **Protected Surfaces:** Ask before touching auth, Docker configuration, ports, volume names, database schema/migrations, deployment scripts, or storage/backup behavior, and explain the impact first.
   - Non-trivial completed tasks must be committed and pushed with conventional commit prefixes (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
-- **Docker Beta & Live Deployment:**
+- **Docker Beta & Live Deployment (On-Demand Only):**
   - Public app ingress runs through Cloudflare Tunnel on external Docker network `web_proxy`.
-  - **Beta is Docker-only (`orbitmoney-beta` on host port `5019`):** When asked to deploy beta, run `cmd /c scripts\deploy-beta.cmd` from the repo root (which delegates to `deploy\beta\deploy-beta.cmd`).
+  - **Manual / Explicit Request Only:** Both `.github/workflows/deploy-beta.yml` and `.github/workflows/deploy-live.yml` use `workflow_dispatch` only (no automatic PWA/Docker rebuilds on `git push`). Never build the PWA or deploy Docker unless the user explicitly asks.
+  - **Beta is Docker-only (`orbitmoney-beta` on host port `5019`):** When explicitly asked to deploy beta, run `cmd /c scripts\deploy-beta.cmd` from the repo root (which delegates to `deploy\beta\deploy-beta.cmd`).
   - Public Docker installs pull `ghcr.io/waspo98/orbit-money:latest`. Maintainer beta publishes `ghcr.io/waspo98/orbit-money:beta`, then locally builds, restarts, and verifies the running beta container.
 - **Versioning & GitHub Releases (Milestone-Based):**
   - Treat version bumps as release milestones (promoting work from Beta to `main`, landing a major feature, changing calculation behavior, or batching fixes). Keep the app in `0.x` until public-ready.
