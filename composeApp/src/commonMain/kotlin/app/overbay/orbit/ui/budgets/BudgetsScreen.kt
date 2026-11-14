@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,6 +52,7 @@ import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.PeriodNavigatorPill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.util.LocalDevicePosture
 import kotlinx.coroutines.launch
 
@@ -203,7 +203,7 @@ fun BudgetsScreen(
                         val startPad = if (isTwoPane) 20.dp else 16.dp
                         val endPad = if (isTwoPane) 0.dp else 16.dp
 
-                        val listState = rememberLazyListState()
+                        val listState = rememberOrbitLazyListState()
                         val coroutineScope = rememberCoroutineScope()
 
                         val openCategoryTransactions: (Long) -> Unit = { categoryId ->

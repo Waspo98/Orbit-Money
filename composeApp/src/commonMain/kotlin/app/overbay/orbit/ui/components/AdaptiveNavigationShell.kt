@@ -61,6 +61,7 @@ fun AdaptiveNavigationShell(
     mhaEnabled: Boolean = true,
     hiddenRouteNames: List<String> = emptyList(),
     moreRouteOrder: List<String> = emptyList(),
+    onTabSelected: (OrbitNavKey) -> Unit = onNavigate,
     content: @Composable () -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -94,7 +95,7 @@ fun AdaptiveNavigationShell(
                     DesktopSidebar(
                         primaryTabs = primaryTabs,
                         currentKey = currentKey,
-                        onNavigate = { haptics.tick(); onNavigate(it) },
+                        onNavigate = { haptics.tick(); onTabSelected(it) },
                         mhaEnabled = mhaEnabled,
                         hiddenRouteNames = hiddenRouteNames,
                         moreRouteOrder = moreRouteOrder
@@ -113,7 +114,7 @@ fun AdaptiveNavigationShell(
                             primaryTabs = primaryTabs,
                             currentKey = currentKey,
                             isSecondaryRoute = isSecondaryRoute,
-                            onTabSelected = { haptics.tick(); onNavigate(it) },
+                            onTabSelected = { haptics.tick(); onTabSelected(it) },
                             onOpenMore = { haptics.tick(); showMoreSheet = true }
                         )
                     }
@@ -129,7 +130,7 @@ fun AdaptiveNavigationShell(
     if (showMoreSheet) {
         MoreDestinationsSheet(
             currentKey = currentKey,
-            onNavigate = onNavigate,
+            onNavigate = onTabSelected,
             onDismiss = { showMoreSheet = false },
             mhaEnabled = mhaEnabled,
             hiddenRouteNames = hiddenRouteNames,

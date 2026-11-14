@@ -33,6 +33,7 @@ import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalDevicePosture
 import kotlin.math.roundToInt
@@ -96,7 +97,9 @@ fun RetirementCalculatorScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Left Column: Assumptions & Portfolio Accounts Inputs
+                    val leftListState = rememberOrbitLazyListState("left")
                     LazyColumn(
+                        state = leftListState,
                         modifier = Modifier.weight(1f).fillMaxSize(),
                         contentPadding = PaddingValues(top = 12.dp, bottom = 88.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -134,7 +137,9 @@ fun RetirementCalculatorScreen(
                     }
 
                     // Right Column: Live Projection Hero Chart, Runway, & History
+                    val rightListState = rememberOrbitLazyListState("right")
                     LazyColumn(
+                        state = rightListState,
                         modifier = Modifier.weight(1f).fillMaxSize(),
                         contentPadding = PaddingValues(top = 12.dp, bottom = 88.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -172,7 +177,9 @@ fun RetirementCalculatorScreen(
                     }
                 }
             } else {
+                val compactListState = rememberOrbitLazyListState("compact")
                 LazyColumn(
+                    state = compactListState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -42,6 +41,7 @@ import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.ui.dashboard.cards.EmptyWorkspaceSetupCard
 import app.overbay.orbit.ui.dashboard.dialogs.DashboardCustomizeSheet
 import app.overbay.orbit.ui.dashboard.dialogs.TransactionReviewSheet
@@ -57,7 +57,7 @@ fun DashboardScreen(
     viewModel: DashboardViewModel,
     onNavigate: (OrbitNavKey) -> Unit,
     modifier: Modifier = Modifier,
-    listState: LazyListState = rememberLazyListState(),
+    listState: LazyListState = rememberOrbitLazyListState(),
     heroScrollState: HeroScrollState = rememberHeroScrollState()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -78,7 +78,7 @@ fun DashboardScreen(
     onAction: (DashboardAction) -> Unit,
     onNavigate: (OrbitNavKey) -> Unit,
     modifier: Modifier = Modifier,
-    listState: LazyListState = rememberLazyListState(),
+    listState: LazyListState = rememberOrbitLazyListState(),
     heroScrollState: HeroScrollState = rememberHeroScrollState()
 ) {
     val posture = LocalDevicePosture.current

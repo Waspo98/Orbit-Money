@@ -2,12 +2,16 @@ package app.overbay.orbit.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -148,10 +152,53 @@ class HeroScrollState(
 
 @Composable
 fun rememberHeroScrollState(maxHeight: Dp = 112.dp, minHeight: Dp = 56.dp): HeroScrollState {
+    val ownerScroll = LocalScreenScrollState.current
     val density = LocalDensity.current
     val maxPx = with(density) { maxHeight.toPx() }
     val minPx = with(density) { minHeight.toPx() }
     val slopPx = with(density) { 14.dp.toPx() }
     val scope = rememberCoroutineScope()
-    return remember(minPx) { HeroScrollState(maxPx, minPx, scope, slopPx) }
+    val initialMaxPx = ownerScroll?.savedHeroMaxHeightPx?.takeIf { it >= minPx } ?: maxPx
+    val state = remember(minPx, ownerScroll) {
+        HeroScrollState(initialMaxPx, minPx, scope, slopPx).apply {
+            if (ownerScroll != null) {
+                scrollOffsetPx = ownerScroll.savedHeroOffsetPx.coerceIn(0f, maxCollapsePx)
+                isFabVisible = ownerScroll.savedHeroFabVisible
+            }
+        }
+    }
+
+    if (ownerScroll != null) {
+        var handledScrollToTopId by remember(ownerScroll) {
+            mutableIntStateOf(ownerScroll.scrollToTopRequestId)
+        }
+
+        LaunchedEffect(ownerScroll, state) {
+            snapshotFlow {
+                Triple(state.scrollOffsetPx, state.maxHeightPx, state.isFabVisible)
+            }.collect { (offsetPx, currentMaxPx, fabVisible) ->
+                ownerScroll.savedHeroOffsetPx = offsetPx
+                ownerScroll.savedHeroMaxHeightPx = currentMaxPx
+                ownerScroll.savedHeroFabVisible = fabVisible
+            }
+        }
+
+        LaunchedEffect(ownerScroll, ownerScroll.scrollToTopRequestId) {
+            val reqId = ownerScroll.scrollToTopRequestId
+            if (reqId > handledScrollToTopId) {
+                handledScrollToTopId = reqId
+                state.expand()
+            }
+        }
+
+        DisposableEffect(ownerScroll, state) {
+            onDispose {
+                ownerScroll.savedHeroOffsetPx = state.scrollOffsetPx
+                ownerScroll.savedHeroMaxHeightPx = state.maxHeightPx
+                ownerScroll.savedHeroFabVisible = state.isFabVisible
+            }
+        }
+    }
+
+    return state
 }

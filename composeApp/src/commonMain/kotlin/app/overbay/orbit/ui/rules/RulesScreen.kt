@@ -55,6 +55,7 @@ import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.ui.rules.components.RuleDetailInspectorPane
 import app.overbay.orbit.ui.rules.components.RuleItemCard
 import app.overbay.orbit.ui.rules.sheets.RuleEditorSheet
@@ -150,7 +151,7 @@ fun RulesScreen(
 
                     val startPad = if (isTwoPane) 20.dp else 16.dp
                     val endPad = if (isTwoPane) 0.dp else 16.dp
-                    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                    val listState = rememberOrbitLazyListState()
                     val accountMap = androidx.compose.runtime.remember(state.accounts) {
                         state.accounts.associate { it.id to it.name }
                     }

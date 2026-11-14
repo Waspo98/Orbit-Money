@@ -17,8 +17,12 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,8 +53,12 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val heroScrollState = rememberHeroScrollState()
 
-    androidx.compose.runtime.LaunchedEffect(uiState.activeSubpage) {
-        heroScrollState.expand()
+    var previousSubpage by remember { mutableStateOf(uiState.activeSubpage) }
+    LaunchedEffect(uiState.activeSubpage) {
+        if (previousSubpage != uiState.activeSubpage) {
+            previousSubpage = uiState.activeSubpage
+            heroScrollState.expand()
+        }
     }
 
     // Handle back button returning from subpage to Hub
@@ -160,7 +168,9 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxSize(),
                 label = "settingsSubpageTransition"
             ) { subpage ->
+                val listState = rememberOrbitLazyListState(slotKey = subpage ?: "hub")
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)

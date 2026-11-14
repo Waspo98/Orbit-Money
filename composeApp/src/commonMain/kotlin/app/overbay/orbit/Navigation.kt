@@ -9,7 +9,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -34,9 +33,8 @@ import app.overbay.orbit.ui.components.AdaptiveNavigationShell
 import app.overbay.orbit.ui.components.GlobalStatusBanners
 import app.overbay.orbit.ui.components.LocalCanopyScreenKeyId
 import app.overbay.orbit.ui.components.LocalCanopyTransitionCoordinator
+import app.overbay.orbit.ui.components.LocalScreenScrollState
 import app.overbay.orbit.ui.components.rememberCanopyTransitionCoordinator
-import app.overbay.orbit.ui.components.rememberHeroScrollState
-import kotlinx.coroutines.launch
 import app.overbay.orbit.ui.dashboard.DashboardScreen
 import app.overbay.orbit.ui.dashboard.DashboardViewModel
 import app.overbay.orbit.ui.goals.GoalsScreen
@@ -91,8 +89,9 @@ fun OrbitNavigation(
     initialKey: OrbitNavKey = OrbitNavKey.Dashboard,
     modifier: Modifier = Modifier
 ) {
-    val backStack = remember(initialKey) { mutableStateListOf<OrbitNavKey>(initialKey) }
-    val currentKey = backStack.lastOrNull() ?: OrbitNavKey.Dashboard
+    val backStackController = remember(initialKey) { OrbitBackStackController(initialKey) }
+    val currentEntry = backStackController.currentEntry
+    val currentKey = currentEntry.key
     val posture = LocalDevicePosture.current
 
     val repo = repository ?: remember { OrbitRepository(PlatformStorage()) }
@@ -109,16 +108,14 @@ fun OrbitNavigation(
             currentKey != OrbitNavKey.Login &&
             currentKey != OrbitNavKey.Onboarding
         ) {
-            backStack.clear()
-            backStack.add(OrbitNavKey.Login)
+            backStackController.resetTo(OrbitNavKey.Login)
         } else if (
             preferences.storageMode == StorageMode.SELF_HOSTED &&
             isAuthenticated &&
             preferences.onboardingCompleted &&
             (currentKey == OrbitNavKey.Login || currentKey == OrbitNavKey.Onboarding)
         ) {
-            backStack.clear()
-            backStack.add(OrbitNavKey.Dashboard)
+            backStackController.resetTo(OrbitNavKey.Dashboard)
         }
     }
 
@@ -129,36 +126,24 @@ fun OrbitNavigation(
     }
 
     val isAuthRoute = currentKey == OrbitNavKey.Login || currentKey == OrbitNavKey.Onboarding
-    val navScope = rememberCoroutineScope()
-    val dashboardListState = rememberLazyListState()
-    val dashboardHeroScrollState = rememberHeroScrollState()
-    LaunchedEffect(isAuthRoute) {
-        if (isAuthRoute) {
-            dashboardListState.scrollToItem(0)
-            dashboardHeroScrollState.scrollOffsetPx = 0f
-            dashboardHeroScrollState.isFabVisible = true
-        }
-    }
-    var lastShellKey by remember {
+    var lastShellEntry by remember(initialKey) {
         mutableStateOf(
             if (initialKey == OrbitNavKey.Login || initialKey == OrbitNavKey.Onboarding) {
-                OrbitNavKey.Dashboard
+                OrbitBackStackEntry(id = 0L, key = OrbitNavKey.Dashboard)
             } else {
-                initialKey
+                OrbitBackStackEntry(id = 0L, key = initialKey)
             }
         )
     }
     if (!isAuthRoute) {
-        lastShellKey = currentKey
+        lastShellEntry = currentEntry
     }
 
-    BackHandler(enabled = !isAuthRoute && backStack.size > 1) {
-        if (backStack.size > 1) {
-            backStack.removeAt(backStack.lastIndex)
-        }
+    BackHandler(enabled = !isAuthRoute && backStackController.canPopBack) {
+        backStackController.popBack()
     }
 
-    val navigateTo: (OrbitNavKey) -> Unit = { destination ->
+    val handleNavigate: (OrbitNavKey, Boolean) -> Unit = { destination, fromTab ->
         if (destination is OrbitNavKey.Transactions) {
             val hasTransactionsDeepLink = destination.transactionId != null ||
                 destination.accountId != null ||
@@ -206,23 +191,11 @@ fun OrbitNavigation(
             viewModels.settingsViewModel.setSubpage(null)
         }
 
-        if (destination == OrbitNavKey.Dashboard && currentKey == OrbitNavKey.Dashboard) {
-            navScope.launch {
-                dashboardListState.animateScrollToItem(0)
-                dashboardHeroScrollState.expand()
-            }
-        } else if (destination != currentKey) {
-            if (
-                destination.primaryTabIndex != null &&
-                destination.primaryTabIndex == currentKey.primaryTabIndex &&
-                backStack.isNotEmpty()
-            ) {
-                backStack[backStack.lastIndex] = destination
-            } else {
-                backStack.add(destination)
-            }
-        }
+        backStackController.navigate(destination, fromTab = fromTab)
     }
+    val navigateTo: (OrbitNavKey) -> Unit = { handleNavigate(it, false) }
+    val navigateFromTab: (OrbitNavKey) -> Unit = { handleNavigate(it, true) }
+
     AnimatedContent(
         targetState = isAuthRoute,
         transitionSpec = {
@@ -241,27 +214,22 @@ fun OrbitNavigation(
             }
             LoginScreen(
                 viewModel = viewModels.loginViewModel,
-                onLoginSuccess = {
-                    backStack.clear()
-                    backStack.add(OrbitNavKey.Dashboard)
-                },
-                onUseOfflineStorage = {
-                    backStack.clear()
-                    backStack.add(OrbitNavKey.Dashboard)
-                },
+                onLoginSuccess = { backStackController.resetTo(OrbitNavKey.Dashboard) },
+                onUseOfflineStorage = { backStackController.resetTo(OrbitNavKey.Dashboard) },
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            val activeShellKey = if (!isAuthRoute) currentKey else lastShellKey
-            val navTransition = updateTransition(targetState = activeShellKey, label = "OrbitNavigationTransition")
+            val activeShellEntry = if (!isAuthRoute) currentEntry else lastShellEntry
+            val navTransition = updateTransition(targetState = activeShellEntry, label = "OrbitNavigationTransition")
             val canopyCoordinator = rememberCanopyTransitionCoordinator(
-                navTransition.targetState.primaryTabIndex ?: navTransition.targetState
+                navTransition.targetState.key.primaryTabIndex ?: navTransition.targetState.key
             )
 
             CompositionLocalProvider(LocalCanopyTransitionCoordinator provides canopyCoordinator) {
                 AdaptiveNavigationShell(
-                    currentKey = activeShellKey,
+                    currentKey = activeShellEntry.key,
                     onNavigate = navigateTo,
+                    onTabSelected = navigateFromTab,
                     mhaEnabled = preferences.mhaTrackerEnabled,
                     hiddenRouteNames = preferences.hiddenRouteNames,
                     moreRouteOrder = preferences.moreRouteOrder,
@@ -273,8 +241,12 @@ fun OrbitNavigation(
                     onNavigate = navigateTo
                 )
                 navTransition.AnimatedContent(
-                    transitionSpec = { orbitNavigationTransitionSpec() },
-                    contentKey = { key -> key.primaryTabIndex ?: key },
+                    transitionSpec = {
+                        buildOrbitTransitionTransform(
+                            resolveOrbitTransitionDirection(initialState.key, targetState.key)
+                        )
+                    },
+                    contentKey = { entry -> entry.id },
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
@@ -285,15 +257,17 @@ fun OrbitNavigation(
                             if (kotlin.math.abs(rw - canopyCoordinator.containerWidthPx) > 0.5f) canopyCoordinator.containerWidthPx = rw
 
                         }
-                ) { key ->
-                    CompositionLocalProvider(LocalCanopyScreenKeyId provides (key.primaryTabIndex ?: key)) {
+                ) { entry ->
+                    val key = entry.key
+                    CompositionLocalProvider(
+                        LocalCanopyScreenKeyId provides (key.primaryTabIndex ?: key),
+                        LocalScreenScrollState provides backStackController.scrollStateFor(entry.id)
+                    ) {
                         when (key) {
                             OrbitNavKey.Dashboard -> DashboardScreen(
                                 viewModel = viewModels.dashboardViewModel,
                                 onNavigate = navigateTo,
-                                modifier = Modifier.fillMaxSize(),
-                                listState = dashboardListState,
-                                heroScrollState = dashboardHeroScrollState
+                                modifier = Modifier.fillMaxSize()
                             )
                             is OrbitNavKey.Transactions -> {
                                 val txVm = viewModels.transactionsViewModel

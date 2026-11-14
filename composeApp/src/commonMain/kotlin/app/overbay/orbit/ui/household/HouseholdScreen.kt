@@ -53,6 +53,7 @@ import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.ui.household.components.HouseholdIncomeHistoryCard
 import app.overbay.orbit.ui.household.components.HouseholdInspectorPane
 import app.overbay.orbit.ui.household.components.HouseholdMembersCard
@@ -131,7 +132,7 @@ fun HouseholdScreen(
 
                 val startPad = if (isTwoPane) 20.dp else 16.dp
                 val endPad = if (isTwoPane) 0.dp else 16.dp
-                val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                val listState = rememberOrbitLazyListState()
 
                 val masterList: @Composable () -> Unit = {
                     LazyColumn(

@@ -11,7 +11,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +44,7 @@ import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.ui.transactions.TransactionsUiState
 import app.overbay.orbit.ui.transactions.TransactionsViewModel
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -206,12 +209,14 @@ fun TransactionsListPane(
                                         }
                                     }
                                     else -> {
+                                        val mainListState = rememberOrbitLazyListState()
                                         TransactionsGroupedLazyList(
                                             state = state,
                                             viewModel = viewModel,
                                             isWideScreen = isWideScreen,
                                             onSelectForInspect = onSelectForInspect,
                                             onNavigate = onNavigate,
+                                            listState = mainListState,
                                             modifier = Modifier.fillMaxSize().nestedScroll(heroScrollState.nestedScrollConnection)
                                         )
                                     }
@@ -280,11 +285,13 @@ private fun TransactionsGroupedLazyList(
     onSelectForInspect: (Long) -> Unit,
     onNavigate: (OrbitNavKey) -> Unit,
     modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
     onInteraction: () -> Unit = {}
 ) {
     val startPadding = if (isWideScreen) 20.dp else 16.dp
     val endPadding = if (isWideScreen) 0.dp else 16.dp
     LazyColumn(
+        state = listState,
         modifier = modifier,
         contentPadding = PaddingValues(start = startPadding, end = endPadding, top = 0.dp, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)

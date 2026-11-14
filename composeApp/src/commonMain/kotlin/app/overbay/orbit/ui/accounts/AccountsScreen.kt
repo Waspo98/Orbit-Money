@@ -308,8 +308,11 @@ private fun AccountsMasterContent(
 
         val cardCyclesById = remember(state.cardCycles) { state.cardCycles.associateBy { it.accountId } }
 
+        val listState = rememberOrbitLazyListState()
+
         // Account Groups List
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)

@@ -172,7 +172,9 @@ fun MhaTrackerScreen(
                     label = "MhaScreenTabTransition"
                 ) { activeTab ->
                     if (activeTab == MhaScreenTab.DEFAULTS) {
+                        val defaultsListState = rememberOrbitLazyListState("defaults")
                         LazyColumn(
+                            state = defaultsListState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -196,7 +198,9 @@ fun MhaTrackerScreen(
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             // Left Pane: Summary Card + Auto Defaults
+                            val leftListState = rememberOrbitLazyListState("two_pane_left")
                             LazyColumn(
+                                state = leftListState,
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(bottom = 32.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -267,7 +271,9 @@ fun MhaTrackerScreen(
                         }
                     } else {
                         // Compact Mobile Single-Column Scroll
+                        val compactListState = rememberOrbitLazyListState("compact")
                         LazyColumn(
+                            state = compactListState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)

@@ -53,6 +53,7 @@ import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.ui.dashboard.dialogs.OrbitBentoCustomizeSheet
 import app.overbay.orbit.util.LocalDevicePosture
 
@@ -196,8 +197,10 @@ fun CardPerksScreen(
                             )
                         }
                     } else {
+                        val listState = rememberOrbitLazyListState()
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                             LazyColumn(
+                                state = listState,
                                 modifier = Modifier.widthIn(max = 1440.dp).fillMaxSize(),
                                 contentPadding = PaddingValues(
                                     start = hPad,

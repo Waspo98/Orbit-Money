@@ -42,6 +42,7 @@ import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.ui.networth.components.AccountContributionsCard
 import app.overbay.orbit.ui.networth.components.AssetLiabilityBreakdownCard
 import app.overbay.orbit.ui.networth.components.NetWorthChartCard
@@ -129,7 +130,9 @@ fun NetWorthScreen(
                         )
                     }
                 } else {
+                    val listState = rememberOrbitLazyListState()
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)

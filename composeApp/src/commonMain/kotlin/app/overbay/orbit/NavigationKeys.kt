@@ -47,8 +47,10 @@ fun resolveOrbitTransitionDirection(
     }
 }
 
-fun AnimatedContentTransitionScope<OrbitNavKey>.orbitNavigationTransitionSpec(): ContentTransform {
-    val direction = resolveOrbitTransitionDirection(initialState, targetState)
+fun AnimatedContentTransitionScope<OrbitNavKey>.orbitNavigationTransitionSpec(): ContentTransform =
+    buildOrbitTransitionTransform(resolveOrbitTransitionDirection(initialState, targetState))
+
+internal fun buildOrbitTransitionTransform(direction: OrbitTransitionDirection): ContentTransform {
     val snappySlideSpring = spring<IntOffset>(
         dampingRatio = Spring.DampingRatioNoBouncy,
         stiffness = 650f,

@@ -134,7 +134,9 @@ fun GoalsScreen(
                             onMove = { from, to -> viewModel.moveGoal(completedGroup = true, fromIndex = from, toIndex = to) },
                             itemSpacingDp = 16.dp
                         )
+                        val listState = rememberOrbitLazyListState()
                         LazyColumn(
+                            state = listState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)

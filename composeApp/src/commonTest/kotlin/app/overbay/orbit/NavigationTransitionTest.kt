@@ -6,6 +6,8 @@ import app.overbay.orbit.ui.components.canopyBackdropFillTopLeft
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -186,5 +188,74 @@ class NavigationTransitionTest {
     @Test
     fun `canopy transition threshold stays sub-pixel relative to IntOffset slide settling`() {
         assertTrue(CanopyTransitionCoordinator.CANOPY_TRANSITION_THRESHOLD < 1f / 1080f)
+    }
+
+    @Test
+    fun `touching bottom tab opens destination at top while system back restores prior scroll position`() {
+        val controller = OrbitBackStackController(OrbitNavKey.Dashboard)
+        val initialDashboardId = controller.currentEntry.id
+        controller.scrollStateFor(initialDashboardId).apply {
+            listSnapshots["default"] = 6 to 140
+            savedHeroOffsetPx = 154f
+        }
+
+        // Navigate to Transactions via bottom tab -> fresh entry starting at (0, 0)
+        controller.navigate(OrbitNavKey.Transactions(), fromTab = true)
+        val txId = controller.currentEntry.id
+        assertNotEquals(initialDashboardId, txId)
+        assertNull(controller.scrollStateFor(txId).listSnapshots["default"])
+        assertEquals(0f, controller.scrollStateFor(txId).savedHeroOffsetPx)
+
+        // Scroll down Transactions, then tap Dashboard bottom tab -> fresh top Dashboard entry
+        controller.scrollStateFor(txId).listSnapshots["default"] = 12 to 48
+        controller.navigate(OrbitNavKey.Dashboard, fromTab = true)
+        val freshDashboardId = controller.currentEntry.id
+        assertNotEquals(initialDashboardId, freshDashboardId)
+        assertEquals(OrbitNavKey.Dashboard, controller.currentKey)
+        assertNull(controller.scrollStateFor(freshDashboardId).listSnapshots["default"])
+        assertEquals(0f, controller.scrollStateFor(freshDashboardId).savedHeroOffsetPx)
+
+        // Back once -> Transactions at saved position (12, 48)
+        assertTrue(controller.popBack())
+        assertEquals(txId, controller.currentEntry.id)
+        assertEquals(12 to 48, controller.scrollStateFor(txId).listSnapshots["default"])
+
+        // Back again -> original Dashboard at saved position (6, 140) and pruned popped entries
+        assertTrue(controller.popBack())
+        assertEquals(initialDashboardId, controller.currentEntry.id)
+        assertEquals(6 to 140, controller.scrollStateFor(initialDashboardId).listSnapshots["default"])
+        assertEquals(154f, controller.scrollStateFor(initialDashboardId).savedHeroOffsetPx)
+        assertEquals(1, controller.trackedScrollEntryCount())
+        assertFalse(controller.popBack())
+    }
+
+    @Test
+    fun `re-tapping active bottom tab triggers scroll-to-top and deep-link reset clears scroll`() {
+        val controller = OrbitBackStackController(OrbitNavKey.Dashboard)
+        val dashScroll = controller.scrollStateFor(controller.currentEntry.id)
+        dashScroll.listSnapshots["default"] = 4 to 80
+
+        // Re-tapping Dashboard from bottom bar triggers smooth scroll-to-top without pushing
+        controller.navigate(OrbitNavKey.Dashboard, fromTab = true)
+        assertEquals(1, controller.entries.size)
+        assertEquals(1, dashScroll.scrollToTopRequestId)
+
+        // In-screen card navigation to filtered Transactions pushes a new entry
+        controller.navigate(OrbitNavKey.Transactions(categoryId = 7L), fromTab = false)
+        assertEquals(2, controller.entries.size)
+        val filteredTxEntryId = controller.currentEntry.id
+        controller.scrollStateFor(filteredTxEntryId).listSnapshots["default"] = 9 to 32
+
+        // Tapping Transactions bottom tab clears filters on the same tab AND resets scroll to top
+        controller.navigate(OrbitNavKey.Transactions(), fromTab = true)
+        assertEquals(2, controller.entries.size)
+        assertEquals(OrbitNavKey.Transactions(), controller.currentKey)
+        val clearedTxScroll = controller.scrollStateFor(filteredTxEntryId)
+        assertNull(clearedTxScroll.listSnapshots["default"])
+        assertEquals(1, clearedTxScroll.scrollToTopRequestId)
+
+        // System Back still returns to original Dashboard scroll position
+        assertTrue(controller.popBack())
+        assertEquals(4 to 80, controller.scrollStateFor(controller.currentEntry.id).listSnapshots["default"])
     }
 }

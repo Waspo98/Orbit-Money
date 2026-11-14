@@ -47,6 +47,7 @@ import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.ui.upcoming.components.CardPaymentsDueCard
 import app.overbay.orbit.ui.upcoming.components.UpcomingCalendarStrip
 import app.overbay.orbit.ui.upcoming.components.UpcomingCashFlowCard
@@ -197,7 +198,9 @@ fun UpcomingScreen(
                     val endPad = if (isTwoPane) 0.dp else 16.dp
 
                     val masterList: @Composable () -> Unit = {
+                        val listState = rememberOrbitLazyListState()
                         LazyColumn(
+                            state = listState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)

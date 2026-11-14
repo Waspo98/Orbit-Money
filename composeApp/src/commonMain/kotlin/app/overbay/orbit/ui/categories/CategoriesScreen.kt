@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -44,6 +43,7 @@ import app.overbay.orbit.ui.components.dragReorderItem
 import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.ui.transactions.components.CanopyMorphingSearchContent
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.DevicePosture
@@ -62,7 +62,7 @@ fun CategoriesScreen(
     val density = LocalDensity.current
     val heroScrollState = rememberHeroScrollState()
     heroScrollState.scrollEnabled = !state.isSearchActive
-    val listState = rememberLazyListState()
+    val listState = rememberOrbitLazyListState()
     val visibleCatCount = state.groups.sumOf { it.items.size }
     val catCount = if (state.searchQuery.isNotBlank()) {
         visibleCatCount
