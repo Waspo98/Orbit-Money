@@ -60,11 +60,40 @@ fun Modifier.orbitTactilePress(
     } else {
         var pointerPressed by remember { mutableStateOf(false) }
         val passiveTracker = Modifier.pointerInput(Unit) {
+            val touchSlop = viewConfiguration.touchSlop
             awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                pointerPressed = true
-                waitForUpOrCancellation(pass = PointerEventPass.Initial)
-                pointerPressed = false
+                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                var abortedBeforePress = false
+                // Disambiguate scroll/drag from deliberate press so LazyColumn drags never jitter cards.
+                withTimeoutOrNull(85L) {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Final)
+                        val change = event.changes.firstOrNull { it.id == down.id }
+                            ?: event.changes.firstOrNull()
+                        if (change == null ||
+                            !change.pressed ||
+                            (change.position - down.position).getDistance() > touchSlop
+                        ) {
+                            abortedBeforePress = true
+                            break
+                        }
+                    }
+                }
+                if (!abortedBeforePress) {
+                    pointerPressed = true
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Final)
+                        val change = event.changes.firstOrNull { it.id == down.id }
+                            ?: event.changes.firstOrNull()
+                        if (change == null ||
+                            !change.pressed ||
+                            (change.position - down.position).getDistance() > touchSlop
+                        ) {
+                            break
+                        }
+                    }
+                    pointerPressed = false
+                }
             }
         }
         val scale by animateFloatAsState(

@@ -9,6 +9,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -34,6 +35,8 @@ import app.overbay.orbit.ui.components.GlobalStatusBanners
 import app.overbay.orbit.ui.components.LocalCanopyScreenKeyId
 import app.overbay.orbit.ui.components.LocalCanopyTransitionCoordinator
 import app.overbay.orbit.ui.components.rememberCanopyTransitionCoordinator
+import app.overbay.orbit.ui.components.rememberHeroScrollState
+import kotlinx.coroutines.launch
 import app.overbay.orbit.ui.dashboard.DashboardScreen
 import app.overbay.orbit.ui.dashboard.DashboardViewModel
 import app.overbay.orbit.ui.goals.GoalsScreen
@@ -126,6 +129,16 @@ fun OrbitNavigation(
     }
 
     val isAuthRoute = currentKey == OrbitNavKey.Login || currentKey == OrbitNavKey.Onboarding
+    val navScope = rememberCoroutineScope()
+    val dashboardListState = rememberLazyListState()
+    val dashboardHeroScrollState = rememberHeroScrollState()
+    LaunchedEffect(isAuthRoute) {
+        if (isAuthRoute) {
+            dashboardListState.scrollToItem(0)
+            dashboardHeroScrollState.scrollOffsetPx = 0f
+            dashboardHeroScrollState.isFabVisible = true
+        }
+    }
     var lastShellKey by remember {
         mutableStateOf(
             if (initialKey == OrbitNavKey.Login || initialKey == OrbitNavKey.Onboarding) {
@@ -193,7 +206,12 @@ fun OrbitNavigation(
             viewModels.settingsViewModel.setSubpage(null)
         }
 
-        if (destination != currentKey) {
+        if (destination == OrbitNavKey.Dashboard && currentKey == OrbitNavKey.Dashboard) {
+            navScope.launch {
+                dashboardListState.animateScrollToItem(0)
+                dashboardHeroScrollState.expand()
+            }
+        } else if (destination != currentKey) {
             if (
                 destination.primaryTabIndex != null &&
                 destination.primaryTabIndex == currentKey.primaryTabIndex &&
@@ -270,7 +288,13 @@ fun OrbitNavigation(
                 ) { key ->
                     CompositionLocalProvider(LocalCanopyScreenKeyId provides (key.primaryTabIndex ?: key)) {
                         when (key) {
-                            OrbitNavKey.Dashboard -> DashboardScreen(viewModels.dashboardViewModel, navigateTo, Modifier.fillMaxSize())
+                            OrbitNavKey.Dashboard -> DashboardScreen(
+                                viewModel = viewModels.dashboardViewModel,
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize(),
+                                listState = dashboardListState,
+                                heroScrollState = dashboardHeroScrollState
+                            )
                             is OrbitNavKey.Transactions -> {
                                 val txVm = viewModels.transactionsViewModel
                                 LaunchedEffect(key) {

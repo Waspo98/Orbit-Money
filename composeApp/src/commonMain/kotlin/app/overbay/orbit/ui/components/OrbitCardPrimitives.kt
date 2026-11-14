@@ -1,7 +1,9 @@
 package app.overbay.orbit.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -115,10 +118,14 @@ fun OrbitCompactListRow(
             }
 
             val rowModifier = if (onClick != null) {
+                val rowInteractionSource = remember { MutableInteractionSource() }
                 Modifier
                     .fillMaxWidth()
-                    .orbitTactilePress()
-                    .clickable { onClick() }
+                    .orbitTactilePress(interactionSource = rowInteractionSource)
+                    .clickable(
+                        interactionSource = rowInteractionSource,
+                        indication = LocalIndication.current
+                    ) { onClick() }
                     .padding(horizontal = if (containerColor != null) 12.dp else 0.dp, vertical = 10.dp)
             } else {
                 Modifier
@@ -316,11 +323,13 @@ fun OrbitActionChip(
     }
 ) {
     val haptics = LocalOrbitHaptics.current
+    val chipInteractionSource = remember { MutableInteractionSource() }
     AssistChip(
         onClick = {
             haptics.tick()
             onClick()
         },
+        interactionSource = chipInteractionSource,
         label = {
             Text(
                 text = label,
@@ -353,6 +362,6 @@ fun OrbitActionChip(
                 OrbitTheme.colors.cardBorder
             }
         ),
-        modifier = modifier.orbitTactilePress(enabled = enabled)
+        modifier = modifier.orbitTactilePress(enabled = enabled, interactionSource = chipInteractionSource)
     )
 }

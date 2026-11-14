@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,6 +36,7 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
+import app.overbay.orbit.ui.components.HeroScrollState
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
@@ -54,7 +56,9 @@ import app.overbay.orbit.util.LocalDevicePosture
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     onNavigate: (OrbitNavKey) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
+    heroScrollState: HeroScrollState = rememberHeroScrollState()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -62,7 +66,9 @@ fun DashboardScreen(
         uiState = uiState,
         onAction = viewModel::onAction,
         onNavigate = onNavigate,
-        modifier = modifier
+        modifier = modifier,
+        listState = listState,
+        heroScrollState = heroScrollState
     )
 }
 
@@ -71,11 +77,11 @@ fun DashboardScreen(
     uiState: DashboardUiState,
     onAction: (DashboardAction) -> Unit,
     onNavigate: (OrbitNavKey) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
+    heroScrollState: HeroScrollState = rememberHeroScrollState()
 ) {
     val posture = LocalDevicePosture.current
-    val heroScrollState = rememberHeroScrollState()
-    val listState = rememberLazyListState()
 
     val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottomContentPadding = navBarBottomPadding + 88.dp

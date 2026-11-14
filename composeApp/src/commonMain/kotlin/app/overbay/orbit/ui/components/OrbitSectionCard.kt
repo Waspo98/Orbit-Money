@@ -1,7 +1,9 @@
 package app.overbay.orbit.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -23,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,12 +59,16 @@ fun OrbitSectionCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
+    val cardInteractionSource = remember { MutableInteractionSource() }
     val interactiveModifier = if (onCardClick != null) {
         modifier
             .fillMaxWidth()
-            .orbitTactilePress(pressedScale = 0.985f)
+            .orbitTactilePress(pressedScale = 0.985f, interactionSource = cardInteractionSource)
             .clip(shape)
-            .clickable {
+            .clickable(
+                interactionSource = cardInteractionSource,
+                indication = LocalIndication.current
+            ) {
                 haptics.tick()
                 onCardClick()
             }
@@ -119,13 +126,17 @@ fun OrbitSectionCard(
                     }
 
                     if (actionText != null && onActionClick != null) {
+                        val actionInteractionSource = remember { MutableInteractionSource() }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .padding(start = 8.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .orbitTactilePress()
-                                .clickable {
+                                .orbitTactilePress(interactionSource = actionInteractionSource)
+                                .clickable(
+                                    interactionSource = actionInteractionSource,
+                                    indication = LocalIndication.current
+                                ) {
                                     haptics.tick()
                                     onActionClick()
                                 }
