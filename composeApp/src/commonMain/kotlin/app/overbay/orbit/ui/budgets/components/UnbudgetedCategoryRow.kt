@@ -114,13 +114,15 @@ fun UnbudgetedCategoryRow(
                 }
             }
 
-            OrbitActionChip(
-                label = "+ Budget",
-                onClick = {
-                    haptics.tick()
-                    onSetBudget()
-                }
-            )
+            if (item.category.id > 0L) {
+                OrbitActionChip(
+                    label = "+ Budget",
+                    onClick = {
+                        haptics.tick()
+                        onSetBudget()
+                    }
+                )
+            }
         }
 
         BudgetCategoryExpandedDrawer(

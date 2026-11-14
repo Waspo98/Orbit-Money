@@ -75,10 +75,14 @@ internal fun SpendingMixPanel(
 
     val categorySlices = buildCategorySlices(sortedCategories, categoryTotal, otherColor, MaterialTheme.colorScheme.primary)
     val merchantSlices = buildMerchantSlices(sortedMerchants, merchantTotal, merchantPalette, otherColor)
+    val headerTotal = when (mode) {
+        SpendingMixMode.CATEGORIES -> categoryTotal
+        SpendingMixMode.MERCHANTS -> merchantTotal
+    }
 
     OrbitSectionCard(
         title = "SPENDING MIX",
-        subtitle = "${MoneyUtils.formatCents(categoryTotal, showCents = false)} total spent",
+        subtitle = "${MoneyUtils.formatCents(headerTotal, showCents = false)} total spent",
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {

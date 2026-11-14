@@ -138,22 +138,24 @@ internal fun BudgetCategoryExpandedDrawer(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                haptics.tick()
-                                onEditBudget()
-                            },
-                            shape = CircleShape,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(
-                                text = if (item.amountCents > 0L) "Edit Budget" else "Set Budget",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                        if (item.category.id > 0L) {
+                            OutlinedButton(
+                                onClick = {
+                                    haptics.tick()
+                                    onEditBudget()
+                                },
+                                shape = CircleShape,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text(
+                                    text = if (item.amountCents > 0L) "Edit Budget" else "Set Budget",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
 
                         OrbitScaleBadgeVisibility(visible = item.budgetId != null) {

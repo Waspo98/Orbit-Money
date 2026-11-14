@@ -130,7 +130,11 @@ fun BudgetDetailInspectorPane(
                             val days = LocalDateUtils.daysInMonth(y, m)
                             val start = "${state.selectedMonth}-01"
                             val end = "${state.selectedMonth}-${days.toString().padStart(2, '0')}"
-                            onNavigate(OrbitNavKey.Transactions(categoryId = inspecting.category.id, startDate = start, endDate = end))
+                            if (inspecting.category.id <= 0L) {
+                                onNavigate(OrbitNavKey.Transactions(uncategorizedOnly = true, startDate = start, endDate = end))
+                            } else {
+                                onNavigate(OrbitNavKey.Transactions(categoryId = inspecting.category.id, startDate = start, endDate = end))
+                            }
                         }
                     )
                 }
@@ -262,10 +266,12 @@ private fun BudgetReadOnlyDetailContent(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OrbitActionChip(
-                    label = if (item.amountCents > 0L) "Edit Budget" else "Set Budget",
-                    onClick = { haptics.tick(); onEdit() }
-                )
+                if (item.category.id > 0L) {
+                    OrbitActionChip(
+                        label = if (item.amountCents > 0L) "Edit Budget" else "Set Budget",
+                        onClick = { haptics.tick(); onEdit() }
+                    )
+                }
                 OrbitActionChip(
                     label = "View All in Transactions",
                     onClick = { haptics.tick(); onViewTransactions() }

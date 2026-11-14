@@ -36,11 +36,9 @@ data class BudgetsUiState(
     val totalBudgetedCents get() = overview?.totalBudgetedCents ?: 0L
     val totalSpentCents get() = overview?.totalSpentCents ?: 0L
     val totalRemainingCents get() = overview?.totalRemainingCents ?: 0L
-    val budgetedRemainingCents get() = overview?.budgetedRemainingCents ?: 0L
     val lastMonthMtdSpentCents get() = overview?.lastMonthMtdSpentCents ?: 0L
     val lastMonthLabel get() = overview?.lastMonthLabel ?: ""
     val dailySafeSpend get() = overview?.dailySafeSpend
-    val budgetedDailySafeSpendCents get() = overview?.budgetedDailySafeSpendCents ?: 0L
     val budgetedItems get() = overview?.budgeted ?: emptyList()
     val unbudgetedItems get() = overview?.unbudgeted ?: emptyList()
     val inactiveItems get() = overview?.inactive ?: emptyList()

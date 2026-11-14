@@ -92,7 +92,6 @@ data class MonthlyBudgetOverview(
     val netSavingsCents: Cents = 0L,
     val savingsRatePercent: Double = 0.0,
     val dailySafeSpend: DailySafeSpend = DailySafeSpend(0L, 0, "", "neutral"),
-    val budgetedDailySafeSpend: DailySafeSpend = DailySafeSpend(0L, 0, "", "neutral"),
     val lastMonthMtdSpentCents: Cents? = null,
     val lastMonthLabel: String = "",
     val budgeted: List<CategoryBudgetOverviewItem> = emptyList(),
@@ -101,13 +100,9 @@ data class MonthlyBudgetOverview(
     val topMerchants: List<MerchantBudgetMixItem> = emptyList()
 ) {
     val totalRemainingCents: Cents get() = totalBudgetedCents - totalSpentCents
-    val budgetedRemainingCents: Cents get() = totalBudgetedCents - totalSpentInBudgetCents
     val dailySafeSpendCents: Cents get() = dailySafeSpend.dailyCents
-    val budgetedDailySafeSpendCents: Cents get() = budgetedDailySafeSpend.dailyCents
     val utilizationRatio: Double
         get() = if (totalBudgetedCents > 0L) totalSpentCents.toDouble() / totalBudgetedCents.toDouble() else 0.0
-    val budgetedUtilizationRatio: Double
-        get() = if (totalBudgetedCents > 0L) totalSpentInBudgetCents.toDouble() / totalBudgetedCents.toDouble() else 0.0
     val categoryRows: List<CategoryBudgetOverviewItem> get() = budgeted + unbudgeted
 }
 

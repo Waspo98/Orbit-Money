@@ -139,13 +139,6 @@ object BudgetEngine {
             todayDate = todayDate,
             daysInMonth = daysInMonth
         )
-        val budgetedDailySafeSpend = calculateDailySafeSpend(
-            totalBudgetedCents = totalBudgetedCents,
-            totalSpentCents = totalSpentInBudgetCents,
-            selectedMonth = month,
-            todayDate = todayDate,
-            daysInMonth = daysInMonth
-        )
 
         val prevMonth = LocalDateUtils.addMonthsToYearMonth(month, -1)
         val (prevYear, prevMonthNum) = LocalDateUtils.parseYearMonth(prevMonth) ?: Pair(2026, 1)
@@ -190,7 +183,6 @@ object BudgetEngine {
             netSavingsCents = netSavingsCents,
             savingsRatePercent = savingsRatePercent,
             dailySafeSpend = dailySafeSpend,
-            budgetedDailySafeSpend = budgetedDailySafeSpend,
             lastMonthMtdSpentCents = lastMonthMtdSpentCents,
             lastMonthLabel = lastMonthLabel,
             budgeted = sortedBudgeted,

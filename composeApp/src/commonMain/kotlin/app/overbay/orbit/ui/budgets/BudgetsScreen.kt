@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CircularProgressIndicator
@@ -25,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +54,7 @@ import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.PeriodNavigatorPill
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.util.LocalDevicePosture
+import kotlinx.coroutines.launch
 
 /**
  * Editorial Budgets screen featuring flat emerald canopy hero with period navigation & active month selector,
@@ -200,16 +203,24 @@ fun BudgetsScreen(
                         val startPad = if (isTwoPane) 20.dp else 16.dp
                         val endPad = if (isTwoPane) 0.dp else 16.dp
 
+                        val listState = rememberLazyListState()
+                        val coroutineScope = rememberCoroutineScope()
+
                         val openCategoryTransactions: (Long) -> Unit = { categoryId ->
                             val (y, m) = LocalDateUtils.parseYearMonth(state.selectedMonth) ?: Pair(2026, 1)
                             val days = LocalDateUtils.daysInMonth(y, m)
                             val start = "${state.selectedMonth}-01"
                             val end = "${state.selectedMonth}-${days.toString().padStart(2, '0')}"
-                            onNavigate(OrbitNavKey.Transactions(categoryId = categoryId, startDate = start, endDate = end))
+                            if (categoryId <= 0L) {
+                                onNavigate(OrbitNavKey.Transactions(uncategorizedOnly = true, startDate = start, endDate = end))
+                            } else {
+                                onNavigate(OrbitNavKey.Transactions(categoryId = categoryId, startDate = start, endDate = end))
+                            }
                         }
 
                         val masterList: @Composable () -> Unit = {
                             LazyColumn(
+                                state = listState,
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -253,7 +264,20 @@ fun BudgetsScreen(
                                             onSelectMode = { viewModel.setSpendingMixMode(it) },
                                             onToggleSlice = { viewModel.toggleSpendingMixKey(it) },
                                             onClearSelection = { viewModel.clearSpendingMixSelection() },
-                                            onInspectCategory = { viewModel.inspectCategoryFromMix(it) },
+                                            onInspectCategory = { categoryId ->
+                                                viewModel.inspectCategoryFromMix(categoryId)
+                                                if (!isTwoPane) {
+                                                    val isBudgeted = state.budgetedItems.any { it.category.id == categoryId }
+                                                    val targetIndex = when {
+                                                        isBudgeted -> 1
+                                                        state.budgetedItems.isNotEmpty() -> 2
+                                                        else -> 1
+                                                    }
+                                                    coroutineScope.launch {
+                                                        listState.animateScrollToItem(targetIndex)
+                                                    }
+                                                }
+                                            },
                                             onEditBudget = { viewModel.openBudgetEditor(it) },
                                             onViewTransactions = openCategoryTransactions,
                                             modifier = Modifier
@@ -311,7 +335,9 @@ fun BudgetsScreen(
 
         // Add Category Budget Modal Sheet
         if (state.showAddCategorySheet) {
-            val availableCategories = state.unbudgetedItems.map { it.category } + state.inactiveItems.map { it.category }
+            val availableCategories = (state.unbudgetedItems + state.inactiveItems)
+                .map { it.category }
+                .filter { it.id > 0L }
             AddBudgetCategorySheet(
                 availableCategories = availableCategories,
                 initialCategoryId = state.initialAddCategoryId,

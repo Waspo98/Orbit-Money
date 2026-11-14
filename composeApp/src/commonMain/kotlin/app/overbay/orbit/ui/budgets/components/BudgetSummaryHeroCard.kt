@@ -154,7 +154,7 @@ fun BudgetSummaryHeroCard(
 
             val scaledPaceMarker = when {
                 monthProgressFraction == null -> null
-                totalBudgeted <= 0L -> monthProgressFraction
+                totalBudgeted <= 0L -> null
                 fitsWithinCap -> monthProgressFraction
                 positiveTotal > 0f -> (monthProgressFraction * (totalBudgeted.toFloat() / positiveTotal)).coerceIn(0.02f, 0.98f)
                 else -> monthProgressFraction
@@ -207,7 +207,7 @@ fun BudgetSummaryHeroCard(
             val lastMonthSub = when {
                 lastMonthSpent == 0L && totalSpent == 0L -> if (lastMonthLabel.isNotBlank()) "No spend $lastMonthLabel" else "No prior spend"
                 lastMonthDelta == 0L -> "Same as $lastMonthLabel"
-                else -> "${MoneyUtils.formatCents(lastMonthDelta, signed = true, showCents = false)} vs this mo"
+                else -> "${MoneyUtils.formatCents(lastMonthDelta, signed = true, showCents = false)} vs last mo"
             }
             val lastMonthDeltaColor = when {
                 lastMonthDelta < 0L -> colors.income

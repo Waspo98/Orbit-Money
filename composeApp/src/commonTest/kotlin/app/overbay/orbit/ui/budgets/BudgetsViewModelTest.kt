@@ -5,6 +5,7 @@ import app.overbay.orbit.data.model.BudgetPaceStatus
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategorySortOption
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.domain.BudgetEngine
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.util.PlatformStorage
 import kotlinx.coroutines.Dispatchers
@@ -321,6 +322,39 @@ class BudgetsViewModelTest {
         viewModel.onPreviousMonth()
         testScheduler.advanceUntilIdle()
         assertNull(viewModel.uiState.value.selectedSpendingMixKey)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testUncategorizedTransactionsAndEditorGuard() = runTest(testDispatcher) {
+        val currentMonth = LocalDateUtils.currentYearMonth()
+        repository.saveTransaction(
+            Transaction(
+                id = 91L,
+                accountId = 1L,
+                originalDate = "$currentMonth-04",
+                originalMerchant = "Mystery Shop",
+                originalAmountCents = -4500L,
+                originalCategoryId = null
+            )
+        )
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        val uncatId = BudgetEngine.UNCATEGORIZED_CATEGORY.id
+        val uncatTxns = viewModel.uiState.value.categoryTransactions[uncatId].orEmpty()
+        assertEquals(1, uncatTxns.size)
+        assertEquals("Mystery Shop", uncatTxns.first().effectiveMerchant)
+
+        val uncatItem = viewModel.uiState.value.unbudgetedItems.first { it.category.id == uncatId }
+        viewModel.openBudgetEditor(uncatItem)
+        testScheduler.advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.showEditorSheet)
+        assertNull(viewModel.uiState.value.editingItem)
 
         collectJob.cancel()
     }

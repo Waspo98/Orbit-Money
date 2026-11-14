@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -66,13 +67,20 @@ internal fun SpendingMixDonut(
         }
     }
 
-    val animatedStrokes = slices.map { slice ->
-        val target = if (activeSlice?.key == slice.key) 26.dp else 20.dp
-        animateDpAsState(targetValue = target, animationSpec = OrbitSprings.DpSpatialFast, label = "donutStroke").value
-    }
-    val animatedAlphas = slices.map { slice ->
-        val target = if (!hasSelection || activeSlice?.key == slice.key) 1f else 0.35f
-        animateFloatAsState(targetValue = target, animationSpec = OrbitSprings.FloatEffectsFast, label = "donutAlpha").value
+    val animatedStyles = slices.map { slice ->
+        key(slice.key) {
+            val stroke = animateDpAsState(
+                targetValue = if (activeSlice?.key == slice.key) 26.dp else 20.dp,
+                animationSpec = OrbitSprings.DpSpatialFast,
+                label = "donutStroke"
+            ).value
+            val alpha = animateFloatAsState(
+                targetValue = if (!hasSelection || activeSlice?.key == slice.key) 1f else 0.35f,
+                animationSpec = OrbitSprings.FloatEffectsFast,
+                label = "donutAlpha"
+            ).value
+            stroke to alpha
+        }
     }
 
     Box(
@@ -91,6 +99,7 @@ internal fun SpendingMixDonut(
                         val outerRadius = min(size.width, size.height) / 2f
                         val innerRadius = outerRadius * 0.45f
 
+                        if (dist > outerRadius) return@detectTapGestures
                         if (dist < innerRadius) {
                             if (hasSelection) {
                                 haptics.tick()
@@ -121,14 +130,15 @@ internal fun SpendingMixDonut(
             sliceAngles.forEachIndexed { index, (slice, start, end) ->
                 val rawSweep = end - start
                 val drawnSweep = (rawSweep - gapDeg).coerceAtLeast(1f)
+                val (strokeDp, sliceAlpha) = animatedStyles[index]
                 drawArc(
-                    color = slice.color.copy(alpha = animatedAlphas[index]),
+                    color = slice.color.copy(alpha = sliceAlpha),
                     startAngle = startDeg,
                     sweepAngle = drawnSweep,
                     useCenter = false,
                     topLeft = topLeft,
                     size = arcSize,
-                    style = Stroke(width = animatedStrokes[index].toPx(), cap = StrokeCap.Butt)
+                    style = Stroke(width = strokeDp.toPx(), cap = StrokeCap.Butt)
                 )
                 startDeg += rawSweep
             }

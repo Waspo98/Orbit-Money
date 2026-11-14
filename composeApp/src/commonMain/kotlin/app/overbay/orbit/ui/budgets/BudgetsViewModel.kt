@@ -124,11 +124,13 @@ class BudgetsViewModel(
             null
         }
 
-        // Group transactions for this month across all categories
+        // Group transactions for this month across all categories (including Uncategorized = -1L)
         val monthTxns = transactions.filter {
             it.effectiveDate.take(7) == control.month && !it.effectiveIsIgnored && !it.effectiveIsTransfer
         }
-        val categoryTransactions = monthTxns.groupBy { it.effectiveCategoryId ?: 0L }
+        val categoryTransactions = monthTxns.groupBy {
+            it.effectiveCategoryId ?: BudgetEngine.UNCATEGORIZED_CATEGORY.id
+        }
 
         BudgetsUiState(
             selectedMonth = control.month,
@@ -254,6 +256,7 @@ class BudgetsViewModel(
     }
 
     fun openBudgetEditor(item: CategoryBudgetOverviewItem) {
+        if (item.category.id <= 0L) return
         _expandedCategoryId.value = item.category.id
         _editingItem.value = item
         _showEditorSheet.value = true
@@ -265,6 +268,7 @@ class BudgetsViewModel(
     }
 
     fun saveBudget(categoryId: Long, amountCents: Cents, rollover: Boolean) {
+        if (categoryId <= 0L) return
         viewModelScope.launch {
             repository.saveBudget(
                 categoryId = categoryId,

@@ -20,6 +20,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -124,10 +128,16 @@ internal fun SpendingMixCategoryTab(
             }
         }
 
+        var cachedSlice by remember { mutableStateOf<SpendingMixSlice?>(null) }
+        if (activeSlice != null) {
+            cachedSlice = activeSlice
+        }
+        val displayedSlice = activeSlice ?: cachedSlice
+
         OrbitAccordionVisibility(visible = activeSlice != null) {
-            if (activeSlice != null) {
+            if (displayedSlice != null) {
                 SpendingMixSelectionStrip(
-                    slice = activeSlice,
+                    slice = displayedSlice,
                     totalSpent = totalSpent,
                     onInspectCategory = onInspectCategory,
                     onEditBudget = onEditBudget,
