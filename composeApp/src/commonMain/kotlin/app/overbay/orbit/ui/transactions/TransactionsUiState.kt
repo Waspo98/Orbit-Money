@@ -71,6 +71,19 @@ internal data class TransactionsOverlayState(
     val showCustomizeActionsSheet: Boolean = false
 )
 
+internal data class TransactionsNavSnapshot(
+    val searchQuery: String = "",
+    val quickFilter: QuickFilter = QuickFilter.ALL,
+    val filterDraft: TransactionFilterDraft = TransactionFilterDraft(),
+    val sortOption: TransactionSortOption = TransactionSortOption.DATE_DESC,
+    val isCompactView: Boolean = false,
+    val currentPage: Int = 1,
+    val isSearchActive: Boolean = false,
+    val inspectingId: Long? = null,
+    val expandedId: Long? = null,
+    val showEditorSheet: Boolean = false
+)
+
 data class TransactionsUiState(
     val transactions: List<Transaction> = emptyList(),
     val filteredTransactions: List<Transaction> = emptyList(),

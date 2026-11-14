@@ -124,7 +124,20 @@ sealed interface OrbitNavKey {
         val openSearch: Boolean = false,
         val includeTransfers: Boolean = true,
         val includeIgnored: Boolean = true
-    ) : OrbitNavKey
+    ) : OrbitNavKey {
+        val hasDeepLinkParams: Boolean
+            get() = transactionId != null ||
+                accountId != null ||
+                categoryId != null ||
+                uncategorizedOnly ||
+                startDate != null ||
+                endDate != null ||
+                sortOption != null ||
+                openAddSheet ||
+                openSearch ||
+                !includeTransfers ||
+                !includeIgnored
+    }
 
     @Serializable
     data object Budgets : OrbitNavKey

@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.transactions
 
+import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.OrbitPreferences
@@ -28,6 +29,32 @@ object TransactionsFilterHelper {
                 ?: TransactionSortOption.DATE_DESC
         }
     }
+
+    internal fun buildDeepLinkNavSnapshot(
+        destination: OrbitNavKey.Transactions,
+        isCompactView: Boolean
+    ): TransactionsNavSnapshot = TransactionsNavSnapshot(
+        searchQuery = "",
+        quickFilter = if (destination.uncategorizedOnly) QuickFilter.UNCATEGORIZED else QuickFilter.ALL,
+        filterDraft = TransactionFilterDraft(
+            accountId = destination.accountId,
+            categoryId = destination.categoryId,
+            accountIds = if (destination.accountId != null) setOf(destination.accountId) else emptySet(),
+            categoryIds = if (destination.categoryId != null) setOf(destination.categoryId) else emptySet(),
+            uncategorizedOnly = destination.uncategorizedOnly,
+            startDate = destination.startDate,
+            endDate = destination.endDate,
+            includeTransfers = destination.includeTransfers,
+            includeIgnored = destination.includeIgnored
+        ),
+        sortOption = parseSortOption(destination.sortOption),
+        isCompactView = isCompactView,
+        currentPage = 1,
+        isSearchActive = destination.openSearch,
+        inspectingId = destination.transactionId,
+        expandedId = destination.transactionId,
+        showEditorSheet = destination.openAddSheet
+    )
 
     fun filterTransactions(
         transactions: List<Transaction>,

@@ -23,6 +23,7 @@ class OrbitBackStackController(initialKey: OrbitNavKey = OrbitNavKey.Dashboard) 
     private var nextEntryId: Long = 1L
     val entries = mutableStateListOf(OrbitBackStackEntry(id = 0L, key = initialKey))
     private val entryScrollStates = HashMap<Long, ScreenScrollState>()
+    private val entryViewStates = HashMap<Long, Any>()
 
     val currentEntry: OrbitBackStackEntry
         get() = entries.lastOrNull() ?: OrbitBackStackEntry(id = 0L, key = OrbitNavKey.Dashboard)
@@ -35,6 +36,16 @@ class OrbitBackStackController(initialKey: OrbitNavKey = OrbitNavKey.Dashboard) 
 
     fun scrollStateFor(entryId: Long): ScreenScrollState =
         entryScrollStates.getOrPut(entryId) { ScreenScrollState() }
+
+    internal fun saveEntryState(entryId: Long, state: Any) {
+        entryViewStates[entryId] = state
+    }
+
+    internal fun entryStateFor(entryId: Long): Any? = entryViewStates[entryId]
+
+    internal fun clearEntryState(entryId: Long) {
+        entryViewStates.remove(entryId)
+    }
 
     fun navigate(destination: OrbitNavKey, fromTab: Boolean = false) {
         val top = entries.lastOrNull()
@@ -80,8 +91,11 @@ class OrbitBackStackController(initialKey: OrbitNavKey = OrbitNavKey.Dashboard) 
 
     internal fun trackedScrollEntryCount(): Int = entryScrollStates.size
 
+    internal fun trackedViewStateEntryCount(): Int = entryViewStates.size
+
     private fun pruneRemovedScrollStates() {
         val activeIds = entries.mapTo(HashSet(entries.size)) { it.id }
         entryScrollStates.keys.retainAll(activeIds)
+        entryViewStates.keys.retainAll(activeIds)
     }
 }

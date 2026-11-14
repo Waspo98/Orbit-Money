@@ -63,7 +63,7 @@ import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.PlatformStorage
 
-private class OrbitViewModelHolder(repo: OrbitRepository) {
+internal class OrbitViewModelHolder(repo: OrbitRepository) {
     val loginViewModel by lazy { LoginViewModel(repo) }
     val dashboardViewModel by lazy { DashboardViewModel(repo) }
     val transactionsViewModel by lazy { TransactionsViewModel(repo) }
@@ -100,6 +100,13 @@ fun OrbitNavigation(
     // Instantiate ViewModels lazily per visited route so cold-starting onto Dashboard
     // only constructs DashboardViewModel instead of all 17 feature ViewModels at once.
     val viewModels = remember(repo) { OrbitViewModelHolder(repo) }
+    val navCoordinator = remember(backStackController, viewModels) {
+        OrbitNavigationCoordinator(backStackController, viewModels)
+    }
+
+    LaunchedEffect(initialKey) {
+        navCoordinator.applyInitialKey(initialKey)
+    }
 
     LaunchedEffect(preferences.storageMode, isAuthenticated, preferences.onboardingCompleted) {
         if (
@@ -140,61 +147,11 @@ fun OrbitNavigation(
     }
 
     BackHandler(enabled = !isAuthRoute && backStackController.canPopBack) {
-        backStackController.popBack()
+        navCoordinator.popBack()
     }
 
-    val handleNavigate: (OrbitNavKey, Boolean) -> Unit = { destination, fromTab ->
-        if (destination is OrbitNavKey.Transactions) {
-            val hasTransactionsDeepLink = destination.transactionId != null ||
-                destination.accountId != null ||
-                destination.categoryId != null ||
-                destination.uncategorizedOnly ||
-                destination.startDate != null ||
-                destination.endDate != null ||
-                destination.sortOption != null ||
-                destination.openAddSheet ||
-                destination.openSearch ||
-                !destination.includeTransfers ||
-                !destination.includeIgnored
-            if (hasTransactionsDeepLink) {
-                viewModels.transactionsViewModel.applyDeepLink(
-                    transactionId = destination.transactionId,
-                    accountId = destination.accountId,
-                    categoryId = destination.categoryId,
-                    uncategorizedOnly = destination.uncategorizedOnly,
-                    startDate = destination.startDate,
-                    endDate = destination.endDate,
-                    sortOption = destination.sortOption,
-                    openAddSheet = destination.openAddSheet,
-                    openSearch = destination.openSearch,
-                    includeTransfers = destination.includeTransfers,
-                    includeIgnored = destination.includeIgnored
-                )
-            } else {
-                viewModels.transactionsViewModel.setSearchActive(false)
-                viewModels.transactionsViewModel.clearFilters()
-                viewModels.transactionsViewModel.dismissInspectorPane()
-            }
-        } else if (destination is OrbitNavKey.Accounts) {
-            if (destination.accountId != null) {
-                viewModels.accountsViewModel.openAccountDeepLink(destination.accountId)
-            } else if (currentKey is OrbitNavKey.Accounts) {
-                viewModels.accountsViewModel.dismissInspectorPane()
-            }
-        } else if (destination is OrbitNavKey.CardPerks) {
-            if (destination.accountId != null) {
-                viewModels.accountsViewModel.openAccountDeepLink(destination.accountId)
-            } else {
-                viewModels.accountsViewModel.dismissInspectorPane()
-            }
-        } else if (destination is OrbitNavKey.Settings) {
-            viewModels.settingsViewModel.setSubpage(null)
-        }
-
-        backStackController.navigate(destination, fromTab = fromTab)
-    }
-    val navigateTo: (OrbitNavKey) -> Unit = { handleNavigate(it, false) }
-    val navigateFromTab: (OrbitNavKey) -> Unit = { handleNavigate(it, true) }
+    val navigateTo: (OrbitNavKey) -> Unit = { navCoordinator.navigate(it, fromTab = false) }
+    val navigateFromTab: (OrbitNavKey) -> Unit = { navCoordinator.navigate(it, fromTab = true) }
 
     AnimatedContent(
         targetState = isAuthRoute,
@@ -269,25 +226,11 @@ fun OrbitNavigation(
                                 onNavigate = navigateTo,
                                 modifier = Modifier.fillMaxSize()
                             )
-                            is OrbitNavKey.Transactions -> {
-                                val txVm = viewModels.transactionsViewModel
-                                LaunchedEffect(key) {
-                                    txVm.applyDeepLink(
-                                        transactionId = key.transactionId,
-                                        accountId = key.accountId,
-                                        categoryId = key.categoryId,
-                                        uncategorizedOnly = key.uncategorizedOnly,
-                                        startDate = key.startDate,
-                                        endDate = key.endDate,
-                                        sortOption = key.sortOption,
-                                        openAddSheet = key.openAddSheet,
-                                        openSearch = key.openSearch,
-                                        includeTransfers = key.includeTransfers,
-                                        includeIgnored = key.includeIgnored
-                                    )
-                                }
-                                TransactionsScreen(txVm, navigateTo, Modifier.fillMaxSize())
-                            }
+                            is OrbitNavKey.Transactions -> TransactionsScreen(
+                                viewModel = viewModels.transactionsViewModel,
+                                onNavigate = navigateTo,
+                                modifier = Modifier.fillMaxSize()
+                            )
                             OrbitNavKey.Budgets -> BudgetsScreen(viewModels.budgetsViewModel, navigateTo, Modifier.fillMaxSize())
                             OrbitNavKey.Upcoming -> UpcomingScreen(viewModels.upcomingViewModel, navigateTo, Modifier.fillMaxSize())
                             OrbitNavKey.Goals -> GoalsScreen(viewModels.goalsViewModel, navigateTo, Modifier.fillMaxSize())

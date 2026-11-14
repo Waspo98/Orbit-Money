@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -172,11 +173,15 @@ fun GoalFocusCard(
     var showGoalPicker by remember { mutableStateOf(false) }
 
     val goal = state.focusedGoal
+    val canPickGoal = state.availableGoals.isNotEmpty()
+    LaunchedEffect(canPickGoal) {
+        if (!canPickGoal) showGoalPicker = false
+    }
 
     OrbitSectionCard(
         title = "Goal Focus",
-        actionText = "Pick Goal",
-        onActionClick = { showGoalPicker = true },
+        actionText = if (canPickGoal) "Pick Goal" else null,
+        onActionClick = if (canPickGoal) { { showGoalPicker = true } } else null,
         onCardClick = onClick,
         modifier = modifier
     ) {

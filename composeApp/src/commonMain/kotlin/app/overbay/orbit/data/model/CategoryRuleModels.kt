@@ -21,8 +21,11 @@ data class Category(
     val createdAt: String = ""
 )
 
+fun isUncategorizedCategoryName(name: String?): Boolean =
+    name != null && name.trim().equals("uncategorized", ignoreCase = true)
+
 fun Category.isUncategorizedCategory(): Boolean =
-    name.trim().equals("uncategorized", ignoreCase = true)
+    isUncategorizedCategoryName(name)
 
 object CategoryEmojiMapper {
     val PRESET_EMOJIS: List<String> = listOf(

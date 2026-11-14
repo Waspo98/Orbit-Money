@@ -1,9 +1,17 @@
 package app.overbay.orbit
 
+import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.ui.components.CanopyTransitionCoordinator
+import app.overbay.orbit.ui.components.TransactionFilterDraft
 import app.overbay.orbit.ui.components.canopyBackdropFillSize
 import app.overbay.orbit.ui.components.canopyBackdropFillTopLeft
+import app.overbay.orbit.util.PlatformStorage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -257,5 +265,93 @@ class NavigationTransitionTest {
         // System Back still returns to original Dashboard scroll position
         assertTrue(controller.popBack())
         assertEquals(4 to 80, controller.scrollStateFor(controller.currentEntry.id).listSnapshots["default"])
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `popping back to unfiltered transactions restores prior state without leaking deep-link filters`() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        val storage = PlatformStorage()
+        storage.clear()
+        try {
+            val repo = OrbitRepository(storage)
+            repo.initialize()
+            val controller = OrbitBackStackController(OrbitNavKey.Dashboard)
+            val viewModels = OrbitViewModelHolder(repo)
+            val coordinator = OrbitNavigationCoordinator(controller, viewModels)
+
+            // 1. Open Transactions tab and type a manual search
+            coordinator.navigate(OrbitNavKey.Transactions(), fromTab = true)
+            viewModels.transactionsViewModel.setSearchQuery("Coffee")
+            viewModels.transactionsViewModel.setSearchActive(true)
+
+            // 2. Switch to Dashboard tab, then open a category deep link from Dashboard
+            coordinator.navigate(OrbitNavKey.Dashboard, fromTab = true)
+            coordinator.navigate(OrbitNavKey.Transactions(categoryId = 7L), fromTab = false)
+            val deepLinkSnap = viewModels.transactionsViewModel.captureNavSnapshot()
+            assertEquals(7L, deepLinkSnap.filterDraft.categoryId)
+            assertEquals("", deepLinkSnap.searchQuery)
+            assertFalse(deepLinkSnap.isSearchActive)
+
+            // 3. System Back -> Dashboard -> earlier Transactions restores "Coffee" without categoryId=7L
+            assertTrue(coordinator.popBack())
+            assertEquals(OrbitNavKey.Dashboard, controller.currentKey)
+            assertTrue(coordinator.popBack())
+            assertEquals(OrbitNavKey.Transactions(), controller.currentKey)
+
+            val restoredSnap = viewModels.transactionsViewModel.captureNavSnapshot()
+            assertEquals("Coffee", restoredSnap.searchQuery)
+            assertTrue(restoredSnap.isSearchActive)
+            assertEquals(TransactionFilterDraft(), restoredSnap.filterDraft)
+            assertEquals(1, controller.trackedViewStateEntryCount())
+
+            // 4. Popping back past Transactions prunes its view state snapshot cleanly
+            assertTrue(coordinator.popBack())
+            assertEquals(OrbitNavKey.Dashboard, controller.currentKey)
+            assertEquals(0, controller.trackedViewStateEntryCount())
+        } finally {
+            Dispatchers.resetMain()
+            storage.clear()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `navigating to accounts root and popping back restores prior account selection state`() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        val storage = PlatformStorage()
+        storage.clear()
+        try {
+            val repo = OrbitRepository(storage)
+            repo.initialize()
+            val controller = OrbitBackStackController(OrbitNavKey.Accounts())
+            val viewModels = OrbitViewModelHolder(repo)
+            val coordinator = OrbitNavigationCoordinator(controller, viewModels)
+
+            assertNull(viewModels.accountsViewModel.currentSelectedAccountId)
+
+            // Navigate to Dashboard then open Account #5 deep link
+            coordinator.navigate(OrbitNavKey.Dashboard, fromTab = true)
+            coordinator.navigate(OrbitNavKey.Accounts(accountId = 5L), fromTab = false)
+            assertEquals(5L, viewModels.accountsViewModel.currentSelectedAccountId)
+
+            // Back -> Dashboard -> original Accounts() clears stale selectedAccountId
+            assertTrue(coordinator.popBack())
+            assertTrue(coordinator.popBack())
+            assertNull(viewModels.accountsViewModel.currentSelectedAccountId)
+
+            // Re-open deep link from Dashboard, switch to Dashboard, then tap Accounts bottom tab -> clears inspector
+            coordinator.navigate(OrbitNavKey.Dashboard, fromTab = true)
+            coordinator.navigate(OrbitNavKey.Accounts(accountId = 5L), fromTab = false)
+            assertEquals(5L, viewModels.accountsViewModel.currentSelectedAccountId)
+            coordinator.navigate(OrbitNavKey.Dashboard, fromTab = true)
+            coordinator.navigate(OrbitNavKey.Accounts(), fromTab = true)
+            assertNull(viewModels.accountsViewModel.currentSelectedAccountId)
+        } finally {
+            Dispatchers.resetMain()
+            storage.clear()
+        }
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.*
 import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.EditSource
@@ -159,53 +160,47 @@ class TransactionsViewModel(
         _currentPage.value = 1
     }
 
-    fun applyDeepLink(
-        transactionId: Long? = null,
-        accountId: Long? = null,
-        categoryId: Long? = null,
-        uncategorizedOnly: Boolean = false,
-        startDate: String? = null,
-        endDate: String? = null,
-        sortOption: String? = null,
-        openAddSheet: Boolean = false,
-        openSearch: Boolean = false,
-        includeTransfers: Boolean = true,
-        includeIgnored: Boolean = true
-    ) {
-        val hasDeepLink = transactionId != null || accountId != null || categoryId != null ||
-            uncategorizedOnly || startDate != null || endDate != null ||
-            sortOption != null || openAddSheet || openSearch || !includeTransfers || !includeIgnored
-        if (!hasDeepLink) return
-
-        setSearchQuery("")
-        _quickFilter.value = if (uncategorizedOnly) QuickFilter.UNCATEGORIZED else QuickFilter.ALL
-
-        val resolvedSort = sortOption?.let { TransactionsFilterHelper.parseSortOption(it) }
-            ?: TransactionSortOption.DATE_DESC
-        _sortOption.value = resolvedSort
-
-        _filterDraft.value = TransactionFilterDraft(
-            accountId = accountId,
-            categoryId = categoryId,
-            accountIds = if (accountId != null) setOf(accountId) else emptySet(),
-            categoryIds = if (categoryId != null) setOf(categoryId) else emptySet(),
-            uncategorizedOnly = uncategorizedOnly,
-            startDate = startDate,
-            endDate = endDate,
-            includeTransfers = includeTransfers,
-            includeIgnored = includeIgnored
+    fun applyDeepLink(destination: OrbitNavKey.Transactions) {
+        if (!destination.hasDeepLinkParams) return
+        restoreNavSnapshot(
+            TransactionsFilterHelper.buildDeepLinkNavSnapshot(
+                destination = destination,
+                isCompactView = _isCompactView.value
+            )
         )
+    }
 
+    internal fun captureNavSnapshot(): TransactionsNavSnapshot {
+        val overlays = _overlays.value
+        return TransactionsNavSnapshot(
+            searchQuery = _searchQuery.value,
+            quickFilter = _quickFilter.value,
+            filterDraft = _filterDraft.value,
+            sortOption = _sortOption.value,
+            isCompactView = _isCompactView.value,
+            currentPage = _currentPage.value,
+            isSearchActive = overlays.isSearchActive,
+            inspectingId = overlays.inspectingId,
+            expandedId = overlays.expandedId
+        )
+    }
+
+    internal fun restoreNavSnapshot(snapshot: TransactionsNavSnapshot) {
+        setSearchQuery(snapshot.searchQuery)
+        _quickFilter.value = snapshot.quickFilter
+        _filterDraft.value = snapshot.filterDraft
+        _sortOption.value = snapshot.sortOption
+        _isCompactView.value = snapshot.isCompactView
+        _currentPage.value = snapshot.currentPage
         _overlays.update {
             it.copy(
-                isSearchActive = openSearch,
-                inspectingId = transactionId,
-                expandedId = transactionId,
-                showEditorSheet = openAddSheet,
+                isSearchActive = snapshot.isSearchActive,
+                inspectingId = snapshot.inspectingId,
+                expandedId = snapshot.expandedId,
+                showEditorSheet = snapshot.showEditorSheet,
                 showSplitSheet = false
             )
         }
-        _currentPage.value = 1
     }
 
     fun toggleTransactionSelection(id: Long) {

@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryEmojiMapper
+import app.overbay.orbit.data.model.isUncategorizedCategoryName
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
@@ -78,7 +79,7 @@ fun RecentTransactionsCard(
                     val isExpanded = expandedTransactionId == txn.id
                     val catColor = txn.categoryColor.toComposeColor(MaterialTheme.colorScheme.primary)
                     val emoji = CategoryEmojiMapper.resolveEmoji(txn.categoryIcon)
-                        ?: if (txn.categoryName.isNullOrBlank() || txn.categoryName == "Uncategorized") "❓" else "💳"
+                        ?: if (txn.categoryName.isNullOrBlank() || isUncategorizedCategoryName(txn.categoryName)) "❓" else "💳"
                     val catLabel = txn.categoryName ?: "Uncategorized"
                     val subtitleText = buildString {
                         append(txn.dateDisplay)

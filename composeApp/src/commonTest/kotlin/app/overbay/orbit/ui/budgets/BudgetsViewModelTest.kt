@@ -358,4 +358,36 @@ class BudgetsViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testBudgetedUncategorizedCategory_keepsTransactionsGroupedUnderCategoryId() = runTest(testDispatcher) {
+        val currentMonth = LocalDateUtils.currentYearMonth()
+        val dbUncat = Category(id = 99L, name = "Uncategorized", isIncome = false, isTransfer = false)
+        repository.saveCategory(dbUncat)
+        repository.saveBudget(categoryId = 99L, amountCents = 10_000L)
+        repository.saveTransaction(
+            Transaction(
+                id = 92L,
+                accountId = 1L,
+                originalDate = "$currentMonth-05",
+                originalMerchant = "Misc Store",
+                originalAmountCents = -2_500L,
+                originalCategoryId = 99L
+            )
+        )
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        val budgeted = viewModel.uiState.value.budgetedItems.firstOrNull { it.category.id == 99L }
+        assertNotNull(budgeted)
+        assertEquals(2_500L, budgeted.spentCents)
+        val matched = viewModel.uiState.value.categoryTransactions[99L].orEmpty()
+        assertEquals(1, matched.size)
+        assertEquals(92L, matched.first().id)
+
+        collectJob.cancel()
+    }
 }

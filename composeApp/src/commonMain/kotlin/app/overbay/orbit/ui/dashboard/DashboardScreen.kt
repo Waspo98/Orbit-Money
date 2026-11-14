@@ -48,7 +48,7 @@ import app.overbay.orbit.ui.transactions.components.TransactionsSearchBar
 import app.overbay.orbit.util.LocalDevicePosture
 
 /**
- * Editorial Orbit Money Dashboard screen supporting all 16 customizable cards.
+ * Editorial Orbit Money Dashboard screen supporting all 15 customizable cards.
  * Root Dashboard screen composable.
  */
 @Composable

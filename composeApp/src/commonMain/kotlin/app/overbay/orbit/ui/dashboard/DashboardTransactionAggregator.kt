@@ -15,8 +15,6 @@ internal data class DashboardTransactionScanResult(
     val priorExpenseCents: Cents,
     val categorySpendingMap: Map<Long, Long>,
     val topBiggestExpenses: List<Transaction>,
-    val topUncategorized: List<Transaction>,
-    val uncategorizedCount: Int,
     val topRecent: List<Transaction>,
     val mhaSpendingCents: Cents,
     val mhaTransactionCount: Int
@@ -45,8 +43,6 @@ internal object DashboardTransactionAggregator {
         var priorExpense: Cents = 0L
         val categorySpendingMap = HashMap<Long, Long>()
         val topBiggestExpenses = ArrayList<Transaction>(6)
-        val topUncategorized = ArrayList<Transaction>(6)
-        var uncategorizedCount = 0
         val topRecent = ArrayList<Transaction>(6)
         var mhaSpending: Cents = 0L
         var mhaTxnCount = 0
@@ -56,11 +52,6 @@ internal object DashboardTransactionAggregator {
 
             val effDate = txn.effectiveDate
             insertTopRecent(topRecent, txn)
-
-            if (txn.isUncategorized(categoryById)) {
-                uncategorizedCount++
-                insertTopByDateDesc(topUncategorized, txn)
-            }
 
             if (effDate.startsWith(currentYearStr)) {
                 val isMhaEligible = txn.effectiveMhaEligible == true ||
@@ -106,8 +97,6 @@ internal object DashboardTransactionAggregator {
             priorExpenseCents = priorExpense,
             categorySpendingMap = categorySpendingMap,
             topBiggestExpenses = topBiggestExpenses,
-            topUncategorized = topUncategorized,
-            uncategorizedCount = uncategorizedCount,
             topRecent = topRecent,
             mhaSpendingCents = mhaSpending,
             mhaTransactionCount = mhaTxnCount
@@ -127,22 +116,6 @@ internal object DashboardTransactionAggregator {
             val cur = top[i]
             val cmp = date.compareTo(cur.effectiveDate)
             if (cmp > 0 || (cmp == 0 && id > cur.id)) {
-                insertAt = i
-                break
-            }
-        }
-        if (insertAt < maxSize) {
-            top.add(insertAt, candidate)
-            if (top.size > maxSize) top.removeAt(maxSize)
-        }
-    }
-
-    private fun insertTopByDateDesc(top: ArrayList<Transaction>, candidate: Transaction, maxSize: Int = 5) {
-        val date = candidate.effectiveDate
-        if (top.size == maxSize && date <= top[maxSize - 1].effectiveDate) return
-        var insertAt = top.size
-        for (i in 0 until top.size) {
-            if (date > top[i].effectiveDate) {
                 insertAt = i
                 break
             }

@@ -125,13 +125,19 @@ class BudgetsViewModel(
             null
         }
 
-        // Group transactions for this month across all categories (including Uncategorized = -1L)
+        // Group transactions for this month across all categories (matching BudgetEngine uncategorized bucketing)
         val categoryById = categories.associateBy { it.id }
+        val budgetedCatIds = budgets.mapTo(HashSet(budgets.size)) { it.categoryId }
         val monthTxns = transactions.filter {
             it.effectiveDate.take(7) == control.month && !it.effectiveIsIgnored && !it.effectiveIsTransfer
         }
         val categoryTransactions = monthTxns.groupBy {
-            if (it.isUncategorized(categoryById)) BudgetEngine.UNCATEGORIZED_CATEGORY.id else it.effectiveCategoryId!!
+            val rawCatId = it.effectiveCategoryId
+            if (it.isUncategorized(categoryById) && (rawCatId == null || rawCatId !in budgetedCatIds)) {
+                BudgetEngine.UNCATEGORIZED_CATEGORY.id
+            } else {
+                rawCatId!!
+            }
         }
 
         BudgetsUiState(

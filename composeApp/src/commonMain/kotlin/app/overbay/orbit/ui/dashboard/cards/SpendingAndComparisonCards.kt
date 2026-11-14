@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.CategoryEmojiMapper
+import app.overbay.orbit.data.model.isUncategorizedCategoryName
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
@@ -215,7 +216,7 @@ fun BiggestTransactionsCard(
                 val txn = entry.value
                 val catColor = txn.categoryColor.toComposeColor(MaterialTheme.colorScheme.primary)
                 val catEmoji = CategoryEmojiMapper.resolveEmoji(txn.categoryIcon)
-                    ?: if (txn.categoryName.isNullOrBlank()) "❓" else "💸"
+                    ?: if (txn.categoryName.isNullOrBlank() || isUncategorizedCategoryName(txn.categoryName)) "❓" else "💸"
                 val catLabel = txn.categoryName ?: "Uncategorized"
                 val detailSubtitle = buildString {
                     append(txn.dateDisplay)

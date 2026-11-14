@@ -10,7 +10,7 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.ReviewQueueCandidate
 
 /**
- * Enumeration of all 16 customizable dashboard cards from original Orbit Money.
+ * Enumeration of all 15 customizable dashboard cards from original Orbit Money.
  * Maps directly to [app.overbay.orbit.data.model.DashboardWidgetConfig].
  */
 enum class DashboardCardType(

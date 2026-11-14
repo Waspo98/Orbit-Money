@@ -82,11 +82,9 @@ class PerformanceOptimizationsTest {
         assertEquals(12_500L + 3_200L + 8_900L + 21_000L + 99_000L, scan.expenseCents)
         assertEquals(420_000L, scan.priorIncomeCents)
         assertEquals(180_000L, scan.priorExpenseCents)
-        assertEquals(2, scan.uncategorizedCount)
-        // Stable tie-breaker on same date ("2026-10-18"): id=12 encountered before id=13
-        assertEquals(listOf(12L, 13L), scan.topUncategorized.map { it.id })
+        assertEquals(3_200L + 8_900L, scan.categorySpendingMap[0L])
 
-        // Verify unified isUncategorized with category map matches seeded "Uncategorized" and excludes null transfers
+        // Verify unified isUncategorized with category map folds seeded "Uncategorized" spend under 0L and excludes null transfers
         val catMap = mapOf(99L to Category(id = 99L, name = "Uncategorized"))
         val scanUnified = DashboardTransactionAggregator.scan(
             transactions = transactions + listOf(
@@ -100,8 +98,8 @@ class PerformanceOptimizationsTest {
             hiddenBiggestIds = hiddenIds,
             categoryById = catMap
         )
-        assertEquals(3, scanUnified.uncategorizedCount)
-        assertEquals(20L, scanUnified.topUncategorized.first().id)
+        assertEquals(3_200L + 8_900L + 1_500L, scanUnified.categorySpendingMap[0L])
+        assertNull(scanUnified.categorySpendingMap[99L])
         // Recent top-5 sorts by effectiveDate DESC then id DESC (includes transfers, excludes ignored)
         val expectedRecentIds = transactions
             .filter { !it.effectiveIsIgnored }

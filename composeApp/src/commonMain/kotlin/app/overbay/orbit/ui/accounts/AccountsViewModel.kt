@@ -53,6 +53,7 @@ class AccountsViewModel(
     val closurePrompts = AccountClosureController(repository, viewModelScope)
 
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
+    internal val currentSelectedAccountId: Long? get() = _selectedAccountId.value
     private val _editingAccount = MutableStateFlow<Account?>(null)
     private val _showEditorSheet = MutableStateFlow(false)
     private val _mergingAccount = MutableStateFlow<Account?>(null)
