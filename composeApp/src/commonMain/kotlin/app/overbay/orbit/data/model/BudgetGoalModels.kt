@@ -82,6 +82,8 @@ data class MonthlyBudgetOverview(
     val savingsRatePercent: Double = 0.0,
     val dailySafeSpend: DailySafeSpend = DailySafeSpend(0L, 0, "", "neutral"),
     val budgetedDailySafeSpend: DailySafeSpend = DailySafeSpend(0L, 0, "", "neutral"),
+    val lastMonthMtdSpentCents: Cents? = null,
+    val lastMonthLabel: String = "",
     val budgeted: List<CategoryBudgetOverviewItem> = emptyList(),
     val unbudgeted: List<CategoryBudgetOverviewItem> = emptyList(),
     val inactive: List<CategoryBudgetOverviewItem> = emptyList()

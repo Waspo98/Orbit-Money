@@ -48,6 +48,7 @@ import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlin.math.roundToInt
 
 /**
  * Shared tinted emoji circle badge for category rows across Budgets.
@@ -102,7 +103,7 @@ internal fun BudgetCategoryExpandedDrawer(
                     .padding(12.dp)
             ) {
                 Text(
-                    text = "RECENT TRANSACTIONS",
+                    text = "RECENT TRANSACTIONS (${transactions.size})",
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
@@ -254,7 +255,7 @@ fun BudgetCategoryRow(
                     haptics.tick()
                     onClick()
                 }
-                .padding(vertical = 12.dp)
+                .padding(vertical = 10.dp)
         ) {
             // Top Row: Emoji badge + Name + Remaining/Over
             Row(
@@ -328,10 +329,15 @@ fun BudgetCategoryRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
+                val rightSubtext = if (item.amountCents > 0L) {
+                    "${(item.utilizationRatio * 100.0).roundToInt()}% used"
+                } else {
+                    "${item.transactionCount} transaction${if (item.transactionCount == 1) "" else "s"}"
+                }
+
                 Text(
-                    text = "${item.transactionCount} transaction${if (item.transactionCount == 1) "" else "s"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 12.sp,
+                    text = rightSubtext,
+                    style = TabularNumStyle.copy(fontSize = 12.sp),
                     color = MaterialTheme.colorScheme.outline
                 )
             }

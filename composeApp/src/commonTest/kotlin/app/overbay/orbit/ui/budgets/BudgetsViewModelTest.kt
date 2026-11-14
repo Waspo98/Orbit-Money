@@ -239,4 +239,36 @@ class BudgetsViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testLastMonthMtdComparison_exposedInUiState() = runTest(testDispatcher) {
+        val currentMonth = LocalDateUtils.currentYearMonth()
+        val prevMonth = LocalDateUtils.addMonthsToYearMonth(currentMonth, -1)
+
+        val catGroceries = Category(id = 1L, name = "Groceries", isIncome = false, isTransfer = false)
+        repository.saveCategory(catGroceries)
+        repository.saveBudget(categoryId = 1L, amountCents = 50000L)
+
+        // Day 01 of prior month is always <= today's day-of-month
+        repository.saveTransaction(
+            Transaction(
+                id = 20L,
+                accountId = 1L,
+                originalDate = "$prevMonth-01",
+                originalMerchant = "Market",
+                originalAmountCents = -12500L,
+                originalCategoryId = 1L
+            )
+        )
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(12500L, viewModel.uiState.value.lastMonthMtdSpentCents)
+        assertTrue(viewModel.uiState.value.lastMonthLabel.isNotBlank())
+
+        collectJob.cancel()
+    }
 }

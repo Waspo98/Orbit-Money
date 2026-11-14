@@ -1,7 +1,10 @@
 package app.overbay.orbit.ui.budgets.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -9,9 +12,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -19,7 +25,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
@@ -29,6 +37,7 @@ import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitExpandableChevron
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -166,27 +175,90 @@ private fun UnbudgetedCategoriesSection(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
+    val colors = OrbitTheme.colors
     val totalUnbudgeted = unbudgeted.sumOf { it.spentCents }
     val totalLabel = MoneyUtils.formatCents(totalUnbudgeted, signed = totalUnbudgeted < 0L)
+    val previewText = buildEverythingElsePreview(unbudgeted)
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        AccordionToggleButton(
-            title = "Unbudgeted Spending (${unbudgeted.size})",
-            trailingValue = totalLabel,
-            expanded = expanded,
-            onClick = {
-                haptics.tick()
-                onToggleSection()
-            }
-        )
-
-        OrbitAccordionVisibility(visible = expanded) {
-            OrbitSectionCard(
-                showHeaderDivider = false,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                modifier = Modifier.padding(top = 8.dp)
+    OrbitSectionCard(
+        showHeaderDivider = false,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        haptics.tick()
+                        onToggleSection()
+                    }
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f).padding(end = 10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "📦", fontSize = 15.sp)
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "Everything Else",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            OrbitBadge(
+                                text = "Unbudgeted",
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = previewText,
+                            style = TabularNumStyle.copy(fontSize = 12.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = totalLabel,
+                        style = TabularNumStyle.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                        color = if (totalUnbudgeted < 0L) colors.income else MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    OrbitExpandableChevron(expanded = expanded)
+                }
+            }
+
+            OrbitAccordionVisibility(visible = expanded) {
                 Column(modifier = Modifier.fillMaxWidth()) {
+                    HorizontalDivider(
+                        thickness = 1.dp,
+                        color = colors.cardBorder,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                    )
                     unbudgeted.forEachIndexed { index, item ->
                         key(item.category.id) {
                             UnbudgetedCategoryRow(
@@ -204,6 +276,20 @@ private fun UnbudgetedCategoriesSection(
                 }
             }
         }
+    }
+}
+
+private fun buildEverythingElsePreview(unbudgeted: List<CategoryBudgetOverviewItem>): String {
+    if (unbudgeted.isEmpty()) return "No unbudgeted spending"
+    val topParts = unbudgeted.take(2).map { item ->
+        val amt = MoneyUtils.formatCents(item.spentCents, signed = item.spentCents < 0L, showCents = false)
+        "${item.category.name} $amt"
+    }
+    val remainingCount = unbudgeted.size - topParts.size
+    return if (remainingCount > 0) {
+        "${topParts.joinToString(" · ")} · +$remainingCount more"
+    } else {
+        topParts.joinToString(" · ")
     }
 }
 
@@ -231,7 +317,6 @@ private fun InactiveBudgetCategoriesSection(
             } else {
                 "Show ${inactive.size} categories with no activity"
             },
-            trailingValue = null,
             expanded = expanded,
             onClick = {
                 haptics.tick()
@@ -284,7 +369,6 @@ private fun InactiveBudgetCategoriesSection(
 @Composable
 private fun AccordionToggleButton(
     title: String,
-    trailingValue: String?,
     expanded: Boolean,
     onClick: () -> Unit
 ) {
@@ -298,7 +382,7 @@ private fun AccordionToggleButton(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = if (trailingValue != null) Arrangement.SpaceBetween else Arrangement.Center
+            horizontalArrangement = Arrangement.Center
         ) {
             Text(
                 text = title,
@@ -306,17 +390,8 @@ private fun AccordionToggleButton(
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (trailingValue != null) {
-                    Text(
-                        text = trailingValue,
-                        style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Spacer(modifier = Modifier.width(6.dp))
-                OrbitExpandableChevron(expanded = expanded)
-            }
+            Spacer(modifier = Modifier.width(6.dp))
+            OrbitExpandableChevron(expanded = expanded)
         }
     }
 }

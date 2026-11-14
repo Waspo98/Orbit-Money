@@ -20,6 +20,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.theme.OrbitSprings
@@ -70,16 +71,11 @@ fun OrbitPillProgressBar(
             drawStopIndicator = {}
         )
         if (paceMarkerFraction != null) {
-            val clampedPace = paceMarkerFraction.coerceIn(0.02f, 0.98f)
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val x = clampedPace * size.width
-                val strokeWidth = 2.dp.toPx()
-                drawLine(
-                    color = markerColor,
-                    start = Offset(x, 0f),
-                    end = Offset(x, size.height),
-                    strokeWidth = strokeWidth,
-                    cap = StrokeCap.Round
+                drawPaceMarker(
+                    fraction = paceMarkerFraction,
+                    markerColor = markerColor,
+                    overhangPx = 2.dp.toPx()
                 )
             }
         }
@@ -95,7 +91,8 @@ data class OrbitBarSegment(
 
 /**
  * Proportional multi-segment horizontal bar drawn in a single GPU [Canvas] with
- * spring-animated slice widths ([OrbitSprings.FloatSpatialDefault]).
+ * spring-animated slice widths ([OrbitSprings.FloatSpatialDefault]) and an optional
+ * day-of-month pace marker tick.
  */
 @Composable
 fun OrbitStackedSegmentBar(
@@ -104,7 +101,8 @@ fun OrbitStackedSegmentBar(
     height: Dp = 8.dp,
     cornerRadius: Dp = 999.dp,
     normalizeToFullWidth: Boolean = false,
-    trackColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh
+    trackColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    paceMarkerFraction: Float? = null
 ) {
     val rawFractions = if (normalizeToFullWidth) {
         val total = segments.sumOf { it.fraction.coerceAtLeast(0f).toDouble() }.toFloat()
@@ -113,29 +111,55 @@ fun OrbitStackedSegmentBar(
         segments.map { it.fraction.coerceIn(0f, 1f) }
     }
     val animatedFractions = rememberAnimatedFloatSeries(targets = rawFractions)
+    val markerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
 
-    Canvas(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(height)
-            .clip(RoundedCornerShape(cornerRadius))
-    ) {
-        val w = size.width
-        val h = size.height
-        drawRect(color = trackColor, size = size)
+    Box(modifier = modifier.fillMaxWidth().height(height)) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(cornerRadius))
+        ) {
+            val w = size.width
+            val h = size.height
+            drawRect(color = trackColor, size = size)
 
-        var currentX = 0f
-        segments.forEachIndexed { index, segment ->
-            val frac = animatedFractions.getOrElse(index) { segment.fraction }.coerceAtLeast(0f)
-            val sliceWidth = (frac * w).coerceAtMost((w - currentX).coerceAtLeast(0f))
-            if (sliceWidth > 0.5f) {
-                drawRect(
-                    color = segment.color,
-                    topLeft = Offset(currentX, 0f),
-                    size = Size(sliceWidth, h)
+            var currentX = 0f
+            segments.forEachIndexed { index, segment ->
+                val frac = animatedFractions.getOrElse(index) { segment.fraction }.coerceAtLeast(0f)
+                val sliceWidth = (frac * w).coerceAtMost((w - currentX).coerceAtLeast(0f))
+                if (sliceWidth > 0.5f) {
+                    drawRect(
+                        color = segment.color,
+                        topLeft = Offset(currentX, 0f),
+                        size = Size(sliceWidth, h)
+                    )
+                    currentX += sliceWidth
+                }
+            }
+        }
+        if (paceMarkerFraction != null) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawPaceMarker(
+                    fraction = paceMarkerFraction,
+                    markerColor = markerColor,
+                    overhangPx = 2.dp.toPx()
                 )
-                currentX += sliceWidth
             }
         }
     }
+}
+
+private fun DrawScope.drawPaceMarker(
+    fraction: Float,
+    markerColor: Color,
+    overhangPx: Float
+) {
+    val x = fraction.coerceIn(0.02f, 0.98f) * size.width
+    drawLine(
+        color = markerColor,
+        start = Offset(x, -overhangPx),
+        end = Offset(x, size.height + overhangPx),
+        strokeWidth = 2.dp.toPx(),
+        cap = StrokeCap.Round
+    )
 }

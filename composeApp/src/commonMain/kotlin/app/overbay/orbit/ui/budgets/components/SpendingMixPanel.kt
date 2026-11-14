@@ -46,20 +46,40 @@ internal fun SpendingMixPanel(
     val totalSpent = sorted.sumOf { it.spentCents }
     if (totalSpent <= 0L) return
 
+    val topItems = sorted.take(5)
+    val otherItems = sorted.drop(5)
+    val otherSpent = otherItems.sumOf { it.spentCents }
+    val otherColor = MaterialTheme.colorScheme.outlineVariant
+
+    val segments = buildList {
+        topItems.forEach { item ->
+            add(
+                OrbitBarSegment(
+                    key = item.category.id,
+                    fraction = (item.spentCents.toFloat() / totalSpent.toFloat()).coerceAtLeast(0.01f),
+                    color = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
+                )
+            )
+        }
+        if (otherSpent > 0L) {
+            add(
+                OrbitBarSegment(
+                    key = "other",
+                    fraction = (otherSpent.toFloat() / totalSpent.toFloat()).coerceAtLeast(0.01f),
+                    color = otherColor
+                )
+            )
+        }
+    }
+
     OrbitSectionCard(
         title = "SPENDING MIX",
-        subtitle = "${MoneyUtils.formatCents(totalSpent, showCents = false)} gross outflows",
+        subtitle = "${MoneyUtils.formatCents(totalSpent, showCents = false)} total spent",
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             OrbitStackedSegmentBar(
-                segments = sorted.map { item ->
-                    OrbitBarSegment(
-                        key = item.category.id,
-                        fraction = (item.spentCents.toFloat() / totalSpent.toFloat()).coerceAtLeast(0.01f),
-                        color = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
-                    )
-                },
+                segments = segments,
                 height = 10.dp,
                 normalizeToFullWidth = true
             )
@@ -71,33 +91,53 @@ internal fun SpendingMixPanel(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                sorted.take(5).forEach { item ->
+                topItems.forEach { item ->
                     val pct = ((item.spentCents.toDouble() / totalSpent.toDouble()) * 100.0).roundToInt()
                     val color = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = item.category.labelWithEmoji,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "${MoneyUtils.formatCents(item.spentCents, showCents = false)} ($pct%)",
-                            style = TabularNumStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    SpendingMixLegendItem(
+                        color = color,
+                        label = item.category.labelWithEmoji,
+                        amountText = "${MoneyUtils.formatCents(item.spentCents, showCents = false)} ($pct%)"
+                    )
+                }
+                if (otherSpent > 0L) {
+                    val otherPct = ((otherSpent.toDouble() / totalSpent.toDouble()) * 100.0).roundToInt()
+                    SpendingMixLegendItem(
+                        color = otherColor,
+                        label = "Other (${otherItems.size})",
+                        amountText = "${MoneyUtils.formatCents(otherSpent, showCents = false)} ($otherPct%)"
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SpendingMixLegendItem(
+    color: androidx.compose.ui.graphics.Color,
+    label: String,
+    amountText: String
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = amountText,
+            style = TabularNumStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

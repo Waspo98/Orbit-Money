@@ -198,4 +198,40 @@ class MoneyAndBudgetEngineTest {
         assertEquals(150_00L, overview.budgetedRemainingCents)
         assertEquals(10_00L, overview.budgetedDailySafeSpendCents)
     }
+
+    @Test
+    fun testBudgetEngine_lastMonthMtdComparison() {
+        val categories = listOf(groceries, utilities)
+        val budgets = listOf(CategoryBudget(id = 1L, categoryId = 1L, amountCents = 500_00L))
+        val txns = listOf(
+            // March transactions: $100 on Mar 5, $50 on Mar 15, $200 on Mar 25
+            Transaction(id = 1L, accountId = 10L, originalDate = "2026-03-05", originalMerchant = "Store", originalAmountCents = -100_00L, originalCategoryId = 1L),
+            Transaction(id = 2L, accountId = 10L, originalDate = "2026-03-15", originalMerchant = "Power", originalAmountCents = -50_00L, originalCategoryId = 2L),
+            Transaction(id = 3L, accountId = 10L, originalDate = "2026-03-25", originalMerchant = "Store", originalAmountCents = -200_00L, originalCategoryId = 1L),
+            // April transactions: $120 on Apr 4
+            Transaction(id = 4L, accountId = 10L, originalDate = "2026-04-04", originalMerchant = "Store", originalAmountCents = -120_00L, originalCategoryId = 1L)
+        )
+
+        // Current month view on Apr 15 -> only Mar 1..15 counted ($150)
+        val currentOverview = BudgetEngine.calculateMonthlyOverview(
+            month = "2026-04",
+            categories = categories,
+            budgets = budgets,
+            transactions = txns,
+            todayDate = "2026-04-15"
+        )
+        assertEquals(150_00L, currentOverview.lastMonthMtdSpentCents)
+        assertEquals("Mar 15", currentOverview.lastMonthLabel)
+
+        // Past month view (today is May 10) -> full March counted ($350)
+        val pastOverview = BudgetEngine.calculateMonthlyOverview(
+            month = "2026-04",
+            categories = categories,
+            budgets = budgets,
+            transactions = txns,
+            todayDate = "2026-05-10"
+        )
+        assertEquals(350_00L, pastOverview.lastMonthMtdSpentCents)
+        assertEquals("Mar", pastOverview.lastMonthLabel)
+    }
 }

@@ -57,7 +57,6 @@ object BudgetEngine {
         for (txn in monthTxns) {
             val amount = txn.effectiveAmountCents
             val catId = txn.effectiveCategoryId
-            val cat = catId?.let { categoryById[it] }
 
             if (amount > 0) {
                 totalIncomeCents += amount
@@ -65,15 +64,10 @@ object BudgetEngine {
                 totalExpensesCents += -amount
             }
 
-            val isIncome = cat?.isIncome == true
-            val isTransfer = cat?.isTransfer == true
-
-            if (!isIncome && !isTransfer) {
-                if (cat != null || amount < 0) {
-                    val spent = -amount
-                    spendByCat[catId] = (spendByCat[catId] ?: 0L) + spent
-                    countByCat[catId] = (countByCat[catId] ?: 0) + 1
-                }
+            if (isCountedSpendingTransaction(txn, categoryById)) {
+                val spent = -amount
+                spendByCat[catId] = (spendByCat[catId] ?: 0L) + spent
+                countByCat[catId] = (countByCat[catId] ?: 0) + 1
             }
         }
 
@@ -144,6 +138,21 @@ object BudgetEngine {
             daysInMonth = daysInMonth
         )
 
+        val prevMonth = LocalDateUtils.addMonthsToYearMonth(month, -1)
+        val (prevYear, prevMonthNum) = LocalDateUtils.parseYearMonth(prevMonth) ?: Pair(2026, 1)
+        val prevDaysInMonth = LocalDateUtils.daysInMonth(prevYear, prevMonthNum)
+        val isCurrentMonth = todayDate.length >= 10 && todayDate.take(7) == month
+        val cutoffDay = if (isCurrentMonth) {
+            (todayDate.substring(8, 10).toIntOrNull() ?: prevDaysInMonth).coerceIn(1, prevDaysInMonth)
+        } else {
+            prevDaysInMonth
+        }
+        val prevStart = "$prevMonth-01"
+        val prevEnd = "$prevMonth-${cutoffDay.toString().padStart(2, '0')}"
+        val lastMonthMtdSpentCents = sumNetSpendingForRange(transactions, categoryById, prevStart, prevEnd)
+        val prevShortLabel = LocalDateUtils.monthShortName(prevMonthNum)
+        val lastMonthLabel = if (isCurrentMonth) "$prevShortLabel $cutoffDay" else prevShortLabel
+
         return MonthlyBudgetOverview(
             month = month,
             totalBudgetedCents = totalBudgetedCents,
@@ -156,10 +165,41 @@ object BudgetEngine {
             savingsRatePercent = savingsRatePercent,
             dailySafeSpend = dailySafeSpend,
             budgetedDailySafeSpend = budgetedDailySafeSpend,
+            lastMonthMtdSpentCents = lastMonthMtdSpentCents,
+            lastMonthLabel = lastMonthLabel,
             budgeted = sortedBudgeted,
             unbudgeted = sortedUnbudgeted,
             inactive = sortedInactive
         )
+    }
+
+    private fun isCountedSpendingTransaction(
+        txn: Transaction,
+        categoryById: Map<Long, Category>
+    ): Boolean {
+        val cat = txn.effectiveCategoryId?.let { categoryById[it] }
+        if (cat?.isIncome == true || cat?.isTransfer == true) return false
+        return cat != null || txn.effectiveAmountCents < 0L
+    }
+
+    private fun sumNetSpendingForRange(
+        transactions: List<Transaction>,
+        categoryById: Map<Long, Category>,
+        startDate: String,
+        endDate: String
+    ): Cents {
+        var total: Cents = 0L
+        for (txn in transactions) {
+            val date = txn.effectiveDate
+            if (date >= startDate && date <= endDate &&
+                !txn.effectiveIsIgnored &&
+                !txn.effectiveIsTransfer &&
+                isCountedSpendingTransaction(txn, categoryById)
+            ) {
+                total += -txn.effectiveAmountCents
+            }
+        }
+        return total
     }
 
     private fun buildItem(
