@@ -29,6 +29,8 @@ class BudgetsViewModel(
     private val _selectedMonth = MutableStateFlow(currentMonth)
     private val _sortOption = MutableStateFlow(repository.preferences.value.budgetSortOption)
     private val _expandedCategoryId = MutableStateFlow<Long?>(null)
+    private val _showUnbudgeted = MutableStateFlow(false)
+    private val _showInactive = MutableStateFlow(false)
     private val _editingItem = MutableStateFlow<CategoryBudgetOverviewItem?>(null)
     private val _showEditorSheet = MutableStateFlow(false)
     private val _showAddCategorySheet = MutableStateFlow(false)
@@ -69,14 +71,22 @@ class BudgetsViewModel(
         BudgetSheetsState(editing, showEditor, showAdd, initialCatId)
     }
 
+    private val sectionsFlow = combine(
+        _expandedCategoryId,
+        _showUnbudgeted,
+        _showInactive
+    ) { expandedCatId, showUnbudgeted, showInactive ->
+        BudgetSectionsState(expandedCatId, showUnbudgeted, showInactive)
+    }
+
     private val controlFlow = combine(
         _selectedMonth,
         _sortOption,
-        _expandedCategoryId,
         _activeMonths,
+        sectionsFlow,
         sheetFlow
-    ) { month, sort, expandedCatId, activeMonths, sheets ->
-        BudgetsControlState(month, sort, expandedCatId, activeMonths, sheets)
+    ) { month, sort, activeMonths, sections, sheets ->
+        BudgetsControlState(month, sort, activeMonths, sections, sheets)
     }
 
     val uiState: StateFlow<BudgetsUiState> = combine(
@@ -93,7 +103,6 @@ class BudgetsViewModel(
             todayDate = todayIso,
             sortOption = control.sortOption
         )
-        val notables = BudgetEngine.extractNotables(overview)
 
         val isCurrent = control.month == currentMonth
         val maxFuture = LocalDateUtils.addMonthsToYearMonth(currentMonth, 24)
@@ -105,6 +114,11 @@ class BudgetsViewModel(
         val totalDaysInMonth = LocalDateUtils.daysInMonth(y, m)
         val dayOfMonth = if (isCurrent) today.dayOfMonth else totalDaysInMonth
         val daysRemaining = (totalDaysInMonth - dayOfMonth).coerceAtLeast(0)
+        val monthProgressFraction = if (isCurrent && totalDaysInMonth > 0) {
+            (dayOfMonth.toFloat() / totalDaysInMonth.toFloat()).coerceIn(0f, 1f)
+        } else {
+            null
+        }
 
         // Group transactions for this month across all categories
         val monthTxns = transactions.filter {
@@ -119,11 +133,13 @@ class BudgetsViewModel(
             canGoNextMonth = canGoNext,
             canGoPreviousMonth = canGoPrev,
             daysRemaining = daysRemaining,
+            monthProgressFraction = monthProgressFraction,
             overview = overview,
-            notables = notables,
             activeMonths = control.activeMonths,
             sortOption = control.sortOption,
-            expandedCategoryId = control.expandedCategoryId,
+            expandedCategoryId = control.sections.expandedCategoryId,
+            showUnbudgeted = control.sections.showUnbudgeted,
+            showInactive = control.sections.showInactive,
             categoryTransactions = categoryTransactions,
             editingItem = control.sheets.editingItem,
             showEditorSheet = control.sheets.showEditorSheet,
@@ -171,6 +187,14 @@ class BudgetsViewModel(
             _showEditorSheet.value = false
             _editingItem.value = null
         }
+    }
+
+    fun toggleShowUnbudgeted() {
+        _showUnbudgeted.value = !_showUnbudgeted.value
+    }
+
+    fun toggleShowInactive() {
+        _showInactive.value = !_showInactive.value
     }
 
     fun dismissInspectorPane() {
@@ -239,6 +263,12 @@ class BudgetsViewModel(
         return if (nonZero.isNotEmpty()) nonZero.sum() / nonZero.size else 0L
     }
 
+    private data class BudgetSectionsState(
+        val expandedCategoryId: Long?,
+        val showUnbudgeted: Boolean,
+        val showInactive: Boolean
+    )
+
     private data class BudgetSheetsState(
         val editingItem: CategoryBudgetOverviewItem?,
         val showEditorSheet: Boolean,
@@ -249,8 +279,8 @@ class BudgetsViewModel(
     private data class BudgetsControlState(
         val month: String,
         val sortOption: CategorySortOption,
-        val expandedCategoryId: Long?,
         val activeMonths: List<String>,
+        val sections: BudgetSectionsState,
         val sheets: BudgetSheetsState
     )
 }

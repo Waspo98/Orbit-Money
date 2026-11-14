@@ -4,10 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -22,16 +19,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,24 +33,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.BudgetPaceStatus
 import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
 import app.overbay.orbit.data.model.Transaction
-import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
-import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.budgets.BudgetsUiState
 import app.overbay.orbit.ui.budgets.BudgetsViewModel
 import app.overbay.orbit.ui.budgets.dialogs.BudgetAmountEditorContent
@@ -131,6 +119,7 @@ fun BudgetDetailInspectorPane(
                     BudgetReadOnlyDetailContent(
                         item = inspecting,
                         monthLabel = state.monthLabel,
+                        monthProgressFraction = state.monthProgressFraction,
                         threeMonthAvgCents = avgSpend,
                         transactions = txns,
                         onClose = onClosePane,
@@ -155,6 +144,7 @@ fun BudgetDetailInspectorPane(
 private fun BudgetReadOnlyDetailContent(
     item: CategoryBudgetOverviewItem,
     monthLabel: String,
+    monthProgressFraction: Float?,
     threeMonthAvgCents: Cents,
     transactions: List<Transaction>,
     onClose: () -> Unit,
@@ -164,7 +154,6 @@ private fun BudgetReadOnlyDetailContent(
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
-    val categoryColor = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
     val isOverBudget = item.spentCents > item.amountCents && item.amountCents > 0L
     val isWatch = item.paceStatus == BudgetPaceStatus.WATCH
     val statusColor = when {
@@ -180,16 +169,11 @@ private fun BudgetReadOnlyDetailContent(
     ) {
         item {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .clip(CircleShape)
-                        .background(categoryColor)
-                )
+                CategoryEmojiBadge(category = item.category)
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = item.category.labelWithEmoji,
+                        text = item.category.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -249,7 +233,8 @@ private fun BudgetReadOnlyDetailContent(
                     percent = progress,
                     overBudget = isOverBudget,
                     customFillColor = statusColor,
-                    height = 8.dp
+                    height = 8.dp,
+                    paceMarkerFraction = if (item.amountCents > 0L) monthProgressFraction else null
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

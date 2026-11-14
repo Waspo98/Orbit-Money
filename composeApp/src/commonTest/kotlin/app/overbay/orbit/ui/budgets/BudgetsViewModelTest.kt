@@ -212,4 +212,31 @@ class BudgetsViewModelTest {
         val avg = viewModel.calculate3MonthAverageSpend(50L)
         assertEquals(12000L, avg)
     }
+
+    @Test
+    fun testSectionTogglesAndMonthProgressFraction() = runTest(testDispatcher) {
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        // Collapsed by default
+        assertFalse(viewModel.uiState.value.showUnbudgeted)
+        assertFalse(viewModel.uiState.value.showInactive)
+        assertNotNull(viewModel.uiState.value.monthProgressFraction)
+
+        viewModel.toggleShowUnbudgeted()
+        viewModel.toggleShowInactive()
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.showUnbudgeted)
+        assertTrue(viewModel.uiState.value.showInactive)
+
+        // Past month clears monthProgressFraction
+        viewModel.onPreviousMonth()
+        testScheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.monthProgressFraction)
+
+        collectJob.cancel()
+    }
 }

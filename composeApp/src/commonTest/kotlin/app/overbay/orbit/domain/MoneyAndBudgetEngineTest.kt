@@ -171,5 +171,31 @@ class MoneyAndBudgetEngineTest {
         )
 
         assertEquals(13_33L, overview.dailySafeSpendCents)
+        assertEquals(13_33L, overview.budgetedDailySafeSpendCents)
+    }
+
+    @Test
+    fun testBudgetEngine_budgetedDailySafeSpendIgnoresUnbudgetedRefunds() {
+        val categories = listOf(groceries, utilities)
+        val budgets = listOf(CategoryBudget(id = 1L, categoryId = 1L, amountCents = 300_00L))
+        val txns = listOf(
+            // Budgeted: $150 spent on Groceries -> $150 remaining over 15 days = $10/day
+            Transaction(accountId = 10L, originalDate = "2026-04-01", originalMerchant = "Store", originalAmountCents = -150_00L, originalCategoryId = 1L),
+            // Unbudgeted net refund on Utilities: +$100
+            Transaction(accountId = 10L, originalDate = "2026-04-02", originalMerchant = "Refund", originalAmountCents = 100_00L, originalCategoryId = 2L)
+        )
+
+        val overview = BudgetEngine.calculateMonthlyOverview(
+            month = "2026-04",
+            categories = categories,
+            budgets = budgets,
+            transactions = txns,
+            todayDate = "2026-04-16"
+        )
+
+        assertEquals(150_00L, overview.totalSpentInBudgetCents)
+        assertEquals(-100_00L, overview.totalSpentUnbudgetedCents)
+        assertEquals(150_00L, overview.budgetedRemainingCents)
+        assertEquals(10_00L, overview.budgetedDailySafeSpendCents)
     }
 }

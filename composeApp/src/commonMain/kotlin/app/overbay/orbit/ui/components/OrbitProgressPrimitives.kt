@@ -3,6 +3,8 @@ package app.overbay.orbit.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
@@ -36,7 +38,8 @@ fun OrbitPillProgressBar(
     overBudget: Boolean = false,
     height: Dp = 10.dp,
     customFillColor: Color? = null,
-    trackColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh
+    trackColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    paceMarkerFraction: Float? = null
 ) {
     val clampedPercent = percent.coerceIn(0f, 1f)
     val animatedPercent by animateFloatAsState(
@@ -54,16 +57,33 @@ fun OrbitPillProgressBar(
         animationSpec = OrbitSprings.ColorEffectsDefault,
         label = "orbitPillProgressColor"
     )
+    val markerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
 
-    LinearProgressIndicator(
-        progress = { animatedPercent },
-        modifier = modifier.fillMaxWidth().height(height).clip(CircleShape),
-        color = animatedFillColor,
-        trackColor = trackColor,
-        strokeCap = StrokeCap.Round,
-        gapSize = 0.dp,
-        drawStopIndicator = {}
-    )
+    Box(modifier = modifier.fillMaxWidth().height(height)) {
+        LinearProgressIndicator(
+            progress = { animatedPercent },
+            modifier = Modifier.fillMaxSize().clip(CircleShape),
+            color = animatedFillColor,
+            trackColor = trackColor,
+            strokeCap = StrokeCap.Round,
+            gapSize = 0.dp,
+            drawStopIndicator = {}
+        )
+        if (paceMarkerFraction != null) {
+            val clampedPace = paceMarkerFraction.coerceIn(0.02f, 0.98f)
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val x = clampedPace * size.width
+                val strokeWidth = 2.dp.toPx()
+                drawLine(
+                    color = markerColor,
+                    start = Offset(x, 0f),
+                    end = Offset(x, size.height),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+            }
+        }
+    }
 }
 
 @Immutable

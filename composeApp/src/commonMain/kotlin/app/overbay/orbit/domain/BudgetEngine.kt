@@ -136,6 +136,13 @@ object BudgetEngine {
             todayDate = todayDate,
             daysInMonth = daysInMonth
         )
+        val budgetedDailySafeSpend = calculateDailySafeSpend(
+            totalBudgetedCents = totalBudgetedCents,
+            totalSpentCents = totalSpentInBudgetCents,
+            selectedMonth = month,
+            todayDate = todayDate,
+            daysInMonth = daysInMonth
+        )
 
         return MonthlyBudgetOverview(
             month = month,
@@ -148,6 +155,7 @@ object BudgetEngine {
             netSavingsCents = netSavingsCents,
             savingsRatePercent = savingsRatePercent,
             dailySafeSpend = dailySafeSpend,
+            budgetedDailySafeSpend = budgetedDailySafeSpend,
             budgeted = sortedBudgeted,
             unbudgeted = sortedUnbudgeted,
             inactive = sortedInactive
@@ -246,36 +254,5 @@ object BudgetEngine {
             CategorySortOption.NAME_A_TO_Z -> items.sortedBy { it.category.name.lowercase() }
         }
     }
-
-    /**
-     * Extracts actionable notable budget items for the month:
-     * 1. Over budget categories (spent > amount)
-     * 2. Near limit categories (>= 80% utilization)
-     * 3. Variances: unbudgeted with spend or net refunds (spent < 0)
-     */
-    fun extractNotables(overview: MonthlyBudgetOverview): BudgetNotables {
-        val allItems = overview.budgeted + overview.unbudgeted
-        val overBudget = allItems.filter { it.amountCents > 0L && it.spentCents > it.amountCents }
-        val nearLimit = allItems.filter {
-            it.amountCents > 0L && it.spentCents <= it.amountCents && it.utilizationRatio >= 0.80
-        }
-        val variances = allItems.filter {
-            (it.amountCents <= 0L && it.spentCents > 0L) || (it.spentCents < 0L)
-        }
-        return BudgetNotables(
-            overBudget = overBudget,
-            nearLimit = nearLimit,
-            variances = variances
-        )
-    }
-}
-
-data class BudgetNotables(
-    val overBudget: List<CategoryBudgetOverviewItem> = emptyList(),
-    val nearLimit: List<CategoryBudgetOverviewItem> = emptyList(),
-    val variances: List<CategoryBudgetOverviewItem> = emptyList()
-) {
-    val totalCount: Int get() = overBudget.size + nearLimit.size + variances.size
-    val hasNotables: Boolean get() = totalCount > 0
 }
 

@@ -1,45 +1,41 @@
 package app.overbay.orbit.ui.budgets.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
 import app.overbay.orbit.data.model.Transaction
-import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
-import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
-import app.overbay.orbit.ui.components.OrbitBarSegment
 import app.overbay.orbit.ui.components.OrbitExpandableChevron
 import app.overbay.orbit.ui.components.OrbitSectionCard
-import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import app.overbay.orbit.util.LocalOrbitHaptics
-import kotlin.math.roundToInt
 
 /**
- * Lazy-list extension that emits Spending Mix, Budgeted rows, Unbudgeted rows,
- * and Inactive categories as individual virtualized LazyColumn items.
+ * Lazy-list extension emitting Budgeted Categories (unified grouped card), collapsed-by-default
+ * Unbudgeted Spending, collapsed-by-default Inactive categories, and Spending Mix at the bottom.
  */
 fun LazyListScope.budgetCategoryGroupItems(
     budgeted: List<CategoryBudgetOverviewItem>,
@@ -47,255 +43,163 @@ fun LazyListScope.budgetCategoryGroupItems(
     inactive: List<CategoryBudgetOverviewItem>,
     expandedCategoryId: Long?,
     categoryTransactions: Map<Long, List<Transaction>>,
+    showUnbudgeted: Boolean,
+    showInactive: Boolean,
+    onToggleUnbudgeted: () -> Unit,
+    onToggleInactive: () -> Unit,
     onToggleExpand: (Long) -> Unit,
     onEditBudget: (CategoryBudgetOverviewItem) -> Unit,
     onDeleteBudget: (Long) -> Unit,
     onViewTransactions: (Long) -> Unit,
+    monthProgressFraction: Float? = null,
     isWideScreen: Boolean = false
 ) {
-    val allActive = (budgeted + unbudgeted).filter { it.spentCents > 0L }
-    if (allActive.isNotEmpty()) {
-        item(key = "budget_spending_mix", contentType = "spending_mix") {
-            SpendingMixPanel(
-                items = allActive,
-                modifier = Modifier
-                    .animateItem(
-                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
-                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
-                        fadeOutSpec = OrbitSprings.FloatEffectsFast
-                    )
-                    .padding(bottom = 8.dp)
-            )
-        }
-    }
-
     if (budgeted.isNotEmpty()) {
         val totalBudgeted = budgeted.sumOf { it.amountCents }
-        item(key = "budgeted_section_header", contentType = "section_header") {
-            SectionHeader(
+        item(key = "budgeted_categories_card", contentType = "budgeted_card") {
+            OrbitSectionCard(
                 title = "Budgeted Categories",
-                subtitle = "${budgeted.size} categories • ${MoneyUtils.formatCents(totalBudgeted, showCents = false)}",
-                modifier = Modifier.animateItem(
-                    fadeInSpec = OrbitSprings.FloatEffectsDefault,
-                    placementSpec = OrbitSprings.IntOffsetSpatialDefault,
-                    fadeOutSpec = OrbitSprings.FloatEffectsFast
-                )
-            )
-        }
-
-        itemsIndexed(
-            items = budgeted,
-            key = { _, item -> "budgeted_${item.category.id}" },
-            contentType = { _, _ -> "budget_category_row" }
-        ) { index, item ->
-            BudgetCategoryRow(
-                item = item,
-                isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
-                isInspected = isWideScreen && item.category.id == expandedCategoryId,
-                transactions = categoryTransactions[item.category.id] ?: emptyList(),
-                onClick = { onToggleExpand(item.category.id) },
-                onEditBudget = { onEditBudget(item) },
-                onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
-                onViewTransactions = { onViewTransactions(item.category.id) },
-                modifier = (if (index == budgeted.lastIndex) Modifier.padding(bottom = 8.dp) else Modifier)
+                subtitle = "${budgeted.size} ${if (budgeted.size == 1) "category" else "categories"} • ${MoneyUtils.formatCents(totalBudgeted, showCents = false)}",
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                modifier = Modifier
+                    .padding(bottom = 4.dp)
                     .animateItem(
                         fadeInSpec = OrbitSprings.FloatEffectsDefault,
                         placementSpec = OrbitSprings.IntOffsetSpatialDefault,
                         fadeOutSpec = OrbitSprings.FloatEffectsFast
                     )
-            )
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    budgeted.forEachIndexed { index, item ->
+                        key(item.category.id) {
+                            BudgetCategoryRow(
+                                item = item,
+                                isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
+                                isInspected = isWideScreen && item.category.id == expandedCategoryId,
+                                transactions = categoryTransactions[item.category.id] ?: emptyList(),
+                                onClick = { onToggleExpand(item.category.id) },
+                                onEditBudget = { onEditBudget(item) },
+                                onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
+                                onViewTransactions = { onViewTransactions(item.category.id) },
+                                showTopDivider = index > 0,
+                                monthProgressFraction = monthProgressFraction
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
     if (unbudgeted.isNotEmpty()) {
-        val totalUnbudgeted = unbudgeted.sumOf { it.spentCents }
-        item(key = "unbudgeted_section_header", contentType = "section_header") {
-            SectionHeader(
-                title = "Unbudgeted Spending",
-                subtitle = "${unbudgeted.size} categories • ${MoneyUtils.formatCents(totalUnbudgeted, showCents = false)}",
+        item(key = "unbudgeted_categories_section", contentType = "unbudgeted_section") {
+            UnbudgetedCategoriesSection(
+                unbudgeted = unbudgeted,
+                expanded = showUnbudgeted,
+                onToggleSection = onToggleUnbudgeted,
+                expandedCategoryId = expandedCategoryId,
+                categoryTransactions = categoryTransactions,
+                onToggleExpand = onToggleExpand,
+                onEditBudget = onEditBudget,
+                onViewTransactions = onViewTransactions,
+                isWideScreen = isWideScreen,
                 modifier = Modifier.animateItem(
                     fadeInSpec = OrbitSprings.FloatEffectsDefault,
                     placementSpec = OrbitSprings.IntOffsetSpatialDefault,
                     fadeOutSpec = OrbitSprings.FloatEffectsFast
                 )
-            )
-        }
-
-        itemsIndexed(
-            items = unbudgeted,
-            key = { _, item -> "unbudgeted_${item.category.id}" },
-            contentType = { _, _ -> "budget_category_row" }
-        ) { index, item ->
-            BudgetCategoryRow(
-                item = item,
-                isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
-                isInspected = isWideScreen && item.category.id == expandedCategoryId,
-                transactions = categoryTransactions[item.category.id] ?: emptyList(),
-                onClick = { onToggleExpand(item.category.id) },
-                onEditBudget = { onEditBudget(item) },
-                onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
-                onViewTransactions = { onViewTransactions(item.category.id) },
-                modifier = (if (index == unbudgeted.lastIndex) Modifier.padding(bottom = 8.dp) else Modifier)
-                    .animateItem(
-                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
-                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
-                        fadeOutSpec = OrbitSprings.FloatEffectsFast
-                    )
             )
         }
     }
 
     if (inactive.isNotEmpty()) {
         item(key = "inactive_categories_section", contentType = "inactive_section") {
-            Box(
+            InactiveBudgetCategoriesSection(
+                inactive = inactive,
+                expanded = showInactive,
+                onToggleSection = onToggleInactive,
+                expandedCategoryId = expandedCategoryId,
+                categoryTransactions = categoryTransactions,
+                onToggleExpand = onToggleExpand,
+                onEditBudget = onEditBudget,
+                onDeleteBudget = onDeleteBudget,
+                onViewTransactions = onViewTransactions,
+                monthProgressFraction = monthProgressFraction,
+                isWideScreen = isWideScreen,
                 modifier = Modifier.animateItem(
                     fadeInSpec = OrbitSprings.FloatEffectsDefault,
                     placementSpec = OrbitSprings.IntOffsetSpatialDefault,
                     fadeOutSpec = OrbitSprings.FloatEffectsFast
                 )
-            ) {
-                InactiveBudgetCategoriesSection(
-                    inactive = inactive,
-                    expandedCategoryId = expandedCategoryId,
-                    categoryTransactions = categoryTransactions,
-                    onToggleExpand = onToggleExpand,
-                    onEditBudget = onEditBudget,
-                    onDeleteBudget = onDeleteBudget,
-                    onViewTransactions = onViewTransactions,
-                    isWideScreen = isWideScreen
-                )
-            }
+            )
+        }
+    }
+
+    val allActive = (budgeted + unbudgeted).filter { it.spentCents > 0L }
+    if (allActive.isNotEmpty()) {
+        item(key = "budget_spending_mix", contentType = "spending_mix") {
+            SpendingMixPanel(
+                items = allActive,
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .animateItem(
+                        fadeInSpec = OrbitSprings.FloatEffectsDefault,
+                        placementSpec = OrbitSprings.IntOffsetSpatialDefault,
+                        fadeOutSpec = OrbitSprings.FloatEffectsFast
+                    )
+            )
         }
     }
 }
 
 @Composable
-private fun InactiveBudgetCategoriesSection(
-    inactive: List<CategoryBudgetOverviewItem>,
+private fun UnbudgetedCategoriesSection(
+    unbudgeted: List<CategoryBudgetOverviewItem>,
+    expanded: Boolean,
+    onToggleSection: () -> Unit,
     expandedCategoryId: Long?,
     categoryTransactions: Map<Long, List<Transaction>>,
     onToggleExpand: (Long) -> Unit,
     onEditBudget: (CategoryBudgetOverviewItem) -> Unit,
-    onDeleteBudget: (Long) -> Unit,
     onViewTransactions: (Long) -> Unit,
-    isWideScreen: Boolean
-) {
-    val haptics = LocalOrbitHaptics.current
-    var showInactive by rememberSaveable { mutableStateOf(false) }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(
-            onClick = {
-                haptics.tick()
-                showInactive = !showInactive
-            },
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-            modifier = Modifier.fillMaxWidth().height(44.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = if (showInactive) {
-                        "Hide ${inactive.size} inactive categories"
-                    } else {
-                        "Show ${inactive.size} categories with no activity"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                OrbitExpandableChevron(expanded = showInactive)
-            }
-        }
-
-        OrbitAccordionVisibility(visible = showInactive) {
-            Column(
-                modifier = Modifier.padding(top = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                inactive.forEach { item ->
-                    BudgetCategoryRow(
-                        item = item,
-                        isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
-                        isInspected = isWideScreen && item.category.id == expandedCategoryId,
-                        transactions = categoryTransactions[item.category.id] ?: emptyList(),
-                        onClick = { onToggleExpand(item.category.id) },
-                        onEditBudget = { onEditBudget(item) },
-                        onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
-                        onViewTransactions = { onViewTransactions(item.category.id) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Multi-segment colored horizontal strip showing each category's proportion
- * of total spent + top spending categories legend.
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun SpendingMixPanel(
-    items: List<CategoryBudgetOverviewItem>,
+    isWideScreen: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val sorted = items.sortedByDescending { it.spentCents }
-    val totalSpent = sorted.sumOf { it.spentCents }
-    if (totalSpent <= 0L) return
+    val haptics = LocalOrbitHaptics.current
+    val totalUnbudgeted = unbudgeted.sumOf { it.spentCents }
+    val totalLabel = MoneyUtils.formatCents(totalUnbudgeted, signed = totalUnbudgeted < 0L)
 
-    OrbitSectionCard(
-        title = "SPENDING MIX",
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            OrbitStackedSegmentBar(
-                segments = sorted.map { item ->
-                    OrbitBarSegment(
-                        key = item.category.id,
-                        fraction = (item.spentCents.toFloat() / totalSpent.toFloat()).coerceAtLeast(0.01f),
-                        color = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
-                    )
-                },
-                height = 10.dp,
-                normalizeToFullWidth = true
-            )
+    Column(modifier = modifier.fillMaxWidth()) {
+        AccordionToggleButton(
+            title = "Unbudgeted Spending (${unbudgeted.size})",
+            trailingValue = totalLabel,
+            expanded = expanded,
+            onClick = {
+                haptics.tick()
+                onToggleSection()
+            }
+        )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+        OrbitAccordionVisibility(visible = expanded) {
+            OrbitSectionCard(
+                showHeaderDivider = false,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                modifier = Modifier.padding(top = 8.dp)
             ) {
-                sorted.take(5).forEach { item ->
-                    val pct = ((item.spentCents.toDouble() / totalSpent.toDouble()) * 100.0).roundToInt()
-                    val color = item.category.color.toComposeColor(MaterialTheme.colorScheme.primary)
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = item.category.labelWithEmoji,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "$pct%",
-                            style = TabularNumStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    unbudgeted.forEachIndexed { index, item ->
+                        key(item.category.id) {
+                            UnbudgetedCategoryRow(
+                                item = item,
+                                isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
+                                isInspected = isWideScreen && item.category.id == expandedCategoryId,
+                                transactions = categoryTransactions[item.category.id] ?: emptyList(),
+                                onClick = { onToggleExpand(item.category.id) },
+                                onSetBudget = { onEditBudget(item) },
+                                onViewTransactions = { onViewTransactions(item.category.id) },
+                                showTopDivider = index > 0
+                            )
+                        }
                     }
                 }
             }
@@ -304,22 +208,115 @@ private fun SpendingMixPanel(
 }
 
 @Composable
-private fun SectionHeader(title: String, subtitle: String, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+private fun InactiveBudgetCategoriesSection(
+    inactive: List<CategoryBudgetOverviewItem>,
+    expanded: Boolean,
+    onToggleSection: () -> Unit,
+    expandedCategoryId: Long?,
+    categoryTransactions: Map<Long, List<Transaction>>,
+    onToggleExpand: (Long) -> Unit,
+    onEditBudget: (CategoryBudgetOverviewItem) -> Unit,
+    onDeleteBudget: (Long) -> Unit,
+    onViewTransactions: (Long) -> Unit,
+    monthProgressFraction: Float?,
+    isWideScreen: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalOrbitHaptics.current
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        AccordionToggleButton(
+            title = if (expanded) {
+                "Hide ${inactive.size} inactive categories"
+            } else {
+                "Show ${inactive.size} categories with no activity"
+            },
+            trailingValue = null,
+            expanded = expanded,
+            onClick = {
+                haptics.tick()
+                onToggleSection()
+            }
+        )
+
+        OrbitAccordionVisibility(visible = expanded) {
+            OrbitSectionCard(
+                showHeaderDivider = false,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    inactive.forEachIndexed { index, item ->
+                        key(item.category.id) {
+                            if (item.amountCents > 0L) {
+                                BudgetCategoryRow(
+                                    item = item,
+                                    isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
+                                    isInspected = isWideScreen && item.category.id == expandedCategoryId,
+                                    transactions = categoryTransactions[item.category.id] ?: emptyList(),
+                                    onClick = { onToggleExpand(item.category.id) },
+                                    onEditBudget = { onEditBudget(item) },
+                                    onDeleteBudget = { item.budgetId?.let(onDeleteBudget) },
+                                    onViewTransactions = { onViewTransactions(item.category.id) },
+                                    showTopDivider = index > 0,
+                                    monthProgressFraction = monthProgressFraction
+                                )
+                            } else {
+                                UnbudgetedCategoryRow(
+                                    item = item,
+                                    isExpanded = !isWideScreen && item.category.id == expandedCategoryId,
+                                    isInspected = isWideScreen && item.category.id == expandedCategoryId,
+                                    transactions = categoryTransactions[item.category.id] ?: emptyList(),
+                                    onClick = { onToggleExpand(item.category.id) },
+                                    onSetBudget = { onEditBudget(item) },
+                                    onViewTransactions = { onViewTransactions(item.category.id) },
+                                    showTopDivider = index > 0
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccordionToggleButton(
+    title: String,
+    trailingValue: String?,
+    expanded: Boolean,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+        modifier = Modifier.fillMaxWidth().height(44.dp)
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (trailingValue != null) Arrangement.SpaceBetween else Arrangement.Center
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (trailingValue != null) {
+                    Text(
+                        text = trailingValue,
+                        style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                OrbitExpandableChevron(expanded = expanded)
+            }
+        }
     }
 }

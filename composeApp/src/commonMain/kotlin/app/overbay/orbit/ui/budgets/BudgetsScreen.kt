@@ -37,7 +37,6 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.budgets.components.BudgetDetailInspectorPane
 import app.overbay.orbit.ui.budgets.components.BudgetSummaryHeroCard
-import app.overbay.orbit.ui.budgets.components.NotablePanel
 import app.overbay.orbit.ui.budgets.components.budgetCategoryGroupItems
 import app.overbay.orbit.ui.budgets.dialogs.AddBudgetCategorySheet
 import app.overbay.orbit.ui.budgets.dialogs.BudgetAmountEditorSheet
@@ -211,35 +210,9 @@ fun BudgetsScreen(
                                         overview = state.overview,
                                         monthLabel = state.monthLabel,
                                         daysRemaining = state.daysRemaining,
+                                        monthProgressFraction = state.monthProgressFraction,
                                         modifier = Modifier.padding(bottom = 8.dp)
                                     )
-                                }
-
-                                if (state.notables.hasNotables) {
-                                    item(key = "budget_notables", contentType = "notables") {
-                                        NotablePanel(
-                                            notables = state.notables,
-                                            onInspectCategory = { categoryId ->
-                                                if (isTwoPane) {
-                                                    viewModel.toggleExpandCategory(categoryId)
-                                                } else {
-                                                    val found = (state.budgetedItems + state.unbudgetedItems + state.inactiveItems)
-                                                        .find { it.category.id == categoryId }
-                                                    if (found != null) viewModel.openBudgetEditor(found)
-                                                }
-                                            },
-                                            onAddBudget = { item ->
-                                                viewModel.openAddBudgetPicker(item.category.id)
-                                            },
-                                            modifier = Modifier
-                                                .padding(bottom = 8.dp)
-                                                .animateItem(
-                                                    fadeInSpec = OrbitSprings.FloatEffectsDefault,
-                                                    placementSpec = OrbitSprings.IntOffsetSpatialDefault,
-                                                    fadeOutSpec = OrbitSprings.FloatEffectsFast
-                                                )
-                                        )
-                                    }
                                 }
 
                                 budgetCategoryGroupItems(
@@ -248,6 +221,10 @@ fun BudgetsScreen(
                                     inactive = state.inactiveItems,
                                     expandedCategoryId = state.expandedCategoryId,
                                     categoryTransactions = state.categoryTransactions,
+                                    showUnbudgeted = state.showUnbudgeted,
+                                    showInactive = state.showInactive,
+                                    onToggleUnbudgeted = { viewModel.toggleShowUnbudgeted() },
+                                    onToggleInactive = { viewModel.toggleShowInactive() },
                                     onToggleExpand = { viewModel.toggleExpandCategory(it) },
                                     onEditBudget = { viewModel.openBudgetEditor(it) },
                                     onDeleteBudget = { viewModel.deleteBudget(it) },
@@ -258,6 +235,7 @@ fun BudgetsScreen(
                                         val end = "${state.selectedMonth}-${days.toString().padStart(2, '0')}"
                                         onNavigate(OrbitNavKey.Transactions(categoryId = categoryId, startDate = start, endDate = end))
                                     },
+                                    monthProgressFraction = state.monthProgressFraction,
                                     isWideScreen = isTwoPane
                                 )
                             }
