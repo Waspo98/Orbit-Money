@@ -70,6 +70,17 @@ data class DailySafeSpend(
 )
 
 @Serializable
+data class MerchantBudgetMixItem(
+    val merchant: String,
+    val spentCents: Cents,
+    val transactionCount: Int,
+    val primaryCategoryId: Long? = null,
+    val primaryCategoryName: String = "",
+    val primaryCategoryColor: String = "#888888",
+    val primaryCategoryIcon: String? = null
+)
+
+@Serializable
 data class MonthlyBudgetOverview(
     val month: String, // YYYY-MM
     val totalBudgetedCents: Cents,
@@ -86,7 +97,8 @@ data class MonthlyBudgetOverview(
     val lastMonthLabel: String = "",
     val budgeted: List<CategoryBudgetOverviewItem> = emptyList(),
     val unbudgeted: List<CategoryBudgetOverviewItem> = emptyList(),
-    val inactive: List<CategoryBudgetOverviewItem> = emptyList()
+    val inactive: List<CategoryBudgetOverviewItem> = emptyList(),
+    val topMerchants: List<MerchantBudgetMixItem> = emptyList()
 ) {
     val totalRemainingCents: Cents get() = totalBudgetedCents - totalSpentCents
     val budgetedRemainingCents: Cents get() = totalBudgetedCents - totalSpentInBudgetCents

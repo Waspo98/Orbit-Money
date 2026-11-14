@@ -44,7 +44,7 @@ import kotlin.math.sqrt
 internal fun SpendingMixDonut(
     slices: List<SpendingMixSlice>,
     totalSpent: Cents,
-    totalCategoryCount: Int,
+    entitySummary: String,
     activeSlice: SpendingMixSlice?,
     onToggleSlice: (String) -> Unit,
     onClearSelection: () -> Unit,
@@ -166,7 +166,7 @@ internal fun SpendingMixDonut(
                     )
                 } else {
                     Text(
-                        text = selected.item?.category?.name ?: selected.centerLabel,
+                        text = selected.centerTitle,
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold,
@@ -181,7 +181,7 @@ internal fun SpendingMixDonut(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${selected.percentInt}% of $totalCategoryCount active",
+                        text = "${selected.percentInt}% of $entitySummary",
                         style = TabularNumStyle.copy(fontSize = 10.5.sp, fontWeight = FontWeight.Medium),
                         color = selected.color
                     )

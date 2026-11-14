@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,26 +28,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
-import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
-import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
-import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.util.LocalOrbitHaptics
-import kotlin.math.roundToInt
 
 /**
- * By-Category tab for [SpendingMixPanel]: pairs [SpendingMixDonut] with tappable legend pills
- * and an expandable selection detail strip offering Inspect, + Budget / Edit, and Transactions.
+ * Shared interactive Donut + tappable pill legend + expandable detail strip
+ * supporting both Categories and Merchants modes in [SpendingMixPanel].
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SpendingMixCategoryTab(
     slices: List<SpendingMixSlice>,
     totalSpent: Cents,
-    totalCategoryCount: Int,
+    entitySummary: String,
     activeSlice: SpendingMixSlice?,
     onToggleSlice: (String) -> Unit,
     onClearSelection: () -> Unit,
@@ -66,7 +60,7 @@ internal fun SpendingMixCategoryTab(
         SpendingMixDonut(
             slices = slices,
             totalSpent = totalSpent,
-            totalCategoryCount = totalCategoryCount,
+            entitySummary = entitySummary,
             activeSlice = activeSlice,
             onToggleSlice = onToggleSlice,
             onClearSelection = onClearSelection
@@ -140,132 +134,6 @@ internal fun SpendingMixCategoryTab(
                     onViewTransactions = onViewTransactions,
                     modifier = Modifier.padding(top = 12.dp)
                 )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun SpendingMixSelectionStrip(
-    slice: SpendingMixSlice,
-    totalSpent: Cents,
-    onInspectCategory: (Long) -> Unit,
-    onEditBudget: (CategoryBudgetOverviewItem) -> Unit,
-    onViewTransactions: (Long) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val colors = OrbitTheme.colors
-
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, colors.cardBorder),
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-            val item = slice.item
-            if (item != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        CategoryEmojiBadge(category = item.category, size = 30.dp)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = item.category.name,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            val budgetContext = if (item.amountCents > 0L) {
-                                "${(item.utilizationRatio * 100.0).roundToInt()}% of ${MoneyUtils.formatCents(item.amountCents, showCents = false)} budget"
-                            } else {
-                                "Unbudgeted · Everything Else"
-                            }
-                            Text(
-                                text = budgetContext,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontSize = 11.5.sp,
-                                color = if (item.amountCents > 0L && item.spentCents > item.amountCents) {
-                                    colors.danger
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                        }
-                    }
-                    Text(
-                        text = "${MoneyUtils.formatCents(item.spentCents)} (${slice.percentInt}%)",
-                        style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    OrbitActionChip(
-                        label = "Inspect",
-                        onClick = { onInspectCategory(item.category.id) }
-                    )
-                    if (item.category.id > 0L) {
-                        OrbitActionChip(
-                            label = if (item.amountCents > 0L) "Edit Budget" else "+ Budget",
-                            onClick = { onEditBudget(item) }
-                        )
-                    }
-                    OrbitActionChip(
-                        label = "Transactions",
-                        onClick = { onViewTransactions(item.category.id) }
-                    )
-                }
-            } else {
-                Text(
-                    text = "OTHER CATEGORIES (${slice.otherItems.size})",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                slice.otherItems.forEachIndexed { index, other ->
-                    val pct = ((other.spentCents.toDouble() / totalSpent.toDouble()) * 100.0).roundToInt()
-                    if (index > 0) {
-                        HorizontalDivider(thickness = 1.dp, color = colors.cardBorder)
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onInspectCategory(other.category.id) }
-                            .padding(vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = other.category.labelWithEmoji,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f).padding(end = 8.dp)
-                        )
-                        Text(
-                            text = "${MoneyUtils.formatCents(other.spentCents, showCents = false)} ($pct%)",
-                            style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
             }
         }
     }

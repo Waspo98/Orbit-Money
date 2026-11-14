@@ -293,15 +293,21 @@ class BudgetsViewModelTest {
         }
         testScheduler.advanceUntilIdle()
 
-        assertEquals(SpendingMixMode.BY_CATEGORY, viewModel.uiState.value.spendingMixMode)
+        assertEquals(SpendingMixMode.CATEGORIES, viewModel.uiState.value.spendingMixMode)
         assertNull(viewModel.uiState.value.selectedSpendingMixKey)
 
-        viewModel.setSpendingMixMode(SpendingMixMode.COVERAGE)
         viewModel.toggleSpendingMixKey("cat:77")
         testScheduler.advanceUntilIdle()
-
-        assertEquals(SpendingMixMode.COVERAGE, viewModel.uiState.value.spendingMixMode)
         assertEquals("cat:77", viewModel.uiState.value.selectedSpendingMixKey)
+
+        // Switching mode clears active selection and exposes topMerchants
+        viewModel.setSpendingMixMode(SpendingMixMode.MERCHANTS)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(SpendingMixMode.MERCHANTS, viewModel.uiState.value.spendingMixMode)
+        assertNull(viewModel.uiState.value.selectedSpendingMixKey)
+        assertEquals(1, viewModel.uiState.value.topMerchants.size)
+        assertEquals("Airline", viewModel.uiState.value.topMerchants.first().merchant)
 
         // Inspecting an unbudgeted category auto-expands Everything Else and selects the category
         viewModel.inspectCategoryFromMix(77L)
@@ -311,6 +317,7 @@ class BudgetsViewModelTest {
         assertEquals(77L, viewModel.uiState.value.expandedCategoryId)
 
         // Month navigation clears selected Spending Mix slice
+        viewModel.toggleSpendingMixKey("merch:airline")
         viewModel.onPreviousMonth()
         testScheduler.advanceUntilIdle()
         assertNull(viewModel.uiState.value.selectedSpendingMixKey)

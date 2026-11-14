@@ -6,8 +6,8 @@ import app.overbay.orbit.data.model.MonthlyBudgetOverview
 import app.overbay.orbit.data.model.Transaction
 
 enum class SpendingMixMode {
-    BY_CATEGORY,
-    COVERAGE
+    CATEGORIES,
+    MERCHANTS
 }
 
 data class BudgetsUiState(
@@ -24,7 +24,7 @@ data class BudgetsUiState(
     val expandedCategoryId: Long? = null,
     val showUnbudgeted: Boolean = false,
     val showInactive: Boolean = false,
-    val spendingMixMode: SpendingMixMode = SpendingMixMode.BY_CATEGORY,
+    val spendingMixMode: SpendingMixMode = SpendingMixMode.CATEGORIES,
     val selectedSpendingMixKey: String? = null,
     val categoryTransactions: Map<Long, List<Transaction>> = emptyMap(),
     val editingItem: CategoryBudgetOverviewItem? = null,
@@ -44,6 +44,7 @@ data class BudgetsUiState(
     val budgetedItems get() = overview?.budgeted ?: emptyList()
     val unbudgetedItems get() = overview?.unbudgeted ?: emptyList()
     val inactiveItems get() = overview?.inactive ?: emptyList()
+    val topMerchants get() = overview?.topMerchants ?: emptyList()
     val inspectingItem: CategoryBudgetOverviewItem?
         get() = (budgetedItems + unbudgetedItems + inactiveItems).find { it.category.id == expandedCategoryId } ?: editingItem
 }

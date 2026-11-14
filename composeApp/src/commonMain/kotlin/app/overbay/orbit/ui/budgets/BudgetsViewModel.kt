@@ -31,7 +31,7 @@ class BudgetsViewModel(
     private val _expandedCategoryId = MutableStateFlow<Long?>(null)
     private val _showUnbudgeted = MutableStateFlow(false)
     private val _showInactive = MutableStateFlow(false)
-    private val _spendingMixMode = MutableStateFlow(SpendingMixMode.BY_CATEGORY)
+    private val _spendingMixMode = MutableStateFlow(SpendingMixMode.CATEGORIES)
     private val _selectedSpendingMixKey = MutableStateFlow<String?>(null)
     private val _editingItem = MutableStateFlow<CategoryBudgetOverviewItem?>(null)
     private val _showEditorSheet = MutableStateFlow(false)
@@ -208,7 +208,10 @@ class BudgetsViewModel(
     }
 
     fun setSpendingMixMode(mode: SpendingMixMode) {
-        _spendingMixMode.value = mode
+        if (_spendingMixMode.value != mode) {
+            _spendingMixMode.value = mode
+            _selectedSpendingMixKey.value = null
+        }
     }
 
     fun toggleSpendingMixKey(key: String) {

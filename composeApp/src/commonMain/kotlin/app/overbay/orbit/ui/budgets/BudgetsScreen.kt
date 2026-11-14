@@ -247,7 +247,7 @@ fun BudgetsScreen(
                                     item(key = "budget_spending_mix", contentType = "spending_mix") {
                                         SpendingMixPanel(
                                             items = allActive,
-                                            totalBudgetedCents = state.totalBudgetedCents,
+                                            merchants = state.topMerchants,
                                             mode = state.spendingMixMode,
                                             selectedKey = state.selectedSpendingMixKey,
                                             onSelectMode = { viewModel.setSpendingMixMode(it) },

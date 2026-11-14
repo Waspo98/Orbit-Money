@@ -6,6 +6,7 @@ import app.overbay.orbit.data.model.CategoryBudget
 import app.overbay.orbit.data.model.CategoryBudgetOverviewItem
 import app.overbay.orbit.data.model.CategorySortOption
 import app.overbay.orbit.data.model.DailySafeSpend
+import app.overbay.orbit.data.model.MerchantBudgetMixItem
 import app.overbay.orbit.data.model.MonthlyBudgetOverview
 import app.overbay.orbit.data.model.Transaction
 import kotlin.math.max
@@ -53,6 +54,7 @@ object BudgetEngine {
 
         val spendByCat = mutableMapOf<Long?, Cents>()
         val countByCat = mutableMapOf<Long?, Int>()
+        val merchantAccs = mutableMapOf<String, MerchantAccumulator>()
 
         for (txn in monthTxns) {
             val amount = txn.effectiveAmountCents
@@ -68,6 +70,13 @@ object BudgetEngine {
                 val spent = -amount
                 spendByCat[catId] = (spendByCat[catId] ?: 0L) + spent
                 countByCat[catId] = (countByCat[catId] ?: 0) + 1
+
+                val displayMerchant = txn.effectiveMerchant.trim().ifEmpty { "Unknown" }
+                val key = displayMerchant.lowercase()
+                val acc = merchantAccs.getOrPut(key) { MerchantAccumulator(displayName = displayMerchant) }
+                acc.spentCents += spent
+                acc.count += 1
+                acc.spendByCat[catId] = (acc.spendByCat[catId] ?: 0L) + spent
             }
         }
 
@@ -153,6 +162,23 @@ object BudgetEngine {
         val prevShortLabel = LocalDateUtils.monthShortName(prevMonthNum)
         val lastMonthLabel = if (isCurrentMonth) "$prevShortLabel $cutoffDay" else prevShortLabel
 
+        val topMerchants = merchantAccs.values
+            .filter { it.spentCents > 0L }
+            .map { acc ->
+                val primaryCatId = acc.spendByCat.maxByOrNull { it.value }?.key
+                val primaryCat = primaryCatId?.let { categoryById[it] } ?: UNCATEGORIZED_CATEGORY
+                MerchantBudgetMixItem(
+                    merchant = acc.displayName,
+                    spentCents = acc.spentCents,
+                    transactionCount = acc.count,
+                    primaryCategoryId = primaryCatId,
+                    primaryCategoryName = primaryCat.name,
+                    primaryCategoryColor = primaryCat.color,
+                    primaryCategoryIcon = primaryCat.icon
+                )
+            }
+            .sortedByDescending { it.spentCents }
+
         return MonthlyBudgetOverview(
             month = month,
             totalBudgetedCents = totalBudgetedCents,
@@ -169,9 +195,17 @@ object BudgetEngine {
             lastMonthLabel = lastMonthLabel,
             budgeted = sortedBudgeted,
             unbudgeted = sortedUnbudgeted,
-            inactive = sortedInactive
+            inactive = sortedInactive,
+            topMerchants = topMerchants
         )
     }
+
+    private data class MerchantAccumulator(
+        val displayName: String,
+        var spentCents: Cents = 0L,
+        var count: Int = 0,
+        val spendByCat: MutableMap<Long?, Cents> = mutableMapOf()
+    )
 
     private fun isCountedSpendingTransaction(
         txn: Transaction,

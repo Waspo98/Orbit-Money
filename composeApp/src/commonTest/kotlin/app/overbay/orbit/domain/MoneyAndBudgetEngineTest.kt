@@ -234,4 +234,35 @@ class MoneyAndBudgetEngineTest {
         assertEquals(350_00L, pastOverview.lastMonthMtdSpentCents)
         assertEquals("Mar", pastOverview.lastMonthLabel)
     }
+
+    @Test
+    fun testBudgetEngine_topMerchantsAggregatesCaseInsensitivelyWithPrimaryCategory() {
+        val categories = listOf(groceries, utilities)
+        val budgets = listOf(CategoryBudget(id = 1L, categoryId = 1L, amountCents = 500_00L))
+        val txns = listOf(
+            Transaction(id = 1L, accountId = 10L, originalDate = "2026-04-02", originalMerchant = "Amazon", originalAmountCents = -120_00L, originalCategoryId = 1L),
+            Transaction(id = 2L, accountId = 10L, originalDate = "2026-04-04", originalMerchant = "amazon", originalAmountCents = -80_00L, originalCategoryId = 2L),
+            Transaction(id = 3L, accountId = 10L, originalDate = "2026-04-05", originalMerchant = "Kroger", originalAmountCents = -90_00L, originalCategoryId = 1L),
+            Transaction(id = 4L, accountId = 10L, originalDate = "2026-04-06", originalMerchant = "RefundStore", originalAmountCents = 50_00L, originalCategoryId = 2L),
+            Transaction(id = 5L, accountId = 10L, originalDate = "2026-04-07", originalMerchant = "TransferBank", originalAmountCents = -500_00L, isTransfer = true)
+        )
+
+        val overview = BudgetEngine.calculateMonthlyOverview(
+            month = "2026-04",
+            categories = categories,
+            budgets = budgets,
+            transactions = txns
+        )
+
+        assertEquals(2, overview.topMerchants.size)
+        val first = overview.topMerchants[0]
+        assertEquals("Amazon", first.merchant)
+        assertEquals(200_00L, first.spentCents)
+        assertEquals(2, first.transactionCount)
+        assertEquals(1L, first.primaryCategoryId)
+
+        val second = overview.topMerchants[1]
+        assertEquals("Kroger", second.merchant)
+        assertEquals(90_00L, second.spentCents)
+    }
 }
